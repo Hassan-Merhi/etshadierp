@@ -119,6 +119,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
             eq(voucherEntries.voucherId, vouchers.id),
             eq(vouchers.companyId, companyId),
             sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
+            sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`,
           ))
           .where(inArray(voucherEntries.ledgerAccountId as any, ledgerAccountIds))
           .groupBy(voucherEntries.ledgerAccountId);
@@ -142,6 +143,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
             eq(voucherEntries.voucherId, vouchers.id),
             eq(vouchers.companyId, companyId),
             sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
+            sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`,
           ))
           .where(and(
             inArray(voucherEntries.customerId as any, customerIds),
