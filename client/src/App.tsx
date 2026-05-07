@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search, Tag, Building2, ClipboardList, KeyRound } from "lucide-react";
-import { FactorySidebar, FACTORY_NAV_SECTIONS } from "@/components/FactorySidebar";
+import { FactorySidebar, FACTORY_NAV_SECTIONS, FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
 import { PropertiesSidebar } from "@/components/PropertiesSidebar";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { DateJumpDialog } from "@/components/DateJumpDialog";
@@ -806,12 +806,16 @@ function AuthenticatedApp() {
   }
 
   // ── Route-level access guard ───────────────────────────────────────────────
-  // Mirrors the exact same logic the sidebar uses, so hiding a page in settings
-  // also blocks direct URL access — not just the nav link.
+  // Hides page in sidebar AND blocks direct URL access when a page is turned
+  // off for a user in the User Management drawer.
   if (isFactoryRoute && !isAdminOwner && myAccess !== undefined) {
-    const isRestrictedUser = !myAccess.fullAccess && myAccess.pageKeys.length > 0;
+    // fullAccess:false means the admin has restricted this user to specific pages.
+    // fullAccess:true means no restrictions are set (or user is admin — already
+    // short-circuited above).
+    const isRestrictedUser = !myAccess.fullAccess;
 
-    // Sub-page → parent pageKey for routes that aren't direct nav items
+    // Sub-page → parent pageKey for detail/action routes that are not direct
+    // nav items but should inherit their parent's access requirement.
     const SUBPAGE_PARENT: [prefix: string, parentKey: string][] = [
       ["/factory/sales/invoices",          "factory/invoicing"],
       ["/factory/sales/new",               "factory/invoicing"],
@@ -828,17 +832,23 @@ function AuthenticatedApp() {
       ["/factory/net-position-details",    "factory/net-position"],
       ["/factory/ledger-monthly",          "factory/accounts"],
       ["/factory/ledger-vouchers",         "factory/accounts"],
+      ["/factory/voucher-detail",          "factory/vouchers"],
+      ["/factory/create",                  "factory/accounts"],
+      ["/factory/financial-snapshot",      "factory/analytics"],
     ];
 
-    // Resolve the pageKey for the current path (nav item match first, then sub-page map)
+    // Resolve the pageKey for the current path.
+    // Uses FACTORY_NAV_PAGES as the canonical list so that pages only in the
+    // manual section (Dashboard, Daybook, Chat) are covered too.
     const resolvePageKey = (path: string): string | null => {
-      for (const section of FACTORY_NAV_SECTIONS) {
-        for (const item of section.items) {
-          if (path === item.url || path.startsWith(item.url + "/")) {
-            return item.url.replace(/^\//, "");
-          }
+      // 1. Direct match against every known page (exact or sub-path)
+      for (const page of FACTORY_NAV_PAGES) {
+        const url = "/" + page.key;
+        if (path === url || path.startsWith(url + "/")) {
+          return page.key;
         }
       }
+      // 2. Sub-page map for detail routes that aren't direct nav entries
       for (const [prefix, parentKey] of SUBPAGE_PARENT) {
         if (path === prefix || path.startsWith(prefix + "/") || path.startsWith(prefix)) {
           return parentKey;
@@ -849,14 +859,14 @@ function AuthenticatedApp() {
 
     const requiredKey = resolvePageKey(currentLocation);
 
-    // 1. Per-user pageKeys restriction
+    // 1. Per-user page restriction — redirect if this page isn't in their allow-list
     if (isRestrictedUser && requiredKey) {
       if (!myAccess.pageKeys.includes(requiredKey)) {
         return <Redirect to={factoryDefaultPage} />;
       }
     }
 
-    // 2. Feature-flag restriction (mirrors sidebar featureFlag checks)
+    // 2. Feature-flag restriction — redirect if the module is turned off in settings
     if (factorySettings && requiredKey) {
       for (const section of FACTORY_NAV_SECTIONS) {
         for (const item of section.items) {
