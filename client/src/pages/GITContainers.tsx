@@ -1218,7 +1218,7 @@ export default function GITContainers() {
                 <TableHead>Supplier</TableHead>
                 <TableHead>Company</TableHead>
                 <TableHead>Shop Name</TableHead>
-                <TableHead>ETA DAS</TableHead>
+                <TableHead>ETA</TableHead>
                 <TableHead className="text-right">Cost</TableHead>
                 <TableHead>Truck #</TableHead>
                 <TableHead>Location</TableHead>
