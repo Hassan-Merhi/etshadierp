@@ -712,7 +712,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const doc = new PDFDocument({ margin: 40, size: "A4", autoFirstPage: true });
       if (custHasArabicFont) doc.registerFont("Arabic", custArabicFontPath);
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename=statement_${(customer.code || customerId).toString().replace(/\s+/g, "_")}.pdf`);
+      res.setHeader("Content-Disposition", `attachment; filename=statement_${(customer.legalName || customer.code || customerId).toString().replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, "_")}.pdf`);
       doc.pipe(res);
 
       // ── Arabic reshaper ──

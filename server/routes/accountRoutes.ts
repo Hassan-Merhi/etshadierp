@@ -1408,7 +1408,30 @@ export function registerAccountRoutes(app: Express) {
       const { generateAccountStatementPdf } = await import("../lib/accountStatementPdfGenerator");
       const pdfBuf = await generateAccountStatementPdf({ accountType, accountId, companyId, startDate, endDate, lang });
 
-      const safeAccName = accountType + "_" + accountId;
+      // Resolve human-readable account name for the filename
+      let resolvedName = `${accountType}_${accountId}`;
+      try {
+        if (accountType === "ledger") {
+          const [r] = await db.select({ name: ledgerAccounts.name }).from(ledgerAccounts).where(eq(ledgerAccounts.id, accountId));
+          resolvedName = r?.name ?? resolvedName;
+        } else if (accountType === "bank") {
+          const [r] = await db.select({ name: bankAccounts.name }).from(bankAccounts).where(eq(bankAccounts.id, accountId));
+          resolvedName = r?.name ?? resolvedName;
+        } else if (accountType === "fixed-asset") {
+          const [r] = await db.select({ name: fixedAssets.name }).from(fixedAssets).where(eq(fixedAssets.id, accountId));
+          resolvedName = r?.name ?? resolvedName;
+        } else if (accountType === "supplier") {
+          const [r] = await db.select({ name: suppliers.legalName }).from(suppliers).where(eq(suppliers.id, accountId));
+          resolvedName = r?.name ?? resolvedName;
+        } else if (accountType === "customer") {
+          const [r] = await db.select({ name: customers.name }).from(customers).where(eq(customers.id, accountId));
+          resolvedName = r?.name ?? resolvedName;
+        } else if (accountType === "employee") {
+          const [r] = await db.select({ firstName: employees.firstName, lastName: employees.lastName }).from(employees).where(eq(employees.id, accountId));
+          if (r) resolvedName = `${r.firstName} ${r.lastName}`.trim();
+        }
+      } catch {}
+      const safeAccName = resolvedName.replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, "_");
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename=statement_${safeAccName}.pdf`);
       res.end(pdfBuf);
