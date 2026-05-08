@@ -438,11 +438,16 @@ export function registerLedgerRoutes(app: Express) {
         const accountIds = allAccounts.map((a) => a.id);
         if (accountIds.length === 0) return res.json([]);
 
-        // Accounts that have any voucher entries
+        // Accounts that have any voucher entries — scoped to this company only
         const usedInEntries = await db
           .selectDistinct({ accountId: voucherEntries.ledgerAccountId })
           .from(voucherEntries)
-          .where(inArray(voucherEntries.ledgerAccountId, accountIds));
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(and(
+            isNotNull(voucherEntries.ledgerAccountId),
+            eq(vouchers.companyId, companyId),
+            inArray(voucherEntries.ledgerAccountId, accountIds),
+          ));
         const usedIds = new Set(usedInEntries.map((r: any) => r.accountId));
 
         // Accounts that are parents to other accounts
