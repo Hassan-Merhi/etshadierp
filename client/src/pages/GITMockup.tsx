@@ -979,29 +979,95 @@ function TabTruckLocation() {
 }
 
 // ─── Tab 5: Agent / Duty Overview ────────────────────────────────────────────
+//
+// Mockup shows the reconciliation concept:
+//   Account Balance   = what the Accounts/Ledger page shows for this agent account
+//   Container Duty Total = sum of duty_fee across all containers for this agent
+//   Difference        = gap (usually = active containers not yet posted to ledger)
+//
+// In the real system, Account Balance is the authoritative figure.
+// Container rows are the operational breakdown — they should reconcile.
+
+// Fake ledger balances — simulating what the Accounts page would return.
+// In production this comes from: opening_balance + sum(voucher_entries.debit - credit)
+// for the ledger account whose name fuzzy-matches the agent string.
+// NOTE: Only offloaded containers have been manually posted to the ledger in this demo,
+// which is why Account Balance < Container Duty Total for every agent.
+const FAKE_LEDGER_BALANCES: Record<string, number> = {
+  NAHLI:    59500,   // matches offloaded-only total; active 6 × $8,500 not yet posted
+  NCA:      23300,   // matches offloaded-only total ($8,500 + $6,300 + $8,500)
+  BELTRANS: 10400,   // matches offloaded-only total ($5,500 + $4,900)
+};
 
 function TabAgentDuty() {
   const agents = [...new Set(DUTY_ROWS.map(r => r.agent))];
 
   return (
     <div className="space-y-4">
+
+      {/* Reconciliation concept banner */}
+      <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 px-3 py-2 text-xs text-amber-800 dark:text-amber-300 flex gap-2 items-start">
+        <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+        <span>
+          <strong>Mockup — reconciliation concept.</strong>{" "}
+          <em>Account Balance</em> = live ledger balance from Accounts page.{" "}
+          <em>Container Duty Total</em> = sum of duty_fee on all containers for this agent.{" "}
+          The gap represents containers whose duty fees have not yet been posted as a payable voucher.
+        </span>
+      </div>
+
       {agents.map(agent => {
-        const offloadedRows = DUTY_ROWS.filter(r => r.agent === agent && r.offloaded);
-        const activeRows    = DUTY_ROWS.filter(r => r.agent === agent && !r.offloaded);
+        const offloadedRows  = DUTY_ROWS.filter(r => r.agent === agent && r.offloaded);
+        const activeRows     = DUTY_ROWS.filter(r => r.agent === agent && !r.offloaded);
         const offloadedTotal = offloadedRows.reduce((s, r) => s + r.amount, 0);
         const activeTotal    = activeRows.reduce((s, r) => s + r.amount, 0);
-        const grandTotal     = offloadedTotal + activeTotal;
+        const containerTotal = offloadedTotal + activeTotal;
+        const ledgerBalance  = FAKE_LEDGER_BALANCES[agent] ?? null;
+        const diff           = ledgerBalance !== null ? ledgerBalance - containerTotal : null;
+        const isReconciled   = diff !== null && diff === 0;
+        const unposted       = diff !== null ? Math.abs(diff) : null;
 
         return (
           <div key={agent} className="rounded-md border overflow-hidden">
-            {/* Agent header */}
-            <div className="bg-yellow-400 text-yellow-950 px-3 py-1.5 font-bold text-sm tracking-wide flex items-center justify-between">
-              <span>{agent}</span>
-              <span className="text-xs font-semibold opacity-80">
-                {offloadedRows.length + activeRows.length} containers — ${fmt(grandTotal, 0)}
-              </span>
+
+            {/* ── Agent header bar ── */}
+            <div className="bg-yellow-400 text-yellow-950 px-3 py-2 font-bold text-sm">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="tracking-wide">{agent}</span>
+                {diff !== null && (
+                  isReconciled
+                    ? <Badge className="text-xs bg-green-600 text-white no-default-active-elevate">Reconciled</Badge>
+                    : <Badge className="text-xs bg-red-600 text-white no-default-active-elevate">Unposted: ${fmt(unposted!, 0)}</Badge>
+                )}
+              </div>
             </div>
 
+            {/* ── Reconciliation summary strip ── */}
+            <div className="grid grid-cols-3 divide-x text-center text-xs border-b bg-yellow-50 dark:bg-yellow-950/20">
+              <div className="px-2 py-1.5">
+                <div className="text-muted-foreground uppercase tracking-wide text-[10px] font-semibold">Account Balance</div>
+                <div className="font-bold text-sm mt-0.5">
+                  {ledgerBalance !== null ? `$${fmt(ledgerBalance, 0)}` : <span className="text-muted-foreground">—</span>}
+                </div>
+                <div className="text-[10px] text-muted-foreground">from Accounts page</div>
+              </div>
+              <div className="px-2 py-1.5">
+                <div className="text-muted-foreground uppercase tracking-wide text-[10px] font-semibold">Container Duty Total</div>
+                <div className="font-bold text-sm mt-0.5">${fmt(containerTotal, 0)}</div>
+                <div className="text-[10px] text-muted-foreground">{offloadedRows.length + activeRows.length} containers</div>
+              </div>
+              <div className="px-2 py-1.5">
+                <div className="text-muted-foreground uppercase tracking-wide text-[10px] font-semibold">Difference</div>
+                <div className={cn("font-bold text-sm mt-0.5", diff !== null && diff < 0 ? "text-red-600 dark:text-red-400" : diff === 0 ? "text-green-600" : "text-amber-600")}>
+                  {diff !== null ? (diff === 0 ? "—" : `$${fmt(Math.abs(diff), 0)}`) : "—"}
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  {diff !== null && diff < 0 ? "active not yet posted" : diff === 0 ? "fully reconciled" : diff !== null && diff > 0 ? "overstated on ledger" : ""}
+                </div>
+              </div>
+            </div>
+
+            {/* ── Row breakdown table ── */}
             <div className="overflow-x-auto">
               <table className="w-full text-xs whitespace-nowrap border-collapse">
                 <thead>
@@ -1012,13 +1078,22 @@ function TabAgentDuty() {
                     <th className="py-1 px-2 text-left font-bold">BORDER DATE</th>
                     <th className="py-1 px-2 text-left font-bold">TRANSPORTER</th>
                     <th className="py-1 px-2 text-left font-bold">LOCATION</th>
-                    <th className="py-1 px-2 text-right font-bold">AMOUNT</th>
+                    <th className="py-1 px-2 text-right font-bold">DUTY FEE</th>
+                    <th className="py-1 px-2 text-center font-bold">ON LEDGER</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Offloaded section */}
+
+                  {/* ── Section label: Already Offloaded ── */}
+                  {offloadedRows.length > 0 && (
+                    <tr className="bg-muted/30">
+                      <td colSpan={8} className="py-0.5 px-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        Already Offloaded — duty payable posted to ledger
+                      </td>
+                    </tr>
+                  )}
                   {offloadedRows.map((r, i) => (
-                    <tr key={`off-${i}`} className="bg-yellow-50/80 dark:bg-yellow-950/20 border-b hover:brightness-95">
+                    <tr key={`off-${i}`} className="bg-yellow-50/80 dark:bg-yellow-950/20 border-b">
                       <td className="py-0.5 px-2 font-mono font-semibold">{r.containerNumber}</td>
                       <td className="py-0.5 px-2 font-medium">{r.company}</td>
                       <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
@@ -1026,20 +1101,28 @@ function TabAgentDuty() {
                       <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>
                       <td className="py-0.5 px-2 text-muted-foreground italic">{r.location}</td>
                       <td className="py-0.5 px-2 text-right font-semibold">${fmt(r.amount, 0)}</td>
+                      <td className="py-0.5 px-2 text-center">
+                        <CheckCircle2 className="h-3 w-3 text-green-600 inline" />
+                      </td>
                     </tr>
                   ))}
-                  {/* Offloaded subtotal */}
                   {offloadedRows.length > 0 && (
                     <tr className="bg-yellow-300/80 dark:bg-yellow-800/30 border-b-2 border-yellow-400 font-bold text-yellow-900 dark:text-yellow-200">
-                      <td colSpan={5} className="py-1 px-2 text-center uppercase tracking-wide text-xs">TOTAL</td>
-                      <td />
-                      <td className="py-1 px-2 text-right">${fmt(offloadedTotal, 0)}</td>
+                      <td colSpan={5} className="py-1 px-2 text-xs uppercase tracking-wide">Offloaded subtotal</td>
+                      <td /><td className="py-1 px-2 text-right">${fmt(offloadedTotal, 0)}</td><td />
                     </tr>
                   )}
 
-                  {/* Active/pending rows */}
+                  {/* ── Section label: Active / In Transit ── */}
+                  {activeRows.length > 0 && (
+                    <tr className="bg-muted/30">
+                      <td colSpan={8} className="py-0.5 px-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        Active / In Transit — not yet posted to ledger
+                      </td>
+                    </tr>
+                  )}
                   {activeRows.map((r, i) => (
-                    <tr key={`act-${i}`} className="border-b hover:bg-muted/30">
+                    <tr key={`act-${i}`} className="border-b">
                       <td className="py-0.5 px-2 font-mono font-semibold">{r.containerNumber}</td>
                       <td className="py-0.5 px-2 font-medium">{r.company}</td>
                       <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? <span className="text-muted-foreground">—</span>}</td>
@@ -1047,22 +1130,22 @@ function TabAgentDuty() {
                       <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>
                       <td className="py-0.5 px-2">{r.location}</td>
                       <td className="py-0.5 px-2 text-right font-semibold">${fmt(r.amount, 0)}</td>
+                      <td className="py-0.5 px-2 text-center">
+                        <Clock className="h-3 w-3 text-amber-500 inline" />
+                      </td>
                     </tr>
                   ))}
-                  {/* Active subtotal */}
                   {activeRows.length > 0 && (
                     <tr className="bg-muted/50 border-b-2 font-bold">
-                      <td colSpan={5} className="py-1 px-2 text-center uppercase tracking-wide text-xs text-muted-foreground">TOTAL</td>
-                      <td />
-                      <td className="py-1 px-2 text-right">${fmt(activeTotal, 0)}</td>
+                      <td colSpan={5} className="py-1 px-2 text-xs uppercase tracking-wide text-muted-foreground">Active subtotal</td>
+                      <td /><td className="py-1 px-2 text-right">${fmt(activeTotal, 0)}</td><td />
                     </tr>
                   )}
 
-                  {/* Grand total */}
+                  {/* ── Container duty grand total ── */}
                   <tr className="bg-yellow-400 text-yellow-950 font-bold">
-                    <td colSpan={5} className="py-1.5 px-2 text-center uppercase tracking-wide text-xs">TOTAL</td>
-                    <td />
-                    <td className="py-1.5 px-2 text-right text-sm">${fmt(grandTotal, 0)}</td>
+                    <td colSpan={5} className="py-1.5 px-2 text-xs uppercase tracking-wide">Container Duty Total</td>
+                    <td /><td className="py-1.5 px-2 text-right text-sm">${fmt(containerTotal, 0)}</td><td />
                   </tr>
                 </tbody>
               </table>
@@ -1070,8 +1153,12 @@ function TabAgentDuty() {
           </div>
         );
       })}
+
       <p className="text-xs text-muted-foreground px-1">
-        Real implementation: derived from containers table, grouped by agent/declarant field. Amount = duty fee. Split between offloaded (status=Offloaded/Closed) and active containers.
+        Real implementation: Account Balance from Accounts page (ledger).
+        Container Duty Total from containers table (duty_fee field).
+        Difference = amount not yet posted as a payable voucher — typically active/in-transit containers.
+        No DB/schema changes in this mockup — all data is hard-coded.
       </p>
     </div>
   );
