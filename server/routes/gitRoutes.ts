@@ -26,7 +26,6 @@ import {
 
 type WarningCode =
   | "no_open_balance"
-  | "credit_overpaid"
   | "ledger_exceeds_containers"
   | "allocation_gap"
   | "fuzzy_match"
@@ -76,9 +75,12 @@ const OFFLOADED_STATUSES = new Set(["Offloaded", "OFFLOADED", "Closed", "CLOSED"
 // Sort offloaded rows oldest→newest, then walk consuming clearedByPayments.
 // Returns three buckets: clearedRows, partialRows (0 or 1), openRows.
 
+// outstanding = amount currently owed to the agent (always a positive number).
+// Payments made toward containers = offloadedDutyTotal - outstanding (floored at 0).
+// The oldest containers are cleared first (FIFO = first-in-first-out).
 function fifoAllocate(
   offloadedRows: ContainerRow[],
-  ledgerBalance: number
+  outstanding: number
 ): {
   clearedRows: AllocatedRow[];
   partialRows: AllocatedRow[];
@@ -98,7 +100,8 @@ function fifoAllocate(
   });
 
   const offloadedDutyTotal = sorted.reduce((s, r) => s + r.dutyFee, 0);
-  let toConsume = Math.max(offloadedDutyTotal - ledgerBalance, 0);
+  // Payments made = total duty – what is still owed. Floored at 0 (can't be negative).
+  let toConsume = Math.max(offloadedDutyTotal - outstanding, 0);
 
   const clearedRows: AllocatedRow[] = [];
   const partialRows: AllocatedRow[] = [];
@@ -341,17 +344,16 @@ async function buildAgentsForCompany(cid: number) {
       let openBalance: number | null = null;
 
       if (ledgerBalance !== null) {
-        if (ledgerBalance < 0) {
-          warnings.push("credit_overpaid");
-          clearedRows = offloadedContainers.map((r) => ({
-            ...r,
-            clearedAmount: r.dutyFee,
-            remainingAmount: 0,
-            allocationStatus: "Cleared" as AllocStatus,
-          }));
-          clearedByPayments = offloadedDutyTotal;
-          openBalance = ledgerBalance;
-        } else if (ledgerBalance === 0) {
+        // outstanding = how much we currently owe the agent.
+        // A negative ledger balance is a Cr-heavy (liability) account — standard AP
+        // convention: the company owes the agent that amount.
+        // A positive ledger balance means Dr-heavy — same "we owe them" interpretation
+        // when duty charges are posted as Debit entries.
+        // In both cases |ledgerBalance| is the net outstanding amount.
+        const outstanding = Math.abs(ledgerBalance);
+
+        if (outstanding === 0) {
+          // Fully settled — zero balance means every duty dollar has been paid.
           warnings.push("no_open_balance");
           clearedRows = offloadedContainers.map((r) => ({
             ...r,
@@ -361,7 +363,9 @@ async function buildAgentsForCompany(cid: number) {
           }));
           clearedByPayments = offloadedDutyTotal;
           openBalance = 0;
-        } else if (ledgerBalance > offloadedDutyTotal) {
+        } else if (outstanding > offloadedDutyTotal) {
+          // Outstanding exceeds all offloaded duty — there may be extra charges not yet
+          // matched to containers, or no containers have been offloaded yet.
           warnings.push("ledger_exceeds_containers");
           openRows = offloadedContainers.map((r) => ({
             ...r,
@@ -370,21 +374,22 @@ async function buildAgentsForCompany(cid: number) {
             allocationStatus: "Open" as AllocStatus,
           }));
           clearedByPayments = 0;
-          openBalance = ledgerBalance;
+          openBalance = outstanding;
         } else {
-          const result = fifoAllocate(offloadedContainers, ledgerBalance);
+          // Partial payment — FIFO: oldest containers are cleared first.
+          const result = fifoAllocate(offloadedContainers, outstanding);
           clearedRows = result.clearedRows;
           partialRows = result.partialRows;
           openRows = result.openRows;
           clearedByPayments =
             clearedRows.reduce((s, r) => s + r.clearedAmount, 0) +
             partialRows.reduce((s, r) => s + r.clearedAmount, 0);
-          openBalance = ledgerBalance;
+          openBalance = outstanding;
 
           const openSum =
             openRows.reduce((s, r) => s + r.remainingAmount, 0) +
             partialRows.reduce((s, r) => s + r.remainingAmount, 0);
-          if (Math.abs(openSum - ledgerBalance) > 0.01) {
+          if (Math.abs(openSum - outstanding) > 0.01) {
             warnings.push("allocation_gap");
           }
         }

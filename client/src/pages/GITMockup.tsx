@@ -1275,7 +1275,6 @@ function TabTruckLocation() {
 
 type WarningCode =
   | "no_open_balance"
-  | "credit_overpaid"
   | "ledger_exceeds_containers"
   | "allocation_gap"
   | "fuzzy_match"
@@ -1366,11 +1365,6 @@ const WARNING_META: Record<WarningCode, {
     icon: AlertCircle,
     className: "bg-muted/50 border-border text-muted-foreground",
     message: "No ledger account linked to this agent. Balance shown as unavailable. Add a mapping in Agent Mappings to enable balance tracking.",
-  },
-  credit_overpaid: {
-    icon: Info,
-    className: "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300",
-    message: "Account balance is negative — this agent has been overpaid or has a credit on the ledger. All offloaded containers are shown as Cleared.",
   },
   ledger_exceeds_containers: {
     icon: AlertTriangle,
