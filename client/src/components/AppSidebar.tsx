@@ -282,7 +282,7 @@ export function AppSidebar({ user }: { user?: any }) {
         )}
 
         <div className="mt-4 pt-3 border-t border-sidebar-border/60 space-y-0.5">
-          {(user?.role === "Admin" || user?.role === "Developer" || user?.role === "Owner") && (
+          {user?.role === "Developer" && (
             <SidebarFlatLink
               href="/containers-otw"
               icon={Ship}
@@ -290,7 +290,7 @@ export function AppSidebar({ user }: { user?: any }) {
               testId="link-containers-otw"
             />
           )}
-          {(user?.role === "Admin" || user?.role === "Developer" || user?.role === "Owner") && (
+          {user?.role === "Developer" && (
             <SidebarFlatLink
               href="/git"
               icon={Globe}
