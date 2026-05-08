@@ -21,7 +21,7 @@ import {
   auditLog,
   employees,
 } from "@shared/schema";
-import { eq, and, sql, gt, ilike, isNull } from "drizzle-orm";
+import { eq, and, sql, gt, ilike, isNull, inArray } from "drizzle-orm";
 
 // ─── Multer ───────────────────────────────────────────────────────────────────
 export const upload = multer({
@@ -83,6 +83,110 @@ export async function logAudit(params: {
     console.error("Error logging audit:", error);
     throw error;
   }
+}
+
+// ─── Voucher audit helpers ─────────────────────────────────────────────────────
+
+type EntrySnap = { account: string; debit: string; credit: string; narration?: string };
+type VoucherSnap = {
+  voucherType?: string | null;
+  voucherDate?: string | null;
+  totalAmount?: string | null;
+  description?: string | null;
+  locationName?: string | null;
+  locationId?: number | null;
+  optional?: boolean | null;
+};
+
+export async function snapshotVoucherEntries(
+  entries: Array<{
+    ledgerAccountId?: number | null;
+    bankAccountId?: number | null;
+    supplierId?: number | null;
+    employeeId?: number | null;
+    customerId?: number | null;
+    factorySupplierId?: number | null;
+    debitAmount?: string | null;
+    creditAmount?: string | null;
+    narration?: string | null;
+  }>
+): Promise<EntrySnap[]> {
+  const ledgerIds = [...new Set(entries.map(e => e.ledgerAccountId).filter((id): id is number => id != null))];
+  const accountNames: Record<number, string> = {};
+  if (ledgerIds.length > 0) {
+    const accts = await db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+      .from(ledgerAccounts)
+      .where(inArray(ledgerAccounts.id, ledgerIds));
+    accts.forEach(a => { accountNames[a.id] = a.name; });
+  }
+  return entries.map(e => {
+    const account = e.ledgerAccountId
+      ? (accountNames[e.ledgerAccountId] ?? `Account #${e.ledgerAccountId}`)
+      : e.bankAccountId ? `Bank #${e.bankAccountId}`
+      : e.supplierId ? `Supplier #${e.supplierId}`
+      : e.employeeId ? `Employee #${e.employeeId}`
+      : e.customerId ? `Customer #${e.customerId}`
+      : e.factorySupplierId ? `Supplier #${e.factorySupplierId}`
+      : "—";
+    const snap: EntrySnap = { account, debit: e.debitAmount || "0", credit: e.creditAmount || "0" };
+    if (e.narration) snap.narration = e.narration;
+    return snap;
+  });
+}
+
+export function buildVoucherChangesForCreate(
+  v: VoucherSnap,
+  entries: EntrySnap[]
+): Record<string, { new: any }> {
+  const c: Record<string, { new: any }> = {};
+  if (v.voucherType) c.voucherType = { new: v.voucherType };
+  if (v.voucherDate) c.date = { new: v.voucherDate };
+  if (v.totalAmount) c.amount = { new: v.totalAmount };
+  if (v.description) c.description = { new: v.description };
+  if (v.locationName || v.locationId) c.location = { new: v.locationName ?? `Location #${v.locationId}` };
+  if (entries.length > 0) c.entries = { new: entries };
+  return c;
+}
+
+export function buildVoucherChangesForDelete(
+  v: VoucherSnap,
+  entries: EntrySnap[]
+): Record<string, { old: any }> {
+  const c: Record<string, { old: any }> = {};
+  if (v.voucherType) c.voucherType = { old: v.voucherType };
+  if (v.voucherDate) c.date = { old: v.voucherDate };
+  if (v.totalAmount) c.amount = { old: v.totalAmount };
+  if (v.description) c.description = { old: v.description };
+  if (v.locationName || v.locationId) c.location = { old: v.locationName ?? `Location #${v.locationId}` };
+  if (entries.length > 0) c.entries = { old: entries };
+  return c;
+}
+
+export function buildVoucherChangesForUpdate(
+  oldV: VoucherSnap,
+  newV: VoucherSnap,
+  oldEntries: EntrySnap[],
+  newEntries: EntrySnap[]
+): Record<string, { old: any; new: any }> {
+  const c: Record<string, { old: any; new: any }> = {};
+  if (oldV.voucherType !== newV.voucherType)
+    c.voucherType = { old: oldV.voucherType, new: newV.voucherType };
+  if (oldV.voucherDate !== newV.voucherDate)
+    c.date = { old: oldV.voucherDate, new: newV.voucherDate };
+  if (parseFloat(oldV.totalAmount || "0") !== parseFloat(newV.totalAmount || "0"))
+    c.amount = { old: oldV.totalAmount, new: newV.totalAmount };
+  if ((oldV.description ?? "") !== (newV.description ?? ""))
+    c.description = { old: oldV.description ?? "", new: newV.description ?? "" };
+  if (oldV.locationId !== newV.locationId)
+    c.location = {
+      old: oldV.locationName ?? (oldV.locationId ? `Location #${oldV.locationId}` : null),
+      new: newV.locationName ?? (newV.locationId ? `Location #${newV.locationId}` : null),
+    };
+  if (oldV.optional !== newV.optional)
+    c.optional = { old: oldV.optional, new: newV.optional };
+  if (JSON.stringify(oldEntries) !== JSON.stringify(newEntries))
+    c.entries = { old: oldEntries, new: newEntries };
+  return c;
 }
 
 // ─── Exchange rate ────────────────────────────────────────────────────────────

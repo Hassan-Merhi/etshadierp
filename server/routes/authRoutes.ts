@@ -30,7 +30,7 @@ import {
   ledgerAccounts, userPreferences, vouchers, voucherEntries,
 } from "@shared/schema";
 import {
-  eq, and, or, desc, lt, gt, ne, inArray, sql, isNull, not,
+  eq, and, or, desc, lt, gt, gte, lte, ne, inArray, sql, isNull, not, ilike,
 } from "drizzle-orm";
 import { format } from "date-fns";
 
@@ -385,7 +385,7 @@ export function registerAuthRoutes(app: Express) {
         }
 
         const companyId = req.session.currentCompanyId;
-        const { limit = "100", offset = "0", tableName, userId } = req.query;
+        const { limit = "200", offset = "0", tableName, userId, action, dateFrom, dateTo, search } = req.query;
 
         // Build query conditions
         let conditions = companyId ? [eq(auditLog.companyId, companyId)] : [];
@@ -394,6 +394,20 @@ export function registerAuthRoutes(app: Express) {
         }
         if (userId && typeof userId === "string") {
           conditions.push(eq(auditLog.userId, userId));
+        }
+        if (action && typeof action === "string" && ["create", "update", "delete"].includes(action)) {
+          conditions.push(eq(auditLog.action, action as any));
+        }
+        if (dateFrom && typeof dateFrom === "string") {
+          conditions.push(gte(auditLog.createdAt, new Date(dateFrom)));
+        }
+        if (dateTo && typeof dateTo === "string") {
+          const to = new Date(dateTo);
+          to.setHours(23, 59, 59, 999);
+          conditions.push(lte(auditLog.createdAt, to));
+        }
+        if (search && typeof search === "string" && search.trim()) {
+          conditions.push(ilike(auditLog.recordIdentifier, `%${search.trim()}%`));
         }
 
         const rawLogs = await db.select()

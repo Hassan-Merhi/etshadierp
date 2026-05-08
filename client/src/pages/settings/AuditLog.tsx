@@ -130,15 +130,86 @@ export function getRecordLabel(log: any): string {
 }
 
 export function getChangesSummary(log: any): string {
-  if (!log.changes) return "—";
-  const n = Object.keys(log.changes).length;
-  if (log.action === "create") return `Created (${n} field${n !== 1 ? "s" : ""})`;
-  if (log.action === "delete") return `Deleted`;
-  return `${n} field${n !== 1 ? "s" : ""} changed`;
+  const c = log.changes;
+  if (!c) return "—";
+
+  if (log.action === "create") {
+    const type = c.voucherType?.new ?? c.type?.new ?? "";
+    const amount = c.amount?.new ? ` ${parseFloat(c.amount.new).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : "";
+    const date = c.date?.new ? ` — ${c.date.new}` : "";
+    if (type) return `Created ${type}${amount}${date}`;
+    const n = Object.keys(c).filter(k => k !== "entries").length;
+    return `Created (${n} field${n !== 1 ? "s" : ""})`;
+  }
+
+  if (log.action === "delete") {
+    const type = c.voucherType?.old ?? c.type?.old ?? "";
+    const amount = c.amount?.old ? ` ${parseFloat(c.amount.old).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : "";
+    const date = c.date?.old ? ` — ${c.date.old}` : "";
+    if (type) return `Deleted ${type}${amount}${date}`;
+    return "Deleted";
+  }
+
+  // update — show first 2 changed scalar fields
+  const SKIP = new Set(["entries"]);
+  const parts: string[] = [];
+  for (const [key, vals] of Object.entries(c)) {
+    if (SKIP.has(key)) continue;
+    const v = vals as any;
+    const label = key === "date" ? "Date"
+      : key === "amount" ? "Amount"
+      : key === "description" ? "Description"
+      : key === "location" ? "Location"
+      : key === "optional" ? "Status"
+      : fieldLabel(key);
+    const oldVal = fmtValue(v?.old);
+    const newVal = fmtValue(v?.new);
+    parts.push(`${label}: ${oldVal} → ${newVal}`);
+    if (parts.length >= 2) break;
+  }
+  if (c.entries && !parts.length) parts.push("Entries changed");
+  if (!parts.length) {
+    const n = Object.keys(c).length;
+    return `${n} field${n !== 1 ? "s" : ""} changed`;
+  }
+  return parts.join(", ");
 }
 
 export function tableShortName(t: string) {
   return t.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// ── Entries mini-table (for voucher entry snapshots) ──────────────────────────
+function EntriesTable({ entries }: { entries: any[] }) {
+  if (!Array.isArray(entries) || entries.length === 0) return null;
+  return (
+    <div className="overflow-x-auto rounded-md border">
+      <table className="text-xs w-full">
+        <thead>
+          <tr className="border-b bg-muted/40">
+            <th className="text-left px-2 py-1.5 text-muted-foreground font-medium">Account</th>
+            <th className="text-right px-2 py-1.5 text-muted-foreground font-medium">Debit</th>
+            <th className="text-right px-2 py-1.5 text-muted-foreground font-medium">Credit</th>
+            <th className="text-left px-2 py-1.5 text-muted-foreground font-medium">Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {entries.map((e: any, i: number) => (
+            <tr key={i} className="border-b last:border-0">
+              <td className="px-2 py-1">{e.account ?? "—"}</td>
+              <td className={`text-right px-2 py-1 ${parseFloat(e.debit) > 0 ? "font-medium" : "text-muted-foreground"}`}>
+                {parseFloat(e.debit) > 0 ? e.debit : "—"}
+              </td>
+              <td className={`text-right px-2 py-1 ${parseFloat(e.credit) > 0 ? "font-medium" : "text-muted-foreground"}`}>
+                {parseFloat(e.credit) > 0 ? e.credit : "—"}
+              </td>
+              <td className="px-2 py-1 text-muted-foreground">{e.narration ?? ""}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 // ── Detail Dialog ─────────────────────────────────────────────────────────────
@@ -157,6 +228,17 @@ export function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void
     navigator.clipboard.writeText(JSON.stringify(obj, null, 2)).then(() => {
       toast({ title: "Copied", description: "JSON copied to clipboard." });
     });
+  };
+
+  const renderFieldValue = (field: string, vals: any, side: "old" | "new") => {
+    const raw = vals?.[side];
+    if (field === "entries" && Array.isArray(raw)) {
+      return <EntriesTable entries={raw} />;
+    }
+    const color = side === "old"
+      ? "text-destructive"
+      : "text-green-600 dark:text-green-400";
+    return <span className={color}>{fmtValue(raw)}</span>;
   };
 
   return (
@@ -191,27 +273,51 @@ export function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void
         {changedFields.length > 0 && (
           <div className="space-y-2">
             <p className="text-sm font-semibold">
-              {isDelete ? "Deleted Values" : isCreate ? "Created Values" : "Changed Fields"}
+              {isDelete ? "Deleted Snapshot" : isCreate ? "Created Values" : "Changed Fields"}
             </p>
             <div className="rounded-md border divide-y text-sm">
-              {changedFields.map(([field, vals]) => (
-                <div key={field} className="grid grid-cols-[180px_1fr] gap-2 px-3 py-2">
-                  <span className="text-muted-foreground font-medium">{fieldLabel(field)}</span>
-                  <div>
-                    {isCreate ? (
-                      <span className="text-green-600 dark:text-green-400">{fmtValue((vals as any)?.new ?? (vals as any))}</span>
-                    ) : isDelete ? (
-                      <span className="text-destructive">{fmtValue((vals as any)?.old ?? (vals as any))}</span>
+              {changedFields.map(([field, vals]) => {
+                const isEntries = field === "entries";
+                return (
+                  <div key={field} className={isEntries ? "px-3 py-2 space-y-1" : "grid grid-cols-[160px_1fr] gap-2 px-3 py-2"}>
+                    <span className={`text-muted-foreground font-medium ${isEntries ? "block text-xs uppercase tracking-wide" : ""}`}>
+                      {fieldLabel(field)}
+                    </span>
+                    {isEntries ? (
+                      isUpdate ? (
+                        <div className="space-y-2 mt-1">
+                          <div>
+                            <span className="text-xs text-muted-foreground uppercase tracking-wide">Before</span>
+                            <EntriesTable entries={(vals as any)?.old ?? []} />
+                          </div>
+                          <div>
+                            <span className="text-xs text-muted-foreground uppercase tracking-wide">After</span>
+                            <EntriesTable entries={(vals as any)?.new ?? []} />
+                          </div>
+                        </div>
+                      ) : isCreate ? (
+                        <EntriesTable entries={(vals as any)?.new ?? []} />
+                      ) : (
+                        <EntriesTable entries={(vals as any)?.old ?? []} />
+                      )
                     ) : (
-                      <span className="flex flex-wrap gap-1 items-center">
-                        <span className="text-destructive line-through">{fmtValue((vals as any)?.old)}</span>
-                        <span className="text-muted-foreground">→</span>
-                        <span className="text-green-600 dark:text-green-400">{fmtValue((vals as any)?.new)}</span>
-                      </span>
+                      <div>
+                        {isCreate ? (
+                          renderFieldValue(field, vals, "new")
+                        ) : isDelete ? (
+                          renderFieldValue(field, vals, "old")
+                        ) : (
+                          <span className="flex flex-wrap gap-1 items-center">
+                            {renderFieldValue(field, vals, "old")}
+                            <span className="text-muted-foreground">→</span>
+                            {renderFieldValue(field, vals, "new")}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -224,32 +330,6 @@ export function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void
           </Button>
           {showAdvanced && (
             <div className="mt-2 space-y-3">
-              {(isUpdate || isDelete) && (
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Before</span>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyJson(
-                      Object.fromEntries(changedFields.map(([k, v]) => [k, (v as any)?.old ?? v]))
-                    )}><Copy className="h-3 w-3" /></Button>
-                  </div>
-                  <pre className="text-xs bg-muted rounded-md p-3 overflow-x-auto whitespace-pre-wrap break-all">
-                    {JSON.stringify(Object.fromEntries(changedFields.map(([k, v]) => [k, (v as any)?.old ?? v])), null, 2)}
-                  </pre>
-                </div>
-              )}
-              {(isUpdate || isCreate) && (
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">After</span>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyJson(
-                      Object.fromEntries(changedFields.map(([k, v]) => [k, (v as any)?.new ?? v]))
-                    )}><Copy className="h-3 w-3" /></Button>
-                  </div>
-                  <pre className="text-xs bg-muted rounded-md p-3 overflow-x-auto whitespace-pre-wrap break-all">
-                    {JSON.stringify(Object.fromEntries(changedFields.map(([k, v]) => [k, (v as any)?.new ?? v])), null, 2)}
-                  </pre>
-                </div>
-              )}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Full changes object</span>
@@ -273,67 +353,150 @@ export function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void
 
 export function EditLogTable({ companyId }: { companyId?: number }) {
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
+  const [filterAction, setFilterAction] = useState("");
+  const [filterModule, setFilterModule] = useState("");
+  const [filterSearch, setFilterSearch] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+
+  const buildUrl = () => {
+    const p = new URLSearchParams();
+    if (filterAction) p.set("action", filterAction);
+    if (filterModule) p.set("tableName", filterModule);
+    if (filterSearch.trim()) p.set("search", filterSearch.trim());
+    if (filterDateFrom) p.set("dateFrom", filterDateFrom);
+    if (filterDateTo) p.set("dateTo", filterDateTo);
+    const qs = p.toString();
+    return `/api/audit-log${qs ? `?${qs}` : ""}`;
+  };
+
+  const queryUrl = buildUrl();
 
   const { data: auditLogs = [], isLoading, error } = useQuery<any[]>({
-    queryKey: ["/api/audit-log", companyId],
+    queryKey: ["audit-log", companyId, filterAction, filterModule, filterSearch, filterDateFrom, filterDateTo],
+    queryFn: async () => {
+      const res = await fetch(queryUrl, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
     enabled: !!companyId,
   });
 
+  const knownModules = [...new Set(auditLogs.map((l: any) => l.tableName))].sort();
+
   if (!companyId) return <p className="text-muted-foreground">Select a company to view edit logs.</p>;
-  if (isLoading) return <div className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>;
-  if (error) return <p className="text-destructive">Error loading audit logs.</p>;
-  if (auditLogs.length === 0) return <p className="text-muted-foreground">No edit logs found. Changes will appear here when records are modified.</p>;
 
   return (
     <>
       {selectedLog && <AuditLogDialog log={selectedLog} onClose={() => setSelectedLog(null)} />}
-      <div className="table-responsive">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="whitespace-nowrap">Date</TableHead>
-              <TableHead>User</TableHead>
-              <TableHead>Action</TableHead>
-              <TableHead>Module</TableHead>
-              <TableHead>Record</TableHead>
-              <TableHead>Changes</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {auditLogs.map((log: any) => (
-              <TableRow key={log.id} className="group">
-                <TableCell className="text-xs whitespace-nowrap text-muted-foreground">{fmtDate(log.createdAt)}</TableCell>
-                <TableCell className="text-sm font-medium">
-                  {log.username && log.username !== "unknown" ? log.username : <span className="text-muted-foreground italic">Unknown</span>}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={log.action === "delete" ? "destructive" : log.action === "create" ? "default" : "secondary"} className="capitalize text-xs">
-                    {log.action}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{tableShortName(log.tableName)}</TableCell>
-                <TableCell
-                  className="text-sm font-mono cursor-pointer hover-elevate rounded-sm px-1"
-                  onClick={() => setSelectedLog(log)}
-                  data-testid={`log-record-${log.id}`}
-                >
-                  <span className="flex items-center gap-1 text-foreground">
-                    {getRecordLabel(log)}
-                    <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity flex-shrink-0" />
-                  </span>
-                </TableCell>
-                <TableCell
-                  className="text-xs text-muted-foreground cursor-pointer hover-elevate rounded-sm px-1"
-                  onClick={() => setSelectedLog(log)}
-                  data-testid={`log-changes-${log.id}`}
-                >
-                  {getChangesSummary(log)}
-                </TableCell>
-              </TableRow>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2 mb-3">
+        <Input
+          placeholder="Search by record…"
+          value={filterSearch}
+          onChange={e => setFilterSearch(e.target.value)}
+          className="h-8 w-44 text-sm"
+          data-testid="input-audit-search"
+        />
+        <Select value={filterAction || "all"} onValueChange={v => setFilterAction(v === "all" ? "" : v)}>
+          <SelectTrigger className="h-8 w-32 text-sm" data-testid="select-audit-action">
+            <SelectValue placeholder="Action" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All actions</SelectItem>
+            <SelectItem value="create">Create</SelectItem>
+            <SelectItem value="update">Update</SelectItem>
+            <SelectItem value="delete">Delete</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filterModule || "all"} onValueChange={v => setFilterModule(v === "all" ? "" : v)}>
+          <SelectTrigger className="h-8 w-36 text-sm" data-testid="select-audit-module">
+            <SelectValue placeholder="Module" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All modules</SelectItem>
+            {knownModules.map(m => (
+              <SelectItem key={m} value={m}>{tableShortName(m)}</SelectItem>
             ))}
-          </TableBody>
-        </Table>
+          </SelectContent>
+        </Select>
+        <Input
+          type="date"
+          value={filterDateFrom}
+          onChange={e => setFilterDateFrom(e.target.value)}
+          className="h-8 w-36 text-sm"
+          data-testid="input-audit-date-from"
+        />
+        <Input
+          type="date"
+          value={filterDateTo}
+          onChange={e => setFilterDateTo(e.target.value)}
+          className="h-8 w-36 text-sm"
+          data-testid="input-audit-date-to"
+        />
+        {(filterAction || filterModule || filterSearch || filterDateFrom || filterDateTo) && (
+          <Button variant="ghost" size="sm" className="h-8 text-muted-foreground" onClick={() => {
+            setFilterAction(""); setFilterModule(""); setFilterSearch("");
+            setFilterDateFrom(""); setFilterDateTo("");
+          }} data-testid="button-audit-clear-filters">
+            <X className="h-3 w-3 mr-1" /> Clear
+          </Button>
+        )}
       </div>
+
+      {isLoading && <div className="flex items-center gap-2 py-4"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>}
+      {error && <p className="text-destructive">Error loading audit logs.</p>}
+      {!isLoading && !error && auditLogs.length === 0 && (
+        <p className="text-muted-foreground py-4">No edit logs found. Changes will appear here when records are modified.</p>
+      )}
+
+      {!isLoading && auditLogs.length > 0 && (
+        <div className="table-responsive">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="whitespace-nowrap">Date</TableHead>
+                <TableHead>User</TableHead>
+                <TableHead>Action</TableHead>
+                <TableHead>Module</TableHead>
+                <TableHead>Record</TableHead>
+                <TableHead>Summary</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {auditLogs.map((log: any) => (
+                <TableRow
+                  key={log.id}
+                  className="group cursor-pointer hover-elevate"
+                  onClick={() => setSelectedLog(log)}
+                  data-testid={`log-row-${log.id}`}
+                >
+                  <TableCell className="text-xs whitespace-nowrap text-muted-foreground">{fmtDate(log.createdAt)}</TableCell>
+                  <TableCell className="text-sm font-medium">
+                    {log.username && log.username !== "unknown" ? log.username : <span className="text-muted-foreground italic">Unknown</span>}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={log.action === "delete" ? "destructive" : log.action === "create" ? "default" : "secondary"} className="capitalize text-xs">
+                      {log.action}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{tableShortName(log.tableName)}</TableCell>
+                  <TableCell className="text-sm font-mono" data-testid={`log-record-${log.id}`}>
+                    <span className="flex items-center gap-1 text-foreground">
+                      {getRecordLabel(log)}
+                      <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity flex-shrink-0" />
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground max-w-xs truncate" data-testid={`log-changes-${log.id}`}>
+                    {getChangesSummary(log)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </>
   );
 }

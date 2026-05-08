@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
-import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries } from "./_helpers";
+import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries, snapshotVoucherEntries, buildVoucherChangesForDelete } from "./_helpers";
 import {
   inventory, stockItems, stockGroups, stockItemCodeAliases,
   stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
@@ -819,7 +819,9 @@ export function registerVoucherEntryRoutes(app: Express) {
             .where(eq(vouchers.id, id));
         });
 
-        // Log the deletion to audit log
+        // Log the deletion to audit log (entries are soft-deleted so still fetchable)
+        const _delEntries = await storage.getVoucherEntriesByVoucher(id).catch(() => []);
+        const _delEntriesSnap = await snapshotVoucherEntries(_delEntries).catch(() => []);
         await logAudit({
           userId: req.session.userId!,
           username: (req.session as any).username || "unknown",
@@ -828,7 +830,7 @@ export function registerVoucherEntryRoutes(app: Express) {
           tableName: "vouchers",
           recordId: id,
           recordIdentifier: voucher.voucherNumber,
-          changes: null,
+          changes: buildVoucherChangesForDelete(voucher, _delEntriesSnap),
         });
 
         res.json({ message: "Voucher deleted successfully" });
@@ -1109,6 +1111,8 @@ export function registerVoucherEntryRoutes(app: Express) {
           });
 
         // Log the deletion to audit log
+        const _bulkEntries = await storage.getVoucherEntriesByVoucher(id).catch(() => []);
+        const _bulkEntriesSnap = await snapshotVoucherEntries(_bulkEntries).catch(() => []);
         await logAudit({
           userId: req.session.userId!,
           username: (req.session as any).username || "unknown",
@@ -1117,7 +1121,7 @@ export function registerVoucherEntryRoutes(app: Express) {
           tableName: "vouchers",
           recordId: id,
           recordIdentifier: voucher.voucherNumber,
-          changes: null,
+          changes: buildVoucherChangesForDelete(voucher, _bulkEntriesSnap),
         });
 
           deletedCount++;

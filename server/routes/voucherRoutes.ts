@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
-import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries } from "./_helpers";
+import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries, snapshotVoucherEntries, buildVoucherChangesForCreate, buildVoucherChangesForUpdate } from "./_helpers";
 import {
   inventory, stockItems, stockGroups, stockItemCodeAliases,
   stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
@@ -595,6 +595,7 @@ export function registerVoucherRoutes(app: Express) {
         const result = { voucher: createdVoucher, entries: createdEntries };
 
         // Log the creation to audit log
+        const _createEntriesSnap = await snapshotVoucherEntries(createdEntries).catch(() => []);
         await logAudit({
           userId: req.session.userId!,
           username: (req.session as any).username || "unknown",
@@ -603,7 +604,7 @@ export function registerVoucherRoutes(app: Express) {
           tableName: "vouchers",
           recordId: createdVoucher.id,
           recordIdentifier: createdVoucher.voucherNumber,
-          changes: null,
+          changes: buildVoucherChangesForCreate(createdVoucher, _createEntriesSnap),
         });
 
         res.json(result);
@@ -893,6 +894,21 @@ export function registerVoucherRoutes(app: Express) {
         } catch (waErr: any) {
           console.error("WhatsApp rule check error (non-fatal):", waErr);
         }
+
+        // Log the payment/receipt creation
+        try {
+          const _prEntriesSnap = await snapshotVoucherEntries(result.entries);
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "create",
+            tableName: "vouchers",
+            recordId: result.voucher.id,
+            recordIdentifier: result.voucher.voucherNumber,
+            changes: buildVoucherChangesForCreate(result.voucher, _prEntriesSnap),
+          });
+        } catch { /* non-fatal */ }
 
         res.json({ ...result, whatsapp: waResult });
       } catch (error: any) {
@@ -3575,6 +3591,8 @@ export function registerVoucherRoutes(app: Express) {
       }
 
       // Log the update to audit log
+      const _oldEntriesSnap = await snapshotVoucherEntries(oldEntries).catch(() => []);
+      const _newEntriesSnap = await snapshotVoucherEntries(createdEntries).catch(() => []);
       await logAudit({
         userId: req.session.userId!,
         username: (req.session as any).username || "unknown",
@@ -3583,10 +3601,7 @@ export function registerVoucherRoutes(app: Express) {
         tableName: "vouchers",
         recordId: id,
         recordIdentifier: updatedVoucher.voucherNumber,
-        changes: {
-          voucherNumber: { old: existingVoucher.voucherNumber, new: updatedVoucher.voucherNumber },
-          voucherType: { old: existingVoucher.voucherType, new: updatedVoucher.voucherType },
-        },
+        changes: buildVoucherChangesForUpdate(existingVoucher, updatedVoucher, _oldEntriesSnap, _newEntriesSnap),
       });
 
       // ── CHARGE voucher sync ──────────────────────────────────────────────
