@@ -1,13 +1,14 @@
 /**
- * GIT — MOCKUP PAGE (planning phase only)
- * Workbook / spreadsheet-style replacement for the daily GIT Excel sheet.
- * All data is hard-coded. No DB reads or writes.
+ * GIT — Goods In Transit Workbook
+ * Spreadsheet-style replacement for the daily GIT Excel sheet.
  *
  * Tabs:
- *   1. GIT Summary  — workbook-style totals, needs-attention breakdown
- *   2. GIT Detail   — Workbook View (default) + Flat Table toggle
- *   3. At Port / Sea — grouped by status: Sea/OTW | At Port | Left Dar
- *   4. WhatsApp Preview — formatted text message
+ *   1. GIT Summary  — real data: status/cost/delay stat cards + company/transporter/agent breakdowns
+ *   2. GIT Detail   — real data: Workbook View (grouped by company) + Flat Table toggle
+ *   3. At Port / Sea — sample data: grouped by status: Sea/OTW | At Port | Left Dar
+ *   4. Truck / Location — sample data
+ *   5. Agent / Duty  — real data: FIFO duty allocation per agent
+ *   6. WhatsApp Preview — sample data: formatted text message
  */
 
 import { useState, useMemo } from "react";
@@ -440,174 +441,402 @@ function WorkbookLegend() {
   );
 }
 
-// ─── Tab 2: GIT Detail ────────────────────────────────────────────────────────
+// ─── Real API types (Summary + Detail tabs) ──────────────────────────────────
 
-function TabDetail({ rows }: { rows: GITRow[] }) {
+type CompanyViewMode = "session" | "all";
+
+interface EnrichedContainerApi {
+  id: number;
+  companyId: number;
+  companyName: string;
+  containerNumber: string;
+  supplierId: number;
+  status: string;
+  importDate: string;
+  grandTotal: string | null;
+  itemName: string | null;
+  shopName: string | null;
+  eta: string | null;
+  etaSource: string | null;
+  transporter: string | null;
+  transportFee: string | null;
+  numberPlate: string | null;
+  trackingLocation: string | null;
+  borderDate: string | null;
+  offloadDate: string | null;
+  agent: string | null;
+  dutyFee: string | null;
+  docReceived: boolean | null;
+  trackingDescription: string | null;
+  docsSentDate: string | null;
+  freightStatus: string | null;
+  trackingLink: string | null;
+  maxOffloadDate: string | null;
+  daysDelayed: number | null;
+  docsReadyNotSent: boolean;
+  isOverdue: boolean;
+}
+
+interface GitContainersSingle {
+  asOf: string;
+  mode: "single";
+  companyId: number;
+  companyName: string;
+  total: number;
+  containers: EnrichedContainerApi[];
+}
+
+interface GitContainersAll {
+  asOf: string;
+  mode: "all";
+  total: number;
+  containers: EnrichedContainerApi[];
+}
+
+type GitContainersResponse = GitContainersSingle | GitContainersAll;
+
+// ─── Shared helpers for real data tabs ───────────────────────────────────────
+
+const parseNum = (v: string | null | undefined): number =>
+  parseFloat(v ?? "0") || 0;
+
+const COMPANY_COLORS: { bg: string; text: string }[] = [
+  { bg: "bg-yellow-400",  text: "text-yellow-950" },
+  { bg: "bg-orange-400",  text: "text-orange-950" },
+  { bg: "bg-teal-600",    text: "text-white" },
+  { bg: "bg-green-600",   text: "text-white" },
+  { bg: "bg-purple-600",  text: "text-white" },
+  { bg: "bg-cyan-600",    text: "text-white" },
+  { bg: "bg-red-600",     text: "text-white" },
+  { bg: "bg-blue-600",    text: "text-white" },
+  { bg: "bg-indigo-600",  text: "text-white" },
+];
+
+function getRealRowBg(r: EnrichedContainerApi): string {
+  if (r.isOverdue)                                      return "bg-red-50 dark:bg-red-950/20";
+  if (r.daysDelayed !== null && r.daysDelayed > 0)      return "bg-orange-50 dark:bg-orange-950/20";
+  if (r.docsReadyNotSent)                               return "bg-amber-50 dark:bg-amber-950/20";
+  return "";
+}
+
+function RealWorkbookBlock({
+  companyName, rows, headerBg, headerText,
+}: {
+  companyName: string;
+  rows: EnrichedContainerApi[];
+  headerBg: string;
+  headerText: string;
+}) {
+  const total = {
+    amount: rows.reduce((s, r) => s + parseNum(r.grandTotal), 0),
+    fee:    rows.reduce((s, r) => s + parseNum(r.transportFee), 0),
+    duty:   rows.reduce((s, r) => s + parseNum(r.dutyFee), 0),
+  };
+  return (
+    <div className="rounded-md border overflow-hidden">
+      <div className={cn("flex items-center justify-between px-3 py-1.5", headerBg, headerText)}>
+        <span className="text-sm font-bold tracking-wide">{companyName}</span>
+        <span className="text-xs font-semibold opacity-90">{rows.length} containers — ${fmt(total.amount, 2)}</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs whitespace-nowrap border-collapse">
+          <thead>
+            <tr className="bg-muted/60 border-b text-muted-foreground">
+              <th className="py-1 px-2 font-semibold text-left">CTR #</th>
+              <th className="py-1 px-2 font-semibold text-right">AMOUNT</th>
+              <th className="py-1 px-2 font-semibold text-left">ETA DAS</th>
+              <th className="py-1 px-2 font-semibold text-left">TRUCK #</th>
+              <th className="py-1 px-2 font-semibold text-left">LOCATION</th>
+              <th className="py-1 px-2 font-semibold text-left">BORDER DT.</th>
+              <th className="py-1 px-2 font-semibold text-left">MAX OFFLOAD</th>
+              <th className="py-1 px-2 font-semibold text-center">DOCS RCVD</th>
+              <th className="py-1 px-2 font-semibold text-center">DOCS→TRUCK</th>
+              <th className="py-1 px-2 font-semibold text-left">FREIGHT</th>
+              <th className="py-1 px-2 font-semibold text-left">TRANSPORTER</th>
+              <th className="py-1 px-2 font-semibold text-right">FEE</th>
+              <th className="py-1 px-2 font-semibold text-left">AGENT</th>
+              <th className="py-1 px-2 font-semibold text-right">DUTY</th>
+              <th className="py-1 px-2 font-semibold text-left">STATUS</th>
+              <th className="py-1 px-2 font-semibold text-center">LINK</th>
+              <th className="py-1 px-2 font-semibold text-left">NOTES</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr><td colSpan={17} className="py-3 text-center text-muted-foreground italic text-xs">No containers</td></tr>
+            ) : (
+              rows.map((r) => {
+                const docsSent = !!r.docsSentDate;
+                return (
+                  <tr key={r.id} className={cn("border-b last:border-b-0", getRealRowBg(r))}>
+                    <td className="py-0.5 px-2 font-mono font-bold">{r.containerNumber}</td>
+                    <td className="py-0.5 px-2 text-right font-semibold">${fmt(parseNum(r.grandTotal), 2)}</td>
+                    <td className="py-0.5 px-2">{fmtD(r.eta)}</td>
+                    <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
+                    <td className="py-0.5 px-2">{r.trackingLocation ?? "—"}</td>
+                    <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
+                    <td className={cn("py-0.5 px-2", r.isOverdue ? "text-red-600 font-bold" : "")}>
+                      {fmtD(r.maxOffloadDate)}
+                      {r.daysDelayed ? <span className="ml-1 text-[10px]">+{r.daysDelayed}d</span> : null}
+                    </td>
+                    <td className="py-0.5 px-2 text-center">
+                      {r.docReceived ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" /> : <XCircle className="h-3.5 w-3.5 text-red-500 mx-auto" />}
+                    </td>
+                    <td className="py-0.5 px-2 text-center">
+                      {docsSent
+                        ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
+                        : r.docsReadyNotSent
+                          ? <span className="text-amber-700 text-[10px] font-medium">READY</span>
+                          : "—"}
+                    </td>
+                    <td className="py-0.5 px-2">{r.freightStatus ?? "—"}</td>
+                    <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>
+                    <td className="py-0.5 px-2 text-right">{parseNum(r.transportFee) > 0 ? `$${fmt(parseNum(r.transportFee), 0)}` : "—"}</td>
+                    <td className="py-0.5 px-2">{r.agent ?? "—"}</td>
+                    <td className="py-0.5 px-2 text-right">{parseNum(r.dutyFee) > 0 ? `$${fmt(parseNum(r.dutyFee), 0)}` : "—"}</td>
+                    <td className="py-0.5 px-2">
+                      <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", (STATUS_BADGE as Record<string, string>)[r.status] ?? "bg-muted text-foreground")}>{r.status}</span>
+                    </td>
+                    <td className="py-0.5 px-2 text-center">
+                      {r.trackingLink ? <a href={r.trackingLink} target="_blank" rel="noopener noreferrer" className="text-primary"><ExternalLink className="h-3.5 w-3.5 mx-auto" /></a> : "—"}
+                    </td>
+                    <td className="py-0.5 px-2 max-w-40 truncate text-muted-foreground italic">{r.trackingDescription ?? "—"}</td>
+                  </tr>
+                );
+              })
+            )}
+            {rows.length > 0 && (
+              <tr className={cn("border-t-2 text-xs font-bold", headerBg, headerText)}>
+                <td className="py-1 px-2">TOTAL — {rows.length} CTR</td>
+                <td className="py-1 px-2 text-right">${fmt(total.amount, 2)}</td>
+                <td colSpan={9} />
+                <td className="py-1 px-2 text-right">{total.fee > 0 ? `$${fmt(total.fee, 0)}` : "—"}</td>
+                <td />
+                <td className="py-1 px-2 text-right">{total.duty > 0 ? `$${fmt(total.duty, 0)}` : "—"}</td>
+                <td colSpan={3} />
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Tab 2: GIT Detail (real data) ───────────────────────────────────────────
+
+function TabDetail() {
+  const [companyMode, setCompanyMode] = useState<CompanyViewMode>("session");
   const [view, setView] = useState<"workbook" | "flat">("workbook");
   const [search, setSearch] = useState("");
 
+  const queryUrl = companyMode === "all"
+    ? "/api/git/containers?allCompanies=true"
+    : "/api/git/containers";
+
+  const { data, isLoading, isError, error } = useQuery<GitContainersResponse>({
+    queryKey: [queryUrl],
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  const allContainers: EnrichedContainerApi[] = data?.containers ?? [];
+
   const filtered = useMemo(() => {
-    if (!search) return rows;
+    if (!search) return allContainers;
     const q = search.toLowerCase();
-    return rows.filter((r) =>
+    return allContainers.filter((r) =>
       r.containerNumber.toLowerCase().includes(q) ||
-      r.company.toLowerCase().includes(q) ||
+      r.companyName.toLowerCase().includes(q) ||
       (r.transporter ?? "").toLowerCase().includes(q) ||
       (r.agent ?? "").toLowerCase().includes(q) ||
       (r.numberPlate ?? "").toLowerCase().includes(q) ||
-      (r.location ?? "").toLowerCase().includes(q) ||
-      r.group.toLowerCase().includes(q)
+      (r.trackingLocation ?? "").toLowerCase().includes(q)
     );
-  }, [rows, search]);
+  }, [allContainers, search]);
 
-  const totals = {
-    amount: filtered.reduce((s, r) => s + r.amount, 0),
-    fee: filtered.reduce((s, r) => s + (r.transportFee ?? 0), 0),
-    duty: filtered.reduce((s, r) => s + (r.dutyFee ?? 0), 0),
-  };
+  const totals = useMemo(() => ({
+    amount: filtered.reduce((s, r) => s + parseNum(r.grandTotal), 0),
+    fee:    filtered.reduce((s, r) => s + parseNum(r.transportFee), 0),
+    duty:   filtered.reduce((s, r) => s + parseNum(r.dutyFee), 0),
+  }), [filtered]);
+
+  const companies = useMemo(() => {
+    const seen = new Map<number, { id: number; name: string; rows: EnrichedContainerApi[] }>();
+    for (const r of filtered) {
+      if (!seen.has(r.companyId)) seen.set(r.companyId, { id: r.companyId, name: r.companyName, rows: [] });
+      seen.get(r.companyId)!.rows.push(r);
+    }
+    return [...seen.values()];
+  }, [filtered]);
+
+  const modeSelector = (
+    <div className="flex items-center gap-2 flex-wrap" data-testid="detail-mode-selector">
+      <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      <span className="text-xs text-muted-foreground">View:</span>
+      <Button size="sm" variant={companyMode === "session" ? "default" : "outline"} className="text-xs gap-1.5" onClick={() => setCompanyMode("session")} data-testid="button-detail-my-company">My Company</Button>
+      <Button size="sm" variant={companyMode === "all" ? "default" : "outline"} className="text-xs gap-1.5" onClick={() => setCompanyMode("all")} data-testid="button-detail-all-companies">All Accessible Companies</Button>
+    </div>
+  );
+
+  if (isLoading) return (
+    <div className="space-y-3">
+      {modeSelector}
+      {[1, 2, 3].map(i => <Skeleton key={i} className="h-32 w-full rounded-md" />)}
+    </div>
+  );
+
+  if (isError) return (
+    <div className="space-y-3">
+      {modeSelector}
+      <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/20 px-4 py-3 flex gap-3 items-start text-sm text-red-800 dark:text-red-300">
+        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+        <div>
+          <div className="font-semibold">Failed to load container data</div>
+          <div className="text-xs mt-0.5">{(error as Error)?.message ?? "Network or server error."}</div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-3">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search container, company, truck, agent…"
-            className="pl-8"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            data-testid="input-git-detail-search"
-          />
-        </div>
-        <span className="text-xs text-muted-foreground">{filtered.length} rows</span>
-        <div className="flex items-center gap-1 ml-auto">
-          <Button
-            size="sm"
-            variant={view === "workbook" ? "default" : "outline"}
-            className="gap-1.5"
-            onClick={() => setView("workbook")}
-            data-testid="button-view-workbook"
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            Workbook
-          </Button>
-          <Button
-            size="sm"
-            variant={view === "flat" ? "default" : "outline"}
-            className="gap-1.5"
-            onClick={() => setView("flat")}
-            data-testid="button-view-flat"
-          >
-            <List className="h-3.5 w-3.5" />
-            Flat Table
-          </Button>
-        </div>
-      </div>
+      {modeSelector}
 
-      {view === "workbook" ? (
-        <div className="space-y-4">
-          <WorkbookLegend />
-          {GROUP_DEFS.map((gd) => {
-            const groupRows = filtered.filter((r) => r.group === gd.id);
-            if (search && groupRows.length === 0) return null;
-            return <WorkbookBlock key={gd.id} groupDef={gd} rows={groupRows} />;
-          })}
-          {/* Grand total bar */}
-          {filtered.length > 0 && (
-            <div className="flex items-center justify-between px-3 py-1.5 rounded-md bg-zinc-800 dark:bg-zinc-700 text-white text-xs font-bold">
-              <span>TOTAL OTW — ALL GROUPS ({filtered.length} containers)</span>
-              <div className="flex gap-4">
-                <span>CTR COST: ${fmt(totals.amount, 2)}</span>
-                <span>TRANSPORT: ${fmt(totals.fee, 0)}</span>
-                <span>DUTY: ${fmt(totals.duty, 0)}</span>
-              </div>
-            </div>
-          )}
+      {allContainers.length === 0 ? (
+        <div className="rounded-md border border-dashed px-6 py-10 text-center text-muted-foreground text-sm">
+          <FileX className="h-8 w-8 mx-auto mb-2 opacity-40" />
+          <div className="font-medium">No active containers found</div>
         </div>
       ) : (
-        /* ── Flat table view ── */
-        <div className="rounded-md border overflow-x-auto">
-          <Table className="text-xs whitespace-nowrap">
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="w-8 text-center">SR</TableHead>
-                <TableHead>Container #</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Group</TableHead>
-                <TableHead>ETA DAS</TableHead>
-                <TableHead>Truck #</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Border Date</TableHead>
-                <TableHead>Max Offload</TableHead>
-                <TableHead className="text-center">Docs Rcvd</TableHead>
-                <TableHead className="text-center">Docs→Truck</TableHead>
-                <TableHead>Transporter</TableHead>
-                <TableHead className="text-right">Fee</TableHead>
-                <TableHead>Agent</TableHead>
-                <TableHead className="text-right">Duty</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-center">Link</TableHead>
-                <TableHead>Notes</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((r, idx) => {
-                const mo = maxOffload(r.borderDate, r.transporter);
-                const del = daysDelayed(r.borderDate, r.transporter);
-                const overdue = mo ? new Date(mo) < new Date() : false;
+        <>
+          {/* Toolbar */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search container, company, truck, agent…"
+                className="pl-8"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                data-testid="input-git-detail-search"
+              />
+            </div>
+            <span className="text-xs text-muted-foreground">{filtered.length} rows</span>
+            <div className="flex items-center gap-1 ml-auto">
+              <Button size="sm" variant={view === "workbook" ? "default" : "outline"} className="gap-1.5" onClick={() => setView("workbook")} data-testid="button-view-workbook">
+                <LayoutGrid className="h-3.5 w-3.5" />Workbook
+              </Button>
+              <Button size="sm" variant={view === "flat" ? "default" : "outline"} className="gap-1.5" onClick={() => setView("flat")} data-testid="button-view-flat">
+                <List className="h-3.5 w-3.5" />Flat Table
+              </Button>
+            </div>
+          </div>
+
+          {view === "workbook" ? (
+            <div className="space-y-4">
+              <WorkbookLegend />
+              {companies.map((company, idx) => {
+                const color = COMPANY_COLORS[idx % COMPANY_COLORS.length];
                 return (
-                  <TableRow key={idx} className={getRowBg(r)} data-testid={`row-git-${r.containerNumber}`}>
-                    <TableCell className="text-center text-muted-foreground">{r.sr}</TableCell>
-                    <TableCell className="font-mono font-semibold">{r.containerNumber}</TableCell>
-                    <TableCell className="text-right font-medium">${fmt(r.amount, 2)}</TableCell>
-                    <TableCell>{r.company}</TableCell>
-                    <TableCell className="text-muted-foreground">{GROUP_DEFS.find(g => g.id === r.group)?.subtitle ?? r.group}</TableCell>
-                    <TableCell>{fmtD(r.eta)}</TableCell>
-                    <TableCell className="font-mono">{r.numberPlate ?? "—"}</TableCell>
-                    <TableCell>{r.location ?? "—"}</TableCell>
-                    <TableCell>{fmtD(r.borderDate)}</TableCell>
-                    <TableCell className={cn(overdue ? "text-red-600 font-bold" : "")}>
-                      {fmtD(mo)}
-                      {del && <span className="ml-1 text-red-600 text-[10px]">+{del}d</span>}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {r.docsReceived ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" /> : <XCircle className="h-3.5 w-3.5 text-red-500 mx-auto" />}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {r.docsSentToTruck
-                        ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
-                        : r.docsReceived
-                          ? <span className="text-amber-700 text-[10px] font-medium">READY</span>
-                          : "—"}
-                    </TableCell>
-                    <TableCell>{r.transporter ?? "—"}</TableCell>
-                    <TableCell className="text-right">{r.transportFee ? `$${fmt(r.transportFee, 0)}` : "—"}</TableCell>
-                    <TableCell>{r.agent ?? "—"}</TableCell>
-                    <TableCell className="text-right">{r.dutyFee ? `$${fmt(r.dutyFee, 0)}` : "—"}</TableCell>
-                    <TableCell>
-                      <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", STATUS_BADGE[r.status])}>{r.status}</span>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {r.trackingLink ? <a href={r.trackingLink} target="_blank" rel="noopener noreferrer" className="text-primary"><ExternalLink className="h-3.5 w-3.5 mx-auto" /></a> : "—"}
-                    </TableCell>
-                    <TableCell className="max-w-32 truncate text-muted-foreground">{r.notes ?? "—"}</TableCell>
-                  </TableRow>
+                  <RealWorkbookBlock
+                    key={company.id}
+                    companyName={company.name}
+                    rows={company.rows}
+                    headerBg={color.bg}
+                    headerText={color.text}
+                  />
                 );
               })}
-              <TableRow className="border-t-2 font-semibold bg-muted/40">
-                <TableCell colSpan={2} className="text-center">Totals ({filtered.length})</TableCell>
-                <TableCell className="text-right">${fmt(totals.amount, 2)}</TableCell>
-                <TableCell colSpan={10} />
-                <TableCell className="text-right">${fmt(totals.fee, 0)}</TableCell>
-                <TableCell />
-                <TableCell className="text-right">${fmt(totals.duty, 0)}</TableCell>
-                <TableCell colSpan={3} />
-              </TableRow>
-            </TableBody>
-          </Table>
-        </div>
+              {filtered.length > 0 && (
+                <div className="flex items-center justify-between px-3 py-1.5 rounded-md bg-zinc-800 dark:bg-zinc-700 text-white text-xs font-bold">
+                  <span>TOTAL — ALL COMPANIES ({filtered.length} containers)</span>
+                  <div className="flex gap-4">
+                    <span>CTR COST: ${fmt(totals.amount, 2)}</span>
+                    <span>TRANSPORT: ${fmt(totals.fee, 0)}</span>
+                    <span>DUTY: ${fmt(totals.duty, 0)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-md border overflow-x-auto">
+              <Table className="text-xs whitespace-nowrap">
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead>Container #</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Company</TableHead>
+                    <TableHead>ETA DAS</TableHead>
+                    <TableHead>Truck #</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Border Date</TableHead>
+                    <TableHead>Max Offload</TableHead>
+                    <TableHead className="text-center">Docs Rcvd</TableHead>
+                    <TableHead className="text-center">Docs→Truck</TableHead>
+                    <TableHead>Transporter</TableHead>
+                    <TableHead className="text-right">Fee</TableHead>
+                    <TableHead>Agent</TableHead>
+                    <TableHead className="text-right">Duty</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-center">Link</TableHead>
+                    <TableHead>Notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((r) => {
+                    const docsSent = !!r.docsSentDate;
+                    return (
+                      <TableRow key={r.id} className={getRealRowBg(r)} data-testid={`row-git-${r.containerNumber}`}>
+                        <TableCell className="font-mono font-semibold">{r.containerNumber}</TableCell>
+                        <TableCell className="text-right font-medium">${fmt(parseNum(r.grandTotal), 2)}</TableCell>
+                        <TableCell>{r.companyName}</TableCell>
+                        <TableCell>{fmtD(r.eta)}</TableCell>
+                        <TableCell className="font-mono">{r.numberPlate ?? "—"}</TableCell>
+                        <TableCell>{r.trackingLocation ?? "—"}</TableCell>
+                        <TableCell>{fmtD(r.borderDate)}</TableCell>
+                        <TableCell className={cn(r.isOverdue ? "text-red-600 font-bold" : "")}>
+                          {fmtD(r.maxOffloadDate)}
+                          {r.daysDelayed ? <span className="ml-1 text-red-600 text-[10px]">+{r.daysDelayed}d</span> : null}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {r.docReceived ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" /> : <XCircle className="h-3.5 w-3.5 text-red-500 mx-auto" />}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {docsSent
+                            ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
+                            : r.docsReadyNotSent
+                              ? <span className="text-amber-700 text-[10px] font-medium">READY</span>
+                              : "—"}
+                        </TableCell>
+                        <TableCell>{r.transporter ?? "—"}</TableCell>
+                        <TableCell className="text-right">{parseNum(r.transportFee) > 0 ? `$${fmt(parseNum(r.transportFee), 0)}` : "—"}</TableCell>
+                        <TableCell>{r.agent ?? "—"}</TableCell>
+                        <TableCell className="text-right">{parseNum(r.dutyFee) > 0 ? `$${fmt(parseNum(r.dutyFee), 0)}` : "—"}</TableCell>
+                        <TableCell>
+                          <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", (STATUS_BADGE as Record<string, string>)[r.status] ?? "bg-muted text-foreground")}>{r.status}</span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {r.trackingLink ? <a href={r.trackingLink} target="_blank" rel="noopener noreferrer" className="text-primary"><ExternalLink className="h-3.5 w-3.5 mx-auto" /></a> : "—"}
+                        </TableCell>
+                        <TableCell className="max-w-32 truncate text-muted-foreground">{r.trackingDescription ?? "—"}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  <TableRow className="border-t-2 font-semibold bg-muted/40">
+                    <TableCell className="text-center">Totals ({filtered.length})</TableCell>
+                    <TableCell className="text-right">${fmt(totals.amount, 2)}</TableCell>
+                    <TableCell colSpan={9} />
+                    <TableCell className="text-right">${fmt(totals.fee, 0)}</TableCell>
+                    <TableCell />
+                    <TableCell className="text-right">${fmt(totals.duty, 0)}</TableCell>
+                    <TableCell colSpan={3} />
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -683,90 +912,154 @@ function SummaryGroupTable({ title, rows }: {
   );
 }
 
-function TabSummary({ active }: { active: GITRow[] }) {
-  const totalActive    = active.length;
-  const atSea          = active.filter(r => r.status === "OTW" || r.status === "Sea").length;
-  const atPort         = active.filter(r => r.status === "At Port").length;
-  const leftDar        = active.filter(r => r.status === "Left Dar").length;
-  const inTransit      = active.filter(r => ["At Border", "In Transit"].includes(r.status)).length;
-  const arrived        = active.filter(r => r.status === "Arrived").length;
-  const delayed        = active.filter(r => daysDelayed(r.borderDate, r.transporter) !== null).length;
-  const docsMissing    = active.filter(r => !r.docsReceived).length;
-  const docsReadyNS    = active.filter(r => r.docsReceived && !r.docsSentToTruck && (r.status === "At Port" || r.status === "Left Dar")).length;
-  const offloadOverdue = active.filter(r => { const mo = maxOffload(r.borderDate, r.transporter); return mo ? new Date(mo) < new Date() : false; }).length;
-  const totalCost      = active.reduce((s, r) => s + r.amount, 0);
-  const totalFee       = active.reduce((s, r) => s + (r.transportFee ?? 0), 0);
-  const totalDuty      = active.reduce((s, r) => s + (r.dutyFee ?? 0), 0);
+function TabSummary() {
+  const [companyMode, setCompanyMode] = useState<CompanyViewMode>("session");
 
-  // Group totals by company, destination/group, transporter, agent
-  const makeGroup = (key: keyof GITRow) => {
-    const keys = [...new Set(active.map(r => (r[key] ?? "—") as string))];
-    return keys.map(k => {
-      const sub = active.filter(r => (r[key] ?? "—") === k);
-      return { label: k, count: sub.length, cost: sub.reduce((s, r) => s + r.amount, 0), fee: sub.reduce((s, r) => s + (r.transportFee ?? 0), 0), duty: sub.reduce((s, r) => s + (r.dutyFee ?? 0), 0) };
-    });
+  const queryUrl = companyMode === "all"
+    ? "/api/git/containers?allCompanies=true"
+    : "/api/git/containers";
+
+  const { data, isLoading, isError, error } = useQuery<GitContainersResponse>({
+    queryKey: [queryUrl],
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  const allContainers: EnrichedContainerApi[] = data?.containers ?? [];
+
+  const stats = useMemo(() => {
+    const byStatus: Record<string, number> = {};
+    for (const r of allContainers) byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
+    return {
+      total:             allContainers.length,
+      atSea:             (byStatus["OTW"] ?? 0) + (byStatus["Sea"] ?? 0),
+      atPort:            byStatus["At Port"] ?? 0,
+      leftDar:           byStatus["Left Dar"] ?? 0,
+      inTransit:         (byStatus["At Border"] ?? 0) + (byStatus["In Transit"] ?? 0),
+      arrived:           byStatus["Arrived"] ?? 0,
+      delayed:           allContainers.filter(r => r.daysDelayed !== null && r.daysDelayed > 0).length,
+      overdue:           allContainers.filter(r => r.isOverdue).length,
+      docsReadyNotSent:  allContainers.filter(r => r.docsReadyNotSent).length,
+      totalCost:         allContainers.reduce((s, r) => s + parseNum(r.grandTotal), 0),
+      totalFee:          allContainers.reduce((s, r) => s + parseNum(r.transportFee), 0),
+      totalDuty:         allContainers.reduce((s, r) => s + parseNum(r.dutyFee), 0),
+    };
+  }, [allContainers]);
+
+  const makeBreakdown = (keyFn: (r: EnrichedContainerApi) => string) => {
+    const map = new Map<string, { label: string; count: number; cost: number; fee: number; duty: number }>();
+    for (const r of allContainers) {
+      const k = keyFn(r);
+      if (!map.has(k)) map.set(k, { label: k, count: 0, cost: 0, fee: 0, duty: 0 });
+      const e = map.get(k)!;
+      e.count++;
+      e.cost  += parseNum(r.grandTotal);
+      e.fee   += parseNum(r.transportFee);
+      e.duty  += parseNum(r.dutyFee);
+    }
+    return [...map.values()];
   };
 
-  const byGroup = GROUP_DEFS.map(gd => {
-    const sub = active.filter(r => r.group === gd.id);
-    return { label: `${gd.title} ${gd.subtitle}`, count: sub.length, cost: sub.reduce((s, r) => s + r.amount, 0), fee: sub.reduce((s, r) => s + (r.transportFee ?? 0), 0), duty: sub.reduce((s, r) => s + (r.dutyFee ?? 0), 0) };
-  }).filter(g => g.count > 0);
+  const byCompany   = useMemo(() => makeBreakdown(r => r.companyName), [allContainers]);
+  const byTransport = useMemo(() => makeBreakdown(r => r.transporter ?? "—"), [allContainers]);
+  const byAgent     = useMemo(() => makeBreakdown(r => r.agent ?? "—"), [allContainers]);
 
-  const byCompany    = makeGroup("company");
-  const byTransport  = makeGroup("transporter");
-  const byAgent      = makeGroup("agent");
+  const attentionRows = useMemo(() => [
+    ...allContainers.filter(r => r.daysDelayed !== null && r.daysDelayed > 0)
+      .map(r => ({ label: r.containerNumber, issue: `Delayed +${r.daysDelayed}d`, color: "text-red-600" })),
+    ...allContainers.filter(r => !r.docReceived && r.status === "At Port")
+      .map(r => ({ label: r.containerNumber, issue: "At port — docs missing", color: "text-rose-600" })),
+    ...allContainers.filter(r => r.docsReadyNotSent)
+      .map(r => ({ label: r.containerNumber, issue: "Docs ready — not sent to truck", color: "text-amber-600" })),
+    ...allContainers.filter(r => r.isOverdue)
+      .map(r => ({ label: r.containerNumber, issue: "Offload overdue", color: "text-orange-600" })),
+  ], [allContainers]);
 
-  const attentionRows = [
-    ...active.filter(r => daysDelayed(r.borderDate, r.transporter) !== null).map(r => ({ label: r.containerNumber, issue: `Overdue +${daysDelayed(r.borderDate, r.transporter)}d`, color: "text-red-600" })),
-    ...active.filter(r => !r.docsReceived && r.status === "At Port").map(r => ({ label: r.containerNumber, issue: "At port — docs missing", color: "text-rose-600" })),
-    ...active.filter(r => r.docsReceived && !r.docsSentToTruck && r.status === "At Port").map(r => ({ label: r.containerNumber, issue: "Docs ready — not sent to truck", color: "text-amber-600" })),
-    ...active.filter(r => !r.docsReceived && (r.status === "OTW" || r.status === "Sea") && isUpcoming(r.eta)).map(r => ({ label: r.containerNumber, issue: `ETA ${fmtD(r.eta)} — docs pending`, color: "text-yellow-700" })),
-  ];
+  const modeSelector = (
+    <div className="flex items-center gap-2 flex-wrap" data-testid="summary-mode-selector">
+      <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      <span className="text-xs text-muted-foreground">View:</span>
+      <Button size="sm" variant={companyMode === "session" ? "default" : "outline"} className="text-xs gap-1.5" onClick={() => setCompanyMode("session")} data-testid="button-summary-my-company">My Company</Button>
+      <Button size="sm" variant={companyMode === "all" ? "default" : "outline"} className="text-xs gap-1.5" onClick={() => setCompanyMode("all")} data-testid="button-summary-all-companies">All Accessible Companies</Button>
+    </div>
+  );
+
+  if (isLoading) return (
+    <div className="space-y-4">
+      {modeSelector}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-11 gap-2">
+        {Array.from({ length: 11 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-md" />)}
+      </div>
+      <Skeleton className="h-40 w-full rounded-md" />
+    </div>
+  );
+
+  if (isError) return (
+    <div className="space-y-4">
+      {modeSelector}
+      <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/20 px-4 py-3 flex gap-3 items-start text-sm text-red-800 dark:text-red-300">
+        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+        <div>
+          <div className="font-semibold">Failed to load container data</div>
+          <div className="text-xs mt-0.5">{(error as Error)?.message ?? "Network or server error."}</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (stats.total === 0) return (
+    <div className="space-y-4">
+      {modeSelector}
+      <div className="rounded-md border border-dashed px-6 py-10 text-center text-muted-foreground text-sm">
+        <FileX className="h-8 w-8 mx-auto mb-2 opacity-40" />
+        <div className="font-medium">No active containers found</div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
+      {modeSelector}
+
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-11 gap-2">
-        <StatCard label="Active GIT"            value={totalActive}   icon={<Package className="h-4 w-4 text-primary" />}          accent="bg-primary/10" />
-        <StatCard label="At Sea / OTW"           value={atSea}          icon={<Ship className="h-4 w-4 text-blue-600" />}             accent="bg-blue-100 dark:bg-blue-900/30" />
-        <StatCard label="At Port"                value={atPort}         icon={<Package className="h-4 w-4 text-amber-600" />}         accent="bg-amber-100 dark:bg-amber-900/30" />
-        <StatCard label="Left Dar"               value={leftDar}        icon={<Truck className="h-4 w-4 text-violet-600" />}          accent="bg-violet-100 dark:bg-violet-900/30" />
-        <StatCard label="In Transit"             value={inTransit}      icon={<Truck className="h-4 w-4 text-indigo-600" />}          accent="bg-indigo-100 dark:bg-indigo-900/30" />
-        <StatCard label="Arrived"                value={arrived}        icon={<CheckCircle2 className="h-4 w-4 text-green-600" />}    accent="bg-green-100 dark:bg-green-900/30" />
-        <StatCard label="Delayed"                value={delayed}        alert={delayed > 0}  icon={<Clock className="h-4 w-4 text-red-600" />}              accent="bg-red-100 dark:bg-red-900/30" />
-        <StatCard label="Docs Missing"           value={docsMissing}    alert={docsMissing > 0} icon={<FileX className="h-4 w-4 text-orange-600" />}         accent="bg-orange-100 dark:bg-orange-900/30" />
-        <StatCard label="Docs Ready, Not Sent"   value={docsReadyNS}    alert={docsReadyNS > 0} icon={<FileX className="h-4 w-4 text-amber-600" />}          accent="bg-amber-100 dark:bg-amber-900/30" />
-        <StatCard label="Container Cost"         value={`$${fmt(totalCost, 0)}`} icon={<DollarSign className="h-4 w-4 text-green-600" />} accent="bg-green-100 dark:bg-green-900/30" />
-        <StatCard label="Total Fees"             value={`$${fmt(totalFee + totalDuty, 0)}`} sub={`T:$${fmt(totalFee,0)} D:$${fmt(totalDuty,0)}`} icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} />
+        <StatCard label="Active GIT"           value={stats.total}                               icon={<Package className="h-4 w-4 text-primary" />}            accent="bg-primary/10" />
+        <StatCard label="At Sea / OTW"          value={stats.atSea}                               icon={<Ship className="h-4 w-4 text-blue-600" />}               accent="bg-blue-100 dark:bg-blue-900/30" />
+        <StatCard label="At Port"               value={stats.atPort}                              icon={<Package className="h-4 w-4 text-amber-600" />}           accent="bg-amber-100 dark:bg-amber-900/30" />
+        <StatCard label="Left Dar"              value={stats.leftDar}                             icon={<Truck className="h-4 w-4 text-violet-600" />}            accent="bg-violet-100 dark:bg-violet-900/30" />
+        <StatCard label="In Transit"            value={stats.inTransit}                           icon={<Truck className="h-4 w-4 text-indigo-600" />}            accent="bg-indigo-100 dark:bg-indigo-900/30" />
+        <StatCard label="Arrived"               value={stats.arrived}                             icon={<CheckCircle2 className="h-4 w-4 text-green-600" />}      accent="bg-green-100 dark:bg-green-900/30" />
+        <StatCard label="Delayed"               value={stats.delayed}       alert={stats.delayed > 0}       icon={<Clock className="h-4 w-4 text-red-600" />}       accent="bg-red-100 dark:bg-red-900/30" />
+        <StatCard label="Docs Ready, Not Sent"  value={stats.docsReadyNotSent} alert={stats.docsReadyNotSent > 0} icon={<FileX className="h-4 w-4 text-amber-600" />} accent="bg-amber-100 dark:bg-amber-900/30" />
+        <StatCard label="Overdue"               value={stats.overdue}       alert={stats.overdue > 0}       icon={<Clock className="h-4 w-4 text-orange-600" />}   accent="bg-orange-100 dark:bg-orange-900/30" />
+        <StatCard label="Container Cost"        value={`$${fmt(stats.totalCost, 0)}`}             icon={<DollarSign className="h-4 w-4 text-green-600" />}        accent="bg-green-100 dark:bg-green-900/30" />
+        <StatCard label="Total Fees"            value={`$${fmt(stats.totalFee + stats.totalDuty, 0)}`} sub={`T:$${fmt(stats.totalFee,0)} D:$${fmt(stats.totalDuty,0)}`} icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} />
       </div>
 
-      {/* OTW Summary bar — like the Excel summary block */}
+      {/* Active container summary bar — by company */}
       <div className="rounded-md border overflow-hidden">
         <div className="bg-zinc-800 dark:bg-zinc-700 text-white px-3 py-1.5 text-xs font-bold tracking-wide">
-          OTW SUMMARY
+          ACTIVE CONTAINER SUMMARY — BY COMPANY
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <tbody>
-              {GROUP_DEFS.map(gd => {
-                const sub = active.filter(r => r.group === gd.id);
-                if (sub.length === 0 && gd.id !== "gc-lsh") return null;
-                const cost = sub.reduce((s, r) => s + r.amount, 0);
+              {byCompany.map((c, idx) => {
+                const color = COMPANY_COLORS[idx % COMPANY_COLORS.length];
                 return (
-                  <tr key={gd.id} className="border-b last:border-b-0 hover:bg-muted/30">
-                    <td className={cn("py-1 px-3 font-bold w-4", gd.headerBg, gd.headerText)} />
-                    <td className="py-1 px-3 font-semibold">{gd.title}</td>
-                    <td className="py-1 px-3 text-muted-foreground">{gd.subtitle}</td>
-                    <td className="py-1 px-3 text-right font-bold text-base">{sub.length}</td>
-                    <td className="py-1 px-3 text-right font-semibold">${fmt(cost, 2)}</td>
+                  <tr key={c.label} className="border-b last:border-b-0 hover:bg-muted/30">
+                    <td className={cn("py-1 px-1 font-bold w-2", color.bg, color.text)} />
+                    <td className="py-1 px-3 font-semibold">{c.label}</td>
+                    <td className="py-1 px-3 text-right font-bold text-base">{c.count}</td>
+                    <td className="py-1 px-3 text-right font-semibold">${fmt(c.cost, 2)}</td>
                   </tr>
                 );
               })}
               <tr className="border-t-2 bg-muted/40 font-bold">
                 <td />
-                <td className="py-1 px-3" colSpan={2}>TOTAL OTW</td>
-                <td className="py-1 px-3 text-right text-base">{totalActive}</td>
-                <td className="py-1 px-3 text-right">${fmt(totalCost, 2)}</td>
+                <td className="py-1 px-3">TOTAL ACTIVE</td>
+                <td className="py-1 px-3 text-right text-base">{stats.total}</td>
+                <td className="py-1 px-3 text-right">${fmt(stats.totalCost, 2)}</td>
               </tr>
             </tbody>
           </table>
@@ -794,12 +1087,11 @@ function TabSummary({ active }: { active: GITRow[] }) {
         </Card>
       )}
 
-      {/* Grouped breakdown tables */}
+      {/* Breakdown tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <SummaryGroupTable title="Totals by Destination / Group" rows={byGroup} />
-        <SummaryGroupTable title="Totals by Company"             rows={byCompany} />
-        <SummaryGroupTable title="Totals by Transporter"         rows={byTransport} />
-        <SummaryGroupTable title="Totals by Agent / Declarant"   rows={byAgent} />
+        <SummaryGroupTable title="Totals by Company"           rows={byCompany} />
+        <SummaryGroupTable title="Totals by Transporter"       rows={byTransport} />
+        <SummaryGroupTable title="Totals by Agent / Declarant" rows={byAgent} />
       </div>
     </div>
   );
@@ -1369,8 +1661,6 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
 
 // ─── Tab 5 wrapper with data fetching ────────────────────────────────────────
 
-type CompanyViewMode = "session" | "all";
-
 function TabAgentDuty() {
   const [companyMode, setCompanyMode] = useState<CompanyViewMode>("session");
 
@@ -1705,7 +1995,7 @@ function TabWhatsApp({ active }: { active: GITRow[] }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function GITMockup() {
-  const active = ROWS.filter(r => ACTIVE_STATUSES.includes(r.status));
+  const mockActive = ROWS.filter(r => ACTIVE_STATUSES.includes(r.status));
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -1716,14 +2006,14 @@ export default function GITMockup() {
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
 
-        {/* Mockup banner */}
-        <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 text-sm text-amber-800 dark:text-amber-300">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
+        {/* Status banner */}
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-blue-300 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-700 text-sm text-blue-800 dark:text-blue-300">
+          <Info className="h-4 w-4 shrink-0" />
           <span>
-            <strong>Mockup mode</strong> — fake data only. No DB reads or writes.{" "}
-            <span className="font-medium">Access: Admin / Developer / Owner only.</span>
+            <strong>Summary, Detail & Agent/Duty tabs</strong> use real database data.{" "}
+            <span className="text-blue-600 dark:text-blue-400">At Port/Sea, Truck/Location, and WhatsApp tabs use sample data.</span>
           </span>
-          <Badge variant="outline" className="ml-auto text-xs shrink-0 border-amber-400 text-amber-700 dark:text-amber-400">
+          <Badge variant="outline" className="ml-auto text-xs shrink-0 border-blue-400 text-blue-700 dark:text-blue-400">
             <FileSpreadsheet className="h-3 w-3 mr-1" />
             GIT Workbook
           </Badge>
@@ -1740,15 +2030,15 @@ export default function GITMockup() {
           </TabsList>
 
           <TabsContent value="summary" className="mt-4">
-            <TabSummary active={active} />
+            <TabSummary />
           </TabsContent>
 
           <TabsContent value="detail" className="mt-4">
-            <TabDetail rows={active} />
+            <TabDetail />
           </TabsContent>
 
           <TabsContent value="port" className="mt-4">
-            <TabPortReport active={active} />
+            <TabPortReport active={mockActive} />
           </TabsContent>
 
           <TabsContent value="trucks" className="mt-4">
@@ -1760,7 +2050,7 @@ export default function GITMockup() {
           </TabsContent>
 
           <TabsContent value="whatsapp" className="mt-4">
-            <TabWhatsApp active={active} />
+            <TabWhatsApp active={mockActive} />
           </TabsContent>
         </Tabs>
 
