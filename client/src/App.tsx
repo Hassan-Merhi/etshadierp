@@ -285,7 +285,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/stock-otw"><Redirect to="/inventory?tab=on-the-way" /></Route>
       <Route path="/mock-containers-otw" component={ContainersOTW} />
       <Route path="/mock-git" component={GITMockup} />
-      <Route path="/git"><Redirect to="/mock-containers-otw" /></Route>
+      <Route path="/git" component={GITMockup} />
       <Route path="/containers"><Redirect to="/inventory?tab=containers" /></Route>
       <Route path="/containers/:id" component={ContainerDetail} />
       <Route path="/offloads/:id" component={OffloadDetail} />

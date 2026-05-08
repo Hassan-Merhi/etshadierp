@@ -31,6 +31,7 @@ import {
   KeyRound,
   LayoutGrid,
   Handshake,
+  Globe,
 } from "lucide-react";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
@@ -281,6 +282,14 @@ export function AppSidebar({ user }: { user?: any }) {
         )}
 
         <div className="mt-4 pt-3 border-t border-sidebar-border/60 space-y-0.5">
+          {(user?.role === "Admin" || user?.role === "Developer" || user?.role === "Owner") && (
+            <SidebarFlatLink
+              href="/git"
+              icon={Globe}
+              label="GIT Workbook"
+              testId="link-git"
+            />
+          )}
           {isItemVisible({ title: "Chat", url: "/chat", icon: MessageCircle }) && (
             <SidebarFlatLink
               href="/chat"
