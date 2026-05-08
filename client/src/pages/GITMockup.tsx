@@ -1191,21 +1191,33 @@ function TabTruckLocation() {
                   </td>
                 </tr>
               );
-              const dataRows = shopRows.map(r => (
-                <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/40">
-                  <td className="py-0.5 px-3 text-center font-mono font-semibold tracking-tight">{r.containerNumber}</td>
-                  <td className="py-0.5 px-3 text-center">{r.supplierName ?? <span className="text-muted-foreground">—</span>}</td>
-                  <td className="py-0.5 px-3 text-center font-mono">{r.numberPlate ?? <span className="text-muted-foreground">—</span>}</td>
-                  <td className="py-0.5 px-3 text-center">{r.trackingLocation ?? <span className="text-muted-foreground">—</span>}</td>
-                  <td className="py-0.5 px-3 text-center">{r.agent ?? <span className="text-muted-foreground">—</span>}</td>
-                  <td className="py-0.5 px-3 text-center">{r.transporter ?? <span className="text-muted-foreground">—</span>}</td>
-                  <td className="py-0.5 px-3 text-center">
-                    <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", (STATUS_BADGE as Record<string, string>)[r.status] ?? "bg-muted text-foreground")}>
-                      {r.status}
-                    </span>
-                  </td>
-                </tr>
-              ));
+              const supplierGroups = groupBySupplier(shopRows);
+              const hasMultiSupplier = supplierGroups.length > 1;
+              const dataRows = supplierGroups.flatMap(({ name: supName, rows: supRows }) => {
+                const supHdr = hasMultiSupplier ? (
+                  <tr key={`sup-${shop}-${supName}`} className="bg-muted/40 border-t border-border">
+                    <td colSpan={7} className="py-0.5 px-3 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      {supName} — {supRows.length}
+                    </td>
+                  </tr>
+                ) : null;
+                const rows = supRows.map(r => (
+                  <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/40">
+                    <td className="py-0.5 px-3 text-center font-mono font-semibold tracking-tight">{r.containerNumber}</td>
+                    <td className="py-0.5 px-3 text-center">{r.supplierName ?? <span className="text-muted-foreground">—</span>}</td>
+                    <td className="py-0.5 px-3 text-center font-mono">{r.numberPlate ?? <span className="text-muted-foreground">—</span>}</td>
+                    <td className="py-0.5 px-3 text-center">{r.trackingLocation ?? <span className="text-muted-foreground">—</span>}</td>
+                    <td className="py-0.5 px-3 text-center">{r.agent ?? <span className="text-muted-foreground">—</span>}</td>
+                    <td className="py-0.5 px-3 text-center">{r.transporter ?? <span className="text-muted-foreground">—</span>}</td>
+                    <td className="py-0.5 px-3 text-center">
+                      <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", (STATUS_BADGE as Record<string, string>)[r.status] ?? "bg-muted text-foreground")}>
+                        {r.status}
+                      </span>
+                    </td>
+                  </tr>
+                ));
+                return supHdr ? [supHdr, ...rows] : rows;
+              });
               return [hdrRow, ...dataRows];
             })}
           </tbody>
