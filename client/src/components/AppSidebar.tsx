@@ -145,7 +145,7 @@ export function useErpVisibleSections(user?: any): {
   const allowedPages = new Set<string>(myErpPages?.pageKeys || []);
 
   const isItemVisible = (item: NavItem): boolean => {
-    const isPOSUser   = user?.role?.startsWith("POS");
+    const isPOSUser   = user?.role === "POS";
     const isAdmin     = user?.role === "Admin" || user?.role === "Developer";
     const isDeveloper = user?.role === "Developer";
     const isOwner     = user?.role === "Owner";

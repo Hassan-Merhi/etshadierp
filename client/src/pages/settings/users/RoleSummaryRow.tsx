@@ -19,7 +19,7 @@ export function RoleSummaryRow({
   onEdit,
   onDelete,
 }: RoleSummaryRowProps) {
-  const isPOS = role.role?.startsWith("POS");
+  const isPOS = role.role === "POS";
   const isPrivileged = ["Admin", "Owner", "Developer"].includes(role.role);
 
   return (

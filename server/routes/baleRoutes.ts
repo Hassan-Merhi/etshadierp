@@ -2482,7 +2482,7 @@ export function registerBaleRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       
       // Check if user is POS role
-      const isPOS = req.session.currentRole?.startsWith("POS");
+      const isPOS = req.session.currentRole === "POS";
       
       const locationId = parseInt(req.params.locationId);
       if (isNaN(locationId)) return res.status(400).json({ message: "Invalid location ID" });

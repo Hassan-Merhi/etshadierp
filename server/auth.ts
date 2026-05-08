@@ -92,7 +92,7 @@ export function canModifyDate(dateField: string = "voucherDate") {
     }
 
     // Manager and POS users can only modify today's date
-    const isPOS = req.user.role.startsWith("POS");
+    const isPOS = req.user.role === "POS";
     if (req.user.role === "Manager" || isPOS) {
       const today = getClientDate(req);
       const recordDate = req.body[dateField];
@@ -114,7 +114,7 @@ export async function checkPOSLocation(req: Request, res: Response, next: NextFu
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  const isPOS = req.user.role.startsWith("POS");
+  const isPOS = req.user.role === "POS";
   if (!isPOS) {
     return next();
   }
@@ -157,7 +157,7 @@ export function requireNonPOS(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  const isPOS = req.user.role.startsWith("POS");
+  const isPOS = req.user.role === "POS";
   if (isPOS) {
     return res.status(403).json({ 
       message: "Access denied: This resource is not available for POS users" 

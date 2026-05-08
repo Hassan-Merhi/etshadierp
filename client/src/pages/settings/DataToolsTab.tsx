@@ -93,7 +93,7 @@ interface SilentImportRow {
   const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
     (data) => {
       // If role is POS, assignedLocationId must be present
-      if (data.role.startsWith("POS") && !data.assignedLocationId) {
+      if (data.role === "POS" && !data.assignedLocationId) {
         return false;
       }
       return true;

@@ -181,7 +181,7 @@ export function registerVoucherRoutes(app: Express) {
       const { startDate, endDate } = req.query;
       
       // Check if user is POS role
-      const isPOS = req.session.currentRole?.startsWith("POS");
+      const isPOS = req.session.currentRole === "POS";
 
       let vouchers;
       if (startDate && endDate) {
@@ -425,7 +425,7 @@ export function registerVoucherRoutes(app: Express) {
   // Create a new voucher
   app.post("/api/vouchers", requireAuth, async (req, res) => {
     try {
-      const isPOS = (req as any).user?.role?.startsWith("POS");
+      const isPOS = (req as any).user?.role === "POS";
       const voucherType = req.body.voucherType;
       if (isPOS && voucherType !== "StockTransfer" && voucherType !== "Stock Transfer") {
         return res.status(403).json({ message: "Access denied: This resource is not available for POS users" });

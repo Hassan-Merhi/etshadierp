@@ -18,7 +18,7 @@ export default function SalesToolsHub() {
     queryKey: ["/api/auth/me"],
   });
 
-  const isPOS = user?.role?.startsWith("POS");
+  const isPOS = user?.role === "POS";
 
   const tabs = isPOS
     ? [

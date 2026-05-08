@@ -47,7 +47,7 @@ export function InlineRoleEditor({
   const [cashAccountId, setCashAccountId] = useState<number | undefined>();
   const [canSellNegativeStock, setCanSellNegativeStock] = useState(false);
 
-  const isPOS = role.startsWith("POS");
+  const isPOS = role === "POS";
   const isPrivileged = ["Admin", "Owner", "Developer"].includes(role);
 
   useEffect(() => {
@@ -60,7 +60,7 @@ export function InlineRoleEditor({
       setCashAccountId(editingRole.cashAccountId ?? undefined);
       setCanSellNegativeStock(editingRole.canSellNegativeStock ?? false);
 
-      if (editingRole.role?.startsWith("POS")) {
+      if (editingRole.role === "POS") {
         fetch(`/api/user-locations/${editingRole.userId}/${editingRole.companyId}`, { credentials: "include" })
           .then((r) => r.json())
           .then((locs) => {

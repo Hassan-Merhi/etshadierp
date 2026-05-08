@@ -780,7 +780,7 @@ export function registerStockRoutes(app: Express) {
         return res.status(400).json({ message: "locationId query parameter is required" });
       }
 
-      const isPOS = req.user?.role?.startsWith("POS");
+      const isPOS = req.user?.role === "POS";
       const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(req.user?.role || "");
 
       if (showAll && isPOS) {

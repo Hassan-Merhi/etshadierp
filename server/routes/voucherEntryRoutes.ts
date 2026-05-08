@@ -138,7 +138,7 @@ export function registerVoucherEntryRoutes(app: Express) {
       // For Sales vouchers, also get sales items
       if (voucher.voucherType === "Sales") {
         const userRole = req.session.currentRole;
-        const isPOSUser = userRole?.startsWith("POS");
+        const isPOSUser = userRole === "POS";
 
         const salesItemsList = await db
           .select({
@@ -197,7 +197,7 @@ export function registerVoucherEntryRoutes(app: Express) {
 
       // Check if user is a POS role (should not see cost prices)
       const userRole = req.session.currentRole;
-      const isPOSUser = userRole?.startsWith("POS");
+      const isPOSUser = userRole === "POS";
 
       // For Purchase vouchers, get purchase order line items
       if (voucher.voucherType === "Purchase") {

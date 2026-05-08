@@ -254,7 +254,7 @@ export function registerPosRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const isPOSUser = (req.user?.role || "").startsWith("POS");
+      const isPOSUser = req.user?.role === "POS";
 
       const {
         locationId,

@@ -235,7 +235,7 @@ declare global {
 }
 
 function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: boolean }) {
-  const isPOS = user?.role?.startsWith("POS");
+  const isPOS = user?.role === "POS";
   const [_location, navigate] = useLocation();
   
   // POS users only see POS and Location Inventory
@@ -467,7 +467,7 @@ function AuthenticatedApp() {
     return () => clearTimeout(t);
   }, [isLoading]);
 
-  const isPOS = user?.role?.startsWith("POS") ?? false;
+  const isPOS = user?.role === "POS";
   const { toast } = useToast();
   const prevUnreadRef = useRef<number>(-1);
 

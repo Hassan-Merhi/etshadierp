@@ -2715,7 +2715,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   // Special rendering for Sales vouchers
                   (() => {
                     // Separate ledger entries (cash/revenue) from sales items
-                    const canSeeProfitCost = !(!user || user?.role?.startsWith("POS"));
+                    const canSeeProfitCost = !(!user || user?.role === "POS");
 
                     const ledgerEntries = viewVoucherEntries.filter(
                       (e: ViewVoucherEntry) => !e.isStockItem && !e.stockItemId,
@@ -2868,7 +2868,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   // Special rendering for Purchase vouchers - show items with supplier info
                   (() => {
                     // SECURITY: Hide cost prices for POS users (default to hiding if user is undefined during load)
-                    const isPOSUser = !user || user?.role?.startsWith("POS");
+                    const isPOSUser = !user || user?.role === "POS";
 
                     // Separate ledger entries from purchase items
                     // Use positive allow-list to keep only charge-type accounts (Freight, Fumigation, Surcharge, Discount, etc.)
@@ -3236,7 +3236,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 <TableHead>Type</TableHead>
                               )}
                               <TableHead className="text-right">Qty</TableHead>
-                              {user && !user?.role?.startsWith("POS") && (
+                              {user && user?.role !== "POS" && (
                                 <>
                                   <TableHead className="text-right">
                                     Amount
@@ -3273,7 +3273,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                       <TableBody>
                         {(() => {
                           const isPOSUser =
-                            !user || user?.role?.startsWith("POS");
+                            !user || user?.role === "POS";
 
                           // For Consumption/Production/Mixed/Stock Transfer, show stock items
                           if (
@@ -3424,7 +3424,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                   )
                                   .toFixed(3).replace(/\.?0+$/, "")}
                               </TableCell>
-                              {user && !user?.role?.startsWith("POS") && (
+                              {user && user?.role !== "POS" && (
                                 <>
                                   <TableCell></TableCell>
                                   <TableCell className="text-right font-mono">
@@ -3515,7 +3515,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               .toFixed(3).replace(/\.?0+$/, "")} units
                           </span>
                         </div>
-                        {user && !user?.role?.startsWith("POS") && (
+                        {user && user?.role !== "POS" && (
                           <span className="font-mono">
                             {(() => {
                               const prodTotal = viewVoucherEntries

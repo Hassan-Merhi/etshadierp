@@ -692,10 +692,10 @@ export function registerAuthRoutes(app: Express) {
         const parsed = insertUserCompanyRoleSchema.parse(req.body);
 
         // Validate POS roles have required fields
-        if (parsed.role.startsWith("POS") && !parsed.assignedLocationId) {
+        if (parsed.role === "POS" && !parsed.assignedLocationId) {
           return res
             .status(400)
-            .json({ message: "POS roles require an assigned location" });
+            .json({ message: "POS role requires an assigned location" });
         }
 
         const role = await storage.createUserCompanyRole(parsed);
@@ -716,10 +716,10 @@ export function registerAuthRoutes(app: Express) {
         const parsed = insertUserCompanyRoleSchema.partial().parse(req.body);
 
         // Validate POS roles have required fields if role is being updated
-        if (parsed.role?.startsWith("POS") && !parsed.assignedLocationId) {
+        if (parsed.role === "POS" && !parsed.assignedLocationId) {
           return res
             .status(400)
-            .json({ message: "POS roles require an assigned location" });
+            .json({ message: "POS role requires an assigned location" });
         }
 
         const role = await storage.updateUserCompanyRole(parseInt(id), parsed);

@@ -314,7 +314,7 @@ if (asOfDate) {
 }
 
         // Filter sensitive data for POS users (they should only see quantity)
-        const isPOS = req.user?.role?.startsWith("POS");
+        const isPOS = req.user?.role === "POS";
         if (isPOS) {
           const filteredInventory = inventory.map((item: any) => ({
             ...item,

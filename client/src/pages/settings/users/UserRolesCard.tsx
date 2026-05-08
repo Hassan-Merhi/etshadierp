@@ -37,7 +37,7 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
   const posCompanyIds = useMemo(() => {
     const ids = new Set<number>();
     companyRoles.forEach((r: any) => {
-      if (r.role?.startsWith("POS") && r.companyId) ids.add(r.companyId);
+      if (r.role === "POS" && r.companyId) ids.add(r.companyId);
     });
     return Array.from(ids);
   }, [companyRoles]);
@@ -62,7 +62,7 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
 
   // POS roles that need user-location lookup
   const posRoleKeys = useMemo(
-    () => companyRoles.filter((r: any) => r.role?.startsWith("POS")).map((r: any) => `${r.id}:${r.companyId}`),
+    () => companyRoles.filter((r: any) => r.role === "POS").map((r: any) => `${r.id}:${r.companyId}`),
     [companyRoles]
   );
 
@@ -70,7 +70,7 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
   const { data: userLocationsMap = {} } = useQuery<Record<number, number[]>>({
     queryKey: ["/api/user-locations/bulk", userId, posRoleKeys],
     queryFn: async () => {
-      const posRoles = companyRoles.filter((r: any) => r.role?.startsWith("POS"));
+      const posRoles = companyRoles.filter((r: any) => r.role === "POS");
       const result: Record<number, number[]> = {};
       await Promise.all(
         posRoles.map(async (r: any) => {
@@ -110,7 +110,7 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
   const showEditor = activeEditorRoleId !== null;
 
   const getLocationNames = (role: any): string[] => {
-    if (!role.role?.startsWith("POS")) return [];
+    if (role.role !== "POS") return [];
     const assignedIds = userLocationsMap[role.id] ?? [];
     if (assignedIds.length > 0) {
       return assignedIds.map((id: number) => locationNameMap[id] ?? `#${id}`);

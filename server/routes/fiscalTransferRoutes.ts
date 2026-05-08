@@ -470,7 +470,7 @@ export function registerFiscalTransferRoutes(app: Express) {
         if (r.destinationLocationId) locationIds.add(r.destinationLocationId);
       }
       // Determine if this is a POS user and their assigned location
-      const isPosUserList = req.user?.role?.startsWith("POS");
+      const isPosUserList = req.user?.role === "POS";
       const posLocationIdList = isPosUserList
         ? (req.user?.assignedLocationId ?? req.session?.currentLocationId ?? null)
         : null;
@@ -1084,7 +1084,7 @@ export function registerFiscalTransferRoutes(app: Express) {
         .from(vouchers)
         .where(eq(vouchers.id, voucherId));
 
-      const isPosUser = req.user?.role?.startsWith("POS");
+      const isPosUser = req.user?.role === "POS";
       const posLocationId = isPosUser
         ? (req.user?.assignedLocationId ?? req.session?.currentLocationId ?? null)
         : null;
