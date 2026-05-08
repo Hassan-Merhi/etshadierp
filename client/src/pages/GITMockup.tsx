@@ -1416,8 +1416,8 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
     <div className="rounded-md border overflow-hidden" data-testid={`agent-card-${agentName}`}>
 
       {/* ── Agent header ── */}
-      <div className="bg-yellow-400 text-yellow-950 px-3 py-2 font-bold text-sm flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="bg-yellow-400 text-yellow-950 px-3 py-2 font-bold text-sm relative flex items-center justify-center gap-2 flex-wrap min-h-[2.5rem]">
+        <div className="flex items-center gap-2 flex-wrap justify-center">
           <span className="tracking-wide">{agentName}</span>
           <Badge className={cn("text-[10px] font-semibold no-default-active-elevate", confidenceBadge.cls)}>
             {confidenceBadge.label}
@@ -1427,13 +1427,16 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
           )}
         </div>
         {hasBalance && (
-          warnings.includes("no_open_balance")
-            ? <Badge className="text-xs bg-green-700 text-white no-default-active-elevate">Fully Cleared</Badge>
-            : warnings.includes("allocation_gap")
-              ? <Badge className="text-xs bg-red-600 text-white no-default-active-elevate">Allocation Gap</Badge>
-              : openBalance !== null && openBalance > 0
-                ? <Badge className="text-xs bg-amber-700 text-white no-default-active-elevate">Open: ${fmt(openBalance, 0)}</Badge>
-                : <Badge className="text-xs bg-green-600 text-white no-default-active-elevate">Balance Allocated</Badge>
+          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            {warnings.includes("no_open_balance")
+              ? <Badge className="text-xs bg-green-700 text-white no-default-active-elevate">Fully Cleared</Badge>
+              : warnings.includes("allocation_gap")
+                ? <Badge className="text-xs bg-red-600 text-white no-default-active-elevate">Allocation Gap</Badge>
+                : openBalance !== null && openBalance > 0
+                  ? <Badge className="text-xs bg-amber-700 text-white no-default-active-elevate">Open: ${fmt(openBalance, 0)}</Badge>
+                  : <Badge className="text-xs bg-green-600 text-white no-default-active-elevate">Balance Allocated</Badge>
+            }
+          </div>
         )}
       </div>
 
@@ -1803,18 +1806,20 @@ function TabAgentDuty() {
           )}
 
           {/* Empty section (possible when a company has no agent data) */}
-          {section.agents.length === 0 ? (
+          {section.agents.filter(a => a.activePreviewRows.length > 0).length === 0 ? (
             <div className="rounded-md border border-dashed px-4 py-6 text-center text-muted-foreground text-sm">
               <FileX className="h-6 w-6 mx-auto mb-1.5 opacity-40" />
               <div className="text-xs">No agent / duty data for {section.companyName}</div>
             </div>
           ) : (
-            section.agents.map(agent => (
-              <AgentCard
-                key={`${section.companyId}-${agent.agentName}`}
-                agent={agent}
-              />
-            ))
+            section.agents
+              .filter(agent => agent.activePreviewRows.length > 0)
+              .map(agent => (
+                <AgentCard
+                  key={`${section.companyId}-${agent.agentName}`}
+                  agent={agent}
+                />
+              ))
           )}
         </div>
       ))}
