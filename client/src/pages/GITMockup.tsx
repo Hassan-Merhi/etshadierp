@@ -980,185 +980,289 @@ function TabTruckLocation() {
 
 // ─── Tab 5: Agent / Duty Overview ────────────────────────────────────────────
 //
-// Mockup shows the reconciliation concept:
-//   Account Balance   = what the Accounts/Ledger page shows for this agent account
-//   Container Duty Total = sum of duty_fee across all containers for this agent
-//   Difference        = gap (usually = active containers not yet posted to ledger)
+// FIFO Balance Allocation — reporting view only.
+//   Official Account Balance (from Accounts/Ledger) is the authoritative figure.
+//   Containers sorted oldest-offloaded-first.
+//   clearedByPayments = max(containerDutyTotal - ledgerBalance, 0)
+//   Walk oldest→newest: mark containers as Cleared / Partially Cleared / Open.
+//   Sum of Remaining amounts on Open rows must equal the Account Balance.
 //
-// In the real system, Account Balance is the authoritative figure.
-// Container rows are the operational breakdown — they should reconcile.
+// Payments are posted MANUALLY in Accounts/Vouchers.
+// This view recalculates automatically whenever the ledger balance changes.
+// No container records, vouchers, or ledger entries are created or modified here.
 
-// Fake ledger balances — simulating what the Accounts page would return.
-// In production this comes from: opening_balance + sum(voucher_entries.debit - credit)
-// for the ledger account whose name fuzzy-matches the agent string.
-// NOTE: Only offloaded containers have been manually posted to the ledger in this demo,
-// which is why Account Balance < Container Duty Total for every agent.
+// Fake ledger balances — simulating what the Accounts page returns.
+// In production: opening_balance + sum(voucher_entries.debit − credit)
+// for the ledger account whose name fuzzy-matches containers.agent.
 const FAKE_LEDGER_BALANCES: Record<string, number> = {
-  NAHLI:    59500,   // matches offloaded-only total; active 6 × $8,500 not yet posted
-  NCA:      23300,   // matches offloaded-only total ($8,500 + $6,300 + $8,500)
-  BELTRANS: 10400,   // matches offloaded-only total ($5,500 + $4,900)
+  NAHLI:    59500,   // $110,500 total − $51,000 cleared = $59,500 open (6 × $8,500 cleared)
+  NCA:      23300,   // $48,800 total − $25,500 cleared = $23,300 open
+  BELTRANS: 10400,   // $22,500 total − $12,100 cleared = $10,400 open
 };
+
+type AllocStatus = "Cleared" | "Partially Cleared" | "Open";
+
+interface AllocRow {
+  row: DutyRow;
+  clearedAmount: number;
+  remainingAmount: number;
+  status: AllocStatus;
+}
+
+/** Sort containers for FIFO allocation: offloaded first, then by borderDate asc, then containerNumber. */
+function sortForFIFO(rows: DutyRow[]): DutyRow[] {
+  return [...rows].sort((a, b) => {
+    if (a.offloaded !== b.offloaded) return a.offloaded ? -1 : 1;
+    const dA = a.borderDate ?? "9999-99-99";
+    const dB = b.borderDate ?? "9999-99-99";
+    if (dA !== dB) return dA < dB ? -1 : 1;
+    return a.containerNumber.localeCompare(b.containerNumber);
+  });
+}
+
+/**
+ * Allocate ledgerBalance against containers oldest-first.
+ * clearedByPayments = max(totalDuty − ledgerBalance, 0)
+ * Walk oldest→newest, consuming clearedByPayments.
+ */
+function allocateFIFO(rows: DutyRow[], ledgerBalance: number): AllocRow[] {
+  const sorted = sortForFIFO(rows);
+  const totalDuty = sorted.reduce((s, r) => s + r.amount, 0);
+  let toConsume = Math.max(totalDuty - ledgerBalance, 0);
+  return sorted.map(row => {
+    if (toConsume >= row.amount) {
+      toConsume -= row.amount;
+      return { row, clearedAmount: row.amount, remainingAmount: 0, status: "Cleared" };
+    } else if (toConsume > 0) {
+      const cl = toConsume; toConsume = 0;
+      return { row, clearedAmount: cl, remainingAmount: row.amount - cl, status: "Partially Cleared" };
+    } else {
+      return { row, clearedAmount: 0, remainingAmount: row.amount, status: "Open" };
+    }
+  });
+}
 
 function TabAgentDuty() {
   const agents = [...new Set(DUTY_ROWS.map(r => r.agent))];
+  const [expandedCleared, setExpandedCleared] = useState<Set<string>>(new Set());
+
+  function toggleCleared(agent: string) {
+    setExpandedCleared(prev => {
+      const next = new Set(prev);
+      if (next.has(agent)) next.delete(agent); else next.add(agent);
+      return next;
+    });
+  }
 
   return (
     <div className="space-y-4">
 
-      {/* Reconciliation concept banner */}
-      <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 px-3 py-2 text-xs text-amber-800 dark:text-amber-300 flex gap-2 items-start">
-        <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+      {/* Info banner */}
+      <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 px-3 py-2 text-xs text-blue-800 dark:text-blue-300 flex gap-2 items-start">
+        <FileSpreadsheet className="h-3.5 w-3.5 shrink-0 mt-0.5" />
         <span>
-          <strong>Mockup — reconciliation concept.</strong>{" "}
-          <em>Account Balance</em> = live ledger balance from Accounts page.{" "}
-          <em>Container Duty Total</em> = sum of duty_fee on all containers for this agent.{" "}
-          The gap represents containers whose duty fees have not yet been posted as a payable voucher.
+          <strong>Balance Allocation — reporting view only.</strong>{" "}
+          Payments are posted manually in Accounts / Vouchers. This tab allocates the current
+          ledger balance to containers <em>oldest-offloaded-first</em>. No records are created or
+          edited by this view.
         </span>
       </div>
 
       {agents.map(agent => {
-        const offloadedRows  = DUTY_ROWS.filter(r => r.agent === agent && r.offloaded);
-        const activeRows     = DUTY_ROWS.filter(r => r.agent === agent && !r.offloaded);
-        const offloadedTotal = offloadedRows.reduce((s, r) => s + r.amount, 0);
-        const activeTotal    = activeRows.reduce((s, r) => s + r.amount, 0);
-        const containerTotal = offloadedTotal + activeTotal;
-        const ledgerBalance  = FAKE_LEDGER_BALANCES[agent] ?? null;
-        const diff           = ledgerBalance !== null ? ledgerBalance - containerTotal : null;
-        const isReconciled   = diff !== null && diff === 0;
-        const unposted       = diff !== null ? Math.abs(diff) : null;
+        const agentRows      = DUTY_ROWS.filter(r => r.agent === agent);
+        const ledgerBal      = FAKE_LEDGER_BALANCES[agent] ?? null;
+        const containerTotal = agentRows.reduce((s, r) => s + r.amount, 0);
+        const allocated      = ledgerBal !== null ? allocateFIFO(agentRows, ledgerBal) : [];
+        const clearedRows    = allocated.filter(a => a.status === "Cleared");
+        const openRows       = allocated.filter(a => a.status !== "Cleared");
+        const clearedTotal   = clearedRows.reduce((s, a) => s + a.clearedAmount, 0);
+        const openSum        = openRows.reduce((s, a) => s + a.remainingAmount, 0);
+        const isBalanceOk    = ledgerBal !== null && Math.abs(openSum - ledgerBal) < 0.01;
+        const showCleared    = expandedCleared.has(agent);
+
+        // Edge cases
+        const ledgerExceedsTotal = ledgerBal !== null && ledgerBal > containerTotal;
+        const ledgerIsZero       = ledgerBal !== null && ledgerBal <= 0;
 
         return (
           <div key={agent} className="rounded-md border overflow-hidden">
 
-            {/* ── Agent header bar ── */}
-            <div className="bg-yellow-400 text-yellow-950 px-3 py-2 font-bold text-sm">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <span className="tracking-wide">{agent}</span>
-                {diff !== null && (
-                  isReconciled
-                    ? <Badge className="text-xs bg-green-600 text-white no-default-active-elevate">Reconciled</Badge>
-                    : <Badge className="text-xs bg-red-600 text-white no-default-active-elevate">Unposted: ${fmt(unposted!, 0)}</Badge>
+            {/* ── Agent header ── */}
+            <div className="bg-yellow-400 text-yellow-950 px-3 py-2 font-bold text-sm flex items-center justify-between gap-2 flex-wrap">
+              <span className="tracking-wide">{agent}</span>
+              {ledgerBal !== null && (
+                ledgerIsZero
+                  ? <Badge className="text-xs bg-green-700 text-white no-default-active-elevate">No Open Balance</Badge>
+                  : isBalanceOk
+                    ? <Badge className="text-xs bg-green-600 text-white no-default-active-elevate">Balance Allocated</Badge>
+                    : <Badge className="text-xs bg-red-600 text-white no-default-active-elevate">Gap: ${fmt(Math.abs(openSum - ledgerBal), 0)}</Badge>
+              )}
+            </div>
+
+            {/* ── 4-column reconciliation strip ── */}
+            {ledgerBal !== null && (
+              <div className="grid grid-cols-4 divide-x text-center text-xs border-b bg-yellow-50 dark:bg-yellow-950/20">
+                <div className="px-2 py-2">
+                  <div className="text-muted-foreground uppercase tracking-wide text-[10px] font-semibold">Account Balance</div>
+                  <div className="font-bold text-sm mt-0.5">${fmt(ledgerBal, 0)}</div>
+                  <div className="text-[10px] text-muted-foreground">from Accounts page</div>
+                </div>
+                <div className="px-2 py-2">
+                  <div className="text-muted-foreground uppercase tracking-wide text-[10px] font-semibold">Container Duty Total</div>
+                  <div className="font-bold text-sm mt-0.5">${fmt(containerTotal, 0)}</div>
+                  <div className="text-[10px] text-muted-foreground">{agentRows.length} containers</div>
+                </div>
+                <div className="px-2 py-2">
+                  <div className="text-muted-foreground uppercase tracking-wide text-[10px] font-semibold">Cleared by Payments</div>
+                  <div className="font-bold text-sm mt-0.5 text-green-700 dark:text-green-400">${fmt(clearedTotal, 0)}</div>
+                  <div className="text-[10px] text-muted-foreground">{clearedRows.length} containers</div>
+                </div>
+                <div className="px-2 py-2">
+                  <div className="text-muted-foreground uppercase tracking-wide text-[10px] font-semibold">Open Balance</div>
+                  <div className={cn("font-bold text-sm mt-0.5",
+                    ledgerIsZero ? "text-green-700 dark:text-green-400" :
+                    isBalanceOk  ? "text-amber-700 dark:text-amber-400" :
+                    "text-red-600 dark:text-red-400"
+                  )}>${fmt(openSum, 0)}</div>
+                  <div className="text-[10px] text-muted-foreground">{openRows.length} containers</div>
+                </div>
+              </div>
+            )}
+
+            {/* Edge-case warnings */}
+            {ledgerExceedsTotal && (
+              <div className="px-3 py-1.5 bg-amber-50 dark:bg-amber-950/20 border-b text-xs text-amber-700 dark:text-amber-400 flex gap-1 items-center">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                Ledger balance exceeds container duty total by ${fmt(ledgerBal! - containerTotal, 0)} — there may be account entries not represented by container rows.
+              </div>
+            )}
+            {ledgerIsZero && (
+              <div className="px-3 py-1.5 bg-green-50 dark:bg-green-950/20 border-b text-xs text-green-700 dark:text-green-400 flex gap-1 items-center">
+                <CheckCircle2 className="h-3 w-3 shrink-0" />
+                Account balance is zero — all containers are cleared by payments.
+              </div>
+            )}
+
+            {/* ── Cleared rows — collapsed by default ── */}
+            {clearedRows.length > 0 && (
+              <>
+                <button
+                  onClick={() => toggleCleared(agent)}
+                  className="w-full flex items-center justify-between px-3 py-1.5 bg-muted/40 text-xs hover-elevate"
+                  data-testid={`button-toggle-cleared-${agent}`}
+                >
+                  <span className="font-semibold uppercase tracking-wide text-muted-foreground">
+                    {showCleared ? "Hide" : "Show"} Cleared — {clearedRows.length} containers, ${fmt(clearedTotal, 0)} cleared by payments
+                  </span>
+                  <span className="text-muted-foreground">{showCleared ? "▲" : "▼"}</span>
+                </button>
+
+                {showCleared && (
+                  <div className="overflow-x-auto border-b">
+                    <table className="w-full text-xs whitespace-nowrap border-collapse">
+                      <thead>
+                        <tr className="bg-muted/50 border-b">
+                          {["CONTAINER #","CO.","PLATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY","CLEARED","STATUS"].map(h => (
+                            <th key={h} className={cn("py-1 px-2 font-bold text-muted-foreground", h === "DUTY" || h === "CLEARED" ? "text-right" : h === "STATUS" ? "text-center" : "text-left")}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {clearedRows.map((a, i) => (
+                          <tr key={i} className="border-b bg-muted/15 text-muted-foreground">
+                            <td className="py-0.5 px-2 font-mono">{a.row.containerNumber}</td>
+                            <td className="py-0.5 px-2">{a.row.company}</td>
+                            <td className="py-0.5 px-2 font-mono">{a.row.numberPlate ?? "—"}</td>
+                            <td className="py-0.5 px-2">{fmtD(a.row.borderDate)}</td>
+                            <td className="py-0.5 px-2">{a.row.transporter ?? "—"}</td>
+                            <td className="py-0.5 px-2">{a.row.location}</td>
+                            <td className="py-0.5 px-2 text-right">${fmt(a.row.amount, 0)}</td>
+                            <td className="py-0.5 px-2 text-right text-green-600 dark:text-green-500 font-semibold">${fmt(a.clearedAmount, 0)}</td>
+                            <td className="py-0.5 px-2 text-center">
+                              <Badge variant="outline" className="text-[10px] text-green-700 border-green-400 no-default-active-elevate">Cleared</Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
-              </div>
-            </div>
+              </>
+            )}
 
-            {/* ── Reconciliation summary strip ── */}
-            <div className="grid grid-cols-3 divide-x text-center text-xs border-b bg-yellow-50 dark:bg-yellow-950/20">
-              <div className="px-2 py-1.5">
-                <div className="text-muted-foreground uppercase tracking-wide text-[10px] font-semibold">Account Balance</div>
-                <div className="font-bold text-sm mt-0.5">
-                  {ledgerBalance !== null ? `$${fmt(ledgerBalance, 0)}` : <span className="text-muted-foreground">—</span>}
-                </div>
-                <div className="text-[10px] text-muted-foreground">from Accounts page</div>
-              </div>
-              <div className="px-2 py-1.5">
-                <div className="text-muted-foreground uppercase tracking-wide text-[10px] font-semibold">Container Duty Total</div>
-                <div className="font-bold text-sm mt-0.5">${fmt(containerTotal, 0)}</div>
-                <div className="text-[10px] text-muted-foreground">{offloadedRows.length + activeRows.length} containers</div>
-              </div>
-              <div className="px-2 py-1.5">
-                <div className="text-muted-foreground uppercase tracking-wide text-[10px] font-semibold">Difference</div>
-                <div className={cn("font-bold text-sm mt-0.5", diff !== null && diff < 0 ? "text-red-600 dark:text-red-400" : diff === 0 ? "text-green-600" : "text-amber-600")}>
-                  {diff !== null ? (diff === 0 ? "—" : `$${fmt(Math.abs(diff), 0)}`) : "—"}
-                </div>
-                <div className="text-[10px] text-muted-foreground">
-                  {diff !== null && diff < 0 ? "active not yet posted" : diff === 0 ? "fully reconciled" : diff !== null && diff > 0 ? "overstated on ledger" : ""}
-                </div>
-              </div>
-            </div>
-
-            {/* ── Row breakdown table ── */}
+            {/* ── Open / Partially Cleared rows — always visible ── */}
             <div className="overflow-x-auto">
               <table className="w-full text-xs whitespace-nowrap border-collapse">
                 <thead>
                   <tr className="bg-yellow-200 text-yellow-900 border-b border-yellow-400">
-                    <th className="py-1 px-2 text-left font-bold">CONTAINER #</th>
-                    <th className="py-1 px-2 text-left font-bold">COMPANY</th>
-                    <th className="py-1 px-2 text-left font-bold">NUMBER PLATE</th>
-                    <th className="py-1 px-2 text-left font-bold">BORDER DATE</th>
-                    <th className="py-1 px-2 text-left font-bold">TRANSPORTER</th>
-                    <th className="py-1 px-2 text-left font-bold">LOCATION</th>
-                    <th className="py-1 px-2 text-right font-bold">DUTY FEE</th>
-                    <th className="py-1 px-2 text-center font-bold">ON LEDGER</th>
+                    {["CONTAINER #","CO.","PLATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY AMT","CLEARED","REMAINING","STATUS"].map(h => (
+                      <th key={h} className={cn("py-1 px-2 font-bold", ["DUTY AMT","CLEARED","REMAINING"].includes(h) ? "text-right" : h === "STATUS" ? "text-center" : "text-left")}>{h}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-
-                  {/* ── Section label: Already Offloaded ── */}
-                  {offloadedRows.length > 0 && (
-                    <tr className="bg-muted/30">
-                      <td colSpan={8} className="py-0.5 px-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        Already Offloaded — duty payable posted to ledger
+                  {openRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="py-3 px-3 text-center text-muted-foreground italic text-xs">
+                        No open containers — account balance is fully cleared.
                       </td>
                     </tr>
-                  )}
-                  {offloadedRows.map((r, i) => (
-                    <tr key={`off-${i}`} className="bg-yellow-50/80 dark:bg-yellow-950/20 border-b">
-                      <td className="py-0.5 px-2 font-mono font-semibold">{r.containerNumber}</td>
-                      <td className="py-0.5 px-2 font-medium">{r.company}</td>
-                      <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
-                      <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
-                      <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>
-                      <td className="py-0.5 px-2 text-muted-foreground italic">{r.location}</td>
-                      <td className="py-0.5 px-2 text-right font-semibold">${fmt(r.amount, 0)}</td>
-                      <td className="py-0.5 px-2 text-center">
-                        <CheckCircle2 className="h-3 w-3 text-green-600 inline" />
-                      </td>
-                    </tr>
-                  ))}
-                  {offloadedRows.length > 0 && (
-                    <tr className="bg-yellow-300/80 dark:bg-yellow-800/30 border-b-2 border-yellow-400 font-bold text-yellow-900 dark:text-yellow-200">
-                      <td colSpan={5} className="py-1 px-2 text-xs uppercase tracking-wide">Offloaded subtotal</td>
-                      <td /><td className="py-1 px-2 text-right">${fmt(offloadedTotal, 0)}</td><td />
-                    </tr>
-                  )}
-
-                  {/* ── Section label: Active / In Transit ── */}
-                  {activeRows.length > 0 && (
-                    <tr className="bg-muted/30">
-                      <td colSpan={8} className="py-0.5 px-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        Active / In Transit — not yet posted to ledger
-                      </td>
-                    </tr>
-                  )}
-                  {activeRows.map((r, i) => (
-                    <tr key={`act-${i}`} className="border-b">
-                      <td className="py-0.5 px-2 font-mono font-semibold">{r.containerNumber}</td>
-                      <td className="py-0.5 px-2 font-medium">{r.company}</td>
-                      <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? <span className="text-muted-foreground">—</span>}</td>
-                      <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
-                      <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>
-                      <td className="py-0.5 px-2">{r.location}</td>
-                      <td className="py-0.5 px-2 text-right font-semibold">${fmt(r.amount, 0)}</td>
-                      <td className="py-0.5 px-2 text-center">
-                        <Clock className="h-3 w-3 text-amber-500 inline" />
-                      </td>
-                    </tr>
-                  ))}
-                  {activeRows.length > 0 && (
-                    <tr className="bg-muted/50 border-b-2 font-bold">
-                      <td colSpan={5} className="py-1 px-2 text-xs uppercase tracking-wide text-muted-foreground">Active subtotal</td>
-                      <td /><td className="py-1 px-2 text-right">${fmt(activeTotal, 0)}</td><td />
-                    </tr>
+                  ) : (
+                    openRows.map((a, i) => (
+                      <tr key={i} className={cn(
+                        "border-b",
+                        a.status === "Partially Cleared" && "bg-amber-50/80 dark:bg-amber-950/20"
+                      )}>
+                        <td className="py-0.5 px-2 font-mono font-semibold">{a.row.containerNumber}</td>
+                        <td className="py-0.5 px-2 font-medium">{a.row.company}</td>
+                        <td className="py-0.5 px-2 font-mono">{a.row.numberPlate ?? "—"}</td>
+                        <td className="py-0.5 px-2">{fmtD(a.row.borderDate)}</td>
+                        <td className="py-0.5 px-2">{a.row.transporter ?? "—"}</td>
+                        <td className="py-0.5 px-2">{a.row.location}</td>
+                        <td className="py-0.5 px-2 text-right">${fmt(a.row.amount, 0)}</td>
+                        <td className="py-0.5 px-2 text-right text-green-600 dark:text-green-500">
+                          {a.clearedAmount > 0 ? `$${fmt(a.clearedAmount, 0)}` : "—"}
+                        </td>
+                        <td className="py-0.5 px-2 text-right font-semibold">${fmt(a.remainingAmount, 0)}</td>
+                        <td className="py-0.5 px-2 text-center">
+                          {a.status === "Partially Cleared"
+                            ? <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-400 no-default-active-elevate">Partially Cleared</Badge>
+                            : <Badge variant="outline" className="text-[10px] no-default-active-elevate">Open</Badge>
+                          }
+                        </td>
+                      </tr>
+                    ))
                   )}
 
-                  {/* ── Container duty grand total ── */}
+                  {/* Open balance footer — must equal Account Balance */}
                   <tr className="bg-yellow-400 text-yellow-950 font-bold">
-                    <td colSpan={5} className="py-1.5 px-2 text-xs uppercase tracking-wide">Container Duty Total</td>
-                    <td /><td className="py-1.5 px-2 text-right text-sm">${fmt(containerTotal, 0)}</td><td />
+                    <td colSpan={7} className="py-1.5 px-2 text-xs uppercase tracking-wide">
+                      Open Balance (= Account Balance)
+                    </td>
+                    <td />
+                    <td className="py-1.5 px-2 text-right text-sm">${fmt(openSum, 0)}</td>
+                    <td />
                   </tr>
                 </tbody>
               </table>
             </div>
+
+            {/* Allocation mismatch warning */}
+            {ledgerBal !== null && !isBalanceOk && !ledgerIsZero && !ledgerExceedsTotal && (
+              <div className="px-3 py-1.5 bg-red-50 dark:bg-red-950/20 border-t text-xs text-red-700 dark:text-red-400 flex gap-1 items-center">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                Open balance ${fmt(openSum, 0)} does not match account balance ${fmt(ledgerBal, 0)} — check for containers missing from this list.
+              </div>
+            )}
+
           </div>
         );
       })}
 
       <p className="text-xs text-muted-foreground px-1">
-        Real implementation: Account Balance from Accounts page (ledger).
-        Container Duty Total from containers table (duty_fee field).
-        Difference = amount not yet posted as a payable voucher — typically active/in-transit containers.
-        No DB/schema changes in this mockup — all data is hard-coded.
+        Mockup only — all data is hard-coded. Real implementation reads Account Balance from Accounts / Ledger page
+        and container rows from the containers table. A reliable agent-name → ledger-account mapping is needed
+        before production (currently fuzzy-matched by name).
       </p>
     </div>
   );
