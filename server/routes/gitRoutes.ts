@@ -596,8 +596,10 @@ export function registerGitRoutes(app: Express) {
       const companyIds =
         scope.mode === "all" ? scope.companyIds : [scope.companyId];
 
+      const includeOffloaded = req.query.includeOffloaded === "true";
+
       const [raw, nameMap] = await Promise.all([
-        fetchActiveContainers(companyIds),
+        fetchActiveContainers(companyIds, { includeOffloaded }),
         loadCompanyNames(companyIds),
       ]);
 

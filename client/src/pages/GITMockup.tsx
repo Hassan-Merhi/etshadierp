@@ -1023,8 +1023,8 @@ function TabTruckLocation() {
   const [companyMode, setCompanyMode] = useState<CompanyViewMode>("session");
 
   const queryUrl = companyMode === "all"
-    ? "/api/git/containers?allCompanies=true"
-    : "/api/git/containers";
+    ? "/api/git/containers?allCompanies=true&includeOffloaded=true"
+    : "/api/git/containers?includeOffloaded=true";
 
   const { data, isLoading, isError, error } = useQuery<GitContainersResponse>({
     queryKey: [queryUrl],

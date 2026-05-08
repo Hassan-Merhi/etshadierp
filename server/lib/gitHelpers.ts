@@ -241,8 +241,13 @@ export type EnrichedContainer = RawContainerRow & {
  */
 export async function fetchActiveContainers(
   companyIds: number[],
+  opts: { includeOffloaded?: boolean } = {},
 ): Promise<RawContainerRow[]> {
   if (companyIds.length === 0) return [];
+
+  const statusFilter = opts.includeOffloaded
+    ? [...ACTIVE_STATUSES, ...INACTIVE_STATUSES]
+    : [...ACTIVE_STATUSES];
 
   return db
     .select({
@@ -288,7 +293,7 @@ export async function fetchActiveContainers(
     .where(
       and(
         inArray(containers.companyId, companyIds),
-        inArray(containers.status, [...ACTIVE_STATUSES]),
+        inArray(containers.status, statusFilter),
       ),
     )
     .orderBy(containers.containerNumber);
