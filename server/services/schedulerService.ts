@@ -776,11 +776,88 @@ export function startScheduler() {
     timezone: "America/New_York",
   });
 
+  // Purge soft-deleted items older than 30 days — runs daily at 2:00 AM EST
+  cron.schedule("0 2 * * *", async () => {
+    console.log("[Purge] 30-day soft-delete purge started.");
+    await purgeOldSoftDeletes();
+  }, {
+    timezone: "America/New_York",
+  });
+
   console.log("[DailyExport] Scheduler started — daily at 6 PM EST (up to 4 retries), recovery crons at 8 PM + 10 PM EST.");
   console.log("[WhatsApp] Monthly net-position scheduler started — runs on the 1st of each month at 7:00 AM EST.");
   console.log("[StockReport] Independent scheduler started — checks every hour.");
   console.log("[NetPositionExport] Scheduled export checker started — checks every hour.");
   console.log("[OverdueCheck] Payment reminder scheduler started — runs daily at 9:00 AM EST.");
+  console.log("[Purge] 30-day soft-delete purge scheduler started — runs daily at 2:00 AM EST.");
+}
+
+/**
+ * Permanently delete all soft-deleted records older than 30 days.
+ * Handles FK dependencies in the correct order.
+ */
+async function purgeOldSoftDeletes(): Promise<void> {
+  try {
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    // ── Stock Items (must clear FK children first) ──────────────────────────
+    const oldStockItems = await pool.query<{ id: number }>(
+      `SELECT id FROM stock_items WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
+      [cutoff]
+    );
+    if (oldStockItems.rows.length > 0) {
+      const ids = oldStockItems.rows.map(r => r.id);
+      const placeholders = ids.map((_, i) => `$${i + 1}`).join(",");
+      await pool.query(`DELETE FROM sales_items                       WHERE stock_item_id IN (${placeholders})`, ids);
+      await pool.query(`DELETE FROM stock_adjustment_items            WHERE stock_item_id IN (${placeholders})`, ids);
+      await pool.query(`DELETE FROM stock_transfer_items              WHERE stock_item_id IN (${placeholders})`, ids);
+      await pool.query(`DELETE FROM stock_transfer_revision_items     WHERE stock_item_id IN (${placeholders})`, ids);
+      await pool.query(`DELETE FROM po_line_items                     WHERE stock_item_id IN (${placeholders})`, ids);
+      await pool.query(`DELETE FROM container_offload_items           WHERE stock_item_id IN (${placeholders})`, ids);
+      await pool.query(`DELETE FROM credit_note_items                 WHERE stock_item_id IN (${placeholders})`, ids);
+      await pool.query(`DELETE FROM inventory                         WHERE stock_item_id IN (${placeholders})`, ids);
+      await pool.query(`DELETE FROM waste_dispatch_items              WHERE stock_item_id IN (${placeholders})`, ids);
+      await pool.query(`DELETE FROM stock_group_location_archive_items WHERE stock_item_id IN (${placeholders})`, ids);
+      await pool.query(`DELETE FROM stock_item_code_aliases           WHERE stock_item_id IN (${placeholders})`, ids);
+      await pool.query(`DELETE FROM stock_item_location_prices        WHERE stock_item_id IN (${placeholders})`, ids);
+      await pool.query(`DELETE FROM stock_items WHERE id IN (${placeholders})`, ids);
+      console.log(`[Purge] Permanently deleted ${ids.length} stock item(s) older than 30 days.`);
+    }
+
+    // ── Simple tables with no FK children referencing them ──────────────────
+    const simplePurges: Array<{ table: string; col: string }> = [
+      { table: "stock_groups",                   col: "deleted_at" },
+      { table: "locations",                      col: "deleted_at" },
+      { table: "ledger_accounts",                col: "deleted_at" },
+      { table: "employees",                      col: "deleted_at" },
+      { table: "customers",                      col: "deleted_at" },
+      { table: "suppliers",                      col: "deleted_at" },
+      { table: "bank_accounts",                  col: "deleted_at" },
+      { table: "factory_categories",             col: "deleted_at" },
+      { table: "factory_bale_products",          col: "deleted_at" },
+      { table: "factory_containers",             col: "deleted_at" },
+      { table: "factory_raw_stock",              col: "deleted_at" },
+      { table: "factory_raw_material_adjustments", col: "deleted_at" },
+      { table: "factory_mix_batches",            col: "deleted_at" },
+      { table: "factory_bales",                  col: "deleted_at" },
+      { table: "customer_proformas",             col: "deleted_at" },
+      { table: "customer_orders",                col: "deleted_at" },
+    ];
+
+    for (const { table, col } of simplePurges) {
+      const result = await pool.query(
+        `DELETE FROM ${table} WHERE ${col} IS NOT NULL AND ${col} < $1`,
+        [cutoff]
+      );
+      if (result.rowCount && result.rowCount > 0) {
+        console.log(`[Purge] Permanently deleted ${result.rowCount} ${table} row(s) older than 30 days.`);
+      }
+    }
+
+    console.log("[Purge] 30-day soft-delete purge complete.");
+  } catch (err: any) {
+    console.error("[Purge] Error during soft-delete purge:", err.message);
+  }
 }
 
 /** Manually trigger the daily ZIP → WhatsApp send (bypasses the dailyAutoSend schedule toggle).
