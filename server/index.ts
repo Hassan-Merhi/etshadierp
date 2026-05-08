@@ -2952,7 +2952,42 @@ let migrationsDone = false;
           console.error("Migration error:", err);
           migrationsDone = true;
         })
-      ).then(() => {
+      ).then(async () => {
+        // ── Post-migration startup diagnostic summary ───────────────────────────
+        try {
+          const [
+            posRows,
+            posWithStation,
+            normalUserRows,
+            oldRoleRows,
+            canDeleteCol,
+          ] = await Promise.all([
+            pool.query(`SELECT COUNT(*) AS n FROM user_company_roles WHERE role = 'POS'`),
+            pool.query(`SELECT COUNT(*) AS n FROM user_company_roles WHERE role = 'POS' AND pos_station IS NOT NULL`),
+            pool.query(`SELECT COUNT(*) AS n FROM user_company_roles WHERE role = 'Normal User'`),
+            pool.query(`SELECT COUNT(*) AS n FROM user_company_roles WHERE role IN ('POS1','POS2','POS3','POS4','POS5','POS6','User')`),
+            pool.query(
+              `SELECT COUNT(*) AS n FROM information_schema.columns
+               WHERE table_name = 'user_company_roles' AND column_name = 'can_delete_records'`
+            ),
+          ]);
+          const posCount      = parseInt(posRows.rows[0]?.n ?? "0", 10);
+          const posWithStn    = parseInt(posWithStation.rows[0]?.n ?? "0", 10);
+          const normalCount   = parseInt(normalUserRows.rows[0]?.n ?? "0", 10);
+          const oldRoleCount  = parseInt(oldRoleRows.rows[0]?.n ?? "0", 10);
+          const canDeleteOk   = parseInt(canDeleteCol.rows[0]?.n ?? "0", 10) > 0;
+          console.log(
+            `[MigrationDiag] POS roles: ${posCount} (${posWithStn} with pos_station set) | ` +
+            `Normal User roles: ${normalCount} | ` +
+            `Old roles remaining: ${oldRoleCount} | ` +
+            `can_delete_records column: ${canDeleteOk ? "✓ present" : "✗ MISSING"}`
+          );
+          if (oldRoleCount > 0) {
+            console.warn(`[MigrationDiag] ⚠️  ${oldRoleCount} row(s) still have old roles (POS1–POS6 or User) — check /api/admin/deployment-diagnostics`);
+          }
+        } catch (e: any) {
+          console.warn("[MigrationDiag] Could not run startup diagnostic:", e.message);
+        }
         // ── Clean up orphaned export runs ──────────────────────────────────────
         // In-memory export jobs are lost on server restart.  Any run that has
         // been 'running' for >5 minutes is almost certainly stuck — mark it failed.

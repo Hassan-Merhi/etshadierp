@@ -451,8 +451,12 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
-
       if (id === null) return res.status(400).json({ message: "Invalid id" });
+
+      // Respect per-user cost visibility settings — same gate as stock/proforma/order exports
+      const vis = await getExportPriceVisibility(req);
+      const hideCostData = vis.hideCost;
+
       const [order] = await db
         .select({ id: customerOrders.id, status: customerOrders.status, invoiceNumber: customerOrders.invoiceNumber, customerName: customers.legalName })
         .from(customerOrders)
@@ -504,11 +508,11 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           baleName: line.baleName,
           qty,
           selling,
-          costPerBale,
-          cost,
-          profit,
-          profitPctOnCost,
-          marginPct,
+          costPerBale: hideCostData ? null : costPerBale,
+          cost: hideCostData ? null : cost,
+          profit: hideCostData ? null : profit,
+          profitPctOnCost: hideCostData ? null : profitPctOnCost,
+          marginPct: hideCostData ? null : marginPct,
           missingCost: !hasCost,
           pricePerBale: parseFloat(line.pricePerBale || "0"),
         };
@@ -524,11 +528,12 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         customerName: order.customerName,
         lines: profitLines,
         totalSelling,
-        totalCost: totalCostKnown ? totalCost : null,
-        totalProfit,
-        totalProfitPctOnCost,
-        totalMarginPct,
+        totalCost: (hideCostData || !totalCostKnown) ? null : totalCost,
+        totalProfit: hideCostData ? null : totalProfit,
+        totalProfitPctOnCost: hideCostData ? null : totalProfitPctOnCost,
+        totalMarginPct: hideCostData ? null : totalMarginPct,
         partialCostData: !totalCostKnown,
+        costHidden: hideCostData,
       });
     } catch (error: any) {
       console.error("Error fetching order profitability:", error);
