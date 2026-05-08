@@ -221,9 +221,14 @@ export function registerVoucherRoutes(app: Express) {
           ));
         const allowedLocIds = assignedLocs.map((l: any) => l.locationId);
         if (allowedLocIds.length > 0) {
-          sanitizedVouchers = sanitizedVouchers.filter((v: any) =>
-            v.locationId === null || allowedLocIds.includes(v.locationId)
-          );
+          const posUserId = req.user!.id;
+          sanitizedVouchers = sanitizedVouchers.filter((v: any) => {
+            const locationOk = v.locationId === null || allowedLocIds.includes(v.locationId);
+            // POS users can only see their own Sales vouchers
+            const isSales = v.voucherType === "Sales";
+            const ownerOk = !isSales || v.userId === posUserId;
+            return locationOk && ownerOk;
+          });
         }
       }
 
@@ -1614,6 +1619,11 @@ export function registerVoucherRoutes(app: Express) {
           .json({
             message: "Access denied: Voucher belongs to a different company",
           });
+      }
+
+      // POS users can only access their own Sales vouchers
+      if (req.user?.role === "POS" && voucher.voucherType === "Sales" && voucher.userId !== req.user.id) {
+        return res.status(403).json({ message: "Access denied" });
       }
 
       const entries = await storage.getVoucherEntriesByVoucher(id);

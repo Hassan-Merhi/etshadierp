@@ -42,7 +42,7 @@ import { classifyNetPositionAccounts, getAccountNetBalance, round2 } from "../ne
 
 
 export function registerStatsRoutes(app: Express) {
-  app.get("/api/stats/net-profit", requireAuth, async (req, res) => {
+  app.get("/api/stats/net-profit", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
@@ -571,7 +571,7 @@ export function registerStatsRoutes(app: Express) {
   });
 
   // Net Position Excel Export
-  app.get("/api/stats/net-position-excel", requireAuth, async (req, res) => {
+  app.get("/api/stats/net-position-excel", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -946,7 +946,7 @@ export function registerStatsRoutes(app: Express) {
   });
 
   // Get monthly sales and profit data for Dashboard charts
-  app.get("/api/stats/monthly-data", requireAuth, async (req, res) => {
+  app.get("/api/stats/monthly-data", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
@@ -1298,7 +1298,7 @@ export function registerStatsRoutes(app: Express) {
 
   // Import Cycle Balance - tracks the full import/offload cycle to ensure it balances to zero
   // Formula: Supplier Balance (credit/liability) + Stock OTW (debit/asset) + Loan accounts + Expense charges - Stock Value on Floor
-  app.get("/api/sales-report", requireAuth, async (req, res) => {
+  app.get("/api/sales-report", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
@@ -1418,7 +1418,7 @@ export function registerStatsRoutes(app: Express) {
   });
 
   // Sales Report - All Companies (cross-company view like container tracking)
-  app.get("/api/dashboard/sales-report-all", requireAuth, async (req, res) => {
+  app.get("/api/dashboard/sales-report-all", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const userId = req.session.userId;
       if (!userId) {
@@ -2055,7 +2055,7 @@ export function registerStatsRoutes(app: Express) {
   );
 
   // Sales Report
-  app.get("/api/reports/sales", requireAuth, async (req, res) => {
+  app.get("/api/reports/sales", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
@@ -2150,7 +2150,7 @@ export function registerStatsRoutes(app: Express) {
   });
 
   // Stock Movement Report
-  app.get("/api/reports/stock-movement", requireAuth, async (req, res) => {
+  app.get("/api/reports/stock-movement", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {

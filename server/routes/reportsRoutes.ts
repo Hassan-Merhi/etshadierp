@@ -49,7 +49,7 @@ import path from "path";
 import fs from "fs";
 
 export function registerReportsRoutes(app: Express) {
-  app.get("/api/reports/net-profit-statement", requireAuth, async (req, res) => {
+  app.get("/api/reports/net-profit-statement", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const sessionCompanyId = req.session.currentCompanyId;
       if (!sessionCompanyId) {
@@ -1318,7 +1318,7 @@ export function registerReportsRoutes(app: Express) {
   });
 
   // Net Profit Drill-down: Purchase Accounts
-  app.get("/api/reports/net-profit-statement/purchase-accounts", requireAuth, async (req, res) => {
+  app.get("/api/reports/net-profit-statement/purchase-accounts", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
@@ -1387,7 +1387,7 @@ export function registerReportsRoutes(app: Express) {
   });
 
   // Net Profit Drill-down: Direct Incomes
-  app.get("/api/reports/net-profit-statement/direct-incomes", requireAuth, async (req, res) => {
+  app.get("/api/reports/net-profit-statement/direct-incomes", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
@@ -1455,7 +1455,7 @@ export function registerReportsRoutes(app: Express) {
   });
 
   // Net Profit Drill-down: Direct Expenses
-  app.get("/api/reports/net-profit-statement/direct-expenses", requireAuth, async (req, res) => {
+  app.get("/api/reports/net-profit-statement/direct-expenses", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
@@ -1545,7 +1545,7 @@ export function registerReportsRoutes(app: Express) {
   });
 
   // Net Profit Drill-down: Indirect Expenses
-  app.get("/api/reports/net-profit-statement/indirect-expenses", requireAuth, async (req, res) => {
+  app.get("/api/reports/net-profit-statement/indirect-expenses", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
@@ -1941,6 +1941,11 @@ export function registerReportsRoutes(app: Express) {
 
       if (!voucher) {
         return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      // POS users can only access their own Sales vouchers
+      if (req.user?.role === "POS" && voucher.voucherType === "Sales" && voucher.userId !== req.user.id) {
+        return res.status(403).json({ message: "Access denied" });
       }
 
       // Get party name from voucher entries (supplier)

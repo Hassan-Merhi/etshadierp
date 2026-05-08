@@ -223,6 +223,18 @@ export function registerPosRoutes(app: Express) {
       if (!location)                     return res.status(404).json({ message: "Location not found" });
       if (!location.whatsappGroupChatId) return res.status(400).json({ message: "No WhatsApp group configured for this location" });
 
+      // POS users can only send invoices for their own vouchers
+      if (req.user?.role === "POS") {
+        const [voucherToCheck] = await db
+          .select({ id: vouchers.id, userId: vouchers.userId })
+          .from(vouchers)
+          .where(and(eq(vouchers.id, parseInt(voucherId)), eq(vouchers.companyId, companyId)))
+          .limit(1);
+        if (!voucherToCheck || voucherToCheck.userId !== req.user.id) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
       const pdfBuffer = await generateInvoicePdf(parseInt(voucherId), companyId, (req as any).user?.username);
 
       const locName  = location.name;
@@ -1239,7 +1251,12 @@ export function registerPosRoutes(app: Express) {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const shifts = await storage.getShiftsByLocation(locationId, limit);
+      let shifts = await storage.getShiftsByLocation(locationId, limit);
+      // POS users can only see their own shifts
+      if (req.user?.role === "POS") {
+        const posUserId = req.user.id;
+        shifts = shifts.filter(s => s.userId === posUserId);
+      }
       res.json(shifts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1258,6 +1275,11 @@ export function registerPosRoutes(app: Express) {
 
       // Verify shift belongs to current company
       if (shift.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // POS users can only access their own shifts
+      if (req.user?.role === "POS" && shift.userId !== req.user.id) {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -2058,6 +2080,11 @@ export function registerPosRoutes(app: Express) {
         .limit(1);
 
       if (!voucher) return res.status(404).json({ message: "Voucher not found" });
+
+      // POS users can only send invoices for their own vouchers
+      if (req.user?.role === "POS" && voucher.userId !== req.user.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
 
       // Fetch the location for this voucher
       const locationId = voucher.locationId;

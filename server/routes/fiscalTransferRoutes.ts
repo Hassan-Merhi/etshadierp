@@ -151,7 +151,7 @@ export function registerFiscalTransferRoutes(app: Express) {
   });
 
   // Get POS sales grouped by location with optional date filtering
-  app.get("/api/financial/sales", requireAuth, async (req, res) => {
+  app.get("/api/financial/sales", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
