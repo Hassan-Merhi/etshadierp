@@ -249,7 +249,7 @@ function RealWorkbookBlock({
   return (
     <div className="rounded-md border overflow-hidden">
       {/* Company-level header */}
-      <div className={cn("flex items-center justify-between px-3 py-1.5", headerBg, headerText)}>
+      <div className={cn("flex items-center justify-center gap-3 px-3 py-1.5", headerBg, headerText)}>
         <span className="text-sm font-bold tracking-wide">{companyName}</span>
         <span className="text-xs font-semibold opacity-90">{rows.length} containers — ${fmt(total.amount, 2)}</span>
       </div>
