@@ -224,15 +224,26 @@ export function registerPosRoutes(app: Express) {
       if (!location)                     return res.status(404).json({ message: "Location not found" });
       if (!location.whatsappGroupChatId) return res.status(400).json({ message: "No WhatsApp group configured for this location" });
 
-      // POS users can only send invoices for their own vouchers
+      // POS users can only send invoices for vouchers from their own shifts
       if (req.user?.role === "POS") {
         const [voucherToCheck] = await db
-          .select({ id: vouchers.id, userId: vouchers.userId })
+          .select({ id: vouchers.id, shiftId: vouchers.shiftId })
           .from(vouchers)
           .where(and(eq(vouchers.id, parseInt(voucherId)), eq(vouchers.companyId, companyId)))
           .limit(1);
-        if (!voucherToCheck || voucherToCheck.userId !== req.user.id) {
-          return res.status(403).json({ message: "Access denied" });
+        if (!voucherToCheck) {
+          return res.status(404).json({ message: "Voucher not found" });
+        }
+        // Verify ownership via shift when a shiftId is present
+        if (voucherToCheck.shiftId) {
+          const [shift] = await db
+            .select({ userId: posShifts.userId })
+            .from(posShifts)
+            .where(eq(posShifts.id, voucherToCheck.shiftId))
+            .limit(1);
+          if (!shift || shift.userId !== req.user.id) {
+            return res.status(403).json({ message: "Access denied" });
+          }
         }
       }
 
@@ -240,10 +251,36 @@ export function registerPosRoutes(app: Express) {
       const hideProfitCols = erpVis.hideSelling || erpVis.hideCost || erpVis.hideSalesProfitCost;
       const pdfBuffer = await generateInvoicePdf(parseInt(voucherId), companyId, (req as any).user?.username, { hideProfitCols });
 
+      // Build filename — for credit sales include customer name
       const locName  = location.name;
       const dateStr  = getClientDate(req);
-      const safeName = `${locName} Invoice ${dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
-      const caption  = `${locName} — ${dateStr}`;
+
+      let customerNameForFile: string | null = null;
+      const [voucherMeta] = await db
+        .select({ isCreditSale: vouchers.isCreditSale })
+        .from(vouchers)
+        .where(eq(vouchers.id, parseInt(voucherId)))
+        .limit(1);
+      if (voucherMeta?.isCreditSale) {
+        const [custEntry] = await db
+          .select({ name: ledgerAccounts.name })
+          .from(voucherEntries)
+          .innerJoin(ledgerAccounts, eq(ledgerAccounts.id, voucherEntries.ledgerAccountId))
+          .where(and(
+            eq(voucherEntries.voucherId, parseInt(voucherId)),
+            sql`${voucherEntries.debitAmount}::numeric > 0`,
+          ))
+          .limit(1);
+        customerNameForFile = custEntry?.name || null;
+      }
+
+      const rawName = customerNameForFile
+        ? `${customerNameForFile} Invoice ${locName} ${dateStr}`
+        : `${locName} Invoice ${dateStr}`;
+      const safeName = rawName.replace(/[^\w\s.()\-]/g, "_").trim();
+      const caption  = customerNameForFile
+        ? `${customerNameForFile} — ${locName} — ${dateStr}`
+        : `${locName} — ${dateStr}`;
 
       console.log(`[WA invoice backend] chatId=${location.whatsappGroupChatId} file=${safeName}.pdf size=${pdfBuffer.length}`);
 
@@ -2161,9 +2198,16 @@ export function registerPosRoutes(app: Express) {
 
       if (!voucher) return res.status(404).json({ message: "Voucher not found" });
 
-      // POS users can only send invoices for their own vouchers
-      if (req.user?.role === "POS" && voucher.userId !== req.user.id) {
-        return res.status(403).json({ message: "Access denied" });
+      // POS users can only send invoices for vouchers from their own shifts
+      if (req.user?.role === "POS" && voucher.shiftId) {
+        const [shift] = await db
+          .select({ userId: posShifts.userId })
+          .from(posShifts)
+          .where(eq(posShifts.id, voucher.shiftId))
+          .limit(1);
+        if (!shift || shift.userId !== req.user.id) {
+          return res.status(403).json({ message: "Access denied" });
+        }
       }
 
       // Fetch the location for this voucher
@@ -2433,12 +2477,31 @@ export function registerPosRoutes(app: Express) {
       });
 
       const pdfBuffer = Buffer.concat(pchunks);
-      const company   = await storage.getCompanyById(companyId);
-      const safeLoc   = (location.name ?? "").replace(/[^a-zA-Z0-9 \-]/g, "").trim();
-      const safeCo    = (company?.name ?? "").replace(/[^a-zA-Z0-9 \-]/g, "").trim();
       const safeDate  = (voucher.voucherDate ?? getClientDate(req)).replace(/[^0-9-]/g, "");
-      const fileName  = `${safeLoc} ${safeCo} ${safeDate}.pdf`.replace(/\s+/g, " ").trim();
-      const caption   = `📍 ${location.name} — ${voucher.voucherNumber}`;
+      const safeLoc   = (location.name ?? "").replace(/[^\w\s.()\-]/g, "_").trim();
+
+      // For credit sales, resolve customer name for the filename
+      let customerNameForFile2: string | null = null;
+      if (voucher.isCreditSale) {
+        const [custEntry2] = await db
+          .select({ name: ledgerAccounts.name })
+          .from(voucherEntries)
+          .innerJoin(ledgerAccounts, eq(ledgerAccounts.id, voucherEntries.ledgerAccountId))
+          .where(and(
+            eq(voucherEntries.voucherId, voucher.id),
+            sql`${voucherEntries.debitAmount}::numeric > 0`,
+          ))
+          .limit(1);
+        customerNameForFile2 = custEntry2?.name || null;
+      }
+
+      const rawFileName2 = customerNameForFile2
+        ? `${customerNameForFile2} Invoice ${safeLoc} ${safeDate}`
+        : `${safeLoc} Invoice ${safeDate}`;
+      const fileName  = rawFileName2.replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, " ").trim() + ".pdf";
+      const caption   = customerNameForFile2
+        ? `${customerNameForFile2} — ${location.name} — ${safeDate}`
+        : `${location.name} — ${voucher.voucherNumber}`;
 
       console.log(`[WA invoice upload] chatId=${location.whatsappGroupChatId} file=${fileName} size=${pdfBuffer.length}`);
       const result = await sendWhatsAppFileByUploadPos(
