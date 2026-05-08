@@ -39,7 +39,8 @@ import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const ContainerDashboard = lazy(() => import("@/pages/ContainerDashboard"));
-const GITContainers = lazy(() => import("@/pages/GITContainers"));
+const ContainersOTW = lazy(() => import("@/pages/GITContainers"));
+const GITMockup = lazy(() => import("@/pages/GITMockup"));
 const POS = lazy(() => import("@/pages/pos/POS"));
 const StockItems = lazy(() => import("@/pages/StockItems"));
 const Containers = lazy(() => import("@/pages/Containers"));
@@ -282,7 +283,9 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/location-inventory"><Redirect to="/inventory?tab=by-location" /></Route>
       <Route path="/stock-items"><Redirect to="/stock?tab=items" /></Route>
       <Route path="/stock-otw"><Redirect to="/inventory?tab=on-the-way" /></Route>
-      <Route path="/git" component={GITContainers} />
+      <Route path="/mock-containers-otw" component={ContainersOTW} />
+      <Route path="/mock-git" component={GITMockup} />
+      <Route path="/git"><Redirect to="/mock-containers-otw" /></Route>
       <Route path="/containers"><Redirect to="/inventory?tab=containers" /></Route>
       <Route path="/containers/:id" component={ContainerDetail} />
       <Route path="/offloads/:id" component={OffloadDetail} />

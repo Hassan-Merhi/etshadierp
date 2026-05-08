@@ -1,5 +1,5 @@
 /**
- * GIT / Containers on the Way — MOCKUP PAGE (planning phase only)
+ * Containers OTW — MOCKUP PAGE (planning phase only)
  * All data is hard-coded. No DB reads or writes.
  * Purpose: visual review before implementation.
  *
@@ -692,8 +692,8 @@ export default function GITContainers() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <PageHeader
-        title="GIT / Containers on the Way"
-        subtitle="Active container logistics — multi-company view"
+        title="Containers OTW"
+        subtitle="Active container logistics and tracking"
       />
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
