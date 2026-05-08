@@ -395,7 +395,7 @@ async function buildAgentsForCompany(cid: number) {
         }
       }
 
-      const activePreviewRows: PreviewRow[] = activeContainers.map((r) => ({
+      const activePreviewRows: PreviewRow[] = activeContainers.filter((r) => !!(r.numberPlate ?? "").trim()).map((r) => ({
         id: r.id,
         containerNumber: r.containerNumber,
         companyId: r.companyId,
