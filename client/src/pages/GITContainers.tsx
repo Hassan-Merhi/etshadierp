@@ -1,24 +1,14 @@
 /**
- * Containers OTW — MOCKUP PAGE (planning phase only)
- * All data is hard-coded. No DB reads or writes.
- * Purpose: visual review before implementation.
- *
- * PLANNING DECISIONS (confirmed):
- * 1. DB field stays `eta`. UI label = "ETA DAS". `eta_dar` is optional future field.
- * 2. OTW tab kept as legacy. Active statuses: OTW, Sea, At Port, Left Dar, At Border, In Transit, Arrived.
- * 3. Max offload = borderDate + days based on transporter (FARHAT/CONTINENTAL=+11, TRH/default=+14).
- * 4. Editing via side drawer (Container Logistics Drawer). Table is view/filter only.
- * 5. Multi-company by default for Admin/Developer/Owner. Company filter included.
- * 6. WhatsApp format = text summary (not PDF/image).
- * 7. "Freight Status" everywhere (not "Freight").
- * 8. "All Active" is the default quick chip.
- * 9. Container Logistics Drawer: editable fields + calculated read-only preview.
- * 10. Access: Admin, Developer, Owner only. Manager/POS/Normal User blocked.
+ * Containers OTW — Operational active-container tracking page.
+ * Real data from GET /api/git/containers.
+ * Edit via PATCH /api/containers/:id/tracking.
+ * Access: Admin, Developer, Owner only.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,172 +52,79 @@ import {
   XCircle,
   ChevronDown,
   Pencil,
-  MessageSquare,
   Building2,
+  Globe,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ContainerStatus =
-  | "OTW"
-  | "Sea"
-  | "At Port"
-  | "Left Dar"
-  | "At Border"
-  | "In Transit"
-  | "Arrived"
-  | "Offloaded"
-  | "Closed";
-
-type ActiveStatus = Exclude<ContainerStatus, "Offloaded" | "Closed">;
-
-const ACTIVE_STATUSES: ActiveStatus[] = ["OTW", "Sea", "At Port", "Left Dar", "At Border", "In Transit", "Arrived"];
-
-interface MockContainer {
+interface EnrichedContainerRow {
   id: number;
   containerNumber: string;
-  amount: number;
-  company: string;
-  eta: string | null;         // DB field stays "eta". UI label = "ETA DAS"
-  etaDar: string | null;      // Optional future field
+  companyId: number;
+  companyName: string;
+  status: string;
+  eta: string | null;
+  grandTotal: string | null;
   numberPlate: string | null;
-  location: string | null;
+  trackingLocation: string | null;
   borderDate: string | null;
-  docsReceived: boolean;
   transporter: string | null;
-  transportFee: number | null;
-  declarant: string | null;
-  dutyFee: number | null;
+  transportFee: string | null;
+  agent: string | null;
+  dutyFee: string | null;
+  docReceived: boolean | null;
+  trackingDescription: string | null;
   docsSentDate: string | null;
-  freightStatus: string | null; // "Yes" | "No" | "Pending" — label = "Freight Status"
-  status: ContainerStatus;
+  freightStatus: string | null;
   trackingLink: string | null;
-  notes: string | null;
+  maxOffloadDate: string | null;
+  daysDelayed: number | null;
+  docsReadyNotSent: boolean;
+  isOverdue: boolean;
 }
 
-// ─── Max Offload Calculation ─────────────────────────────────────────────────
-// FARHAT = borderDate + 11, CONTINENTAL = borderDate + 11, TRH = borderDate + 14, default = +14
-
-function calcMaxOffloadDate(borderDate: string | null, transporter: string | null): string | null {
-  if (!borderDate) return null;
-  const t = (transporter ?? "").toUpperCase();
-  const days = t.includes("FARHAT") ? 11
-    : t.includes("CONTINENTAL") ? 11
-    : t.includes("TRH") ? 14
-    : 14;
-  const d = new Date(borderDate);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split("T")[0];
+interface GitContainersResponse {
+  containers: EnrichedContainerRow[];
+  mode: "single" | "all";
+  companyId?: number;
+  companyName?: string;
+  total: number;
 }
 
-function calcDaysDelayed(maxOffloadDate: string | null): number | null {
-  if (!maxOffloadDate) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const max = new Date(maxOffloadDate);
-  const diff = Math.floor((today.getTime() - max.getTime()) / 86400000);
-  return diff > 0 ? diff : null;
+interface AuthUser {
+  id: number;
+  role: string;
+  username: string;
+  companyId?: number;
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-const MOCK: MockContainer[] = [
-  {
-    id: 1, containerNumber: "MSCU1234567", amount: 48500, company: "HADI L'SHI",
-    eta: "2026-05-10", etaDar: "2026-05-14",
-    numberPlate: "T123ABC", location: "Dar",
-    borderDate: "2026-05-13",
-    docsReceived: true, transporter: "FARHAT", transportFee: 3200,
-    declarant: "ATLAS", dutyFee: 5100, docsSentDate: "2026-05-12",
-    freightStatus: "Yes", status: "In Transit",
-    trackingLink: "https://track.example.com/MSCU1234567", notes: null,
-  },
-  {
-    id: 2, containerNumber: "TCKU8876543", amount: 62000, company: "HADI KOLWEZI",
-    eta: "2026-05-08", etaDar: "2026-05-12",
-    numberPlate: null, location: "Dar Port",
-    borderDate: null,
-    docsReceived: false, transporter: "CONTINENTAL", transportFee: 4100,
-    declarant: "BELTRANS", dutyFee: 7200, docsSentDate: null,
-    freightStatus: "Pending", status: "At Port",
-    trackingLink: null, notes: "Awaiting customs release",
-  },
-  {
-    id: 3, containerNumber: "OOLU5541230", amount: 35000, company: "HADI L'SHI",
-    eta: "2026-05-20", etaDar: null,
-    numberPlate: null, location: null,
-    borderDate: null,
-    docsReceived: false, transporter: "TRH", transportFee: 2800,
-    declarant: "ATLAS", dutyFee: null, docsSentDate: null,
-    freightStatus: "No", status: "Sea",
-    trackingLink: "https://track.example.com/OOLU5541230", notes: null,
-  },
-  {
-    id: 4, containerNumber: "HLCU3312984", amount: 55000, company: "HADI KOLWEZI",
-    eta: "2026-05-06", etaDar: "2026-05-10",
-    numberPlate: "T456DEF", location: "Kasumbalesa",
-    borderDate: "2026-05-11",
-    docsReceived: true, transporter: "TRH", transportFee: 3500,
-    declarant: "BELTRANS", dutyFee: 6300, docsSentDate: "2026-05-09",
-    freightStatus: "Yes", status: "At Border",
-    trackingLink: null, notes: null,
-  },
-  {
-    id: 5, containerNumber: "CMAU7765431", amount: 41200, company: "HADI L'SHI",
-    eta: "2026-04-28", etaDar: "2026-05-02",
-    numberPlate: null, location: "Dar Port",
-    borderDate: null,
-    docsReceived: true, transporter: "FARHAT", transportFee: 3000,
-    declarant: "ATLAS", dutyFee: 4900, docsSentDate: "2026-05-01",
-    freightStatus: "Yes", status: "At Port",
-    trackingLink: null, notes: "Delayed — truck not assigned",
-  },
-  {
-    id: 6, containerNumber: "EITU1198823", amount: 29800, company: "HADI L'SHI",
-    eta: "2026-05-15", etaDar: null,
-    numberPlate: null, location: null,
-    borderDate: null,
-    docsReceived: false, transporter: null, transportFee: null,
-    declarant: null, dutyFee: null, docsSentDate: null,
-    freightStatus: "Pending", status: "Sea",
-    trackingLink: null, notes: "New shipment",
-  },
-  {
-    id: 7, containerNumber: "MSCU9988001", amount: 71500, company: "HADI KOLWEZI",
-    eta: "2026-05-04", etaDar: "2026-05-08",
-    numberPlate: "T789GHI", location: "Lubumbashi",
-    borderDate: "2026-05-09",
-    docsReceived: true, transporter: "FARHAT", transportFee: 4500,
-    declarant: "ATLAS", dutyFee: 8100, docsSentDate: "2026-05-07",
-    freightStatus: "Yes", status: "Arrived",
-    trackingLink: "https://track.example.com/MSCU9988001", notes: null,
-  },
-  {
-    id: 8, containerNumber: "GESU4421098", amount: 38700, company: "HADI KOLWEZI",
-    eta: "2026-05-22", etaDar: null,
-    numberPlate: null, location: null,
-    borderDate: null,
-    docsReceived: false, transporter: "TRH", transportFee: 2600,
-    declarant: null, dutyFee: null, docsSentDate: null,
-    freightStatus: "No", status: "OTW",
-    trackingLink: "https://track.example.com/GESU4421098", notes: "ETA to DAS confirmed",
-  },
-];
+const ACTIVE_STATUSES = [
+  "OTW", "Sea", "At Port", "Left Dar", "At Border", "In Transit", "Arrived",
+] as const;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+type ActiveStatus = typeof ACTIVE_STATUSES[number];
 
-const STATUS_META: Record<ContainerStatus, { color: string; icon: React.ReactNode }> = {
-  OTW:        { color: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300",          icon: <Ship className="h-3 w-3" /> },
-  Sea:        { color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",       icon: <Ship className="h-3 w-3" /> },
-  "At Port":  { color: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",   icon: <Package className="h-3 w-3" /> },
-  "Left Dar": { color: "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300", icon: <Truck className="h-3 w-3" /> },
-  "At Border":{ color: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300", icon: <Truck className="h-3 w-3" /> },
-  "In Transit":{ color: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300", icon: <Truck className="h-3 w-3" /> },
-  Arrived:    { color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",   icon: <CheckCircle2 className="h-3 w-3" /> },
-  Offloaded:  { color: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",          icon: <Package className="h-3 w-3" /> },
-  Closed:     { color: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500",          icon: <XCircle className="h-3 w-3" /> },
+const ALL_STATUSES = [
+  ...ACTIVE_STATUSES, "Offloaded", "Closed", "Completed",
+] as const;
+
+const STATUS_META: Record<string, { color: string; icon: React.ReactNode }> = {
+  OTW:          { color: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300",             icon: <Ship className="h-3 w-3" /> },
+  Sea:          { color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",          icon: <Ship className="h-3 w-3" /> },
+  "At Port":    { color: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",      icon: <Package className="h-3 w-3" /> },
+  "Left Dar":   { color: "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300",  icon: <Truck className="h-3 w-3" /> },
+  "At Border":  { color: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",  icon: <Truck className="h-3 w-3" /> },
+  "In Transit": { color: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300",  icon: <Truck className="h-3 w-3" /> },
+  Arrived:      { color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",      icon: <CheckCircle2 className="h-3 w-3" /> },
+  Offloaded:    { color: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",             icon: <Package className="h-3 w-3" /> },
+  Closed:       { color: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500",             icon: <XCircle className="h-3 w-3" /> },
+  Completed:    { color: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500",             icon: <XCircle className="h-3 w-3" /> },
 };
 
 const FREIGHT_META: Record<string, { color: string }> = {
@@ -236,21 +133,33 @@ const FREIGHT_META: Record<string, { color: string }> = {
   Pending: { color: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" },
 };
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function parseNum(v: string | null | undefined): number {
+  if (!v) return 0;
+  const n = parseFloat(String(v).replace(/,/g, ""));
+  return isNaN(n) ? 0 : n;
+}
+
 function fmt(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
-function fmtDate(d: string | null) {
+function fmtDate(d: string | null | undefined) {
   if (!d) return "—";
-  const [y, m, day] = d.split("-");
+  const parts = d.split("-");
+  if (parts.length !== 3) return d;
+  const [y, m, day] = parts;
   return `${day}/${m}/${y.slice(2)}`;
 }
 
 // ─── Summary Card ─────────────────────────────────────────────────────────────
 
-function SummaryCard({ label, value, sub, icon, accent }: {
-  label: string; value: string | number; sub?: string;
-  icon: React.ReactNode; accent?: string;
+function SummaryCard({ label, value, icon, accent }: {
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+  accent?: string;
 }) {
   return (
     <Card className="min-w-0">
@@ -259,7 +168,6 @@ function SummaryCard({ label, value, sub, icon, accent }: {
         <div className="min-w-0">
           <p className="text-xs text-muted-foreground leading-tight truncate">{label}</p>
           <p className="text-lg font-bold leading-tight">{value}</p>
-          {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
         </div>
       </CardContent>
     </Card>
@@ -269,7 +177,10 @@ function SummaryCard({ label, value, sub, icon, accent }: {
 // ─── Status Chip ──────────────────────────────────────────────────────────────
 
 function StatusChip({ label, active, onClick, icon }: {
-  label: string; active: boolean; onClick: () => void; icon?: React.ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  icon?: React.ReactNode;
 }) {
   return (
     <button
@@ -281,97 +192,145 @@ function StatusChip({ label, active, onClick, icon }: {
           : "bg-background border-border text-muted-foreground hover-elevate",
       )}
     >
-      {icon}
-      {label}
+      {icon}{label}
     </button>
   );
 }
 
-// ─── Container Logistics Drawer ───────────────────────────────────────────────
+// ─── Drawer form type & seed ──────────────────────────────────────────────────
 
-interface DrawerState {
+interface DrawerForm {
   eta: string;
-  etaDar: string;
+  status: string;
   transporter: string;
   transportFee: string;
   numberPlate: string;
-  location: string;
+  trackingLocation: string;
   borderDate: string;
-  declarant: string;
+  agent: string;
   dutyFee: string;
-  docsReceived: boolean;
+  docReceived: boolean;
   docsSentDate: string;
   freightStatus: string;
-  status: ContainerStatus;
   trackingLink: string;
-  notes: string;
+  trackingDescription: string;
 }
 
-function ContainerDrawer({ container, open, onClose }: {
-  container: MockContainer | null;
+function seedForm(c: EnrichedContainerRow): DrawerForm {
+  return {
+    eta: c.eta ?? "",
+    status: c.status,
+    transporter: c.transporter ?? "",
+    transportFee: c.transportFee ?? "",
+    numberPlate: c.numberPlate ?? "",
+    trackingLocation: c.trackingLocation ?? "",
+    borderDate: c.borderDate ?? "",
+    agent: c.agent ?? "",
+    dutyFee: c.dutyFee ?? "",
+    docReceived: c.docReceived === true,
+    docsSentDate: c.docsSentDate ?? "",
+    freightStatus: c.freightStatus ?? "Pending",
+    trackingLink: c.trackingLink ?? "",
+    trackingDescription: c.trackingDescription ?? "",
+  };
+}
+
+// ─── Container Logistics Drawer ───────────────────────────────────────────────
+
+function ContainerDrawer({
+  container,
+  open,
+  onClose,
+  queryKey,
+  sessionCompanyId,
+}: {
+  container: EnrichedContainerRow | null;
   open: boolean;
   onClose: () => void;
+  queryKey: string;
+  sessionCompanyId: number | null;
 }) {
-  const [form, setForm] = useState<DrawerState>({
-    eta: "", etaDar: "", transporter: "", transportFee: "",
-    numberPlate: "", location: "", borderDate: "", declarant: "",
-    dutyFee: "", docsReceived: false, docsSentDate: "",
-    freightStatus: "Pending", status: "Sea",
-    trackingLink: "", notes: "",
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState<DrawerForm | null>(null);
+  const [lastId, setLastId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (open && container && container.id !== lastId) {
+      setForm(seedForm(container));
+      setLastId(container.id);
+    }
+  }, [open, container?.id]);
+
+  const set = (field: keyof DrawerForm, val: any) =>
+    setForm((prev) => prev ? { ...prev, [field]: val } : prev);
+
+  const canEdit =
+    sessionCompanyId === null ||
+    !container ||
+    container.companyId === sessionCompanyId;
+
+  const maxOffload = (() => {
+    if (!form?.borderDate) return null;
+    const d = new Date(form.borderDate);
+    if (isNaN(d.getTime())) return null;
+    const t = (form.transporter ?? "").toUpperCase();
+    const days = t.includes("FARHAT") || t.includes("CONTINENTAL") ? 11 : 14;
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  })();
+
+  const daysDelayed = (() => {
+    if (!maxOffload || (form?.numberPlate ?? "").trim()) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const max = new Date(maxOffload);
+    const diff = Math.floor((today.getTime() - max.getTime()) / 86400000);
+    return diff > 0 ? diff : null;
+  })();
+
+  const mutation = useMutation({
+    mutationFn: (data: Record<string, unknown>) =>
+      apiRequest("PATCH", `/api/containers/${container!.id}/tracking`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [queryKey] });
+      toast({ title: "Saved", description: `${container?.containerNumber} updated.` });
+      onClose();
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Save failed",
+        description: err?.message ?? "Unknown error",
+        variant: "destructive",
+      });
+    },
   });
 
-  // Reset form when container changes
-  const prevId = container?.id;
-  if (container && container.id !== prevId) {
-    setForm({
-      eta: container.eta ?? "",
-      etaDar: container.etaDar ?? "",
-      transporter: container.transporter ?? "",
-      transportFee: container.transportFee?.toString() ?? "",
-      numberPlate: container.numberPlate ?? "",
-      location: container.location ?? "",
-      borderDate: container.borderDate ?? "",
-      declarant: container.declarant ?? "",
-      dutyFee: container.dutyFee?.toString() ?? "",
-      docsReceived: container.docsReceived,
-      docsSentDate: container.docsSentDate ?? "",
-      freightStatus: container.freightStatus ?? "Pending",
-      status: container.status,
-      trackingLink: container.trackingLink ?? "",
-      notes: container.notes ?? "",
+  function handleSave() {
+    if (!container || !form) return;
+    mutation.mutate({
+      eta: form.eta || null,
+      status: form.status,
+      transporter: form.transporter || null,
+      transportFee: form.transportFee || null,
+      numberPlate: form.numberPlate || null,
+      trackingLocation: form.trackingLocation || null,
+      borderDate: form.borderDate || null,
+      agent: form.agent || null,
+      dutyFee: form.dutyFee || null,
+      docReceived: form.docReceived,
+      docsSentDate: form.docsSentDate || null,
+      freightStatus: form.freightStatus || null,
+      trackingLink: form.trackingLink || null,
+      trackingDescription: form.trackingDescription || null,
     });
   }
 
-  // Seed form on open
-  const [lastOpened, setLastOpened] = useState<number | null>(null);
-  if (open && container && container.id !== lastOpened) {
-    setLastOpened(container.id);
-    setForm({
-      eta: container.eta ?? "",
-      etaDar: container.etaDar ?? "",
-      transporter: container.transporter ?? "",
-      transportFee: container.transportFee?.toString() ?? "",
-      numberPlate: container.numberPlate ?? "",
-      location: container.location ?? "",
-      borderDate: container.borderDate ?? "",
-      declarant: container.declarant ?? "",
-      dutyFee: container.dutyFee?.toString() ?? "",
-      docsReceived: container.docsReceived,
-      docsSentDate: container.docsSentDate ?? "",
-      freightStatus: container.freightStatus ?? "Pending",
-      status: container.status,
-      trackingLink: container.trackingLink ?? "",
-      notes: container.notes ?? "",
-    });
-  }
+  if (!container || !form) return null;
 
-  const set = (field: keyof DrawerState, val: any) =>
-    setForm((prev) => ({ ...prev, [field]: val }));
-
-  const maxOffload = calcMaxOffloadDate(form.borderDate || null, form.transporter || null);
-  const daysDelayed = calcDaysDelayed(maxOffload);
-
-  if (!container) return null;
+  const transUpper = form.transporter.toUpperCase();
+  const transLabel = transUpper.includes("FARHAT") || transUpper.includes("CONTINENTAL")
+    ? "(+11d)" : form.transporter ? "(+14d)" : "";
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -379,33 +338,59 @@ function ContainerDrawer({ container, open, onClose }: {
         <SheetHeader className="pb-2">
           <SheetTitle className="text-base font-mono">{container.containerNumber}</SheetTitle>
           <SheetDescription className="text-xs">
-            {container.company} — Container Logistics Drawer
+            {container.companyName} — Container Logistics
           </SheetDescription>
         </SheetHeader>
 
         <div className="space-y-4 pt-2">
 
-          {/* ── Calculated Read-only Preview ── */}
+          {!canEdit && (
+            <div className="flex items-start gap-2 px-3 py-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 text-xs text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <span>
+                This container belongs to <strong>{container.companyName}</strong>.
+                Switch to that company to edit it.
+              </span>
+            </div>
+          )}
+
+          {/* ── Calculated read-only preview ── */}
           <div className="rounded-md border bg-muted/30 p-3 space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Calculated (read-only)</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Calculated (read-only)
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-xs text-muted-foreground">Max Offload Date</p>
                 <p className={cn("text-sm font-medium",
                   maxOffload && new Date(maxOffload) < new Date() ? "text-red-600" : ""
                 )}>
-                  {maxOffload ? fmtDate(maxOffload) : "—"}
-                  {form.transporter && (
-                    <span className="text-xs text-muted-foreground ml-1">
-                      ({(form.transporter.toUpperCase().includes("FARHAT") || form.transporter.toUpperCase().includes("CONTINENTAL")) ? "+11d" : "+14d"})
-                    </span>
+                  {fmtDate(maxOffload)}
+                  {maxOffload && form.transporter && (
+                    <span className="text-xs text-muted-foreground ml-1">{transLabel}</span>
                   )}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Days Delayed</p>
                 <p className={cn("text-sm font-medium", daysDelayed ? "text-red-600" : "text-muted-foreground")}>
-                  {daysDelayed ? `+${daysDelayed} days` : "—"}
+                  {daysDelayed ? `+${daysDelayed}d` : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Docs Ready / Not Sent</p>
+                <p className="text-sm font-medium">
+                  {container.docsReadyNotSent
+                    ? <span className="text-amber-600">Yes</span>
+                    : <span className="text-muted-foreground">—</span>}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Offload Overdue</p>
+                <p className="text-sm font-medium">
+                  {container.isOverdue
+                    ? <span className="text-red-600">Yes</span>
+                    : <span className="text-muted-foreground">—</span>}
                 </p>
               </div>
             </div>
@@ -413,23 +398,35 @@ function ContainerDrawer({ container, open, onClose }: {
 
           <Separator />
 
-          {/* ── Status & Freight Status ── */}
+          {/* ── Status + Freight Status ── */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Status</Label>
-              <Select value={form.status} onValueChange={(v) => set("status", v)}>
-                <SelectTrigger data-testid="select-drawer-status"><SelectValue /></SelectTrigger>
+              <Select
+                value={form.status}
+                onValueChange={(v) => set("status", v)}
+                disabled={!canEdit}
+              >
+                <SelectTrigger data-testid="select-drawer-status">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {ACTIVE_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  <SelectItem value="Offloaded">Offloaded</SelectItem>
-                  <SelectItem value="Closed">Closed</SelectItem>
+                  {ALL_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Freight Status</Label>
-              <Select value={form.freightStatus} onValueChange={(v) => set("freightStatus", v)}>
-                <SelectTrigger data-testid="select-drawer-freight"><SelectValue /></SelectTrigger>
+              <Select
+                value={form.freightStatus}
+                onValueChange={(v) => set("freightStatus", v)}
+                disabled={!canEdit}
+              >
+                <SelectTrigger data-testid="select-drawer-freight">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Yes">Yes</SelectItem>
                   <SelectItem value="No">No</SelectItem>
@@ -439,24 +436,30 @@ function ContainerDrawer({ container, open, onClose }: {
             </div>
           </div>
 
-          {/* ── ETA Fields ── */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">ETA DAS <span className="text-muted-foreground">(DB: eta)</span></Label>
-              <Input type="date" value={form.eta} onChange={(e) => set("eta", e.target.value)} data-testid="input-drawer-eta" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">ETA Dar <span className="text-muted-foreground">(optional)</span></Label>
-              <Input type="date" value={form.etaDar} onChange={(e) => set("etaDar", e.target.value)} data-testid="input-drawer-eta-dar" />
-            </div>
+          {/* ── ETA DAS ── */}
+          <div className="space-y-1">
+            <Label className="text-xs">ETA DAS</Label>
+            <Input
+              type="date"
+              value={form.eta}
+              onChange={(e) => set("eta", e.target.value)}
+              disabled={!canEdit}
+              data-testid="input-drawer-eta"
+            />
           </div>
 
           {/* ── Transporter + Transport Fee ── */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Transporter</Label>
-              <Select value={form.transporter || "__none"} onValueChange={(v) => set("transporter", v === "__none" ? "" : v)}>
-                <SelectTrigger data-testid="select-drawer-transporter"><SelectValue placeholder="—" /></SelectTrigger>
+              <Select
+                value={form.transporter || "__none"}
+                onValueChange={(v) => set("transporter", v === "__none" ? "" : v)}
+                disabled={!canEdit}
+              >
+                <SelectTrigger data-testid="select-drawer-transporter">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none">—</SelectItem>
                   <SelectItem value="FARHAT">FARHAT (+11d)</SelectItem>
@@ -467,7 +470,14 @@ function ContainerDrawer({ container, open, onClose }: {
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Transport Fee ($)</Label>
-              <Input type="number" placeholder="0" value={form.transportFee} onChange={(e) => set("transportFee", e.target.value)} data-testid="input-drawer-transport-fee" />
+              <Input
+                type="number"
+                placeholder="0"
+                value={form.transportFee}
+                onChange={(e) => set("transportFee", e.target.value)}
+                disabled={!canEdit}
+                data-testid="input-drawer-transport-fee"
+              />
             </div>
           </div>
 
@@ -475,30 +485,63 @@ function ContainerDrawer({ container, open, onClose }: {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Truck / Number Plate</Label>
-              <Input placeholder="T123ABC" value={form.numberPlate} onChange={(e) => set("numberPlate", e.target.value)} data-testid="input-drawer-plate" />
+              <Input
+                placeholder="T123ABC"
+                value={form.numberPlate}
+                onChange={(e) => set("numberPlate", e.target.value)}
+                disabled={!canEdit}
+                data-testid="input-drawer-plate"
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Location</Label>
-              <Input placeholder="e.g. Kasumbalesa" value={form.location} onChange={(e) => set("location", e.target.value)} data-testid="input-drawer-location" />
+              <Input
+                placeholder="e.g. Kasumbalesa"
+                value={form.trackingLocation}
+                onChange={(e) => set("trackingLocation", e.target.value)}
+                disabled={!canEdit}
+                data-testid="input-drawer-location"
+              />
             </div>
           </div>
 
           {/* ── Border Date ── */}
           <div className="space-y-1">
             <Label className="text-xs">Border Date</Label>
-            <Input type="date" value={form.borderDate} onChange={(e) => set("borderDate", e.target.value)} data-testid="input-drawer-border-date" />
-            <p className="text-xs text-muted-foreground">Used to calculate Max Offload Date based on transporter</p>
+            <Input
+              type="date"
+              value={form.borderDate}
+              onChange={(e) => set("borderDate", e.target.value)}
+              disabled={!canEdit}
+              data-testid="input-drawer-border-date"
+            />
+            <p className="text-xs text-muted-foreground">
+              Used to calculate Max Offload Date based on transporter
+            </p>
           </div>
 
           {/* ── Declarant + Duty Fee ── */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Declarant / Agent</Label>
-              <Input placeholder="e.g. ATLAS" value={form.declarant} onChange={(e) => set("declarant", e.target.value)} data-testid="input-drawer-declarant" />
+              <Input
+                placeholder="e.g. ATLAS"
+                value={form.agent}
+                onChange={(e) => set("agent", e.target.value)}
+                disabled={!canEdit}
+                data-testid="input-drawer-agent"
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Duty Fee ($)</Label>
-              <Input type="number" placeholder="0" value={form.dutyFee} onChange={(e) => set("dutyFee", e.target.value)} data-testid="input-drawer-duty-fee" />
+              <Input
+                type="number"
+                placeholder="0"
+                value={form.dutyFee}
+                onChange={(e) => set("dutyFee", e.target.value)}
+                disabled={!canEdit}
+                data-testid="input-drawer-duty-fee"
+              />
             </div>
           </div>
 
@@ -507,34 +550,77 @@ function ContainerDrawer({ container, open, onClose }: {
             <div className="space-y-1">
               <Label className="text-xs">Docs Received</Label>
               <div className="flex items-center gap-2 pt-1">
-                <Switch checked={form.docsReceived} onCheckedChange={(v) => set("docsReceived", v)} data-testid="switch-drawer-docs-received" />
-                <span className="text-sm">{form.docsReceived ? "Yes" : "No"}</span>
+                <Switch
+                  checked={form.docReceived}
+                  onCheckedChange={(v) => set("docReceived", v)}
+                  disabled={!canEdit}
+                  data-testid="switch-drawer-docs-received"
+                />
+                <span className="text-sm">{form.docReceived ? "Yes" : "No"}</span>
               </div>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Docs Sent to Transporter</Label>
-              <Input type="date" value={form.docsSentDate} onChange={(e) => set("docsSentDate", e.target.value)} data-testid="input-drawer-docs-sent" />
+              <Input
+                type="date"
+                value={form.docsSentDate}
+                onChange={(e) => set("docsSentDate", e.target.value)}
+                disabled={!canEdit}
+                data-testid="input-drawer-docs-sent"
+              />
             </div>
           </div>
 
           {/* ── Tracking Link ── */}
           <div className="space-y-1">
             <Label className="text-xs">Tracking Link</Label>
-            <Input placeholder="https://…" value={form.trackingLink} onChange={(e) => set("trackingLink", e.target.value)} data-testid="input-drawer-tracking" />
+            <Input
+              placeholder="https://…"
+              value={form.trackingLink}
+              onChange={(e) => set("trackingLink", e.target.value)}
+              disabled={!canEdit}
+              data-testid="input-drawer-tracking"
+            />
           </div>
 
           {/* ── Notes ── */}
           <div className="space-y-1">
             <Label className="text-xs">Notes</Label>
-            <Textarea rows={3} placeholder="Any additional notes…" value={form.notes} onChange={(e) => set("notes", e.target.value)} data-testid="input-drawer-notes" />
+            <Textarea
+              rows={3}
+              placeholder="Additional notes…"
+              value={form.trackingDescription}
+              onChange={(e) => set("trackingDescription", e.target.value)}
+              disabled={!canEdit}
+              data-testid="input-drawer-notes"
+            />
           </div>
 
-          {/* ── Save (mockup only) ── */}
+          {/* ── Save / Cancel ── */}
           <div className="flex gap-2 pt-1 pb-4">
-            <Button className="flex-1" data-testid="button-drawer-save">
-              Save Changes <span className="ml-1 text-xs opacity-70">(mockup)</span>
-            </Button>
-            <Button variant="outline" onClick={onClose} data-testid="button-drawer-cancel">
+            {canEdit ? (
+              <Button
+                className="flex-1"
+                onClick={handleSave}
+                disabled={mutation.isPending}
+                data-testid="button-drawer-save"
+              >
+                {mutation.isPending ? "Saving…" : "Save Changes"}
+              </Button>
+            ) : (
+              <Button
+                className="flex-1"
+                disabled
+                data-testid="button-drawer-save-disabled"
+              >
+                Switch Company to Edit
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={onClose}
+              data-testid="button-drawer-cancel"
+            >
               Cancel
             </Button>
           </div>
@@ -545,149 +631,149 @@ function ContainerDrawer({ container, open, onClose }: {
   );
 }
 
-// ─── WhatsApp Text Preview ─────────────────────────────────────────────────────
-
-function WhatsAppPreview({ containers }: { containers: MockContainer[] }) {
-  const active = containers.filter((c) => ACTIVE_STATUSES.includes(c.status as ActiveStatus));
-  const atSea = active.filter((c) => c.status === "OTW" || c.status === "Sea").length;
-  const atPort = active.filter((c) => c.status === "At Port").length;
-  const leftDar = active.filter((c) => c.status === "Left Dar").length;
-  const inTransit = active.filter((c) => ["At Border", "In Transit"].includes(c.status)).length;
-  const arrived = active.filter((c) => c.status === "Arrived").length;
-  const delayed = active.filter((c) => {
-    const m = calcMaxOffloadDate(c.borderDate, c.transporter);
-    return calcDaysDelayed(m) !== null;
-  }).length;
-  const docsMissing = active.filter((c) => !c.docsReceived).length;
-  const offloadOverdue = active.filter((c) => {
-    const m = calcMaxOffloadDate(c.borderDate, c.transporter);
-    return m ? new Date(m) < new Date() : false;
-  }).length;
-  const totalCost = active.reduce((s, c) => s + c.amount, 0);
-  const totalTransport = active.reduce((s, c) => s + (c.transportFee ?? 0), 0);
-  const totalDuty = active.reduce((s, c) => s + (c.dutyFee ?? 0), 0);
-
-  const topDelayed = active
-    .map((c) => ({ c, delay: calcDaysDelayed(calcMaxOffloadDate(c.borderDate, c.transporter)) }))
-    .filter((x) => x.delay)
-    .sort((a, b) => (b.delay ?? 0) - (a.delay ?? 0))
-    .slice(0, 3);
-
-  const today = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-
-  const lines = [
-    `📦 *GIT CONTAINER REPORT — ${today}*`,
-    ``,
-    `Active: ${active.length}`,
-    `At Sea / OTW: ${atSea}`,
-    `At Port: ${atPort}`,
-    `Left Dar: ${leftDar}`,
-    `In Transit: ${inTransit}`,
-    `Arrived: ${arrived}`,
-    ``,
-    `⚠️ Delayed: ${delayed}`,
-    `📄 Docs Missing: ${docsMissing}`,
-    `🔴 Offload Overdue: ${offloadOverdue}`,
-    ``,
-    `💵 Total Container Cost: $${fmt(totalCost)}`,
-    `🚚 Total Transport Fees: $${fmt(totalTransport)}`,
-    `📋 Total Duty Fees: $${fmt(totalDuty)}`,
-    ...(topDelayed.length > 0 ? [
-      ``,
-      `*Top Delayed Containers:*`,
-      ...topDelayed.map((x) => `  • ${x.c.containerNumber} — +${x.delay}d (${x.c.status})`),
-    ] : []),
-    ...(active.filter((c) => c.trackingLink).length > 0 ? [
-      ``,
-      `*Tracking Links:*`,
-      ...active.filter((c) => c.trackingLink).map((c) => `  ${c.containerNumber}: ${c.trackingLink}`),
-    ] : []),
-  ];
-
-  return (
-    <div className="rounded-md border bg-[#e5ddd5] dark:bg-zinc-800 p-3 space-y-2">
-      <div className="flex items-center gap-2 mb-2">
-        <MessageSquare className="h-4 w-4 text-green-600" />
-        <p className="text-xs font-semibold">WhatsApp Text Preview <span className="text-muted-foreground font-normal">(planned format)</span></p>
-      </div>
-      <div className="bg-white dark:bg-zinc-700 rounded-lg p-3 text-xs font-mono whitespace-pre-wrap max-h-64 overflow-y-auto leading-relaxed">
-        {lines.join("\n")}
-      </div>
-      <p className="text-xs text-muted-foreground">This text will be sent to the WhatsApp group. No PDF or image attachment.</p>
-    </div>
-  );
-}
-
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 type QuickChip = "All Active" | ActiveStatus;
 
 export default function GITContainers() {
+  const { data: user } = useQuery<AuthUser>({ queryKey: ["/api/auth/me"] });
+
+  const [allCompanies, setAllCompanies] = useState(false);
   const [chipFilter, setChipFilter] = useState<QuickChip>("All Active");
   const [companyFilter, setCompanyFilter] = useState("ALL");
   const [transporterFilter, setTransporterFilter] = useState("ALL");
-  const [declarantFilter, setDeclarantFilter] = useState("ALL");
+  const [agentFilter, setAgentFilter] = useState("ALL");
   const [docsFilter, setDocsFilter] = useState("ALL");
   const [delayedFilter, setDelayedFilter] = useState("ALL");
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
-  const [showWaPreview, setShowWaPreview] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerContainer, setDrawerContainer] = useState<MockContainer | null>(null);
+  const [drawerContainer, setDrawerContainer] = useState<EnrichedContainerRow | null>(null);
 
-  const active = MOCK.filter((c) => ACTIVE_STATUSES.includes(c.status as ActiveStatus));
+  const role = user?.role;
+  const isAllowed = !!role && ["Admin", "Developer", "Owner"].includes(role);
+
+  const queryUrl = allCompanies
+    ? "/api/git/containers?allCompanies=true"
+    : "/api/git/containers";
+
+  const { data, isLoading, isError, error } = useQuery<GitContainersResponse>({
+    queryKey: [queryUrl],
+    staleTime: 60_000,
+    enabled: !!isAllowed,
+  });
+
+  const allContainers = data?.containers ?? [];
 
   const filtered = useMemo(() => {
-    return active.filter((c) => {
+    return allContainers.filter((c) => {
       if (chipFilter !== "All Active" && c.status !== chipFilter) return false;
-      if (companyFilter !== "ALL" && c.company !== companyFilter) return false;
+      if (companyFilter !== "ALL" && c.companyName !== companyFilter) return false;
       if (transporterFilter !== "ALL" && c.transporter !== transporterFilter) return false;
-      if (declarantFilter !== "ALL" && c.declarant !== declarantFilter) return false;
-      if (docsFilter === "MISSING" && c.docsReceived) return false;
-      if (docsFilter === "RECEIVED" && !c.docsReceived) return false;
-      if (delayedFilter === "YES") {
-        const m = calcMaxOffloadDate(c.borderDate, c.transporter);
-        if (!calcDaysDelayed(m)) return false;
-      }
+      if (agentFilter !== "ALL" && c.agent !== agentFilter) return false;
+      if (docsFilter === "MISSING" && c.docReceived) return false;
+      if (docsFilter === "RECEIVED" && !c.docReceived) return false;
+      if (docsFilter === "READY_NOT_SENT" && !c.docsReadyNotSent) return false;
+      if (delayedFilter === "YES" && !(c.daysDelayed && c.daysDelayed > 0)) return false;
+      if (delayedFilter === "OVERDUE" && !c.isOverdue) return false;
       if (search) {
         const q = search.toLowerCase();
         if (
           !c.containerNumber.toLowerCase().includes(q) &&
-          !c.company.toLowerCase().includes(q) &&
+          !(c.companyName ?? "").toLowerCase().includes(q) &&
           !(c.numberPlate ?? "").toLowerCase().includes(q) &&
-          !(c.transporter ?? "").toLowerCase().includes(q)
+          !(c.transporter ?? "").toLowerCase().includes(q) &&
+          !(c.agent ?? "").toLowerCase().includes(q)
         ) return false;
       }
       return true;
     });
-  }, [active, chipFilter, companyFilter, transporterFilter, declarantFilter, docsFilter, delayedFilter, search]);
+  }, [allContainers, chipFilter, companyFilter, transporterFilter, agentFilter, docsFilter, delayedFilter, search]);
 
-  // Summary stats (always over all active)
-  const totalActive = active.length;
-  const atSea = active.filter((c) => c.status === "OTW" || c.status === "Sea").length;
-  const atPort = active.filter((c) => c.status === "At Port").length;
-  const leftDar = active.filter((c) => c.status === "Left Dar").length;
-  const inTransit = active.filter((c) => ["At Border", "In Transit", "Arrived"].includes(c.status)).length;
-  const delayed = active.filter((c) => calcDaysDelayed(calcMaxOffloadDate(c.borderDate, c.transporter)) !== null).length;
-  const docsMissing = active.filter((c) => !c.docsReceived).length;
-  const offloadOverdue = active.filter((c) => {
-    const m = calcMaxOffloadDate(c.borderDate, c.transporter);
-    return m ? new Date(m) < new Date() : false;
-  }).length;
-  const totalCost = active.reduce((s, c) => s + c.amount, 0);
-  const totalTransport = active.reduce((s, c) => s + (c.transportFee ?? 0), 0);
-  const totalDuty = active.reduce((s, c) => s + (c.dutyFee ?? 0), 0);
+  // Summary stats (always over all loaded active containers)
+  const atSea          = allContainers.filter((c) => c.status === "OTW" || c.status === "Sea").length;
+  const atPort         = allContainers.filter((c) => c.status === "At Port").length;
+  const leftDar        = allContainers.filter((c) => c.status === "Left Dar").length;
+  const inTransit      = allContainers.filter((c) => ["At Border", "In Transit"].includes(c.status)).length;
+  const arrived        = allContainers.filter((c) => c.status === "Arrived").length;
+  const delayed        = allContainers.filter((c) => c.daysDelayed !== null && c.daysDelayed > 0).length;
+  const docsReadyNS    = allContainers.filter((c) => c.docsReadyNotSent).length;
+  const offloadOverdue = allContainers.filter((c) => c.isOverdue).length;
+  const totalCost      = allContainers.reduce((s, c) => s + parseNum(c.grandTotal), 0);
+  const totalTransport = allContainers.reduce((s, c) => s + parseNum(c.transportFee), 0);
+  const totalDuty      = allContainers.reduce((s, c) => s + parseNum(c.dutyFee), 0);
 
-  const companies = [...new Set(MOCK.map((c) => c.company))];
-  const transporters = [...new Set(MOCK.map((c) => c.transporter).filter(Boolean))] as string[];
-  const declarants = [...new Set(MOCK.map((c) => c.declarant).filter(Boolean))] as string[];
+  const companies   = [...new Set(allContainers.map((c) => c.companyName))].sort();
+  const transporters = [...new Set(allContainers.map((c) => c.transporter).filter(Boolean))].sort() as string[];
+  const agents      = [...new Set(allContainers.map((c) => c.agent).filter(Boolean))].sort() as string[];
 
   const chips: QuickChip[] = ["All Active", ...ACTIVE_STATUSES];
 
-  function openDrawer(c: MockContainer) {
+  function openDrawer(c: EnrichedContainerRow) {
     setDrawerContainer(c);
     setDrawerOpen(true);
   }
+
+  function clearFilters() {
+    setCompanyFilter("ALL");
+    setTransporterFilter("ALL");
+    setAgentFilter("ALL");
+    setDocsFilter("ALL");
+    setDelayedFilter("ALL");
+    setSearch("");
+    setChipFilter("All Active");
+  }
+
+  // ── Access denied ──
+  if (user && !isAllowed) {
+    return (
+      <div className="flex flex-col h-full overflow-hidden">
+        <PageHeader title="Containers OTW" subtitle="Active container logistics and tracking" />
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center space-y-2">
+            <AlertTriangle className="h-8 w-8 text-muted-foreground mx-auto" />
+            <p className="text-sm font-medium">Access Restricted</p>
+            <p className="text-xs text-muted-foreground">
+              This page is available to Admin, Developer, and Owner roles only.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Loading ──
+  if (!user || isLoading) {
+    return (
+      <div className="flex flex-col h-full overflow-hidden">
+        <PageHeader title="Containers OTW" subtitle="Active container logistics and tracking" />
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-muted-foreground">Loading containers…</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Error ──
+  if (isError) {
+    return (
+      <div className="flex flex-col h-full overflow-hidden">
+        <PageHeader title="Containers OTW" subtitle="Active container logistics and tracking" />
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center space-y-2">
+            <AlertTriangle className="h-8 w-8 text-red-500 mx-auto" />
+            <p className="text-sm font-medium">Failed to load containers</p>
+            <p className="text-xs text-muted-foreground">
+              {(error as any)?.message ?? "Unknown error"}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Session company ID — for multi-company drawer edit gating
+  const sessionCompanyId = (data?.mode === "single" && data.companyId) ? data.companyId : null;
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -698,28 +784,58 @@ export default function GITContainers() {
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
 
-        {/* ── Mockup Banner ── */}
-        <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 text-sm text-amber-800 dark:text-amber-300">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span><strong>Mockup mode</strong> — all data is fake. No DB reads or writes. Access restricted to Admin / Developer / Owner.</span>
+        {/* ── Company Mode ── */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => { setAllCompanies(false); setCompanyFilter("ALL"); }}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors",
+              !allCompanies
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background border-border text-muted-foreground hover-elevate",
+            )}
+            data-testid="button-my-company"
+          >
+            <Building2 className="h-3.5 w-3.5" />
+            My Company
+          </button>
+          <button
+            onClick={() => { setAllCompanies(true); setCompanyFilter("ALL"); }}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors",
+              allCompanies
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background border-border text-muted-foreground hover-elevate",
+            )}
+            data-testid="button-all-companies"
+          >
+            <Globe className="h-3.5 w-3.5" />
+            All Accessible Companies
+          </button>
+          {data && (
+            <span className="text-xs text-muted-foreground ml-1">
+              {data.total} active container{data.total !== 1 ? "s" : ""}
+              {data.mode === "single" && data.companyName ? ` — ${data.companyName}` : ""}
+            </span>
+          )}
         </div>
 
         {/* ── Summary Cards ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-11 gap-2">
-          <SummaryCard label="Active" value={totalActive} icon={<Package className="h-4 w-4 text-primary" />} accent="bg-primary/10" />
+          <SummaryCard label="Active" value={allContainers.length} icon={<Package className="h-4 w-4 text-primary" />} accent="bg-primary/10" />
           <SummaryCard label="At Sea / OTW" value={atSea} icon={<Ship className="h-4 w-4 text-blue-600" />} accent="bg-blue-100 dark:bg-blue-900/30" />
           <SummaryCard label="At Port" value={atPort} icon={<Package className="h-4 w-4 text-amber-600" />} accent="bg-amber-100 dark:bg-amber-900/30" />
           <SummaryCard label="Left Dar" value={leftDar} icon={<Truck className="h-4 w-4 text-violet-600" />} accent="bg-violet-100 dark:bg-violet-900/30" />
           <SummaryCard label="In Transit" value={inTransit} icon={<Truck className="h-4 w-4 text-indigo-600" />} accent="bg-indigo-100 dark:bg-indigo-900/30" />
+          <SummaryCard label="Arrived" value={arrived} icon={<CheckCircle2 className="h-4 w-4 text-green-600" />} accent="bg-green-100 dark:bg-green-900/30" />
           <SummaryCard label="Delayed" value={delayed} icon={<Clock className="h-4 w-4 text-red-600" />} accent="bg-red-100 dark:bg-red-900/30" />
-          <SummaryCard label="Docs Missing" value={docsMissing} icon={<FileX className="h-4 w-4 text-orange-600" />} accent="bg-orange-100 dark:bg-orange-900/30" />
+          <SummaryCard label="Docs Ready / Unsent" value={docsReadyNS} icon={<FileX className="h-4 w-4 text-amber-600" />} accent="bg-amber-100 dark:bg-amber-900/30" />
           <SummaryCard label="Offload Overdue" value={offloadOverdue} icon={<AlertTriangle className="h-4 w-4 text-red-600" />} accent="bg-red-100 dark:bg-red-900/30" />
           <SummaryCard label="Container Cost" value={`$${fmt(totalCost)}`} icon={<DollarSign className="h-4 w-4 text-green-600" />} accent="bg-green-100 dark:bg-green-900/30" />
-          <SummaryCard label="Transport Fees" value={`$${fmt(totalTransport)}`} icon={<Truck className="h-4 w-4 text-muted-foreground" />} />
-          <SummaryCard label="Duty Fees" value={`$${fmt(totalDuty)}`} icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} />
+          <SummaryCard label="Transport + Duty" value={`$${fmt(totalTransport + totalDuty)}`} icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} />
         </div>
 
-        {/* ── Status Quick Chips — "All Active" is default ── */}
+        {/* ── Status Quick Chips ── */}
         <div className="flex items-center gap-2 flex-wrap">
           {chips.map((s) => (
             <StatusChip
@@ -727,64 +843,62 @@ export default function GITContainers() {
               label={s}
               active={chipFilter === s}
               onClick={() => setChipFilter(s)}
-              icon={s !== "All Active" ? STATUS_META[s as ContainerStatus]?.icon : <Package className="h-3 w-3" />}
+              icon={s !== "All Active"
+                ? STATUS_META[s as string]?.icon
+                : <Package className="h-3 w-3" />}
             />
           ))}
         </div>
 
-        {/* ── Search + Toolbar ── */}
+        {/* ── Search + Filters Toggle ── */}
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 min-w-48">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search container #, company, truck, transporter…"
+              placeholder="Search container #, company, truck, transporter, agent…"
               className="pl-8"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              data-testid="input-git-search"
+              data-testid="input-otw-search"
             />
           </div>
           <Button
             variant="outline"
             size="default"
             onClick={() => setShowFilters((v) => !v)}
-            data-testid="button-git-filters"
+            data-testid="button-otw-filters"
           >
             <Filter className="h-4 w-4 mr-1" />
             Filters
             <ChevronDown className={cn("h-3.5 w-3.5 ml-1 transition-transform", showFilters && "rotate-180")} />
-          </Button>
-          <Button
-            variant="outline"
-            size="default"
-            onClick={() => setShowWaPreview((v) => !v)}
-            data-testid="button-git-wa-preview"
-          >
-            <MessageSquare className="h-4 w-4 mr-1" />
-            WA Preview
-          </Button>
-          <Button variant="outline" size="default" data-testid="button-git-export">
-            Export Excel
           </Button>
         </div>
 
         {/* ── Expandable Filters ── */}
         {showFilters && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 p-3 rounded-md border bg-muted/30">
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground flex items-center gap-1"><Building2 className="h-3 w-3" /> Company</p>
-              <Select value={companyFilter} onValueChange={setCompanyFilter}>
-                <SelectTrigger className="h-8 text-xs" data-testid="select-git-company"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Companies</SelectItem>
-                  {companies.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            {allCompanies && (
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Building2 className="h-3 w-3" /> Company
+                </p>
+                <Select value={companyFilter} onValueChange={setCompanyFilter}>
+                  <SelectTrigger className="h-8 text-xs" data-testid="select-otw-company">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Companies</SelectItem>
+                    {companies.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Transporter</p>
               <Select value={transporterFilter} onValueChange={setTransporterFilter}>
-                <SelectTrigger className="h-8 text-xs" data-testid="select-git-transporter"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8 text-xs" data-testid="select-otw-transporter">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All Transporters</SelectItem>
                   {transporters.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -792,43 +906,51 @@ export default function GITContainers() {
               </Select>
             </div>
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Declarant</p>
-              <Select value={declarantFilter} onValueChange={setDeclarantFilter}>
-                <SelectTrigger className="h-8 text-xs" data-testid="select-git-declarant"><SelectValue /></SelectTrigger>
+              <p className="text-xs text-muted-foreground">Agent / Declarant</p>
+              <Select value={agentFilter} onValueChange={setAgentFilter}>
+                <SelectTrigger className="h-8 text-xs" data-testid="select-otw-agent">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">All Declarants</SelectItem>
-                  {declarants.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  <SelectItem value="ALL">All Agents</SelectItem>
+                  {agents.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Docs</p>
               <Select value={docsFilter} onValueChange={setDocsFilter}>
-                <SelectTrigger className="h-8 text-xs" data-testid="select-git-docs"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8 text-xs" data-testid="select-otw-docs">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All</SelectItem>
-                  <SelectItem value="MISSING">Missing</SelectItem>
-                  <SelectItem value="RECEIVED">Received</SelectItem>
+                  <SelectItem value="MISSING">Docs Missing</SelectItem>
+                  <SelectItem value="RECEIVED">Docs Received</SelectItem>
+                  <SelectItem value="READY_NOT_SENT">Ready / Not Sent</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Delayed</p>
+              <p className="text-xs text-muted-foreground">Delay / Overdue</p>
               <Select value={delayedFilter} onValueChange={setDelayedFilter}>
-                <SelectTrigger className="h-8 text-xs" data-testid="select-git-delayed"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8 text-xs" data-testid="select-otw-delayed">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All</SelectItem>
                   <SelectItem value="YES">Delayed only</SelectItem>
+                  <SelectItem value="OVERDUE">Offload Overdue</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="flex items-end">
               <Button
-                variant="ghost" size="sm" className="h-8 text-xs"
-                onClick={() => {
-                  setCompanyFilter("ALL"); setTransporterFilter("ALL"); setDeclarantFilter("ALL");
-                  setDocsFilter("ALL"); setDelayedFilter("ALL"); setSearch(""); setChipFilter("All Active");
-                }}
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={clearFilters}
+                data-testid="button-otw-clear"
               >
                 Clear All
               </Button>
@@ -836,12 +958,25 @@ export default function GITContainers() {
           </div>
         )}
 
-        {/* ── WhatsApp Text Preview ── */}
-        {showWaPreview && <WhatsAppPreview containers={MOCK} />}
-
-        {/* ── Results count ── */}
-        <div className="text-xs text-muted-foreground">
-          Showing {filtered.length} of {active.length} active containers — click a row or Edit to open the drawer
+        {/* ── Results count + Legend ── */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <p className="text-xs text-muted-foreground">
+            Showing {filtered.length} of {allContainers.length} active containers — click a row to edit
+          </p>
+          <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded-sm bg-red-200 dark:bg-red-900/40" />
+              Offload Overdue
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded-sm bg-amber-200 dark:bg-amber-900/40" />
+              Docs Ready / Not Sent
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded-sm bg-rose-200 dark:bg-rose-900/40" />
+              Docs Missing — At Port
+            </span>
+          </div>
         </div>
 
         {/* ── Main Table ── */}
@@ -851,103 +986,134 @@ export default function GITContainers() {
               <TableRow>
                 <TableHead className="w-8">#</TableHead>
                 <TableHead>Container #</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Company</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>ETA DAS</TableHead>
+                <TableHead className="text-right">Cost</TableHead>
                 <TableHead>Truck #</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead>Border Date</TableHead>
                 <TableHead>Max Offload</TableHead>
-                <TableHead>Days Delayed</TableHead>
+                <TableHead>Delayed</TableHead>
                 <TableHead>Docs</TableHead>
+                <TableHead>Docs Sent</TableHead>
+                <TableHead>Ready/Unsent</TableHead>
+                <TableHead>Freight</TableHead>
                 <TableHead>Transporter</TableHead>
                 <TableHead className="text-right">Transport Fee</TableHead>
-                <TableHead>Declarant</TableHead>
+                <TableHead>Agent</TableHead>
                 <TableHead className="text-right">Duty Fee</TableHead>
-                <TableHead>Docs Sent</TableHead>
-                <TableHead>Freight Status</TableHead>
                 <TableHead>Tracking</TableHead>
                 <TableHead>Notes</TableHead>
-                <TableHead className="w-10"></TableHead>
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={21} className="text-center py-8 text-muted-foreground">
-                    No containers match the current filters.
+                  <TableCell colSpan={22} className="text-center py-8 text-muted-foreground">
+                    {allContainers.length === 0
+                      ? "No active containers found."
+                      : "No containers match the current filters."}
                   </TableCell>
                 </TableRow>
               ) : (
                 filtered.map((c, i) => {
-                  const statusMeta = STATUS_META[c.status];
-                  const maxOffload = calcMaxOffloadDate(c.borderDate, c.transporter);
-                  const daysDelayed = calcDaysDelayed(maxOffload);
-                  const isOverdue = maxOffload ? new Date(maxOffload) < new Date() : false;
+                  const statusMeta = STATUS_META[c.status] ?? STATUS_META["Closed"];
+                  const rowBg = c.isOverdue
+                    ? "bg-red-50/50 dark:bg-red-950/20"
+                    : c.docsReadyNotSent
+                    ? "bg-amber-50/50 dark:bg-amber-950/20"
+                    : !c.docReceived && c.status === "At Port"
+                    ? "bg-rose-50/50 dark:bg-rose-950/20"
+                    : "";
+
                   return (
                     <TableRow
                       key={c.id}
-                      className={cn(
-                        "cursor-pointer",
-                        daysDelayed ? "bg-red-50/40 dark:bg-red-950/20" : ""
-                      )}
+                      className={cn("cursor-pointer", rowBg)}
                       onClick={() => openDrawer(c)}
                       data-testid={`row-container-${c.id}`}
                     >
                       <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                       <TableCell className="font-mono font-medium">{c.containerNumber}</TableCell>
-                      <TableCell className="text-right font-medium">${fmt(c.amount)}</TableCell>
-                      <TableCell>{c.company}</TableCell>
+                      <TableCell>{c.companyName}</TableCell>
                       <TableCell>
-                        <span className={cn("flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium w-fit", statusMeta.color)}>
+                        <span className={cn(
+                          "flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium w-fit",
+                          statusMeta.color
+                        )}>
                           {statusMeta.icon}{c.status}
                         </span>
                       </TableCell>
                       <TableCell>{fmtDate(c.eta)}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {c.grandTotal ? `$${fmt(parseNum(c.grandTotal))}` : "—"}
+                      </TableCell>
                       <TableCell>
                         {c.numberPlate
                           ? <span className="font-mono">{c.numberPlate}</span>
                           : <span className="text-muted-foreground">—</span>}
                       </TableCell>
-                      <TableCell>{c.location ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                      <TableCell>
+                        {c.trackingLocation ?? <span className="text-muted-foreground">—</span>}
+                      </TableCell>
                       <TableCell>{fmtDate(c.borderDate)}</TableCell>
-                      <TableCell className={isOverdue ? "text-red-600 font-medium" : ""}>
-                        {fmtDate(maxOffload)}
-                        {c.transporter && maxOffload && (
-                          <span className="text-muted-foreground ml-1 text-xs">
-                            ({(c.transporter.toUpperCase().includes("FARHAT") || c.transporter.toUpperCase().includes("CONTINENTAL")) ? "+11d" : "+14d"})
-                          </span>
-                        )}
+                      <TableCell className={c.isOverdue ? "text-red-600 font-medium" : ""}>
+                        {fmtDate(c.maxOffloadDate)}
                       </TableCell>
                       <TableCell>
-                        {daysDelayed
-                          ? <span className="text-red-600 font-medium">+{daysDelayed}d</span>
+                        {c.daysDelayed && c.daysDelayed > 0
+                          ? <span className="text-red-600 font-medium">+{c.daysDelayed}d</span>
                           : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell>
-                        {c.docsReceived
+                        {c.docReceived
                           ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
                           : <XCircle className="h-3.5 w-3.5 text-red-500" />}
                       </TableCell>
-                      <TableCell>{c.transporter ?? <span className="text-muted-foreground">—</span>}</TableCell>
-                      <TableCell className="text-right">{c.transportFee ? `$${fmt(c.transportFee)}` : "—"}</TableCell>
-                      <TableCell>{c.declarant ?? <span className="text-muted-foreground">—</span>}</TableCell>
-                      <TableCell className="text-right">{c.dutyFee ? `$${fmt(c.dutyFee)}` : "—"}</TableCell>
                       <TableCell>{fmtDate(c.docsSentDate)}</TableCell>
                       <TableCell>
+                        {c.docsReadyNotSent
+                          ? <span className="text-amber-600 font-medium">Yes</span>
+                          : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell>
                         {c.freightStatus
-                          ? <span className={cn("px-1.5 py-0.5 rounded text-xs font-medium", FREIGHT_META[c.freightStatus]?.color)}>{c.freightStatus}</span>
-                          : "—"}
+                          ? <span className={cn(
+                              "px-1.5 py-0.5 rounded text-xs font-medium",
+                              FREIGHT_META[c.freightStatus]?.color
+                            )}>{c.freightStatus}</span>
+                          : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell>
+                        {c.transporter ?? <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {c.transportFee ? `$${fmt(parseNum(c.transportFee))}` : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {c.agent ?? <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {c.dutyFee ? `$${fmt(parseNum(c.dutyFee))}` : "—"}
                       </TableCell>
                       <TableCell>
                         {c.trackingLink
-                          ? <a href={c.trackingLink} target="_blank" rel="noopener noreferrer" className="text-primary" onClick={(e) => e.stopPropagation()}>
+                          ? <a
+                              href={c.trackingLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <ExternalLink className="h-3.5 w-3.5" />
                             </a>
                           : <span className="text-muted-foreground">—</span>}
                       </TableCell>
-                      <TableCell className="max-w-28 truncate text-muted-foreground">{c.notes ?? "—"}</TableCell>
+                      <TableCell className="max-w-28 truncate text-muted-foreground">
+                        {c.trackingDescription ?? "—"}
+                      </TableCell>
                       <TableCell>
                         <Button
                           size="icon"
@@ -966,79 +1132,14 @@ export default function GITContainers() {
           </Table>
         </div>
 
-        {/* ── OTW Sub-report (legacy tab equivalent) ── */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold">Sea / OTW Overview</h2>
-            <Badge variant="outline" className="text-xs">Legacy OTW tab kept for reference</Badge>
-          </div>
-          <div className="flex gap-3 flex-wrap mb-2">
-            {[
-              { label: "OTW", value: active.filter((c) => c.status === "OTW").length, color: "text-sky-600" },
-              { label: "At Sea", value: active.filter((c) => c.status === "Sea").length, color: "text-blue-600" },
-              { label: "At Port", value: atPort, color: "text-amber-600" },
-              { label: "Left Dar", value: leftDar, color: "text-violet-600" },
-              { label: "Total Active", value: totalActive, color: "text-foreground" },
-              { label: "Delayed", value: delayed, color: "text-red-600" },
-            ].map((s) => (
-              <div key={s.label} className="flex items-center gap-1.5 text-sm">
-                <span className="text-muted-foreground">{s.label}:</span>
-                <span className={cn("font-semibold", s.color)}>{s.value}</span>
-              </div>
-            ))}
-          </div>
-          <div className="rounded-md border overflow-x-auto">
-            <Table className="text-xs whitespace-nowrap">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8">#</TableHead>
-                  <TableHead>Container #</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>ETA DAS</TableHead>
-                  <TableHead>Transporter</TableHead>
-                  <TableHead>Days Delayed</TableHead>
-                  <TableHead>Truck #</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {active.filter((c) => ["OTW", "Sea", "At Port", "Left Dar"].includes(c.status)).map((c, i) => {
-                  const statusMeta = STATUS_META[c.status];
-                  const maxOff = calcMaxOffloadDate(c.borderDate, c.transporter);
-                  const delayed = calcDaysDelayed(maxOff);
-                  return (
-                    <TableRow key={c.id} className="cursor-pointer" onClick={() => openDrawer(c)}>
-                      <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                      <TableCell className="font-mono font-medium">{c.containerNumber}</TableCell>
-                      <TableCell>{c.company}</TableCell>
-                      <TableCell>{fmtDate(c.eta)}</TableCell>
-                      <TableCell>{c.transporter ?? "—"}</TableCell>
-                      <TableCell>
-                        {delayed
-                          ? <span className="text-red-600 font-medium">+{delayed}d</span>
-                          : "—"}
-                      </TableCell>
-                      <TableCell className="font-mono">{c.numberPlate ?? "—"}</TableCell>
-                      <TableCell>
-                        <span className={cn("flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium w-fit", statusMeta.color)}>
-                          {statusMeta.icon}{c.status}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-
       </div>
 
-      {/* ── Container Logistics Drawer ── */}
       <ContainerDrawer
         container={drawerContainer}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
+        queryKey={queryUrl}
+        sessionCompanyId={sessionCompanyId}
       />
     </div>
   );

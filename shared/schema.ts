@@ -2196,6 +2196,7 @@ export const updateContainerTrackingSchema = z.object({
   docsSentDate: z.string().nullable().optional(),
   freightStatus: z.enum(["Yes", "No", "Pending"]).nullable().optional(),
   trackingLink: z.string().nullable().optional(),
+  status: z.string().optional(),
 });
 
 export type UpdateContainerTracking = z.infer<typeof updateContainerTrackingSchema>;
