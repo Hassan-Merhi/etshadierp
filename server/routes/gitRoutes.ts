@@ -8,7 +8,7 @@ import {
   vouchers,
   agentDeclarantMappings,
 } from "../../shared/schema";
-import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -194,11 +194,20 @@ export function registerGitRoutes(app: Express) {
           ...new Set(rawContainers.map((r) => r.agent!.trim()).filter(Boolean)),
         ];
 
-        // ── 3. Load active mapping records ──
+        // ── 3. Load active mapping records for this company + global ──
+        // Company-specific mappings (companyId matches) take priority over global (companyId IS NULL).
         const allMappings = await db
           .select()
           .from(agentDeclarantMappings)
-          .where(eq(agentDeclarantMappings.active, true));
+          .where(
+            and(
+              eq(agentDeclarantMappings.active, true),
+              or(
+                eq(agentDeclarantMappings.companyId, companyId),
+                isNull(agentDeclarantMappings.companyId)
+              )
+            )
+          );
 
         // ── 4. Load all ledger accounts for this company (non-deleted) ──
         const allLedgerAccts = await db
@@ -217,7 +226,12 @@ export function registerGitRoutes(app: Express) {
           );
 
         // ── 5. Agent → ledger account resolution ──
-        // Priority: exact mapping name → alias → fuzzy account name match
+        // Priority:
+        //   1. Company-specific exact agent_name match
+        //   2. Company-specific alias match
+        //   3. Global (company_id IS NULL) exact agent_name match
+        //   4. Global alias match
+        //   5. Fuzzy ledger account name match (fallback)
         function resolveAgent(agentName: string): {
           accountId: number | null;
           accountName: string | null;
@@ -225,29 +239,51 @@ export function registerGitRoutes(app: Express) {
         } {
           const norm = agentName.trim().toLowerCase();
 
-          // Pass 1 — exact agent_name in mappings
-          const byName = allMappings.find(
-            (m) => m.agentName.trim().toLowerCase() === norm
+          // Pass 1 — company-specific exact agent_name
+          const byCompanyName = allMappings.find(
+            (m) => m.companyId === companyId && m.agentName.trim().toLowerCase() === norm
           );
-          if (byName?.ledgerAccountId) {
-            const acc = allLedgerAccts.find((a) => a.id === byName.ledgerAccountId);
+          if (byCompanyName?.ledgerAccountId) {
+            const acc = allLedgerAccts.find((a) => a.id === byCompanyName.ledgerAccountId);
             if (acc)
               return { accountId: acc.id, accountName: acc.name, confidence: "exact" };
           }
 
-          // Pass 2 — alias match
-          const byAlias = allMappings.find((m) =>
-            (m.aliases as string[]).some(
-              (al) => al.trim().toLowerCase() === norm
-            )
+          // Pass 2 — company-specific alias
+          const byCompanyAlias = allMappings.find(
+            (m) =>
+              m.companyId === companyId &&
+              (m.aliases as string[]).some((al) => al.trim().toLowerCase() === norm)
           );
-          if (byAlias?.ledgerAccountId) {
-            const acc = allLedgerAccts.find((a) => a.id === byAlias.ledgerAccountId);
+          if (byCompanyAlias?.ledgerAccountId) {
+            const acc = allLedgerAccts.find((a) => a.id === byCompanyAlias.ledgerAccountId);
             if (acc)
               return { accountId: acc.id, accountName: acc.name, confidence: "exact" };
           }
 
-          // Pass 3 — fuzzy match on ledger account name
+          // Pass 3 — global exact agent_name (company_id IS NULL)
+          const byGlobalName = allMappings.find(
+            (m) => m.companyId === null && m.agentName.trim().toLowerCase() === norm
+          );
+          if (byGlobalName?.ledgerAccountId) {
+            const acc = allLedgerAccts.find((a) => a.id === byGlobalName.ledgerAccountId);
+            if (acc)
+              return { accountId: acc.id, accountName: acc.name, confidence: "exact" };
+          }
+
+          // Pass 4 — global alias (company_id IS NULL)
+          const byGlobalAlias = allMappings.find(
+            (m) =>
+              m.companyId === null &&
+              (m.aliases as string[]).some((al) => al.trim().toLowerCase() === norm)
+          );
+          if (byGlobalAlias?.ledgerAccountId) {
+            const acc = allLedgerAccts.find((a) => a.id === byGlobalAlias.ledgerAccountId);
+            if (acc)
+              return { accountId: acc.id, accountName: acc.name, confidence: "exact" };
+          }
+
+          // Pass 5 — fuzzy match on ledger account name (fallback)
           const fuzzy = allLedgerAccts.find((acc) => {
             const an = acc.name.trim().toLowerCase();
             return an.includes(norm) || norm.includes(an);

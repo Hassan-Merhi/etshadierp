@@ -2749,8 +2749,75 @@ let migrationsDone = false;
       active            BOOLEAN      NOT NULL DEFAULT TRUE,
       created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_adm_agent_name_lower
-      ON agent_declarant_mappings (LOWER(agent_name))`,
+
+    // Phase 2 — add company_id for per-company agent mappings.
+    // NAHLI exists in company 1 and company 10 with different ledger accounts,
+    // so the old single-column unique index on agent_name alone is insufficient.
+    `ALTER TABLE agent_declarant_mappings
+       ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE`,
+
+    // Drop the old non-partial unique index (replaced by the two partial indexes below).
+    // Safe: IF EXISTS means no error on fresh installs or re-runs after it was already dropped.
+    `DROP INDEX IF EXISTS idx_adm_agent_name_lower`,
+
+    // Unique index for company-specific mappings: (agent_name, company_id) per company.
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_adm_agent_company_lower
+       ON agent_declarant_mappings (LOWER(agent_name), company_id)
+       WHERE company_id IS NOT NULL`,
+
+    // Unique index for global mappings: agent_name alone, only when company_id is NULL.
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_adm_agent_global_lower
+       ON agent_declarant_mappings (LOWER(agent_name))
+       WHERE company_id IS NULL`,
+
+    // ── Approved agent mappings — idempotent upsert ──────────────────────────
+    // Company 1 (HADI L'SHI): NAHLI → HUSSAIN NAHLI (id=40)
+    `INSERT INTO agent_declarant_mappings (agent_name, company_id, ledger_account_id, aliases, active)
+       VALUES ('NAHLI', 1, 40, ARRAY['HUSSAIN NAHLI','HUSSEIN NAHLI','NAHLI AGENT'], TRUE)
+       ON CONFLICT ((LOWER(agent_name)), company_id) WHERE company_id IS NOT NULL
+       DO UPDATE SET ledger_account_id = EXCLUDED.ledger_account_id,
+                     aliases           = EXCLUDED.aliases,
+                     active            = TRUE`,
+
+    // Company 1 (HADI L'SHI): NCA → NCA (id=43)
+    `INSERT INTO agent_declarant_mappings (agent_name, company_id, ledger_account_id, aliases, active)
+       VALUES ('NCA', 1, 43, ARRAY[]::TEXT[], TRUE)
+       ON CONFLICT ((LOWER(agent_name)), company_id) WHERE company_id IS NOT NULL
+       DO UPDATE SET ledger_account_id = EXCLUDED.ledger_account_id,
+                     aliases           = EXCLUDED.aliases,
+                     active            = TRUE`,
+
+    // Company 1 (HADI L'SHI): AFEPRO → AFEPRO (id=607)
+    `INSERT INTO agent_declarant_mappings (agent_name, company_id, ledger_account_id, aliases, active)
+       VALUES ('AFEPRO', 1, 607, ARRAY[]::TEXT[], TRUE)
+       ON CONFLICT ((LOWER(agent_name)), company_id) WHERE company_id IS NOT NULL
+       DO UPDATE SET ledger_account_id = EXCLUDED.ledger_account_id,
+                     aliases           = EXCLUDED.aliases,
+                     active            = TRUE`,
+
+    // Company 8 (HMD KINSHASA): HUSSAIN SAAD → HUSSEIN SAAD (id=359)
+    `INSERT INTO agent_declarant_mappings (agent_name, company_id, ledger_account_id, aliases, active)
+       VALUES ('HUSSAIN SAAD', 8, 359, ARRAY['HUSSEIN SAAD'], TRUE)
+       ON CONFLICT ((LOWER(agent_name)), company_id) WHERE company_id IS NOT NULL
+       DO UPDATE SET ledger_account_id = EXCLUDED.ledger_account_id,
+                     aliases           = EXCLUDED.aliases,
+                     active            = TRUE`,
+
+    // Company 8 (HMD KINSHASA): RIDA SALEH → RIDA SALEH (id=365)
+    `INSERT INTO agent_declarant_mappings (agent_name, company_id, ledger_account_id, aliases, active)
+       VALUES ('RIDA SALEH', 8, 365, ARRAY[]::TEXT[], TRUE)
+       ON CONFLICT ((LOWER(agent_name)), company_id) WHERE company_id IS NOT NULL
+       DO UPDATE SET ledger_account_id = EXCLUDED.ledger_account_id,
+                     aliases           = EXCLUDED.aliases,
+                     active            = TRUE`,
+
+    // Company 10 (GC - LSHI): NAHLI → Hussein Nahli (id=419)
+    `INSERT INTO agent_declarant_mappings (agent_name, company_id, ledger_account_id, aliases, active)
+       VALUES ('NAHLI', 10, 419, ARRAY['HUSSAIN NAHLI','HUSSEIN NAHLI','NAHLI AGENT'], TRUE)
+       ON CONFLICT ((LOWER(agent_name)), company_id) WHERE company_id IS NOT NULL
+       DO UPDATE SET ledger_account_id = EXCLUDED.ledger_account_id,
+                     aliases           = EXCLUDED.aliases,
+                     active            = TRUE`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

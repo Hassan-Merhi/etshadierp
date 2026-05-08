@@ -562,10 +562,13 @@ export type Container = typeof containers.$inferSelect;
 // ─── Agent / Declarant Mapping ───────────────────────────────────────────────
 // Maps a free-text agent name (as stored in containers.agent) to a specific
 // ledger account. Aliases allow variant spellings to resolve to the same account.
+// company_id: NULL = global mapping (applies to all companies).
+//             Non-null = company-specific (takes priority over global).
 // Used by GET /api/git/agent-duty-summary for reliable balance lookup.
 export const agentDeclarantMappings = pgTable("agent_declarant_mappings", {
   id:              serial("id").primaryKey(),
   agentName:       varchar("agent_name", { length: 100 }).notNull(),
+  companyId:       integer("company_id").references(() => companies.id, { onDelete: "cascade" }),
   ledgerAccountId: integer("ledger_account_id").references(() => ledgerAccounts.id, { onDelete: "set null" }),
   aliases:         text("aliases").array().notNull().default([]),
   active:          boolean("active").notNull().default(true),
