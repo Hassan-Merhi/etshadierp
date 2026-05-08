@@ -26,7 +26,7 @@ import {
   Ship, Truck, Package, AlertTriangle, FileX, Clock, DollarSign,
   Search, ExternalLink, CheckCircle2, XCircle, MessageSquare,
   FileSpreadsheet, LayoutGrid, List, Info, AlertCircle, ChevronDown, ChevronUp,
-  Building2,
+  Building2, Layers,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
@@ -1611,6 +1611,7 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
 
 function TabAgentDuty() {
   const [companyMode, setCompanyMode] = useState<CompanyViewMode>("session");
+  const [mergeAgents, setMergeAgents] = useState(true);
 
   const queryUrl =
     companyMode === "all"
@@ -1631,7 +1632,50 @@ function TabAgentDuty() {
     ? data.companies
     : [{ companyId: data.companyId, companyName: data.companyName, agents: data.agents }];
 
-  const totalAgents = sections.reduce((s, c) => s + c.agents.length, 0);
+  // When viewing all companies with merge on, collapse same-named agents into one card.
+  const CONF_RANK: Record<AgentDutySummary["matchConfidence"], number> = { exact: 0, fuzzy: 1, unmapped: 2 };
+  const displaySections: AgentDutyCompanySection[] = useMemo(() => {
+    if (!mergeAgents || companyMode !== "all" || sections.length <= 1) return sections;
+    const agentMap = new Map<string, AgentDutySummary[]>();
+    for (const section of sections) {
+      for (const agent of section.agents) {
+        const key = agent.agentName.trim().toLowerCase();
+        if (!agentMap.has(key)) agentMap.set(key, []);
+        agentMap.get(key)!.push(agent);
+      }
+    }
+    const merged: AgentDutySummary[] = [];
+    for (const [, group] of agentMap) {
+      if (group.length === 1) { merged.push(group[0]); continue; }
+      const hasNullBalance = group.some(a => a.ledgerBalance === null);
+      const hasNullOpen    = group.some(a => a.openBalance === null);
+      const accountNames   = [...new Set(group.map(a => a.ledgerAccountName).filter(Boolean))];
+      const worstConf      = group.reduce<AgentDutySummary["matchConfidence"]>(
+        (best, a) => CONF_RANK[a.matchConfidence] > CONF_RANK[best] ? a.matchConfidence : best,
+        "exact"
+      );
+      merged.push({
+        agentName:          group[0].agentName,
+        ledgerAccountId:    null,
+        ledgerAccountName:  accountNames.length > 0 ? accountNames.join(" / ") : null,
+        matchConfidence:    worstConf,
+        ledgerBalance:      hasNullBalance ? null : group.reduce((s, a) => s + a.ledgerBalance!, 0),
+        containerDutyTotal: group.reduce((s, a) => s + a.containerDutyTotal, 0),
+        offloadedDutyTotal: group.reduce((s, a) => s + a.offloadedDutyTotal, 0),
+        clearedByPayments:  group.reduce((s, a) => s + a.clearedByPayments, 0),
+        openBalance:        hasNullOpen ? null : group.reduce((s, a) => s + a.openBalance!, 0),
+        warnings:           [...new Set(group.flatMap(a => a.warnings))],
+        clearedRows:        group.flatMap(a => a.clearedRows),
+        partialRows:        group.flatMap(a => a.partialRows),
+        openRows:           group.flatMap(a => a.openRows),
+        activePreviewRows:  group.flatMap(a => a.activePreviewRows),
+      });
+    }
+    merged.sort((a, b) => a.agentName.localeCompare(b.agentName));
+    return [{ companyId: 0, companyName: "All Companies", agents: merged }];
+  }, [sections, mergeAgents, companyMode]);
+
+  const totalAgents = displaySections.reduce((s, c) => s + c.agents.length, 0);
   const asOf = data?.asOf;
 
   // ── Company selector (rendered in every path so the user can switch while loading/errored) ──
@@ -1657,6 +1701,18 @@ function TabAgentDuty() {
       >
         All Accessible Companies
       </Button>
+      {companyMode === "all" && (
+        <Button
+          size="sm"
+          variant="outline"
+          className={cn("text-xs gap-1.5 toggle-elevate", mergeAgents && "toggle-elevated")}
+          onClick={() => setMergeAgents(v => !v)}
+          data-testid="button-agent-duty-merge"
+        >
+          <Layers className="h-3 w-3" />
+          Merge same agents
+        </Button>
+      )}
     </div>
   );
 
@@ -1749,11 +1805,11 @@ function TabAgentDuty() {
       {infoBanner}
       {modeSelector}
 
-      {sections.map(section => (
+      {displaySections.map(section => (
         <div key={section.companyId} className="space-y-4" data-testid={`company-section-${section.companyId}`}>
 
-          {/* Company heading — shown only in all-companies mode */}
-          {companyMode === "all" && (
+          {/* Company heading — shown only in all-companies mode without merge */}
+          {companyMode === "all" && !(mergeAgents && displaySections.length === 1) && (
             <div className="flex items-center gap-2 pt-1">
               <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
               <span className="text-sm font-semibold tracking-wide">{section.companyName}</span>
