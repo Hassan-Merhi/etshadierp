@@ -20,6 +20,10 @@ import {
   ledgerAccounts,
   auditLog,
   employees,
+  bankAccounts,
+  suppliers,
+  customers,
+  factorySuppliers,
 } from "@shared/schema";
 import { eq, and, sql, gt, ilike, isNull, inArray } from "drizzle-orm";
 
@@ -111,22 +115,73 @@ export async function snapshotVoucherEntries(
     narration?: string | null;
   }>
 ): Promise<EntrySnap[]> {
+  // Resolve ledger account names
   const ledgerIds = [...new Set(entries.map(e => e.ledgerAccountId).filter((id): id is number => id != null))];
-  const accountNames: Record<number, string> = {};
+  const ledgerNames: Record<number, string> = {};
   if (ledgerIds.length > 0) {
     const accts = await db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
-      .from(ledgerAccounts)
-      .where(inArray(ledgerAccounts.id, ledgerIds));
-    accts.forEach(a => { accountNames[a.id] = a.name; });
+      .from(ledgerAccounts).where(inArray(ledgerAccounts.id, ledgerIds));
+    accts.forEach(a => { ledgerNames[a.id] = a.name; });
   }
+
+  // Resolve bank account names
+  const bankIds = [...new Set(entries.map(e => e.bankAccountId).filter((id): id is number => id != null))];
+  const bankNames: Record<number, string> = {};
+  if (bankIds.length > 0) {
+    const bnks = await db.select({ id: bankAccounts.id, name: bankAccounts.name })
+      .from(bankAccounts).where(inArray(bankAccounts.id, bankIds));
+    bnks.forEach(b => { bankNames[b.id] = b.name; });
+  }
+
+  // Resolve supplier names
+  const supplierIds = [...new Set(entries.map(e => e.supplierId).filter((id): id is number => id != null))];
+  const supplierNames: Record<number, string> = {};
+  if (supplierIds.length > 0) {
+    const supps = await db.select({ id: suppliers.id, name: suppliers.legalName })
+      .from(suppliers).where(inArray(suppliers.id, supplierIds));
+    supps.forEach(s => { supplierNames[s.id] = s.name; });
+  }
+
+  // Resolve employee names (firstName + lastName)
+  const employeeIds = [...new Set(entries.map(e => e.employeeId).filter((id): id is number => id != null))];
+  const employeeNames: Record<number, string> = {};
+  if (employeeIds.length > 0) {
+    const emps = await db.select({ id: employees.id, firstName: employees.firstName, lastName: employees.lastName })
+      .from(employees).where(inArray(employees.id, employeeIds));
+    emps.forEach(emp => { employeeNames[emp.id] = `${emp.firstName} ${emp.lastName}`.trim(); });
+  }
+
+  // Resolve customer names
+  const customerIds = [...new Set(entries.map(e => e.customerId).filter((id): id is number => id != null))];
+  const customerNames: Record<number, string> = {};
+  if (customerIds.length > 0) {
+    const custs = await db.select({ id: customers.id, name: customers.legalName })
+      .from(customers).where(inArray(customers.id, customerIds));
+    custs.forEach(c => { customerNames[c.id] = c.name; });
+  }
+
+  // Resolve factory supplier names
+  const factorySupplierIds = [...new Set(entries.map(e => e.factorySupplierId).filter((id): id is number => id != null))];
+  const factorySupplierNames: Record<number, string> = {};
+  if (factorySupplierIds.length > 0) {
+    const fsupps = await db.select({ id: factorySuppliers.id, name: factorySuppliers.name })
+      .from(factorySuppliers).where(inArray(factorySuppliers.id, factorySupplierIds));
+    fsupps.forEach(s => { factorySupplierNames[s.id] = s.name; });
+  }
+
   return entries.map(e => {
     const account = e.ledgerAccountId
-      ? (accountNames[e.ledgerAccountId] ?? `Account #${e.ledgerAccountId}`)
-      : e.bankAccountId ? `Bank #${e.bankAccountId}`
-      : e.supplierId ? `Supplier #${e.supplierId}`
-      : e.employeeId ? `Employee #${e.employeeId}`
-      : e.customerId ? `Customer #${e.customerId}`
-      : e.factorySupplierId ? `Supplier #${e.factorySupplierId}`
+      ? (ledgerNames[e.ledgerAccountId] ?? `Account #${e.ledgerAccountId}`)
+      : e.bankAccountId
+      ? (bankNames[e.bankAccountId] ?? `Bank #${e.bankAccountId}`)
+      : e.supplierId
+      ? (supplierNames[e.supplierId] ?? `Supplier #${e.supplierId}`)
+      : e.employeeId
+      ? (employeeNames[e.employeeId] ?? `Employee #${e.employeeId}`)
+      : e.customerId
+      ? (customerNames[e.customerId] ?? `Customer #${e.customerId}`)
+      : e.factorySupplierId
+      ? (factorySupplierNames[e.factorySupplierId] ?? `Supplier #${e.factorySupplierId}`)
       : "—";
     const snap: EntrySnap = { account, debit: e.debitAmount || "0", credit: e.creditAmount || "0" };
     if (e.narration) snap.narration = e.narration;

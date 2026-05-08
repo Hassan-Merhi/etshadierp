@@ -1120,7 +1120,7 @@ export function registerVoucherRoutes(app: Express) {
             .values(voucherEntriesToCreate)
             .returning();
 
-          return { voucher: updatedVoucher, entries: createdEntries, oldEntries, wasOptional: existingVoucher.optional };
+          return { voucher: updatedVoucher, entries: createdEntries, oldEntries, existingVoucher, wasOptional: existingVoucher.optional };
         });
 
         // Sync employee balances: reverse old entries if voucher was non-optional
@@ -1165,6 +1165,8 @@ export function registerVoucherRoutes(app: Express) {
         }
 
         try {
+          const _oldSnap = await snapshotVoucherEntries(result.oldEntries);
+          const _newSnap = await snapshotVoucherEntries(result.entries);
           await logAudit({
             userId: req.session.userId!,
             username: (req.session as any).username || "unknown",
@@ -1174,10 +1176,22 @@ export function registerVoucherRoutes(app: Express) {
             recordId: result.voucher.id,
             recordIdentifier: result.voucher.voucherNumber,
             changes: buildVoucherChangesForUpdate(
-              { ...result.voucher, entries: result.oldEntries },
-              { ...result.voucher, entries: result.entries },
-              result.oldEntries,
-              result.entries,
+              {
+                voucherType: result.existingVoucher.voucherType,
+                voucherDate: result.existingVoucher.voucherDate,
+                totalAmount: result.existingVoucher.totalAmount,
+                description: result.existingVoucher.description,
+                optional: result.existingVoucher.optional,
+              },
+              {
+                voucherType: result.voucher.voucherType,
+                voucherDate: result.voucher.voucherDate,
+                totalAmount: result.voucher.totalAmount,
+                description: result.voucher.description,
+                optional: result.voucher.optional,
+              },
+              _oldSnap,
+              _newSnap,
             ),
           });
         } catch { /* non-fatal */ }
@@ -1510,7 +1524,7 @@ export function registerVoucherRoutes(app: Express) {
             .values(voucherEntriesToCreate)
             .returning();
 
-          return { voucher: updatedVoucher, entries: createdEntries, oldEntries, wasOptional: existingVoucher.optional };
+          return { voucher: updatedVoucher, entries: createdEntries, oldEntries, existingVoucher, wasOptional: existingVoucher.optional };
         });
 
         // Sync employee balances: reverse old entries if voucher was non-optional
@@ -1569,6 +1583,8 @@ export function registerVoucherRoutes(app: Express) {
         }
 
         try {
+          const _oldSnapJ = await snapshotVoucherEntries(result.oldEntries);
+          const _newSnapJ = await snapshotVoucherEntries(result.entries);
           await logAudit({
             userId: req.session.userId!,
             username: (req.session as any).username || "unknown",
@@ -1578,10 +1594,22 @@ export function registerVoucherRoutes(app: Express) {
             recordId: result.voucher.id,
             recordIdentifier: result.voucher.voucherNumber,
             changes: buildVoucherChangesForUpdate(
-              { ...result.voucher, entries: result.oldEntries },
-              { ...result.voucher, entries: result.entries },
-              result.oldEntries,
-              result.entries,
+              {
+                voucherType: result.existingVoucher.voucherType,
+                voucherDate: result.existingVoucher.voucherDate,
+                totalAmount: result.existingVoucher.totalAmount,
+                description: result.existingVoucher.description,
+                optional: result.existingVoucher.optional,
+              },
+              {
+                voucherType: result.voucher.voucherType,
+                voucherDate: result.voucher.voucherDate,
+                totalAmount: result.voucher.totalAmount,
+                description: result.voucher.description,
+                optional: result.voucher.optional,
+              },
+              _oldSnapJ,
+              _newSnapJ,
             ),
           });
         } catch { /* non-fatal */ }
