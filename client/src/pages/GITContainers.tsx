@@ -194,26 +194,6 @@ function SummaryCard({ label, value, icon, accent }: {
 
 // ─── Status Chip ──────────────────────────────────────────────────────────────
 
-function StatusChip({ label, active, onClick, icon }: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
-        active
-          ? "bg-primary text-primary-foreground border-primary"
-          : "bg-background border-border text-muted-foreground hover-elevate",
-      )}
-    >
-      {icon}{label}
-    </button>
-  );
-}
 
 // ─── Drawer form type & seed ──────────────────────────────────────────────────
 
@@ -864,13 +844,10 @@ function ContainerDrawer({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-type QuickChip = "All Active" | ActiveStatus;
-
 export default function GITContainers() {
   const { data: user } = useQuery<AuthUser>({ queryKey: ["/api/auth/me"] });
 
   const [allCompanies, setAllCompanies] = useState(false);
-  const [chipFilter, setChipFilter] = useState<QuickChip>("All Active");
   const [companyFilter, setCompanyFilter] = useState("ALL");
   const [transporterFilter, setTransporterFilter] = useState("ALL");
   const [agentFilter, setAgentFilter] = useState("ALL");
@@ -898,7 +875,6 @@ export default function GITContainers() {
 
   const filtered = useMemo(() => {
     return allContainers.filter((c) => {
-      if (chipFilter !== "All Active" && c.status !== chipFilter) return false;
       if (companyFilter !== "ALL" && c.companyName !== companyFilter) return false;
       if (transporterFilter !== "ALL" && c.transporter !== transporterFilter) return false;
       if (agentFilter !== "ALL" && c.agent !== agentFilter) return false;
@@ -938,8 +914,6 @@ export default function GITContainers() {
   const transporters = [...new Set(allContainers.map((c) => c.transporter).filter(Boolean))].sort() as string[];
   const agents      = [...new Set(allContainers.map((c) => c.agent).filter(Boolean))].sort() as string[];
 
-  const chips: QuickChip[] = ["All Active", ...ACTIVE_STATUSES];
-
   function openDrawer(c: EnrichedContainerRow) {
     setDrawerContainer(c);
     setDrawerOpen(true);
@@ -952,7 +926,6 @@ export default function GITContainers() {
     setDocsFilter("ALL");
     setDelayedFilter("ALL");
     setSearch("");
-    setChipFilter("All Active");
   }
 
   // ── Access denied ──
@@ -1066,20 +1039,6 @@ export default function GITContainers() {
           <SummaryCard label="Transport + Duty" value={`$${fmt(totalTransport + totalDuty)}`} icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} />
         </div>
 
-        {/* ── Status Quick Chips ── */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {chips.map((s) => (
-            <StatusChip
-              key={s}
-              label={s}
-              active={chipFilter === s}
-              onClick={() => setChipFilter(s)}
-              icon={s !== "All Active"
-                ? STATUS_META[s as string]?.icon
-                : <Package className="h-3 w-3" />}
-            />
-          ))}
-        </div>
 
         {/* ── Search + Filters Toggle ── */}
         <div className="flex items-center gap-2 flex-wrap">
