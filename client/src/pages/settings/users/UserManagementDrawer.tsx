@@ -148,13 +148,13 @@ export function UserManagementDrawer({
   }, [user?.id]);
 
   const { data: erpHiddenCostData } = useQuery<{ hiddenCostFields: string[] }>({
-    queryKey: ["/api/erp-user-hidden-costs", user.id],
+    queryKey: ["/api/erp-user-hidden-costs", user?.id],
     queryFn: async () => {
-      const res = await fetch(`/api/erp-user-hidden-costs/${user.id}`, { credentials: "include" });
+      const res = await fetch(`/api/erp-user-hidden-costs/${user?.id}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch ERP hidden cost fields");
       return res.json();
     },
-    enabled: !!user.id,
+    enabled: !!user?.id,
   });
 
   useEffect(() => {
@@ -478,7 +478,7 @@ export function UserManagementDrawer({
             </Card>
 
             {/* Card 3: Company Roles — inline editing, no modal */}
-            <UserRolesCard userId={user.id} companies={companies} />
+            <UserRolesCard userId={user?.id} companies={companies} />
 
             {/* Card 4: Advanced Restrictions */}
             <Card>
