@@ -1451,6 +1451,15 @@ export function registerContainerRoutes(app: Express) {
             })
             .where(eq(containerOffloads.id, currentOffload.id));
 
+          // Keep containers.dutyFee in sync with the actual duties entered so the
+          // Agent/Duty FIFO tab always uses the real duty amount.
+          if (parseFloat(duties) > 0) {
+            await tx
+              .update(containers)
+              .set({ dutyFee: duties })
+              .where(eq(containers.id, containerId));
+          }
+
           // Delete old vouchers and create new ones with updated charges
           const containerVouchers = await tx
             .select()
