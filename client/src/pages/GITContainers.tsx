@@ -58,7 +58,17 @@ import {
   RefreshCw,
   History,
   Loader2,
+  Download,
+  Upload,
+  FileSpreadsheet,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useRef } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -857,6 +867,8 @@ export default function GITContainers() {
   const [showFilters, setShowFilters] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerContainer, setDrawerContainer] = useState<EnrichedContainerRow | null>(null);
+  const [importResult, setImportResult] = useState<{ updated: number; skipped: number; notFound: number; errors: string[] } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const role = user?.role;
   const isAllowed = !!role && ["Admin", "Developer", "Owner"].includes(role);
@@ -865,13 +877,48 @@ export default function GITContainers() {
     ? "/api/git/containers?allCompanies=true"
     : "/api/git/containers";
 
-  const { data, isLoading, isError, error } = useQuery<GitContainersResponse>({
+  const { data, isLoading, isError, error, refetch } = useQuery<GitContainersResponse>({
     queryKey: [queryUrl],
     staleTime: 60_000,
     enabled: !!isAllowed,
   });
 
   const allContainers = data?.containers ?? [];
+
+  const importMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/git/containers/import-excel", {
+        method: "POST",
+        body: form,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Import failed" }));
+        throw new Error(err.message || "Import failed");
+      }
+      return res.json() as Promise<{ updated: number; skipped: number; notFound: number; errors: string[] }>;
+    },
+    onSuccess: (result) => {
+      setImportResult(result);
+      refetch();
+      toast({
+        title: `Import complete — ${result.updated} container${result.updated !== 1 ? "s" : ""} updated`,
+        description: result.errors.length > 0 ? `${result.errors.length} row(s) had issues — see details.` : undefined,
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Import failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    importMutation.mutate(file);
+    e.target.value = "";
+  }
 
   const filtered = useMemo(() => {
     return allContainers.filter((c) => {
@@ -1067,6 +1114,40 @@ export default function GITContainers() {
             <Filter className="h-4 w-4 mr-1" />
             Filters
             <ChevronDown className={cn("h-3.5 w-3.5 ml-1 transition-transform", showFilters && "rotate-180")} />
+          </Button>
+
+          {/* Excel import controls */}
+          <a
+            href="/api/git/containers/import-template.xlsx"
+            download
+            data-testid="link-download-template"
+          >
+            <Button variant="outline" size="default" type="button">
+              <Download className="h-4 w-4 mr-1" />
+              Template
+            </Button>
+          </a>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={handleFileChange}
+            data-testid="input-import-excel"
+          />
+          <Button
+            variant="outline"
+            size="default"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importMutation.isPending}
+            data-testid="button-import-excel"
+          >
+            {importMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Upload className="h-4 w-4 mr-1" />
+            )}
+            Import Excel
           </Button>
         </div>
 
@@ -1309,6 +1390,47 @@ export default function GITContainers() {
         queryKey={queryUrl}
         sessionCompanyId={sessionCompanyId}
       />
+
+      {/* ── Import result dialog ── */}
+      <Dialog open={!!importResult} onOpenChange={(o) => { if (!o) setImportResult(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5 text-green-600" />
+              Import Complete
+            </DialogTitle>
+          </DialogHeader>
+          {importResult && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-md border p-3 text-center">
+                  <p className="text-2xl font-bold text-green-600">{importResult.updated}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Updated</p>
+                </div>
+                <div className="rounded-md border p-3 text-center">
+                  <p className="text-2xl font-bold text-muted-foreground">{importResult.skipped}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Skipped</p>
+                </div>
+                <div className="rounded-md border p-3 text-center">
+                  <p className="text-2xl font-bold text-amber-600">{importResult.notFound}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Not Found</p>
+                </div>
+              </div>
+              {importResult.errors.length > 0 && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3 space-y-1 max-h-48 overflow-y-auto">
+                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-400 mb-1">Issues</p>
+                  {importResult.errors.map((e, i) => (
+                    <p key={i} className="text-xs text-amber-700 dark:text-amber-300">{e}</p>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                The page has been refreshed with the latest data.
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

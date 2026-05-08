@@ -1,4 +1,7 @@
 import type { Express, Request, Response } from "express";
+import multer from "multer";
+import XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { db } from "../db";
 import { requireAuth, requireRole } from "../auth";
 import {
@@ -11,6 +14,7 @@ import {
   userCompanyRoles,
 } from "../../shared/schema";
 import { and, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+
 import {
   resolveGitCompanyScope,
   fetchActiveContainers,
@@ -21,6 +25,8 @@ import {
   type GitFilterQuery,
   type EnrichedContainer,
 } from "../lib/gitHelpers";
+
+const gitUpload = multer({ storage: multer.memoryStorage() });
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -785,5 +791,244 @@ export function registerGitRoutes(app: Express) {
       handleGitListing(req, res, (rows) =>
         rows.filter((r) => !!(r.numberPlate ?? "").trim()),
       ),
+  );
+
+  // ─── Excel import template ────────────────────────────────────────────────
+
+  app.get(
+    "/api/git/containers/import-template.xlsx",
+    requireAuth,
+    requireRole("Admin", "Owner", "Developer"),
+    async (req: any, res: any) => {
+      try {
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet("Containers");
+
+        const headers = [
+          "Container #",
+          "Status",
+          "Plate / Truck #",
+          "ETA (YYYY-MM-DD)",
+          "Border Date (YYYY-MM-DD)",
+          "Transporter",
+          "Location",
+          "Agent",
+          "Duty Fee",
+          "Transport Fee",
+          "Tracking Description",
+          "Freight Status",
+        ];
+
+        // Header row — dark blue
+        const headerRow = ws.addRow(headers);
+        headerRow.eachCell((cell: any) => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "1F4E79" } };
+          cell.font = { bold: true, color: { argb: "FFFFFF" }, size: 11 };
+          cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+          cell.border = {
+            bottom: { style: "thin", color: { argb: "FFFFFF" } },
+          };
+        });
+        headerRow.height = 28;
+
+        // Hint row — light grey, italic
+        const hints = [
+          "Required — used to match",
+          "OTW / Sea / At Port / Left Dar / At Border / In Transit / Arrived",
+          "e.g. T840 EFX",
+          "YYYY-MM-DD",
+          "YYYY-MM-DD",
+          "",
+          "e.g. NAKONDE",
+          "",
+          "number",
+          "number",
+          "",
+          "Yes / No / Pending",
+        ];
+        const hintRow = ws.addRow(hints);
+        hintRow.eachCell((cell: any) => {
+          if (cell.value) {
+            cell.font = { italic: true, color: { argb: "888888" }, size: 9 };
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "F5F5F5" } };
+          }
+        });
+
+        // Example row 1
+        const ex1 = ws.addRow([
+          "MSKU1234567", "In Transit", "T840 EFX", "2026-05-20", "2026-05-15",
+          "FARHAT", "NAKONDE", "NCA", "8500", "1200",
+          "Cleared border — heading inland", "Yes",
+        ]);
+        ex1.eachCell((cell: any) => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
+          cell.font = { italic: true, color: { argb: "5D4037" } };
+        });
+
+        // Example row 2
+        const ex2 = ws.addRow([
+          "TCNU9876543", "At Port", "T191 BAV", "2026-05-25", "",
+          "CONTINENTAL", "LEFT DAR", "FARHAT AGENCY", "8500", "",
+          "Awaiting customs clearance", "Pending",
+        ]);
+        ex2.eachCell((cell: any) => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
+          cell.font = { italic: true, color: { argb: "5D4037" } };
+        });
+
+        // Add a note in the first example cell
+        ex1.getCell(1).font = { bold: true, italic: true, color: { argb: "5D4037" } };
+        ex1.getCell(1).note = "Example row — delete before importing";
+
+        // Column widths
+        const colWidths = [20, 28, 18, 20, 20, 18, 16, 18, 12, 14, 35, 14];
+        colWidths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        res.setHeader("Content-Disposition", 'attachment; filename="container_import_template.xlsx"');
+        await wb.xlsx.write(res);
+        res.end();
+      } catch (err: any) {
+        console.error("[GIT import template]", err);
+        res.status(500).json({ message: err.message });
+      }
+    },
+  );
+
+  // ─── Excel bulk import / update ───────────────────────────────────────────
+
+  app.post(
+    "/api/git/containers/import-excel",
+    requireAuth,
+    requireRole("Admin", "Owner", "Developer"),
+    gitUpload.single("file"),
+    async (req: any, res: any) => {
+      try {
+        if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rawRows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+        // Normalise column header → internal key
+        const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const COL: Record<string, string> = {
+          container: "containerNumber",
+          containerno: "containerNumber",
+          containernum: "containerNumber",
+          containernumber: "containerNumber",
+          status: "status",
+          platetruckno: "numberPlate",
+          platetruck: "numberPlate",
+          plate: "numberPlate",
+          numberplate: "numberPlate",
+          truck: "numberPlate",
+          trucknumber: "numberPlate",
+          plateno: "numberPlate",
+          eta: "eta",
+          etayyyymmdd: "eta",
+          borderdate: "borderDate",
+          borderdateyyyymmdd: "borderDate",
+          transporter: "transporter",
+          location: "trackingLocation",
+          trackinglocation: "trackingLocation",
+          agent: "agent",
+          dutyfee: "dutyFee",
+          duty: "dutyFee",
+          transportfee: "transportFee",
+          trackingdescription: "trackingDescription",
+          description: "trackingDescription",
+          freightstatus: "freightStatus",
+          freight: "freightStatus",
+        };
+
+        const VALID_STATUSES = new Set([
+          "OTW", "Sea", "At Port", "Left Dar", "At Border", "In Transit", "Arrived",
+          "Offloaded", "OFFLOADED", "Closed", "Completed",
+        ]);
+        const VALID_FREIGHT = new Set(["Yes", "No", "Pending"]);
+
+        // Fetch all containers accessible to this session company
+        const allContainers = await db
+          .select({ id: containers.id, containerNumber: containers.containerNumber, companyId: containers.companyId })
+          .from(containers)
+          .where(eq(containers.companyId, req.session.currentCompanyId));
+
+        const byNumber = new Map(allContainers.map((c) => [c.containerNumber.trim().toUpperCase(), c]));
+
+        let updated = 0;
+        let skipped = 0;
+        let notFound = 0;
+        const errors: string[] = [];
+
+        for (let i = 0; i < rawRows.length; i++) {
+          const raw = rawRows[i];
+          const rowNum = i + 3; // 1 header + 1 hint = data starts at row 3
+
+          // Map raw keys to internal keys
+          const row: Record<string, string> = {};
+          for (const [rawKey, rawVal] of Object.entries(raw)) {
+            const mapped = COL[norm(rawKey)];
+            if (mapped) row[mapped] = String(rawVal ?? "").trim();
+          }
+
+          const ctrNum = row.containerNumber?.toUpperCase();
+          if (!ctrNum) { skipped++; continue; }
+
+          // Skip the two example rows that ship with the template
+          const knownExamples = ["MSKU1234567", "TCNU9876543"];
+          if (knownExamples.includes(ctrNum)) { skipped++; continue; }
+
+          const match = byNumber.get(ctrNum);
+          if (!match) {
+            notFound++;
+            errors.push(`Row ${rowNum}: "${ctrNum}" not found`);
+            continue;
+          }
+
+          const updateData: Record<string, any> = {};
+
+          if (row.status) {
+            if (!VALID_STATUSES.has(row.status)) {
+              errors.push(`Row ${rowNum}: invalid status "${row.status}" — skipped`);
+              skipped++;
+              continue;
+            }
+            updateData.status = row.status;
+          }
+          if (row.numberPlate !== undefined && row.numberPlate !== "") updateData.numberPlate = row.numberPlate;
+          if (row.eta) updateData.eta = row.eta;
+          if (row.borderDate) updateData.borderDate = row.borderDate;
+          if (row.transporter !== undefined && row.transporter !== "") updateData.transporter = row.transporter;
+          if (row.trackingLocation !== undefined && row.trackingLocation !== "") updateData.trackingLocation = row.trackingLocation;
+          if (row.agent !== undefined && row.agent !== "") updateData.agent = row.agent;
+          if (row.dutyFee !== undefined && row.dutyFee !== "") {
+            const n = parseFloat(row.dutyFee);
+            if (!isNaN(n)) updateData.dutyFee = n.toString();
+          }
+          if (row.transportFee !== undefined && row.transportFee !== "") {
+            const n = parseFloat(row.transportFee);
+            if (!isNaN(n)) updateData.transportFee = n.toString();
+          }
+          if (row.trackingDescription !== undefined && row.trackingDescription !== "") updateData.trackingDescription = row.trackingDescription;
+          if (row.freightStatus) {
+            if (VALID_FREIGHT.has(row.freightStatus)) updateData.freightStatus = row.freightStatus;
+          }
+
+          if (Object.keys(updateData).length === 0) { skipped++; continue; }
+
+          await db.update(containers).set(updateData).where(eq(containers.id, match.id));
+          updated++;
+        }
+
+        res.json({ updated, skipped, notFound, errors });
+      } catch (err: any) {
+        console.error("[GIT import excel]", err);
+        res.status(500).json({ message: err.message });
+      }
+    },
   );
 }
