@@ -42,14 +42,13 @@ export function InlineRoleEditor({
   const [role, setRole] = useState("Manager");
   const [assignedLocationId, setAssignedLocationId] = useState<number | undefined>();
   const [selectedLocationIds, setSelectedLocationIds] = useState<number[]>([]);
+  const [locationCashAccounts, setLocationCashAccounts] = useState<Record<number, number | undefined>>({});
   const [posStation, setPosStation] = useState<number | undefined>();
   const [daybookEditDays, setDaybookEditDays] = useState(0);
-  const [cashAccountId, setCashAccountId] = useState<number | undefined>();
   const [canSellNegativeStock, setCanSellNegativeStock] = useState(false);
   const [canDeleteRecords, setCanDeleteRecords] = useState(false);
 
   const isPOS = role === "POS";
-  const isPrivileged = ["Admin", "Owner", "Developer"].includes(role);
 
   useEffect(() => {
     if (editingRole) {
@@ -58,7 +57,6 @@ export function InlineRoleEditor({
       setAssignedLocationId(editingRole.assignedLocationId);
       setPosStation(editingRole.posStation ?? undefined);
       setDaybookEditDays(editingRole.daybookEditDays ?? 0);
-      setCashAccountId(editingRole.cashAccountId ?? undefined);
       setCanSellNegativeStock(editingRole.canSellNegativeStock ?? false);
       setCanDeleteRecords(editingRole.canDeleteRecords ?? false);
 
@@ -75,17 +73,29 @@ export function InlineRoleEditor({
           .catch(() => {
             setSelectedLocationIds(editingRole.assignedLocationId ? [editingRole.assignedLocationId] : []);
           });
+
+        fetch(`/api/user-location-cash-accounts/${editingRole.userId}/${editingRole.companyId}`, { credentials: "include" })
+          .then((r) => r.json())
+          .then((mappings) => {
+            if (Array.isArray(mappings)) {
+              const record: Record<number, number> = {};
+              mappings.forEach((m: any) => { record[m.locationId] = m.cashAccountId; });
+              setLocationCashAccounts(record);
+            }
+          })
+          .catch(() => {});
       } else {
         setSelectedLocationIds([]);
+        setLocationCashAccounts({});
       }
     } else {
       setCompanyId(companies[0]?.id ?? 0);
       setRole("Manager");
       setAssignedLocationId(undefined);
       setSelectedLocationIds([]);
+      setLocationCashAccounts({});
       setPosStation(undefined);
       setDaybookEditDays(0);
-      setCashAccountId(undefined);
       setCanSellNegativeStock(false);
       setCanDeleteRecords(false);
     }
@@ -110,13 +120,24 @@ export function InlineRoleEditor({
       if (!res.ok) throw new Error("Failed to fetch ledger accounts");
       return res.json();
     },
-    enabled: !!companyId,
+    enabled: !!companyId && isPOS,
   });
 
   const cashAccounts = ledgerAccounts.filter((a: any) => a.accountType === "Cash");
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      if (isPOS && selectedLocationIds.length > 0) {
+        const missing = selectedLocationIds.filter((id) => !locationCashAccounts[id]);
+        if (missing.length > 0) {
+          const locNames = missing.map((id) => {
+            const loc = (locations as any[]).find((l: any) => l.id === id);
+            return loc?.name || `Location #${id}`;
+          });
+          throw new Error(`Cash account required for: ${locNames.join(", ")}`);
+        }
+      }
+
       const primary = selectedLocationIds[0] ?? assignedLocationId;
       const payload = {
         userId,
@@ -125,7 +146,7 @@ export function InlineRoleEditor({
         assignedLocationId: isPOS ? primary : undefined,
         posStation: isPOS ? posStation : undefined,
         daybookEditDays,
-        cashAccountId: cashAccountId ?? undefined,
+        cashAccountId: undefined,
         canSellNegativeStock,
         canDeleteRecords: role === "Manager" ? canDeleteRecords : false,
       };
@@ -140,10 +161,17 @@ export function InlineRoleEditor({
         await apiRequest("PUT", `/api/user-locations/${userId}/${companyId}`, {
           locationIds: selectedLocationIds,
         });
+        const mappings = selectedLocationIds
+          .filter((id) => locationCashAccounts[id])
+          .map((id) => ({ locationId: id, cashAccountId: locationCashAccounts[id] }));
+        await apiRequest("PUT", `/api/user-location-cash-accounts/${userId}/${companyId}`, {
+          mappings,
+        });
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/users/${userId}/company-roles`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-locations"] });
       toast({ title: isEditing ? "Role updated" : "Role assigned" });
       onSaved();
     },
@@ -154,8 +182,16 @@ export function InlineRoleEditor({
 
   const toggleLocation = (locId: number) => {
     setSelectedLocationIds((prev) => {
-      const next = prev.includes(locId) ? prev.filter((id) => id !== locId) : [...prev, locId];
+      const isRemoving = prev.includes(locId);
+      const next = isRemoving ? prev.filter((id) => id !== locId) : [...prev, locId];
       if (next.length > 0) setAssignedLocationId(next[0]);
+      if (isRemoving) {
+        setLocationCashAccounts((c) => {
+          const copy = { ...c };
+          delete copy[locId];
+          return copy;
+        });
+      }
       return next;
     });
   };
@@ -169,6 +205,7 @@ export function InlineRoleEditor({
   const clearLocations = () => {
     setSelectedLocationIds([]);
     setAssignedLocationId(undefined);
+    setLocationCashAccounts({});
   };
 
   return (
@@ -199,7 +236,7 @@ export function InlineRoleEditor({
 
         <div className="space-y-1.5">
           <Label className="text-xs">Role</Label>
-          <Select value={role} onValueChange={(v) => { setRole(v); setSelectedLocationIds([]); }}>
+          <Select value={role} onValueChange={(v) => { setRole(v); setSelectedLocationIds([]); setLocationCashAccounts({}); }}>
             <SelectTrigger className="h-8 text-xs" data-testid="select-role-type">
               <SelectValue placeholder="Select role" />
             </SelectTrigger>
@@ -217,7 +254,7 @@ export function InlineRoleEditor({
         <div className="space-y-3 rounded-md border border-border/60 bg-background p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">POS Settings</p>
 
-          {/* Locations */}
+          {/* Locations with per-location cash accounts */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <Label className="text-xs flex items-center gap-1">
@@ -235,24 +272,49 @@ export function InlineRoleEditor({
             {locations.length === 0 ? (
               <p className="text-xs text-muted-foreground">No locations for this company.</p>
             ) : (
-              <div className="grid grid-cols-2 gap-1 max-h-36 overflow-y-auto rounded-md border p-2" data-testid="select-locations">
-                {locations.map((loc: any) => {
+              <div className="space-y-1 max-h-56 overflow-y-auto rounded-md border p-2" data-testid="select-locations">
+                {(locations as any[]).map((loc: any) => {
                   const checked = selectedLocationIds.includes(loc.id);
                   return (
-                    <label
-                      key={loc.id}
-                      className={`flex items-center gap-2 cursor-pointer text-xs rounded px-2 py-1 transition-colors ${checked ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted/50"}`}
-                      data-testid={`checkbox-location-${loc.id}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleLocation(loc.id)}
-                        className="rounded shrink-0"
-                      />
-                      <span className="truncate">{loc.name}</span>
-                      <span className="text-muted-foreground shrink-0">({loc.code})</span>
-                    </label>
+                    <div key={loc.id} className="space-y-1">
+                      <label
+                        className={`flex items-center gap-2 cursor-pointer text-xs rounded px-2 py-1 transition-colors ${checked ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted/50"}`}
+                        data-testid={`checkbox-location-${loc.id}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleLocation(loc.id)}
+                          className="rounded shrink-0"
+                        />
+                        <span className="truncate">{loc.name}</span>
+                        <span className="text-muted-foreground shrink-0">({loc.code})</span>
+                      </label>
+                      {checked && (
+                        <div className="pl-6 pr-1 pb-1">
+                          <Select
+                            value={locationCashAccounts[loc.id]?.toString() || ""}
+                            onValueChange={(v) =>
+                              setLocationCashAccounts((prev) => ({ ...prev, [loc.id]: parseInt(v) }))
+                            }
+                          >
+                            <SelectTrigger className="h-7 text-xs" data-testid={`select-cash-account-loc-${loc.id}`}>
+                              <SelectValue placeholder="Select cash account *" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {cashAccounts.map((a: any) => (
+                                <SelectItem key={a.id} value={a.id.toString()}>
+                                  {a.name} ({a.code})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {!locationCashAccounts[loc.id] && (
+                            <p className="text-xs text-destructive mt-0.5">Cash account required</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -291,39 +353,19 @@ export function InlineRoleEditor({
             </div>
           </div>
 
-          {/* Cash Account + Can Sell Negative */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Cash Account</Label>
-              <Select
-                value={cashAccountId?.toString() ?? ""}
-                onValueChange={(v) => setCashAccountId(v ? parseInt(v) : undefined)}
-              >
-                <SelectTrigger className="h-8 text-xs" data-testid="select-cash-account">
-                  <SelectValue placeholder="Optional" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cashAccounts.map((a: any) => (
-                    <SelectItem key={a.id} value={a.id.toString()}>
-                      {a.name} ({a.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2 pt-5">
-              <Switch
-                checked={canSellNegativeStock}
-                onCheckedChange={setCanSellNegativeStock}
-                data-testid="switch-can-sell-negative-stock"
-              />
-              <Label className="text-xs cursor-pointer">Allow 0-stock sales</Label>
-            </div>
+          {/* Allow 0-stock sales */}
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={canSellNegativeStock}
+              onCheckedChange={setCanSellNegativeStock}
+              data-testid="switch-can-sell-negative-stock"
+            />
+            <Label className="text-xs cursor-pointer">Allow 0-stock sales</Label>
           </div>
         </div>
       )}
 
-      {/* Non-POS daybook days — shown for Manager and Owner (both now obey time windows) */}
+      {/* Non-POS daybook days */}
       {!isPOS && (role === "Manager" || role === "Owner" || role === "Normal User") && (
         <div className="space-y-1.5">
           <Label className="text-xs">Daybook Edit Days</Label>
@@ -358,6 +400,28 @@ export function InlineRoleEditor({
               When enabled, this Manager can delete, void, and archive records.
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Non-POS cash account (non-privileged roles) */}
+      {!isPOS && !["Admin", "Owner", "Developer"].includes(role) && (
+        <div className="space-y-1.5">
+          <Label className="text-xs">Cash Account (Optional)</Label>
+          <Select
+            value={""}
+            onValueChange={() => {}}
+          >
+            <SelectTrigger className="h-8 text-xs" data-testid="select-cash-account">
+              <SelectValue placeholder="Not applicable for this role" />
+            </SelectTrigger>
+            <SelectContent>
+              {cashAccounts.map((a: any) => (
+                <SelectItem key={a.id} value={a.id.toString()}>
+                  {a.name} ({a.code})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
 
