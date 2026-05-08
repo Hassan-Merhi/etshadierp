@@ -894,6 +894,12 @@ export default function GITContainers() {
         ) return false;
       }
       return true;
+    }).sort((a, b) => {
+      const co = a.companyName.localeCompare(b.companyName, undefined, { sensitivity: "base" });
+      if (co !== 0) return co;
+      const sh = (a.shopName ?? "").localeCompare(b.shopName ?? "", undefined, { numeric: true, sensitivity: "base" });
+      if (sh !== 0) return sh;
+      return a.containerNumber.localeCompare(b.containerNumber);
     });
   }, [allContainers, chipFilter, companyFilter, transporterFilter, agentFilter, docsFilter, delayedFilter, search]);
 
