@@ -1452,44 +1452,6 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
         );
       })}
 
-      {/* ── 4-column reconciliation strip ── */}
-      {hasBalance && (
-        <div className="grid grid-cols-4 divide-x text-center text-xs border-b bg-yellow-50 dark:bg-yellow-950/20">
-          <div className="px-2 py-2">
-            <div className="text-muted-foreground uppercase tracking-wide text-[10px] font-semibold">Account Balance</div>
-            <div className="font-bold text-sm mt-0.5">${fmt(ledgerBalance!, 0)}</div>
-            <div className="text-[10px] text-muted-foreground">from Accounts / Ledger</div>
-          </div>
-          <div className="px-2 py-2">
-            <div className="text-muted-foreground uppercase tracking-wide text-[10px] font-semibold">Offloaded Duty Total</div>
-            <div className="font-bold text-sm mt-0.5">${fmt(offloadedDutyTotal, 0)}</div>
-            <div className="text-[10px] text-muted-foreground">{clearedRows.length + partialRows.length + openRows.length} offloaded</div>
-          </div>
-          <div className="px-2 py-2">
-            <div className="text-muted-foreground uppercase tracking-wide text-[10px] font-semibold">Cleared by Payments</div>
-            <div className="font-bold text-sm mt-0.5 text-green-700 dark:text-green-400">${fmt(clearedByPayments, 0)}</div>
-            <div className="text-[10px] text-muted-foreground">{clearedRows.length} containers</div>
-          </div>
-          <div className="px-2 py-2">
-            <div className="text-muted-foreground uppercase tracking-wide text-[10px] font-semibold">Open Balance</div>
-            <div className={cn("font-bold text-sm mt-0.5",
-              (openBalance ?? 0) <= 0   ? "text-green-700 dark:text-green-400" :
-              warnings.includes("allocation_gap") ? "text-red-600 dark:text-red-400" :
-              "text-amber-700 dark:text-amber-400"
-            )}>
-              {openBalance !== null ? `$${fmt(openBalance, 0)}` : "—"}
-            </div>
-            <div className="text-[10px] text-muted-foreground">{openAndPartial.length} containers</div>
-          </div>
-        </div>
-      )}
-
-      {!hasBalance && (
-        <div className="px-3 py-2 text-xs text-muted-foreground border-b bg-muted/20 flex items-center gap-2">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-          No ledger account linked — balance unavailable. Container Duty Total: ${fmt(containerDutyTotal, 0)}
-        </div>
-      )}
 
       {/* ── Cleared rows (collapsed) ── */}
       {clearedRows.length > 0 && (
