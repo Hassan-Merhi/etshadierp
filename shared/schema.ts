@@ -541,6 +541,9 @@ export const containers = pgTable("containers", {
   dutyFee: decimal("duty_fee", { precision: 15, scale: 2 }),
   docReceived: boolean("doc_received").default(false),
   trackingDescription: text("tracking_description"),
+  docsSentDate: date("docs_sent_date"),
+  freightStatus: text("freight_status"),
+  trackingLink: text("tracking_link"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   companyIdx: index("containers_company_idx").on(t.companyId),
@@ -2190,6 +2193,9 @@ export const updateContainerTrackingSchema = z.object({
   dutyFee: z.string().nullable().optional(),
   docReceived: z.boolean().optional(),
   trackingDescription: z.string().optional(),
+  docsSentDate: z.string().nullable().optional(),
+  freightStatus: z.enum(["Yes", "No", "Pending"]).nullable().optional(),
+  trackingLink: z.string().nullable().optional(),
 });
 
 export type UpdateContainerTracking = z.infer<typeof updateContainerTrackingSchema>;

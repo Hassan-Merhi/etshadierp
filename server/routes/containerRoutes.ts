@@ -165,6 +165,9 @@ export function registerContainerRoutes(app: Express) {
         dutyFee,
         docReceived,
         trackingDescription,
+        docsSentDate,
+        freightStatus,
+        trackingLink,
       } = parseResult.data;
       
       const updateData: any = {};
@@ -181,6 +184,9 @@ export function registerContainerRoutes(app: Express) {
       if (dutyFee !== undefined) updateData.dutyFee = dutyFee || null;
       if (docReceived !== undefined) updateData.docReceived = docReceived;
       if (trackingDescription !== undefined) updateData.trackingDescription = trackingDescription;
+      if (docsSentDate !== undefined) updateData.docsSentDate = docsSentDate || null;
+      if (freightStatus !== undefined) updateData.freightStatus = freightStatus || null;
+      if (trackingLink !== undefined) updateData.trackingLink = trackingLink || null;
       
       await db
         .update(containers)

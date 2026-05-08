@@ -136,6 +136,8 @@ export default function Containers() {
     "dutyFee",
     "docReceived",
     "trackingDescription",
+    "docsSentDate",
+    "trackingLink",
   ] as const;
 
   // Auto-size inputs to fit their text.
@@ -1400,6 +1402,15 @@ export default function Containers() {
                       <TableHead className="whitespace-nowrap min-w-[150px]">
                         Description
                       </TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[130px]">
+                        Docs Sent
+                      </TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[110px]">
+                        Freight (GIT)
+                      </TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[160px]">
+                        Link
+                      </TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1740,6 +1751,91 @@ export default function Containers() {
                             className="h-8 text-sm w-auto"
                             placeholder="Notes..."
                             data-testid={`input-desc-${container.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            id={`tracking-${container.id}-docsSentDate`}
+                            type="date"
+                            value={
+                              (getEditValue(
+                                container,
+                                "docsSentDate",
+                              ) as string) || ""
+                            }
+                            onChange={(e) =>
+                              setEditValue(
+                                container.id,
+                                "docsSentDate",
+                                e.target.value,
+                              )
+                            }
+                            onKeyDown={(e) =>
+                              handleKeyDown(e, container.id, 12)
+                            }
+                            style={autoSizeStyle(
+                              getEditValue(container, "docsSentDate"),
+                              "yyyy-mm-dd",
+                              12,
+                              12,
+                            )}
+                            className="h-8 text-sm w-auto"
+                            data-testid={`input-docs-sent-${container.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <select
+                            id={`tracking-${container.id}-freightStatus`}
+                            value={
+                              (getEditValue(
+                                container,
+                                "freightStatus",
+                              ) as string) || ""
+                            }
+                            onChange={(e) =>
+                              setEditValue(
+                                container.id,
+                                "freightStatus",
+                                e.target.value || null,
+                              )
+                            }
+                            className="h-8 text-sm rounded-md border border-input bg-background px-2 py-1"
+                            data-testid={`select-freight-git-${container.id}`}
+                          >
+                            <option value="">—</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                            <option value="Pending">Pending</option>
+                          </select>
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            id={`tracking-${container.id}-trackingLink`}
+                            value={
+                              (getEditValue(
+                                container,
+                                "trackingLink",
+                              ) as string) || ""
+                            }
+                            onChange={(e) =>
+                              setEditValue(
+                                container.id,
+                                "trackingLink",
+                                e.target.value,
+                              )
+                            }
+                            onKeyDown={(e) =>
+                              handleKeyDown(e, container.id, 13)
+                            }
+                            style={autoSizeStyle(
+                              getEditValue(container, "trackingLink"),
+                              "https://...",
+                              12,
+                              32,
+                            )}
+                            className="h-8 text-sm w-auto"
+                            placeholder="https://..."
+                            data-testid={`input-link-${container.id}`}
                           />
                         </TableCell>
                         <TableCell>

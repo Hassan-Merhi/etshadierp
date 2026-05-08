@@ -2818,6 +2818,11 @@ let migrationsDone = false;
        DO UPDATE SET ledger_account_id = EXCLUDED.ledger_account_id,
                      aliases           = EXCLUDED.aliases,
                      active            = TRUE`,
+
+    // GIT Phase P1 — three new nullable tracking columns on containers
+    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS docs_sent_date date`,
+    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS freight_status text`,
+    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_link text`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
