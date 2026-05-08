@@ -71,6 +71,7 @@ interface EnrichedContainerRow {
   companyId: number;
   companyName: string;
   shopName: string | null;
+  supplierName: string | null;
   status: string;
   eta: string | null;
   grandTotal: string | null;
@@ -1214,9 +1215,9 @@ export default function GITContainers() {
               <TableRow>
                 <TableHead className="w-8">#</TableHead>
                 <TableHead>Container #</TableHead>
+                <TableHead>Supplier</TableHead>
                 <TableHead>Company</TableHead>
                 <TableHead>Shop Name</TableHead>
-                <TableHead>Status</TableHead>
                 <TableHead>ETA DAS</TableHead>
                 <TableHead className="text-right">Cost</TableHead>
                 <TableHead>Truck #</TableHead>
@@ -1266,16 +1267,9 @@ export default function GITContainers() {
                     >
                       <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                       <TableCell className="font-mono font-medium">{c.containerNumber}</TableCell>
+                      <TableCell>{c.supplierName ?? <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell>{c.companyName}</TableCell>
                       <TableCell>{c.shopName ?? <span className="text-muted-foreground">—</span>}</TableCell>
-                      <TableCell>
-                        <span className={cn(
-                          "flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium w-fit",
-                          statusMeta.color
-                        )}>
-                          {statusMeta.icon}{c.status}
-                        </span>
-                      </TableCell>
                       <TableCell>{fmtDate(c.eta)}</TableCell>
                       <TableCell className="text-right font-medium">
                         {c.grandTotal ? `$${fmt(parseNum(c.grandTotal))}` : "—"}
