@@ -59,16 +59,18 @@ export function registerExportRoutes(app: Express) {
   app.get("/api/export/settings", guard, async (_req: Request, res: Response) => {
     try {
       const result = await pool.query(
-        `SELECT id, gmail_user, schedule_enabled, last_run_at FROM export_settings WHERE id = 1`
+        `SELECT id, gmail_user, schedule_enabled, last_run_at, schedule_hour, schedule_timezone FROM export_settings WHERE id = 1`
       );
       if (!result.rows || result.rows.length === 0) {
-        return res.json({ gmailUser: "", scheduleEnabled: false, lastRunAt: null });
+        return res.json({ gmailUser: "", scheduleEnabled: false, lastRunAt: null, scheduleHour: 18, scheduleTimezone: "America/New_York" });
       }
       const row = result.rows[0];
       res.json({
         gmailUser: row.gmail_user || "",
         scheduleEnabled: row.schedule_enabled || false,
         lastRunAt: row.last_run_at || null,
+        scheduleHour: row.schedule_hour ?? 18,
+        scheduleTimezone: row.schedule_timezone || "America/New_York",
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -76,13 +78,13 @@ export function registerExportRoutes(app: Express) {
   });
 
   app.put("/api/export/settings", guard, async (req: Request, res: Response) => {
-    const { gmailUser, gmailAppPassword, scheduleEnabled } = req.body;
+    const { gmailUser, gmailAppPassword, scheduleEnabled, scheduleHour, scheduleTimezone } = req.body;
     try {
       const existing = await pool.query(`SELECT id FROM export_settings WHERE id = 1`);
       if (!existing.rows || existing.rows.length === 0) {
         await pool.query(
-          `INSERT INTO export_settings (id, gmail_user, gmail_app_password, schedule_enabled) VALUES (1, $1, $2, $3)`,
-          [gmailUser || "", gmailAppPassword || "", scheduleEnabled ?? false]
+          `INSERT INTO export_settings (id, gmail_user, gmail_app_password, schedule_enabled, schedule_hour, schedule_timezone) VALUES (1, $1, $2, $3, $4, $5)`,
+          [gmailUser || "", gmailAppPassword || "", scheduleEnabled ?? false, scheduleHour ?? 18, scheduleTimezone || "America/New_York"]
         );
       } else {
         const setParts: string[] = [];
@@ -95,6 +97,8 @@ export function registerExportRoutes(app: Express) {
         }
         setParts.push(`schedule_enabled = $${idx++}`);
         params.push(scheduleEnabled ?? false);
+        if (scheduleHour !== undefined) { setParts.push(`schedule_hour = $${idx++}`); params.push(scheduleHour); }
+        if (scheduleTimezone !== undefined) { setParts.push(`schedule_timezone = $${idx++}`); params.push(scheduleTimezone); }
         params.push(1);
         await pool.query(
           `UPDATE export_settings SET ${setParts.join(", ")} WHERE id = $${idx}`,

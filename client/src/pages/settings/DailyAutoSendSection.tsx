@@ -70,9 +70,9 @@ export function DailyAutoSendSection() {
         <div className="flex items-center gap-3">
           <Archive className="h-5 w-5 text-blue-500" />
           <div>
-            <p className="font-semibold">Daily Auto-Send (6 PM EST)</p>
+            <p className="font-semibold">Daily Auto-Send</p>
             <p className="text-sm text-muted-foreground">
-              Send the daily ZIP export to a WhatsApp group every day at 6 PM
+              Send the daily ZIP export to a WhatsApp group every day
             </p>
           </div>
         </div>
@@ -93,7 +93,7 @@ export function DailyAutoSendSection() {
           <div className="flex gap-2 rounded-md bg-muted/50 border p-3 text-sm text-muted-foreground">
             <Info className="h-4 w-4 shrink-0 mt-0.5 text-blue-500" />
             <p>
-              Every day at <strong>6 PM EST</strong> a ZIP file is generated containing all company
+              Every day at the configured schedule time a ZIP file is generated containing all company
               exports plus the all-companies net position Excel (full current year) and sent to the
               selected WhatsApp group.
             </p>
@@ -118,7 +118,7 @@ export function DailyAutoSendSection() {
             <div>
               <p className="text-sm font-medium">Enable Daily Auto-Send</p>
               <p className="text-xs text-muted-foreground">
-                Automatically send the ZIP every day at 6 PM EST to the group below
+                Automatically send the ZIP every day at the scheduled time to the group below
               </p>
             </div>
             <Switch

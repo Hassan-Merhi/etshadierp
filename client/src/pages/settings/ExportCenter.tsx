@@ -29,7 +29,7 @@ import { PosWhatsAppSection } from "./PosWhatsAppSection";
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface Recipient { id: number; email: string; active: boolean; created_at: string; }
-interface ExportSettings { gmailUser: string; scheduleEnabled: boolean; lastRunAt: string | null; }
+interface ExportSettings { gmailUser: string; scheduleEnabled: boolean; lastRunAt: string | null; scheduleHour: number; scheduleTimezone: string; }
 interface Company { id: number; name: string; code: string; }
 interface JobStep { time: string; message: string; type: "info" | "success" | "error" | "warning"; }
 interface JobStatus { status: "running" | "done" | "error"; steps: JobStep[]; error?: string; hasZip: boolean; }
@@ -91,6 +91,37 @@ function runTypeBadgeClass(t: string): string {
     case "manual_download": return "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300";
     default: return "bg-muted text-muted-foreground";
   }
+}
+
+/** Format a 0-23 hour as "6:00 AM" / "10:00 PM" */
+function fmt12h(hour: number): string {
+  const h = hour % 12 === 0 ? 12 : hour % 12;
+  const ampm = hour < 12 ? "AM" : "PM";
+  return `${h}:00 ${ampm}`;
+}
+
+const TIMEZONES: { value: string; label: string }[] = [
+  { value: "Africa/Lubumbashi", label: "Lubumbashi (CAT, UTC+2)" },
+  { value: "Africa/Nairobi",    label: "Nairobi (EAT, UTC+3)" },
+  { value: "Africa/Lagos",      label: "Lagos (WAT, UTC+1)" },
+  { value: "Africa/Cairo",      label: "Cairo (EET, UTC+2)" },
+  { value: "Africa/Johannesburg", label: "Johannesburg (SAST, UTC+2)" },
+  { value: "UTC",               label: "UTC (GMT+0)" },
+  { value: "Europe/London",     label: "London (GMT/BST)" },
+  { value: "Europe/Paris",      label: "Paris (CET, UTC+1/+2)" },
+  { value: "Europe/Istanbul",   label: "Istanbul (TRT, UTC+3)" },
+  { value: "Asia/Dubai",        label: "Dubai (GST, UTC+4)" },
+  { value: "Asia/Karachi",      label: "Karachi (PKT, UTC+5)" },
+  { value: "Asia/Kolkata",      label: "Kolkata (IST, UTC+5:30)" },
+  { value: "Asia/Riyadh",       label: "Riyadh (AST, UTC+3)" },
+  { value: "America/New_York",  label: "New York (EST/EDT)" },
+  { value: "America/Chicago",   label: "Chicago (CST/CDT)" },
+  { value: "America/Denver",    label: "Denver (MST/MDT)" },
+  { value: "America/Los_Angeles", label: "Los Angeles (PST/PDT)" },
+];
+
+function tzLabel(tz: string): string {
+  return TIMEZONES.find(t => t.value === tz)?.label ?? tz;
 }
 
 const DAYS = [
@@ -408,6 +439,9 @@ export function ExportCenter() {
   const [toDate, setToDate] = useState("");
   const [savingGmail, setSavingGmail] = useState(false);
   const [sendingWa, setSendingWa] = useState(false);
+  const [scheduleHour, setScheduleHour] = useState<number | null>(null);
+  const [scheduleTimezone, setScheduleTimezone] = useState<string | null>(null);
+  const [savingScheduleTime, setSavingScheduleTime] = useState(false);
 
   // Progress dialog
   const [progressOpen, setProgressOpen] = useState(false);
@@ -519,8 +553,26 @@ export function ExportCenter() {
     try {
       await apiRequest("PUT", "/api/export/settings", { scheduleEnabled: enabled, gmailUser: exportSettings?.gmailUser });
       qc.invalidateQueries({ queryKey: ["/api/export/settings"] });
-      toast({ title: enabled ? "Schedule enabled — runs daily at 6:00 PM EST" : "Schedule disabled" });
+      const effHour = scheduleHour ?? exportSettings?.scheduleHour ?? 18;
+      const effTz   = scheduleTimezone ?? exportSettings?.scheduleTimezone ?? "America/New_York";
+      toast({ title: enabled ? `Schedule enabled — runs daily at ${fmt12h(effHour)} (${tzLabel(effTz)})` : "Schedule disabled" });
     } catch (e: any) { toast({ variant: "destructive", title: "Error", description: e.message }); }
+  };
+
+  const saveScheduleTime = async () => {
+    setSavingScheduleTime(true);
+    try {
+      const effHour = scheduleHour ?? exportSettings?.scheduleHour ?? 18;
+      const effTz   = scheduleTimezone ?? exportSettings?.scheduleTimezone ?? "America/New_York";
+      await apiRequest("PUT", "/api/export/settings", {
+        scheduleEnabled: exportSettings?.scheduleEnabled ?? false,
+        scheduleHour: effHour,
+        scheduleTimezone: effTz,
+      });
+      qc.invalidateQueries({ queryKey: ["/api/export/settings"] });
+      toast({ title: `Schedule time saved — runs daily at ${fmt12h(effHour)} (${tzLabel(effTz)})` });
+    } catch (e: any) { toast({ variant: "destructive", title: "Error", description: e.message }); }
+    finally { setSavingScheduleTime(false); }
   };
 
   const saveGmail = async () => {
@@ -679,7 +731,9 @@ export function ExportCenter() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1.5">
                       <Clock className="h-3 w-3 shrink-0" />
-                      Schedule: {exportSettings?.scheduleEnabled ? "Daily at 6:00 PM EST" : "Disabled"}
+                      Schedule: {exportSettings?.scheduleEnabled
+                        ? `Daily at ${fmt12h(scheduleHour ?? exportSettings?.scheduleHour ?? 18)} (${tzLabel(scheduleTimezone ?? exportSettings?.scheduleTimezone ?? "America/New_York")})`
+                        : "Disabled"}
                     </span>
                     <span className="flex items-center gap-1.5">
                       <CheckCircle2 className="h-3 w-3 shrink-0" />
@@ -778,14 +832,71 @@ export function ExportCenter() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium">Enable daily schedule</p>
-                  <p className="text-xs text-muted-foreground">Runs at 6:00 PM Eastern Time, emails the export to all recipients</p>
+                  <p className="text-xs text-muted-foreground">
+                    Runs daily at{" "}
+                    <span className="font-medium text-foreground">
+                      {fmt12h(scheduleHour ?? exportSettings?.scheduleHour ?? 18)}
+                    </span>
+                    {" "}—{" "}
+                    <span className="font-medium text-foreground">
+                      {tzLabel(scheduleTimezone ?? exportSettings?.scheduleTimezone ?? "America/New_York")}
+                    </span>
+                  </p>
                 </div>
                 <Switch checked={exportSettings?.scheduleEnabled ?? false}
                   onCheckedChange={toggleSchedule} data-testid="switch-schedule-enabled" />
               </div>
+
+              {/* Time picker */}
+              <div className="space-y-2">
+                <Label className="text-xs">Send time</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select
+                    value={String(scheduleHour ?? exportSettings?.scheduleHour ?? 18)}
+                    onValueChange={v => setScheduleHour(Number(v))}
+                    data-testid="select-schedule-hour"
+                  >
+                    <SelectTrigger className="w-32" data-testid="trigger-schedule-hour">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <SelectItem key={i} value={String(i)} data-testid={`option-hour-${i}`}>
+                          {fmt12h(i)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={scheduleTimezone ?? exportSettings?.scheduleTimezone ?? "America/New_York"}
+                    onValueChange={v => setScheduleTimezone(v)}
+                    data-testid="select-schedule-timezone"
+                  >
+                    <SelectTrigger className="flex-1 min-w-52" data-testid="trigger-schedule-timezone">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIMEZONES.map(tz => (
+                        <SelectItem key={tz.value} value={tz.value} data-testid={`option-tz-${tz.value}`}>
+                          {tz.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="sm"
+                    onClick={saveScheduleTime}
+                    disabled={savingScheduleTime}
+                    data-testid="button-save-schedule-time"
+                  >
+                    {savingScheduleTime ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save"}
+                  </Button>
+                </div>
+              </div>
+
               {exportSettings?.lastRunAt && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <CheckCircle2 className="h-3 w-3 text-green-600" />
@@ -820,7 +931,7 @@ export function ExportCenter() {
                 </p>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm">Enable daily auto-send (6 PM EST)</p>
+                    <p className="text-sm">Enable daily auto-send</p>
                     <p className="text-xs text-muted-foreground">Send the daily ZIP to a WhatsApp group every day</p>
                   </div>
                   <Switch
@@ -951,7 +1062,7 @@ export function ExportCenter() {
                 {filteredRuns.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
                     {(backupStatus?.recentRuns ?? []).length === 0
-                      ? "No backup runs recorded yet. Trigger a manual send or wait for the 6 PM scheduled run."
+                      ? "No backup runs recorded yet. Trigger a manual send or wait for the scheduled run."
                       : "No runs match this filter."}
                   </p>
                 ) : (

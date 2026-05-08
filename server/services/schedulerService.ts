@@ -104,7 +104,7 @@ export async function checkAndRecoverDailyExport(): Promise<void> {
 
 async function runDailyExport(): Promise<boolean> {
   const cronFiredAt = new Date().toISOString();
-  console.log(`[DailyExport] 6 PM cron executed at ${cronFiredAt}`);
+  console.log(`[DailyExport] Scheduled run triggered at ${cronFiredAt}`);
 
   // ── Check what's enabled BEFORE any expensive work ──────────────────────
   const emailEnabled  = await isScheduleEnabled();
@@ -710,15 +710,42 @@ export async function checkOverdueCustomers(): Promise<void> {
   }
 }
 
-export function startScheduler() {
-  if (schedulerStarted) return;
-  schedulerStarted = true;
+/**
+ * Reads the configured schedule_hour + schedule_timezone from export_settings
+ * and runs the daily export if the current local hour matches and it hasn't run today.
+ * Called every hour by the main hourly cron.
+ */
+async function checkAndRunScheduledDailyExport(): Promise<void> {
+  try {
+    const r = await pool.query(
+      `SELECT schedule_enabled, schedule_hour, schedule_timezone FROM export_settings WHERE id = 1`
+    );
+    if (!r.rows.length) return;
+    const row = r.rows[0];
 
-  // Run at 6:00 PM EST (America/New_York) every day.
-  // Retries up to 4× with 15-minute gaps on failure (covers transient errors).
-  // Server-restart failures are handled by the 8 PM / 10 PM recovery crons and startup check.
-  cron.schedule("0 18 * * *", async () => {
-    console.log(`[DailyExport] 6 PM cron fired at ${new Date().toISOString()}`);
+    if (!row.schedule_enabled) return;
+
+    const configuredHour: number = row.schedule_hour ?? 18;
+    const tz: string = row.schedule_timezone || "America/New_York";
+
+    // Get the current hour in the configured timezone
+    const nowInTz = new Date(new Date().toLocaleString("en-US", { timeZone: tz }));
+    const currentHour = nowInTz.getHours();
+
+    if (currentHour !== configuredHour) return;
+
+    // Already succeeded today?
+    if (await hasTodayExportSucceeded()) {
+      console.log("[DailyExport] Hourly check: today's export already succeeded — skipping.");
+      return;
+    }
+    // Already running?
+    if (await isTodayExportRunning()) {
+      console.log("[DailyExport] Hourly check: export is currently running — skipping.");
+      return;
+    }
+
+    console.log(`[DailyExport] Hourly check: time matches (${configuredHour}:00 ${tz}) — starting export.`);
     const MAX_ATTEMPTS = 4;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const ok = await runDailyExport();
@@ -730,28 +757,17 @@ export function startScheduler() {
         console.log(`[DailyExport] Attempt ${attempt}/${MAX_ATTEMPTS} failed — retrying in 15 minutes...`);
         await new Promise<void>(res => setTimeout(res, 15 * 60 * 1000));
       } else {
-        console.error(`[DailyExport] All ${MAX_ATTEMPTS} attempts failed. Recovery crons at 8 PM / 10 PM will retry.`);
+        console.error(`[DailyExport] All ${MAX_ATTEMPTS} attempts failed.`);
       }
     }
-  }, {
-    timezone: "America/New_York",
-  });
+  } catch (err: any) {
+    console.error("[DailyExport] checkAndRunScheduledDailyExport error:", err?.message || err);
+  }
+}
 
-  // Recovery cron at 8 PM EST — re-run if today's scheduled export hasn't succeeded yet.
-  cron.schedule("0 20 * * *", async () => {
-    console.log("[DailyExport] 8 PM recovery cron — checking if today's export needs a retry...");
-    await checkAndRecoverDailyExport();
-  }, {
-    timezone: "America/New_York",
-  });
-
-  // Final recovery cron at 10 PM EST — last attempt for the day.
-  cron.schedule("0 22 * * *", async () => {
-    console.log("[DailyExport] 10 PM final recovery cron — checking if today's export still needs a retry...");
-    await checkAndRecoverDailyExport();
-  }, {
-    timezone: "America/New_York",
-  });
+export function startScheduler() {
+  if (schedulerStarted) return;
+  schedulerStarted = true;
 
   // Run on the 1st of every month at 7:00 AM EST — send net-position Excel via WhatsApp
   cron.schedule("0 7 1 * *", async () => {
@@ -760,10 +776,13 @@ export function startScheduler() {
     timezone: "America/New_York",
   });
 
-  // Stock + Net Position report — check every hour (minute 0) in EST
+  // Every hour: check stock report, net position export, AND the configurable daily export.
+  // The daily export fires when the current local hour (in the stored timezone) matches
+  // the stored schedule_hour — this replaces the old hardcoded 6 PM EST cron.
   cron.schedule("0 * * * *", async () => {
     await checkAndRunStockReport();
     await checkAndRunNetPositionExport();
+    await checkAndRunScheduledDailyExport();
   }, {
     timezone: "America/New_York",
   });
@@ -784,7 +803,7 @@ export function startScheduler() {
     timezone: "America/New_York",
   });
 
-  console.log("[DailyExport] Scheduler started — daily at 6 PM EST (up to 4 retries), recovery crons at 8 PM + 10 PM EST.");
+  console.log("[DailyExport] Scheduler started — time-configurable via export settings (checked every hour).");
   console.log("[WhatsApp] Monthly net-position scheduler started — runs on the 1st of each month at 7:00 AM EST.");
   console.log("[StockReport] Independent scheduler started — checks every hour.");
   console.log("[NetPositionExport] Scheduled export checker started — checks every hour.");

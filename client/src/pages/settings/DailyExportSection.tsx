@@ -16,6 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -42,7 +43,34 @@ import {
 } from "lucide-react";
 
 interface Recipient { id: number; email: string; active: boolean; created_at: string; }
-interface ExportSettings { gmailUser: string; scheduleEnabled: boolean; lastRunAt: string | null; }
+interface ExportSettings { gmailUser: string; scheduleEnabled: boolean; lastRunAt: string | null; scheduleHour: number; scheduleTimezone: string; }
+
+function fmt12h(hour: number): string {
+  const h = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h}:00 ${hour < 12 ? "AM" : "PM"}`;
+}
+const TIMEZONES = [
+  { value: "Africa/Lubumbashi", label: "Lubumbashi (CAT, UTC+2)" },
+  { value: "Africa/Nairobi",    label: "Nairobi (EAT, UTC+3)" },
+  { value: "Africa/Lagos",      label: "Lagos (WAT, UTC+1)" },
+  { value: "Africa/Cairo",      label: "Cairo (EET, UTC+2)" },
+  { value: "Africa/Johannesburg", label: "Johannesburg (SAST, UTC+2)" },
+  { value: "UTC",               label: "UTC (GMT+0)" },
+  { value: "Europe/London",     label: "London (GMT/BST)" },
+  { value: "Europe/Paris",      label: "Paris (CET, UTC+1/+2)" },
+  { value: "Europe/Istanbul",   label: "Istanbul (TRT, UTC+3)" },
+  { value: "Asia/Dubai",        label: "Dubai (GST, UTC+4)" },
+  { value: "Asia/Karachi",      label: "Karachi (PKT, UTC+5)" },
+  { value: "Asia/Kolkata",      label: "Kolkata (IST, UTC+5:30)" },
+  { value: "Asia/Riyadh",       label: "Riyadh (AST, UTC+3)" },
+  { value: "America/New_York",  label: "New York (EST/EDT)" },
+  { value: "America/Chicago",   label: "Chicago (CST/CDT)" },
+  { value: "America/Denver",    label: "Denver (MST/MDT)" },
+  { value: "America/Los_Angeles", label: "Los Angeles (PST/PDT)" },
+];
+function tzLabel(tz: string): string {
+  return TIMEZONES.find(t => t.value === tz)?.label ?? tz;
+}
 interface Company { id: number; name: string; code: string; }
 interface JobStep { time: string; message: string; type: "info" | "success" | "error" | "warning"; }
 interface JobStatus { status: "running" | "done" | "error"; steps: JobStep[]; error?: string; hasZip: boolean; }
@@ -354,7 +382,7 @@ function BackupStatusCard({ status, onRefresh, isRefreshing }: {
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            No backup runs recorded yet. Trigger a manual send or wait for the 6 PM scheduled run.
+            No backup runs recorded yet. Trigger a manual send or wait for the scheduled run.
           </p>
         )}
       </CardContent>
@@ -521,6 +549,9 @@ export function DailyExportSection() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [savingSettings, setSavingSettings] = useState(false);
+  const [scheduleHour, setScheduleHour] = useState<number | null>(null);
+  const [scheduleTimezone, setScheduleTimezone] = useState<string | null>(null);
+  const [savingScheduleTime, setSavingScheduleTime] = useState(false);
 
   // Progress dialog state
   const [progressOpen, setProgressOpen] = useState(false);
@@ -588,9 +619,30 @@ export function DailyExportSection() {
         gmailUser: settings?.gmailUser,
       });
       qc.invalidateQueries({ queryKey: ["/api/export/settings"] });
-      toast({ title: enabled ? "Schedule enabled — runs daily at 6:00 PM EST" : "Schedule disabled" });
+      const effHour = scheduleHour ?? settings?.scheduleHour ?? 18;
+      const effTz   = scheduleTimezone ?? settings?.scheduleTimezone ?? "America/New_York";
+      toast({ title: enabled ? `Schedule enabled — runs daily at ${fmt12h(effHour)} (${tzLabel(effTz)})` : "Schedule disabled" });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
+    }
+  };
+
+  const saveScheduleTime = async () => {
+    setSavingScheduleTime(true);
+    try {
+      const effHour = scheduleHour ?? settings?.scheduleHour ?? 18;
+      const effTz   = scheduleTimezone ?? settings?.scheduleTimezone ?? "America/New_York";
+      await apiRequest("PUT", "/api/export/settings", {
+        scheduleEnabled: settings?.scheduleEnabled ?? false,
+        scheduleHour: effHour,
+        scheduleTimezone: effTz,
+      });
+      qc.invalidateQueries({ queryKey: ["/api/export/settings"] });
+      toast({ title: `Schedule time saved — runs daily at ${fmt12h(effHour)} (${tzLabel(effTz)})` });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Error", description: e.message });
+    } finally {
+      setSavingScheduleTime(false);
     }
   };
 
@@ -848,13 +900,20 @@ export function DailyExportSection() {
             <Clock className="h-4 w-4" />
             Scheduled Daily Export
           </CardTitle>
-          <CardDescription>Automatically runs every day at 6:00 PM EST and emails the export to all recipients.</CardDescription>
+          <CardDescription>
+            Automatically emails the export to all recipients every day at{" "}
+            <strong>{fmt12h(scheduleHour ?? settings?.scheduleHour ?? 18)}</strong>
+            {" — "}
+            <strong>{tzLabel(scheduleTimezone ?? settings?.scheduleTimezone ?? "America/New_York")}</strong>.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium">Enable daily schedule</p>
-              <p className="text-xs text-muted-foreground">Runs at 6:00 PM Eastern Time, Monday–Sunday</p>
+              <p className="text-xs text-muted-foreground">
+                Runs at {fmt12h(scheduleHour ?? settings?.scheduleHour ?? 18)}, Monday–Sunday
+              </p>
             </div>
             <Switch
               checked={settings?.scheduleEnabled ?? false}
@@ -862,6 +921,54 @@ export function DailyExportSection() {
               data-testid="switch-schedule-enabled"
             />
           </div>
+
+          {/* Time picker */}
+          <div className="space-y-2">
+            <Label className="text-xs">Send time</Label>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                value={String(scheduleHour ?? settings?.scheduleHour ?? 18)}
+                onValueChange={v => setScheduleHour(Number(v))}
+                data-testid="select-schedule-hour"
+              >
+                <SelectTrigger className="w-32" data-testid="trigger-schedule-hour">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <SelectItem key={i} value={String(i)} data-testid={`option-hour-${i}`}>
+                      {fmt12h(i)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={scheduleTimezone ?? settings?.scheduleTimezone ?? "America/New_York"}
+                onValueChange={v => setScheduleTimezone(v)}
+                data-testid="select-schedule-timezone"
+              >
+                <SelectTrigger className="flex-1 min-w-52" data-testid="trigger-schedule-timezone">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIMEZONES.map(tz => (
+                    <SelectItem key={tz.value} value={tz.value} data-testid={`option-tz-${tz.value}`}>
+                      {tz.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                onClick={saveScheduleTime}
+                disabled={savingScheduleTime}
+                data-testid="button-save-schedule-time"
+              >
+                {savingScheduleTime ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save"}
+              </Button>
+            </div>
+          </div>
+
           {settings?.lastRunAt && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <CheckCircle2 className="h-3 w-3 text-green-600" />

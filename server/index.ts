@@ -2712,6 +2712,10 @@ let migrationsDone = false;
     // Migrate role_feature_permissions table as well
     `UPDATE role_feature_permissions SET role = 'POS' WHERE role IN ('POS1','POS2','POS3','POS4','POS5','POS6')`,
     `UPDATE role_feature_permissions SET role = 'Normal User' WHERE role = 'User'`,
+
+    // ── Configurable daily-export schedule time (May 2026) ─────────────────
+    `ALTER TABLE export_settings ADD COLUMN IF NOT EXISTS schedule_hour integer NOT NULL DEFAULT 18`,
+    `ALTER TABLE export_settings ADD COLUMN IF NOT EXISTS schedule_timezone text NOT NULL DEFAULT 'America/New_York'`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
