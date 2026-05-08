@@ -1186,10 +1186,10 @@ export default function FactoryStockAllocationV5() {
         </Dialog>
       )}
 
-      {/* Cancel Container — LOADING (supervisor credentials required) */}
+      {/* Cancel Container — LOADING */}
       {cancelDialog?.status === "LOADING" && (
         <Dialog open onOpenChange={open => {
-          if (!open) { setCancelDialog(null); setCancelSuperUser(""); setCancelSuperPass(""); }
+          if (!open) { setCancelDialog(null); }
         }}>
           <DialogContent className="max-w-sm">
             <DialogHeader>
@@ -1201,49 +1201,24 @@ export default function FactoryStockAllocationV5() {
             <div className="flex flex-col gap-4 py-1">
               <p className="text-sm text-muted-foreground">
                 Cancel <span className="font-semibold text-foreground">{cancelDialog.containerName}</span>?
-                This container is actively loading. Admin approval is required.
+                This container is actively loading.
               </p>
               <p className="text-xs text-muted-foreground bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2">
                 All scanned bale links will be removed. Bales will remain in stock. This action cannot be undone.
               </p>
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-sm">Supervisor Username</Label>
-                  <Input
-                    autoComplete="off"
-                    value={cancelSuperUser}
-                    onChange={e => setCancelSuperUser(e.target.value)}
-                    data-testid="input-v5-cancel-super-user"
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-sm">Supervisor Password</Label>
-                  <Input
-                    type="password"
-                    autoComplete="current-password"
-                    value={cancelSuperPass}
-                    onChange={e => setCancelSuperPass(e.target.value)}
-                    data-testid="input-v5-cancel-super-pass"
-                  />
-                </div>
-              </div>
             </div>
             <DialogFooter className="gap-2">
               <Button
                 variant="outline"
-                onClick={() => { setCancelDialog(null); setCancelSuperUser(""); setCancelSuperPass(""); }}
+                onClick={() => { setCancelDialog(null); }}
                 data-testid="button-v5-cancel-ct-dismiss"
               >
                 Back
               </Button>
               <Button
                 variant="destructive"
-                onClick={() => cancelContainerMut.mutate({
-                  orderId: cancelDialog.orderId,
-                  supervisorUsername: cancelSuperUser,
-                  supervisorPassword: cancelSuperPass,
-                })}
-                disabled={cancelContainerMut.isPending || !cancelSuperUser.trim() || !cancelSuperPass}
+                onClick={() => cancelContainerMut.mutate({ orderId: cancelDialog.orderId })}
+                disabled={cancelContainerMut.isPending}
                 data-testid="button-v5-cancel-ct-confirm"
               >
                 {cancelContainerMut.isPending

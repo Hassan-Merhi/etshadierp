@@ -2939,26 +2939,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           });
         }
 
-        // LOADING — requires supervisor credentials even if no bales are scanned
+        // LOADING — any authenticated user can cancel; bale links are cleaned up
         if (order.status === "LOADING") {
-          const { supervisorUsername, supervisorPassword } = req.body;
-          if (!supervisorUsername || !supervisorPassword) {
-            return res.status(400).json({
-              message: "Supervisor credentials are required to cancel a loading V5 container.",
-              requiresSupervisor: true,
-            });
-          }
-          const [supervisor] = await db.select().from(users).where(eq(users.username, supervisorUsername));
-          if (!supervisor) return res.status(403).json({ message: "Supervisor not found." });
-          const passwordValid = await verifySupervisorPassword(supervisorPassword, supervisor.password);
-          if (!passwordValid) return res.status(403).json({ message: "Invalid supervisor password." });
-          const [role] = await db.select().from(userCompanyRoles)
-            .where(and(eq(userCompanyRoles.userId, supervisor.id), eq(userCompanyRoles.companyId, companyId)));
-          if (!role || !["Admin", "Owner", "Manager", "Developer"].includes(role.role)) {
-            return res.status(403).json({ message: "Supervisor must have Admin, Owner, or Manager role." });
-          }
-
-          // Bale cleanup: V5 LOADING bales are already IN_STOCK; set as safety, then unlink
           const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
           for (const ob of orderBales) {
             await db.update(factoryBales)
@@ -2980,12 +2962,13 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
             eq(factoryDaybookEntries.txType, "ORDER_CANCELLED"),
             eq(factoryDaybookEntries.referenceId, orderId),
           ));
+          const cancelledBy = (req.session as any)?.username || "user";
           await writeDaybookEntry(db, {
             companyId,
             txDate: cancelToday,
             txType: "ORDER_CANCELLED",
             referenceId: orderId,
-            description: `V5 container cancelled: ${cancelCustomer?.legalName || "Customer"}, ${orderBales.length} bale link${orderBales.length !== 1 ? "s" : ""} removed. Authorised by: ${supervisorUsername}.`,
+            description: `V5 container cancelled: ${cancelCustomer?.legalName || "Customer"}, ${orderBales.length} bale link${orderBales.length !== 1 ? "s" : ""} removed. Cancelled by: ${cancelledBy}.`,
           });
           return res.json(updated);
         }
