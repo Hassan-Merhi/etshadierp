@@ -178,23 +178,23 @@ function RealWorkbookBlock({
         <table className="w-full text-xs whitespace-nowrap border-collapse">
           <thead>
             <tr className="bg-muted/60 border-b text-muted-foreground">
-              <th className="py-1 px-2 font-semibold text-left">CTR #</th>
-              <th className="py-1 px-2 font-semibold text-right">AMOUNT</th>
-              <th className="py-1 px-2 font-semibold text-left">ETA DAS</th>
-              <th className="py-1 px-2 font-semibold text-left">TRUCK #</th>
-              <th className="py-1 px-2 font-semibold text-left">LOCATION</th>
-              <th className="py-1 px-2 font-semibold text-left">BORDER DT.</th>
-              <th className="py-1 px-2 font-semibold text-left">MAX OFFLOAD</th>
+              <th className="py-1 px-2 font-semibold text-center">CTR #</th>
+              <th className="py-1 px-2 font-semibold text-center">AMOUNT</th>
+              <th className="py-1 px-2 font-semibold text-center">ETA DAS</th>
+              <th className="py-1 px-2 font-semibold text-center">TRUCK #</th>
+              <th className="py-1 px-2 font-semibold text-center">LOCATION</th>
+              <th className="py-1 px-2 font-semibold text-center">BORDER DT.</th>
+              <th className="py-1 px-2 font-semibold text-center">MAX OFFLOAD</th>
               <th className="py-1 px-2 font-semibold text-center">DOCS RCVD</th>
               <th className="py-1 px-2 font-semibold text-center">DOCS→TRUCK</th>
-              <th className="py-1 px-2 font-semibold text-left">FREIGHT</th>
-              <th className="py-1 px-2 font-semibold text-left">TRANSPORTER</th>
-              <th className="py-1 px-2 font-semibold text-right">FEE</th>
-              <th className="py-1 px-2 font-semibold text-left">AGENT</th>
-              <th className="py-1 px-2 font-semibold text-right">DUTY</th>
-              <th className="py-1 px-2 font-semibold text-left">STATUS</th>
+              <th className="py-1 px-2 font-semibold text-center">FREIGHT</th>
+              <th className="py-1 px-2 font-semibold text-center">TRANSPORTER</th>
+              <th className="py-1 px-2 font-semibold text-center">FEE</th>
+              <th className="py-1 px-2 font-semibold text-center">AGENT</th>
+              <th className="py-1 px-2 font-semibold text-center">DUTY</th>
+              <th className="py-1 px-2 font-semibold text-center">STATUS</th>
               <th className="py-1 px-2 font-semibold text-center">LINK</th>
-              <th className="py-1 px-2 font-semibold text-left">NOTES</th>
+              <th className="py-1 px-2 font-semibold text-center">NOTES</th>
             </tr>
           </thead>
           <tbody>
@@ -871,19 +871,19 @@ function TabPortReport() {
                 <table className="w-full text-xs whitespace-nowrap border-collapse">
                   <thead>
                     <tr className="bg-muted/60 border-b text-muted-foreground">
-                      <th className="py-1 px-2 font-semibold text-left">CONTAINER #</th>
-                      <th className="py-1 px-2 font-semibold text-left">CO.</th>
-                      <th className="py-1 px-2 font-semibold text-right">AMOUNT</th>
-                      <th className="py-1 px-2 font-semibold text-left">ETA DAS</th>
-                      <th className="py-1 px-2 font-semibold text-left">TRANSPORTER</th>
-                      <th className="py-1 px-2 font-semibold text-left">TRUCK #</th>
-                      <th className="py-1 px-2 font-semibold text-left">LOCATION</th>
-                      <th className="py-1 px-2 font-semibold text-left">BORDER DT.</th>
-                      <th className="py-1 px-2 font-semibold text-left">MAX OFFLOAD</th>
+                      <th className="py-1 px-2 font-semibold text-center">CONTAINER #</th>
+                      <th className="py-1 px-2 font-semibold text-center">CO.</th>
+                      <th className="py-1 px-2 font-semibold text-center">AMOUNT</th>
+                      <th className="py-1 px-2 font-semibold text-center">ETA DAS</th>
+                      <th className="py-1 px-2 font-semibold text-center">TRANSPORTER</th>
+                      <th className="py-1 px-2 font-semibold text-center">TRUCK #</th>
+                      <th className="py-1 px-2 font-semibold text-center">LOCATION</th>
+                      <th className="py-1 px-2 font-semibold text-center">BORDER DT.</th>
+                      <th className="py-1 px-2 font-semibold text-center">MAX OFFLOAD</th>
                       <th className="py-1 px-2 font-semibold text-center">DOCS RCVD</th>
                       <th className="py-1 px-2 font-semibold text-center">DOCS→TRUCK</th>
-                      <th className="py-1 px-2 font-semibold text-left">AGENT</th>
-                      <th className="py-1 px-2 font-semibold text-left">NOTES</th>
+                      <th className="py-1 px-2 font-semibold text-center">AGENT</th>
+                      <th className="py-1 px-2 font-semibold text-center">NOTES</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1038,14 +1038,14 @@ function TabTruckLocation() {
         <table className="w-full text-xs whitespace-nowrap border-collapse">
           <thead>
             <tr className="bg-yellow-400 text-yellow-950 font-bold border-b-2 border-yellow-600">
-              <th className="py-1.5 px-3 text-left">CONTAINER #</th>
-              <th className="py-1.5 px-3 text-left">COMPANY</th>
-              <th className="py-1.5 px-3 text-left">NUMBER PLATE</th>
-              <th className="py-1.5 px-3 text-left">LOCATION</th>
-              <th className="py-1.5 px-3 text-left">AGENT</th>
-              <th className="py-1.5 px-3 text-left">TRANSPORTER</th>
-              <th className="py-1.5 px-3 text-left">BORDER DT.</th>
-              <th className="py-1.5 px-3 text-left">STATUS</th>
+              <th className="py-1.5 px-3 text-center">CONTAINER #</th>
+              <th className="py-1.5 px-3 text-center">COMPANY</th>
+              <th className="py-1.5 px-3 text-center">NUMBER PLATE</th>
+              <th className="py-1.5 px-3 text-center">LOCATION</th>
+              <th className="py-1.5 px-3 text-center">AGENT</th>
+              <th className="py-1.5 px-3 text-center">TRANSPORTER</th>
+              <th className="py-1.5 px-3 text-center">BORDER DT.</th>
+              <th className="py-1.5 px-3 text-center">STATUS</th>
             </tr>
           </thead>
           <tbody>
@@ -1359,9 +1359,7 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
                 <thead>
                   <tr className="bg-muted/50 border-b">
                     {["CONTAINER #","PLATE","OFFLOAD DATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY","CLEARED","STATUS"].map(h => (
-                      <th key={h} className={cn("py-1 px-2 font-bold text-muted-foreground",
-                        ["DUTY","CLEARED"].includes(h) ? "text-right" : h === "STATUS" ? "text-center" : "text-left"
-                      )}>{h}</th>
+                      <th key={h} className="py-1 px-2 font-bold text-muted-foreground text-center">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -1394,9 +1392,7 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
           <thead>
             <tr className="bg-yellow-200 text-yellow-900 border-b border-yellow-400">
               {["CONTAINER #","PLATE","OFFLOAD DATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY","CLEARED","REMAINING","STATUS"].map(h => (
-                <th key={h} className={cn("py-1 px-2 font-bold",
-                  ["DUTY","CLEARED","REMAINING"].includes(h) ? "text-right" : h === "STATUS" ? "text-center" : "text-left"
-                )}>{h}</th>
+                <th key={h} className="py-1 px-2 font-bold text-center">{h}</th>
               ))}
             </tr>
           </thead>
@@ -1469,9 +1465,7 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
                 <thead>
                   <tr className="bg-sky-100 dark:bg-sky-950/30 border-b text-sky-800 dark:text-sky-300">
                     {["CONTAINER #","PLATE","BORDER DATE","TRANSPORTER","LOCATION","STATUS","DUTY"].map(h => (
-                      <th key={h} className={cn("py-1 px-2 font-bold",
-                        h === "DUTY" ? "text-right" : h === "STATUS" ? "text-center" : "text-left"
-                      )}>{h}</th>
+                      <th key={h} className="py-1 px-2 font-bold text-center">{h}</th>
                     ))}
                   </tr>
                 </thead>
