@@ -20,9 +20,11 @@ import {
   Download, Mail, Plus, Trash2, Building2, Calendar, ChevronDown, ChevronRight,
   Clock, Eye, EyeOff, Loader2, AlertTriangle, CheckCircle2, XCircle, Info,
   MessageSquare, Send, RefreshCw, ShieldCheck, ShieldAlert, Users, TrendingUp,
-  Settings2, Zap,
+  Settings2, Zap, MessageCircle,
 } from "lucide-react";
 import { StockReportSection } from "./StockReportSection";
+import { WhatsAppExportSection } from "./WhatsAppExportSection";
+import { PosWhatsAppSection } from "./PosWhatsAppSection";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -654,6 +656,10 @@ export function ExportCenter() {
           <TabsTrigger value="daily" data-testid="tab-daily-export">Daily Export</TabsTrigger>
           <TabsTrigger value="np" data-testid="tab-np-export">Net Position Export</TabsTrigger>
           <TabsTrigger value="stock" data-testid="tab-stock-report">Stock Report</TabsTrigger>
+          <TabsTrigger value="wa-groups" data-testid="tab-wa-groups" className="flex items-center gap-1.5">
+            <MessageCircle className="h-3.5 w-3.5 text-green-600" />
+            WhatsApp Groups
+          </TabsTrigger>
         </TabsList>
 
         {/* ══════════════════════════════════════════════════════════════
@@ -1160,6 +1166,13 @@ export function ExportCenter() {
           <StockReportSection />
         </TabsContent>
 
+        {/* ══════════════════════════════════════════════════════════════
+            WHATSAPP GROUPS TAB
+        ══════════════════════════════════════════════════════════════ */}
+        <TabsContent value="wa-groups" className="space-y-4 mt-4">
+          <PosWhatsAppSection />
+        </TabsContent>
+
       </Tabs>
 
       {/* ── Recipients (collapsible) ───────────────────────────────────── */}
@@ -1258,7 +1271,7 @@ export function ExportCenter() {
                 </div>
               )}
               <p className="text-xs text-muted-foreground">
-                To add or remove WhatsApp groups and manage credentials, go to the <strong>WhatsApp Export</strong> section in Settings.
+                To add or remove WhatsApp groups and manage credentials, expand <strong>Advanced Settings</strong> below.
               </p>
             </div>
           </div>
@@ -1281,6 +1294,16 @@ export function ExportCenter() {
 
         {showAdvanced && (
           <div className="border-t p-4 space-y-5">
+
+            {/* WhatsApp Export credentials & recipients */}
+            <div className="space-y-1">
+              <p className="text-sm font-semibold">WhatsApp Export</p>
+              <p className="text-xs text-muted-foreground">Green API credentials, recipients, and master on/off switch for all WhatsApp export features.</p>
+            </div>
+            <WhatsAppExportSection />
+
+            <Separator />
+
             <div className="space-y-1">
               <p className="text-sm font-semibold">Gmail Sender Credentials</p>
               <p className="text-xs text-muted-foreground">

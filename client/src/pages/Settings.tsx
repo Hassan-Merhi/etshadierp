@@ -64,7 +64,7 @@
   import { useAppMode } from "@/contexts/AppModeContext";
   import { getApiRequest } from "@/lib/factoryApi";
   import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, Zap, Eraser, ArrowLeft, Info } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, Zap, Eraser, ArrowLeft, Info } from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -86,10 +86,8 @@ import { ActiveUsersSection } from "./settings/ActiveUsersSection";
 import { DataToolsTab } from "./settings/DataToolsTab";
 import { fmtDate, fieldLabel, fmtValue, getRecordLabel, getChangesSummary, tableShortName, AuditLogDialog, EditLogTable } from "./settings/AuditLog";
 import { PosSettingsTab } from "./settings/PosSettingsTab";
-import { PosWhatsAppSection } from "./settings/PosWhatsAppSection";
 import { ExportAccountsSection } from "./settings/ExportAccountsSection";
 import { DailyExportSection } from "./settings/DailyExportSection";
-import { WhatsAppExportSection } from "./settings/WhatsAppExportSection";
 import { StockReportSection } from "./settings/StockReportSection";
 import { NetPositionExportSection } from "./settings/NetPositionExportSection";
 import { DailyAutoSendSection } from "./settings/DailyAutoSendSection";
@@ -711,7 +709,6 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
           { key: "files", label: "File Storage", icon: Upload },
           { key: "export-accounts", label: "Export Accounts", icon: Download },
           { key: "export-center", label: "Export Center", icon: Zap },
-          { key: "whatsapp-export", label: "WhatsApp Export", icon: MessageCircle },
         ],
       },
       {
@@ -719,7 +716,6 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
         items: appMode !== "factory" ? [
           { key: "pos-settings", label: "POS Settings", icon: ShoppingCart, devOnly: true },
           { key: "price-groups", label: "Price Groups", icon: Layers },
-          { key: "pos-whatsapp", label: "WhatsApp Groups", icon: MessageCircle },
         ] : [],
       },
       {
@@ -1257,10 +1253,6 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
             <ExportCenter />
           )}
 
-          {activeSection === "whatsapp-export" && (
-            <WhatsAppExportSection />
-          )}
-
           {activeSection === "fiscal" && (
             <FiscalPeriodTab currentCompanyId={selectedCompany?.id} userRole={currentUser?.role} />
           )}
@@ -1323,10 +1315,6 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
 
           {activeSection === "price-groups" && (
             <PriceGroupsTab />
-          )}
-
-          {activeSection === "pos-whatsapp" && (
-            <PosWhatsAppSection />
           )}
 
           {activeSection === "system" && (() => {
