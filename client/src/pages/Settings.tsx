@@ -686,8 +686,8 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
         label: "General",
         items: [
           { key: "companies", label: "Companies", icon: Building2 },
-          { key: "preferences", label: "Preferences", icon: Settings2 },
-          { key: "fiscal", label: "Fiscal Period", icon: CalendarRange },
+          { key: "preferences", label: "Preferences", icon: Settings2, devOnly: true },
+          { key: "fiscal", label: "Fiscal Period", icon: CalendarRange, devOnly: true },
           { key: "exchange-rates", label: "Exchange Rates", icon: TrendingUp },
         ],
       },
@@ -721,14 +721,14 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
       {
         label: "Intercompany",
         items: appMode !== "factory" ? [
-          { key: "intercompany", label: "POS Auto-Transfer", icon: ArrowLeftRight },
+          { key: "intercompany", label: "POS Auto-Transfer", icon: ArrowLeftRight, devOnly: true },
         ] : [],
       },
       {
         label: "System",
         items: [
           { key: "system", label: "System Tools", icon: Wrench },
-          { key: "offline", label: "Offline & Sync", icon: WifiOff },
+          { key: "offline", label: "Offline & Sync", icon: WifiOff, devOnly: true },
         ],
       },
     ];
