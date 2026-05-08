@@ -212,138 +212,408 @@ function EntriesTable({ entries }: { entries: any[] }) {
   );
 }
 
-// ── Detail Dialog ─────────────────────────────────────────────────────────────
+// ── Detail Dialog helpers ──────────────────────────────────────────────────────
+
+const BUSINESS_FIELD_LABELS: Record<string, string> = {
+  voucherType: "Voucher Type",
+  date: "Date",
+  amount: "Amount",
+  description: "Description",
+  narration: "Narration",
+  location: "Location",
+  optional: "Status",
+  ledgerAccount: "Ledger Account",
+  debitAccount: "Debit Account",
+  creditAccount: "Credit Account",
+  cashAccount: "Cash / Bank Account",
+  customer: "Customer",
+  supplier: "Supplier",
+  paymentMethod: "Payment Method",
+  currency: "Currency",
+  exchangeRate: "Exchange Rate",
+  sourceLocation: "Source Location",
+  destinationLocation: "Destination Location",
+  company: "Company",
+  reference: "Reference",
+  name: "Name",
+  status: "Status",
+  type: "Type",
+  balance: "Balance",
+  phone: "Phone",
+  email: "Email",
+  address: "Address",
+  contactPerson: "Contact Person",
+  notes: "Notes",
+  paymentTerms: "Payment Terms",
+  taxNumber: "Tax Number",
+  code: "Code",
+  unit: "Unit",
+  category: "Category",
+  quantity: "Quantity",
+  unitPrice: "Unit Price",
+  total: "Total",
+};
+
+function isLikelyTechnical(field: string, vals: any): boolean {
+  if (/Id$|_id$|Ids$/.test(field)) return true;
+  const v = (vals as any)?.old ?? (vals as any)?.new;
+  if (v !== null && typeof v === "object" && !Array.isArray(v)) return true;
+  return false;
+}
+
+function fmtBusinessValue(field: string, value: any): string {
+  if (value === null || value === undefined) return "—";
+  if (field === "optional") return value ? "Optional" : "Active";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (field === "amount" || field === "balance" || field === "total" || field === "unitPrice") {
+    const n = parseFloat(String(value));
+    if (!isNaN(n)) return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  if (field === "exchangeRate" || field === "quantity") {
+    const n = parseFloat(String(value));
+    if (!isNaN(n)) return n.toLocaleString();
+  }
+  if (field === "date" || (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(String(value)))) {
+    try {
+      const d = new Date(String(value));
+      if (!isNaN(d.getTime())) return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    } catch { /* fall through */ }
+  }
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+function getHeaderSentence(log: any): string {
+  const changes = log.changes || {};
+  const user = log.username || "Unknown user";
+  const verb = log.action === "create" ? "created" : log.action === "delete" ? "deleted" : "updated";
+  const vType = changes.voucherType?.new ?? changes.voucherType?.old ?? changes.type?.new ?? changes.type?.old ?? "";
+  const module = tableShortName(log.tableName);
+  const singular = module.replace(/s$/, "");
+  const typePart = vType ? `${vType} ${singular}` : singular;
+  const ref = log.recordIdentifier ?? (log.recordId ? `#${log.recordId}` : "");
+  return `${user} ${verb} ${typePart}${ref ? ` ${ref}` : ""} on ${fmtDate(log.createdAt)}.`;
+}
+
+function fmtEntryAmount(v: string | number): string {
+  const n = parseFloat(String(v));
+  return isNaN(n) ? "—" : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function compareEntries(oldArr: any[], newArr: any[]) {
+  const oldMap = new Map<string, any>(oldArr.map(e => [e.account, e]));
+  const newMap = new Map<string, any>(newArr.map(e => [e.account, e]));
+  const added: any[] = [];
+  const removed: any[] = [];
+  const changed: Array<{ account: string; old: any; new: any }> = [];
+  for (const [account, entry] of newMap) {
+    if (!oldMap.has(account)) {
+      added.push(entry);
+    } else {
+      const old = oldMap.get(account)!;
+      if (
+        parseFloat(old.debit || "0") !== parseFloat(entry.debit || "0") ||
+        parseFloat(old.credit || "0") !== parseFloat(entry.credit || "0") ||
+        (old.narration ?? "") !== (entry.narration ?? "")
+      ) {
+        changed.push({ account, old, new: entry });
+      }
+    }
+  }
+  for (const [account, entry] of oldMap) {
+    if (!newMap.has(account)) removed.push(entry);
+  }
+  return { added, removed, changed };
+}
+
+// ── Detail Dialog ──────────────────────────────────────────────────────────────
 
 export function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void }) {
-  const { toast } = useToast();
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showFull, setShowFull] = useState(false);
+  const { data: me } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
+  const isAdminOrDev = me?.role === "Admin" || me?.role === "Developer" || me?.role === "Owner";
 
   const changes: Record<string, { old?: any; new?: any }> = log.changes || {};
-  const changedFields = Object.entries(changes);
   const isDelete = log.action === "delete";
   const isCreate = log.action === "create";
   const isUpdate = log.action === "update";
 
-  const copyJson = async (obj: any) => {
-    navigator.clipboard.writeText(JSON.stringify(obj, null, 2)).then(() => {
-      toast({ title: "Copied", description: "JSON copied to clipboard." });
-    });
+  const { entries: entriesChange, ...scalarChanges } = changes as any;
+  const oldEntries: any[] = entriesChange?.old ?? [];
+  const newEntries: any[] = entriesChange?.new ?? [];
+  const hasEntries = oldEntries.length > 0 || newEntries.length > 0;
+  const entryDiff = isUpdate ? compareEntries(oldEntries, newEntries) : { added: [], removed: [], changed: [] };
+
+  const voucherType =
+    changes.voucherType?.new ?? changes.voucherType?.old ??
+    changes.type?.new ?? changes.type?.old ?? "";
+
+  // Split scalar fields: readable vs technical
+  const readableFields = Object.entries(scalarChanges).filter(([k, v]) => !isLikelyTechnical(k, v));
+  const technicalFields = Object.entries(scalarChanges).filter(([k, v]) => isLikelyTechnical(k, v));
+
+  const renderRow = (field: string, vals: any) => {
+    const label = BUSINESS_FIELD_LABELS[field] ?? fieldLabel(field);
+    const oldFmt = fmtBusinessValue(field, vals?.old);
+    const newFmt = fmtBusinessValue(field, vals?.new);
+    // skip fake changes (value didn't actually change in display)
+    if (isUpdate && oldFmt === newFmt) return null;
+
+    return (
+      <div key={field} className="flex gap-3 text-sm py-1.5 border-b last:border-0 items-start">
+        <span className="text-muted-foreground w-40 shrink-0">{label}</span>
+        {isCreate && <span className="font-medium">{newFmt}</span>}
+        {isDelete && <span className="font-medium">{oldFmt}</span>}
+        {isUpdate && (
+          <span className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-destructive line-through">{oldFmt}</span>
+            <span className="text-muted-foreground">→</span>
+            <span className="font-medium text-green-600 dark:text-green-400">{newFmt}</span>
+          </span>
+        )}
+      </div>
+    );
   };
 
-  const renderFieldValue = (field: string, vals: any, side: "old" | "new") => {
-    const raw = vals?.[side];
-    if (field === "entries" && Array.isArray(raw)) {
-      return <EntriesTable entries={raw} />;
-    }
-    const color = side === "old"
-      ? "text-destructive"
-      : "text-green-600 dark:text-green-400";
-    return <span className={color}>{fmtValue(raw)}</span>;
-  };
+  const renderedRows = readableFields.map(([field, vals]) => renderRow(field, vals)).filter(Boolean);
+  const hasMainContent = renderedRows.length > 0;
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <History className="h-5 w-5 text-muted-foreground" />
-            Audit Detail
+          <DialogTitle className="text-base font-medium leading-snug pr-6">
+            {getHeaderSentence(log)}
           </DialogTitle>
         </DialogHeader>
 
-        {/* Meta */}
-        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm border rounded-md p-3 bg-muted/30">
-          <div className="text-muted-foreground">User</div>
-          <div className="font-medium">{log.username || "Unknown"}</div>
-          <div className="text-muted-foreground">Date</div>
-          <div>{fmtDate(log.createdAt)}</div>
-          <div className="text-muted-foreground">Action</div>
-          <div>
-            <Badge variant={log.action === "delete" ? "destructive" : log.action === "create" ? "default" : "secondary"} className="capitalize">
+        {/* Summary card */}
+        <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-sm rounded-md border p-3 bg-muted/30">
+          <span className="text-muted-foreground">User</span>
+          <span className="font-medium">{log.username || "Unknown"}</span>
+          <span className="text-muted-foreground">Date & Time</span>
+          <span>{fmtDate(log.createdAt)}</span>
+          <span className="text-muted-foreground">Action</span>
+          <span>
+            <Badge
+              variant={isDelete ? "destructive" : isCreate ? "default" : "secondary"}
+              className="capitalize text-xs"
+            >
               {log.action}
             </Badge>
-          </div>
-          <div className="text-muted-foreground">Module</div>
-          <div>{tableShortName(log.tableName)}</div>
-          <div className="text-muted-foreground">Record</div>
-          <div className="font-mono text-xs">{log.recordIdentifier || (log.recordId ? `#${log.recordId}` : "—")}</div>
+          </span>
+          <span className="text-muted-foreground">Module</span>
+          <span>{tableShortName(log.tableName)}</span>
+          {voucherType && (
+            <>
+              <span className="text-muted-foreground">Type</span>
+              <span>{voucherType}</span>
+            </>
+          )}
+          {log.recordIdentifier && (
+            <>
+              <span className="text-muted-foreground">Reference</span>
+              <span className="font-mono text-xs">{log.recordIdentifier}</span>
+            </>
+          )}
         </div>
 
-        {/* Changes */}
-        {changedFields.length > 0 && (
-          <div className="space-y-2">
+        {/* Business details section */}
+        {hasMainContent && (
+          <div className="space-y-1.5">
             <p className="text-sm font-semibold">
-              {isDelete ? "Deleted Snapshot" : isCreate ? "Created Values" : "Changed Fields"}
+              {isDelete ? "Deleted record details" : isCreate ? "Created record details" : "What changed"}
             </p>
-            <div className="rounded-md border divide-y text-sm">
-              {changedFields.map(([field, vals]) => {
-                const isEntries = field === "entries";
-                return (
-                  <div key={field} className={isEntries ? "px-3 py-2 space-y-1" : "grid grid-cols-[160px_1fr] gap-2 px-3 py-2"}>
-                    <span className={`text-muted-foreground font-medium ${isEntries ? "block text-xs uppercase tracking-wide" : ""}`}>
-                      {fieldLabel(field)}
-                    </span>
-                    {isEntries ? (
-                      isUpdate ? (
-                        <div className="space-y-2 mt-1">
-                          <div>
-                            <span className="text-xs text-muted-foreground uppercase tracking-wide">Before</span>
-                            <EntriesTable entries={(vals as any)?.old ?? []} />
-                          </div>
-                          <div>
-                            <span className="text-xs text-muted-foreground uppercase tracking-wide">After</span>
-                            <EntriesTable entries={(vals as any)?.new ?? []} />
-                          </div>
-                        </div>
-                      ) : isCreate ? (
-                        <EntriesTable entries={(vals as any)?.new ?? []} />
-                      ) : (
-                        <EntriesTable entries={(vals as any)?.old ?? []} />
-                      )
-                    ) : (
-                      <div>
-                        {isCreate ? (
-                          renderFieldValue(field, vals, "new")
-                        ) : isDelete ? (
-                          renderFieldValue(field, vals, "old")
-                        ) : (
-                          <span className="flex flex-wrap gap-1 items-center">
-                            {renderFieldValue(field, vals, "old")}
-                            <span className="text-muted-foreground">→</span>
-                            {renderFieldValue(field, vals, "new")}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+            {isDelete && (
+              <p className="text-xs text-muted-foreground">
+                This record was deleted. Before deletion, it contained:
+              </p>
+            )}
+            <div className="rounded-md border px-3 divide-y">
+              {renderedRows}
             </div>
           </div>
         )}
 
-        {/* Advanced */}
-        <div>
-          <Button variant="ghost" size="sm" className="gap-1 px-0 text-muted-foreground" onClick={() => setShowAdvanced(v => !v)}>
-            <ChevronDown className={`h-3 w-3 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
-            Advanced (raw JSON)
-          </Button>
-          {showAdvanced && (
-            <div className="mt-2 space-y-3">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Full changes object</span>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyJson(log.changes)}>
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                </div>
-                <pre className="text-xs bg-muted rounded-md p-3 overflow-x-auto whitespace-pre-wrap break-all">
-                  {JSON.stringify(log.changes, null, 2)}
-                </pre>
+        {/* Accounting / entry details */}
+        {hasEntries && (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold">Accounting Details</p>
+            {isUpdate ? (
+              <div className="space-y-3">
+                {entryDiff.added.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-green-600 dark:text-green-400">Entries added</p>
+                    {entryDiff.added.map((e, i) => (
+                      <div key={i} className="text-sm py-1 border-b last:border-0">
+                        <span className="font-medium">{e.account}</span>
+                        {parseFloat(e.debit) > 0 && <span className="text-muted-foreground"> — debit <span className="font-medium text-foreground">{fmtEntryAmount(e.debit)}</span></span>}
+                        {parseFloat(e.credit) > 0 && <span className="text-muted-foreground"> — credit <span className="font-medium text-foreground">{fmtEntryAmount(e.credit)}</span></span>}
+                        {e.narration && <span className="text-muted-foreground"> | {e.narration}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {entryDiff.removed.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-destructive">Entries removed</p>
+                    {entryDiff.removed.map((e, i) => (
+                      <div key={i} className="text-sm py-1 border-b last:border-0">
+                        <span className="font-medium">{e.account}</span>
+                        {parseFloat(e.debit) > 0 && <span className="text-muted-foreground"> — debit <span className="font-medium text-foreground">{fmtEntryAmount(e.debit)}</span></span>}
+                        {parseFloat(e.credit) > 0 && <span className="text-muted-foreground"> — credit <span className="font-medium text-foreground">{fmtEntryAmount(e.credit)}</span></span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {entryDiff.changed.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground">Entries modified</p>
+                    {entryDiff.changed.map((c, i) => (
+                      <div key={i} className="py-1.5 border-b last:border-0 space-y-0.5">
+                        <div className="text-sm font-medium">{c.account}</div>
+                        {parseFloat(c.old.debit) !== parseFloat(c.new.debit) && (
+                          <div className="text-xs flex gap-1.5 items-center">
+                            <span className="text-muted-foreground w-12 shrink-0">Debit</span>
+                            <span className="text-destructive line-through">{fmtEntryAmount(c.old.debit)}</span>
+                            <span className="text-muted-foreground">→</span>
+                            <span className="font-medium text-green-600 dark:text-green-400">{fmtEntryAmount(c.new.debit)}</span>
+                          </div>
+                        )}
+                        {parseFloat(c.old.credit) !== parseFloat(c.new.credit) && (
+                          <div className="text-xs flex gap-1.5 items-center">
+                            <span className="text-muted-foreground w-12 shrink-0">Credit</span>
+                            <span className="text-destructive line-through">{fmtEntryAmount(c.old.credit)}</span>
+                            <span className="text-muted-foreground">→</span>
+                            <span className="font-medium text-green-600 dark:text-green-400">{fmtEntryAmount(c.new.credit)}</span>
+                          </div>
+                        )}
+                        {(c.old.narration ?? "") !== (c.new.narration ?? "") && (
+                          <div className="text-xs flex gap-1.5 items-center">
+                            <span className="text-muted-foreground w-12 shrink-0">Note</span>
+                            <span className="text-destructive line-through">{c.old.narration || "—"}</span>
+                            <span className="text-muted-foreground">→</span>
+                            <span className="font-medium text-green-600 dark:text-green-400">{c.new.narration || "—"}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {entryDiff.added.length === 0 && entryDiff.removed.length === 0 && entryDiff.changed.length === 0 && (
+                  <p className="text-sm text-muted-foreground">Accounting entries were unchanged.</p>
+                )}
               </div>
-            </div>
-          )}
-        </div>
+            ) : (
+              <div className="rounded-md border divide-y">
+                {(isCreate ? newEntries : oldEntries).map((e: any, i: number) => (
+                  <div key={i} className="text-sm px-3 py-1.5">
+                    <span className="font-medium">{e.account}</span>
+                    {parseFloat(e.debit) > 0 && <span className="text-muted-foreground"> — debit <span className="font-medium text-foreground">{fmtEntryAmount(e.debit)}</span></span>}
+                    {parseFloat(e.credit) > 0 && <span className="text-muted-foreground"> — credit <span className="font-medium text-foreground">{fmtEntryAmount(e.credit)}</span></span>}
+                    {e.narration && <span className="text-muted-foreground"> | {e.narration}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Full alteration details — Admin / Owner / Developer only, collapsed */}
+        {isAdminOrDev && (
+          <div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1 px-0 text-muted-foreground"
+              onClick={() => setShowFull(v => !v)}
+              data-testid="button-audit-full-details"
+            >
+              <ChevronDown className={`h-3 w-3 transition-transform ${showFull ? "rotate-180" : ""}`} />
+              Full alteration details
+            </Button>
+
+            {showFull && (
+              <div className="mt-2 rounded-md border divide-y text-sm">
+                {/* All readable fields */}
+                {readableFields.length > 0 && (
+                  <div className="px-3 py-2 divide-y">
+                    {readableFields.map(([field, vals]) => {
+                      const label = BUSINESS_FIELD_LABELS[field] ?? fieldLabel(field);
+                      return (
+                        <div key={field} className="flex gap-3 py-1.5 items-start">
+                          <span className="text-muted-foreground w-40 shrink-0">{label}</span>
+                          {isCreate && <span>{fmtBusinessValue(field, (vals as any)?.new)}</span>}
+                          {isDelete && <span>{fmtBusinessValue(field, (vals as any)?.old)}</span>}
+                          {isUpdate && (
+                            <span className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-destructive">{fmtBusinessValue(field, (vals as any)?.old)}</span>
+                              <span className="text-muted-foreground">→</span>
+                              <span>{fmtBusinessValue(field, (vals as any)?.new)}</span>
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Technical / ID fields */}
+                {technicalFields.length > 0 && (
+                  <div className="px-3 py-2">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">System fields</p>
+                    <div className="divide-y">
+                      {technicalFields.map(([field, vals]) => (
+                        <div key={field} className="flex gap-3 py-1 text-xs items-start">
+                          <span className="text-muted-foreground w-40 shrink-0">{fieldLabel(field)}</span>
+                          {isCreate && <span>{fmtValue((vals as any)?.new)}</span>}
+                          {isDelete && <span>{fmtValue((vals as any)?.old)}</span>}
+                          {isUpdate && (
+                            <span className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-destructive">{fmtValue((vals as any)?.old)}</span>
+                              <span className="text-muted-foreground">→</span>
+                              <span>{fmtValue((vals as any)?.new)}</span>
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Full entries tables */}
+                {hasEntries && (
+                  <div className="px-3 py-2 space-y-2">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Accounting entries</p>
+                    {isUpdate ? (
+                      <>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Before</p>
+                          <EntriesTable entries={oldEntries} />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">After</p>
+                          <EntriesTable entries={newEntries} />
+                        </div>
+                      </>
+                    ) : (
+                      <EntriesTable entries={isCreate ? newEntries : oldEntries} />
+                    )}
+                  </div>
+                )}
+
+                {/* Metadata */}
+                <div className="px-3 py-2 text-xs text-muted-foreground flex flex-wrap gap-4">
+                  <span>Log ID: {log.id}</span>
+                  <span>Table: {log.tableName}</span>
+                  {log.recordId && <span>Record ID: {log.recordId}</span>}
+                  {log.companyId && <span>Company ID: {log.companyId}</span>}
+                  {log.userId && <span>User ID: {log.userId}</span>}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
