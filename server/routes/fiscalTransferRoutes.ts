@@ -524,15 +524,17 @@ export function registerFiscalTransferRoutes(app: Express) {
 
       const allResult = rows.map(r => {
         const allItems = itemsByTransfer.get(r.transferId) || [];
-        // Destination-side POS users see all items; source-side see only their items
-        // For single-source transfers the source is on the voucher (items have null sourceLocationId)
-        // For multi-source transfers the source is on each item
-        const isDestUser     = posLocationIdList !== null && r.destinationLocationId === posLocationIdList;
-        const isSingleSource = posLocationIdList !== null && r.sourceLocationId === posLocationIdList;
+        // Destination-side POS users see all items; source-side see only their items:
+        //   - Items with item-level sourceLocationId matching their location
+        //   - Items with no item-level sourceLocationId AND voucher-level source matches
+        const isDestUser = posLocationIdList !== null && r.destinationLocationId === posLocationIdList;
         const myItems = posLocationIdList !== null
-          ? (isDestUser || isSingleSource
-              ? allItems
-              : allItems.filter(i => i.sourceLocationId === posLocationIdList))
+          ? isDestUser
+            ? allItems
+            : allItems.filter(i =>
+                i.sourceLocationId === posLocationIdList ||
+                (i.sourceLocationId === null && r.sourceLocationId === posLocationIdList)
+              )
           : allItems;
         const totalAmount = myItems.reduce((s, i) => s + parseFloat(i.totalAmount || "0"), 0);
         const stockItemNames = [...new Set(
@@ -1094,15 +1096,18 @@ export function registerFiscalTransferRoutes(app: Express) {
         .from(stockTransferItems)
         .where(eq(stockTransferItems.transferId, transferRow.id));
 
-      // Destination-side POS users see all items (they receive everything)
-      // Single-source POS users see all items (source is on the voucher, not item level)
-      // Multi-source POS users see only items from their own location
-      const isDestinationUser  = posLocationId !== null && posLocationId === transferRow.destinationLocationId;
-      const isSingleSourceUser = posLocationId !== null && posLocationId === transferRow.sourceLocationId;
+      // Destination-side POS users see all items (they receive everything).
+      // Source-side POS users see only items assigned to their specific location:
+      //   - Items with item-level sourceLocationId matching their location
+      //   - Items with no item-level sourceLocationId AND voucher-level source matches (true single-source)
+      const isDestinationUser = posLocationId !== null && posLocationId === transferRow.destinationLocationId;
       const transferItems = posLocationId
-        ? (isDestinationUser || isSingleSourceUser
-            ? allTransferItems
-            : allTransferItems.filter(i => i.sourceLocationId === posLocationId))
+        ? isDestinationUser
+          ? allTransferItems
+          : allTransferItems.filter(i =>
+              i.sourceLocationId === posLocationId ||
+              (i.sourceLocationId === null && posLocationId === transferRow.sourceLocationId)
+            )
         : allTransferItems;
 
       const stockItemIdSet = [...new Set(transferItems.map(i => i.stockItemId).filter(Boolean))] as number[];
