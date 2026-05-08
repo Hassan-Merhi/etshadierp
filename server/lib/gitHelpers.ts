@@ -6,7 +6,7 @@
  */
 
 import { db } from "../db";
-import { containers, companies, userCompanyRoles } from "../../shared/schema";
+import { containers, companies, userCompanyRoles, suppliers } from "../../shared/schema";
 import { and, eq, inArray } from "drizzle-orm";
 
 // ── Status constants ──────────────────────────────────────────────────────────
@@ -190,6 +190,7 @@ export type RawContainerRow = {
   companyId: number;
   containerNumber: string;
   supplierId: number;
+  supplierName: string | null;
   status: string;
   importDate: string;
   grandTotal: string | null;
@@ -227,6 +228,7 @@ export type RawContainerRow = {
 
 export type EnrichedContainer = RawContainerRow & {
   companyName: string;
+  supplierName: string | null;
   maxOffloadDate: string | null;
   daysDelayed: number | null;
   docsReadyNotSent: boolean;
@@ -255,6 +257,7 @@ export async function fetchActiveContainers(
       companyId: containers.companyId,
       containerNumber: containers.containerNumber,
       supplierId: containers.supplierId,
+      supplierName: suppliers.legalName,
       status: containers.status,
       importDate: containers.importDate,
       grandTotal: containers.grandTotal,
@@ -290,6 +293,7 @@ export async function fetchActiveContainers(
       createdAt: containers.createdAt,
     })
     .from(containers)
+    .leftJoin(suppliers, eq(containers.supplierId, suppliers.id))
     .where(
       and(
         inArray(containers.companyId, companyIds),

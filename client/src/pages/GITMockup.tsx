@@ -87,6 +87,7 @@ interface EnrichedContainerApi {
   companyName: string;
   containerNumber: string;
   supplierId: number;
+  supplierName: string | null;
   status: string;
   importDate: string;
   grandTotal: string | null;
@@ -160,6 +161,7 @@ function WorkbookDataRow({ r }: { r: EnrichedContainerApi }) {
   return (
     <tr className={cn("border-b last:border-b-0", getRealRowBg(r))}>
       <td className="py-0.5 px-2 font-mono font-bold">{r.containerNumber}</td>
+      <td className="py-0.5 px-2">{r.supplierName ?? "—"}</td>
       <td className="py-0.5 px-2 text-right font-semibold">${fmt(parseNum(r.grandTotal), 2)}</td>
       <td className="py-0.5 px-2">{fmtD(r.eta)}</td>
       <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
@@ -195,7 +197,7 @@ function WorkbookDataRow({ r }: { r: EnrichedContainerApi }) {
   );
 }
 
-const WORKBOOK_COLS = 17;
+const WORKBOOK_COLS = 18;
 
 function RealWorkbookBlock({
   companyName, rows, headerBg, headerText,
@@ -227,6 +229,7 @@ function RealWorkbookBlock({
   const columnHeaders = (
     <tr className="bg-muted/60 border-b text-muted-foreground">
       <th className="py-1 px-2 font-semibold text-center">CTR #</th>
+      <th className="py-1 px-2 font-semibold text-center">SUPPLIER</th>
       <th className="py-1 px-2 font-semibold text-center">AMOUNT</th>
       <th className="py-1 px-2 font-semibold text-center">ETA</th>
       <th className="py-1 px-2 font-semibold text-center">TRUCK #</th>
@@ -277,6 +280,7 @@ function RealWorkbookBlock({
                       {shopRows.map(r => <WorkbookDataRow key={r.id} r={r} />)}
                       <tr className="bg-yellow-50 dark:bg-yellow-900/10 border-t border-yellow-200 dark:border-yellow-800 text-xs font-semibold text-yellow-900 dark:text-yellow-300">
                         <td className="py-1 px-2">SUB-TOTAL — {shopRows.length} CTR</td>
+                        <td />
                         <td className="py-1 px-2 text-right">${fmt(st.amount, 2)}</td>
                         <td colSpan={9} />
                         <td className="py-1 px-2 text-right">{st.fee > 0 ? `$${fmt(st.fee, 0)}` : "—"}</td>
@@ -314,6 +318,7 @@ function RealWorkbookBlock({
               {rows.length > 0 && (
                 <tr className={cn("border-t-2 text-xs font-bold", headerBg, headerText)}>
                   <td className="py-1 px-2">TOTAL — {rows.length} CTR</td>
+                  <td />
                   <td className="py-1 px-2 text-right">${fmt(total.amount, 2)}</td>
                   <td colSpan={9} />
                   <td className="py-1 px-2 text-right">{total.fee > 0 ? `$${fmt(total.fee, 0)}` : "—"}</td>
@@ -1142,6 +1147,7 @@ function TabTruckLocation() {
           <thead>
             <tr className="bg-yellow-400 text-yellow-950 font-bold border-b-2 border-yellow-600">
               <th className="py-1.5 px-3 text-center">CONTAINER #</th>
+              <th className="py-1.5 px-3 text-center">SUPPLIER</th>
               <th className="py-1.5 px-3 text-center">NUMBER PLATE</th>
               <th className="py-1.5 px-3 text-center">LOCATION</th>
               <th className="py-1.5 px-3 text-center">AGENT</th>
@@ -1154,7 +1160,7 @@ function TabTruckLocation() {
               const shopRows = withTruck.filter(r => (r.shopName ?? r.companyName ?? "Unknown") === shop);
               const hdrRow = (
                 <tr key={`hdr-${shop}`} className="bg-yellow-300 border-t border-yellow-500">
-                  <td colSpan={6} className="py-1 px-3 font-bold text-yellow-900 text-center tracking-wide uppercase">
+                  <td colSpan={7} className="py-1 px-3 font-bold text-yellow-900 text-center tracking-wide uppercase">
                     {shop} — {shopRows.length} container{shopRows.length !== 1 ? "s" : ""} on road
                   </td>
                 </tr>
@@ -1162,6 +1168,7 @@ function TabTruckLocation() {
               const dataRows = shopRows.map(r => (
                 <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/40">
                   <td className="py-0.5 px-3 text-center font-mono font-semibold tracking-tight">{r.containerNumber}</td>
+                  <td className="py-0.5 px-3 text-center">{r.supplierName ?? <span className="text-muted-foreground">—</span>}</td>
                   <td className="py-0.5 px-3 text-center font-mono">{r.numberPlate ?? <span className="text-muted-foreground">—</span>}</td>
                   <td className="py-0.5 px-3 text-center">{r.trackingLocation ?? <span className="text-muted-foreground">—</span>}</td>
                   <td className="py-0.5 px-3 text-center">{r.agent ?? <span className="text-muted-foreground">—</span>}</td>
