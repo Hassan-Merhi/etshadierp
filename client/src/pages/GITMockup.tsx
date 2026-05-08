@@ -37,231 +37,9 @@ type Status =
   | "OTW" | "Sea" | "At Port" | "Left Dar"
   | "At Border" | "In Transit" | "Arrived" | "Offloaded";
 
-type GroupId =
-  | "hadi1-lsh" | "hadi2-lsh" | "gc-lsh"
-  | "hadi-kolwezi" | "kinshasa" | "mali" | "port-dar";
-
-interface GITRow {
-  sr: number;
-  group: GroupId;
-  containerNumber: string;
-  amount: number;
-  company: string;
-  eta: string | null;
-  numberPlate: string | null;
-  location: string | null;
-  borderDate: string | null;
-  docsReceived: boolean;
-  docsSentToTruck: boolean;
-  transporter: string | null;
-  transportFee: number | null;
-  agent: string | null;
-  dutyFee: number | null;
-  freightStatus: "Yes" | "No" | "Pending" | null;
-  status: Status;
-  trackingLink: string | null;
-  notes: string | null;
-}
-
-interface GITGroupDef {
-  id: GroupId;
-  title: string;
-  subtitle: string;
-  headerBg: string;
-  headerText: string;
-}
-
-// ─── Group Definitions ────────────────────────────────────────────────────────
-
-const GROUP_DEFS: GITGroupDef[] = [
-  { id: "hadi1-lsh",    title: "HADI #1",        subtitle: "CONTAINERS OTW — LUBUMBASHI",  headerBg: "bg-yellow-400",   headerText: "text-yellow-950" },
-  { id: "hadi2-lsh",    title: "HADI #2",         subtitle: "CONTAINERS OTW — LUBUMBASHI",  headerBg: "bg-orange-400",   headerText: "text-orange-950" },
-  { id: "gc-lsh",       title: "GOLDEN COAST",    subtitle: "CONTAINERS OTW — LUBUMBASHI",  headerBg: "bg-teal-600",     headerText: "text-white" },
-  { id: "hadi-kolwezi", title: "HADI",            subtitle: "CONTAINERS OTW — KOLWEZI",     headerBg: "bg-green-600",    headerText: "text-white" },
-  { id: "kinshasa",     title: "OTW",             subtitle: "KINSHASA #2",                  headerBg: "bg-purple-600",   headerText: "text-white" },
-  { id: "mali",         title: "OTW",             subtitle: "MALI",                         headerBg: "bg-cyan-600",     headerText: "text-white" },
-  { id: "port-dar",     title: "CONTAINERS AT PORT", subtitle: "DAR ES SALAAM",             headerBg: "bg-red-600",      headerText: "text-white" },
-];
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const ROWS: GITRow[] = [
-  // ── HADI #1 — OTW LUBUMBASHI ───────────────────────────────────────────────
-  { sr:1,  group:"hadi1-lsh", containerNumber:"CAAU6065353", amount:41568.05, company:"EG",  eta:"2026-02-26", numberPlate:"T303 AAD", location:"MPIKA",      borderDate:"2026-03-02", docsReceived:true,  docsSentToTruck:true,  transporter:"CONTINENTAL", transportFee:9800,  agent:"NAHLI", dutyFee:8500, freightStatus:"Yes",     status:"Arrived",    trackingLink:null, notes:null },
-  { sr:2,  group:"hadi1-lsh", containerNumber:"MRSU3216638", amount:39503.00, company:"EG",  eta:"2026-03-18", numberPlate:"T609 DHR", location:"TUNDUMA",    borderDate:"2026-03-22", docsReceived:true,  docsSentToTruck:true,  transporter:"CONTINENTAL", transportFee:9800,  agent:"NAHLI", dutyFee:8500, freightStatus:"Yes",     status:"In Transit", trackingLink:null, notes:null },
-  { sr:3,  group:"hadi1-lsh", containerNumber:"MRSU5491459", amount:38459.05, company:"EG",  eta:"2026-05-23", numberPlate:null,        location:null,         borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:null,          transportFee:null,  agent:"NAHLI", dutyFee:8500, freightStatus:"No",      status:"OTW",        trackingLink:null, notes:null },
-  { sr:4,  group:"hadi1-lsh", containerNumber:"SEKU4470393", amount:39890.95, company:"EG",  eta:"2026-05-23", numberPlate:null,        location:null,         borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:null,          transportFee:null,  agent:"NAHLI", dutyFee:8500, freightStatus:"No",      status:"OTW",        trackingLink:null, notes:null },
-  { sr:5,  group:"hadi1-lsh", containerNumber:"MSCU1786517", amount:39224.05, company:"EG",  eta:"2026-05-23", numberPlate:null,        location:null,         borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:null,          transportFee:null,  agent:"NAHLI", dutyFee:8500, freightStatus:"No",      status:"OTW",        trackingLink:null, notes:null },
-  { sr:6,  group:"hadi1-lsh", containerNumber:"HASU5110162", amount:38494.60, company:"EG",  eta:"2026-05-23", numberPlate:null,        location:null,         borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:null,          transportFee:null,  agent:"NAHLI", dutyFee:8500, freightStatus:"No",      status:"OTW",        trackingLink:null, notes:null },
-  { sr:7,  group:"hadi1-lsh", containerNumber:"DCKU5891839", amount:38810.35, company:"3AP", eta:"2026-05-23", numberPlate:null,        location:null,         borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:null,          transportFee:null,  agent:"NAHLI", dutyFee:8500, freightStatus:"No",      status:"OTW",        trackingLink:null, notes:null },
-  { sr:8,  group:"hadi1-lsh", containerNumber:"SUDU7034993", amount:37037.40, company:"3AP", eta:"2026-06-08", numberPlate:null,        location:null,         borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:null,          transportFee:null,  agent:"NAHLI", dutyFee:8500, freightStatus:"No",      status:"Sea",        trackingLink:null, notes:null },
-  { sr:9,  group:"hadi1-lsh", containerNumber:"SUDU8959140", amount:42188.50, company:"3AP", eta:"2026-02-26", numberPlate:"T791 CDG", location:"MBALA",      borderDate:"2026-03-01", docsReceived:true,  docsSentToTruck:true,  transporter:"CONTINENTAL", transportFee:9800,  agent:"NCA",   dutyFee:8500, freightStatus:"Yes",     status:"Arrived",    trackingLink:null, notes:null },
-  { sr:10, group:"hadi1-lsh", containerNumber:"MSKU1457569", amount:39306.00, company:"3AP", eta:"2026-03-18", numberPlate:null,        location:null,         borderDate:"2026-03-24", docsReceived:true,  docsSentToTruck:false, transporter:"CONTINENTAL", transportFee:9800,  agent:"NCA",   dutyFee:8500, freightStatus:"Pending", status:"At Port",    trackingLink:null, notes:"Docs ready, awaiting truck" },
-  { sr:11, group:"hadi1-lsh", containerNumber:"MRKU5513611", amount:38766.70, company:"3AP", eta:"2026-05-23", numberPlate:null,        location:null,         borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:null,          transportFee:null,  agent:"NCA",   dutyFee:8500, freightStatus:"No",      status:"OTW",        trackingLink:null, notes:null },
-  { sr:12, group:"hadi1-lsh", containerNumber:"MRSU4304962", amount:39317.20, company:"3AP", eta:"2026-05-23", numberPlate:null,        location:null,         borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:null,          transportFee:null,  agent:"NAHLI", dutyFee:8500, freightStatus:"No",      status:"OTW",        trackingLink:null, notes:null },
-  { sr:13, group:"hadi1-lsh", containerNumber:"MRSU7943419", amount:38446.00, company:"3AP", eta:"2026-04-24", numberPlate:null,        location:null,         borderDate:null,         docsReceived:true,  docsSentToTruck:false, transporter:null,          transportFee:9800,  agent:"NAHLI", dutyFee:8500, freightStatus:"Pending", status:"At Port",    trackingLink:null, notes:null },
-  { sr:14, group:"hadi1-lsh", containerNumber:"MRKU3181091", amount:39935.25, company:"3AP", eta:"2026-05-23", numberPlate:null,        location:null,         borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:null,          transportFee:null,  agent:"NAHLI", dutyFee:8500, freightStatus:"No",      status:"OTW",        trackingLink:null, notes:null },
-
-  // ── HADI #2 — OTW LUBUMBASHI ───────────────────────────────────────────────
-  { sr:1,  group:"hadi2-lsh", containerNumber:"MRKU4157373", amount:42504.25, company:"MJS", eta:"2026-02-03", numberPlate:"T767 EEV", location:"KASUMBALESA", borderDate:"2026-04-05", docsReceived:true,  docsSentToTruck:true,  transporter:"TRH",         transportFee:9000,  agent:"NAHLI", dutyFee:8500, freightStatus:"Yes",     status:"In Transit", trackingLink:"https://track.example.com/MRKU4157373", notes:null },
-  { sr:2,  group:"hadi2-lsh", containerNumber:"MSNU9482779", amount:40224.50, company:"MJS", eta:"2026-03-18", numberPlate:"T280 DEB", location:"ISOKA",       borderDate:"2026-03-22", docsReceived:true,  docsSentToTruck:true,  transporter:"FARHAT",      transportFee:11410, agent:"NAHLI", dutyFee:8500, freightStatus:"Yes",     status:"In Transit", trackingLink:null, notes:null },
-  { sr:3,  group:"hadi2-lsh", containerNumber:"TCKU6871283", amount:47451.00, company:"MJS", eta:"2026-05-23", numberPlate:null,        location:null,          borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:null,          transportFee:null,  agent:"NAHLI", dutyFee:8500, freightStatus:"No",      status:"OTW",        trackingLink:null, notes:null },
-  { sr:4,  group:"hadi2-lsh", containerNumber:"MSKU1758728", amount:48693.50, company:"MJS", eta:"2026-05-23", numberPlate:null,        location:null,          borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:null,          transportFee:null,  agent:"NAHLI", dutyFee:8500, freightStatus:"No",      status:"OTW",        trackingLink:null, notes:null },
-  { sr:5,  group:"hadi2-lsh", containerNumber:"TCNU4693444", amount:49754.25, company:"MJS", eta:"2026-05-28", numberPlate:null,        location:null,          borderDate:null,         docsReceived:true,  docsSentToTruck:false, transporter:null,          transportFee:11200, agent:"NAHLI", dutyFee:8500, freightStatus:"Pending", status:"OTW",        trackingLink:null, notes:null },
-  { sr:6,  group:"hadi2-lsh", containerNumber:"SUDU6817960", amount:46083.50, company:"MJS", eta:"2026-04-25", numberPlate:null,        location:null,          borderDate:null,         docsReceived:true,  docsSentToTruck:false, transporter:"CONTINENTAL", transportFee:9800,  agent:"NAHLI", dutyFee:8500, freightStatus:"Pending", status:"At Port",    trackingLink:null, notes:null },
-  { sr:7,  group:"hadi2-lsh", containerNumber:"CAAU8996519", amount:47475.25, company:"MJS", eta:"2026-05-02", numberPlate:null,        location:null,          borderDate:null,         docsReceived:true,  docsSentToTruck:false, transporter:"CONTINENTAL", transportFee:9800,  agent:"NAHLI", dutyFee:8500, freightStatus:"Pending", status:"At Port",    trackingLink:null, notes:"Awaiting truck assignment" },
-  { sr:8,  group:"hadi2-lsh", containerNumber:"MRSU9212305", amount:47042.75, company:"MJS", eta:"2026-05-30", numberPlate:null,        location:null,          borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:null,          transportFee:null,  agent:"NAHLI", dutyFee:8500, freightStatus:"No",      status:"Sea",        trackingLink:null, notes:null },
-  { sr:9,  group:"hadi2-lsh", containerNumber:"MSKU3237946", amount:47458.50, company:"MJS", eta:"2026-06-01", numberPlate:null,        location:null,          borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:null,          transportFee:null,  agent:"NAHLI", dutyFee:8500, freightStatus:"No",      status:"Sea",        trackingLink:null, notes:null },
-  { sr:10, group:"hadi2-lsh", containerNumber:"CAAU6658493", amount:36322.90, company:"GS",  eta:"2026-03-18", numberPlate:"T218 DEQ", location:"MPEMBA",      borderDate:"2026-03-24", docsReceived:true,  docsSentToTruck:true,  transporter:"CONTINENTAL", transportFee:9800,  agent:"NAHLI", dutyFee:8500, freightStatus:"Yes",     status:"In Transit", trackingLink:null, notes:null },
-  { sr:11, group:"hadi2-lsh", containerNumber:"MSFU5640434", amount:34968.22, company:"GS",  eta:"2026-05-02", numberPlate:null,        location:null,          borderDate:null,         docsReceived:true,  docsSentToTruck:false, transporter:"FARHAT",      transportFee:11200, agent:"NAHLI", dutyFee:8500, freightStatus:"Pending", status:"At Port",    trackingLink:null, notes:null },
-  { sr:12, group:"hadi2-lsh", containerNumber:"TCNU3945946", amount:35461.29, company:"GS",  eta:"2026-05-02", numberPlate:null,        location:null,          borderDate:null,         docsReceived:true,  docsSentToTruck:false, transporter:"FARHAT",      transportFee:11200, agent:"NAHLI", dutyFee:8500, freightStatus:"Pending", status:"At Port",    trackingLink:null, notes:null },
-  { sr:13, group:"hadi2-lsh", containerNumber:"MRSU6080329", amount:35098.09, company:"GS",  eta:"2026-06-08", numberPlate:null,        location:null,          borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:null,          transportFee:null,  agent:"NAHLI", dutyFee:8500, freightStatus:"No",      status:"Sea",        trackingLink:null, notes:null },
-  { sr:14, group:"hadi2-lsh", containerNumber:"MSCU0920792", amount:35396.09, company:"GS",  eta:"2026-06-08", numberPlate:null,        location:null,          borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:null,          transportFee:null,  agent:"NAHLI", dutyFee:8500, freightStatus:"No",      status:"Sea",        trackingLink:null, notes:null },
-
-  // ── GOLDEN COAST — OTW LUBUMBASHI (currently empty) ───────────────────────
-  // (no rows — demonstrates an empty group block)
-
-  // ── HADI — OTW KOLWEZI ─────────────────────────────────────────────────────
-  { sr:1,  group:"hadi-kolwezi", containerNumber:"HLCU3312984", amount:55000.00, company:"MJS", eta:"2026-05-12", numberPlate:"T456 DEF", location:"KASUMBALESA", borderDate:"2026-05-18", docsReceived:true,  docsSentToTruck:true,  transporter:"TRH",    transportFee:3500,  agent:"BELTRANS", dutyFee:6300, freightStatus:"Yes",     status:"In Transit", trackingLink:null, notes:null },
-  { sr:2,  group:"hadi-kolwezi", containerNumber:"CMAU7765431", amount:41200.00, company:"MJS", eta:"2026-04-28", numberPlate:null,        location:"Dar Port",    borderDate:null,         docsReceived:true,  docsSentToTruck:true,  transporter:"FARHAT", transportFee:3000,  agent:"BELTRANS", dutyFee:4900, freightStatus:"Yes",     status:"At Port",    trackingLink:null, notes:"Delayed — truck not assigned" },
-  { sr:3,  group:"hadi-kolwezi", containerNumber:"GESU4421098", amount:38700.00, company:"MJS", eta:"2026-05-22", numberPlate:null,        location:null,          borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:"TRH",    transportFee:2600,  agent:null,       dutyFee:null, freightStatus:"No",      status:"OTW",        trackingLink:"https://track.example.com/GESU4421098", notes:"ETA DAS confirmed" },
-  { sr:4,  group:"hadi-kolwezi", containerNumber:"EITU1198823", amount:29800.00, company:"MJS", eta:"2026-06-15", numberPlate:null,        location:null,          borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:null,     transportFee:null,  agent:null,       dutyFee:null, freightStatus:"Pending", status:"Sea",        trackingLink:null, notes:"New shipment" },
-  { sr:5,  group:"hadi-kolwezi", containerNumber:"TRHU9182736", amount:44600.00, company:"EG",  eta:"2026-04-25", numberPlate:"T654 MNO", location:"Lubumbashi",  borderDate:"2026-04-30", docsReceived:true,  docsSentToTruck:true,  transporter:"TRH",    transportFee:3100,  agent:"BELTRANS", dutyFee:5500, freightStatus:"Yes",     status:"Arrived",    trackingLink:null, notes:null },
-
-  // ── OTW KINSHASA ───────────────────────────────────────────────────────────
-  { sr:1,  group:"kinshasa", containerNumber:"GAOU7275696", amount:47957.50, company:"AJ", eta:"2026-05-15", numberPlate:null, location:null, borderDate:null, docsReceived:true,  docsSentToTruck:false, transporter:null, transportFee:402.50, agent:"HUSSAIN SAAD", dutyFee:null, freightStatus:"Pending", status:"OTW",  trackingLink:"https://track.example.com/GAOU7275696", notes:"Arriving" },
-  { sr:2,  group:"kinshasa", containerNumber:"SEKU6901777", amount:51718.75, company:"AJ", eta:"2026-08-01", numberPlate:null, location:null, borderDate:null, docsReceived:false, docsSentToTruck:false, transporter:null, transportFee:402.50, agent:"HUSSAIN SAAD", dutyFee:null, freightStatus:"No",      status:"Sea",  trackingLink:null, notes:"Through Oman" },
-  { sr:3,  group:"kinshasa", containerNumber:"CMAU6837494", amount:59210.00, company:"AJ", eta:"2026-06-06", numberPlate:null, location:null, borderDate:null, docsReceived:false, docsSentToTruck:false, transporter:null, transportFee:400.00, agent:"RIDA SALEH",   dutyFee:null, freightStatus:"No",      status:"Sea",  trackingLink:null, notes:"Through Oman" },
-  { sr:4,  group:"kinshasa", containerNumber:"MRKU3072559", amount:39306.90, company:"GS", eta:"2026-07-07", numberPlate:null, location:null, borderDate:null, docsReceived:false, docsSentToTruck:false, transporter:null, transportFee:407.50, agent:"HUSSAIN SAAD", dutyFee:null, freightStatus:"No",      status:"Sea",  trackingLink:null, notes:"Through Oman" },
-  { sr:5,  group:"kinshasa", containerNumber:"CAIU6678432", amount:53200.00, company:"AJ", eta:"2026-05-28", numberPlate:null, location:null, borderDate:null, docsReceived:false, docsSentToTruck:false, transporter:null, transportFee:402.50, agent:"HUSSAIN SAAD", dutyFee:null, freightStatus:"No",      status:"OTW",  trackingLink:null, notes:null },
-  { sr:6,  group:"kinshasa", containerNumber:"OOLU5541230", amount:35000.00, company:"HMD", eta:"2026-06-10", numberPlate:null, location:null, borderDate:null, docsReceived:false, docsSentToTruck:false, transporter:null, transportFee:402.50, agent:"HUSSAIN SAAD", dutyFee:null, freightStatus:"No",     status:"Sea",  trackingLink:"https://track.example.com/OOLU5541230", notes:null },
-
-  // ── OTW MALI ───────────────────────────────────────────────────────────────
-  { sr:1,  group:"mali", containerNumber:"MRSU4144595", amount:33153.00, company:"SH",  eta:"2026-05-26", numberPlate:null, location:null, borderDate:null, docsReceived:false, docsSentToTruck:false, transporter:null, transportFee:null, agent:null, dutyFee:null, freightStatus:"No",  status:"OTW", trackingLink:"https://track.example.com/MRSU4144595", notes:null },
-  { sr:2,  group:"mali", containerNumber:"TXGU8434249", amount:39606.00, company:"HMD", eta:"2026-05-17", numberPlate:null, location:null, borderDate:null, docsReceived:false, docsSentToTruck:false, transporter:null, transportFee:null, agent:null, dutyFee:null, freightStatus:"No",  status:"OTW", trackingLink:null, notes:"No link" },
-
-  // ── CONTAINERS AT PORT — DAR ────────────────────────────────────────────────
-  { sr:1,  group:"port-dar", containerNumber:"MSCU1234567", amount:48500.00, company:"HADI", eta:"2026-05-05", numberPlate:"T123 ABC", location:"Dar Port", borderDate:"2026-05-08", docsReceived:true,  docsSentToTruck:true,  transporter:"FARHAT",      transportFee:11200, agent:"ATLAS",   dutyFee:8500, freightStatus:"Yes",     status:"Left Dar",   trackingLink:"https://track.example.com/MSCU1234567", notes:null },
-  { sr:2,  group:"port-dar", containerNumber:"TCKU8876543", amount:62000.00, company:"MJS",  eta:"2026-05-08", numberPlate:null,        location:"Dar Port", borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:"CONTINENTAL", transportFee:9800,  agent:"BELTRANS", dutyFee:7200, freightStatus:"Pending", status:"At Port",    trackingLink:null, notes:"Awaiting customs release" },
-  { sr:3,  group:"port-dar", containerNumber:"CAIU9988001", amount:71500.00, company:"HADI", eta:"2026-05-04", numberPlate:"T789 GHI", location:"Dar Port", borderDate:null,         docsReceived:true,  docsSentToTruck:false, transporter:"FARHAT",      transportFee:11200, agent:"ATLAS",   dutyFee:8100, freightStatus:"Pending", status:"At Port",    trackingLink:null, notes:"Docs ready, truck pending" },
-  { sr:4,  group:"port-dar", containerNumber:"OOLU4421112", amount:38700.00, company:"GS",   eta:"2026-05-12", numberPlate:null,        location:"Dar Port", borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:"TRH",         transportFee:3500,  agent:"BELTRANS", dutyFee:null, freightStatus:"No",      status:"At Port",    trackingLink:null, notes:null },
-  { sr:5,  group:"port-dar", containerNumber:"SUDU3312000", amount:44200.00, company:"EG",   eta:"2026-05-15", numberPlate:null,        location:"Dar Port", borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:null,          transportFee:null,  agent:"NAHLI",   dutyFee:8500, freightStatus:"No",      status:"At Port",    trackingLink:null, notes:"License plate not assigned" },
-];
-
-// ─── Truck / Location Mock Data ───────────────────────────────────────────────
-// Real implementation: derived from containers table filtered to active statuses
-// and joined with company/agent.
-
-type TruckGroupId = "hadi1" | "hadi2" | "hadi3" | "hadi4" | "hadi5";
-
-interface TruckRow {
-  group: TruckGroupId;
-  containerNumber: string;
-  company: string;
-  numberPlate: string | null;
-  location: string | null;
-  agent: string | null;
-}
-
-const TRUCK_GROUP_DEFS: { id: TruckGroupId; label: string }[] = [
-  { id: "hadi1", label: "HADI#1" },
-  { id: "hadi2", label: "HADI#2" },
-  { id: "hadi3", label: "HADI#3" },
-  { id: "hadi4", label: "HADI#4" },
-  { id: "hadi5", label: "HADI#5" },
-];
-
-const TRUCK_ROWS: TruckRow[] = [
-  // HADI#1
-  { group:"hadi1", containerNumber:"SUDU8959140", company:"3AP",     numberPlate:"T791 CDG", location:"MBALA",        agent:"NCA"   },
-  { group:"hadi1", containerNumber:"CAAU6065353", company:"EG",      numberPlate:"T303 AAD", location:"MPIKA",        agent:"NAHLI" },
-  { group:"hadi1", containerNumber:"MRSU3216638", company:"EG",      numberPlate:"T609 DHR", location:"TUNDUMA",      agent:"NAHLI" },
-  // HADI#2
-  { group:"hadi2", containerNumber:"MSKU9482779", company:"MJS",     numberPlate:"T280 DEB", location:"ISOKA",        agent:"NAHLI" },
-  { group:"hadi2", containerNumber:"MRKU4157373", company:"MJS",     numberPlate:"T767 EEV", location:"KASUMBALESA",  agent:"NAHLI" },
-  { group:"hadi2", containerNumber:"CAAU6658493", company:"GS",      numberPlate:"T218 DEQ", location:"MPEMBA",       agent:"NAHLI" },
-  // HADI#3 — empty (shown as blank group, matching Excel style)
-  // HADI#4
-  { group:"hadi4", containerNumber:"CAIU8859993", company:"AJ/KIN",  numberPlate:"T178 DDR", location:"AT DOOR",      agent:"NCA"   },
-  { group:"hadi4", containerNumber:"MRSU5096085", company:"AJ",      numberPlate:"T935 DYR", location:"KASUMBALESA",  agent:"NAHLI" },
-  { group:"hadi4", containerNumber:"MRKU2087111", company:"AJ",      numberPlate:"T225 DEQ", location:"MUNUNGA",      agent:"NCA"   },
-  { group:"hadi4", containerNumber:"TGBU9358135", company:"AJ",      numberPlate:"T198 AQZ", location:"ISOKA",        agent:"NCA"   },
-  { group:"hadi4", containerNumber:"HASU4056848", company:"AJ",      numberPlate:"T422 CAR", location:"MBEYA",        agent:"NCA"   },
-  { group:"hadi4", containerNumber:"MRKU2681859", company:"AJ",      numberPlate:"T619 BVU", location:"TUNDUMA",      agent:"NCA"   },
-  // HADI#5
-  { group:"hadi5", containerNumber:"TGHU9661992", company:"WH/SP",   numberPlate:"T211 ENA", location:"LEFT DAR",     agent:"NCA"   },
-  { group:"hadi5", containerNumber:"TCLU8745533", company:"WH/SP",   numberPlate:"T159 EBF", location:"LEFT DAR",     agent:"NCA"   },
-  { group:"hadi5", containerNumber:"SUDU8852430", company:"WH/SP",   numberPlate:"T668 ECS", location:"LEFT DAR",     agent:"NCA"   },
-];
-
-// ─── Agent / Duty Mock Data ───────────────────────────────────────────────────
-// Real implementation: derived from containers table grouped by agent/declarant,
-// split between offloaded (status=Offloaded/Closed) and active.
-
-interface DutyRow {
-  agent: string;
-  containerNumber: string;
-  company: string;
-  numberPlate: string | null;
-  borderDate: string | null;
-  transporter: string | null;
-  location: string;
-  amount: number;
-  offloaded: boolean;
-}
-
-const DUTY_ROWS: DutyRow[] = [
-  // ── NAHLI — Offloaded ──────────────────────────────────────────────────────
-  { agent:"NAHLI", containerNumber:"MSKU0369421", company:"MJS",       numberPlate:"T953 CUL", borderDate:"2026-04-19", transporter:"FARHAT",      location:"ALREADY OFFLOADED", amount:8500, offloaded:true  },
-  { agent:"NAHLI", containerNumber:"MRKU2036198", company:"MR",        numberPlate:"T464 DLL", borderDate:"2026-04-20", transporter:"TRH",         location:"ALREADY OFFLOADED", amount:8500, offloaded:true  },
-  { agent:"NAHLI", containerNumber:"GCXU5541253", company:"AJ",        numberPlate:"T896 DPN", borderDate:"2026-04-17", transporter:"TRH",         location:"ALREADY OFFLOADED", amount:8500, offloaded:true  },
-  { agent:"NAHLI", containerNumber:"MSKU0824145", company:"MR/LMP200", numberPlate:"T881 DNB", borderDate:"2026-04-20", transporter:"TRH",         location:"ALREADY OFFLOADED", amount:8500, offloaded:true  },
-  { agent:"NAHLI", containerNumber:"TLLU5762197", company:"MJS",       numberPlate:"T199 DNR", borderDate:"2026-04-29", transporter:"CONTINENTAL", location:"ALREADY OFFLOADED", amount:8500, offloaded:true  },
-  { agent:"NAHLI", containerNumber:"CAAU7751260", company:"GC",        numberPlate:"T240 CAF", borderDate:"2026-04-29", transporter:"CONTINENTAL", location:"ALREADY OFFLOADED", amount:8500, offloaded:true  },
-  { agent:"NAHLI", containerNumber:"MRKU5910460", company:"SH",        numberPlate:"T396 CVG", borderDate:"2026-04-27", transporter:"FARHAT",      location:"ALREADY OFFLOADED", amount:8500, offloaded:true  },
-  // ── NAHLI — Active ────────────────────────────────────────────────────────
-  { agent:"NAHLI", containerNumber:"MSKU9482779", company:"MJS",       numberPlate:"T280 DEB", borderDate:null,         transporter:"FARHAT",      location:"ISOKA",             amount:8500, offloaded:false },
-  { agent:"NAHLI", containerNumber:"MRSU5096085", company:"AJ",        numberPlate:"T935 DYR", borderDate:"2026-05-04", transporter:"TRH",         location:"KASUMBALESA",       amount:8500, offloaded:false },
-  { agent:"NAHLI", containerNumber:"MRKU4157373", company:"MJS",       numberPlate:"T767 EEV", borderDate:"2026-05-04", transporter:"TRH",         location:"KASUMBALESA",       amount:8500, offloaded:false },
-  { agent:"NAHLI", containerNumber:"CAAU6658493", company:"GS",        numberPlate:"T218 DEQ", borderDate:null,         transporter:"CONTINENTAL", location:"MPEMBA",            amount:8500, offloaded:false },
-  { agent:"NAHLI", containerNumber:"MRSU3216638", company:"EG",        numberPlate:"T609 DHR", borderDate:null,         transporter:"CONTINENTAL", location:"TUNDUMA",           amount:8500, offloaded:false },
-  { agent:"NAHLI", containerNumber:"CAAU6065353", company:"EG",        numberPlate:"T303 AAD", borderDate:null,         transporter:"CONTINENTAL", location:"MPIKA",             amount:8500, offloaded:false },
-  // ── NCA — Offloaded ───────────────────────────────────────────────────────
-  { agent:"NCA",   containerNumber:"SUDU8959140", company:"3AP",       numberPlate:"T791 CDG", borderDate:"2026-03-01", transporter:"CONTINENTAL", location:"ALREADY OFFLOADED", amount:8500, offloaded:true  },
-  { agent:"NCA",   containerNumber:"HLCU3312984", company:"MJS",       numberPlate:"T456 DEF", borderDate:"2026-04-10", transporter:"TRH",         location:"ALREADY OFFLOADED", amount:6300, offloaded:true  },
-  { agent:"NCA",   containerNumber:"CAAU6065900", company:"EG",        numberPlate:"T802 GFH", borderDate:"2026-04-18", transporter:"FARHAT",      location:"ALREADY OFFLOADED", amount:8500, offloaded:true  },
-  // ── NCA — Active ──────────────────────────────────────────────────────────
-  { agent:"NCA",   containerNumber:"MSKU1457569", company:"3AP",       numberPlate:null,        borderDate:"2026-03-24", transporter:"CONTINENTAL", location:"DAR PORT",          amount:8500, offloaded:false },
-  { agent:"NCA",   containerNumber:"MRKU2087111", company:"AJ",        numberPlate:"T225 DEQ", borderDate:"2026-05-02", transporter:"TRH",         location:"MUNUNGA",           amount:8500, offloaded:false },
-  { agent:"NCA",   containerNumber:"TGBU9358135", company:"AJ",        numberPlate:"T198 AQZ", borderDate:"2026-05-05", transporter:"TRH",         location:"ISOKA",             amount:8500, offloaded:false },
-  // ── BELTRANS — Offloaded ──────────────────────────────────────────────────
-  { agent:"BELTRANS", containerNumber:"TRHU9182736", company:"EG",     numberPlate:"T654 MNO", borderDate:"2026-04-30", transporter:"TRH",         location:"ALREADY OFFLOADED", amount:5500, offloaded:true  },
-  { agent:"BELTRANS", containerNumber:"MSNU9000112", company:"MJS",    numberPlate:"T301 KLM", borderDate:"2026-04-22", transporter:"FARHAT",      location:"ALREADY OFFLOADED", amount:4900, offloaded:true  },
-  // ── BELTRANS — Active ─────────────────────────────────────────────────────
-  { agent:"BELTRANS", containerNumber:"TCKU8876543", company:"MJS",    numberPlate:null,        borderDate:null,         transporter:"CONTINENTAL", location:"DAR PORT",          amount:7200, offloaded:false },
-  { agent:"BELTRANS", containerNumber:"CMAU7765431", company:"MJS",    numberPlate:null,        borderDate:null,         transporter:"FARHAT",      location:"DAR PORT",          amount:4900, offloaded:false },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const ACTIVE_STATUSES: Status[] = ["OTW", "Sea", "At Port", "Left Dar", "At Border", "In Transit", "Arrived"];
-
-function maxOffload(borderDate: string | null, transporter: string | null): string | null {
-  if (!borderDate) return null;
-  const t = (transporter ?? "").toUpperCase();
-  const days = t.includes("FARHAT") || t.includes("CONTINENTAL") ? 11 : 14;
-  const d = new Date(borderDate);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split("T")[0];
-}
-
-function daysDelayed(borderDate: string | null, transporter: string | null): number | null {
-  const mo = maxOffload(borderDate, transporter);
-  if (!mo) return null;
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const diff = Math.floor((today.getTime() - new Date(mo).getTime()) / 86400000);
-  return diff > 0 ? diff : null;
-}
 
 function fmt(n: number, decimals = 0) {
   return n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
@@ -273,29 +51,6 @@ function fmtD(d: string | null) {
   return `${day}/${m}/${y.slice(2)}`;
 }
 
-function isUpcoming(eta: string | null) {
-  if (!eta) return false;
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const e = new Date(eta);
-  const diff = Math.floor((e.getTime() - today.getTime()) / 86400000);
-  return diff >= 0 && diff <= 45;
-}
-
-function getRowBg(r: GITRow) {
-  if (!r.docsReceived && (r.status === "OTW" || r.status === "Sea") && isUpcoming(r.eta)) {
-    return "bg-yellow-100/80 dark:bg-yellow-950/30"; // yellow: upcoming but docs missing
-  }
-  if (!r.docsReceived && r.status === "At Port") {
-    return "bg-rose-100/80 dark:bg-rose-950/30"; // pink: at port, docs missing
-  }
-  if (r.docsReceived && !r.docsSentToTruck && (r.status === "At Port" || r.status === "Left Dar")) {
-    return "bg-amber-50/80 dark:bg-amber-950/20"; // amber: docs ready not sent
-  }
-  if (daysDelayed(r.borderDate, r.transporter) !== null) {
-    return "bg-red-100/80 dark:bg-red-950/30"; // red: overdue
-  }
-  return "";
-}
 
 const STATUS_BADGE: Record<Status, string> = {
   OTW:         "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
@@ -307,125 +62,6 @@ const STATUS_BADGE: Record<Status, string> = {
   Arrived:     "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
   Offloaded:   "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
 };
-
-// ─── Workbook Block ───────────────────────────────────────────────────────────
-
-function WorkbookBlock({ groupDef, rows }: { groupDef: GITGroupDef; rows: GITRow[] }) {
-  const total = rows.reduce((s, r) => s + r.amount, 0);
-  const totalFee = rows.reduce((s, r) => s + (r.transportFee ?? 0), 0);
-  const totalDuty = rows.reduce((s, r) => s + (r.dutyFee ?? 0), 0);
-
-  return (
-    <div className="rounded-md border overflow-hidden">
-      {/* Colored header bar */}
-      <div className={cn("flex items-center justify-between px-3 py-1.5 gap-3", groupDef.headerBg, groupDef.headerText)}>
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="font-bold text-sm uppercase tracking-wide shrink-0">{groupDef.title}</span>
-          <span className="text-xs opacity-80 font-medium truncate">{groupDef.subtitle}</span>
-        </div>
-        <div className="flex items-center gap-3 shrink-0 text-xs font-semibold">
-          <span className="opacity-90">{rows.length} CTR</span>
-          {total > 0 && <span className="opacity-90">${fmt(total, 2)}</span>}
-        </div>
-      </div>
-
-      {/* Mini table */}
-      {rows.length === 0 ? (
-        <div className="py-4 text-center text-xs text-muted-foreground italic bg-muted/20">
-          No containers — empty group
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs whitespace-nowrap border-collapse">
-            <thead>
-              <tr className="bg-muted/60 border-b text-muted-foreground">
-                <th className="py-1 px-2 text-center font-semibold w-8">SR</th>
-                <th className="py-1 px-2 font-semibold text-left">CONTAINER #</th>
-                <th className="py-1 px-2 font-semibold text-right">AMOUNT</th>
-                <th className="py-1 px-2 font-semibold text-left">CO.</th>
-                <th className="py-1 px-2 font-semibold text-left">ETA DAS</th>
-                <th className="py-1 px-2 font-semibold text-left">TRUCK #</th>
-                <th className="py-1 px-2 font-semibold text-left">LOCATION</th>
-                <th className="py-1 px-2 font-semibold text-left">BORDER DT.</th>
-                <th className="py-1 px-2 font-semibold text-left">MAX OFFLOAD</th>
-                <th className="py-1 px-2 font-semibold text-center">DOCS RCVD</th>
-                <th className="py-1 px-2 font-semibold text-center">DOCS→TRUCK</th>
-                <th className="py-1 px-2 font-semibold text-left">TRANSPORTER</th>
-                <th className="py-1 px-2 font-semibold text-right">FEE</th>
-                <th className="py-1 px-2 font-semibold text-left">AGENT</th>
-                <th className="py-1 px-2 font-semibold text-right">DUTY</th>
-                <th className="py-1 px-2 font-semibold text-left">STATUS</th>
-                <th className="py-1 px-2 font-semibold text-center">LINK</th>
-                <th className="py-1 px-2 font-semibold text-left">NOTES</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const mo = maxOffload(r.borderDate, r.transporter);
-                const del = daysDelayed(r.borderDate, r.transporter);
-                const overdue = mo ? new Date(mo) < new Date() : false;
-                return (
-                  <tr key={r.sr} className={cn("border-b last:border-b-0 hover:brightness-95", getRowBg(r))}>
-                    <td className="py-0.5 px-2 text-center text-muted-foreground font-medium">{r.sr}</td>
-                    <td className="py-0.5 px-2 font-mono font-bold tracking-tight">{r.containerNumber}</td>
-                    <td className="py-0.5 px-2 text-right font-semibold">${fmt(r.amount, 2)}</td>
-                    <td className="py-0.5 px-2 font-medium">{r.company}</td>
-                    <td className={cn("py-0.5 px-2", isUpcoming(r.eta) && !r.borderDate ? "font-semibold text-amber-700 dark:text-amber-400" : "")}>{fmtD(r.eta)}</td>
-                    <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? <span className="text-muted-foreground">—</span>}</td>
-                    <td className="py-0.5 px-2">{r.location ?? <span className="text-muted-foreground">—</span>}</td>
-                    <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
-                    <td className={cn("py-0.5 px-2", overdue ? "text-red-600 font-bold" : del ? "text-red-500 font-semibold" : "")}>
-                      {fmtD(mo)}
-                      {del && <span className="ml-1 text-red-600 text-[10px]">+{del}d</span>}
-                    </td>
-                    <td className="py-0.5 px-2 text-center">
-                      {r.docsReceived
-                        ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
-                        : <XCircle className="h-3.5 w-3.5 text-red-500 mx-auto" />}
-                    </td>
-                    <td className="py-0.5 px-2 text-center">
-                      {r.docsSentToTruck
-                        ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
-                        : r.docsReceived
-                          ? <span className="px-1 py-0.5 rounded text-[10px] font-medium bg-amber-200 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">READY</span>
-                          : <span className="text-muted-foreground">—</span>}
-                    </td>
-                    <td className="py-0.5 px-2">{r.transporter ?? <span className="text-muted-foreground">—</span>}</td>
-                    <td className="py-0.5 px-2 text-right">{r.transportFee ? `$${fmt(r.transportFee, 0)}` : "—"}</td>
-                    <td className="py-0.5 px-2 font-medium">{r.agent ?? <span className="text-muted-foreground">—</span>}</td>
-                    <td className="py-0.5 px-2 text-right">{r.dutyFee ? `$${fmt(r.dutyFee, 0)}` : "—"}</td>
-                    <td className="py-0.5 px-2">
-                      <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", STATUS_BADGE[r.status])}>{r.status}</span>
-                    </td>
-                    <td className="py-0.5 px-2 text-center">
-                      {r.trackingLink
-                        ? <a href={r.trackingLink} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/70">
-                            <ExternalLink className="h-3 w-3 mx-auto" />
-                          </a>
-                        : <span className="text-muted-foreground text-[10px]">—</span>}
-                    </td>
-                    <td className="py-0.5 px-2 max-w-40 truncate text-muted-foreground italic">{r.notes ?? "—"}</td>
-                  </tr>
-                );
-              })}
-              {/* Total row */}
-              <tr className="border-t-2 bg-muted/50 font-bold text-xs">
-                <td className="py-1 px-2 text-center text-muted-foreground">{rows.length}</td>
-                <td className="py-1 px-2">TOTAL</td>
-                <td className="py-1 px-2 text-right">${fmt(total, 2)}</td>
-                <td colSpan={9} />
-                <td className="py-1 px-2 text-right">{totalFee > 0 ? `$${fmt(totalFee, 0)}` : "—"}</td>
-                <td />
-                <td className="py-1 px-2 text-right">{totalDuty > 0 ? `$${fmt(totalDuty, 0)}` : "—"}</td>
-                <td colSpan={3} />
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ─── Legend strip ─────────────────────────────────────────────────────────────
 
@@ -2041,132 +1677,234 @@ function TabAgentDuty() {
 }
 
 // ─── Tab 6: WhatsApp Preview ──────────────────────────────────────────────────
+//
+// Self-contained — fetches /api/git/containers and builds a WhatsApp-style
+// plain-text daily report from real container data.
+// My Company / All Accessible Companies selector.
+// Read-only — no mutations, no WhatsApp send API calls.
 
-function TabWhatsApp({ active }: { active: GITRow[] }) {
-  const [inclTrucks, setInclTrucks] = useState(false);
-  const [inclDuty,   setInclDuty]   = useState(false);
+function TabWhatsApp() {
+  const [companyMode, setCompanyMode] = useState<CompanyViewMode>("session");
+  const [inclTrucks,  setInclTrucks]  = useState(false);
+  const [inclAgents,  setInclAgents]  = useState(false);
+  const [copied,      setCopied]      = useState(false);
 
-  const seaOtw    = active.filter(r => r.status === "OTW" || r.status === "Sea").length;
-  const atPort    = active.filter(r => r.status === "At Port").length;
-  const leftDar   = active.filter(r => r.status === "Left Dar").length;
-  const inTransit = active.filter(r => ["At Border", "In Transit"].includes(r.status)).length;
-  const arrived   = active.filter(r => r.status === "Arrived").length;
-  const delayed   = active.filter(r => daysDelayed(r.borderDate, r.transporter) !== null);
-  const docsMiss  = active.filter(r => !r.docsReceived);
-  const docsReady = active.filter(r => r.docsReceived && !r.docsSentToTruck && r.status === "At Port");
-  const overdue   = active.filter(r => { const mo = maxOffload(r.borderDate, r.transporter); return mo ? new Date(mo) < new Date() : false; });
-  const totalCost = active.reduce((s, r) => s + r.amount, 0);
-  const totalFee  = active.reduce((s, r) => s + (r.transportFee ?? 0), 0);
-  const totalDuty = active.reduce((s, r) => s + (r.dutyFee ?? 0), 0);
+  const queryUrl = companyMode === "all"
+    ? "/api/git/containers?allCompanies=true"
+    : "/api/git/containers";
 
-  const today = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  const { data, isLoading, isError, error } = useQuery<GitContainersResponse>({
+    queryKey: [queryUrl],
+    staleTime: 60_000,
+    retry: 1,
+  });
 
-  // Optional: Truck / Location summary lines
-  const truckLines: string[] = inclTrucks ? [
-    ``,
-    `*TRUCK / LOCATION STATUS*`,
-    ...TRUCK_GROUP_DEFS.map(gd => {
-      const rows = TRUCK_ROWS.filter(r => r.group === gd.id);
-      if (rows.length === 0) return `${gd.label}: — no containers`;
-      return [
-        `${gd.label} (${rows.length}):`,
-        ...rows.map(r => `  ${r.containerNumber} | ${r.company} | ${r.numberPlate ?? "no truck"} | ${r.location ?? "—"} | ${r.agent ?? "—"}`),
-      ].join("\n");
+  const containers: EnrichedContainerApi[] = data?.containers ?? [];
+
+  // ── Status counts ────────────────────────────────────────────────────────────
+  const seaOtw    = containers.filter(r => r.status === "OTW" || r.status === "Sea").length;
+  const atPort    = containers.filter(r => r.status === "At Port").length;
+  const leftDar   = containers.filter(r => r.status === "Left Dar").length;
+  const inTransit = containers.filter(r => ["At Border", "In Transit"].includes(r.status)).length;
+  const arrived   = containers.filter(r => r.status === "Arrived").length;
+
+  // ── Attention lists ──────────────────────────────────────────────────────────
+  const delayed   = containers.filter(r => r.daysDelayed !== null && r.daysDelayed > 0);
+  const docsReady = containers.filter(r => r.docsReadyNotSent);
+  const docsMiss  = containers.filter(r => !r.docReceived);
+  const overdue   = containers.filter(r => r.isOverdue);
+
+  // ── Financial totals ─────────────────────────────────────────────────────────
+  const totalCost = containers.reduce((s, r) => s + parseNum(r.grandTotal), 0);
+  const totalFee  = containers.reduce((s, r) => s + parseNum(r.transportFee), 0);
+  const totalDuty = containers.reduce((s, r) => s + parseNum(r.dutyFee), 0);
+
+  // ── By company ───────────────────────────────────────────────────────────────
+  const companies    = [...new Set(containers.map(r => r.companyName))].sort();
+  const companyLines = companies.map(c => {
+    const sub  = containers.filter(r => r.companyName === c);
+    const cost = sub.reduce((s, r) => s + parseNum(r.grandTotal), 0);
+    return `• ${c}: ${sub.length} ctr${cost > 0 ? ` — $${fmt(cost, 0)}` : ""}`;
+  });
+
+  // ── By transporter ───────────────────────────────────────────────────────────
+  const tpNames   = [...new Set(containers.filter(r => r.transporter).map(r => r.transporter!))].sort();
+  const noTpCount = containers.filter(r => !r.transporter).length;
+  const tpLines   = [
+    ...tpNames.map(tp => {
+      const sub = containers.filter(r => r.transporter === tp);
+      const fee = sub.reduce((s, r) => s + parseNum(r.transportFee), 0);
+      return `• ${tp}: ${sub.length} ctr${fee > 0 ? ` — $${fmt(fee, 0)}` : ""}`;
     }),
-  ] : [];
+    ...(noTpCount > 0 ? [`• Unassigned: ${noTpCount} ctr`] : []),
+  ];
 
-  // Optional: Agent / Duty summary lines
-  const dutyLines: string[] = inclDuty ? (() => {
-    const agents = [...new Set(DUTY_ROWS.map(r => r.agent))];
+  // ── By agent / declarant ─────────────────────────────────────────────────────
+  const agentNames = [...new Set(containers.filter(r => r.agent).map(r => r.agent!))].sort();
+  const agentLines = agentNames.map(ag => {
+    const sub  = containers.filter(r => r.agent === ag);
+    const duty = sub.reduce((s, r) => s + parseNum(r.dutyFee), 0);
+    return `• ${ag}: ${sub.length} ctr${duty > 0 ? ` — $${fmt(duty, 0)} duty` : ""}`;
+  });
+
+  const today = new Date()
+    .toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+    .toUpperCase();
+
+  // ── Optional: Truck / Location section ───────────────────────────────────────
+  const truckLines: string[] = inclTrucks ? (() => {
+    const withTruck = containers.filter(r => !!(r.numberPlate ?? "").trim());
+    if (withTruck.length === 0) return [``, `*TRUCK / LOCATION STATUS*`, `• No containers on road`];
+    const tps = [...new Set(withTruck.map(r => r.transporter ?? "Unknown"))].sort();
     return [
       ``,
-      `*AGENT / DUTY SUMMARY*`,
-      ...agents.map(agent => {
-        const offRows  = DUTY_ROWS.filter(r => r.agent === agent && r.offloaded);
-        const actRows  = DUTY_ROWS.filter(r => r.agent === agent && !r.offloaded);
-        const offTotal = offRows.reduce((s, r) => s + r.amount, 0);
-        const actTotal = actRows.reduce((s, r) => s + r.amount, 0);
+      `*TRUCK / LOCATION STATUS (${withTruck.length} on road)*`,
+      ...tps.flatMap(tp => {
+        const rows = withTruck.filter(r => (r.transporter ?? "Unknown") === tp);
         return [
-          `${agent}:`,
-          `  Offloaded: ${offRows.length} ctr — $${fmt(offTotal, 0)}`,
-          `  Active:    ${actRows.length} ctr — $${fmt(actTotal, 0)}`,
-          `  TOTAL:     $${fmt(offTotal + actTotal, 0)}`,
-        ].join("\n");
+          `${tp} (${rows.length}):`,
+          ...rows.map(r =>
+            `  ${r.containerNumber} | ${r.companyName} | ${r.numberPlate ?? "—"} | ${r.trackingLocation ?? "—"} | ${r.agent ?? "—"}`
+          ),
+        ];
       }),
     ];
   })() : [];
 
+  // ── Optional: Agent / Duty section ───────────────────────────────────────────
+  const dutyLines: string[] = inclAgents ? [
+    ``,
+    `*AGENT / DUTY SUMMARY*`,
+    ...(agentLines.length > 0 ? agentLines : [`• No agent data`]),
+    `• Active Duty Total: $${fmt(totalDuty, 0)}`,
+  ] : [];
+
+  // ── Full message ─────────────────────────────────────────────────────────────
   const lines = [
-    `*GIT DAILY REPORT — ${today.toUpperCase()}*`,
+    `*GIT DAILY REPORT — ${today}*`,
     ``,
-    `*ACTIVE CONTAINERS: ${active.length}*`,
-    `• OTW / At Sea:    ${seaOtw}`,
-    `• At Port (Dar):   ${atPort}`,
-    `• Left Dar:        ${leftDar}`,
-    `• In Transit:      ${inTransit}`,
-    `• Arrived:         ${arrived}`,
+    `*ACTIVE CONTAINERS: ${containers.length}*`,
+    `• OTW / At Sea:      ${seaOtw}`,
+    `• At Port (Dar):     ${atPort}`,
+    `• Left Dar:          ${leftDar}`,
+    `• In Transit:        ${inTransit}`,
+    `• Arrived:           ${arrived}`,
     ``,
-    `*CONTAINER COST:  $${fmt(totalCost, 2)}*`,
-    `• Transport Fees:  $${fmt(totalFee, 0)}`,
-    `• Duty Fees:       $${fmt(totalDuty, 0)}`,
-    `• Total Fees:      $${fmt(totalFee + totalDuty, 0)}`,
-    ``,
-    `*BY GROUP / DESTINATION*`,
-    ...GROUP_DEFS.map(gd => {
-      const sub = active.filter(r => r.group === gd.id);
-      if (sub.length === 0) return `• ${gd.title} ${gd.subtitle}: 0`;
-      const cost = sub.reduce((s, r) => s + r.amount, 0);
-      return `• ${gd.title} ${gd.subtitle}: ${sub.length} ctr — $${fmt(cost, 0)}`;
-    }),
+    `*FINANCIALS*`,
+    `• Container Cost:    $${fmt(totalCost, 0)}`,
+    `• Transport Fees:    $${fmt(totalFee, 0)}`,
+    `• Duty Fees:         $${fmt(totalDuty, 0)}`,
+    `• Total Fees:        $${fmt(totalFee + totalDuty, 0)}`,
     ``,
     `*BY COMPANY*`,
-    ...([...new Set(active.map(r => r.company))]).map(c => {
-      const sub = active.filter(r => r.company === c);
-      return `• ${c}: ${sub.length} ctr — $${fmt(sub.reduce((s, r) => s + r.amount, 0), 0)}`;
-    }),
+    ...(companyLines.length > 0 ? companyLines : [`• No data`]),
+    ``,
+    `*BY TRANSPORTER*`,
+    ...(tpLines.length > 0 ? tpLines : [`• No data`]),
+    ``,
+    `*BY AGENT / DECLARANT*`,
+    ...(agentLines.length > 0 ? agentLines : [`• No data`]),
     ...(delayed.length > 0 ? [
       ``,
       `⚠ *DELAYED — ${delayed.length}*`,
-      ...delayed.map(r => `• ${r.containerNumber} +${daysDelayed(r.borderDate, r.transporter)}d [${r.company}] ${r.transporter ?? "no truck"}`),
+      ...delayed.map(r => `• ${r.containerNumber} +${r.daysDelayed}d [${r.companyName}] ${r.transporter ?? "no transporter"}`),
     ] : []),
     ...(overdue.length > 0 ? [
       ``,
       `! *OFFLOAD OVERDUE — ${overdue.length}*`,
-      ...overdue.map(r => `• ${r.containerNumber} [${r.company}]`),
-    ] : []),
-    ...(docsMiss.length > 0 ? [
-      ``,
-      `*DOCS MISSING — ${docsMiss.length}*`,
-      ...docsMiss.map(r => `• ${r.containerNumber} [${r.company}] ETA ${fmtD(r.eta)}`),
+      ...overdue.map(r => `• ${r.containerNumber} [${r.companyName}]`),
     ] : []),
     ...(docsReady.length > 0 ? [
       ``,
       `*DOCS READY — NOT SENT TO TRUCK (${docsReady.length})*`,
       ...docsReady.map(r => `• ${r.containerNumber} → ${r.transporter ?? "no transporter"}`),
     ] : []),
-    ...(active.filter(r => r.trackingLink).length > 0 ? [
+    ...(docsMiss.length > 0 ? [
+      ``,
+      `*DOCS MISSING — ${docsMiss.length}*`,
+      ...docsMiss.map(r => `• ${r.containerNumber} [${r.companyName}] ETA ${fmtD(r.eta)}`),
+    ] : []),
+    ...(containers.filter(r => r.trackingLink).length > 0 ? [
       ``,
       `*TRACKING LINKS*`,
-      ...active.filter(r => r.trackingLink).map(r => `${r.containerNumber}: ${r.trackingLink}`),
+      ...containers.filter(r => r.trackingLink).map(r => `${r.containerNumber}: ${r.trackingLink}`),
     ] : []),
     ...truckLines,
     ...dutyLines,
   ];
+
+  const text = lines.join("\n");
+
+  function handleCopy() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  const modeSelector = (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-xs text-muted-foreground">Viewing:</span>
+      <Button
+        size="sm"
+        variant={companyMode === "session" ? "default" : "outline"}
+        onClick={() => setCompanyMode("session")}
+        data-testid="btn-wa-mode-session"
+      >
+        My Company
+      </Button>
+      <Button
+        size="sm"
+        variant={companyMode === "all" ? "default" : "outline"}
+        onClick={() => setCompanyMode("all")}
+        data-testid="btn-wa-mode-all"
+      >
+        All Accessible Companies
+      </Button>
+    </div>
+  );
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3 max-w-2xl">
+        {modeSelector}
+        <Skeleton className="h-96 w-full rounded-lg" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-3 max-w-2xl">
+        {modeSelector}
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-sm">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <div>
+            <div className="font-semibold">Failed to load container data</div>
+            <div className="text-xs mt-0.5">{(error as Error)?.message ?? "Network or server error."}</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3 max-w-2xl">
       <div className="flex items-center gap-2 flex-wrap">
         <MessageSquare className="h-4 w-4 text-green-600" />
         <p className="text-sm font-medium">Daily WhatsApp GIT Report</p>
-        <Badge variant="outline" className="text-xs">Text preview — no PDF/image</Badge>
+        <Badge variant="outline" className="text-xs">Text preview — no PDF / image</Badge>
       </div>
-      {/* Optional section toggles */}
+
+      {modeSelector}
+
+      {/* Optional toggles + copy */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs text-muted-foreground">Include optional sections:</span>
         <Button
           size="sm"
           variant={inclTrucks ? "default" : "outline"}
-          className="gap-1.5 text-xs h-7"
+          className="gap-1.5 text-xs"
           onClick={() => setInclTrucks(v => !v)}
           data-testid="button-wa-trucks"
         >
@@ -2175,22 +1913,48 @@ function TabWhatsApp({ active }: { active: GITRow[] }) {
         </Button>
         <Button
           size="sm"
-          variant={inclDuty ? "default" : "outline"}
-          className="gap-1.5 text-xs h-7"
-          onClick={() => setInclDuty(v => !v)}
+          variant={inclAgents ? "default" : "outline"}
+          className="gap-1.5 text-xs"
+          onClick={() => setInclAgents(v => !v)}
           data-testid="button-wa-duty"
         >
           <DollarSign className="h-3 w-3" />
           Agent / Duty
         </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1.5 text-xs ml-auto"
+          onClick={handleCopy}
+          data-testid="button-wa-copy"
+        >
+          {copied
+            ? <CheckCircle2 className="h-3 w-3 text-green-600" />
+            : <MessageSquare className="h-3 w-3" />}
+          {copied ? "Copied!" : "Copy"}
+        </Button>
       </div>
-      <div className="rounded-lg border bg-[#e5ddd5] dark:bg-zinc-800 p-3">
-        <div className="bg-white dark:bg-zinc-700 rounded-lg p-3 text-xs font-mono whitespace-pre-wrap leading-relaxed max-h-[600px] overflow-y-auto">
-          {lines.join("\n")}
+
+      {containers.length === 0 ? (
+        <div className="py-10 text-center text-muted-foreground text-sm border rounded-lg border-dashed">
+          <FileX className="h-8 w-8 mx-auto mb-2 opacity-40" />
+          <div className="font-medium">No active containers found</div>
+          <div className="text-xs mt-1">
+            {companyMode === "all"
+              ? "No containers exist across accessible companies."
+              : "No containers exist for this company."}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="rounded-lg border bg-[#e5ddd5] dark:bg-zinc-800 p-3">
+          <div className="bg-white dark:bg-zinc-700 rounded-lg p-3 text-xs font-mono whitespace-pre-wrap leading-relaxed max-h-[600px] overflow-y-auto">
+            {text}
+          </div>
+        </div>
+      )}
+
       <p className="text-xs text-muted-foreground">
-        This text summarises the full workbook. Sent manually or via scheduled auto-send to the configured WhatsApp group.
+        Text preview only. Copy and send manually to the WhatsApp group — no automated sending.
       </p>
     </div>
   );
@@ -2199,8 +1963,6 @@ function TabWhatsApp({ active }: { active: GITRow[] }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function GITMockup() {
-  const mockActive = ROWS.filter(r => ACTIVE_STATUSES.includes(r.status));
-
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <PageHeader
@@ -2214,8 +1976,8 @@ export default function GITMockup() {
         <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-blue-300 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-700 text-sm text-blue-800 dark:text-blue-300">
           <Info className="h-4 w-4 shrink-0" />
           <span>
-            <strong>Summary, Detail, At Port/Sea, Truck/Location & Agent/Duty tabs</strong> use real database data.{" "}
-            <span className="text-blue-600 dark:text-blue-400">WhatsApp tab uses sample data.</span>
+            <strong>All tabs</strong> use real database data.{" "}
+            <span className="text-blue-600 dark:text-blue-400">WhatsApp preview is read-only — no automated sending.</span>
           </span>
           <Badge variant="outline" className="ml-auto text-xs shrink-0 border-blue-400 text-blue-700 dark:text-blue-400">
             <FileSpreadsheet className="h-3 w-3 mr-1" />
@@ -2254,7 +2016,7 @@ export default function GITMockup() {
           </TabsContent>
 
           <TabsContent value="whatsapp" className="mt-4">
-            <TabWhatsApp active={mockActive} />
+            <TabWhatsApp />
           </TabsContent>
         </Tabs>
 
