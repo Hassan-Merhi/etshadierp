@@ -728,19 +728,51 @@ function TabSummary() {
     <div className="space-y-4">
       {modeSelector}
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-11 gap-2">
-        <StatCard label="Active GIT"           value={stats.total}                               icon={<Package className="h-4 w-4 text-primary" />}            accent="bg-primary/10" />
-        <StatCard label="At Sea / OTW"          value={stats.atSea}                               icon={<Ship className="h-4 w-4 text-blue-600" />}               accent="bg-blue-100 dark:bg-blue-900/30" />
-        <StatCard label="At Port"               value={stats.atPort}                              icon={<Package className="h-4 w-4 text-amber-600" />}           accent="bg-amber-100 dark:bg-amber-900/30" />
-        <StatCard label="Left Dar"              value={stats.leftDar}                             icon={<Truck className="h-4 w-4 text-violet-600" />}            accent="bg-violet-100 dark:bg-violet-900/30" />
-        <StatCard label="In Transit"            value={stats.inTransit}                           icon={<Truck className="h-4 w-4 text-indigo-600" />}            accent="bg-indigo-100 dark:bg-indigo-900/30" />
-        <StatCard label="Arrived"               value={stats.arrived}                             icon={<CheckCircle2 className="h-4 w-4 text-green-600" />}      accent="bg-green-100 dark:bg-green-900/30" />
-        <StatCard label="Delayed"               value={stats.delayed}       alert={stats.delayed > 0}       icon={<Clock className="h-4 w-4 text-red-600" />}       accent="bg-red-100 dark:bg-red-900/30" />
-        <StatCard label="Docs Ready, Not Sent"  value={stats.docsReadyNotSent} alert={stats.docsReadyNotSent > 0} icon={<FileX className="h-4 w-4 text-amber-600" />} accent="bg-amber-100 dark:bg-amber-900/30" />
-        <StatCard label="Overdue"               value={stats.overdue}       alert={stats.overdue > 0}       icon={<Clock className="h-4 w-4 text-orange-600" />}   accent="bg-orange-100 dark:bg-orange-900/30" />
-        <StatCard label="Container Cost"        value={`$${fmt(stats.totalCost, 0)}`}             icon={<DollarSign className="h-4 w-4 text-green-600" />}        accent="bg-green-100 dark:bg-green-900/30" />
-        <StatCard label="Total Fees"            value={`$${fmt(stats.totalFee + stats.totalDuty, 0)}`} sub={`T:$${fmt(stats.totalFee,0)} D:$${fmt(stats.totalDuty,0)}`} icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} />
+      {/* Compact stats strip */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-md border bg-muted/30 px-4 py-2.5 text-sm">
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground text-xs">Active</span>
+          <span className="font-bold">{stats.total}</span>
+        </div>
+        <div className="w-px h-4 bg-border" />
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground text-xs">At Sea</span>
+          <span className="font-semibold">{stats.atSea}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground text-xs">At Port</span>
+          <span className="font-semibold">{stats.atPort}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground text-xs">Left Dar</span>
+          <span className="font-semibold">{stats.leftDar}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground text-xs">In Transit</span>
+          <span className="font-semibold">{stats.inTransit}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground text-xs">Arrived</span>
+          <span className="font-semibold">{stats.arrived}</span>
+        </div>
+        <div className="w-px h-4 bg-border" />
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground text-xs">Delayed</span>
+          <span className={cn("font-bold", stats.delayed > 0 ? "text-red-600" : "")}>{stats.delayed}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground text-xs">Docs Pending</span>
+          <span className={cn("font-bold", stats.docsReadyNotSent > 0 ? "text-amber-600" : "")}>{stats.docsReadyNotSent}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground text-xs">Overdue</span>
+          <span className={cn("font-bold", stats.overdue > 0 ? "text-orange-600" : "")}>{stats.overdue}</span>
+        </div>
+        <div className="w-px h-4 bg-border" />
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground text-xs">Cost</span>
+          <span className="font-bold text-green-700 dark:text-green-400">${fmt(stats.totalCost, 0)}</span>
+        </div>
       </div>
 
       {/* Active container summary bar — by company */}
