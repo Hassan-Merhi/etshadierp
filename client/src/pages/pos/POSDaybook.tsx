@@ -53,6 +53,7 @@ interface Voucher {
   locationId: number;
   locationName?: string;
   createdAt: string;
+  userId?: string | null;
 }
 
 interface SalesItem {
@@ -137,6 +138,7 @@ export default function POSDaybook() {
   // Admin and Owner can always edit regardless of daybookEditDays setting
   const daybookEditDays = currentUser?.daybookEditDays || 0;
   const isAdminOrOwner = currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
+  const isPOS = currentUser?.role === "POS";
   const canEditDaybook = isAdminOrOwner || daybookEditDays > 0;
   
   // Check if user can see profit/cost (Admin or Owner only)
@@ -673,27 +675,36 @@ export default function POSDaybook() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
-                            {voucher.voucherType === "Sales" && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setReprintRowVoucherId(voucher.id)}
-                                disabled={reprintRowVoucherId === voucher.id}
-                                data-testid={`button-reprint-row-${voucher.id}`}
-                                title="Reprint invoice"
-                              >
-                                <Printer className={`h-4 w-4 ${reprintRowVoucherId === voucher.id ? "animate-pulse" : ""}`} />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setSelectedVoucher(voucher as VoucherWithItems)}
-                              data-testid={`button-view-${voucher.id}`}
-                              title="View details"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
+                            {(() => {
+                              // POS users can only act on their own sales; others can see the row but not open/reprint it
+                              const isOwnVoucher = !isPOS || voucher.userId === currentUser?.id;
+                              return (
+                                <>
+                                  {voucher.voucherType === "Sales" && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => setReprintRowVoucherId(voucher.id)}
+                                      disabled={reprintRowVoucherId === voucher.id || !isOwnVoucher}
+                                      data-testid={`button-reprint-row-${voucher.id}`}
+                                      title={isOwnVoucher ? "Reprint invoice" : "You can only reprint your own sales"}
+                                    >
+                                      <Printer className={`h-4 w-4 ${reprintRowVoucherId === voucher.id ? "animate-pulse" : ""}`} />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => isOwnVoucher && setSelectedVoucher(voucher as VoucherWithItems)}
+                                    disabled={!isOwnVoucher}
+                                    data-testid={`button-view-${voucher.id}`}
+                                    title={isOwnVoucher ? "View details" : "You can only view details of your own sales"}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              );
+                            })()}
                             <Button
                               variant="ghost"
                               size="icon"

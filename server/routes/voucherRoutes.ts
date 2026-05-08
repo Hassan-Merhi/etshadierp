@@ -210,7 +210,9 @@ export function registerVoucherRoutes(app: Express) {
           })
         : vouchers;
 
-      // Fix 6: For POS users, only return vouchers from their assigned locations
+      // For POS users, only return vouchers from their assigned locations.
+      // Ownership is NOT checked here — POS users can see all sales from their location
+      // (not just their own). Ownership is enforced at detail/edit/send-invoice endpoints.
       if (isPOS && req.user?.id) {
         const assignedLocs = await db
           .select({ locationId: userLocations.locationId })
@@ -221,14 +223,9 @@ export function registerVoucherRoutes(app: Express) {
           ));
         const allowedLocIds = assignedLocs.map((l: any) => l.locationId);
         if (allowedLocIds.length > 0) {
-          const posUserId = req.user!.id;
-          sanitizedVouchers = sanitizedVouchers.filter((v: any) => {
-            const locationOk = v.locationId === null || allowedLocIds.includes(v.locationId);
-            // POS users can only see their own Sales vouchers
-            const isSales = v.voucherType === "Sales";
-            const ownerOk = !isSales || v.userId === posUserId;
-            return locationOk && ownerOk;
-          });
+          sanitizedVouchers = sanitizedVouchers.filter((v: any) =>
+            v.locationId === null || allowedLocIds.includes(v.locationId)
+          );
         }
       }
 
