@@ -827,6 +827,28 @@ export function registerPosRoutes(app: Express) {
 
       const result = { voucher, saleItems };
 
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId: req.session.currentCompanyId!,
+          action: "create",
+          tableName: "vouchers",
+          recordId: voucher.id,
+          recordIdentifier: voucherNumber,
+          changes: {
+            voucherNumber: { new: voucherNumber },
+            voucherType: { new: "Sales" },
+            saleType: { new: isCreditSale ? "Credit Invoice" : "Cash Sale" },
+            location: { new: location.name },
+            totalAmount: { new: grandTotal.toFixed(2) },
+            date: { new: voucherDate },
+            itemCount: { new: saleItems.length },
+            customer: { new: customerAccount ? (customerAccount as any).name : null },
+          },
+        });
+      } catch { /* non-fatal */ }
+
       // ── Intercompany POS auto-transfer (non-blocking, cash sales only) ──
       if (!isCreditSale && accountType === "cash") {
         // fire-and-forget; never let errors surface to the client
@@ -1188,6 +1210,26 @@ export function registerPosRoutes(app: Express) {
           .catch((err) => console.error("[IntercompanyPOS Recalc] Unhandled:", err));
       }
 
+      try {
+        const _posChanges: Record<string, { old: any; new: any }> = {};
+        if (existingVoucher.totalAmount !== updatedVoucher.totalAmount)
+          _posChanges.totalAmount = { old: existingVoucher.totalAmount, new: updatedVoucher.totalAmount };
+        if (existingVoucher.voucherDate !== updatedVoucher.voucherDate)
+          _posChanges.date = { old: existingVoucher.voucherDate, new: updatedVoucher.voucherDate };
+        if (existingVoucher.locationId !== updatedVoucher.locationId)
+          _posChanges.locationId = { old: existingVoucher.locationId, new: updatedVoucher.locationId };
+        _posChanges.itemCount = { new: updatedSalesItems.length };
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId: req.session.currentCompanyId!,
+          action: "update",
+          tableName: "vouchers",
+          recordId: voucherId,
+          recordIdentifier: updatedVoucher.voucherNumber,
+          changes: _posChanges,
+        });
+      } catch { /* non-fatal */ }
       res.json({
         voucher: updatedVoucher,
         location: updatedLocation,

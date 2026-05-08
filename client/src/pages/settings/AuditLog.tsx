@@ -109,7 +109,13 @@ export function fieldLabel(key: string) {
 export function fmtValue(v: any): string {
   if (v === null || v === undefined) return "—";
   if (typeof v === "boolean") return v ? "Yes" : "No";
-  if (typeof v === "object") return JSON.stringify(v);
+  if (Array.isArray(v)) return `(${v.length} item${v.length !== 1 ? "s" : ""})`;
+  if (typeof v === "object") {
+    const keys = Object.keys(v);
+    if (keys.length === 0) return "—";
+    const preview = keys.slice(0, 3).map(k => `${fieldLabel(k)}: ${String(v[k] ?? "—")}`).join(", ");
+    return keys.length > 3 ? `${preview}, +${keys.length - 3} more` : preview;
+  }
   const s = String(v);
   // try to detect ISO date strings
   if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
@@ -279,7 +285,13 @@ function fmtBusinessValue(field: string, value: any): string {
       if (!isNaN(d.getTime())) return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
     } catch { /* fall through */ }
   }
-  if (typeof value === "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `(${value.length} item${value.length !== 1 ? "s" : ""})`;
+  if (typeof value === "object") {
+    const keys = Object.keys(value);
+    if (keys.length === 0) return "—";
+    const preview = keys.slice(0, 3).map(k => `${fieldLabel(k)}: ${String((value as any)[k] ?? "—")}`).join(", ");
+    return keys.length > 3 ? `${preview}, +${keys.length - 3} more` : preview;
+  }
   return String(value);
 }
 

@@ -178,6 +178,25 @@ export function registerStockRoutes(app: Express) {
       }
 
       const item = await storage.createStockItem(parsed);
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId: req.session.currentCompanyId!,
+          action: "create",
+          tableName: "stock_items",
+          recordId: item.id,
+          recordIdentifier: item.name,
+          changes: {
+            name: { new: item.name },
+            code: { new: item.code },
+            uom: { new: item.uom },
+            sellingPrice: { new: item.sellingPrice || "0" },
+            openingQty: { new: item.openingQty || "0" },
+            openingRate: { new: item.openingRate || "0" },
+          },
+        });
+      } catch { /* non-fatal */ }
       res.status(201).json(item);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -224,7 +243,25 @@ export function registerStockRoutes(app: Express) {
       }
 
       await storage.bulkDeleteStockItems(validIds);
-      
+      try {
+        for (const deletedItem of validItems) {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "delete",
+            tableName: "stock_items",
+            recordId: deletedItem.id,
+            recordIdentifier: deletedItem.name,
+            changes: {
+              name: { old: deletedItem.name },
+              code: { old: deletedItem.code },
+              uom: { old: deletedItem.uom },
+            },
+          });
+        }
+      } catch { /* non-fatal */ }
+
       const skippedCount = ids.length - validIds.length;
       const message = skippedCount > 0
         ? `Successfully deleted ${validIds.length} stock item(s). ${skippedCount} item(s) were skipped (not found or belong to another company).`
@@ -311,6 +348,23 @@ export function registerStockRoutes(app: Express) {
       }
 
       const message = `Updated ${updated} price(s)${notFound > 0 ? `. ${notFound} barcode(s) not found.` : "."}`;
+      try {
+        if (updated > 0) {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: companyId,
+            action: "update",
+            tableName: "stock_items",
+            recordId: 0,
+            recordIdentifier: `Bulk price update (${updated} items)`,
+            changes: {
+              pricesUpdated: { new: updated },
+              barcodesNotFound: { new: notFound },
+            },
+          });
+        }
+      } catch { /* non-fatal */ }
       res.json({ message, updated, notFound });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1209,6 +1263,24 @@ export function registerStockRoutes(app: Express) {
         }
 
         const updated = await storage.updateStockItem(stockItemId, updates);
+        try {
+          const _stockChanges: Record<string, { old: any; new: any }> = {};
+          for (const _f of ["name", "code", "uom", "barcode", "sellingPrice", "active"] as const) {
+            if (String((existingItem as any)[_f] ?? "") !== String((updated as any)[_f] ?? "")) {
+              _stockChanges[_f] = { old: (existingItem as any)[_f], new: (updated as any)[_f] };
+            }
+          }
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "update",
+            tableName: "stock_items",
+            recordId: updated.id,
+            recordIdentifier: updated.name,
+            changes: _stockChanges,
+          });
+        } catch { /* non-fatal */ }
         res.json(updated);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -1260,6 +1332,23 @@ export function registerStockRoutes(app: Express) {
         }
 
         await storage.deleteStockItem(stockItemId);
+        try {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "delete",
+            tableName: "stock_items",
+            recordId: existingItem.id,
+            recordIdentifier: existingItem.name,
+            changes: {
+              name: { old: existingItem.name },
+              code: { old: existingItem.code },
+              uom: { old: existingItem.uom },
+              sellingPrice: { old: existingItem.sellingPrice || "0" },
+            },
+          });
+        } catch { /* non-fatal */ }
         res.json({ message: "Stock item deleted successfully" });
       } catch (error: any) {
         res.status(500).json({ message: error.message });

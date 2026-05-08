@@ -182,6 +182,25 @@ export function registerLedgerRoutes(app: Express) {
         }
 
         const account = await storage.createLedgerAccount(parsed);
+        try {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: parsed.companyId,
+            action: "create",
+            tableName: "ledger_accounts",
+            recordId: account.id,
+            recordIdentifier: account.name,
+            changes: {
+              name: { new: account.name },
+              code: { new: account.code },
+              accountType: { new: account.accountType },
+              subType: { new: account.subType || null },
+              openingBalance: { new: account.openingBalance || "0" },
+              openingBalanceSide: { new: account.openingBalanceSide || null },
+            },
+          });
+        } catch { /* non-fatal */ }
         res.status(201).json(account);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
@@ -319,6 +338,24 @@ export function registerLedgerRoutes(app: Express) {
           return updated;
         });
 
+        try {
+          const _ledChanges: Record<string, { old: any; new: any }> = {};
+          for (const _f of ["name", "code", "accountType", "subType", "openingBalance", "openingBalanceSide", "active"] as const) {
+            if (String((existingAccount as any)[_f] ?? "") !== String((updatedAccount as any)[_f] ?? "")) {
+              _ledChanges[_f] = { old: (existingAccount as any)[_f], new: (updatedAccount as any)[_f] };
+            }
+          }
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "update",
+            tableName: "ledger_accounts",
+            recordId: updatedAccount.id,
+            recordIdentifier: updatedAccount.name,
+            changes: _ledChanges,
+          });
+        } catch { /* non-fatal */ }
         res.json(updatedAccount);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
@@ -413,6 +450,24 @@ export function registerLedgerRoutes(app: Express) {
         }
 
         await storage.deleteLedgerAccount(accountId);
+        try {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "delete",
+            tableName: "ledger_accounts",
+            recordId: existingAccount.id,
+            recordIdentifier: existingAccount.name,
+            changes: {
+              name: { old: existingAccount.name },
+              code: { old: existingAccount.code },
+              accountType: { old: existingAccount.accountType },
+              subType: { old: existingAccount.subType || null },
+              openingBalance: { old: existingAccount.openingBalance || "0" },
+            },
+          });
+        } catch { /* non-fatal */ }
         res.json({ message: "Ledger account deleted successfully" });
       } catch (error: any) {
         res.status(400).json({ message: error.message });

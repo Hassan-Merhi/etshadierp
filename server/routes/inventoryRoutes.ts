@@ -180,6 +180,24 @@ export function registerInventoryRoutes(app: Express) {
           adjustedQty,
         };
       });
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId: companyId,
+          action: "update",
+          tableName: "inventory",
+          recordId: stockItem.id,
+          recordIdentifier: `${stockItem.code} @ ${location.name}`,
+          changes: {
+            item: { old: stockItem.code, new: stockItem.code },
+            location: { new: location.name },
+            adjustmentType: { new: type === "add" ? "Add Stock" : "Subtract Stock" },
+            quantity: { old: String(result.currentQty), new: String(result.newQty) },
+            adjustment: { new: `${type === "add" ? "+" : "-"}${qty}` },
+          },
+        });
+      } catch { /* non-fatal */ }
       res.json({
         message: `Successfully ${type === "add" ? "added" : "subtracted"} ${qty} units. New quantity: ${result.newQty}`,
         previousQuantity: result.currentQty,

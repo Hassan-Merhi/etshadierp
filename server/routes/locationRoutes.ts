@@ -96,6 +96,24 @@ export function registerLocationRoutes(app: Express) {
       };
 
       const location = await storage.createLocation(locationData);
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId: req.session.currentCompanyId!,
+          action: "create",
+          tableName: "locations",
+          recordId: location.id,
+          recordIdentifier: location.name,
+          changes: {
+            name: { new: location.name },
+            code: { new: location.code },
+            city: { new: location.city || null },
+            state: { new: location.state || null },
+            country: { new: location.country || null },
+          },
+        });
+      } catch { /* non-fatal */ }
       res.status(201).json(location);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -163,6 +181,20 @@ export function registerLocationRoutes(app: Express) {
         .where(eq(locations.id, locationId))
         .returning();
 
+      try {
+        const _locChanges: Record<string, { old: any; new: any }> = {};
+        if (location.name !== updated.name) _locChanges.name = { old: location.name, new: updated.name };
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId: req.session.currentCompanyId!,
+          action: "update",
+          tableName: "locations",
+          recordId: updated.id,
+          recordIdentifier: updated.name,
+          changes: _locChanges,
+        });
+      } catch { /* non-fatal */ }
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -192,6 +224,21 @@ export function registerLocationRoutes(app: Express) {
       }
 
       await storage.deleteLocation(locationId);
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId: req.session.currentCompanyId!,
+          action: "delete",
+          tableName: "locations",
+          recordId: location.id,
+          recordIdentifier: location.name,
+          changes: {
+            name: { old: location.name },
+            code: { old: location.code },
+          },
+        });
+      } catch { /* non-fatal */ }
       res.json({ message: "Location deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

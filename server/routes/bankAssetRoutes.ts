@@ -102,6 +102,25 @@ export function registerBankAssetRoutes(app: Express) {
       }
 
       const account = await storage.createBankAccount(parsed);
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId: req.session.currentCompanyId!,
+          action: "create",
+          tableName: "bank_accounts",
+          recordId: account.id,
+          recordIdentifier: account.name,
+          changes: {
+            name: { new: account.name },
+            code: { new: account.code },
+            bankName: { new: (account as any).bankName || null },
+            accountNumber: { new: (account as any).accountNumber || null },
+            openingBalance: { new: account.openingBalance || "0" },
+            openingBalanceSide: { new: account.openingBalanceSide || null },
+          },
+        });
+      } catch { /* non-fatal */ }
       res.status(201).json(account);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -115,6 +134,7 @@ export function registerBankAssetRoutes(app: Express) {
       }
 
       const id = parseInt(req.params.id);
+      const existingBankAcc = await storage.getBankAccountById(id, req.session.currentCompanyId);
       const parsed = insertBankAccountSchema.partial().parse(req.body);
 
       // Validate opening balance amount and side must both be present or both absent
@@ -137,6 +157,26 @@ export function registerBankAssetRoutes(app: Express) {
       }
 
       const account = await storage.updateBankAccount(id, parsed, req.session.currentCompanyId);
+      try {
+        if (existingBankAcc) {
+          const _bankChanges: Record<string, { old: any; new: any }> = {};
+          for (const _f of ["name", "code", "openingBalance", "openingBalanceSide"] as const) {
+            if (String((existingBankAcc as any)[_f] ?? "") !== String((account as any)[_f] ?? "")) {
+              _bankChanges[_f] = { old: (existingBankAcc as any)[_f], new: (account as any)[_f] };
+            }
+          }
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "update",
+            tableName: "bank_accounts",
+            recordId: account.id,
+            recordIdentifier: account.name,
+            changes: _bankChanges,
+          });
+        }
+      } catch { /* non-fatal */ }
       res.json(account);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -150,7 +190,26 @@ export function registerBankAssetRoutes(app: Express) {
       }
 
       const id = parseInt(req.params.id);
+      const existingBankAccDel = await storage.getBankAccountById(id, req.session.currentCompanyId);
       await storage.deleteBankAccount(id, req.session.currentCompanyId);
+      try {
+        if (existingBankAccDel) {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "delete",
+            tableName: "bank_accounts",
+            recordId: existingBankAccDel.id,
+            recordIdentifier: existingBankAccDel.name,
+            changes: {
+              name: { old: existingBankAccDel.name },
+              code: { old: existingBankAccDel.code },
+              openingBalance: { old: existingBankAccDel.openingBalance || "0" },
+            },
+          });
+        }
+      } catch { /* non-fatal */ }
       res.status(204).send();
     } catch (error: any) {
       res.status(400).json({ message: error.message });

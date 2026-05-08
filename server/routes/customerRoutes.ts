@@ -233,6 +233,27 @@ export function registerCustomerRoutes(app: Express) {
       // Create customer with auto-generated code
       const customer = await storage.createCustomer({ ...parsed, code } as any);
 
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId: req.session.currentCompanyId!,
+          action: "create",
+          tableName: "customers",
+          recordId: customer.id,
+          recordIdentifier: customer.legalName,
+          changes: {
+            name: { new: customer.legalName },
+            code: { new: customer.code },
+            phone: { new: customer.phone || null },
+            email: { new: customer.email || null },
+            address: { new: customer.address || null },
+            openingBalance: { new: customer.openingBalance || "0" },
+            openingBalanceSide: { new: customer.openingBalanceSide || null },
+          },
+        });
+      } catch { /* non-fatal */ }
+
       // Auto-create ledger account for customer with opening balance
       const customerAccountCode = `CUST-${customer.code}`;
       let customerAccount =
@@ -312,6 +333,25 @@ export function registerCustomerRoutes(app: Express) {
           parsed,
         );
 
+        try {
+          const _custChanges: Record<string, { old: any; new: any }> = {};
+          for (const _f of ["legalName", "phone", "email", "address", "openingBalance", "openingBalanceSide", "active"] as const) {
+            if (String((existingCustomer as any)[_f] ?? "") !== String((updatedCustomer as any)[_f] ?? "")) {
+              _custChanges[_f] = { old: (existingCustomer as any)[_f], new: (updatedCustomer as any)[_f] };
+            }
+          }
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "update",
+            tableName: "customers",
+            recordId: updatedCustomer.id,
+            recordIdentifier: updatedCustomer.legalName,
+            changes: _custChanges,
+          });
+        } catch { /* non-fatal */ }
+
         // Sync ledger account opening balance if customer has a linked ledger account
         // and opening balance was updated
         if (updatedCustomer.ledgerAccountId && 
@@ -356,6 +396,24 @@ export function registerCustomerRoutes(app: Express) {
           return res.status(403).json({ message: "Access denied" });
         }
         await storage.deleteCustomer(customerId);
+        try {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "delete",
+            tableName: "customers",
+            recordId: existing.id,
+            recordIdentifier: existing.legalName,
+            changes: {
+              name: { old: existing.legalName },
+              code: { old: existing.code },
+              phone: { old: existing.phone || null },
+              email: { old: existing.email || null },
+              address: { old: existing.address || null },
+            },
+          });
+        } catch { /* non-fatal */ }
         res.status(204).send();
       } catch (error: any) {
         res.status(500).json({ message: error.message });

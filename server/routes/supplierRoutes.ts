@@ -199,6 +199,24 @@ export function registerSupplierRoutes(app: Express) {
       };
 
       const supplier = await storage.createSupplier(supplierData);
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId: supplier.companyId!,
+          action: "create",
+          tableName: "suppliers",
+          recordId: supplier.id,
+          recordIdentifier: supplier.legalName,
+          changes: {
+            name: { new: supplier.legalName },
+            code: { new: supplier.code },
+            phone: { new: supplier.phone || null },
+            email: { new: supplier.email || null },
+            address: { new: supplier.address || null },
+          },
+        });
+      } catch { /* non-fatal */ }
       res.status(201).json(supplier);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -237,6 +255,24 @@ export function registerSupplierRoutes(app: Express) {
           parsed,
         );
 
+        try {
+          const _supChanges: Record<string, { old: any; new: any }> = {};
+          for (const _f of ["legalName", "phone", "email", "address", "taxId", "paymentTerms"] as const) {
+            if (String((existingSupplier as any)[_f] ?? "") !== String((updatedSupplier as any)[_f] ?? "")) {
+              _supChanges[_f] = { old: (existingSupplier as any)[_f], new: (updatedSupplier as any)[_f] };
+            }
+          }
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: updatedSupplier.companyId!,
+            action: "update",
+            tableName: "suppliers",
+            recordId: updatedSupplier.id,
+            recordIdentifier: updatedSupplier.legalName,
+            changes: _supChanges,
+          });
+        } catch { /* non-fatal */ }
         res.json(updatedSupplier);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
@@ -259,6 +295,23 @@ export function registerSupplierRoutes(app: Express) {
           return res.status(404).json({ message: "Supplier not found" });
         }
         await storage.deleteSupplier(supplierId);
+        try {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: existing.companyId!,
+            action: "delete",
+            tableName: "suppliers",
+            recordId: existing.id,
+            recordIdentifier: existing.legalName,
+            changes: {
+              name: { old: existing.legalName },
+              code: { old: existing.code },
+              phone: { old: existing.phone || null },
+              email: { old: existing.email || null },
+            },
+          });
+        } catch { /* non-fatal */ }
         res.status(204).send();
       } catch (error: any) {
         res.status(500).json({ message: error.message });
