@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../db";
 import { requireAuth, requireRole } from "../auth";
 import {
@@ -11,6 +11,16 @@ import {
   userCompanyRoles,
 } from "../../shared/schema";
 import { and, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import {
+  resolveGitCompanyScope,
+  fetchActiveContainers,
+  loadCompanyNames,
+  enrichContainers,
+  applyGitFilters,
+  buildSummary,
+  type GitFilterQuery,
+  type EnrichedContainer,
+} from "../lib/gitHelpers";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -555,5 +565,217 @@ export function registerGitRoutes(app: Express) {
         return res.status(500).json({ message: "Internal server error" });
       }
     }
+  );
+
+  // ─── Shared inner helper ────────────────────────────────────────────────────
+  // Resolves scope, fetches+enriches active containers, applies query filters,
+  // then calls the route-specific shaper function. Read-only: zero mutations.
+
+  async function handleGitListing(
+    req: Request,
+    res: Response,
+    preFilter?: (rows: EnrichedContainer[]) => EnrichedContainer[],
+  ): Promise<void> {
+    try {
+      const userId: string = (req.user as any).id;
+      const role: string = (req.user as any).role;
+      const sessionCompanyId: number | undefined =
+        (req.session as any)?.currentCompanyId;
+
+      const scope = await resolveGitCompanyScope(
+        userId,
+        role,
+        req.query as Record<string, string | undefined>,
+        sessionCompanyId,
+      );
+      if ("error" in scope) {
+        res.status(scope.status).json({ message: scope.error });
+        return;
+      }
+
+      const companyIds =
+        scope.mode === "all" ? scope.companyIds : [scope.companyId];
+
+      const [raw, nameMap] = await Promise.all([
+        fetchActiveContainers(companyIds),
+        loadCompanyNames(companyIds),
+      ]);
+
+      let enriched = enrichContainers(raw, nameMap);
+
+      // Route-level pre-filter (e.g. at-port, truck-location)
+      if (preFilter) enriched = preFilter(enriched);
+
+      // User-supplied query filters
+      const filtered = applyGitFilters(enriched, req.query as GitFilterQuery);
+
+      const asOf = new Date().toISOString();
+
+      if (scope.mode === "all") {
+        res.json({ asOf, mode: "all", total: filtered.length, containers: filtered });
+      } else {
+        const companyName = nameMap[scope.companyId] ?? `Company ${scope.companyId}`;
+        res.json({
+          asOf,
+          mode: "single",
+          companyId: scope.companyId,
+          companyName,
+          total: filtered.length,
+          containers: filtered,
+        });
+      }
+    } catch (err) {
+      console.error("[gitRoutes] listing error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  /**
+   * GET /api/git/containers
+   *
+   * All active containers (OTW / Sea / At Port / Left Dar / At Border /
+   * In Transit / Arrived) with computed fields attached.
+   *
+   * Access: Admin / Developer (any company) | Owner (their companies only)
+   * Query:  companyId, allCompanies, status, transporter, agent, location,
+   *         search/q, docsReady, delayed, overdue
+   *
+   * Response (single):
+   *   { asOf, mode:"single", companyId, companyName, total, containers:[...] }
+   * Response (all):
+   *   { asOf, mode:"all", total, containers:[...] }
+   *
+   * Each container includes:
+   *   all original DB fields + companyName + maxOffloadDate + daysDelayed
+   *   + docsReadyNotSent + isOverdue
+   *
+   * Read-only. No mutations.
+   */
+  app.get(
+    "/api/git/containers",
+    requireAuth,
+    requireRole("Admin", "Owner"),
+    (req, res) => handleGitListing(req, res),
+  );
+
+  /**
+   * GET /api/git/summary
+   *
+   * Aggregate counts over active containers (same scope + filter logic as
+   * /api/git/containers, but returns stats instead of raw rows).
+   *
+   * Response (single):
+   *   { asOf, mode:"single", companyId, companyName, summary:{...} }
+   * Response (all):
+   *   { asOf, mode:"all", summary:{...}, byCompany:[{companyId,companyName,summary}] }
+   *
+   * summary fields: total, byStatus, delayed, overdue, docsReadyNotSent,
+   *                 withTruck, withoutTruck
+   *
+   * Read-only. No mutations.
+   */
+  app.get(
+    "/api/git/summary",
+    requireAuth,
+    requireRole("Admin", "Owner"),
+    async (req, res) => {
+      try {
+        const userId: string = (req.user as any).id;
+        const role: string = (req.user as any).role;
+        const sessionCompanyId: number | undefined =
+          (req.session as any)?.currentCompanyId;
+
+        const scope = await resolveGitCompanyScope(
+          userId,
+          role,
+          req.query as Record<string, string | undefined>,
+          sessionCompanyId,
+        );
+        if ("error" in scope) {
+          return res.status(scope.status).json({ message: scope.error });
+        }
+
+        const companyIds =
+          scope.mode === "all" ? scope.companyIds : [scope.companyId];
+
+        const [raw, nameMap] = await Promise.all([
+          fetchActiveContainers(companyIds),
+          loadCompanyNames(companyIds),
+        ]);
+
+        const enriched = enrichContainers(raw, nameMap);
+        const filtered = applyGitFilters(enriched, req.query as GitFilterQuery);
+        const asOf = new Date().toISOString();
+
+        if (scope.mode === "all") {
+          // Overall + per-company breakdown
+          const overall = buildSummary(filtered);
+
+          const byCompany = companyIds.map((cid) => ({
+            companyId: cid,
+            companyName: nameMap[cid] ?? `Company ${cid}`,
+            summary: buildSummary(filtered.filter((r) => r.companyId === cid)),
+          }));
+
+          return res.json({
+            asOf,
+            mode: "all",
+            summary: overall,
+            byCompany,
+          });
+        }
+
+        const companyName =
+          nameMap[scope.companyId] ?? `Company ${scope.companyId}`;
+        return res.json({
+          asOf,
+          mode: "single",
+          companyId: scope.companyId,
+          companyName,
+          summary: buildSummary(filtered),
+        });
+      } catch (err) {
+        console.error("[gitRoutes] summary error:", err);
+        return res.status(500).json({ message: "Internal server error" });
+      }
+    },
+  );
+
+  /**
+   * GET /api/git/at-port
+   *
+   * Active containers whose status is exactly "At Port".
+   * All query params from /api/git/containers are supported on top of the
+   * pre-filter (e.g. ?agent=NAHLI further narrows within At Port containers).
+   *
+   * Read-only. No mutations.
+   */
+  app.get(
+    "/api/git/at-port",
+    requireAuth,
+    requireRole("Admin", "Owner"),
+    (req, res) =>
+      handleGitListing(req, res, (rows) =>
+        rows.filter((r) => r.status === "At Port"),
+      ),
+  );
+
+  /**
+   * GET /api/git/truck-location
+   *
+   * Active containers that have a truck assigned (numberPlate is set).
+   * Useful for real-time fleet positioning view.
+   * All query params from /api/git/containers are supported on top.
+   *
+   * Read-only. No mutations.
+   */
+  app.get(
+    "/api/git/truck-location",
+    requireAuth,
+    requireRole("Admin", "Owner"),
+    (req, res) =>
+      handleGitListing(req, res, (rows) =>
+        rows.filter((r) => !!(r.numberPlate ?? "").trim()),
+      ),
   );
 }
