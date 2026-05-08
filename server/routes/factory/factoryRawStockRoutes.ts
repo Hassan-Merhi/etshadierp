@@ -632,7 +632,10 @@ export function registerFactoryRawStockRoutes(app: Express) {
           eq(factoryRawMaterialAdjustments.supplierId, factorySuppliers.id),
           eq(factorySuppliers.companyId, companyId)
         ))
-        .where(eq(factoryRawMaterialAdjustments.companyId, companyId))
+        .where(and(
+          eq(factoryRawMaterialAdjustments.companyId, companyId),
+          isNull(factoryRawMaterialAdjustments.deletedAt),
+        ))
         .orderBy(desc(factoryRawMaterialAdjustments.createdAt));
       res.json(rows);
     } catch (error: any) {
@@ -893,43 +896,44 @@ export function registerFactoryRawStockRoutes(app: Express) {
         .limit(1);
       if (!adj) return res.status(404).json({ message: "Adjustment not found" });
 
-      // Soft-delete: preserve linked vouchers/daybook for restore.
-      // Permanent deletion (with cascade) is from Settings → Deleted Items.
-      await db.update(factoryRawMaterialAdjustments)
-        .set({ deletedAt: new Date() })
-        .where(and(eq(factoryRawMaterialAdjustments.id, id), eq(factoryRawMaterialAdjustments.companyId, companyId)));
-
-      res.json({ success: true });
-      return;
-
-      // eslint-disable-next-line no-unreachable
-      await db.transaction(async (tx) => {
-        // Delete the raw stock adjustment record
-        await tx.delete(factoryRawMaterialAdjustments)
-          .where(and(eq(factoryRawMaterialAdjustments.id, id), eq(factoryRawMaterialAdjustments.companyId, companyId)));
-
-        // Reverse any linked journal vouchers created for this adjustment
-        // Voucher numbers were created as: FACTORY-MANUAL-{id}-{timestamp}
-        const linkedVouchers = await tx.select({ id: vouchers.id })
-          .from(vouchers)
+      if (adj.type === "DEDUCT" && adj.supplierId) {
+        // For DEDUCT: restore receivedKg on the supplier's raw stock rows (LIFO — newest first),
+        // then hard-delete the record so it no longer appears in the list.
+        const stockRows = await db
+          .select({ id: factoryRawStock.id, receivedKg: factoryRawStock.receivedKg })
+          .from(factoryRawStock)
+          .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
           .where(and(
-            eq(vouchers.companyId, companyId),
-            sql`${vouchers.voucherNumber} LIKE ${'FACTORY-MANUAL-' + id + '-%'}`,
-          ));
+            eq(factoryRawStock.companyId, companyId),
+            eq(factoryContainers.supplierId, adj.supplierId),
+            sql`${factoryContainers.status} != 'DELETED'`,
+          ))
+          .orderBy(desc(factoryRawStock.offloadedAt));
 
-        for (const v of linkedVouchers) {
-          // Delete voucher entries first (FK constraint)
-          await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, v.id));
-          await tx.delete(vouchers).where(eq(vouchers.id, v.id));
-        }
-
-        // Delete linked daybook entries (referenceId = adj.id, txType = 'OFFLOAD_RAW_STOCK')
-        await tx.delete(factoryDaybookEntries).where(and(
-          eq(factoryDaybookEntries.companyId, companyId),
-          eq(factoryDaybookEntries.referenceId, id),
-          sql`${factoryDaybookEntries.txType} = 'OFFLOAD_RAW_STOCK'`,
-        ));
-      });
+        await db.transaction(async (tx) => {
+          let remaining = parseFloat(String(adj.kg));
+          for (const row of stockRows) {
+            if (remaining <= 0.001) break;
+            const received = parseFloat(String(row.receivedKg));
+            // Add back all remaining to this row (newest first)
+            await tx.update(factoryRawStock)
+              .set({ receivedKg: String((received + remaining).toFixed(3)) })
+              .where(eq(factoryRawStock.id, row.id));
+            remaining = 0;
+          }
+          // Hard-delete the DEDUCT record
+          await tx.delete(factoryRawMaterialAdjustments)
+            .where(and(
+              eq(factoryRawMaterialAdjustments.id, id),
+              eq(factoryRawMaterialAdjustments.companyId, companyId),
+            ));
+        });
+      } else {
+        // For ADD / REMOVE: soft-delete (vouchers and daybook stay intact)
+        await db.update(factoryRawMaterialAdjustments)
+          .set({ deletedAt: new Date() })
+          .where(and(eq(factoryRawMaterialAdjustments.id, id), eq(factoryRawMaterialAdjustments.companyId, companyId)));
+      }
 
       res.json({ success: true });
     } catch (error: any) {

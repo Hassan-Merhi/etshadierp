@@ -275,16 +275,21 @@ function AdjustmentsHistoryCard({ onDeleteRequest }: {
                 <TableRow key={adj.id} data-testid={`row-adjustment-${adj.id}`}>
                   <TableCell className="text-sm text-muted-foreground">{formatDisplayDate(adj.date)}</TableCell>
                   <TableCell>
-                    <Badge variant={adj.type === "ADD" ? "default" : "secondary"} data-testid={`badge-adj-type-${adj.id}`}>
-                      {adj.type}
+                    <Badge
+                      variant={adj.type === "ADD" ? "default" : adj.type === "DEDUCT" ? "destructive" : "secondary"}
+                      data-testid={`badge-adj-type-${adj.id}`}
+                    >
+                      {adj.type === "DEDUCT" ? "DEDUCT" : adj.type}
                     </Badge>
                   </TableCell>
                   <TableCell className="font-medium">
                     {adj.materialLabel || adj.supplierName || `Supplier #${adj.supplierId}`}
                   </TableCell>
-                  <TableCell className="text-right font-mono">{parseFloat(adj.kg).toFixed(3)}</TableCell>
+                  <TableCell className="text-right font-mono">
+                    {adj.type === "DEDUCT" ? "-" : ""}{parseFloat(adj.kg).toFixed(3)}
+                  </TableCell>
                   <TableCell className="text-right font-mono text-muted-foreground">
-                    {adj.type === "ADD" && parseFloat(adj.costPerKg) > 0
+                    {(adj.type === "ADD" || adj.type === "DEDUCT") && parseFloat(adj.costPerKg) > 0
                       ? `${adj.currencyCode} ${parseFloat(adj.costPerKg).toFixed(4)}`
                       : "—"}
                   </TableCell>
