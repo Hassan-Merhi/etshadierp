@@ -1118,6 +1118,15 @@ function TabTruckLocation() {
   const noTruck   = allContainers.filter(r => !(r.numberPlate ?? "").trim());
   const shops = [...new Set(withTruck.map(r => r.shopName ?? r.companyName ?? "Unknown"))].sort();
 
+  // Group by company for multi-company view
+  const companyGroups: { id: number; name: string; rows: EnrichedContainerApi[] }[] = [];
+  for (const r of withTruck) {
+    const existing = companyGroups.find(g => g.id === r.companyId);
+    if (existing) existing.rows.push(r);
+    else companyGroups.push({ id: r.companyId, name: r.companyName, rows: [r] });
+  }
+  companyGroups.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+
   const modeSelector = (
     <div className="flex items-center gap-2 mb-3">
       <span className="text-xs text-muted-foreground">Viewing:</span>
@@ -1183,61 +1192,75 @@ function TabTruckLocation() {
         </div>
       )}
 
-      <div className="rounded-md border overflow-hidden">
-        <table className="w-full text-xs whitespace-nowrap border-collapse">
-          <thead>
-            <tr className="bg-yellow-400 text-yellow-950 font-bold border-b-2 border-yellow-600">
-              <th className="py-1.5 px-3 text-center">CONTAINER #</th>
-              <th className="py-1.5 px-3 text-center">SUPPLIER</th>
-              <th className="py-1.5 px-3 text-center">NUMBER PLATE</th>
-              <th className="py-1.5 px-3 text-center">LOCATION</th>
-              <th className="py-1.5 px-3 text-center">AGENT</th>
-              <th className="py-1.5 px-3 text-center">TRANSPORTER</th>
-              <th className="py-1.5 px-3 text-center">STATUS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shops.flatMap(shop => {
-              const shopRows = withTruck.filter(r => (r.shopName ?? r.companyName ?? "Unknown") === shop);
-              const hdrRow = (
-                <tr key={`hdr-${shop}`} className="bg-yellow-300 border-t border-yellow-500">
-                  <td colSpan={7} className="py-1 px-3 font-bold text-yellow-900 text-center tracking-wide uppercase">
-                    {shop} — {shopRows.length} container{shopRows.length !== 1 ? "s" : ""} on road
-                  </td>
-                </tr>
-              );
-              const supplierGroups = groupBySupplier(shopRows);
-              const hasMultiSupplier = supplierGroups.length > 1;
-              const dataRows = supplierGroups.flatMap(({ name: supName, rows: supRows }) => {
-                const supHdr = hasMultiSupplier ? (
-                  <tr key={`sup-${shop}-${supName}`} className="bg-muted/40 border-t border-border">
-                    <td colSpan={7} className="py-0.5 px-3 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                      {supName} — {supRows.length}
-                    </td>
+      {(companyMode === "all" ? companyGroups : [{ id: 0, name: "", rows: withTruck }]).map(cg => {
+        const cgShops = [...new Set(cg.rows.map(r => r.shopName ?? r.companyName ?? "Unknown"))].sort(
+          (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+        );
+        return (
+          <div key={cg.id} className="space-y-1">
+            {companyMode === "all" && (
+              <div className="px-3 py-1.5 rounded-t-md bg-muted/60 border border-b-0 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                {cg.name} — {cg.rows.length} on road
+              </div>
+            )}
+            <div className={cn("rounded-md border overflow-hidden", companyMode === "all" && "rounded-t-none")}>
+              <table className="w-full text-xs whitespace-nowrap border-collapse">
+                <thead>
+                  <tr className="bg-yellow-400 text-yellow-950 font-bold border-b-2 border-yellow-600">
+                    <th className="py-1.5 px-3 text-center">CONTAINER #</th>
+                    <th className="py-1.5 px-3 text-center">SUPPLIER</th>
+                    <th className="py-1.5 px-3 text-center">NUMBER PLATE</th>
+                    <th className="py-1.5 px-3 text-center">LOCATION</th>
+                    <th className="py-1.5 px-3 text-center">AGENT</th>
+                    <th className="py-1.5 px-3 text-center">TRANSPORTER</th>
+                    <th className="py-1.5 px-3 text-center">STATUS</th>
                   </tr>
-                ) : null;
-                const rows = supRows.map(r => (
-                  <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/40">
-                    <td className="py-0.5 px-3 text-center font-mono font-semibold tracking-tight">{r.containerNumber}</td>
-                    <td className="py-0.5 px-3 text-center">{r.supplierName ?? <span className="text-muted-foreground">—</span>}</td>
-                    <td className="py-0.5 px-3 text-center font-mono">{r.numberPlate ?? <span className="text-muted-foreground">—</span>}</td>
-                    <td className="py-0.5 px-3 text-center">{r.trackingLocation ?? <span className="text-muted-foreground">—</span>}</td>
-                    <td className="py-0.5 px-3 text-center">{r.agent ?? <span className="text-muted-foreground">—</span>}</td>
-                    <td className="py-0.5 px-3 text-center">{r.transporter ?? <span className="text-muted-foreground">—</span>}</td>
-                    <td className="py-0.5 px-3 text-center">
-                      <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", (STATUS_BADGE as Record<string, string>)[r.status] ?? "bg-muted text-foreground")}>
-                        {r.status}
-                      </span>
-                    </td>
-                  </tr>
-                ));
-                return supHdr ? [supHdr, ...rows] : rows;
-              });
-              return [hdrRow, ...dataRows];
-            })}
-          </tbody>
-        </table>
-      </div>
+                </thead>
+                <tbody>
+                  {cgShops.flatMap(shop => {
+                    const shopRows = cg.rows.filter(r => (r.shopName ?? r.companyName ?? "Unknown") === shop);
+                    const hdrRow = (
+                      <tr key={`hdr-${cg.id}-${shop}`} className="bg-yellow-300 border-t border-yellow-500">
+                        <td colSpan={7} className="py-1 px-3 font-bold text-yellow-900 text-center tracking-wide uppercase">
+                          {shop} — {shopRows.length} container{shopRows.length !== 1 ? "s" : ""} on road
+                        </td>
+                      </tr>
+                    );
+                    const supplierGroups = groupBySupplier(shopRows);
+                    const hasMultiSupplier = supplierGroups.length > 1;
+                    const dataRows = supplierGroups.flatMap(({ name: supName, rows: supRows }) => {
+                      const supHdr = hasMultiSupplier ? (
+                        <tr key={`sup-${cg.id}-${shop}-${supName}`} className="bg-muted/40 border-t border-border">
+                          <td colSpan={7} className="py-0.5 px-3 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                            {supName} — {supRows.length}
+                          </td>
+                        </tr>
+                      ) : null;
+                      const rows = supRows.map(r => (
+                        <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/40">
+                          <td className="py-0.5 px-3 text-center font-mono font-semibold tracking-tight">{r.containerNumber}</td>
+                          <td className="py-0.5 px-3 text-center">{r.supplierName ?? <span className="text-muted-foreground">—</span>}</td>
+                          <td className="py-0.5 px-3 text-center font-mono">{r.numberPlate ?? <span className="text-muted-foreground">—</span>}</td>
+                          <td className="py-0.5 px-3 text-center">{r.trackingLocation ?? <span className="text-muted-foreground">—</span>}</td>
+                          <td className="py-0.5 px-3 text-center">{r.agent ?? <span className="text-muted-foreground">—</span>}</td>
+                          <td className="py-0.5 px-3 text-center">{r.transporter ?? <span className="text-muted-foreground">—</span>}</td>
+                          <td className="py-0.5 px-3 text-center">
+                            <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", (STATUS_BADGE as Record<string, string>)[r.status] ?? "bg-muted text-foreground")}>
+                              {r.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ));
+                      return supHdr ? [supHdr, ...rows] : rows;
+                    });
+                    return [hdrRow, ...dataRows];
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
