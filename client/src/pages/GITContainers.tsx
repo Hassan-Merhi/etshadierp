@@ -948,7 +948,7 @@ export default function GITContainers() {
       if (sh !== 0) return sh;
       return a.containerNumber.localeCompare(b.containerNumber);
     });
-  }, [allContainers, chipFilter, companyFilter, transporterFilter, agentFilter, docsFilter, delayedFilter, search]);
+  }, [allContainers, companyFilter, transporterFilter, agentFilter, docsFilter, delayedFilter, search]);
 
   // Summary stats (always over all loaded active containers)
   const atSea          = allContainers.filter((c) => c.status === "OTW" || c.status === "Sea").length;
