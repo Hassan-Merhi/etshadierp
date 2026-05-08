@@ -676,16 +676,9 @@ function TabSummary() {
   const byTransport = useMemo(() => makeBreakdown(r => r.transporter ?? "—"), [allContainers]);
   const byAgent     = useMemo(() => makeBreakdown(r => r.agent ?? "—"), [allContainers]);
 
-  const attentionRows = useMemo(() => [
-    ...allContainers.filter(r => r.daysDelayed !== null && r.daysDelayed > 0)
-      .map(r => ({ label: r.containerNumber, issue: `Delayed +${r.daysDelayed}d`, color: "text-red-600" })),
-    ...allContainers.filter(r => !r.docReceived && r.status === "At Port")
-      .map(r => ({ label: r.containerNumber, issue: "At port — docs missing", color: "text-rose-600" })),
-    ...allContainers.filter(r => r.docsReadyNotSent)
-      .map(r => ({ label: r.containerNumber, issue: "Docs ready — not sent to truck", color: "text-amber-600" })),
-    ...allContainers.filter(r => r.isOverdue)
-      .map(r => ({ label: r.containerNumber, issue: "Offload overdue", color: "text-orange-600" })),
-  ], [allContainers]);
+  const attentionRows = useMemo(() =>
+    allContainers.filter(r => r.docsReadyNotSent),
+  [allContainers]);
 
   const modeSelector = (
     <div className="flex items-center gap-2 flex-wrap" data-testid="summary-mode-selector">
@@ -812,23 +805,25 @@ function TabSummary() {
 
       {/* Attention section */}
       {attentionRows.length > 0 && (
-        <Card className="border-red-200 dark:border-red-900 bg-red-50/40 dark:bg-red-950/20">
-          <CardHeader className="pb-2 pt-3 px-3">
-            <CardTitle className="text-sm text-red-700 dark:text-red-400 flex items-center gap-1.5">
-              <AlertTriangle className="h-4 w-4" /> Needs Attention ({attentionRows.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-3 pb-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
-              {attentionRows.map((a, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs">
-                  <span className="font-mono font-semibold text-foreground">{a.label}</span>
-                  <span className={cn("truncate", a.color)}>{a.issue}</span>
+        <div className="rounded-md border border-amber-200 dark:border-amber-800 overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+            <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+              Docs ready — not sent to transporter yet
+            </span>
+            <span className="ml-auto text-xs text-amber-600 dark:text-amber-400 font-medium">{attentionRows.length} container{attentionRows.length !== 1 ? "s" : ""}</span>
+          </div>
+          <div className="p-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-1.5">
+              {attentionRows.map(r => (
+                <div key={r.id} className="flex items-center gap-1.5 bg-amber-50/60 dark:bg-amber-950/20 rounded px-2 py-1">
+                  <span className="font-mono text-xs font-semibold text-foreground truncate">{r.containerNumber}</span>
+                  {r.shopName && <span className="text-[10px] text-muted-foreground truncate">· {r.shopName}</span>}
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Breakdown tables */}
