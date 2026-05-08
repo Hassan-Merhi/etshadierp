@@ -206,9 +206,11 @@ export function registerPosRoutes(app: Express) {
   app.post("/api/pos/send-invoice-pdf-backend", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
+      console.log(`[WA invoice] START role=${req.user?.role} user=${req.user?.id} companyId=${companyId}`);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { voucherId, locationId } = req.body;
+      console.log(`[WA invoice] voucherId=${voucherId} locationId=${locationId}`);
       if (!voucherId)  return res.status(400).json({ message: "voucherId is required" });
       if (!locationId) return res.status(400).json({ message: "locationId is required" });
 
@@ -221,8 +223,14 @@ export function registerPosRoutes(app: Express) {
         .where(and(eq(locations.id, locId), eq(locations.companyId, companyId)))
         .limit(1);
 
-      if (!location)                     return res.status(404).json({ message: "Location not found" });
-      if (!location.whatsappGroupChatId) return res.status(400).json({ message: "No WhatsApp group configured for this location" });
+      if (!location) {
+        console.log(`[WA invoice] FAIL: location ${locId} not found for company ${companyId}`);
+        return res.status(404).json({ message: "Location not found" });
+      }
+      if (!location.whatsappGroupChatId) {
+        console.log(`[WA invoice] FAIL: location ${locId} has no whatsappGroupChatId`);
+        return res.status(400).json({ message: "No WhatsApp group configured for this location" });
+      }
 
       // POS users can only send invoices for vouchers from their own shifts
       if (req.user?.role === "POS") {
@@ -232,8 +240,10 @@ export function registerPosRoutes(app: Express) {
           .where(and(eq(vouchers.id, parseInt(voucherId)), eq(vouchers.companyId, companyId)))
           .limit(1);
         if (!voucherToCheck) {
+          console.log(`[WA invoice] FAIL: voucher ${voucherId} not found for company ${companyId}`);
           return res.status(404).json({ message: "Voucher not found" });
         }
+        console.log(`[WA invoice] POS check: voucherShiftId=${voucherToCheck.shiftId}`);
         // Verify ownership via shift when a shiftId is present
         if (voucherToCheck.shiftId) {
           const [shift] = await db
@@ -241,10 +251,13 @@ export function registerPosRoutes(app: Express) {
             .from(posShifts)
             .where(eq(posShifts.id, voucherToCheck.shiftId))
             .limit(1);
+          console.log(`[WA invoice] POS shift check: shiftUserId=${shift?.userId} reqUserId=${req.user.id} match=${shift?.userId === req.user.id}`);
           if (!shift || shift.userId !== req.user.id) {
+            console.log(`[WA invoice] FAIL: ownership mismatch shiftUserId=${shift?.userId} vs reqUserId=${req.user.id}`);
             return res.status(403).json({ message: "Access denied" });
           }
         }
+        console.log(`[WA invoice] POS ownership OK`);
       }
 
       const erpVis = await getErpExportVisibility(req);
