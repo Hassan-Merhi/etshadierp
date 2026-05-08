@@ -1037,3 +1037,103 @@ export async function syncEmployeeBalancesFromEntries(
       .where(eq(employees.id, employee.id));
   }
 }
+
+// ─── Item-level diff builder ───────────────────────────────────────────────────
+export async function buildItemLevelChanges(
+  oldItems: Array<{
+    stockItemId?: number | null;
+    itemName?: string | null;
+    quantity?: string | number | null;
+    rate?: string | number | null;
+    totalAmount?: string | number | null;
+    lineTotal?: string | number | null;
+    totalValue?: string | number | null;
+  }>,
+  newItems: Array<{
+    stockItemId?: number | null;
+    itemName?: string | null;
+    quantity?: string | number | null;
+    rate?: string | number | null;
+    totalAmount?: string | number | null;
+    lineTotal?: string | number | null;
+    totalValue?: string | number | null;
+  }>,
+  resolveNameFn?: (id: number) => Promise<string>
+): Promise<Record<string, { old?: string; new?: string }>> {
+  const nameCache = new Map<number, string>();
+  async function getName(
+    id: number | null | undefined,
+    hint?: string | null
+  ): Promise<string> {
+    if (hint) return hint;
+    if (!id) return "Unknown Item";
+    if (nameCache.has(id)) return nameCache.get(id)!;
+    const name = resolveNameFn ? await resolveNameFn(id) : `Item #${id}`;
+    nameCache.set(id, name);
+    return name;
+  }
+
+  const oldMap = new Map<number, (typeof oldItems)[0]>();
+  for (const item of oldItems) {
+    if (item.stockItemId != null) oldMap.set(item.stockItemId, item);
+  }
+  const newMap = new Map<number, (typeof newItems)[0]>();
+  for (const item of newItems) {
+    if (item.stockItemId != null) newMap.set(item.stockItemId, item);
+  }
+
+  const changes: Record<string, { old?: string; new?: string }> = {};
+  let idx = 0;
+
+  for (const [id, item] of newMap) {
+    if (!oldMap.has(id)) {
+      const name = await getName(id, item.itemName);
+      const qty = String(item.quantity ?? "");
+      const rate = String(item.rate ?? "");
+      const total = String(
+        item.totalAmount ?? item.lineTotal ?? item.totalValue ?? ""
+      );
+      changes[`item_added_${++idx}`] = {
+        new: `Added ${name}, quantity ${qty}, unit price ${rate}, total ${total}`,
+      };
+    }
+  }
+
+  for (const [id, item] of oldMap) {
+    if (!newMap.has(id)) {
+      const name = await getName(id, item.itemName);
+      const qty = String(item.quantity ?? "");
+      const rate = String(item.rate ?? "");
+      const total = String(
+        item.totalAmount ?? item.lineTotal ?? item.totalValue ?? ""
+      );
+      changes[`item_removed_${++idx}`] = {
+        old: `Removed ${name}, quantity ${qty}, rate ${rate}, total ${total}`,
+      };
+    }
+  }
+
+  for (const [id, newItem] of newMap) {
+    const oldItem = oldMap.get(id);
+    if (!oldItem) continue;
+    const name = await getName(id, newItem.itemName ?? oldItem.itemName);
+    const fieldChanges: string[] = [];
+    const qn = parseFloat(String(newItem.quantity ?? 0));
+    const qo = parseFloat(String(oldItem.quantity ?? 0));
+    if (!isNaN(qn) && !isNaN(qo) && Math.abs(qn - qo) > 0.0001) {
+      fieldChanges.push(`quantity from ${qo} to ${qn}`);
+    }
+    const rn = parseFloat(String(newItem.rate ?? 0));
+    const ro = parseFloat(String(oldItem.rate ?? 0));
+    if (!isNaN(rn) && !isNaN(ro) && Math.abs(rn - ro) > 0.0001) {
+      fieldChanges.push(`unit price from ${ro} to ${rn}`);
+    }
+    if (fieldChanges.length) {
+      changes[`item_changed_${++idx}`] = {
+        new: `${name}: ${fieldChanges.join("; ")}`,
+      };
+    }
+  }
+
+  return changes;
+}

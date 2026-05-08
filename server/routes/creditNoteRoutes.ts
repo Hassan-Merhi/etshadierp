@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
-import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries } from "./_helpers";
+import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries, buildItemLevelChanges } from "./_helpers";
 import {
   inventory, stockItems, stockGroups, stockItemCodeAliases,
   stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
@@ -503,6 +503,12 @@ export function registerCreditNoteRoutes(app: Express) {
         }
       }
 
+      // Snapshot old credit note items BEFORE the transaction (for audit diff)
+      const _oldCNItems = await db
+        .select()
+        .from(creditNoteItems)
+        .where(eq(creditNoteItems.voucherId, voucherId));
+
       // Wrap all mutations in a transaction
       await db.transaction(async (tx) => {
         // Get existing credit note items to reverse inventory
@@ -695,8 +701,32 @@ export function registerCreditNoteRoutes(app: Express) {
 
       try {
         const _cnChanges: Record<string, any> = {};
-        if (voucherDate && voucher.voucherDate !== voucherDate) _cnChanges.date = { old: voucher.voucherDate, new: voucherDate };
-        if (items?.length) _cnChanges.itemCount = { new: items.length };
+        if (voucherDate && voucher.voucherDate !== voucherDate)
+          _cnChanges.date = { old: voucher.voucherDate, new: voucherDate };
+        if (cashAccountId !== undefined)
+          _cnChanges.cashAccount = { old: _oldCNItems[0]?.voucherId ?? null, new: cashAccountId };
+        const _resolveCNName = async (id: number) =>
+          (await storage.getStockItemById(id))?.name ?? `Item #${id}`;
+        const _cnItemDiff = items?.length
+          ? await buildItemLevelChanges(
+              _oldCNItems.map(it => ({
+                stockItemId: it.stockItemId,
+                quantity: it.quantity,
+                rate: it.rate,
+                totalValue: it.totalValue,
+              })),
+              (items as any[]).map(it => ({
+                stockItemId: Number(it.stockItemId),
+                quantity: String(it.quantity ?? ""),
+                rate: String(it.refundRate ?? it.rate ?? ""),
+                totalValue: String(
+                  parseFloat(String(it.quantity ?? 0)) *
+                    parseFloat(String(it.refundRate ?? it.rate ?? 0))
+                ),
+              })),
+              _resolveCNName
+            )
+          : {};
         await logAudit({
           userId: req.session.userId!,
           username: (req.session as any).username || "unknown",
@@ -705,7 +735,7 @@ export function registerCreditNoteRoutes(app: Express) {
           tableName: "vouchers",
           recordId: voucherId,
           recordIdentifier: voucher.voucherNumber,
-          changes: _cnChanges,
+          changes: { ..._cnChanges, ..._cnItemDiff },
         });
       } catch { /* non-fatal */ }
       res.json({

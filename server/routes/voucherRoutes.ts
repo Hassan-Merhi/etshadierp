@@ -3,7 +3,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { requireActionAccess } from "../lib/permissionMiddleware";
-import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries, snapshotVoucherEntries, buildVoucherChangesForCreate, buildVoucherChangesForUpdate } from "./_helpers";
+import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries, snapshotVoucherEntries, buildVoucherChangesForCreate, buildVoucherChangesForUpdate, buildItemLevelChanges } from "./_helpers";
 import {
   inventory, stockItems, stockGroups, stockItemCodeAliases,
   stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
@@ -2954,6 +2954,9 @@ export function registerVoucherRoutes(app: Express) {
           };
         });
 
+        // Snapshot old PO line items for audit diff (before delete)
+        const _oldPOItems = await db.select().from(poLineItems).where(eq(poLineItems.poId, po.id));
+
         // Delete existing PO line items
         await db.delete(poLineItems).where(eq(poLineItems.poId, po.id));
 
@@ -3013,8 +3016,24 @@ export function registerVoucherRoutes(app: Express) {
             _purChanges.date = { old: existingVoucher.voucherDate, new: updated[0].voucherDate };
           if (existingVoucher.totalAmount !== updated[0].totalAmount)
             _purChanges.totalAmount = { old: existingVoucher.totalAmount, new: updated[0].totalAmount };
-          if ((items as any[])?.length)
-            _purChanges.lineItems = { new: `${(items as any[]).length} item(s)` };
+          if (existingVoucher.description !== updated[0].description)
+            _purChanges.description = { old: existingVoucher.description ?? "", new: updated[0].description ?? "" };
+          const _itemDiff = await buildItemLevelChanges(
+            _oldPOItems.map(it => ({
+              stockItemId: it.stockItemId,
+              itemName: it.itemName,
+              quantity: it.quantity,
+              rate: it.rate,
+              lineTotal: it.lineTotal,
+            })),
+            poItemsData.map(it => ({
+              stockItemId: it.stockItemId,
+              itemName: it.itemName,
+              quantity: it.quantity,
+              rate: it.rate,
+              lineTotal: it.lineTotal,
+            }))
+          );
           await logAudit({
             userId: req.session.userId!,
             username: (req.session as any).username || "unknown",
@@ -3023,7 +3042,7 @@ export function registerVoucherRoutes(app: Express) {
             tableName: "vouchers",
             recordId: updated[0].id,
             recordIdentifier: updated[0].voucherNumber,
-            changes: _purChanges,
+            changes: { ..._purChanges, ..._itemDiff },
           });
         } catch { /* non-fatal */ }
         res.json(updated[0]);
@@ -3119,6 +3138,12 @@ export function registerVoucherRoutes(app: Express) {
           .where(eq(stockAdjustmentVouchers.voucherId, id))
           .limit(1)
           .then((rows) => rows[0]);
+
+        // Snapshot old adjustment items before creating/replacing (empty if just created)
+        const _oldAdjItems = adjustmentVoucher
+          ? await db.select().from(stockAdjustmentItems)
+              .where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id))
+          : [];
 
         // If no adjustment voucher exists, create one
         if (!adjustmentVoucher) {
@@ -3236,8 +3261,25 @@ export function registerVoucherRoutes(app: Express) {
             _adjChanges.totalAmount = { old: existingVoucher.totalAmount, new: updated.totalAmount };
           if (existingVoucher.locationId !== updated.locationId)
             _adjChanges.location = { old: existingVoucher.locationId, new: updated.locationId };
-          if ((items as any[])?.length)
-            _adjChanges.lineItems = { new: `${(items as any[]).length} item(s)` };
+          if ((existingVoucher.description ?? "") !== (updated.description ?? ""))
+            _adjChanges.description = { old: existingVoucher.description ?? "", new: updated.description ?? "" };
+          const _resolveAdjName = async (id: number) =>
+            (await storage.getStockItemById(id))?.name ?? `Item #${id}`;
+          const _adjItemDiff = await buildItemLevelChanges(
+            _oldAdjItems.map(it => ({
+              stockItemId: it.stockItemId,
+              quantity: it.quantity,
+              rate: it.rate,
+              totalAmount: it.totalAmount,
+            })),
+            adjustmentItemsData.map(it => ({
+              stockItemId: it.stockItemId,
+              quantity: it.quantity,
+              rate: it.rate,
+              totalAmount: it.totalAmount,
+            })),
+            _resolveAdjName
+          );
           await logAudit({
             userId: req.session.userId!,
             username: (req.session as any).username || "unknown",
@@ -3246,7 +3288,7 @@ export function registerVoucherRoutes(app: Express) {
             tableName: "vouchers",
             recordId: updated.id,
             recordIdentifier: updated.voucherNumber,
-            changes: _adjChanges,
+            changes: { ..._adjChanges, ..._adjItemDiff },
           });
         } catch { /* non-fatal */ }
         res.json(updated);
@@ -3339,6 +3381,20 @@ export function registerVoucherRoutes(app: Express) {
         }
 
         console.log(`[Stock Transfer Edit] Starting update for voucher ${id}`);
+
+        // Snapshot old transfer items before the transaction mutates them
+        const _preTransfer = await db
+          .select()
+          .from(stockTransferVouchers)
+          .where(eq(stockTransferVouchers.voucherId, id))
+          .limit(1)
+          .then((rows) => rows[0]);
+        const _oldXfrItems = _preTransfer
+          ? await db
+              .select()
+              .from(stockTransferItems)
+              .where(eq(stockTransferItems.transferId, _preTransfer.id))
+          : [];
 
         // Wrap the entire operation in a transaction for atomicity
         const updated = await db.transaction(async (tx) => {
@@ -3469,10 +3525,29 @@ export function registerVoucherRoutes(app: Express) {
             _xfrChanges.date = { old: existingVoucher.voucherDate, new: updated.voucherDate };
           if (existingVoucher.totalAmount !== updated.totalAmount)
             _xfrChanges.totalAmount = { old: existingVoucher.totalAmount, new: updated.totalAmount };
-          if (existingVoucher.locationId !== updated.locationId)
-            _xfrChanges.sourceLocation = { old: existingVoucher.locationId, new: updated.locationId };
-          if ((items as any[])?.length)
-            _xfrChanges.lineItems = { new: `${(items as any[]).length} item(s)` };
+          if (_preTransfer && parseInt(sourceLocationId) !== _preTransfer.sourceLocationId)
+            _xfrChanges.sourceLocation = { old: _preTransfer.sourceLocationId, new: parseInt(sourceLocationId) };
+          if (_preTransfer && parseInt(destinationLocationId) !== _preTransfer.destinationLocationId)
+            _xfrChanges.destinationLocation = { old: _preTransfer.destinationLocationId, new: parseInt(destinationLocationId) };
+          if ((existingVoucher.description ?? "") !== (updated.description ?? ""))
+            _xfrChanges.description = { old: existingVoucher.description ?? "", new: updated.description ?? "" };
+          const _resolveXfrName = async (id: number) =>
+            (await storage.getStockItemById(id))?.name ?? `Item #${id}`;
+          const _xfrItemDiff = await buildItemLevelChanges(
+            _oldXfrItems.map(it => ({
+              stockItemId: it.stockItemId,
+              quantity: it.quantity,
+              rate: it.rate,
+              totalAmount: it.totalAmount,
+            })),
+            transferItemsData.map(it => ({
+              stockItemId: it.stockItemId,
+              quantity: it.quantity,
+              rate: it.rate,
+              totalAmount: it.totalAmount,
+            })),
+            _resolveXfrName
+          );
           await logAudit({
             userId: req.session.userId!,
             username: (req.session as any).username || "unknown",
@@ -3481,7 +3556,7 @@ export function registerVoucherRoutes(app: Express) {
             tableName: "vouchers",
             recordId: updated.id,
             recordIdentifier: updated.voucherNumber,
-            changes: _xfrChanges,
+            changes: { ..._xfrChanges, ..._xfrItemDiff },
           });
         } catch { /* non-fatal */ }
         console.log(`[Stock Transfer Edit] Successfully updated voucher ${id}`);
