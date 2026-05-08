@@ -586,7 +586,9 @@ export const containerTrackingEvents = pgTable("container_tracking_events", {
   eventDescription: text("event_description"),
   rawEventJson: jsonb("raw_event_json"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  dedupUnique: uniqueIndex("cte_dedup_unique").on(t.containerId, t.eventTime, t.eventStatus),
+}));
 
 export type ContainerTrackingEvent = typeof containerTrackingEvents.$inferSelect;
 

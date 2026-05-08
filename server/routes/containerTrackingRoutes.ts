@@ -12,7 +12,7 @@ import {
   containers,
   containerTrackingEvents,
 } from "../../shared/schema";
-import { and, eq, desc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
 import { trackOneContainerById } from "../services/containerTrackingService";
 import { testConnection } from "../lib/parcelsAppClient";

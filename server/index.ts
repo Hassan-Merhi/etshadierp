@@ -2851,6 +2851,7 @@ let migrationsDone = false;
     )`,
     `CREATE INDEX IF NOT EXISTS cte_container_id_idx ON container_tracking_events (container_id)`,
     `CREATE INDEX IF NOT EXISTS cte_event_time_idx ON container_tracking_events (container_id, event_time DESC)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS cte_dedup_unique ON container_tracking_events (container_id, event_time, event_status) WHERE event_time IS NOT NULL AND event_status IS NOT NULL`,
 
     // ParcelsApp — container_tracking_checks table
     `CREATE TABLE IF NOT EXISTS container_tracking_checks (
