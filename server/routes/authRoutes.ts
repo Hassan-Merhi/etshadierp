@@ -683,6 +683,19 @@ export function registerAuthRoutes(app: Express) {
     },
   );
 
+  // Helper: invalidate all active sessions belonging to a specific user.
+  // Called after any role or permission change so the user must re-login to
+  // pick up the new permissions from the fresh session fields.
+  async function invalidateUserSessions(userId: string) {
+    try {
+      await db.execute(
+        sql`DELETE FROM session WHERE sess::jsonb ->> 'userId' = ${userId}`
+      );
+    } catch (_err) {
+      // Non-fatal — if the session table doesn't exist yet, skip silently
+    }
+  }
+
   app.post(
     "/api/user-company-roles",
     requireAuth,
@@ -698,7 +711,37 @@ export function registerAuthRoutes(app: Express) {
             .json({ message: "POS role requires an assigned location" });
         }
 
+        // Enforce one role per company per user
+        const existing = await db
+          .select({ id: userCompanyRoles.id })
+          .from(userCompanyRoles)
+          .where(
+            and(
+              eq(userCompanyRoles.userId, parsed.userId),
+              eq(userCompanyRoles.companyId, parsed.companyId)
+            )
+          )
+          .limit(1);
+        if (existing.length > 0) {
+          return res.status(409).json({
+            message:
+              "This user already has a role in this company. Edit the existing role instead.",
+          });
+        }
+
         const role = await storage.createUserCompanyRole(parsed);
+
+        await logAudit({
+          userId: req.user!.id,
+          username: req.user!.username || req.session.username || "unknown",
+          companyId: req.session.currentCompanyId,
+          action: "create",
+          tableName: "user_company_roles",
+          recordId: role.id,
+          recordIdentifier: `userId:${parsed.userId} role:${parsed.role} company:${parsed.companyId}`,
+          changes: null,
+        });
+
         res.status(201).json(role);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
@@ -722,7 +765,39 @@ export function registerAuthRoutes(app: Express) {
             .json({ message: "POS role requires an assigned location" });
         }
 
+        // Fetch old record for audit diff and to get the affected userId
+        const [oldRecord] = await db
+          .select()
+          .from(userCompanyRoles)
+          .where(eq(userCompanyRoles.id, parseInt(id)))
+          .limit(1);
+
         const role = await storage.updateUserCompanyRole(parseInt(id), parsed);
+
+        if (oldRecord) {
+          const changes: Record<string, { old: any; new: any }> = {};
+          for (const key of Object.keys(parsed) as Array<keyof typeof parsed>) {
+            const oldVal = (oldRecord as any)[key];
+            const newVal = (parsed as any)[key];
+            if (newVal !== undefined && String(oldVal) !== String(newVal)) {
+              changes[key] = { old: oldVal, new: newVal };
+            }
+          }
+          await logAudit({
+            userId: req.user!.id,
+            username: req.user!.username || req.session.username || "unknown",
+            companyId: req.session.currentCompanyId,
+            action: "update",
+            tableName: "user_company_roles",
+            recordId: parseInt(id),
+            recordIdentifier: `userId:${oldRecord.userId} role:${oldRecord.role} company:${oldRecord.companyId}`,
+            changes: Object.keys(changes).length > 0 ? changes : null,
+          });
+
+          // Invalidate affected user's sessions so permissions refresh on next login
+          await invalidateUserSessions(oldRecord.userId);
+        }
+
         res.json(role);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
@@ -737,7 +812,32 @@ export function registerAuthRoutes(app: Express) {
     async (req, res) => {
       try {
         const { id } = req.params;
+
+        // Fetch record before deletion for audit log and session invalidation
+        const [oldRecord] = await db
+          .select()
+          .from(userCompanyRoles)
+          .where(eq(userCompanyRoles.id, parseInt(id)))
+          .limit(1);
+
         await storage.deleteUserCompanyRole(parseInt(id));
+
+        if (oldRecord) {
+          await logAudit({
+            userId: req.user!.id,
+            username: req.user!.username || req.session.username || "unknown",
+            companyId: req.session.currentCompanyId,
+            action: "delete",
+            tableName: "user_company_roles",
+            recordId: parseInt(id),
+            recordIdentifier: `userId:${oldRecord.userId} role:${oldRecord.role} company:${oldRecord.companyId}`,
+            changes: null,
+          });
+
+          // Invalidate affected user's sessions so the removed role takes effect immediately
+          await invalidateUserSessions(oldRecord.userId);
+        }
+
         res.status(204).send();
       } catch (error: any) {
         res.status(400).json({ message: error.message });

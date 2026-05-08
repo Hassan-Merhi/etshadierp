@@ -66,7 +66,10 @@ export function requireRole(...roles: string[]) {
   };
 }
 
-// Permission check for delete operations (Owner can't delete)
+// Permission check for delete operations.
+// - Owner: cannot delete (read-only oversight role)
+// - POS: cannot delete (sales-entry only role)
+// All other roles pass through (Manager, Normal User, Admin, Developer).
 export function canDelete(req: Request, res: Response, next: NextFunction) {
   if (!req.user) {
     return res.status(401).json({ message: "Unauthorized" });
@@ -74,6 +77,10 @@ export function canDelete(req: Request, res: Response, next: NextFunction) {
 
   if (req.user.role === "Owner") {
     return res.status(403).json({ message: "Owners cannot delete records" });
+  }
+
+  if (req.user.role === "POS") {
+    return res.status(403).json({ message: "POS users cannot delete records" });
   }
 
   next();

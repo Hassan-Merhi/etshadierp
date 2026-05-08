@@ -886,6 +886,17 @@ export function registerPosRoutes(app: Express) {
         return res.status(400).json({ message: "Only Sales vouchers can be updated with this endpoint" });
       }
 
+      // POS restriction: cannot change location or payment account on an existing sale.
+      // Date changes are already blocked by the canModifyDate middleware above.
+      if (req.user?.role === "POS") {
+        if (newLocationId && parseInt(newLocationId) !== existingVoucher.locationId) {
+          return res.status(403).json({ message: "POS users cannot change the location of an existing sale" });
+        }
+        if (paymentAccountType !== undefined || paymentAccountId !== undefined) {
+          return res.status(403).json({ message: "POS users cannot change the payment account on an existing sale" });
+        }
+      }
+
       // Determine target location - use new location if provided, otherwise keep existing
       const oldLocationId = existingVoucher.locationId!;
       const targetLocationId = newLocationId ? parseInt(newLocationId) : oldLocationId;

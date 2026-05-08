@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Users, Clock, Activity } from "lucide-react";
+import { Users, Clock, Activity, LayoutGrid } from "lucide-react";
 import { UsersSection } from "./UsersSection";
 import { LoginHistoryTab } from "./LoginHistoryTab";
 import { ActiveUsersSection } from "./ActiveUsersSection";
+import { ModuleAccessSection } from "./ModuleAccessSection";
 
 interface UsersPermissionsHubProps {
   userRole?: string;
@@ -14,6 +15,7 @@ export function UsersPermissionsHub({ userRole, appMode }: UsersPermissionsHubPr
   const [activeTab, setActiveTab] = useState("users");
 
   const isDev = userRole === "Developer";
+  const canManageAccess = userRole === "Developer" || userRole === "Admin" || userRole === "Owner";
 
   return (
     <div className="space-y-4">
@@ -23,7 +25,7 @@ export function UsersPermissionsHub({ userRole, appMode }: UsersPermissionsHubPr
           Users &amp; Permissions
         </h2>
         <p className="text-muted-foreground text-sm mt-1">
-          Manage users and role assignments.
+          Manage users, role assignments, and module access.
         </p>
       </div>
 
@@ -33,6 +35,12 @@ export function UsersPermissionsHub({ userRole, appMode }: UsersPermissionsHubPr
             <Users className="h-3.5 w-3.5" />
             Users
           </TabsTrigger>
+          {canManageAccess && (
+            <TabsTrigger value="module-access" className="flex items-center gap-1.5" data-testid="tab-module-access">
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Module Access
+            </TabsTrigger>
+          )}
           {isDev && (
             <TabsTrigger value="login-history" className="flex items-center gap-1.5" data-testid="tab-login-history">
               <Clock className="h-3.5 w-3.5" />
@@ -50,6 +58,12 @@ export function UsersPermissionsHub({ userRole, appMode }: UsersPermissionsHubPr
         <TabsContent value="users" className="mt-4">
           <UsersSection />
         </TabsContent>
+
+        {canManageAccess && (
+          <TabsContent value="module-access" className="mt-4">
+            <ModuleAccessSection />
+          </TabsContent>
+        )}
 
         {isDev && (
           <TabsContent value="login-history" className="mt-4">
