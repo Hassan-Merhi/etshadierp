@@ -1296,6 +1296,7 @@ interface ApiAllocatedRow {
   clearedAmount: number;
   remainingAmount: number;
   allocationStatus: ApiAllocStatus;
+  supplierName: string | null;
 }
 
 interface ApiPreviewRow {
@@ -1308,6 +1309,7 @@ interface ApiPreviewRow {
   location: string | null;
   dutyFee: number;
   status: string;
+  supplierName: string | null;
 }
 
 interface AgentDutySummary {
@@ -1472,7 +1474,7 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
               <table className="w-full text-xs whitespace-nowrap border-collapse">
                 <thead>
                   <tr className="bg-muted/50 border-b">
-                    {["CONTAINER #","PLATE","OFFLOAD DATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY","CLEARED","STATUS"].map(h => (
+                    {["CONTAINER #","SUPPLIER","PLATE","OFFLOAD DATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY","CLEARED","STATUS"].map(h => (
                       <th key={h} className="py-1 px-2 font-bold text-muted-foreground text-center">{h}</th>
                     ))}
                   </tr>
@@ -1481,6 +1483,7 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
                   {clearedRows.map((r) => (
                     <tr key={r.id} className="border-b bg-muted/15 text-muted-foreground">
                       <td className="py-0.5 px-2 font-mono">{r.containerNumber}</td>
+                      <td className="py-0.5 px-2">{r.supplierName ?? "—"}</td>
                       <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
                       <td className="py-0.5 px-2">{fmtD(r.offloadDate ?? null)}</td>
                       <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
@@ -1505,7 +1508,7 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
         <table className="w-full text-xs whitespace-nowrap border-collapse">
           <thead>
             <tr className="bg-yellow-200 text-yellow-900 border-b border-yellow-400">
-              {["CONTAINER #","PLATE","OFFLOAD DATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY","CLEARED","REMAINING","STATUS"].map(h => (
+              {["CONTAINER #","SUPPLIER","PLATE","OFFLOAD DATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY","CLEARED","REMAINING","STATUS"].map(h => (
                 <th key={h} className="py-1 px-2 font-bold text-center">{h}</th>
               ))}
             </tr>
@@ -1513,7 +1516,7 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
           <tbody>
             {openAndPartial.length === 0 ? (
               <tr>
-                <td colSpan={10} className="py-3 px-3 text-center text-muted-foreground italic text-xs">
+                <td colSpan={11} className="py-3 px-3 text-center text-muted-foreground italic text-xs">
                   No open containers — account balance is fully cleared.
                 </td>
               </tr>
@@ -1524,6 +1527,7 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
                   r.allocationStatus === "Partially Cleared" && "bg-amber-50/80 dark:bg-amber-950/20"
                 )}>
                   <td className="py-0.5 px-2 font-mono font-semibold">{r.containerNumber}</td>
+                  <td className="py-0.5 px-2">{r.supplierName ?? "—"}</td>
                   <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
                   <td className="py-0.5 px-2">{fmtD(r.offloadDate ?? null)}</td>
                   <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
@@ -1547,7 +1551,7 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
             {/* Open balance footer row */}
             {hasBalance && (
               <tr className="bg-yellow-400 text-yellow-950 font-bold">
-                <td colSpan={8} className="py-1.5 px-2 text-xs uppercase tracking-wide">
+                <td colSpan={9} className="py-1.5 px-2 text-xs uppercase tracking-wide">
                   Open Balance (= Account Balance)
                 </td>
                 <td className="py-1.5 px-2 text-right text-sm">${fmt(openBalance ?? openSum, 0)}</td>
@@ -1578,7 +1582,7 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
               <table className="w-full text-xs whitespace-nowrap border-collapse">
                 <thead>
                   <tr className="bg-sky-100 dark:bg-sky-950/30 border-b text-sky-800 dark:text-sky-300">
-                    {["CONTAINER #","PLATE","BORDER DATE","TRANSPORTER","LOCATION","STATUS","DUTY"].map(h => (
+                    {["CONTAINER #","SUPPLIER","PLATE","BORDER DATE","TRANSPORTER","LOCATION","STATUS","DUTY"].map(h => (
                       <th key={h} className="py-1 px-2 font-bold text-center">{h}</th>
                     ))}
                   </tr>
@@ -1587,6 +1591,7 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
                   {activePreviewRows.map((r) => (
                     <tr key={r.id} className="border-b bg-sky-50/30 dark:bg-sky-950/10 text-muted-foreground">
                       <td className="py-0.5 px-2 font-mono">{r.containerNumber}</td>
+                      <td className="py-0.5 px-2">{r.supplierName ?? "—"}</td>
                       <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
                       <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
                       <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>

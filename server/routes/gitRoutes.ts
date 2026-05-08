@@ -12,6 +12,7 @@ import {
   agentDeclarantMappings,
   companies,
   userCompanyRoles,
+  suppliers,
 } from "../../shared/schema";
 import { and, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 
@@ -51,6 +52,7 @@ interface ContainerRow {
   location: string | null;
   dutyFee: number;
   status: string;
+  supplierName: string | null;
 }
 
 interface AllocatedRow extends ContainerRow {
@@ -69,6 +71,7 @@ interface PreviewRow {
   location: string | null;
   dutyFee: number;
   status: string;
+  supplierName: string | null;
 }
 
 // ─── Container statuses treated as "offloaded / completed" ───────────────────
@@ -166,8 +169,10 @@ async function buildAgentsForCompany(cid: number) {
       dutyFee: containers.dutyFee,
       agent: containers.agent,
       status: containers.status,
+      supplierName: suppliers.name,
     })
     .from(containers)
+    .leftJoin(suppliers, eq(containers.supplierId, suppliers.id))
     .where(
       and(
         eq(containers.companyId, cid),
@@ -322,6 +327,7 @@ async function buildAgentsForCompany(cid: number) {
           location: r.location ?? null,
           dutyFee: parseFloat(r.dutyFee || "0"),
           status: r.status,
+          supplierName: r.supplierName ?? null,
         }));
 
       const offloadedContainers = agentContainers.filter((r) =>
@@ -410,6 +416,7 @@ async function buildAgentsForCompany(cid: number) {
         transporter: r.transporter,
         location: r.location,
         dutyFee: r.dutyFee,
+        supplierName: r.supplierName,
         status: r.status,
       }));
 
