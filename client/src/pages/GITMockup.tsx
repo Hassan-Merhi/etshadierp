@@ -967,7 +967,7 @@ function TabTruckLocation() {
   const allContainers: EnrichedContainerApi[] = data?.containers ?? [];
   const withTruck = allContainers.filter(r => !!(r.numberPlate ?? "").trim());
   const noTruck   = allContainers.filter(r => !(r.numberPlate ?? "").trim());
-  const transporters = [...new Set(withTruck.map(r => r.transporter ?? "Unknown"))].sort();
+  const shops = [...new Set(withTruck.map(r => r.shopName ?? r.companyName ?? "Unknown"))].sort();
 
   const modeSelector = (
     <div className="flex items-center gap-2 mb-3">
@@ -1023,8 +1023,8 @@ function TabTruckLocation() {
           <span className="font-bold">{noTruck.length}</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-muted-foreground text-xs">Transporters:</span>
-          <span className="font-bold">{transporters.length}</span>
+          <span className="text-muted-foreground text-xs">Shops:</span>
+          <span className="font-bold">{shops.length}</span>
         </div>
       </div>
 
@@ -1049,20 +1049,20 @@ function TabTruckLocation() {
             </tr>
           </thead>
           <tbody>
-            {/* With truck: one section per transporter (sorted alphabetically) */}
-            {transporters.flatMap(tp => {
-              const tpRows = withTruck.filter(r => (r.transporter ?? "Unknown") === tp);
+            {/* With truck: one section per shop name (sorted alphabetically) */}
+            {shops.flatMap(shop => {
+              const shopRows = withTruck.filter(r => (r.shopName ?? r.companyName ?? "Unknown") === shop);
               const hdrRow = (
-                <tr key={`hdr-${tp}`} className="bg-yellow-300 border-t border-yellow-500">
+                <tr key={`hdr-${shop}`} className="bg-yellow-300 border-t border-yellow-500">
                   <td colSpan={8} className="py-1 px-3 font-bold text-yellow-900 text-center tracking-wide uppercase">
-                    {tp} — {tpRows.length} container{tpRows.length !== 1 ? "s" : ""} on road
+                    {shop} — {shopRows.length} container{shopRows.length !== 1 ? "s" : ""} on road
                   </td>
                 </tr>
               );
-              const dataRows = tpRows.map(r => (
+              const dataRows = shopRows.map(r => (
                 <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/40">
                   <td className="py-0.5 px-3 font-mono font-semibold tracking-tight">{r.containerNumber}</td>
-                  <td className="py-0.5 px-3 font-medium">{r.companyName}</td>
+                  <td className="py-0.5 px-3 font-medium">{r.shopName ?? r.companyName}</td>
                   <td className="py-0.5 px-3 font-mono">{r.numberPlate ?? <span className="text-muted-foreground">—</span>}</td>
                   <td className="py-0.5 px-3">{r.trackingLocation ?? <span className="text-muted-foreground">—</span>}</td>
                   <td className="py-0.5 px-3">{r.agent ?? <span className="text-muted-foreground">—</span>}</td>
@@ -1093,7 +1093,7 @@ function TabTruckLocation() {
             ) : noTruck.map(r => (
               <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/40">
                 <td className="py-0.5 px-3 font-mono font-semibold tracking-tight">{r.containerNumber}</td>
-                <td className="py-0.5 px-3 font-medium">{r.companyName}</td>
+                <td className="py-0.5 px-3 font-medium">{r.shopName ?? r.companyName}</td>
                 <td className="py-0.5 px-3 text-muted-foreground">—</td>
                 <td className="py-0.5 px-3">{r.trackingLocation ?? <span className="text-muted-foreground">—</span>}</td>
                 <td className="py-0.5 px-3">{r.agent ?? <span className="text-muted-foreground">—</span>}</td>

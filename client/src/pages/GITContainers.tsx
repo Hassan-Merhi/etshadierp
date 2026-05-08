@@ -70,6 +70,7 @@ interface EnrichedContainerRow {
   containerNumber: string;
   companyId: number;
   companyName: string;
+  shopName: string | null;
   status: string;
   eta: string | null;
   grandTotal: string | null;
@@ -1214,6 +1215,7 @@ export default function GITContainers() {
                 <TableHead className="w-8">#</TableHead>
                 <TableHead>Container #</TableHead>
                 <TableHead>Company</TableHead>
+                <TableHead>Shop Name</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>ETA DAS</TableHead>
                 <TableHead className="text-right">Cost</TableHead>
@@ -1238,7 +1240,7 @@ export default function GITContainers() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={22} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={23} className="text-center py-8 text-muted-foreground">
                     {allContainers.length === 0
                       ? "No active containers found."
                       : "No containers match the current filters."}
@@ -1265,6 +1267,7 @@ export default function GITContainers() {
                       <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                       <TableCell className="font-mono font-medium">{c.containerNumber}</TableCell>
                       <TableCell>{c.companyName}</TableCell>
+                      <TableCell>{c.shopName ?? <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell>
                         <span className={cn(
                           "flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium w-fit",
