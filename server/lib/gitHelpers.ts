@@ -137,23 +137,23 @@ export function calcMaxOffloadDate(
 }
 
 /**
- * Days elapsed since maxOffloadDate.
- * Returns null when:
- *   - truck is already assigned (numberPlate is set)
- *   - maxOffloadDate has not yet passed
- *   - maxOffloadDate is unknown
+ * Days the container has been sitting at port since its ETA, with no truck
+ * assigned yet. Returns null when:
+ *   - truck is already assigned (numberPlate is set)  → resets to "—"
+ *   - ETA is unknown
+ *   - container arrived today or hasn't arrived yet
  */
 export function calcDaysDelayed(
-  maxOffloadDate: string | null,
+  eta: string | null,
   numberPlate: string | null,
 ): number | null {
   if (numberPlate && numberPlate.trim()) return null;
-  if (!maxOffloadDate) return null;
+  if (!eta) return null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const max = new Date(maxOffloadDate);
-  if (isNaN(max.getTime())) return null;
-  const diffMs = today.getTime() - max.getTime();
+  const arrival = new Date(eta);
+  if (isNaN(arrival.getTime())) return null;
+  const diffMs = today.getTime() - arrival.getTime();
   if (diffMs <= 0) return null;
   return Math.floor(diffMs / (1000 * 60 * 60 * 24));
 }
@@ -331,7 +331,7 @@ export function enrichContainers(
       ...r,
       companyName: nameMap[r.companyId] ?? `Company ${r.companyId}`,
       maxOffloadDate,
-      daysDelayed: calcDaysDelayed(maxOffloadDate, r.numberPlate),
+      daysDelayed: calcDaysDelayed(r.eta, r.numberPlate),
       docsReadyNotSent: calcDocsReadyNotSent(r.docReceived, r.docsSentDate),
       isOverdue: calcIsOverdue(maxOffloadDate, r.status),
     };

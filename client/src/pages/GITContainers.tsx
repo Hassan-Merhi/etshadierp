@@ -306,11 +306,13 @@ function ContainerDrawer({
   })();
 
   const daysDelayed = (() => {
-    if (!maxOffload || (form?.numberPlate ?? "").trim()) return null;
+    if ((form?.numberPlate ?? "").trim()) return null;
+    if (!form?.eta) return null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const max = new Date(maxOffload);
-    const diff = Math.floor((today.getTime() - max.getTime()) / 86400000);
+    const arrival = new Date(form.eta);
+    if (isNaN(arrival.getTime())) return null;
+    const diff = Math.floor((today.getTime() - arrival.getTime()) / 86400000);
     return diff > 0 ? diff : null;
   })();
 
