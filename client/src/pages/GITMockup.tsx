@@ -144,6 +144,100 @@ const ROWS: GITRow[] = [
   { sr:5,  group:"port-dar", containerNumber:"SUDU3312000", amount:44200.00, company:"EG",   eta:"2026-05-15", numberPlate:null,        location:"Dar Port", borderDate:null,         docsReceived:false, docsSentToTruck:false, transporter:null,          transportFee:null,  agent:"NAHLI",   dutyFee:8500, freightStatus:"No",      status:"At Port",    trackingLink:null, notes:"License plate not assigned" },
 ];
 
+// ─── Truck / Location Mock Data ───────────────────────────────────────────────
+// Real implementation: derived from containers table filtered to active statuses
+// and joined with company/agent.
+
+type TruckGroupId = "hadi1" | "hadi2" | "hadi3" | "hadi4" | "hadi5";
+
+interface TruckRow {
+  group: TruckGroupId;
+  containerNumber: string;
+  company: string;
+  numberPlate: string | null;
+  location: string | null;
+  agent: string | null;
+}
+
+const TRUCK_GROUP_DEFS: { id: TruckGroupId; label: string }[] = [
+  { id: "hadi1", label: "HADI#1" },
+  { id: "hadi2", label: "HADI#2" },
+  { id: "hadi3", label: "HADI#3" },
+  { id: "hadi4", label: "HADI#4" },
+  { id: "hadi5", label: "HADI#5" },
+];
+
+const TRUCK_ROWS: TruckRow[] = [
+  // HADI#1
+  { group:"hadi1", containerNumber:"SUDU8959140", company:"3AP",     numberPlate:"T791 CDG", location:"MBALA",        agent:"NCA"   },
+  { group:"hadi1", containerNumber:"CAAU6065353", company:"EG",      numberPlate:"T303 AAD", location:"MPIKA",        agent:"NAHLI" },
+  { group:"hadi1", containerNumber:"MRSU3216638", company:"EG",      numberPlate:"T609 DHR", location:"TUNDUMA",      agent:"NAHLI" },
+  // HADI#2
+  { group:"hadi2", containerNumber:"MSKU9482779", company:"MJS",     numberPlate:"T280 DEB", location:"ISOKA",        agent:"NAHLI" },
+  { group:"hadi2", containerNumber:"MRKU4157373", company:"MJS",     numberPlate:"T767 EEV", location:"KASUMBALESA",  agent:"NAHLI" },
+  { group:"hadi2", containerNumber:"CAAU6658493", company:"GS",      numberPlate:"T218 DEQ", location:"MPEMBA",       agent:"NAHLI" },
+  // HADI#3 — empty (shown as blank group, matching Excel style)
+  // HADI#4
+  { group:"hadi4", containerNumber:"CAIU8859993", company:"AJ/KIN",  numberPlate:"T178 DDR", location:"AT DOOR",      agent:"NCA"   },
+  { group:"hadi4", containerNumber:"MRSU5096085", company:"AJ",      numberPlate:"T935 DYR", location:"KASUMBALESA",  agent:"NAHLI" },
+  { group:"hadi4", containerNumber:"MRKU2087111", company:"AJ",      numberPlate:"T225 DEQ", location:"MUNUNGA",      agent:"NCA"   },
+  { group:"hadi4", containerNumber:"TGBU9358135", company:"AJ",      numberPlate:"T198 AQZ", location:"ISOKA",        agent:"NCA"   },
+  { group:"hadi4", containerNumber:"HASU4056848", company:"AJ",      numberPlate:"T422 CAR", location:"MBEYA",        agent:"NCA"   },
+  { group:"hadi4", containerNumber:"MRKU2681859", company:"AJ",      numberPlate:"T619 BVU", location:"TUNDUMA",      agent:"NCA"   },
+  // HADI#5
+  { group:"hadi5", containerNumber:"TGHU9661992", company:"WH/SP",   numberPlate:"T211 ENA", location:"LEFT DAR",     agent:"NCA"   },
+  { group:"hadi5", containerNumber:"TCLU8745533", company:"WH/SP",   numberPlate:"T159 EBF", location:"LEFT DAR",     agent:"NCA"   },
+  { group:"hadi5", containerNumber:"SUDU8852430", company:"WH/SP",   numberPlate:"T668 ECS", location:"LEFT DAR",     agent:"NCA"   },
+];
+
+// ─── Agent / Duty Mock Data ───────────────────────────────────────────────────
+// Real implementation: derived from containers table grouped by agent/declarant,
+// split between offloaded (status=Offloaded/Closed) and active.
+
+interface DutyRow {
+  agent: string;
+  containerNumber: string;
+  company: string;
+  numberPlate: string | null;
+  borderDate: string | null;
+  transporter: string | null;
+  location: string;
+  amount: number;
+  offloaded: boolean;
+}
+
+const DUTY_ROWS: DutyRow[] = [
+  // ── NAHLI — Offloaded ──────────────────────────────────────────────────────
+  { agent:"NAHLI", containerNumber:"MSKU0369421", company:"MJS",       numberPlate:"T953 CUL", borderDate:"2026-04-19", transporter:"FARHAT",      location:"ALREADY OFFLOADED", amount:8500, offloaded:true  },
+  { agent:"NAHLI", containerNumber:"MRKU2036198", company:"MR",        numberPlate:"T464 DLL", borderDate:"2026-04-20", transporter:"TRH",         location:"ALREADY OFFLOADED", amount:8500, offloaded:true  },
+  { agent:"NAHLI", containerNumber:"GCXU5541253", company:"AJ",        numberPlate:"T896 DPN", borderDate:"2026-04-17", transporter:"TRH",         location:"ALREADY OFFLOADED", amount:8500, offloaded:true  },
+  { agent:"NAHLI", containerNumber:"MSKU0824145", company:"MR/LMP200", numberPlate:"T881 DNB", borderDate:"2026-04-20", transporter:"TRH",         location:"ALREADY OFFLOADED", amount:8500, offloaded:true  },
+  { agent:"NAHLI", containerNumber:"TLLU5762197", company:"MJS",       numberPlate:"T199 DNR", borderDate:"2026-04-29", transporter:"CONTINENTAL", location:"ALREADY OFFLOADED", amount:8500, offloaded:true  },
+  { agent:"NAHLI", containerNumber:"CAAU7751260", company:"GC",        numberPlate:"T240 CAF", borderDate:"2026-04-29", transporter:"CONTINENTAL", location:"ALREADY OFFLOADED", amount:8500, offloaded:true  },
+  { agent:"NAHLI", containerNumber:"MRKU5910460", company:"SH",        numberPlate:"T396 CVG", borderDate:"2026-04-27", transporter:"FARHAT",      location:"ALREADY OFFLOADED", amount:8500, offloaded:true  },
+  // ── NAHLI — Active ────────────────────────────────────────────────────────
+  { agent:"NAHLI", containerNumber:"MSKU9482779", company:"MJS",       numberPlate:"T280 DEB", borderDate:null,         transporter:"FARHAT",      location:"ISOKA",             amount:8500, offloaded:false },
+  { agent:"NAHLI", containerNumber:"MRSU5096085", company:"AJ",        numberPlate:"T935 DYR", borderDate:"2026-05-04", transporter:"TRH",         location:"KASUMBALESA",       amount:8500, offloaded:false },
+  { agent:"NAHLI", containerNumber:"MRKU4157373", company:"MJS",       numberPlate:"T767 EEV", borderDate:"2026-05-04", transporter:"TRH",         location:"KASUMBALESA",       amount:8500, offloaded:false },
+  { agent:"NAHLI", containerNumber:"CAAU6658493", company:"GS",        numberPlate:"T218 DEQ", borderDate:null,         transporter:"CONTINENTAL", location:"MPEMBA",            amount:8500, offloaded:false },
+  { agent:"NAHLI", containerNumber:"MRSU3216638", company:"EG",        numberPlate:"T609 DHR", borderDate:null,         transporter:"CONTINENTAL", location:"TUNDUMA",           amount:8500, offloaded:false },
+  { agent:"NAHLI", containerNumber:"CAAU6065353", company:"EG",        numberPlate:"T303 AAD", borderDate:null,         transporter:"CONTINENTAL", location:"MPIKA",             amount:8500, offloaded:false },
+  // ── NCA — Offloaded ───────────────────────────────────────────────────────
+  { agent:"NCA",   containerNumber:"SUDU8959140", company:"3AP",       numberPlate:"T791 CDG", borderDate:"2026-03-01", transporter:"CONTINENTAL", location:"ALREADY OFFLOADED", amount:8500, offloaded:true  },
+  { agent:"NCA",   containerNumber:"HLCU3312984", company:"MJS",       numberPlate:"T456 DEF", borderDate:"2026-04-10", transporter:"TRH",         location:"ALREADY OFFLOADED", amount:6300, offloaded:true  },
+  { agent:"NCA",   containerNumber:"CAAU6065900", company:"EG",        numberPlate:"T802 GFH", borderDate:"2026-04-18", transporter:"FARHAT",      location:"ALREADY OFFLOADED", amount:8500, offloaded:true  },
+  // ── NCA — Active ──────────────────────────────────────────────────────────
+  { agent:"NCA",   containerNumber:"MSKU1457569", company:"3AP",       numberPlate:null,        borderDate:"2026-03-24", transporter:"CONTINENTAL", location:"DAR PORT",          amount:8500, offloaded:false },
+  { agent:"NCA",   containerNumber:"MRKU2087111", company:"AJ",        numberPlate:"T225 DEQ", borderDate:"2026-05-02", transporter:"TRH",         location:"MUNUNGA",           amount:8500, offloaded:false },
+  { agent:"NCA",   containerNumber:"TGBU9358135", company:"AJ",        numberPlate:"T198 AQZ", borderDate:"2026-05-05", transporter:"TRH",         location:"ISOKA",             amount:8500, offloaded:false },
+  // ── BELTRANS — Offloaded ──────────────────────────────────────────────────
+  { agent:"BELTRANS", containerNumber:"TRHU9182736", company:"EG",     numberPlate:"T654 MNO", borderDate:"2026-04-30", transporter:"TRH",         location:"ALREADY OFFLOADED", amount:5500, offloaded:true  },
+  { agent:"BELTRANS", containerNumber:"MSNU9000112", company:"MJS",    numberPlate:"T301 KLM", borderDate:"2026-04-22", transporter:"FARHAT",      location:"ALREADY OFFLOADED", amount:4900, offloaded:true  },
+  // ── BELTRANS — Active ─────────────────────────────────────────────────────
+  { agent:"BELTRANS", containerNumber:"TCKU8876543", company:"MJS",    numberPlate:null,        borderDate:null,         transporter:"CONTINENTAL", location:"DAR PORT",          amount:7200, offloaded:false },
+  { agent:"BELTRANS", containerNumber:"CMAU7765431", company:"MJS",    numberPlate:null,        borderDate:null,         transporter:"FARHAT",      location:"DAR PORT",          amount:4900, offloaded:false },
+];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const ACTIVE_STATUSES: Status[] = ["OTW", "Sea", "At Port", "Left Dar", "At Border", "In Transit", "Arrived"];
@@ -823,9 +917,172 @@ function TabPortReport({ active }: { active: GITRow[] }) {
   );
 }
 
-// ─── Tab 4: WhatsApp Preview ──────────────────────────────────────────────────
+// ─── Tab 4: Truck / Location Overview ────────────────────────────────────────
+
+function TabTruckLocation() {
+  return (
+    <div className="space-y-1">
+      {/* Column header row — mimics Excel spreadsheet header */}
+      <div className="overflow-x-auto rounded-md border">
+        <table className="w-full text-xs whitespace-nowrap border-collapse">
+          <thead>
+            <tr className="bg-yellow-400 text-yellow-950 font-bold border-b-2 border-yellow-600">
+              <th className="py-1.5 px-3 text-left w-40">CONTAINER #</th>
+              <th className="py-1.5 px-3 text-left w-24">COMPANY</th>
+              <th className="py-1.5 px-3 text-left w-28">NUMBER PLATE</th>
+              <th className="py-1.5 px-3 text-left w-36">LOCATION</th>
+              <th className="py-1.5 px-3 text-left w-24">AGENT</th>
+            </tr>
+          </thead>
+          <tbody>
+            {TRUCK_GROUP_DEFS.map((gd) => {
+              const rows = TRUCK_ROWS.filter(r => r.group === gd.id);
+              return (
+                <>
+                  {/* Group header row — yellow, full-width label */}
+                  <tr key={`hdr-${gd.id}`} className="bg-yellow-300 border-t border-yellow-500">
+                    <td colSpan={5} className="py-1 px-3 font-bold text-yellow-900 text-center tracking-wide uppercase">
+                      {gd.label}
+                    </td>
+                  </tr>
+                  {rows.length === 0 ? (
+                    <tr key={`empty-${gd.id}`} className="border-b">
+                      <td colSpan={5} className="py-1.5 px-3 text-muted-foreground italic text-center">
+                        — no containers —
+                      </td>
+                    </tr>
+                  ) : (
+                    rows.map((r, i) => (
+                      <tr
+                        key={`${gd.id}-${i}`}
+                        className="border-b last:border-b-0 hover:bg-muted/40"
+                      >
+                        <td className="py-0.5 px-3 font-mono font-semibold tracking-tight">{r.containerNumber}</td>
+                        <td className="py-0.5 px-3 font-medium">{r.company}</td>
+                        <td className="py-0.5 px-3 font-mono">{r.numberPlate ?? <span className="text-muted-foreground">—</span>}</td>
+                        <td className="py-0.5 px-3">{r.location ?? <span className="text-muted-foreground">—</span>}</td>
+                        <td className="py-0.5 px-3 font-medium">{r.agent ?? <span className="text-muted-foreground">—</span>}</td>
+                      </tr>
+                    ))
+                  )}
+                </>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-muted-foreground px-1 pt-1">
+        Real implementation: derived from the containers table — active statuses only, truck/location/agent fields.
+      </p>
+    </div>
+  );
+}
+
+// ─── Tab 5: Agent / Duty Overview ────────────────────────────────────────────
+
+function TabAgentDuty() {
+  const agents = [...new Set(DUTY_ROWS.map(r => r.agent))];
+
+  return (
+    <div className="space-y-4">
+      {agents.map(agent => {
+        const offloadedRows = DUTY_ROWS.filter(r => r.agent === agent && r.offloaded);
+        const activeRows    = DUTY_ROWS.filter(r => r.agent === agent && !r.offloaded);
+        const offloadedTotal = offloadedRows.reduce((s, r) => s + r.amount, 0);
+        const activeTotal    = activeRows.reduce((s, r) => s + r.amount, 0);
+        const grandTotal     = offloadedTotal + activeTotal;
+
+        return (
+          <div key={agent} className="rounded-md border overflow-hidden">
+            {/* Agent header */}
+            <div className="bg-yellow-400 text-yellow-950 px-3 py-1.5 font-bold text-sm tracking-wide flex items-center justify-between">
+              <span>{agent}</span>
+              <span className="text-xs font-semibold opacity-80">
+                {offloadedRows.length + activeRows.length} containers — ${fmt(grandTotal, 0)}
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs whitespace-nowrap border-collapse">
+                <thead>
+                  <tr className="bg-yellow-200 text-yellow-900 border-b border-yellow-400">
+                    <th className="py-1 px-2 text-left font-bold">CONTAINER #</th>
+                    <th className="py-1 px-2 text-left font-bold">COMPANY</th>
+                    <th className="py-1 px-2 text-left font-bold">NUMBER PLATE</th>
+                    <th className="py-1 px-2 text-left font-bold">BORDER DATE</th>
+                    <th className="py-1 px-2 text-left font-bold">TRANSPORTER</th>
+                    <th className="py-1 px-2 text-left font-bold">LOCATION</th>
+                    <th className="py-1 px-2 text-right font-bold">AMOUNT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Offloaded section */}
+                  {offloadedRows.map((r, i) => (
+                    <tr key={`off-${i}`} className="bg-yellow-50/80 dark:bg-yellow-950/20 border-b hover:brightness-95">
+                      <td className="py-0.5 px-2 font-mono font-semibold">{r.containerNumber}</td>
+                      <td className="py-0.5 px-2 font-medium">{r.company}</td>
+                      <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
+                      <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
+                      <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>
+                      <td className="py-0.5 px-2 text-muted-foreground italic">{r.location}</td>
+                      <td className="py-0.5 px-2 text-right font-semibold">${fmt(r.amount, 0)}</td>
+                    </tr>
+                  ))}
+                  {/* Offloaded subtotal */}
+                  {offloadedRows.length > 0 && (
+                    <tr className="bg-yellow-300/80 dark:bg-yellow-800/30 border-b-2 border-yellow-400 font-bold text-yellow-900 dark:text-yellow-200">
+                      <td colSpan={5} className="py-1 px-2 text-center uppercase tracking-wide text-xs">TOTAL</td>
+                      <td />
+                      <td className="py-1 px-2 text-right">${fmt(offloadedTotal, 0)}</td>
+                    </tr>
+                  )}
+
+                  {/* Active/pending rows */}
+                  {activeRows.map((r, i) => (
+                    <tr key={`act-${i}`} className="border-b hover:bg-muted/30">
+                      <td className="py-0.5 px-2 font-mono font-semibold">{r.containerNumber}</td>
+                      <td className="py-0.5 px-2 font-medium">{r.company}</td>
+                      <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? <span className="text-muted-foreground">—</span>}</td>
+                      <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
+                      <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>
+                      <td className="py-0.5 px-2">{r.location}</td>
+                      <td className="py-0.5 px-2 text-right font-semibold">${fmt(r.amount, 0)}</td>
+                    </tr>
+                  ))}
+                  {/* Active subtotal */}
+                  {activeRows.length > 0 && (
+                    <tr className="bg-muted/50 border-b-2 font-bold">
+                      <td colSpan={5} className="py-1 px-2 text-center uppercase tracking-wide text-xs text-muted-foreground">TOTAL</td>
+                      <td />
+                      <td className="py-1 px-2 text-right">${fmt(activeTotal, 0)}</td>
+                    </tr>
+                  )}
+
+                  {/* Grand total */}
+                  <tr className="bg-yellow-400 text-yellow-950 font-bold">
+                    <td colSpan={5} className="py-1.5 px-2 text-center uppercase tracking-wide text-xs">TOTAL</td>
+                    <td />
+                    <td className="py-1.5 px-2 text-right text-sm">${fmt(grandTotal, 0)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })}
+      <p className="text-xs text-muted-foreground px-1">
+        Real implementation: derived from containers table, grouped by agent/declarant field. Amount = duty fee. Split between offloaded (status=Offloaded/Closed) and active containers.
+      </p>
+    </div>
+  );
+}
+
+// ─── Tab 6: WhatsApp Preview ──────────────────────────────────────────────────
 
 function TabWhatsApp({ active }: { active: GITRow[] }) {
+  const [inclTrucks, setInclTrucks] = useState(false);
+  const [inclDuty,   setInclDuty]   = useState(false);
+
   const seaOtw    = active.filter(r => r.status === "OTW" || r.status === "Sea").length;
   const atPort    = active.filter(r => r.status === "At Port").length;
   const leftDar   = active.filter(r => r.status === "Left Dar").length;
@@ -840,6 +1097,41 @@ function TabWhatsApp({ active }: { active: GITRow[] }) {
   const totalDuty = active.reduce((s, r) => s + (r.dutyFee ?? 0), 0);
 
   const today = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+
+  // Optional: Truck / Location summary lines
+  const truckLines: string[] = inclTrucks ? [
+    ``,
+    `*TRUCK / LOCATION STATUS*`,
+    ...TRUCK_GROUP_DEFS.map(gd => {
+      const rows = TRUCK_ROWS.filter(r => r.group === gd.id);
+      if (rows.length === 0) return `${gd.label}: — no containers`;
+      return [
+        `${gd.label} (${rows.length}):`,
+        ...rows.map(r => `  ${r.containerNumber} | ${r.company} | ${r.numberPlate ?? "no truck"} | ${r.location ?? "—"} | ${r.agent ?? "—"}`),
+      ].join("\n");
+    }),
+  ] : [];
+
+  // Optional: Agent / Duty summary lines
+  const dutyLines: string[] = inclDuty ? (() => {
+    const agents = [...new Set(DUTY_ROWS.map(r => r.agent))];
+    return [
+      ``,
+      `*AGENT / DUTY SUMMARY*`,
+      ...agents.map(agent => {
+        const offRows  = DUTY_ROWS.filter(r => r.agent === agent && r.offloaded);
+        const actRows  = DUTY_ROWS.filter(r => r.agent === agent && !r.offloaded);
+        const offTotal = offRows.reduce((s, r) => s + r.amount, 0);
+        const actTotal = actRows.reduce((s, r) => s + r.amount, 0);
+        return [
+          `${agent}:`,
+          `  Offloaded: ${offRows.length} ctr — $${fmt(offTotal, 0)}`,
+          `  Active:    ${actRows.length} ctr — $${fmt(actTotal, 0)}`,
+          `  TOTAL:     $${fmt(offTotal + actTotal, 0)}`,
+        ].join("\n");
+      }),
+    ];
+  })() : [];
 
   const lines = [
     `*GIT DAILY REPORT — ${today.toUpperCase()}*`,
@@ -894,14 +1186,40 @@ function TabWhatsApp({ active }: { active: GITRow[] }) {
       `*TRACKING LINKS*`,
       ...active.filter(r => r.trackingLink).map(r => `${r.containerNumber}: ${r.trackingLink}`),
     ] : []),
+    ...truckLines,
+    ...dutyLines,
   ];
 
   return (
     <div className="space-y-3 max-w-2xl">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <MessageSquare className="h-4 w-4 text-green-600" />
         <p className="text-sm font-medium">Daily WhatsApp GIT Report</p>
         <Badge variant="outline" className="text-xs">Text preview — no PDF/image</Badge>
+      </div>
+      {/* Optional section toggles */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-muted-foreground">Include optional sections:</span>
+        <Button
+          size="sm"
+          variant={inclTrucks ? "default" : "outline"}
+          className="gap-1.5 text-xs h-7"
+          onClick={() => setInclTrucks(v => !v)}
+          data-testid="button-wa-trucks"
+        >
+          <Truck className="h-3 w-3" />
+          Truck / Location
+        </Button>
+        <Button
+          size="sm"
+          variant={inclDuty ? "default" : "outline"}
+          className="gap-1.5 text-xs h-7"
+          onClick={() => setInclDuty(v => !v)}
+          data-testid="button-wa-duty"
+        >
+          <DollarSign className="h-3 w-3" />
+          Agent / Duty
+        </Button>
       </div>
       <div className="rounded-lg border bg-[#e5ddd5] dark:bg-zinc-800 p-3">
         <div className="bg-white dark:bg-zinc-700 rounded-lg p-3 text-xs font-mono whitespace-pre-wrap leading-relaxed max-h-[600px] overflow-y-auto">
@@ -943,10 +1261,12 @@ export default function GITMockup() {
         </div>
 
         <Tabs defaultValue="detail">
-          <TabsList className="grid grid-cols-4 w-full max-w-xl">
-            <TabsTrigger value="summary"  data-testid="tab-git-summary">GIT Summary</TabsTrigger>
-            <TabsTrigger value="detail"   data-testid="tab-git-detail">GIT Detail</TabsTrigger>
+          <TabsList className="grid grid-cols-3 w-full max-w-2xl">
+            <TabsTrigger value="summary"  data-testid="tab-git-summary">Summary</TabsTrigger>
+            <TabsTrigger value="detail"   data-testid="tab-git-detail">Detail</TabsTrigger>
             <TabsTrigger value="port"     data-testid="tab-git-port">At Port / Sea</TabsTrigger>
+            <TabsTrigger value="trucks"   data-testid="tab-git-trucks">Truck / Location</TabsTrigger>
+            <TabsTrigger value="agents"   data-testid="tab-git-agents">Agent / Duty</TabsTrigger>
             <TabsTrigger value="whatsapp" data-testid="tab-git-wa">WhatsApp</TabsTrigger>
           </TabsList>
 
@@ -960,6 +1280,14 @@ export default function GITMockup() {
 
           <TabsContent value="port" className="mt-4">
             <TabPortReport active={active} />
+          </TabsContent>
+
+          <TabsContent value="trucks" className="mt-4">
+            <TabTruckLocation />
+          </TabsContent>
+
+          <TabsContent value="agents" className="mt-4">
+            <TabAgentDuty />
           </TabsContent>
 
           <TabsContent value="whatsapp" className="mt-4">
