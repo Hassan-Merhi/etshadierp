@@ -63,9 +63,24 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const [proforma] = await db.select().from(customerProformas)
-        .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)));
-      if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+      // Use SELECT * to avoid "column does not exist" errors when the Drizzle schema
+      // has columns not yet migrated to production.
+      const rawProformaRes = await db.execute(
+        sql`SELECT * FROM customer_proformas WHERE id = ${id} AND company_id = ${companyId} AND deleted_at IS NULL LIMIT 1`,
+      );
+      const rawProformaRows: any[] = (rawProformaRes as any).rows ?? (rawProformaRes as unknown as any[]);
+      if (!rawProformaRows.length) return res.status(404).json({ message: "Proforma not found" });
+      const pr = rawProformaRows[0];
+      const proforma = {
+        id:         pr.id,
+        companyId:  pr.company_id,
+        customerId: pr.customer_id,
+        name:       pr.name       ?? "",
+        isActive:   pr.is_active  ?? false,
+        deletedAt:  pr.deleted_at ?? null,
+        createdAt:  pr.created_at,
+        updatedAt:  pr.updated_at ?? pr.created_at,
+      };
       // Raw SQL to avoid "column does not exist" when price_fixed / production_price_per_bale
       // are absent from the production DB.
       const rawLinesRes = await db.execute(
@@ -105,23 +120,34 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const customerId = req.query.customerId ? parseOptionalId(req.query.customerId) : null;
       if (!customerId) return res.status(400).json({ message: "customerId is required" });
 
-      const proformas = await db
-        .select()
-        .from(customerProformas)
-        .where(and(
-          eq(customerProformas.companyId, companyId),
-          eq(customerProformas.customerId, customerId),
-          isNull(customerProformas.deletedAt),
-        ))
-        .orderBy(asc(customerProformas.name));
+      // SELECT * to avoid explicit-column failures when the Drizzle schema has
+      // columns not yet migrated to production (e.g. is_active added later).
+      const rawProformasRes = await db.execute(
+        sql`SELECT * FROM customer_proformas
+            WHERE company_id = ${companyId}
+              AND customer_id = ${customerId}
+              AND deleted_at IS NULL
+            ORDER BY name ASC`,
+      );
+      const proformas: any[] = ((rawProformasRes as any).rows ?? (rawProformasRes as unknown as any[])).map((r: any) => ({
+        id:         r.id,
+        companyId:  r.company_id,
+        customerId: r.customer_id,
+        name:       r.name      ?? "",
+        isActive:   r.is_active ?? false,
+        deletedAt:  r.deleted_at ?? null,
+        createdAt:  r.created_at,
+        updatedAt:  r.updated_at ?? r.created_at,
+      }));
 
       const proformaIds = proformas.map((p: any) => p.id);
       let lines: any[] = [];
       if (proformaIds.length > 0) {
-        // Use raw SQL to avoid explicit-column failures when newer columns
-        // (price_fixed, production_price_per_bale) are absent from production.
+        // ANY(${jsArray}) generates tuple syntax ANY(($1,$2,...)) which PostgreSQL
+        // rejects.  Use IN (${sql.join(...)}) which produces valid IN ($1,$2,...).
+        const idList = sql.join(proformaIds.map((id: number) => sql`${id}`), sql`,`);
         const rawLines = await db.execute(
-          sql`SELECT * FROM customer_proforma_lines WHERE proforma_id = ANY(${proformaIds})`,
+          sql`SELECT * FROM customer_proforma_lines WHERE proforma_id IN (${idList})`,
         );
         const rawRows: any[] = (rawLines as any).rows ?? (rawLines as unknown as any[]);
         lines = rawRows.map((l: any) => ({
