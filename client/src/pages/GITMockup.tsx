@@ -1986,7 +1986,7 @@ export default function GITMockup() {
         </div>
 
         <Tabs defaultValue="detail">
-          <TabsList className="grid grid-cols-3 w-full max-w-2xl">
+          <TabsList className="grid grid-cols-6 w-full">
             <TabsTrigger value="summary"  data-testid="tab-git-summary">Summary</TabsTrigger>
             <TabsTrigger value="detail"   data-testid="tab-git-detail">Detail</TabsTrigger>
             <TabsTrigger value="port"     data-testid="tab-git-port">At Port / Sea</TabsTrigger>
