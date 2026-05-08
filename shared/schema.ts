@@ -2223,23 +2223,23 @@ export const ROUTE_TO_FEATURE: Record<string, FeatureKey> = Object.fromEntries(
 
 // Container tracking update schema for OTW tracking
 export const updateContainerTrackingSchema = z.object({
-  shopName: z.string().optional(),
+  shopName: z.string().nullable().optional(),
   eta: z.string().nullable().optional(),
   etaSource: z.enum(["manual", "api"]).optional(),
-  transporter: z.string().optional(),
+  transporter: z.string().nullable().optional(),
   transportFee: z.string().nullable().optional(),
-  numberPlate: z.string().optional(),
-  trackingLocation: z.string().optional(),
+  numberPlate: z.string().nullable().optional(),
+  trackingLocation: z.string().nullable().optional(),
   borderDate: z.string().nullable().optional(),
   offloadDate: z.string().nullable().optional(),
-  agent: z.string().optional(),
+  agent: z.string().nullable().optional(),
   dutyFee: z.string().nullable().optional(),
   docReceived: z.boolean().optional(),
-  trackingDescription: z.string().optional(),
+  trackingDescription: z.string().nullable().optional(),
   docsSentDate: z.string().nullable().optional(),
   freightStatus: z.enum(["Yes", "No", "Pending"]).nullable().optional(),
   trackingLink: z.string().nullable().optional(),
-  status: z.string().optional(),
+  status: z.string().nullable().optional(),
 });
 
 export type UpdateContainerTracking = z.infer<typeof updateContainerTrackingSchema>;
