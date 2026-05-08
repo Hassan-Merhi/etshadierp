@@ -2715,7 +2715,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   // Special rendering for Sales vouchers
                   (() => {
                     // Separate ledger entries (cash/revenue) from sales items
-                    const canSeeProfitCost = !(!user || user?.role === "POS");
+                    const canSeeProfitCost = !(!user || user?.role === "POS") && !hiddenErpCosts.includes("sales_profit_cost");
 
                     const ledgerEntries = viewVoucherEntries.filter(
                       (e: ViewVoucherEntry) => !e.isStockItem && !e.stockItemId,

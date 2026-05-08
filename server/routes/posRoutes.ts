@@ -40,6 +40,7 @@ import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeW
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
 import { generateStockPdf }   from "../helpers/generateStockPdf";
 import { generateInvoicePdf } from "../helpers/generateInvoicePdf";
+import { getErpExportVisibility } from "../helpers/exportVisibility";
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
 import { sendWhatsAppTextToChatIdPos, sendWhatsAppFileToChatIdPos, sendWhatsAppFileByUrlToChatIdPos, sendWhatsAppFileByUploadPos } from "../services/whatsappService";
 import PDFDocument from "pdfkit";
@@ -235,7 +236,9 @@ export function registerPosRoutes(app: Express) {
         }
       }
 
-      const pdfBuffer = await generateInvoicePdf(parseInt(voucherId), companyId, (req as any).user?.username);
+      const erpVis = await getErpExportVisibility(req);
+      const hideProfitCols = erpVis.hideSelling || erpVis.hideCost || erpVis.hideSalesProfitCost;
+      const pdfBuffer = await generateInvoicePdf(parseInt(voucherId), companyId, (req as any).user?.username, { hideProfitCols });
 
       const locName  = location.name;
       const dateStr  = getClientDate(req);
@@ -2134,8 +2137,17 @@ export function registerPosRoutes(app: Express) {
       const PW = 595.28;
       const USE = PW - ML - MR; // 523.28
 
-      // Column proportions — Description wider for readability
-      const cols = [
+      // Check if profit/cost columns should be hidden for this user
+      const waVis = await getErpExportVisibility(req);
+      const hideProfitCols = waVis.hideSelling || waVis.hideCost || waVis.hideSalesProfitCost;
+
+      // Column proportions — 4-column layout when hiding profit columns, 7-column otherwise
+      const cols = hideProfitCols ? [
+        { label: "Description", w: Math.floor(USE * 0.43), align: "left"   as const },
+        { label: "Qty",         w: Math.floor(USE * 0.08), align: "center" as const },
+        { label: "Rate",        w: Math.floor(USE * 0.18), align: "right"  as const },
+        { label: "Amount",      w: Math.floor(USE * 0.31), align: "right"  as const },
+      ] : [
         { label: "Description", w: Math.floor(USE * 0.32), align: "left"   as const },
         { label: "Qty",         w: Math.floor(USE * 0.07), align: "center" as const },
         { label: "Rate",        w: Math.floor(USE * 0.10), align: "right"  as const },
@@ -2277,9 +2289,11 @@ export function registerPosRoutes(app: Express) {
           drawCell(fmtN(qty),    colX[1], rowY, cols[1].w, dynH, { align: "center", bg, border: "#d8e0ea" });
           drawCell(fmtC(rate),   colX[2], rowY, cols[2].w, dynH, { align: "right",  bg, border: "#d8e0ea" });
           drawCell(fmtC(amt),    colX[3], rowY, cols[3].w, dynH, { align: "right",  bg, border: "#d8e0ea" });
-          drawCell(fmtC(config), colX[4], rowY, cols[4].w, dynH, { align: "right",  bg, border: "#d8e0ea" });
-          drawCell(fmtC(plBale), colX[5], rowY, cols[5].w, dynH, { align: "right",  bg, border: "#d8e0ea", color: plBaleColor });
-          drawCell(fmtC(pl),     colX[6], rowY, cols[6].w, dynH, { align: "right",  bg, border: "#d8e0ea", color: plTotalColor });
+          if (!hideProfitCols) {
+            drawCell(fmtC(config), colX[4], rowY, cols[4].w, dynH, { align: "right",  bg, border: "#d8e0ea" });
+            drawCell(fmtC(plBale), colX[5], rowY, cols[5].w, dynH, { align: "right",  bg, border: "#d8e0ea", color: plBaleColor });
+            drawCell(fmtC(pl),     colX[6], rowY, cols[6].w, dynH, { align: "right",  bg, border: "#d8e0ea", color: plTotalColor });
+          }
           rowY += dynH;
         });
 
@@ -2295,9 +2309,11 @@ export function registerPosRoutes(app: Express) {
         drawCell(fmtN(totalQty), colX[1], rowY, cols[1].w, TOT_H, { align: "center", bold: true, bg: ACCENT_BG, border: "#8fa8c8", color: ACCENT });
         drawCell("",             colX[2], rowY, cols[2].w, TOT_H, { bg: ACCENT_BG, border: "#8fa8c8" });
         drawCell(fmtC(totalAmt), colX[3], rowY, cols[3].w, TOT_H, { align: "right",  bold: true, bg: ACCENT_BG, border: "#8fa8c8", color: ACCENT });
-        drawCell("",             colX[4], rowY, cols[4].w, TOT_H, { bg: ACCENT_BG, border: "#8fa8c8" });
-        drawCell("",             colX[5], rowY, cols[5].w, TOT_H, { bg: ACCENT_BG, border: "#8fa8c8" });
-        drawCell(fmtC(totalPL),  colX[6], rowY, cols[6].w, TOT_H, { align: "right",  bold: true, bg: ACCENT_BG, border: "#8fa8c8", color: plTotColor });
+        if (!hideProfitCols) {
+          drawCell("",             colX[4], rowY, cols[4].w, TOT_H, { bg: ACCENT_BG, border: "#8fa8c8" });
+          drawCell("",             colX[5], rowY, cols[5].w, TOT_H, { bg: ACCENT_BG, border: "#8fa8c8" });
+          drawCell(fmtC(totalPL),  colX[6], rowY, cols[6].w, TOT_H, { align: "right",  bold: true, bg: ACCENT_BG, border: "#8fa8c8", color: plTotColor });
+        }
         rowY += TOT_H + 10;
 
         // ── Total Paid ─────────────────────────────────────────────────────────

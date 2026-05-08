@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -56,6 +56,12 @@ const ALL_ERP_PAGES: { key: string; label: string; group: string }[] = FEATURE_K
   group: FEATURE_PAGE_INFO[key].group,
 }));
 const ERP_PAGE_GROUPS = Array.from(new Set(ALL_ERP_PAGES.map((p) => p.group)));
+const ERP_COST_FIELDS = [
+  { key: "sales_profit_cost",         label: "Sales Cost/Profit Columns" },
+  { key: "hide_export_selling_price", label: "Hide Selling Prices in Exports/Prints" },
+  { key: "hide_export_cost_price",    label: "Hide Cost / Production Prices in Exports/Prints" },
+];
+
 const FACTORY_COST_FIELDS = [
   { key: "inventory_avg_rate", label: "Avg Rate Column" },
   { key: "inventory_total_value", label: "Total Value Column" },
@@ -120,6 +126,7 @@ export function UserManagementDrawer({
   const [hasFactoryAccess, setHasFactoryAccess] = useState(true);
   const [pageAccess, setPageAccess] = useState<Set<string>>(new Set());
   const [hiddenCostFields, setHiddenCostFields] = useState<string[]>([]);
+  const [hiddenErpCostFields, setHiddenErpCostFields] = useState<string[]>([]);
 
   const [newPassword, setNewPassword] = useState("");
   const [showPasswordReset, setShowPasswordReset] = useState(false);
@@ -139,6 +146,22 @@ export function UserManagementDrawer({
       setAdvancedOpen(false);
     }
   }, [user?.id]);
+
+  const { data: erpHiddenCostData } = useQuery<{ hiddenCostFields: string[] }>({
+    queryKey: ["/api/erp-user-hidden-costs", user.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/erp-user-hidden-costs/${user.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch ERP hidden cost fields");
+      return res.json();
+    },
+    enabled: !!user.id,
+  });
+
+  useEffect(() => {
+    if (erpHiddenCostData?.hiddenCostFields) {
+      setHiddenErpCostFields(erpHiddenCostData.hiddenCostFields);
+    }
+  }, [erpHiddenCostData]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -225,6 +248,34 @@ export function UserManagementDrawer({
     );
   };
 
+  const toggleErpCostField = (key: string) => {
+    setHiddenErpCostFields((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  };
+
+  const saveErpRestrictionsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PUT", `/api/erp-user-hidden-costs/${user.id}`, {
+        hiddenCostFields: isPrivileged ? [] : hiddenErpCostFields,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to save ERP restrictions");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/erp-user-hidden-costs", user.id] });
+      toast({ title: "Saved", description: "ERP cost field restrictions updated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleSaveErpRestrictions = () => saveErpRestrictionsMutation.mutate();
+
   if (!user) return null;
 
   const accessLabel =
@@ -237,7 +288,9 @@ export function UserManagementDrawer({
       : "No access";
 
   const restrictionCount =
-    (isPrivileged ? 0 : pageAccess.size) + (isPrivileged ? 0 : hiddenCostFields.length);
+    (isPrivileged ? 0 : pageAccess.size) +
+    (isPrivileged ? 0 : hiddenCostFields.length) +
+    (isPrivileged ? 0 : hiddenErpCostFields.length);
 
   return (
     <>
@@ -643,6 +696,29 @@ export function UserManagementDrawer({
                             <Save className="h-3.5 w-3.5" />
                             {updateMutation.isPending ? "Saving..." : "Save Restrictions"}
                           </Button>
+                        </div>
+
+                        <div className="space-y-2 pt-2 border-t">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">ERP Cost &amp; Profit Fields</p>
+                          <p className="text-xs text-muted-foreground">Checked items will be hidden from this user in the ERP system (sales detail, exports, prints).</p>
+                          <div className="space-y-1.5 border rounded-md p-3">
+                            {ERP_COST_FIELDS.map((field) => (
+                              <div key={field.key} className="flex items-center gap-2">
+                                <Checkbox
+                                  checked={hiddenErpCostFields.includes(field.key)}
+                                  onCheckedChange={() => toggleErpCostField(field.key)}
+                                  data-testid={`checkbox-erp-cost-${field.key}`}
+                                />
+                                <span className="text-sm">{field.label}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex justify-end">
+                            <Button size="sm" className="gap-2" onClick={handleSaveErpRestrictions} disabled={saveErpRestrictionsMutation.isPending} data-testid="button-save-erp-restrictions">
+                              <Save className="h-3.5 w-3.5" />
+                              {saveErpRestrictionsMutation.isPending ? "Saving..." : "Save ERP Restrictions"}
+                            </Button>
+                          </div>
                         </div>
                       </>
                     )}

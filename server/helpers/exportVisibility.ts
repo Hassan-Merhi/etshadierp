@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { factoryUserProfiles } from "@shared/schema";
+import { factoryUserProfiles, users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 export interface ExportPriceVisibility {
@@ -13,12 +13,13 @@ export async function getExportPriceVisibility(req: any): Promise<ExportPriceVis
     const userId = req.user?.id ? String(req.user.id) : null;
     if (!userId) return { hideSelling: true, hideCost: true, hideProformaPrice: true };
 
-    // Non-admin / non-owner users never see prices in exports
     const role: string = req.user?.role || "";
-    if (role !== "Admin" && role !== "Owner" && role !== "Developer") {
-      return { hideSelling: true, hideCost: true, hideProformaPrice: true };
+    // Developer and Admin can always see everything in exports
+    if (role === "Developer" || role === "Admin") {
+      return { hideSelling: false, hideCost: false, hideProformaPrice: false };
     }
 
+    // All other roles (Owner, Manager, POS, Normal User): check their factoryUserProfiles.hiddenCostFields
     const [profile] = await db
       .select({ hiddenCostFields: factoryUserProfiles.hiddenCostFields })
       .from(factoryUserProfiles)
@@ -33,5 +34,43 @@ export async function getExportPriceVisibility(req: any): Promise<ExportPriceVis
     };
   } catch {
     return { hideSelling: false, hideCost: false, hideProformaPrice: false };
+  }
+}
+
+export interface ErpExportVisibility {
+  hideSelling: boolean;
+  hideCost: boolean;
+  hideSalesProfitCost: boolean;
+}
+
+/**
+ * ERP/POS context export visibility — reads from users.hiddenErpCostFields.
+ * Developer and Admin always see everything.
+ * Everyone else respects their individual field restriction settings.
+ */
+export async function getErpExportVisibility(req: any): Promise<ErpExportVisibility> {
+  try {
+    const userId = req.user?.id ? String(req.user.id) : null;
+    if (!userId) return { hideSelling: false, hideCost: false, hideSalesProfitCost: false };
+
+    const role: string = req.user?.role || "";
+    if (role === "Developer" || role === "Admin") {
+      return { hideSelling: false, hideCost: false, hideSalesProfitCost: false };
+    }
+
+    const [user] = await db
+      .select({ hiddenErpCostFields: users.hiddenErpCostFields })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    const fields: string[] = user?.hiddenErpCostFields ?? [];
+    return {
+      hideSelling: fields.includes("hide_export_selling_price"),
+      hideCost: fields.includes("hide_export_cost_price"),
+      hideSalesProfitCost: fields.includes("sales_profit_cost"),
+    };
+  } catch {
+    return { hideSelling: false, hideCost: false, hideSalesProfitCost: false };
   }
 }

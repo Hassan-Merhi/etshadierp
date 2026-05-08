@@ -140,6 +140,22 @@ export function registerVoucherEntryRoutes(app: Express) {
         const userRole = req.session.currentRole;
         const isPOSUser = userRole === "POS";
 
+        // Check ERP hidden field restrictions for non-POS users
+        let hideSalesCostForErpUser = false;
+        if (!isPOSUser) {
+          const currentUserId = req.user?.id ? String(req.user.id) : null;
+          if (currentUserId) {
+            const [userProfile] = await db
+              .select({ hiddenErpCostFields: users.hiddenErpCostFields })
+              .from(users)
+              .where(eq(users.id, currentUserId))
+              .limit(1);
+            const erpHidden: string[] = userProfile?.hiddenErpCostFields ?? [];
+            hideSalesCostForErpUser = erpHidden.includes("sales_profit_cost");
+          }
+        }
+        const hideCostAndProfit = isPOSUser || hideSalesCostForErpUser;
+
         const salesItemsList = await db
           .select({
             id: salesItems.id,
@@ -176,13 +192,13 @@ export function registerVoucherEntryRoutes(app: Express) {
               quantity: item.quantity,
               rate: item.sellingPrice,
               sellingPrice: item.sellingPrice,
-              costPrice: isPOSUser ? null : item.costPrice,
+              costPrice: hideCostAndProfit ? null : item.costPrice,
               totalSales: item.totalSales,
-              profit: isPOSUser ? null : item.profit,
-              configuredPrice: configuredPriceNum > 0 ? item.configuredPrice : null,
-              hassansPrice: configuredPriceNum > 0 ? configuredPriceNum.toFixed(2) : null,
-              hassansProfit: configuredPriceNum > 0 ? hassansProfit.toFixed(2) : null,
-              hassansPercentage: configuredPriceNum > 0 ? hassansPercentage.toFixed(1) : null,
+              profit: hideCostAndProfit ? null : item.profit,
+              configuredPrice: (hideCostAndProfit || configuredPriceNum <= 0) ? null : item.configuredPrice,
+              hassansPrice: (hideCostAndProfit || configuredPriceNum <= 0) ? null : configuredPriceNum.toFixed(2),
+              hassansProfit: (hideCostAndProfit || configuredPriceNum <= 0) ? null : hassansProfit.toFixed(2),
+              hassansPercentage: (hideCostAndProfit || configuredPriceNum <= 0) ? null : hassansPercentage.toFixed(1),
               debitAmount: "0",
               creditAmount: item.totalSales,
               narration: `Sale of ${item.quantity} x ${item.stockItemName || 'Unknown Item'} @ $${item.sellingPrice}`,

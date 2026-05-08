@@ -1,9 +1,15 @@
 /**
  * Invoice PDF — mirrors the POS invoice print template exactly.
  *
- * Columns : Description (34%) | Qty (7%) | Rate (10%) | Amt (11%) | Config (11%) | P/L Bale (13%) | Total P/L (14%)
+ * Full columns  : Description (34%) | Qty (7%) | Rate (10%) | Amt (11%) | Config (11%) | P/L Bale (13%) | Total P/L (14%)
+ * Profit hidden : Description (42%) | Qty (8%)  | Rate (18%) | Amt (32%)
+ *
  * Numbers : fmtPrint logic — strips trailing ".00", prefixes "$\u00A0" for currency
  * Colours : green (#0a7e1f) for profit, red (#c2272d) for loss
+ *
+ * Pass opts.hideProfitCols = true to strip the Config / P/L Bale / Total P/L
+ * columns from the generated PDF (used when the requesting user has
+ * hide_export_selling_price or hide_export_cost_price in their ERP hidden fields).
  */
 
 import { pool } from "../db";
@@ -23,24 +29,6 @@ const PAGE_H   = 842;
 const MARGIN_X = 36;
 const MARGIN_Y = 36;
 const USABLE_W = PAGE_W - MARGIN_X * 2;   // 523 pt
-
-// ── Column widths matching HTML template percentages ─────────────────────────
-const COL_DESC_W = Math.round(USABLE_W * 0.34);
-const COL_QTY_W  = Math.round(USABLE_W * 0.07);
-const COL_RATE_W = Math.round(USABLE_W * 0.10);
-const COL_AMT_W  = Math.round(USABLE_W * 0.11);
-const COL_CFG_W  = Math.round(USABLE_W * 0.11);
-const COL_PLB_W  = Math.round(USABLE_W * 0.13);
-const COL_TPL_W  = USABLE_W - COL_DESC_W - COL_QTY_W - COL_RATE_W - COL_AMT_W - COL_CFG_W - COL_PLB_W;
-
-// ── Column x-positions ────────────────────────────────────────────────────────
-const X_DESC = MARGIN_X;
-const X_QTY  = X_DESC + COL_DESC_W;
-const X_RATE = X_QTY  + COL_QTY_W;
-const X_AMT  = X_RATE + COL_RATE_W;
-const X_CFG  = X_AMT  + COL_AMT_W;
-const X_PLB  = X_CFG  + COL_CFG_W;
-const X_TPL  = X_PLB  + COL_PLB_W;
 
 // ── Number formatting — matches fmtPrint() in POS.tsx ────────────────────────
 function fmtNum(n: number, prefix = ""): string {
@@ -66,18 +54,24 @@ interface InvoiceItem {
   configuredPrice: number;
 }
 interface InvoiceData {
-  voucherDate:  string;
-  description:  string | null;
-  exchangeRate: number | null;
-  isCreditSale: boolean;
-  companyName:  string;
-  userName:     string;
-  customerName: string | null;
-  items:        InvoiceItem[];
+  voucherDate:    string;
+  description:    string | null;
+  exchangeRate:   number | null;
+  isCreditSale:   boolean;
+  companyName:    string;
+  userName:       string;
+  customerName:   string | null;
+  items:          InvoiceItem[];
+  hideProfitCols: boolean;
 }
 
 // ── DB query ──────────────────────────────────────────────────────────────────
-export async function generateInvoicePdf(voucherId: number, companyId: number, callerUserName?: string): Promise<Buffer> {
+export async function generateInvoicePdf(
+  voucherId: number,
+  companyId: number,
+  callerUserName?: string,
+  opts?: { hideProfitCols?: boolean },
+): Promise<Buffer> {
 
   // 1. Voucher header
   const vRes = await pool.query<{
@@ -138,14 +132,15 @@ export async function generateInvoicePdf(voucherId: number, companyId: number, c
   }
 
   return buildPdf({
-    voucherDate:  formatDbDate(v.voucher_date),
-    description:  v.description,
-    exchangeRate: v.exchange_rate ? parseFloat(v.exchange_rate) : null,
-    isCreditSale: v.is_credit_sale,
-    companyName:  v.company_name,
+    voucherDate:    formatDbDate(v.voucher_date),
+    description:    v.description,
+    exchangeRate:   v.exchange_rate ? parseFloat(v.exchange_rate) : null,
+    isCreditSale:   v.is_credit_sale,
+    companyName:    v.company_name,
     userName,
     customerName,
     items,
+    hideProfitCols: opts?.hideProfitCols ?? false,
   });
 }
 
@@ -164,13 +159,51 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   const isMali = d.companyName.toLowerCase().includes("mali");
   let y = MARGIN_Y;
 
+  // ── Column geometry — computed based on hideProfitCols flag ───────────────
+  let COL_DESC_W: number, COL_QTY_W: number, COL_RATE_W: number, COL_AMT_W: number;
+  let COL_CFG_W: number, COL_PLB_W: number, COL_TPL_W: number;
+  let X_DESC: number, X_QTY: number, X_RATE: number, X_AMT: number;
+  let X_CFG: number, X_PLB: number, X_TPL: number;
+  let innerDividers: number[];
+
+  if (d.hideProfitCols) {
+    // 4-column layout: no Config / P/L Bale / Total P/L
+    COL_DESC_W = Math.round(USABLE_W * 0.42);
+    COL_QTY_W  = Math.round(USABLE_W * 0.08);
+    COL_RATE_W = Math.round(USABLE_W * 0.18);
+    COL_AMT_W  = USABLE_W - COL_DESC_W - COL_QTY_W - COL_RATE_W;
+    COL_CFG_W  = 0; COL_PLB_W = 0; COL_TPL_W = 0;
+    X_DESC = MARGIN_X;
+    X_QTY  = X_DESC + COL_DESC_W;
+    X_RATE = X_QTY  + COL_QTY_W;
+    X_AMT  = X_RATE + COL_RATE_W;
+    X_CFG  = X_AMT; X_PLB = X_AMT; X_TPL = X_AMT;
+    innerDividers = [X_QTY, X_RATE, X_AMT];
+  } else {
+    // 7-column layout (full)
+    COL_DESC_W = Math.round(USABLE_W * 0.34);
+    COL_QTY_W  = Math.round(USABLE_W * 0.07);
+    COL_RATE_W = Math.round(USABLE_W * 0.10);
+    COL_AMT_W  = Math.round(USABLE_W * 0.11);
+    COL_CFG_W  = Math.round(USABLE_W * 0.11);
+    COL_PLB_W  = Math.round(USABLE_W * 0.13);
+    COL_TPL_W  = USABLE_W - COL_DESC_W - COL_QTY_W - COL_RATE_W - COL_AMT_W - COL_CFG_W - COL_PLB_W;
+    X_DESC = MARGIN_X;
+    X_QTY  = X_DESC + COL_DESC_W;
+    X_RATE = X_QTY  + COL_QTY_W;
+    X_AMT  = X_RATE + COL_RATE_W;
+    X_CFG  = X_AMT  + COL_AMT_W;
+    X_PLB  = X_CFG  + COL_CFG_W;
+    X_TPL  = X_PLB  + COL_PLB_W;
+    innerDividers = [X_QTY, X_RATE, X_AMT, X_CFG, X_PLB, X_TPL];
+  }
+
   // ── Title ─────────────────────────────────────────────────────────────────
   doc.font("Helvetica-Bold").fontSize(13).fillColor("#000000");
   doc.text("POS INVOICE", MARGIN_X, y, { width: USABLE_W, align: "center", lineBreak: false });
   y += 20;
 
   // ── Date / User row ────────────────────────────────────────────────────────
-  // Bordered top + bottom (1.5px solid black), 8pt bold
   const infoH = 16;
   doc.save();
   doc.moveTo(MARGIN_X, y)         .lineTo(MARGIN_X + USABLE_W, y)         .strokeColor("#000000").lineWidth(1.5).stroke();
@@ -214,15 +247,17 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     doc.save();
     doc.rect(MARGIN_X, atY, USABLE_W, THR_H).fill("#d8d8d8");
     doc.restore();
-    drawRowBorders(doc, atY, THR_H, true);
+    drawRowBorders(doc, atY, THR_H, true, innerDividers);
     doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#000000");
     cellText(doc, "Description", X_DESC, COL_DESC_W, atY, THR_H, "left");
     cellText(doc, "Qty",         X_QTY,  COL_QTY_W,  atY, THR_H, "center");
     cellText(doc, "Rate",        X_RATE, COL_RATE_W,  atY, THR_H, "center");
     cellText(doc, "Amt",         X_AMT,  COL_AMT_W,   atY, THR_H, "center");
-    cellText(doc, "Config",      X_CFG,  COL_CFG_W,   atY, THR_H, "center");
-    cellText(doc, "P/L Bale",    X_PLB,  COL_PLB_W,   atY, THR_H, "center");
-    cellText(doc, "Total P/L",   X_TPL,  COL_TPL_W,   atY, THR_H, "center");
+    if (!d.hideProfitCols) {
+      cellText(doc, "Config",    X_CFG,  COL_CFG_W,   atY, THR_H, "center");
+      cellText(doc, "P/L Bale",  X_PLB,  COL_PLB_W,   atY, THR_H, "center");
+      cellText(doc, "Total P/L", X_TPL,  COL_TPL_W,   atY, THR_H, "center");
+    }
     return atY + THR_H;
   }
 
@@ -257,7 +292,7 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     doc.save();
     doc.rect(MARGIN_X, y, USABLE_W, dynH).fill("#ffffff");
     doc.restore();
-    drawRowBorders(doc, y, dynH, false);
+    drawRowBorders(doc, y, dynH, false, innerDividers);
 
     // Description: top-aligned so wrapping text stays inside the cell border
     doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#000000");
@@ -265,14 +300,17 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
 
     // All other cells: single-line, vertically centred
     const cy = y + Math.round((dynH - 7.5) / 2);
+    doc.fillColor("#000000");
     doc.text(fmtQty(item.quantity),        X_QTY  + 1, cy, { width: COL_QTY_W  - 2,  align: "center", lineBreak: false });
     doc.text(fmtUSD(item.rateUSD),         X_RATE + 1, cy, { width: COL_RATE_W - 2,  align: "center", lineBreak: false });
     doc.text(fmtUSD(amtUSD),               X_AMT  + 1, cy, { width: COL_AMT_W  - 2,  align: "center", lineBreak: false });
-    doc.text(fmtUSD(item.configuredPrice), X_CFG  + 1, cy, { width: COL_CFG_W  - 2,  align: "center", lineBreak: false });
-    doc.fillColor(plColor(plBale));
-    doc.text(fmtUSD(plBale),               X_PLB  + 1, cy, { width: COL_PLB_W  - 2,  align: "center", lineBreak: false });
-    doc.fillColor(plColor(itemPL));
-    doc.text(fmtUSD(itemPL),               X_TPL  + 1, cy, { width: COL_TPL_W  - 2,  align: "center", lineBreak: false });
+    if (!d.hideProfitCols) {
+      doc.text(fmtUSD(item.configuredPrice), X_CFG  + 1, cy, { width: COL_CFG_W  - 2,  align: "center", lineBreak: false });
+      doc.fillColor(plColor(plBale));
+      doc.text(fmtUSD(plBale),               X_PLB  + 1, cy, { width: COL_PLB_W  - 2,  align: "center", lineBreak: false });
+      doc.fillColor(plColor(itemPL));
+      doc.text(fmtUSD(itemPL),               X_TPL  + 1, cy, { width: COL_TPL_W  - 2,  align: "center", lineBreak: false });
+    }
 
     y += dynH;
   }
@@ -286,21 +324,18 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   doc.save();
   doc.rect(MARGIN_X, y, USABLE_W, totH).fill("#e0e0e0");
   doc.restore();
-  drawRowBorders(doc, y, totH, true);
+  drawRowBorders(doc, y, totH, true, innerDividers);
   doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#000000");
   cellText(doc, "TOTAL",           X_DESC, COL_DESC_W, y, totH, "left");
   cellText(doc, fmtQty(totalQty), X_QTY,  COL_QTY_W,  y, totH, "center");
-  // Rate cell: blank (matches HTML template)
-  // Amt
-  cellText(doc, fmtUSD(totalAmt), X_AMT, COL_AMT_W, y, totH, "center");
-  // Config + P/L Bale: blank
-  // Total P/L
-  doc.fillColor(plColor(totalPL));
-  cellText(doc, fmtUSD(totalPL), X_TPL, COL_TPL_W, y, totH, "center");
+  cellText(doc, fmtUSD(totalAmt), X_AMT,  COL_AMT_W,  y, totH, "center");
+  if (!d.hideProfitCols) {
+    doc.fillColor(plColor(totalPL));
+    cellText(doc, fmtUSD(totalPL), X_TPL, COL_TPL_W, y, totH, "center");
+  }
   y += totH + 5;
 
   // ── TOTAL PAID bar ─────────────────────────────────────────────────────────
-  // Guard: ensure the bar + footer fit on this page
   if (y + 40 > PAGE_H - MARGIN_Y) {
     doc.addPage({ size: "A4" });
     y = MARGIN_Y;
@@ -310,7 +345,6 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   doc.restore();
   y += 4;
   doc.font("Helvetica-Bold").fontSize(11).fillColor("#000000");
-  // Use explicit x for both label and amount — guarantees same y, no auto-page drift
   doc.text("TOTAL PAID:", MARGIN_X, y, { lineBreak: false });
   const paidStr = fmtUSD(totalAmt);
   const paidW   = doc.widthOfString(paidStr);
@@ -347,24 +381,19 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
 }
 
 // ── Draw a table row as a fully bordered rectangle + inner column dividers ─────
-// Each row gets a complete 4-sided box; adjacent rows share the border stroke so
-// the result looks like a solid grid (matching the manual-print PDF style).
-function drawRowBorders(doc: any, y: number, h: number, isHeader: boolean): void {
+function drawRowBorders(doc: any, y: number, h: number, isHeader: boolean, dividers: number[]): void {
   const outerColor  = isHeader ? "#666666" : "#aaaaaa";
   const innerColor  = isHeader ? "#888888" : "#cccccc";
   const outerWidth  = isHeader ? 0.75 : 0.5;
 
-  // Full outer rectangle for this row
   doc.save();
   doc.strokeColor(outerColor).lineWidth(outerWidth);
   doc.rect(MARGIN_X, y, USABLE_W, h).stroke();
   doc.restore();
 
-  // Inner column dividers only (left/right outer already covered by rect)
-  const innerDividers = [X_QTY, X_RATE, X_AMT, X_CFG, X_PLB, X_TPL];
   doc.save();
   doc.strokeColor(innerColor).lineWidth(0.5);
-  for (const x of innerDividers) {
+  for (const x of dividers) {
     doc.moveTo(x, y).lineTo(x, y + h).stroke();
   }
   doc.restore();
