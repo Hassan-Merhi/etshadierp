@@ -95,6 +95,10 @@ export function registerAuthRoutes(app: Express) {
         req.session.currentLocationId = firstCompany.assignedLocationId;
         req.session.currentPOSStation = firstCompany.posStation;
         req.session.cashAccountId = firstCompany.cashAccountId;
+        req.session.canSellNegativeStock = firstCompany.canSellNegativeStock;
+        req.session.daybookEditDays = firstCompany.daybookEditDays;
+        req.session.canAccessCustomers = firstCompany.canAccessCustomers;
+        req.session.canDeleteRecords = firstCompany.canDeleteRecords;
       }
 
       console.log("✅ Login successful, session saved");
@@ -1529,6 +1533,7 @@ export function registerAuthRoutes(app: Express) {
             canSellNegativeStock: true,
             daybookEditDays: 9999,
             canAccessCustomers: true,
+            canDeleteRecords: true,
             createdAt: new Date(),
           };
         } else {
@@ -1546,6 +1551,7 @@ export function registerAuthRoutes(app: Express) {
       req.session.canSellNegativeStock = userRole.canSellNegativeStock;
       req.session.daybookEditDays = userRole.daybookEditDays;
       req.session.canAccessCustomers = userRole.canAccessCustomers;
+      req.session.canDeleteRecords = userRole.canDeleteRecords;
 
       // Explicitly save session to ensure it's persisted before responding
       req.session.save((err) => {

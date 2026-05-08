@@ -81,6 +81,7 @@ declare module 'express-session' {
     canSellNegativeStock?: boolean;
     daybookEditDays?: number;
     canAccessCustomers?: boolean;
+    canDeleteRecords?: boolean;
   }
 }
 
@@ -350,6 +351,7 @@ let migrationsDone = false;
     `ALTER TABLE user_company_roles ADD COLUMN IF NOT EXISTS can_sell_negative_stock boolean NOT NULL DEFAULT false`,
     `ALTER TABLE user_company_roles ADD COLUMN IF NOT EXISTS daybook_edit_days integer NOT NULL DEFAULT 0`,
     `ALTER TABLE user_company_roles ADD COLUMN IF NOT EXISTS can_access_customers boolean NOT NULL DEFAULT false`,
+    `ALTER TABLE user_company_roles ADD COLUMN IF NOT EXISTS can_delete_records boolean NOT NULL DEFAULT false`,
     `ALTER TABLE user_company_roles ADD COLUMN IF NOT EXISTS cash_account_id integer`,
     `ALTER TABLE user_company_roles ADD COLUMN IF NOT EXISTS pos_station integer`,
     `ALTER TABLE stock_transfer_vouchers ADD COLUMN IF NOT EXISTS inventory_applied boolean DEFAULT false`,

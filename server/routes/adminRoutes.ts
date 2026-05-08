@@ -1857,6 +1857,42 @@ export function registerAdminRoutes(app: Express) {
         }));
 
         const results = await storage.bulkUpsertRoleFeaturePermissions(permissionsWithCompany);
+
+        // Audit: log each permission change
+        for (const p of permissions) {
+          await logAudit({
+            userId: req.user!.id,
+            username: req.session.username || "unknown",
+            companyId,
+            action: "update",
+            tableName: "role_feature_permissions",
+            recordId: null,
+            recordIdentifier: `role:${p.role} feature:${p.featureKey} enabled:${p.enabled}`,
+            changes: { enabled: { old: !p.enabled, new: p.enabled } },
+          });
+        }
+
+        // Session invalidation: force affected users to re-login so new permissions take effect
+        try {
+          const affectedRoles = [...new Set(permissions.map((p: any) => p.role as string))];
+          const affectedUsers = await db
+            .select({ userId: userCompanyRoles.userId })
+            .from(userCompanyRoles)
+            .where(
+              and(
+                eq(userCompanyRoles.companyId, companyId),
+                inArray(userCompanyRoles.role, affectedRoles)
+              )
+            );
+          for (const u of affectedUsers) {
+            await db.execute(
+              sql`DELETE FROM session WHERE sess::jsonb ->> 'userId' = ${u.userId}`
+            );
+          }
+        } catch (_err) {
+          // Non-fatal — session table may not exist in all environments
+        }
+
         res.json({ message: "Permissions updated successfully", permissions: results });
       } catch (error: any) {
         res.status(500).json({ message: error.message });

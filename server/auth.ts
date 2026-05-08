@@ -4,6 +4,32 @@ import { userLocations } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { getClientDate } from "./lib/dateUtils";
 
+// Lightweight structured log for security-denied events. Fire-and-forget; never
+// throws so it never interrupts the request that triggered it.
+function logDenied(params: {
+  userId?: string | null;
+  username?: string | null;
+  role?: string | null;
+  companyId?: number | null;
+  method: string;
+  path: string;
+  reason: string;
+}) {
+  console.error(
+    JSON.stringify({
+      event: "access_denied",
+      ts: new Date().toISOString(),
+      userId: params.userId ?? null,
+      username: params.username ?? null,
+      role: params.role ?? null,
+      companyId: params.companyId ?? null,
+      method: params.method,
+      path: params.path,
+      reason: params.reason,
+    })
+  );
+}
+
 // Light authentication middleware — only requires a valid user session.
 // Does NOT require a company to be selected. Use for personal-account actions
 // such as changing one's own password.
@@ -46,6 +72,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
       : (req.session.canSellNegativeStock ?? false),
     daybookEditDays: req.session.daybookEditDays ?? 0,
     canAccessCustomers: req.session.canAccessCustomers ?? false,
+    canDeleteRecords: req.session.canDeleteRecords ?? false,
   } as any;
 
   next();
@@ -66,51 +93,111 @@ export function requireRole(...roles: string[]) {
   };
 }
 
-// Permission check for delete operations.
-// - Owner: cannot delete (read-only oversight role)
-// - POS: cannot delete (sales-entry only role)
-// All other roles pass through (Manager, Normal User, Admin, Developer).
+// Permission check for delete/void/archive operations.
+// - Developer / Admin: always allowed.
+// - Manager: allowed only when the canDeleteRecords flag is enabled for that user.
+// - Owner / POS: always blocked.
+// - Normal User: allowed (existing behaviour).
 export function canDelete(req: Request, res: Response, next: NextFunction) {
   if (!req.user) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  if (req.user.role === "Owner") {
+  const role = req.user.role;
+  const path = req.path;
+  const method = req.method;
+  const userId = req.session.userId ?? null;
+  const username = req.session.username ?? null;
+  const companyId = req.session.currentCompanyId ?? null;
+
+  if (role === "Developer" || role === "Admin") {
+    return next();
+  }
+
+  if (role === "Owner") {
+    logDenied({ userId, username, role, companyId, method, path, reason: "Owner role cannot delete records" });
     return res.status(403).json({ message: "Owners cannot delete records" });
   }
 
-  if (req.user.role === "POS") {
+  if (role === "POS") {
+    logDenied({ userId, username, role, companyId, method, path, reason: "POS role cannot delete records" });
     return res.status(403).json({ message: "POS users cannot delete records" });
   }
 
+  if (role === "Manager") {
+    if (req.session.canDeleteRecords !== true) {
+      logDenied({ userId, username, role, companyId, method, path, reason: "Manager without canDeleteRecords flag" });
+      return res.status(403).json({ message: "This manager account does not have delete permission" });
+    }
+    return next();
+  }
+
+  // Normal User and any other future role: pass through
   next();
 }
 
-// Check if user can modify data from a specific date
+// Check if user can modify data from a specific date.
+// - Admin / Developer: bypass all date restrictions.
+// - POS: today only, always.
+// - Manager / Owner: obey the daybookEditDays window.
+//     0  → today only
+//     N  → today or within N calendar days in the past
+// - Normal User: no restrictions.
 export function canModifyDate(dateField: string = "voucherDate") {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.user || !req.user.role) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    // Admin, Owner, and Developer can modify any date
-    if (req.user.role === "Admin" || req.user.role === "Owner" || req.user.role === "Developer") {
+    const role = req.user.role;
+
+    // Admin and Developer bypass all date restrictions
+    if (role === "Admin" || role === "Developer") {
       return next();
     }
 
-    // Manager and POS users can only modify today's date
-    const isPOS = req.user.role === "POS";
-    if (req.user.role === "Manager" || isPOS) {
-      const today = getClientDate(req);
-      const recordDate = req.body[dateField];
-      
-      if (recordDate && recordDate !== today) {
-        return res.status(403).json({ 
-          message: "You can only create or modify records for today's date" 
-        });
-      }
+    const recordDate: string | undefined = req.body[dateField];
+    if (!recordDate) {
+      return next();
     }
 
+    const today = getClientDate(req);
+
+    // POS: today only, no exceptions
+    if (role === "POS") {
+      if (recordDate !== today) {
+        return res.status(403).json({
+          message: "You can only create or modify records for today's date",
+        });
+      }
+      return next();
+    }
+
+    // Manager and Owner: respect daybookEditDays window
+    if (role === "Manager" || role === "Owner") {
+      if (recordDate === today) return next();
+
+      const editDays = req.session.daybookEditDays ?? 0;
+      if (editDays === 0) {
+        return res.status(403).json({
+          message: "You can only create or modify records for today's date",
+        });
+      }
+
+      // Allow records within editDays calendar days in the past
+      const todayMs = new Date(today).getTime();
+      const recordMs = new Date(recordDate).getTime();
+      const diffDays = Math.floor((todayMs - recordMs) / 86_400_000);
+
+      if (diffDays < 0 || diffDays > editDays) {
+        return res.status(403).json({
+          message: `You can only modify records within ${editDays} day(s) of today`,
+        });
+      }
+      return next();
+    }
+
+    // Normal User: no date restrictions
     next();
   };
 }
@@ -166,6 +253,15 @@ export function requireNonPOS(req: Request, res: Response, next: NextFunction) {
 
   const isPOS = req.user.role === "POS";
   if (isPOS) {
+    logDenied({
+      userId: req.session.userId ?? null,
+      username: req.session.username ?? null,
+      role: req.user.role,
+      companyId: req.session.currentCompanyId ?? null,
+      method: req.method,
+      path: req.path,
+      reason: "POS role attempted access to non-POS route",
+    });
     return res.status(403).json({ 
       message: "Access denied: This resource is not available for POS users" 
     });

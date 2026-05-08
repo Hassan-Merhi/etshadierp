@@ -271,6 +271,23 @@ export function registerPosRoutes(app: Express) {
         exchangeRate,
       } = req.body;
 
+      // POS cash account enforcement: backend must not trust the frontend's account selection.
+      // If the POS user has an assigned cash account, any non-credit sale must use it.
+      if (isPOSUser && !isCreditSale && req.session.cashAccountId) {
+        const assignedId = req.session.cashAccountId;
+        const requestedId = paymentAccountId
+          ? parseInt(paymentAccountId)
+          : cashAccountId
+          ? parseInt(cashAccountId)
+          : null;
+
+        if (requestedId !== null && requestedId !== assignedId) {
+          return res.status(403).json({
+            message: "POS users must use their assigned cash account for sales",
+          });
+        }
+      }
+
       // Determine account type and ID by validating against actual database records
       let accountType: string;
       let accountId: number;

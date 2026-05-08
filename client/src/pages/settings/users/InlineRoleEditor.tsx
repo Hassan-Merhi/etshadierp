@@ -46,6 +46,7 @@ export function InlineRoleEditor({
   const [daybookEditDays, setDaybookEditDays] = useState(0);
   const [cashAccountId, setCashAccountId] = useState<number | undefined>();
   const [canSellNegativeStock, setCanSellNegativeStock] = useState(false);
+  const [canDeleteRecords, setCanDeleteRecords] = useState(false);
 
   const isPOS = role === "POS";
   const isPrivileged = ["Admin", "Owner", "Developer"].includes(role);
@@ -59,6 +60,7 @@ export function InlineRoleEditor({
       setDaybookEditDays(editingRole.daybookEditDays ?? 0);
       setCashAccountId(editingRole.cashAccountId ?? undefined);
       setCanSellNegativeStock(editingRole.canSellNegativeStock ?? false);
+      setCanDeleteRecords(editingRole.canDeleteRecords ?? false);
 
       if (editingRole.role === "POS") {
         fetch(`/api/user-locations/${editingRole.userId}/${editingRole.companyId}`, { credentials: "include" })
@@ -85,6 +87,7 @@ export function InlineRoleEditor({
       setDaybookEditDays(0);
       setCashAccountId(undefined);
       setCanSellNegativeStock(false);
+      setCanDeleteRecords(false);
     }
   }, [editingRole?.id]);
 
@@ -124,6 +127,7 @@ export function InlineRoleEditor({
         daybookEditDays,
         cashAccountId: cashAccountId ?? undefined,
         canSellNegativeStock,
+        canDeleteRecords: role === "Manager" ? canDeleteRecords : false,
       };
 
       if (isEditing) {
@@ -319,20 +323,41 @@ export function InlineRoleEditor({
         </div>
       )}
 
-      {/* Non-POS daybook days */}
-      {!isPOS && !isPrivileged && (
+      {/* Non-POS daybook days — shown for Manager and Owner (both now obey time windows) */}
+      {!isPOS && (role === "Manager" || role === "Owner" || role === "Normal User") && (
         <div className="space-y-1.5">
           <Label className="text-xs">Daybook Edit Days</Label>
           <Input
             type="number"
             min={0}
-            placeholder="0 = no editing"
+            placeholder="0 = today only"
             value={daybookEditDays}
             onChange={(e) => setDaybookEditDays(parseInt(e.target.value) || 0)}
             className="h-8 text-xs"
             data-testid="input-daybook-edit-days"
           />
-          <p className="text-xs text-muted-foreground">How many past days this user can edit POS daybook vouchers.</p>
+          <p className="text-xs text-muted-foreground">
+            {role === "Owner"
+              ? "How many past days this Owner can edit records. 0 = today only."
+              : "How many past days this user can edit records. 0 = today only."}
+          </p>
+        </div>
+      )}
+
+      {/* Manager-only: allow delete/void/archive */}
+      {role === "Manager" && (
+        <div className="flex items-center gap-3 rounded-md border border-border/60 bg-background px-3 py-2">
+          <Switch
+            checked={canDeleteRecords}
+            onCheckedChange={setCanDeleteRecords}
+            data-testid="switch-can-delete-records"
+          />
+          <div className="space-y-0.5">
+            <Label className="text-xs cursor-pointer">Allow Delete / Void / Archive</Label>
+            <p className="text-xs text-muted-foreground">
+              When enabled, this Manager can delete, void, and archive records.
+            </p>
+          </div>
         </div>
       )}
 
