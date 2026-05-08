@@ -170,6 +170,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/users/${userId}/company-roles`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-locations"] });
       toast({
         title: "Success",
         description: editingRole ? "Role updated" : "Role assigned",

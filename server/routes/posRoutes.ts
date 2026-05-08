@@ -292,21 +292,39 @@ export function registerPosRoutes(app: Express) {
       let posEnforcedCashAccountId: number | null = null;
       if (isPOSUser && !isCreditSale) {
         const parsedLocId = locationId ? Number(locationId) : null;
-        if (parsedLocId) {
-          const [locMapping] = await db
-            .select({ cashAccountId: userLocationCashAccounts.cashAccountId })
+        // Block immediately — POS users must always supply a location for cash sales.
+        if (!parsedLocId) {
+          return res.status(400).json({ message: "Location is required for POS sales" });
+        }
+        const [locMapping] = await db
+          .select({ cashAccountId: userLocationCashAccounts.cashAccountId })
+          .from(userLocationCashAccounts)
+          .where(
+            and(
+              eq(userLocationCashAccounts.userId, req.user!.id),
+              eq(userLocationCashAccounts.companyId, req.session.currentCompanyId!),
+              eq(userLocationCashAccounts.locationId, parsedLocId),
+            )
+          )
+          .limit(1);
+        if (locMapping) {
+          posEnforcedCashAccountId = locMapping.cashAccountId;
+        } else {
+          // Legacy fallback: only apply when this user has NO mappings at all
+          // (pre-migration POS user). If any mapping exists, this location is
+          // simply not configured — block with a clear error instead of using
+          // a session account that belongs to a different location.
+          const [anyMapping] = await db
+            .select({ id: userLocationCashAccounts.id })
             .from(userLocationCashAccounts)
             .where(
               and(
                 eq(userLocationCashAccounts.userId, req.user!.id),
                 eq(userLocationCashAccounts.companyId, req.session.currentCompanyId!),
-                eq(userLocationCashAccounts.locationId, parsedLocId),
               )
             )
             .limit(1);
-          if (locMapping) {
-            posEnforcedCashAccountId = locMapping.cashAccountId;
-          } else if (req.session.cashAccountId) {
+          if (!anyMapping && req.session.cashAccountId) {
             posEnforcedCashAccountId = req.session.cashAccountId;
           } else {
             return res.status(400).json({
