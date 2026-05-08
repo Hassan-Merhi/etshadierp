@@ -419,6 +419,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const [stockWaStatus, setStockWaStatus]       = useState<StockWaStatus>("idle");
   const [pendingStockSend, setPendingStockSend] = useState(false);
 
+  // Invoice WhatsApp auto-send status (mirrors stockWaStatus for UI feedback)
+  type InvoiceWaStatus = "idle" | "sending" | "sent" | "failed";
+  const [invoiceWaStatus, setInvoiceWaStatus] = useState<InvoiceWaStatus>("idle");
+
   // Mobile-specific state
   const [mobileItemSearchOpen, setMobileItemSearchOpen] = useState(false);
   const [mobileItemSearchTerm, setMobileItemSearchTerm] = useState("");
@@ -614,6 +618,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
     const doSend = async () => {
       setSendingInvoiceWhatsApp(true);
+      setInvoiceWaStatus("sending");
       try {
         const result = await sendInvoicePdfWithRetry(
           data.voucherId,
@@ -627,11 +632,13 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           },
         );
         if (!result.ok) {
+          setInvoiceWaStatus("failed");
           toast({ title: "WhatsApp", description: result.message, variant: "destructive" });
         } else {
-          toast({ title: "WhatsApp", description: "Invoice sent to WhatsApp group." });
+          setInvoiceWaStatus("sent");
         }
       } catch (e: any) {
+        setInvoiceWaStatus("failed");
         toast({ title: "WhatsApp", description: e.message || "Could not send invoice.", variant: "destructive" });
       } finally {
         setSendingInvoiceWhatsApp(false);
@@ -920,6 +927,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       return;
     }
     setSendingInvoiceWhatsApp(true);
+    setInvoiceWaStatus("sending");
     try {
       const result = await sendInvoicePdfWithRetry(
         vId,
@@ -933,11 +941,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         },
       );
       if (!result.ok) {
+        setInvoiceWaStatus("failed");
         toast({ title: "Failed to send", description: result.message, variant: "destructive" });
       } else {
+        setInvoiceWaStatus("sent");
         toast({ title: "Sent", description: "Invoice sent to WhatsApp group." });
       }
     } catch (e: any) {
+      setInvoiceWaStatus("failed");
       toast({ title: "Error", description: e.message || "Could not reach the server.", variant: "destructive" });
     } finally {
       setSendingInvoiceWhatsApp(false);
@@ -1289,6 +1300,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     setCurrentDraftId(null);
     setShowPrintDialog(false);
     setStockWaStatus("idle");
+    setInvoiceWaStatus("idle");
     setPendingStockSend(false);
     lastSavedFingerprintRef.current = "";
     setLastAutosaved(null);
@@ -2943,18 +2955,36 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 New Sale
               </Button>
             )}
-            {(activeLocation as any)?.whatsappGroupChatId && (
-              <Button
-                variant="outline"
-                onClick={handleSendInvoiceWhatsApp}
-                disabled={sendingInvoiceWhatsApp}
-                className="gap-2"
-                data-testid="button-send-whatsapp-invoice"
-              >
-                <Send className="h-4 w-4" />
-                {sendingInvoiceWhatsApp ? "Sending…" : "Resend Invoice"}
-              </Button>
-            )}
+            {(activeLocation as any)?.whatsappGroupChatId && (() => {
+              if (invoiceWaStatus === "sending") {
+                return (
+                  <Button variant="outline" disabled className="gap-2" data-testid="button-invoice-wa-sending">
+                    <span className="animate-spin inline-block"><Send className="h-4 w-4" /></span>
+                    Sending Invoice…
+                  </Button>
+                );
+              }
+              if (invoiceWaStatus === "sent") {
+                return (
+                  <Button variant="outline" disabled className="gap-2 opacity-60" data-testid="button-invoice-wa-sent">
+                    <Send className="h-4 w-4" />
+                    Invoice Sent
+                  </Button>
+                );
+              }
+              return (
+                <Button
+                  variant="outline"
+                  onClick={handleSendInvoiceWhatsApp}
+                  disabled={sendingInvoiceWhatsApp}
+                  className="gap-2"
+                  data-testid="button-send-whatsapp-invoice"
+                >
+                  <Send className="h-4 w-4" />
+                  {invoiceWaStatus === "failed" ? "Retry Invoice" : "Resend Invoice"}
+                </Button>
+              );
+            })()}
             {!editVoucherId && (() => {
               const hasWa = !!(activeLocation as any)?.whatsappGroupChatId;
               if (stockWaStatus === "sending") {
