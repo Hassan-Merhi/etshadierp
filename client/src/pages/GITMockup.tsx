@@ -228,7 +228,7 @@ function RealWorkbookBlock({
     <tr className="bg-muted/60 border-b text-muted-foreground">
       <th className="py-1 px-2 font-semibold text-center">CTR #</th>
       <th className="py-1 px-2 font-semibold text-center">AMOUNT</th>
-      <th className="py-1 px-2 font-semibold text-center">ETA DAS</th>
+      <th className="py-1 px-2 font-semibold text-center">ETA</th>
       <th className="py-1 px-2 font-semibold text-center">TRUCK #</th>
       <th className="py-1 px-2 font-semibold text-center">LOCATION</th>
       <th className="py-1 px-2 font-semibold text-center">BORDER DT.</th>
@@ -474,7 +474,7 @@ function TabDetail() {
                     <TableHead>Container #</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                     <TableHead>Company</TableHead>
-                    <TableHead>ETA DAS</TableHead>
+                    <TableHead>ETA</TableHead>
                     <TableHead>Truck #</TableHead>
                     <TableHead>Location</TableHead>
                     <TableHead>Border Date</TableHead>
@@ -945,7 +945,7 @@ function TabPortReport() {
                       <th className="py-1 px-2 font-semibold text-center">CONTAINER #</th>
                       <th className="py-1 px-2 font-semibold text-center">CO.</th>
                       <th className="py-1 px-2 font-semibold text-center">AMOUNT</th>
-                      <th className="py-1 px-2 font-semibold text-center">ETA DAS</th>
+                      <th className="py-1 px-2 font-semibold text-center">ETA</th>
                       <th className="py-1 px-2 font-semibold text-center">TRANSPORTER</th>
                       <th className="py-1 px-2 font-semibold text-center">TRUCK #</th>
                       <th className="py-1 px-2 font-semibold text-center">LOCATION</th>
