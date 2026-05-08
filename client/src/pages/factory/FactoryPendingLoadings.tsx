@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
-import { Clock, Package, Play, Trash2, Download, Link, X, Undo2, Pencil, Save } from "lucide-react";
+import { Clock, Package, Play, Trash2, Download, Link, X, Undo2, Pencil, Save, ChevronDown, ChevronRight, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
 import {
@@ -69,6 +69,16 @@ export default function FactoryPendingLoadings() {
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState<PendingLoad | null>(null);
   const [linkTarget, setLinkTarget] = useState<PendingLoad | null>(null);
+  const [expandedCustomers, setExpandedCustomers] = useState<Set<number>>(new Set());
+
+  const toggleCustomer = (customerId: number) => {
+    setExpandedCustomers(prev => {
+      const next = new Set(prev);
+      if (next.has(customerId)) next.delete(customerId);
+      else next.add(customerId);
+      return next;
+    });
+  };
   const [selectedProformaId, setSelectedProformaId] = useState<number | null>(null);
   const [undoItems, setUndoItems] = useState<UndoItem[]>([]);
   const [, forceRender] = useState(0);
@@ -293,132 +303,147 @@ export default function FactoryPendingLoadings() {
         </div>
       ) : (
         <div className="space-y-3">
-          {loads.map((load) => (
-            <Card key={load.id} className="p-4" data-testid={`card-load-${load.id}`}>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-col gap-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-base" data-testid={`text-customer-${load.id}`}>
-                      {load.customerName || `Customer #${load.customerId}`}
-                    </span>
-                    <Badge variant="secondary" data-testid={`badge-load-id-${load.id}`}>
-                      Loading #{load.id}
-                    </Badge>
-                    {load.proformaIdUsed ? (
-                      <Badge variant="outline" data-testid={`badge-proforma-${load.id}`}>
-                        <Link className="h-3 w-3 mr-1" />
-                        {load.proformaName ? load.proformaName : `Proforma #${load.proformaIdUsed}`}
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-muted-foreground" data-testid={`badge-no-proforma-${load.id}`}>
-                        No proforma linked
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-                    <span>
-                      <Clock className="inline h-3 w-3 mr-1" />
-                      Started: {formatDate(load.loadingStartedAt)}
-                    </span>
-                    <span>
-                      <Package className="inline h-3 w-3 mr-1" />
-                      {load.totalQtyBales} bales scanned
-                    </span>
-                  </div>
+          {(() => {
+            // Group loads by customer, preserving first-appearance order
+            const seen = new Map<number, { customerId: number; customerName: string; loads: PendingLoad[] }>();
+            for (const load of loads) {
+              if (!seen.has(load.customerId)) {
+                seen.set(load.customerId, { customerId: load.customerId, customerName: load.customerName || `Customer #${load.customerId}`, loads: [] });
+              }
+              seen.get(load.customerId)!.loads.push(load);
+            }
+            const groups = Array.from(seen.values());
 
-                  {/* Loading note row */}
-                  {editingNoteId === load.id ? (
-                    <div className="flex gap-2 items-start mt-1">
-                      <Textarea
-                        value={editingNoteText}
-                        onChange={(e) => setEditingNoteText(e.target.value)}
-                        className="resize-none text-sm"
-                        rows={2}
-                        autoFocus
-                        data-testid={`input-note-${load.id}`}
-                      />
-                      <div className="flex flex-col gap-1">
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          onClick={() => saveNoteMutation.mutate({ id: load.id, note: editingNoteText })}
-                          disabled={saveNoteMutation.isPending}
-                          data-testid={`button-save-note-${load.id}`}
-                          title="Save note"
-                        >
-                          <Save className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setEditingNoteId(null)}
-                          data-testid={`button-cancel-note-${load.id}`}
-                          title="Cancel"
-                        >
-                          <X className="h-4 w-4" />
+            const renderLoadCard = (load: PendingLoad) => (
+              <Card key={load.id} className="p-4" data-testid={`card-load-${load.id}`}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-base" data-testid={`text-customer-${load.id}`}>
+                        {load.customerName || `Customer #${load.customerId}`}
+                      </span>
+                      <Badge variant="secondary" data-testid={`badge-load-id-${load.id}`}>
+                        Loading #{load.id}
+                      </Badge>
+                      {load.proformaIdUsed ? (
+                        <Badge variant="outline" data-testid={`badge-proforma-${load.id}`}>
+                          <Link className="h-3 w-3 mr-1" />
+                          {load.proformaName ? load.proformaName : `Proforma #${load.proformaIdUsed}`}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground" data-testid={`badge-no-proforma-${load.id}`}>
+                          No proforma linked
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+                      <span>
+                        <Clock className="inline h-3 w-3 mr-1" />
+                        Started: {formatDate(load.loadingStartedAt)}
+                      </span>
+                      <span>
+                        <Package className="inline h-3 w-3 mr-1" />
+                        {load.totalQtyBales} bales scanned
+                      </span>
+                    </div>
+
+                    {editingNoteId === load.id ? (
+                      <div className="flex gap-2 items-start mt-1">
+                        <Textarea
+                          value={editingNoteText}
+                          onChange={(e) => setEditingNoteText(e.target.value)}
+                          className="resize-none text-sm"
+                          rows={2}
+                          autoFocus
+                          data-testid={`input-note-${load.id}`}
+                        />
+                        <div className="flex flex-col gap-1">
+                          <Button size="icon" variant="outline" onClick={() => saveNoteMutation.mutate({ id: load.id, note: editingNoteText })} disabled={saveNoteMutation.isPending} data-testid={`button-save-note-${load.id}`} title="Save note">
+                            <Save className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => setEditingNoteId(null)} data-testid={`button-cancel-note-${load.id}`} title="Cancel">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-2 mt-1">
+                        <span className="text-sm text-muted-foreground italic flex-1" data-testid={`text-note-${load.id}`}>
+                          {load.containerNotes ? load.containerNotes : "No note"}
+                        </span>
+                        <Button size="icon" variant="ghost" className="shrink-0" onClick={() => { setEditingNoteId(load.id); setEditingNoteText(load.containerNotes || ""); }} data-testid={`button-edit-note-${load.id}`} title="Edit note">
+                          <Pencil className="h-3 w-3" />
                         </Button>
                       </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button variant="outline" size="icon" onClick={() => handleExport(load)} data-testid={`button-export-${load.id}`} title="Export to Excel">
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleOpenLink(load)} data-testid={`button-link-proforma-${load.id}`} title="Link proforma">
+                      <Link className="h-4 w-4 mr-1.5" />
+                      {load.proformaIdUsed ? "Change Proforma" : "Link Proforma"}
+                    </Button>
+                    <Button variant="outline" size="icon" onClick={() => handleDelete(load)} disabled={cancelMutation.isPending} data-testid={`button-delete-${load.id}`} title="Delete loading (returns bales to stock)" className="text-destructive">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                    <Button onClick={() => navigate(`/factory/sales/loading/new?orderId=${load.id}`)} data-testid={`button-resume-${load.id}`}>
+                      <Play className="h-4 w-4 mr-2" />
+                      Resume
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            );
+
+            return groups.map(group => {
+              if (group.loads.length === 1) return renderLoadCard(group.loads[0]);
+              const isExpanded = expandedCustomers.has(group.customerId);
+              const totalBales = group.loads.reduce((s, l) => s + (l.totalQtyBales || 0), 0);
+              return (
+                <div key={`group-${group.customerId}`} className="space-y-2">
+                  {/* Group header card */}
+                  <Card
+                    className="p-4 cursor-pointer hover-elevate"
+                    onClick={() => toggleCustomer(group.customerId)}
+                    data-testid={`card-group-${group.customerId}`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {isExpanded
+                          ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        }
+                        <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="font-semibold text-base" data-testid={`text-group-customer-${group.customerId}`}>
+                          {group.customerName}
+                        </span>
+                        <Badge variant="outline" className="shrink-0">
+                          {group.loads.length} loadings
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm text-muted-foreground shrink-0">
+                        <span>
+                          <Package className="inline h-3 w-3 mr-1" />
+                          {totalBales} bales total
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {isExpanded ? "Click to collapse" : "Click to expand"}
+                        </span>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="flex items-start gap-2 mt-1">
-                      <span className="text-sm text-muted-foreground italic flex-1" data-testid={`text-note-${load.id}`}>
-                        {load.containerNotes ? load.containerNotes : "No note"}
-                      </span>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="shrink-0"
-                        onClick={() => { setEditingNoteId(load.id); setEditingNoteText(load.containerNotes || ""); }}
-                        data-testid={`button-edit-note-${load.id}`}
-                        title="Edit note"
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </Button>
+                  </Card>
+                  {/* Expanded individual cards */}
+                  {isExpanded && (
+                    <div className="space-y-2 pl-4 border-l-2 border-muted ml-2">
+                      {group.loads.map(load => renderLoadCard(load))}
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleExport(load)}
-                    data-testid={`button-export-${load.id}`}
-                    title="Export to Excel"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleOpenLink(load)}
-                    data-testid={`button-link-proforma-${load.id}`}
-                    title="Link proforma"
-                  >
-                    <Link className="h-4 w-4 mr-1.5" />
-                    {load.proformaIdUsed ? "Change Proforma" : "Link Proforma"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleDelete(load)}
-                    disabled={cancelMutation.isPending}
-                    data-testid={`button-delete-${load.id}`}
-                    title="Delete loading (returns bales to stock)"
-                    className="text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    onClick={() => navigate(`/factory/sales/loading/new?orderId=${load.id}`)}
-                    data-testid={`button-resume-${load.id}`}
-                  >
-                    <Play className="h-4 w-4 mr-2" />
-                    Resume
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          ))}
+              );
+            });
+          })()}
         </div>
       )}
 
