@@ -276,6 +276,24 @@ export function registerCreditNoteRoutes(app: Express) {
         return createdVoucher;
       });
 
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId: companyId,
+          action: "create",
+          tableName: "vouchers",
+          recordId: voucher.id,
+          recordIdentifier: voucher.voucherNumber,
+          changes: {
+            voucherType: { new: noteType },
+            date: { new: voucherDate },
+            totalAmount: { new: totalRefundAmount.toFixed(2) },
+            itemCount: { new: items.length },
+            cashAccount: { new: cashAccountId },
+          },
+        });
+      } catch { /* non-fatal */ }
       res.json({
         success: true,
         voucherId: voucher.id,
@@ -675,6 +693,21 @@ export function registerCreditNoteRoutes(app: Express) {
         }
       });
 
+      try {
+        const _cnChanges: Record<string, any> = {};
+        if (voucherDate && voucher.voucherDate !== voucherDate) _cnChanges.date = { old: voucher.voucherDate, new: voucherDate };
+        if (items?.length) _cnChanges.itemCount = { new: items.length };
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId: companyId,
+          action: "update",
+          tableName: "vouchers",
+          recordId: voucherId,
+          recordIdentifier: voucher.voucherNumber,
+          changes: _cnChanges,
+        });
+      } catch { /* non-fatal */ }
       res.json({
         success: true,
         voucherId,

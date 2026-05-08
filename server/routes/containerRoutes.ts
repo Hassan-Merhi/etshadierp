@@ -894,6 +894,23 @@ export function registerContainerRoutes(app: Express) {
         }
       }
 
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId: req.session.currentCompanyId!,
+          action: "create",
+          tableName: "containers",
+          recordId: container.id,
+          recordIdentifier: container.containerNumber || `Container #${container.id}`,
+          changes: {
+            containerNumber: { new: container.containerNumber },
+            status: { new: container.status },
+            importDate: { new: container.importDate },
+            supplierId: { new: container.supplierId },
+          },
+        });
+      } catch { /* non-fatal */ }
       res.status(201).json(container);
     } catch (error: any) {
       if (error.name === "ZodError") {
@@ -1822,6 +1839,43 @@ export function registerContainerRoutes(app: Express) {
         const supplier = await storage.getSupplierById(existingPO.supplierId);
         const container = await storage.getContainerById(existingPO.containerId);
         
+        try {
+          const _poItemChanges: Record<string, any> = {};
+          const _oldItemMap = new Map((existingLineItems as any[]).map((it: any) => [it.id, it]));
+          const _addedItems: string[] = [];
+          const _removedItems: string[] = [];
+          const _changedItems: string[] = [];
+          for (const newIt of lineItems as any[]) {
+            if (newIt.id && _oldItemMap.has(newIt.id)) {
+              const oldIt = _oldItemMap.get(newIt.id)!;
+              const diffs: string[] = [];
+              if (String(oldIt.quantity ?? "") !== String(newIt.quantity ?? "")) diffs.push(`qty: ${oldIt.quantity}→${newIt.quantity}`);
+              if (String(oldIt.unitPrice ?? oldIt.rate ?? "") !== String(newIt.unitPrice ?? newIt.rate ?? "")) diffs.push(`price changed`);
+              if (diffs.length) _changedItems.push(`${newIt.stockItemCode || newIt.stockItemId}: ${diffs.join(", ")}`);
+            } else {
+              _addedItems.push(newIt.stockItemCode || String(newIt.stockItemId || "new"));
+            }
+          }
+          const _newIdSet = new Set((lineItems as any[]).filter((it: any) => it.id).map((it: any) => it.id));
+          for (const [oldId, oldIt] of _oldItemMap) {
+            if (!_newIdSet.has(oldId)) _removedItems.push((oldIt as any).stockItemCode || String(oldId));
+          }
+          if (_addedItems.length) _poItemChanges.itemsAdded = { new: _addedItems.join(", ") };
+          if (_removedItems.length) _poItemChanges.itemsRemoved = { old: _removedItems.join(", ") };
+          if (_changedItems.length) _poItemChanges.itemsChanged = { new: _changedItems.join("; ") };
+          if (existingPO.poNumber !== updatedPO?.poNumber) _poItemChanges.poNumber = { old: existingPO.poNumber, new: updatedPO?.poNumber };
+          if (existingPO.itemsTotal !== updatedPO?.itemsTotal) _poItemChanges.itemsTotal = { old: existingPO.itemsTotal, new: updatedPO?.itemsTotal };
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "update",
+            tableName: "purchase_orders",
+            recordId: id,
+            recordIdentifier: existingPO.poNumber || `PO #${id}`,
+            changes: _poItemChanges,
+          });
+        } catch { /* non-fatal */ }
         return res.json({
           ...updatedPO,
           items: lineItems,
@@ -2043,6 +2097,24 @@ export function registerContainerRoutes(app: Express) {
         }
       }
       
+      try {
+        const _poChanges: Record<string, any> = {};
+        for (const _f of ["poNumber", "currency", "status", "freight", "surcharge", "fumigation", "documentCharges", "discount", "otherCharges", "itemsTotal"] as const) {
+          if (String((existingPO as any)[_f] ?? "") !== String((updated as any)[_f] ?? "")) {
+            _poChanges[_f] = { old: (existingPO as any)[_f], new: (updated as any)[_f] };
+          }
+        }
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId: req.session.currentCompanyId!,
+          action: "update",
+          tableName: "purchase_orders",
+          recordId: id,
+          recordIdentifier: existingPO.poNumber || `PO #${id}`,
+          changes: _poChanges,
+        });
+      } catch { /* non-fatal */ }
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -2078,6 +2150,23 @@ export function registerContainerRoutes(app: Express) {
         }
 
         await storage.deletePurchaseOrder(id);
+        try {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "delete",
+            tableName: "purchase_orders",
+            recordId: existingPO.id,
+            recordIdentifier: existingPO.poNumber || `PO #${id}`,
+            changes: {
+              poNumber: { old: existingPO.poNumber },
+              supplier: { old: existingPO.supplierId },
+              itemsTotal: { old: existingPO.itemsTotal || "0" },
+              status: { old: existingPO.status },
+            },
+          });
+        } catch { /* non-fatal */ }
         res.json({ message: "Purchase order deleted successfully" });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -2114,6 +2203,22 @@ export function registerContainerRoutes(app: Express) {
         }
 
         await storage.deleteContainer(id);
+        try {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "delete",
+            tableName: "containers",
+            recordId: existingContainer.id,
+            recordIdentifier: existingContainer.containerNumber || `Container #${id}`,
+            changes: {
+              containerNumber: { old: existingContainer.containerNumber },
+              status: { old: existingContainer.status },
+              importDate: { old: existingContainer.importDate },
+            },
+          });
+        } catch { /* non-fatal */ }
         res.json({ message: "Container deleted successfully" });
       } catch (error: any) {
         res.status(500).json({ message: error.message });

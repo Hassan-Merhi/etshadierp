@@ -1164,6 +1164,23 @@ export function registerVoucherRoutes(app: Express) {
           console.error("WhatsApp rule check error (non-fatal):", waErr);
         }
 
+        try {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "update",
+            tableName: "vouchers",
+            recordId: result.voucher.id,
+            recordIdentifier: result.voucher.voucherNumber,
+            changes: buildVoucherChangesForUpdate(
+              { ...result.voucher, entries: result.oldEntries },
+              { ...result.voucher, entries: result.entries },
+              result.oldEntries,
+              result.entries,
+            ),
+          });
+        } catch { /* non-fatal */ }
         res.json({ voucher: result.voucher, entries: result.entries, whatsapp: waResultPatch });
       } catch (error: any) {
         console.error("Error updating payment/receipt voucher:", error);
@@ -1347,6 +1364,18 @@ export function registerVoucherRoutes(app: Express) {
           console.error("WhatsApp rule check error (non-fatal):", waErr);
         }
 
+        try {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "create",
+            tableName: "vouchers",
+            recordId: result.voucher.id,
+            recordIdentifier: result.voucher.voucherNumber,
+            changes: buildVoucherChangesForCreate(result.voucher, result.entries),
+          });
+        } catch { /* non-fatal */ }
         res.json({ ...result, whatsapp: waJournalResult });
       } catch (error: any) {
         console.error("Error creating journal voucher:", error);
@@ -1539,6 +1568,23 @@ export function registerVoucherRoutes(app: Express) {
           console.error("WhatsApp rule check error (non-fatal):", waErr);
         }
 
+        try {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "update",
+            tableName: "vouchers",
+            recordId: result.voucher.id,
+            recordIdentifier: result.voucher.voucherNumber,
+            changes: buildVoucherChangesForUpdate(
+              { ...result.voucher, entries: result.oldEntries },
+              { ...result.voucher, entries: result.entries },
+              result.oldEntries,
+              result.entries,
+            ),
+          });
+        } catch { /* non-fatal */ }
         res.json({ voucher: result.voucher, entries: result.entries, whatsapp: waJournalPatch });
       } catch (error: any) {
         console.error("Error updating journal voucher:", error);
@@ -2114,6 +2160,18 @@ export function registerVoucherRoutes(app: Express) {
           );
         }
 
+        try {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "update",
+            tableName: "vouchers",
+            recordId: updated.id,
+            recordIdentifier: updated.voucherNumber,
+            changes: buildVoucherChangesForUpdate(existingVoucher, updated, oldEntries, newEntries),
+          });
+        } catch { /* non-fatal */ }
         res.json({ ...updated, entries: newEntries });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -2949,6 +3007,25 @@ export function registerVoucherRoutes(app: Express) {
           .where(eq(vouchers.id, id))
           .returning();
 
+        try {
+          const _purChanges: Record<string, any> = {};
+          if (existingVoucher.voucherDate !== updated[0].voucherDate)
+            _purChanges.date = { old: existingVoucher.voucherDate, new: updated[0].voucherDate };
+          if (existingVoucher.totalAmount !== updated[0].totalAmount)
+            _purChanges.totalAmount = { old: existingVoucher.totalAmount, new: updated[0].totalAmount };
+          if ((items as any[])?.length)
+            _purChanges.lineItems = { new: `${(items as any[]).length} item(s)` };
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "update",
+            tableName: "vouchers",
+            recordId: updated[0].id,
+            recordIdentifier: updated[0].voucherNumber,
+            changes: _purChanges,
+          });
+        } catch { /* non-fatal */ }
         res.json(updated[0]);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -3151,6 +3228,27 @@ export function registerVoucherRoutes(app: Express) {
           return updatedVoucher;
         });
 
+        try {
+          const _adjChanges: Record<string, any> = {};
+          if (existingVoucher.voucherDate !== updated.voucherDate)
+            _adjChanges.date = { old: existingVoucher.voucherDate, new: updated.voucherDate };
+          if (existingVoucher.totalAmount !== updated.totalAmount)
+            _adjChanges.totalAmount = { old: existingVoucher.totalAmount, new: updated.totalAmount };
+          if (existingVoucher.locationId !== updated.locationId)
+            _adjChanges.location = { old: existingVoucher.locationId, new: updated.locationId };
+          if ((items as any[])?.length)
+            _adjChanges.lineItems = { new: `${(items as any[]).length} item(s)` };
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "update",
+            tableName: "vouchers",
+            recordId: updated.id,
+            recordIdentifier: updated.voucherNumber,
+            changes: _adjChanges,
+          });
+        } catch { /* non-fatal */ }
         res.json(updated);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -3365,6 +3463,27 @@ export function registerVoucherRoutes(app: Express) {
           return updatedVoucher;
         });
 
+        try {
+          const _xfrChanges: Record<string, any> = {};
+          if (existingVoucher.voucherDate !== updated.voucherDate)
+            _xfrChanges.date = { old: existingVoucher.voucherDate, new: updated.voucherDate };
+          if (existingVoucher.totalAmount !== updated.totalAmount)
+            _xfrChanges.totalAmount = { old: existingVoucher.totalAmount, new: updated.totalAmount };
+          if (existingVoucher.locationId !== updated.locationId)
+            _xfrChanges.sourceLocation = { old: existingVoucher.locationId, new: updated.locationId };
+          if ((items as any[])?.length)
+            _xfrChanges.lineItems = { new: `${(items as any[]).length} item(s)` };
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "update",
+            tableName: "vouchers",
+            recordId: updated.id,
+            recordIdentifier: updated.voucherNumber,
+            changes: _xfrChanges,
+          });
+        } catch { /* non-fatal */ }
         console.log(`[Stock Transfer Edit] Successfully updated voucher ${id}`);
         res.json(updated);
       } catch (error: any) {

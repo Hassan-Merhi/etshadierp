@@ -1653,6 +1653,22 @@ export function registerStockRoutes(app: Express) {
       }
 
       const updated = await storage.updateStockTransferItem(itemId, req.body);
+      try {
+        const _sti: Record<string, any> = {};
+        if (req.body.quantity !== undefined) _sti.quantity = { new: String(req.body.quantity) };
+        if (req.body.rate !== undefined) _sti.rate = { new: String(req.body.rate) };
+        if (req.body.stockItemId !== undefined) _sti.stockItemId = { new: String(req.body.stockItemId) };
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId: req.session.currentCompanyId!,
+          action: "update",
+          tableName: "stock_transfer_items",
+          recordId: itemId,
+          recordIdentifier: `Transfer item #${itemId}`,
+          changes: _sti,
+        });
+      } catch { /* non-fatal */ }
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
