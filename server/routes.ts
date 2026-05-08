@@ -69,6 +69,11 @@ import {
   requireNonPOS,
 } from "./auth";
 import {
+  requireModuleAccess,
+  requireActionAccess,
+  requireExportAccess,
+} from "./lib/permissionMiddleware";
+import {
   insertLocationSchema,
   insertLedgerAccountSchema,
   updateLedgerAccountSchema,
@@ -1071,6 +1076,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     next();
   });
+
+  // ─── Phase 3: Module-level permission enforcement ────────────────────────────
+  // Must be registered BEFORE individual route handlers so the middleware fires
+  // first on every matching request.
+  // Semantics (per permissionHelpers.ts):
+  //   Developer/Admin  → always allowed
+  //   Owner/Manager/POS → allowed by default; explicit enabled=false = restricted
+  //   Normal User       → denied by default; explicit enabled=true = allowed
+  // Unauthenticated requests pass through (session has no userId); per-route
+  // requireAuth will return 401 as normal.
+
+  // Factory module
+  app.use("/api/factory", requireModuleAccess("mod_factory"));
+
+  // POS module (also covers /api/pos/price-list from stockRoutes)
+  app.use("/api/pos", requireModuleAccess("mod_pos"));
+
+  // Properties / Rentals module
+  app.use("/api/properties", requireModuleAccess("mod_properties"));
+
+  // ERP module: customers, suppliers, employees, purchase orders, ERP rental
+  for (const p of ["/api/customers", "/api/suppliers", "/api/employees",
+                   "/api/purchase-orders", "/api/erp"]) {
+    app.use(p, requireModuleAccess("mod_erp"));
+  }
+
+  // Accounting module: vouchers, accounts, ledger, bank accounts, fiscal
+  for (const p of [
+    "/api/vouchers", "/api/voucher-entries", "/api/voucher-detail",
+    "/api/accounts",  "/api/ledger-accounts",
+    "/api/bank-accounts", "/api/fixed-assets",
+    "/api/fiscal-period", "/api/financial",
+    "/api/credit-notes",
+  ]) {
+    app.use(p, requireModuleAccess("mod_accounting"));
+  }
+
+  // Inventory module: stock, bales, containers, locations, transfers
+  for (const p of [
+    "/api/inventory", "/api/stock-items", "/api/stock-groups",
+    "/api/bales", "/api/containers",
+    "/api/locations", "/api/pending-barcodes",
+    "/api/stock-transfers", "/api/stock-transfer-revisions",
+    "/api/stock-summary", "/api/offload-item-search",
+    "/api/location-price-groups",
+  ]) {
+    app.use(p, requireModuleAccess("mod_inventory"));
+  }
+
+  // Analytics module: reports, stats, dashboard data
+  for (const p of [
+    "/api/reports", "/api/stats",
+    "/api/dashboard", "/api/sales-report",
+  ]) {
+    app.use(p, requireModuleAccess("mod_analytics"));
+  }
+
+  // ─── Action-level guards (write operations) ──────────────────────────────────
+  // These fire before the actual route handler via Express middleware chaining.
+  // The action middleware calls next() on success, so the real handler still runs.
+
+  // Create / edit vouchers (journals, purchases, payments)
+  app.post("/api/vouchers",          requireActionAccess("act_create_voucher"));
+  app.put( "/api/vouchers/:id/with-entries", requireActionAccess("act_create_voucher"));
+
+  // Void / cancel sales
+  app.patch("/api/vouchers/:id/sales", requireActionAccess("act_void_sale"));
+
+  // Stock adjustments (manual inventory corrections)
+  app.post("/api/inventory/quick-adjust", requireActionAccess("act_adjust_stock"));
+
+  // Stock transfers (approve / create revision)
+  app.post("/api/stock-transfer-revisions/:id/approve", requireActionAccess("act_transfer_stock"));
+
+  // Import data operations
+  for (const p of [
+    "/api/stock-items/import-opening-balances",
+    "/api/bales/import",
+    "/api/factory/workers/import-excel",
+    "/api/containers/tracking/import",
+  ]) {
+    app.post(p, requireActionAccess("act_import_data"));
+  }
+
+  // Bulk operations (mass-edit / mass-delete)
+  for (const p of [
+    "/api/stock-items/bulk-delete",
+    "/api/stock-items/bulk-update-prices",
+    "/api/stock-items/bulk-update-uom",
+    "/api/stock-items/bulk-rename",
+    "/api/vouchers/bulk-delete",
+  ]) {
+    app.post(p, requireActionAccess("act_bulk_operations"));
+  }
+
+  // Export endpoints (PDF / Excel download tools)
+  for (const p of [
+    "/api/factory/payroll/export-pdf",
+    "/api/factory/payroll/export-excel",
+    "/api/stats/net-position-excel",
+    "/api/accounts/:type/:id/statement-pdf",
+  ]) {
+    app.use(p, requireExportAccess("exp_pdf"));
+  }
+
+  // ─── End Phase 3 guards ──────────────────────────────────────────────────────
 
   registerFactoryRoutes(app, requireAuth, db);
   registerFactoryWorkerRoutes(app, requireAuth, db);

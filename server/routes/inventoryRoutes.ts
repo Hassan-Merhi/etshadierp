@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
+import { requireActionAccess } from "../lib/permissionMiddleware";
 import {
   upload, logAudit, getCurrentExchangeRate, syncEmployeeBalancesFromEntries,
 } from "./_helpers";
