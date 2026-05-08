@@ -86,13 +86,12 @@ import { ActiveUsersSection } from "./settings/ActiveUsersSection";
 import { DataToolsTab } from "./settings/DataToolsTab";
 import { fmtDate, fieldLabel, fmtValue, getRecordLabel, getChangesSummary, tableShortName, AuditLogDialog, EditLogTable } from "./settings/AuditLog";
 import { PosSettingsTab } from "./settings/PosSettingsTab";
-import { ExportAccountsSection } from "./settings/ExportAccountsSection";
+import { FileStorageAndExport } from "./settings/FileStorageAndExport";
 import { DailyExportSection } from "./settings/DailyExportSection";
 import { StockReportSection } from "./settings/StockReportSection";
 import { NetPositionExportSection } from "./settings/NetPositionExportSection";
 import { DailyAutoSendSection } from "./settings/DailyAutoSendSection";
 import { ExportCenter } from "./settings/ExportCenter";
-import { FileStorageTab } from "./settings/FileStorageTab";
 import { BulkRenameTab } from "./settings/BulkRenameTab";
 import { LoginHistoryTab } from "./settings/LoginHistoryTab";
 import { POSReceiptSettings, IntercompanyPosTab } from "./settings/IntercompanyPosTab";
@@ -706,8 +705,7 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
           { key: "data-tools", label: "Data Tools", icon: Database, devOnly: true, factoryAdminAllowed: true },
           { key: "bulk-rename", label: "Bulk Rename", icon: Package, devOnly: true },
           { key: "edit-log", label: "Edit Log", icon: History },
-          { key: "files", label: "File Storage", icon: Upload },
-          { key: "export-accounts", label: "Export Accounts", icon: Download },
+          { key: "files-export", label: "Files & Export", icon: Upload },
           { key: "export-center", label: "Export Center", icon: Zap },
         ],
       },
@@ -1241,12 +1239,8 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
           {activeSection === "pos-settings" && currentUser?.role === "Developer" && (
             <PosSettingsTab />
           )}
-          {activeSection === "files" && (
-            <FileStorageTab />
-          )}
-
-          {activeSection === "export-accounts" && (
-            <ExportAccountsSection />
+          {activeSection === "files-export" && (
+            <FileStorageAndExport />
           )}
 
           {activeSection === "export-center" && (
