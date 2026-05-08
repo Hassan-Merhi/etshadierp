@@ -2739,6 +2739,18 @@ let migrationsDone = false;
         AND ucr.cash_account_id IS NOT NULL
         AND COALESCE(ul.location_id, ucr.assigned_location_id) IS NOT NULL
       ON CONFLICT (user_id, company_id, location_id) DO NOTHING`,
+
+    // Agent / Declarant mapping table for GIT Agent/Duty summary
+    `CREATE TABLE IF NOT EXISTS agent_declarant_mappings (
+      id                SERIAL PRIMARY KEY,
+      agent_name        VARCHAR(100) NOT NULL,
+      ledger_account_id INTEGER REFERENCES ledger_accounts(id) ON DELETE SET NULL,
+      aliases           TEXT[]       NOT NULL DEFAULT '{}',
+      active            BOOLEAN      NOT NULL DEFAULT TRUE,
+      created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_adm_agent_name_lower
+      ON agent_declarant_mappings (LOWER(agent_name))`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

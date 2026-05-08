@@ -559,6 +559,26 @@ export const insertContainerSchema = createInsertSchema(containers).omit({
 export type InsertContainer = z.infer<typeof insertContainerSchema>;
 export type Container = typeof containers.$inferSelect;
 
+// ─── Agent / Declarant Mapping ───────────────────────────────────────────────
+// Maps a free-text agent name (as stored in containers.agent) to a specific
+// ledger account. Aliases allow variant spellings to resolve to the same account.
+// Used by GET /api/git/agent-duty-summary for reliable balance lookup.
+export const agentDeclarantMappings = pgTable("agent_declarant_mappings", {
+  id:              serial("id").primaryKey(),
+  agentName:       varchar("agent_name", { length: 100 }).notNull(),
+  ledgerAccountId: integer("ledger_account_id").references(() => ledgerAccounts.id, { onDelete: "set null" }),
+  aliases:         text("aliases").array().notNull().default([]),
+  active:          boolean("active").notNull().default(true),
+  createdAt:       timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertAgentDeclarantMappingSchema = createInsertSchema(agentDeclarantMappings).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAgentDeclarantMapping = z.infer<typeof insertAgentDeclarantMappingSchema>;
+export type AgentDeclarantMapping = typeof agentDeclarantMappings.$inferSelect;
+
 export const purchaseOrders = pgTable("purchase_orders", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),

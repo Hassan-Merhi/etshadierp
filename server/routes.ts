@@ -50,6 +50,7 @@ import { registerImportCycleRoutes } from "./routes/importCycleRoutes";
 import { registerDebugRoutes } from "./routes/debugRoutes";
 import { registerExportRoutes } from "./routes/exportRoutes";
 import { registerGlobalTransactionRoutes } from "./routes/globalTransactionRoutes";
+import { registerGitRoutes } from "./routes/gitRoutes";
 import { registerPropertiesRentalRoutes } from "./routes/propertiesRentalRoutes";
 import { registerErpRentalRoutes } from "./routes/erpRentalRoutes";
 import { registerFactoryRentalRoutes } from "./routes/factoryRentalRoutes";
@@ -1769,6 +1770,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerNetPositionMonthlyExcelRoute(app);
   registerWhatsAppRoutes(app);
   registerExportRoutes(app);
+  registerGitRoutes(app);
 
   const httpServer = createServer(app);
 
