@@ -25,6 +25,7 @@ import {
   Ship, Truck, Package, AlertTriangle, FileX, Clock, DollarSign,
   Search, ExternalLink, CheckCircle2, XCircle, MessageSquare,
   FileSpreadsheet, LayoutGrid, List, Info, AlertCircle, ChevronDown, ChevronUp,
+  Building2,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
@@ -1043,10 +1044,27 @@ interface AgentDutySummary {
   activePreviewRows: ApiPreviewRow[];
 }
 
-interface AgentDutyResponse {
-  asOf: string;
+interface AgentDutyCompanySection {
+  companyId: number;
+  companyName: string;
   agents: AgentDutySummary[];
 }
+
+interface AgentDutyResponseSingle {
+  asOf: string;
+  mode: "single";
+  companyId: number;
+  companyName: string;
+  agents: AgentDutySummary[];
+}
+
+interface AgentDutyResponseAll {
+  asOf: string;
+  mode: "all";
+  companies: AgentDutyCompanySection[];
+}
+
+type AgentDutyResponse = AgentDutyResponseSingle | AgentDutyResponseAll;
 
 // ─── Warning banner config ────────────────────────────────────────────────────
 
@@ -1351,26 +1369,83 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
 
 // ─── Tab 5 wrapper with data fetching ────────────────────────────────────────
 
+type CompanyViewMode = "session" | "all";
+
 function TabAgentDuty() {
+  const [companyMode, setCompanyMode] = useState<CompanyViewMode>("session");
+
+  const queryUrl =
+    companyMode === "all"
+      ? "/api/git/agent-duty-summary?allCompanies=true"
+      : "/api/git/agent-duty-summary";
+
   const { data, isLoading, isError, error } = useQuery<AgentDutyResponse>({
-    queryKey: ["/api/git/agent-duty-summary"],
+    queryKey: [queryUrl],
     staleTime: 60_000,
     retry: 1,
   });
+
+  // Normalise to an array of company sections for uniform rendering.
+  // Computed before any early return so it is always available in all render paths.
+  const sections: AgentDutyCompanySection[] = !data
+    ? []
+    : data.mode === "all"
+    ? data.companies
+    : [{ companyId: data.companyId, companyName: data.companyName, agents: data.agents }];
+
+  const totalAgents = sections.reduce((s, c) => s + c.agents.length, 0);
+  const asOf = data?.asOf;
+
+  // ── Company selector (rendered in every path so the user can switch while loading/errored) ──
+  const modeSelector = (
+    <div className="flex items-center gap-2 flex-wrap" data-testid="agent-duty-mode-selector">
+      <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      <span className="text-xs text-muted-foreground">View:</span>
+      <Button
+        size="sm"
+        variant={companyMode === "session" ? "default" : "outline"}
+        className="text-xs gap-1.5"
+        onClick={() => setCompanyMode("session")}
+        data-testid="button-agent-duty-my-company"
+      >
+        My Company
+      </Button>
+      <Button
+        size="sm"
+        variant={companyMode === "all" ? "default" : "outline"}
+        className="text-xs gap-1.5"
+        onClick={() => setCompanyMode("all")}
+        data-testid="button-agent-duty-all-companies"
+      >
+        All Accessible Companies
+      </Button>
+    </div>
+  );
+
+  // ── Info banner (rendered in main path and loading path) ──
+  const infoBanner = (
+    <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 px-3 py-2 text-xs text-blue-800 dark:text-blue-300 flex gap-2 items-start">
+      <FileSpreadsheet className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+      <div className="flex-1">
+        <strong>Balance Allocation — reporting view only.</strong>{" "}
+        Payments are posted manually in Accounts / Vouchers. This tab allocates the current
+        ledger balance to containers <em>oldest-offloaded-first</em>. No records are created or
+        edited by this view.
+      </div>
+      {asOf && (
+        <span className="shrink-0 text-[10px] text-blue-600 dark:text-blue-400 whitespace-nowrap">
+          As of {new Date(asOf).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+        </span>
+      )}
+    </div>
+  );
 
   // ── Loading state ──
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 px-3 py-2 text-xs text-blue-800 dark:text-blue-300 flex gap-2 items-start">
-          <FileSpreadsheet className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-          <span>
-            <strong>Balance Allocation — reporting view only.</strong>{" "}
-            Payments are posted manually in Accounts / Vouchers. This tab allocates the current
-            ledger balance to containers <em>oldest-offloaded-first</em>. No records are created or
-            edited by this view.
-          </span>
-        </div>
+        {infoBanner}
+        {modeSelector}
         {[1, 2, 3].map(i => (
           <div key={i} className="rounded-md border overflow-hidden">
             <Skeleton className="h-9 w-full rounded-none" />
@@ -1395,7 +1470,9 @@ function TabAgentDuty() {
   // ── Error state ──
   if (isError) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
+        {infoBanner}
+        {modeSelector}
         <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/20 px-4 py-3 flex gap-3 items-start text-sm text-red-800 dark:text-red-300">
           <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
           <div>
@@ -1410,42 +1487,61 @@ function TabAgentDuty() {
   }
 
   // ── Empty state ──
-  if (!data || data.agents.length === 0) {
+  if (totalAgents === 0) {
     return (
-      <div className="rounded-md border border-dashed px-6 py-10 text-center text-muted-foreground text-sm">
-        <FileX className="h-8 w-8 mx-auto mb-2 opacity-40" />
-        <div className="font-medium">No agent / duty data found</div>
-        <div className="text-xs mt-1">
-          No containers with a non-zero duty fee and agent name exist for this company.
+      <div className="space-y-4">
+        {infoBanner}
+        {modeSelector}
+        <div className="rounded-md border border-dashed px-6 py-10 text-center text-muted-foreground text-sm">
+          <FileX className="h-8 w-8 mx-auto mb-2 opacity-40" />
+          <div className="font-medium">No agent / duty data found</div>
+          <div className="text-xs mt-1">
+            {companyMode === "all"
+              ? "No containers with a non-zero duty fee and agent name exist across accessible companies."
+              : "No containers with a non-zero duty fee and agent name exist for this company."}
+          </div>
         </div>
       </div>
     );
   }
 
+  // ── Main render ──
   return (
     <div className="space-y-4">
+      {infoBanner}
+      {modeSelector}
 
-      {/* ── Info banner ── */}
-      <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 px-3 py-2 text-xs text-blue-800 dark:text-blue-300 flex gap-2 items-start">
-        <FileSpreadsheet className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-        <div className="flex-1">
-          <strong>Balance Allocation — reporting view only.</strong>{" "}
-          Payments are posted manually in Accounts / Vouchers. This tab allocates the current
-          ledger balance to containers <em>oldest-offloaded-first</em>. No records are created or
-          edited by this view.
+      {sections.map(section => (
+        <div key={section.companyId} className="space-y-4" data-testid={`company-section-${section.companyId}`}>
+
+          {/* Company heading — shown only in all-companies mode */}
+          {companyMode === "all" && (
+            <div className="flex items-center gap-2 pt-1">
+              <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm font-semibold tracking-wide">{section.companyName}</span>
+              <Badge variant="outline" className="text-xs no-default-active-elevate">
+                {section.agents.length} {section.agents.length === 1 ? "agent" : "agents"}
+              </Badge>
+              <div className="flex-1 border-t" />
+            </div>
+          )}
+
+          {/* Empty section (possible when a company has no agent data) */}
+          {section.agents.length === 0 ? (
+            <div className="rounded-md border border-dashed px-4 py-6 text-center text-muted-foreground text-sm">
+              <FileX className="h-6 w-6 mx-auto mb-1.5 opacity-40" />
+              <div className="text-xs">No agent / duty data for {section.companyName}</div>
+            </div>
+          ) : (
+            section.agents.map(agent => (
+              <AgentCard
+                key={`${section.companyId}-${agent.agentName}`}
+                agent={agent}
+              />
+            ))
+          )}
         </div>
-        {data.asOf && (
-          <span className="shrink-0 text-[10px] text-blue-600 dark:text-blue-400 whitespace-nowrap">
-            As of {new Date(data.asOf).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-          </span>
-        )}
-      </div>
-
-      {/* ── Per-agent cards ── */}
-      {data.agents.map(agent => (
-        <AgentCard key={agent.agentName} agent={agent} />
       ))}
-
     </div>
   );
 }
