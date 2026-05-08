@@ -155,6 +155,48 @@ function getRealRowBg(r: EnrichedContainerApi): string {
   return "";
 }
 
+function WorkbookDataRow({ r }: { r: EnrichedContainerApi }) {
+  const docsSent = !!r.docsSentDate;
+  return (
+    <tr className={cn("border-b last:border-b-0", getRealRowBg(r))}>
+      <td className="py-0.5 px-2 font-mono font-bold">{r.containerNumber}</td>
+      <td className="py-0.5 px-2 text-right font-semibold">${fmt(parseNum(r.grandTotal), 2)}</td>
+      <td className="py-0.5 px-2">{fmtD(r.eta)}</td>
+      <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
+      <td className="py-0.5 px-2">{r.trackingLocation ?? "—"}</td>
+      <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
+      <td className={cn("py-0.5 px-2", r.isOverdue ? "text-red-600 font-bold" : "")}>
+        {fmtD(r.maxOffloadDate)}
+        {r.daysDelayed ? <span className="ml-1 text-[10px]">+{r.daysDelayed}d</span> : null}
+      </td>
+      <td className="py-0.5 px-2 text-center">
+        {r.docReceived ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" /> : <XCircle className="h-3.5 w-3.5 text-red-500 mx-auto" />}
+      </td>
+      <td className="py-0.5 px-2 text-center">
+        {docsSent
+          ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
+          : r.docsReadyNotSent
+            ? <span className="text-amber-700 text-[10px] font-medium">READY</span>
+            : "—"}
+      </td>
+      <td className="py-0.5 px-2">{r.freightStatus ?? "—"}</td>
+      <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>
+      <td className="py-0.5 px-2 text-right">{parseNum(r.transportFee) > 0 ? `$${fmt(parseNum(r.transportFee), 0)}` : "—"}</td>
+      <td className="py-0.5 px-2">{r.agent ?? "—"}</td>
+      <td className="py-0.5 px-2 text-right">{parseNum(r.dutyFee) > 0 ? `$${fmt(parseNum(r.dutyFee), 0)}` : "—"}</td>
+      <td className="py-0.5 px-2">
+        <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", (STATUS_BADGE as Record<string, string>)[r.status] ?? "bg-muted text-foreground")}>{r.status}</span>
+      </td>
+      <td className="py-0.5 px-2 text-center">
+        {r.trackingLink ? <a href={r.trackingLink} target="_blank" rel="noopener noreferrer" className="text-primary"><ExternalLink className="h-3.5 w-3.5 mx-auto" /></a> : "—"}
+      </td>
+      <td className="py-0.5 px-2 max-w-40 truncate text-muted-foreground italic">{r.trackingDescription ?? "—"}</td>
+    </tr>
+  );
+}
+
+const WORKBOOK_COLS = 17;
+
 function RealWorkbookBlock({
   companyName, rows, headerBg, headerText,
 }: {
@@ -168,93 +210,119 @@ function RealWorkbookBlock({
     fee:    rows.reduce((s, r) => s + parseNum(r.transportFee), 0),
     duty:   rows.reduce((s, r) => s + parseNum(r.dutyFee), 0),
   };
+
+  // Group by shopName; fall back to companyName when shopName is null
+  const shopGroups: Array<{ name: string; rows: EnrichedContainerApi[] }> = [];
+  for (const r of rows) {
+    const key = r.shopName ?? companyName;
+    const existing = shopGroups.find(g => g.name === key);
+    if (existing) existing.rows.push(r);
+    else shopGroups.push({ name: key, rows: [r] });
+  }
+  const hasShops = shopGroups.length > 1;
+
+  const columnHeaders = (
+    <tr className="bg-muted/60 border-b text-muted-foreground">
+      <th className="py-1 px-2 font-semibold text-center">CTR #</th>
+      <th className="py-1 px-2 font-semibold text-center">AMOUNT</th>
+      <th className="py-1 px-2 font-semibold text-center">ETA DAS</th>
+      <th className="py-1 px-2 font-semibold text-center">TRUCK #</th>
+      <th className="py-1 px-2 font-semibold text-center">LOCATION</th>
+      <th className="py-1 px-2 font-semibold text-center">BORDER DT.</th>
+      <th className="py-1 px-2 font-semibold text-center">MAX OFFLOAD</th>
+      <th className="py-1 px-2 font-semibold text-center">DOCS RCVD</th>
+      <th className="py-1 px-2 font-semibold text-center">DOCS→TRUCK</th>
+      <th className="py-1 px-2 font-semibold text-center">FREIGHT</th>
+      <th className="py-1 px-2 font-semibold text-center">TRANSPORTER</th>
+      <th className="py-1 px-2 font-semibold text-center">FEE</th>
+      <th className="py-1 px-2 font-semibold text-center">AGENT</th>
+      <th className="py-1 px-2 font-semibold text-center">DUTY</th>
+      <th className="py-1 px-2 font-semibold text-center">STATUS</th>
+      <th className="py-1 px-2 font-semibold text-center">LINK</th>
+      <th className="py-1 px-2 font-semibold text-center">NOTES</th>
+    </tr>
+  );
+
   return (
     <div className="rounded-md border overflow-hidden">
+      {/* Company-level header */}
       <div className={cn("flex items-center justify-between px-3 py-1.5", headerBg, headerText)}>
         <span className="text-sm font-bold tracking-wide">{companyName}</span>
         <span className="text-xs font-semibold opacity-90">{rows.length} containers — ${fmt(total.amount, 2)}</span>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs whitespace-nowrap border-collapse">
-          <thead>
-            <tr className="bg-muted/60 border-b text-muted-foreground">
-              <th className="py-1 px-2 font-semibold text-center">CTR #</th>
-              <th className="py-1 px-2 font-semibold text-center">AMOUNT</th>
-              <th className="py-1 px-2 font-semibold text-center">ETA DAS</th>
-              <th className="py-1 px-2 font-semibold text-center">TRUCK #</th>
-              <th className="py-1 px-2 font-semibold text-center">LOCATION</th>
-              <th className="py-1 px-2 font-semibold text-center">BORDER DT.</th>
-              <th className="py-1 px-2 font-semibold text-center">MAX OFFLOAD</th>
-              <th className="py-1 px-2 font-semibold text-center">DOCS RCVD</th>
-              <th className="py-1 px-2 font-semibold text-center">DOCS→TRUCK</th>
-              <th className="py-1 px-2 font-semibold text-center">FREIGHT</th>
-              <th className="py-1 px-2 font-semibold text-center">TRANSPORTER</th>
-              <th className="py-1 px-2 font-semibold text-center">FEE</th>
-              <th className="py-1 px-2 font-semibold text-center">AGENT</th>
-              <th className="py-1 px-2 font-semibold text-center">DUTY</th>
-              <th className="py-1 px-2 font-semibold text-center">STATUS</th>
-              <th className="py-1 px-2 font-semibold text-center">LINK</th>
-              <th className="py-1 px-2 font-semibold text-center">NOTES</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr><td colSpan={17} className="py-3 text-center text-muted-foreground italic text-xs">No containers</td></tr>
-            ) : (
-              rows.map((r) => {
-                const docsSent = !!r.docsSentDate;
-                return (
-                  <tr key={r.id} className={cn("border-b last:border-b-0", getRealRowBg(r))}>
-                    <td className="py-0.5 px-2 font-mono font-bold">{r.containerNumber}</td>
-                    <td className="py-0.5 px-2 text-right font-semibold">${fmt(parseNum(r.grandTotal), 2)}</td>
-                    <td className="py-0.5 px-2">{fmtD(r.eta)}</td>
-                    <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
-                    <td className="py-0.5 px-2">{r.trackingLocation ?? "—"}</td>
-                    <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
-                    <td className={cn("py-0.5 px-2", r.isOverdue ? "text-red-600 font-bold" : "")}>
-                      {fmtD(r.maxOffloadDate)}
-                      {r.daysDelayed ? <span className="ml-1 text-[10px]">+{r.daysDelayed}d</span> : null}
-                    </td>
-                    <td className="py-0.5 px-2 text-center">
-                      {r.docReceived ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" /> : <XCircle className="h-3.5 w-3.5 text-red-500 mx-auto" />}
-                    </td>
-                    <td className="py-0.5 px-2 text-center">
-                      {docsSent
-                        ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
-                        : r.docsReadyNotSent
-                          ? <span className="text-amber-700 text-[10px] font-medium">READY</span>
-                          : "—"}
-                    </td>
-                    <td className="py-0.5 px-2">{r.freightStatus ?? "—"}</td>
-                    <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>
-                    <td className="py-0.5 px-2 text-right">{parseNum(r.transportFee) > 0 ? `$${fmt(parseNum(r.transportFee), 0)}` : "—"}</td>
-                    <td className="py-0.5 px-2">{r.agent ?? "—"}</td>
-                    <td className="py-0.5 px-2 text-right">{parseNum(r.dutyFee) > 0 ? `$${fmt(parseNum(r.dutyFee), 0)}` : "—"}</td>
-                    <td className="py-0.5 px-2">
-                      <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", (STATUS_BADGE as Record<string, string>)[r.status] ?? "bg-muted text-foreground")}>{r.status}</span>
-                    </td>
-                    <td className="py-0.5 px-2 text-center">
-                      {r.trackingLink ? <a href={r.trackingLink} target="_blank" rel="noopener noreferrer" className="text-primary"><ExternalLink className="h-3.5 w-3.5 mx-auto" /></a> : "—"}
-                    </td>
-                    <td className="py-0.5 px-2 max-w-40 truncate text-muted-foreground italic">{r.trackingDescription ?? "—"}</td>
-                  </tr>
-                );
-              })
-            )}
-            {rows.length > 0 && (
-              <tr className={cn("border-t-2 text-xs font-bold", headerBg, headerText)}>
-                <td className="py-1 px-2">TOTAL — {rows.length} CTR</td>
-                <td className="py-1 px-2 text-right">${fmt(total.amount, 2)}</td>
-                <td colSpan={9} />
-                <td className="py-1 px-2 text-right">{total.fee > 0 ? `$${fmt(total.fee, 0)}` : "—"}</td>
-                <td />
-                <td className="py-1 px-2 text-right">{total.duty > 0 ? `$${fmt(total.duty, 0)}` : "—"}</td>
-                <td colSpan={3} />
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+
+      {hasShops ? (
+        /* Multiple shops — one mini-table per shop */
+        <div className="divide-y">
+          {shopGroups.map(({ name, rows: shopRows }) => {
+            const st = {
+              amount: shopRows.reduce((s, r) => s + parseNum(r.grandTotal), 0),
+              fee:    shopRows.reduce((s, r) => s + parseNum(r.transportFee), 0),
+              duty:   shopRows.reduce((s, r) => s + parseNum(r.dutyFee), 0),
+            };
+            return (
+              <div key={name}>
+                {/* Shop sub-header */}
+                <div className="flex items-center justify-between px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 border-b border-yellow-300 dark:border-yellow-700">
+                  <span className="text-xs font-bold uppercase tracking-wide text-yellow-900 dark:text-yellow-300">{name}</span>
+                  <span className="text-xs text-yellow-800 dark:text-yellow-400">{shopRows.length} container{shopRows.length !== 1 ? "s" : ""} — ${fmt(st.amount, 2)}</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs whitespace-nowrap border-collapse">
+                    <thead>{columnHeaders}</thead>
+                    <tbody>
+                      {shopRows.map(r => <WorkbookDataRow key={r.id} r={r} />)}
+                      <tr className="bg-yellow-50 dark:bg-yellow-900/10 border-t border-yellow-200 dark:border-yellow-800 text-xs font-semibold text-yellow-900 dark:text-yellow-300">
+                        <td className="py-1 px-2">SUB-TOTAL — {shopRows.length} CTR</td>
+                        <td className="py-1 px-2 text-right">${fmt(st.amount, 2)}</td>
+                        <td colSpan={9} />
+                        <td className="py-1 px-2 text-right">{st.fee > 0 ? `$${fmt(st.fee, 0)}` : "—"}</td>
+                        <td />
+                        <td className="py-1 px-2 text-right">{st.duty > 0 ? `$${fmt(st.duty, 0)}` : "—"}</td>
+                        <td colSpan={3} />
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
+          {/* Company grand total */}
+          <div className={cn("px-3 py-1.5 flex items-center justify-between text-xs font-bold", headerBg, headerText)}>
+            <span>TOTAL — {rows.length} CTR</span>
+            <div className="flex gap-4">
+              <span>${fmt(total.amount, 2)}</span>
+              {total.fee > 0 && <span>TRANSPORT: ${fmt(total.fee, 0)}</span>}
+              {total.duty > 0 && <span>DUTY: ${fmt(total.duty, 0)}</span>}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Single shop (or no shopName set) — original flat table */
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs whitespace-nowrap border-collapse">
+            <thead>{columnHeaders}</thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr><td colSpan={WORKBOOK_COLS} className="py-3 text-center text-muted-foreground italic text-xs">No containers</td></tr>
+              ) : (
+                rows.map(r => <WorkbookDataRow key={r.id} r={r} />)
+              )}
+              {rows.length > 0 && (
+                <tr className={cn("border-t-2 text-xs font-bold", headerBg, headerText)}>
+                  <td className="py-1 px-2">TOTAL — {rows.length} CTR</td>
+                  <td className="py-1 px-2 text-right">${fmt(total.amount, 2)}</td>
+                  <td colSpan={9} />
+                  <td className="py-1 px-2 text-right">{total.fee > 0 ? `$${fmt(total.fee, 0)}` : "—"}</td>
+                  <td />
+                  <td className="py-1 px-2 text-right">{total.duty > 0 ? `$${fmt(total.duty, 0)}` : "—"}</td>
+                  <td colSpan={3} />
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
