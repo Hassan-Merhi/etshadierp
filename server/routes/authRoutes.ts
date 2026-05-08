@@ -414,38 +414,41 @@ export function registerAuthRoutes(app: Express) {
           conditions.push(ilike(auditLog.recordIdentifier, `%${search.trim()}%`));
         }
 
-        const rawLogs = await db.select()
+        const rawLogs = await db
+          .select({
+            id: auditLog.id,
+            userId: auditLog.userId,
+            storedUsername: auditLog.username,
+            companyId: auditLog.companyId,
+            action: auditLog.action,
+            tableName: auditLog.tableName,
+            recordId: auditLog.recordId,
+            recordIdentifier: auditLog.recordIdentifier,
+            changes: auditLog.changes,
+            createdAt: auditLog.createdAt,
+            resolvedUsername: users.username,
+            displayName: factoryUserProfiles.displayName,
+          })
           .from(auditLog)
+          .leftJoin(users, eq(users.id, auditLog.userId))
+          .leftJoin(
+            factoryUserProfiles,
+            and(
+              eq(factoryUserProfiles.userId, auditLog.userId),
+              companyId
+                ? eq(factoryUserProfiles.companyId, companyId)
+                : sql`1 = 0`,
+            ),
+          )
           .where(conditions.length > 0 ? and(...conditions) : undefined)
           .orderBy(desc(auditLog.createdAt))
           .limit(parseInt(limit as string))
           .offset(parseInt(offset as string));
 
-        // Resolve real usernames: look up users table then factoryUserProfiles for displayName
-        const userIds = [...new Set(rawLogs.map(l => l.userId).filter(Boolean))];
-        const resolvedUsers: Record<string, { username: string; displayName?: string }> = {};
-        if (userIds.length > 0) {
-          const userRows = await db.select({ id: users.id, username: users.username })
-            .from(users)
-            .where(inArray(users.id, userIds));
-          userRows.forEach(u => { resolvedUsers[u.id] = { username: u.username }; });
-
-          if (companyId) {
-            const profileRows = await db.select({ userId: factoryUserProfiles.userId, displayName: factoryUserProfiles.displayName })
-              .from(factoryUserProfiles)
-              .where(and(eq(factoryUserProfiles.companyId, companyId), inArray(factoryUserProfiles.userId, userIds)));
-            profileRows.forEach(p => {
-              if (resolvedUsers[p.userId]) resolvedUsers[p.userId].displayName = p.displayName;
-              else resolvedUsers[p.userId] = { username: p.userId, displayName: p.displayName };
-            });
-          }
-        }
-
-        const logs = rawLogs.map(log => {
-          const resolved = resolvedUsers[log.userId];
-          const resolvedUsername = resolved?.displayName || resolved?.username || log.username;
-          return { ...log, username: resolvedUsername };
-        });
+        const logs = rawLogs.map(({ storedUsername, resolvedUsername, displayName, ...row }) => ({
+          ...row,
+          username: displayName || resolvedUsername || storedUsername || "Unknown",
+        }));
 
         res.json(logs);
       } catch (error: any) {

@@ -312,12 +312,11 @@ function fmtBusinessValue(field: string, value: any): string {
 
 function getHeaderSentence(log: any): string {
   const changes = log.changes || {};
-  const rawUser = log.username;
   const user =
-    rawUser && rawUser !== "unknown" && rawUser !== "User"
-      ? rawUser
+    log.username && log.username !== "unknown"
+      ? log.username
       : log.userId
-        ? `User #${log.userId}`
+        ? `User #${log.userId.slice(0, 8)}`
         : "Unknown user";
   const verb = log.action === "create" ? "created" : log.action === "delete" ? "deleted" : "updated";
   const vType = changes.voucherType?.new ?? changes.voucherType?.old ?? changes.type?.new ?? changes.type?.old ?? "";
@@ -813,12 +812,11 @@ export function EditLogTable({ companyId }: { companyId?: number }) {
             </TableHeader>
             <TableBody>
               {auditLogs.map((log: any) => {
-                const rawUser = log.username;
                 const displayUser =
-                  rawUser && rawUser !== "unknown" && rawUser !== "User"
-                    ? rawUser
+                  log.username && log.username !== "unknown"
+                    ? log.username
                     : log.userId
-                      ? `User #${log.userId}`
+                      ? `User #${log.userId.slice(0, 8)}`
                       : null;
                 return (
                   <TableRow
