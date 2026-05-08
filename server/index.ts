@@ -2718,6 +2718,27 @@ let migrationsDone = false;
     // ── Configurable daily-export schedule time (May 2026) ─────────────────
     `ALTER TABLE export_settings ADD COLUMN IF NOT EXISTS schedule_hour integer NOT NULL DEFAULT 18`,
     `ALTER TABLE export_settings ADD COLUMN IF NOT EXISTS schedule_timezone text NOT NULL DEFAULT 'America/New_York'`,
+    // Per-location POS cash account mappings (May 2026)
+    `CREATE TABLE IF NOT EXISTS user_location_cash_accounts (
+      id serial PRIMARY KEY,
+      user_id varchar NOT NULL,
+      company_id integer NOT NULL,
+      location_id integer NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      cash_account_id integer NOT NULL REFERENCES ledger_accounts(id) ON DELETE RESTRICT,
+      pos_station integer,
+      created_at timestamp NOT NULL DEFAULT now(),
+      CONSTRAINT ulca_user_company_location_unique UNIQUE (user_id, company_id, location_id)
+    )`,
+    `CREATE INDEX IF NOT EXISTS ulca_company_idx ON user_location_cash_accounts(company_id)`,
+    `CREATE INDEX IF NOT EXISTS ulca_user_idx ON user_location_cash_accounts(user_id)`,
+    `INSERT INTO user_location_cash_accounts (user_id, company_id, location_id, cash_account_id, pos_station)
+      SELECT ucr.user_id, ucr.company_id, COALESCE(ul.location_id, ucr.assigned_location_id), ucr.cash_account_id, ucr.pos_station
+      FROM user_company_roles ucr
+      LEFT JOIN user_locations ul ON ul.user_id = ucr.user_id AND ul.company_id = ucr.company_id
+      WHERE ucr.role = 'POS'
+        AND ucr.cash_account_id IS NOT NULL
+        AND COALESCE(ul.location_id, ucr.assigned_location_id) IS NOT NULL
+      ON CONFLICT (user_id, company_id, location_id) DO NOTHING`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

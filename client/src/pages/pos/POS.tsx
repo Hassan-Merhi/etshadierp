@@ -276,10 +276,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   // Filter cash ledger accounts
   const cashLedgerAccounts = (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc: any) => acc.accountType === "Cash");
 
-  // Fetch assigned cash account for POS users
+  // Cash account info now comes from posSelectedLocation (per-location mapping)
+  // assignedCashAccount is no longer used — kept disabled to avoid breaking other code
   const { data: assignedCashAccount } = useQuery<any>({
-    queryKey: posUser?.cashAccountId ? [`/api/ledger-accounts/${posUser.cashAccountId}`] : [],
-    enabled: !!posUser?.cashAccountId,
+    queryKey: [],
+    enabled: false,
   });
 
   // Fetch drafts for current user and location
@@ -460,13 +461,17 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }
   }, [posUser, posSelectedLocation]);
 
-  // Auto-set cash account for POS users with assigned cash account
+  // Auto-set cash account for POS users from their selected location's per-location mapping
   useEffect(() => {
-    if (posUser?.cashAccountId && assignedCashAccount && !paymentAccountId) {
+    const locCashId = (posSelectedLocation as any)?.cashAccountId;
+    if (posUser && locCashId) {
       setPaymentAccountType("cash");
-      setPaymentAccountId(String(posUser.cashAccountId));
+      setPaymentAccountId(String(locCashId));
+    } else if (posUser && posSelectedLocation && !locCashId) {
+      setPaymentAccountId(null);
     }
-  }, [posUser, assignedCashAccount, paymentAccountId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(posSelectedLocation as any)?.id]);
 
   // Set location from edit voucher when in edit mode
   useEffect(() => {
@@ -480,8 +485,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   // Auto-select first account when loaded based on account type (for non-POS users)
   useEffect(() => {
-    // Skip auto-selection if POS user has assigned cash account
-    if (posUser?.cashAccountId) return;
+    // POS users get cash account from per-location mapping — skip generic auto-selection
+    if (posUser) return;
     
     if (paymentAccountType === "bank" && bankAccounts.length > 0 && !paymentAccountId) {
       setPaymentAccountId(String(bankAccounts[0].id));
@@ -2005,9 +2010,15 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               <Select
                 value={posSelectedLocation?.id.toString() || ""}
                 onValueChange={(value) => {
+                  const cartHasItems = rows.some(r => (r.stockItemId || r.itemName.trim()) && r.quantity > 0);
+                  if (cartHasItems) {
+                    toast({ title: "Cart not empty", description: "Clear the cart before switching location.", variant: "destructive" });
+                    return;
+                  }
                   const location = posAssignedLocations.find(loc => loc.id.toString() === value);
                   if (location) {
-                    setPosSelectedLocation(location);
+                    setPosSelectedLocation(location as any);
+                    setPaymentAccountId(null);
                   }
                 }}
               >
@@ -2076,11 +2087,21 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         {!isCreditSale && (
           <div className="flex items-center gap-2 col-span-2 sm:col-span-1 flex-wrap">
             <Wallet className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
-            {posUser?.cashAccountId && assignedCashAccount ? (
-              <div className="px-2 sm:px-3 py-1.5 bg-muted/50 rounded-md border">
-                <span className="text-xs sm:text-sm">{assignedCashAccount.name}</span>
-                <span className="text-xs text-muted-foreground ml-1 sm:ml-2 hidden sm:inline">({assignedCashAccount.code})</span>
-              </div>
+            {posUser ? (
+              posSelectedLocation ? (
+                (posSelectedLocation as any).cashAccountId ? (
+                  <div className="px-2 sm:px-3 py-1.5 bg-muted/50 rounded-md border">
+                    <span className="text-xs sm:text-sm">{(posSelectedLocation as any).cashAccountName || `Account #${(posSelectedLocation as any).cashAccountId}`}</span>
+                    {(posSelectedLocation as any).cashAccountCode && <span className="text-xs text-muted-foreground ml-1 sm:ml-2 hidden sm:inline">({(posSelectedLocation as any).cashAccountCode})</span>}
+                  </div>
+                ) : (
+                  <div className="px-2 sm:px-3 py-1.5 bg-destructive/10 rounded-md border border-destructive/30">
+                    <span className="text-xs sm:text-sm text-destructive">No cash account — contact admin</span>
+                  </div>
+                )
+              ) : (
+                <div className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-muted-foreground">Select a location</div>
+              )
             ) : (
               <>
                 <Select value={paymentAccountType} onValueChange={(value: "bank" | "cash") => setPaymentAccountType(value)}>

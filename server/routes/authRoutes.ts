@@ -28,6 +28,7 @@ import {
   userPresence,
   users,
   ledgerAccounts, userPreferences, vouchers, voucherEntries,
+  userLocationCashAccounts,
 } from "@shared/schema";
 import {
   eq, and, or, desc, lt, gt, gte, lte, ne, inArray, sql, isNull, not, ilike,
@@ -936,6 +937,99 @@ export function registerAuthRoutes(app: Express) {
     }
   );
 
+  // Per-location cash account mappings for POS users
+  app.get(
+    "/api/user-location-cash-accounts/:userId/:companyId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const { currentRole } = req.session;
+        if (!currentRole || !["Admin", "Owner", "Developer"].includes(currentRole)) {
+          return res.status(403).json({ message: "Admin access required" });
+        }
+        const { userId, companyId: companyIdStr } = req.params;
+        const companyId = parseInt(companyIdStr);
+        if (isNaN(companyId)) return res.status(400).json({ message: "Invalid companyId" });
+
+        const mappings = await db
+          .select({
+            id: userLocationCashAccounts.id,
+            locationId: userLocationCashAccounts.locationId,
+            cashAccountId: userLocationCashAccounts.cashAccountId,
+            posStation: userLocationCashAccounts.posStation,
+          })
+          .from(userLocationCashAccounts)
+          .where(
+            and(
+              eq(userLocationCashAccounts.userId, userId),
+              eq(userLocationCashAccounts.companyId, companyId),
+            )
+          );
+
+        res.json(mappings);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  app.put(
+    "/api/user-location-cash-accounts/:userId/:companyId",
+    requireAuth,
+    requireRole("Admin"),
+    async (req, res) => {
+      try {
+        const { userId, companyId: companyIdStr } = req.params;
+        const companyId = parseInt(companyIdStr);
+        if (isNaN(companyId)) return res.status(400).json({ message: "Invalid companyId" });
+
+        const { mappings } = req.body;
+        if (!Array.isArray(mappings)) {
+          return res.status(400).json({ message: "mappings array required" });
+        }
+
+        for (const m of mappings) {
+          if (!m.locationId || !m.cashAccountId) {
+            return res.status(400).json({ message: "Each mapping must have locationId and cashAccountId" });
+          }
+          const [ca] = await db
+            .select({ id: ledgerAccounts.id, accountType: ledgerAccounts.accountType })
+            .from(ledgerAccounts)
+            .where(and(eq(ledgerAccounts.id, m.cashAccountId), eq(ledgerAccounts.companyId, companyId)))
+            .limit(1);
+          if (!ca) return res.status(400).json({ message: `Cash account ${m.cashAccountId} not found in this company` });
+          if (ca.accountType !== "Cash") return res.status(400).json({ message: `Account ${m.cashAccountId} is not a Cash account` });
+        }
+
+        await db.transaction(async (tx) => {
+          await tx
+            .delete(userLocationCashAccounts)
+            .where(
+              and(
+                eq(userLocationCashAccounts.userId, userId),
+                eq(userLocationCashAccounts.companyId, companyId),
+              )
+            );
+          if (mappings.length > 0) {
+            await tx.insert(userLocationCashAccounts).values(
+              mappings.map((m: any) => ({
+                userId,
+                companyId,
+                locationId: m.locationId,
+                cashAccountId: m.cashAccountId,
+                posStation: m.posStation ?? null,
+              }))
+            );
+          }
+        });
+
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
   // Get assigned locations for current user (used by POS)
   app.get(
     "/api/my-locations",
@@ -957,9 +1051,21 @@ export function registerAuthRoutes(app: Express) {
             city: locations.city,
             state: locations.state,
             country: locations.country,
+            cashAccountId: userLocationCashAccounts.cashAccountId,
+            cashAccountName: ledgerAccounts.name,
+            cashAccountCode: ledgerAccounts.code,
           })
           .from(userLocations)
           .innerJoin(locations, eq(userLocations.locationId, locations.id))
+          .leftJoin(
+            userLocationCashAccounts,
+            and(
+              eq(userLocationCashAccounts.userId, req.user.id),
+              eq(userLocationCashAccounts.companyId, companyId),
+              eq(userLocationCashAccounts.locationId, locations.id),
+            )
+          )
+          .leftJoin(ledgerAccounts, eq(ledgerAccounts.id, userLocationCashAccounts.cashAccountId))
           .where(
             and(
               eq(userLocations.userId, req.user.id),
@@ -993,8 +1099,20 @@ export function registerAuthRoutes(app: Express) {
                 city: locations.city,
                 state: locations.state,
                 country: locations.country,
+                cashAccountId: userLocationCashAccounts.cashAccountId,
+                cashAccountName: ledgerAccounts.name,
+                cashAccountCode: ledgerAccounts.code,
               })
               .from(locations)
+              .leftJoin(
+                userLocationCashAccounts,
+                and(
+                  eq(userLocationCashAccounts.userId, req.user.id),
+                  eq(userLocationCashAccounts.companyId, companyId),
+                  eq(userLocationCashAccounts.locationId, locations.id),
+                )
+              )
+              .leftJoin(ledgerAccounts, eq(ledgerAccounts.id, userLocationCashAccounts.cashAccountId))
               .where(and(eq(locations.id, fallbackLocId), eq(locations.active, true)))
               .limit(1);
 

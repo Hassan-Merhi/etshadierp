@@ -104,6 +104,28 @@ export const insertUserLocationSchema = createInsertSchema(userLocations).omit({
 export type InsertUserLocation = z.infer<typeof insertUserLocationSchema>;
 export type UserLocation = typeof userLocations.$inferSelect;
 
+export const userLocationCashAccounts = pgTable("user_location_cash_accounts", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  companyId: integer("company_id").notNull(),
+  locationId: integer("location_id").notNull().references(() => locations.id, { onDelete: "cascade" }),
+  cashAccountId: integer("cash_account_id").notNull().references(() => ledgerAccounts.id, { onDelete: "restrict" }),
+  posStation: integer("pos_station"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueUserCompanyLocation: uniqueIndex("ulca_user_company_location_unique").on(t.userId, t.companyId, t.locationId),
+  companyIdx: index("ulca_company_idx").on(t.companyId),
+  userIdx: index("ulca_user_idx").on(t.userId),
+}));
+
+export const insertUserLocationCashAccountSchema = createInsertSchema(userLocationCashAccounts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertUserLocationCashAccount = z.infer<typeof insertUserLocationCashAccountSchema>;
+export type UserLocationCashAccount = typeof userLocationCashAccounts.$inferSelect;
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),

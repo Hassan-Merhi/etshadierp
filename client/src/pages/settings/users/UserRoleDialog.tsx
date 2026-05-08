@@ -51,6 +51,7 @@ interface UserRoleDialogProps {
 export function UserRoleDialog({ open, onClose, userId, companies, editingRole }: UserRoleDialogProps) {
   const { toast } = useToast();
   const [selectedLocationIds, setSelectedLocationIds] = useState<number[]>([]);
+  const [locationCashAccounts, setLocationCashAccounts] = useState<Record<number, number | undefined>>({});
 
   const form = useForm<RoleAssignmentData>({
     resolver: zodResolver(roleAssignmentSchema),
@@ -87,12 +88,24 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
             .catch(() => {
               setSelectedLocationIds(editingRole.assignedLocationId ? [editingRole.assignedLocationId] : []);
             });
+          fetch(`/api/user-location-cash-accounts/${editingRole.userId}/${editingRole.companyId}`)
+            .then((r) => r.json())
+            .then((mappings) => {
+              if (Array.isArray(mappings)) {
+                const record: Record<number, number> = {};
+                mappings.forEach((m: any) => { record[m.locationId] = m.cashAccountId; });
+                setLocationCashAccounts(record);
+              }
+            })
+            .catch(() => {});
         } else {
           setSelectedLocationIds([]);
+          setLocationCashAccounts({});
         }
       } else {
         form.reset({ userId, companyId: companies[0]?.id || 0, role: "Manager" });
         setSelectedLocationIds([]);
+        setLocationCashAccounts({});
       }
     }
   }, [open, editingRole?.id]);
@@ -123,6 +136,17 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
 
   const saveMutation = useMutation({
     mutationFn: async (data: RoleAssignmentData) => {
+      if (data.role === "POS" && selectedLocationIds.length > 0) {
+        const missing = selectedLocationIds.filter((id) => !locationCashAccounts[id]);
+        if (missing.length > 0) {
+          const locNames = missing.map((id) => {
+            const loc = (locations as any[]).find((l: any) => l.id === id);
+            return loc?.name || `Location #${id}`;
+          });
+          throw new Error(`Cash account required for: ${locNames.join(", ")}`);
+        }
+      }
+
       let result;
       if (editingRole) {
         const res = await apiRequest("PATCH", `/api/user-company-roles/${editingRole.id}`, data);
@@ -134,6 +158,12 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
       if (data.role === "POS" && selectedLocationIds.length > 0) {
         await apiRequest("PUT", `/api/user-locations/${data.userId}/${data.companyId}`, {
           locationIds: selectedLocationIds,
+        });
+        const mappings = selectedLocationIds
+          .filter((id) => locationCashAccounts[id])
+          .map((id) => ({ locationId: id, cashAccountId: locationCashAccounts[id] }));
+        await apiRequest("PUT", `/api/user-location-cash-accounts/${data.userId}/${data.companyId}`, {
+          mappings,
         });
       }
       return result;
@@ -157,7 +187,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editingRole ? "Edit Role Assignment" : "Add Role Assignment"}</DialogTitle>
         </DialogHeader>
@@ -222,29 +252,65 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Assigned Locations *</FormLabel>
-                      <div className="border rounded-md p-3 space-y-2 max-h-48 overflow-y-auto" data-testid="select-locations">
-                        {locations.map((loc: any) => {
+                      <div className="border rounded-md p-3 space-y-3 max-h-56 overflow-y-auto" data-testid="select-locations">
+                        {(locations as any[]).map((loc: any) => {
                           const isChecked = selectedLocationIds.includes(loc.id);
                           return (
-                            <label
-                              key={loc.id}
-                              className="flex items-center gap-2 cursor-pointer text-sm"
-                              data-testid={`checkbox-location-${loc.id}`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={(e) => {
-                                  const newIds = e.target.checked
-                                    ? [...selectedLocationIds, loc.id]
-                                    : selectedLocationIds.filter((id) => id !== loc.id);
-                                  setSelectedLocationIds(newIds);
-                                  field.onChange(newIds.length > 0 ? newIds[0] : undefined);
-                                }}
-                                className="rounded"
-                              />
-                              {loc.name} ({loc.code})
-                            </label>
+                            <div key={loc.id} className="space-y-1.5">
+                              <label
+                                className="flex items-center gap-2 cursor-pointer text-sm"
+                                data-testid={`checkbox-location-${loc.id}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    const newIds = e.target.checked
+                                      ? [...selectedLocationIds, loc.id]
+                                      : selectedLocationIds.filter((id) => id !== loc.id);
+                                    setSelectedLocationIds(newIds);
+                                    field.onChange(newIds.length > 0 ? newIds[0] : undefined);
+                                    if (!e.target.checked) {
+                                      setLocationCashAccounts((prev) => {
+                                        const next = { ...prev };
+                                        delete next[loc.id];
+                                        return next;
+                                      });
+                                    }
+                                  }}
+                                  className="rounded"
+                                />
+                                <span className="font-medium">{loc.name}</span>
+                                <span className="text-muted-foreground">({loc.code})</span>
+                              </label>
+                              {isChecked && (
+                                <div className="pl-6">
+                                  <Select
+                                    value={locationCashAccounts[loc.id]?.toString() || ""}
+                                    onValueChange={(v) =>
+                                      setLocationCashAccounts((prev) => ({ ...prev, [loc.id]: parseInt(v) }))
+                                    }
+                                  >
+                                    <SelectTrigger
+                                      className="h-8 text-xs"
+                                      data-testid={`select-cash-account-loc-${loc.id}`}
+                                    >
+                                      <SelectValue placeholder="Select cash account *" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {cashAccounts.map((a: any) => (
+                                        <SelectItem key={a.id} value={a.id.toString()}>
+                                          {a.name} ({a.code})
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  {!locationCashAccounts[loc.id] && (
+                                    <p className="text-xs text-destructive mt-0.5">Cash account required</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           );
                         })}
                       </div>
@@ -307,33 +373,35 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
               />
             )}
 
-            <FormField
-              control={form.control}
-              name="cashAccountId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cash Account (Optional)</FormLabel>
-                  <Select
-                    onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)}
-                    value={field.value?.toString() || ""}
-                  >
-                    <FormControl>
-                      <SelectTrigger data-testid="select-cash-account">
-                        <SelectValue placeholder="Select cash account" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {cashAccounts.map((a: any) => (
-                        <SelectItem key={a.id} value={a.id.toString()}>
-                          {a.name} ({a.code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {!isPOSRole && (
+              <FormField
+                control={form.control}
+                name="cashAccountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cash Account (Optional)</FormLabel>
+                    <Select
+                      onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)}
+                      value={field.value?.toString() || ""}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-cash-account">
+                          <SelectValue placeholder="Select cash account" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {cashAccounts.map((a: any) => (
+                          <SelectItem key={a.id} value={a.id.toString()}>
+                            {a.name} ({a.code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}

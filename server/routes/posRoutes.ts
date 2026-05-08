@@ -29,7 +29,7 @@ import {
   creditNoteItems, pendingBarcodes, insertPendingBarcodeSchema,
   bales, baleProducts, baleProductCategories, storedFiles,
   stockItemLocationPrices, insertCustomerSchema,
-  posShifts,
+  posShifts, userLocationCashAccounts,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
@@ -286,20 +286,33 @@ export function registerPosRoutes(app: Express) {
         exchangeRate,
       } = req.body;
 
-      // POS cash account enforcement: backend must not trust the frontend's account selection.
-      // If the POS user has an assigned cash account, any non-credit sale must use it.
-      if (isPOSUser && !isCreditSale && req.session.cashAccountId) {
-        const assignedId = req.session.cashAccountId;
-        const requestedId = paymentAccountId
-          ? parseInt(paymentAccountId)
-          : cashAccountId
-          ? parseInt(cashAccountId)
-          : null;
-
-        if (requestedId !== null && requestedId !== assignedId) {
-          return res.status(403).json({
-            message: "POS users must use their assigned cash account for sales",
-          });
+      // POS cash account enforcement: look up the mapped cash account from DB.
+      // For POS users on non-credit sales, the cash account is determined server-side
+      // from user_location_cash_accounts, not from the frontend submission.
+      let posEnforcedCashAccountId: number | null = null;
+      if (isPOSUser && !isCreditSale) {
+        const parsedLocId = locationId ? Number(locationId) : null;
+        if (parsedLocId) {
+          const [locMapping] = await db
+            .select({ cashAccountId: userLocationCashAccounts.cashAccountId })
+            .from(userLocationCashAccounts)
+            .where(
+              and(
+                eq(userLocationCashAccounts.userId, req.user!.id),
+                eq(userLocationCashAccounts.companyId, req.session.currentCompanyId!),
+                eq(userLocationCashAccounts.locationId, parsedLocId),
+              )
+            )
+            .limit(1);
+          if (locMapping) {
+            posEnforcedCashAccountId = locMapping.cashAccountId;
+          } else if (req.session.cashAccountId) {
+            posEnforcedCashAccountId = req.session.cashAccountId;
+          } else {
+            return res.status(400).json({
+              message: "No cash account assigned for this POS location. Contact admin.",
+            });
+          }
         }
       }
 
@@ -342,6 +355,10 @@ export function registerPosRoutes(app: Express) {
         customerAccount = fetchedCustomerAccount;
         accountType = "credit";
         accountId = paymentAccountId;
+      } else if (posEnforcedCashAccountId !== null) {
+        // POS users: use the server-enforced cash account from user_location_cash_accounts
+        accountType = "cash";
+        accountId = posEnforcedCashAccountId;
       } else if (cashAccountId) {
         // Legacy: cashAccountId parameter - validate it's a cash ledger account in current company
         const [cashLedger] = await db
