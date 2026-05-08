@@ -2014,10 +2014,9 @@ export default function GITMockup() {
         </div>
 
         <Tabs defaultValue="detail">
-          <TabsList className="grid grid-cols-6 w-full">
+          <TabsList className="grid grid-cols-5 w-full">
             <TabsTrigger value="summary"  data-testid="tab-git-summary">Summary</TabsTrigger>
             <TabsTrigger value="detail"   data-testid="tab-git-detail">Detail</TabsTrigger>
-            <TabsTrigger value="port"     data-testid="tab-git-port">At Port / Sea</TabsTrigger>
             <TabsTrigger value="trucks"   data-testid="tab-git-trucks">Truck / Location</TabsTrigger>
             <TabsTrigger value="agents"   data-testid="tab-git-agents">Agent / Duty</TabsTrigger>
             <TabsTrigger value="whatsapp" data-testid="tab-git-wa">WhatsApp</TabsTrigger>
@@ -2029,10 +2028,6 @@ export default function GITMockup() {
 
           <TabsContent value="detail" className="mt-4">
             <TabDetail />
-          </TabsContent>
-
-          <TabsContent value="port" className="mt-4">
-            <TabPortReport />
           </TabsContent>
 
           <TabsContent value="trucks" className="mt-4">
