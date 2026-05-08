@@ -1393,8 +1393,11 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
     agentName, matchConfidence, ledgerAccountName,
     ledgerBalance, containerDutyTotal, offloadedDutyTotal,
     clearedByPayments, openBalance,
-    warnings, clearedRows, partialRows, openRows, activePreviewRows,
+    warnings, clearedRows, partialRows, openRows,
   } = agent;
+
+  // Only show containers that have a truck number assigned
+  const activePreviewRows = agent.activePreviewRows.filter(r => !!(r.numberPlate ?? "").trim());
 
   const openAndPartial = [...partialRows, ...openRows];
   const openSum = openAndPartial.reduce((s, r) => s + r.remainingAmount, 0);
