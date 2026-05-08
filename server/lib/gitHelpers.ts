@@ -24,7 +24,8 @@ export const ACTIVE_STATUSES = [
 export type ActiveStatus = (typeof ACTIVE_STATUSES)[number];
 
 export const INACTIVE_STATUSES = ["Offloaded", "Closed", "Completed"] as const;
-export const INACTIVE_SET = new Set<string>(INACTIVE_STATUSES);
+// DB stores "OFFLOADED" (all-caps) via storage.offloadContainer; include both casings.
+export const INACTIVE_SET = new Set<string>([...INACTIVE_STATUSES, "OFFLOADED", "CLOSED", "COMPLETED"]);
 
 // ── Transporter SLA windows (days from borderDate to maxOffloadDate) ──────────
 

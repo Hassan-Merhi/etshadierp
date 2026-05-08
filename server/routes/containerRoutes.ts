@@ -180,7 +180,12 @@ export function registerContainerRoutes(app: Express) {
       if (numberPlate !== undefined) updateData.numberPlate = numberPlate;
       if (trackingLocation !== undefined) updateData.trackingLocation = trackingLocation;
       if (borderDate !== undefined) updateData.borderDate = borderDate || null;
-      if (offloadDate !== undefined) updateData.offloadDate = offloadDate || null;
+      if (offloadDate !== undefined) {
+        updateData.offloadDate = offloadDate || null;
+        // When an offload date is recorded, always force status to OFFLOADED
+        // regardless of the container's previous location or status.
+        if (offloadDate) updateData.status = "OFFLOADED";
+      }
       if (agent !== undefined) updateData.agent = agent;
       if (dutyFee !== undefined) updateData.dutyFee = dutyFee || null;
       if (docReceived !== undefined) updateData.docReceived = docReceived;

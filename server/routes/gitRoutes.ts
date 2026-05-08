@@ -69,7 +69,8 @@ interface PreviewRow {
 // ─── Container statuses treated as "offloaded / completed" ───────────────────
 // These are included in the official FIFO balance allocation.
 // All other statuses (OTW, At Port, etc.) go to activePreviewRows.
-const OFFLOADED_STATUSES = new Set(["Offloaded", "Closed", "Completed"]);
+// DB stores "OFFLOADED" (all-caps) via storage.offloadContainer; keep both casings.
+const OFFLOADED_STATUSES = new Set(["Offloaded", "OFFLOADED", "Closed", "CLOSED", "Completed", "COMPLETED"]);
 
 // ─── FIFO allocation ─────────────────────────────────────────────────────────
 // Sort offloaded rows oldest→newest, then walk consuming clearedByPayments.
