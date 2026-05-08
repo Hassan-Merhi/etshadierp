@@ -135,51 +135,66 @@ export function getRecordLabel(log: any): string {
   return log.tableName;
 }
 
-export function getChangesSummary(log: any): string {
-  const c = log.changes;
-  if (!c) return "—";
+// Returns true for keys that carry pre-formatted item-diff strings
+function isItemDiffKey(field: string): boolean {
+  return /^item_(added|removed|changed)_/.test(field);
+}
+
+export function getDetailsSentence(log: any): string {
+  const c = log.changes || {};
+  const vType =
+    c.voucherType?.new ?? c.voucherType?.old ??
+    c.type?.new ?? c.type?.old ?? "";
+  const module = tableShortName(log.tableName).replace(/s$/, "");
+  const typePart = vType ? `${vType} ${module}` : module;
+  const ref = log.recordIdentifier ?? (log.recordId ? `#${log.recordId}` : "");
+  const refPart = ref ? ` ${ref}` : "";
 
   if (log.action === "create") {
-    const type = c.voucherType?.new ?? c.type?.new ?? "";
-    const amount = c.amount?.new ? ` ${parseFloat(c.amount.new).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : "";
-    const date = c.date?.new ? ` — ${c.date.new}` : "";
-    if (type) return `Created ${type}${amount}${date}`;
-    const n = Object.keys(c).filter(k => k !== "entries").length;
-    return `Created (${n} field${n !== 1 ? "s" : ""})`;
+    const amt = c.amount?.new
+      ? ` — ${parseFloat(c.amount.new).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+      : "";
+    return `Created ${typePart}${refPart}${amt}.`;
   }
 
   if (log.action === "delete") {
-    const type = c.voucherType?.old ?? c.type?.old ?? "";
-    const amount = c.amount?.old ? ` ${parseFloat(c.amount.old).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : "";
-    const date = c.date?.old ? ` — ${c.date.old}` : "";
-    if (type) return `Deleted ${type}${amount}${date}`;
-    return "Deleted";
+    if (!c || Object.keys(c).length === 0)
+      return `Deleted ${typePart}${refPart}. Details not captured in this log.`;
+    const amt = c.amount?.old
+      ? ` — ${parseFloat(c.amount.old).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+      : "";
+    return `Deleted ${typePart}${refPart}${amt}.`;
   }
 
-  // update — show first 2 changed scalar fields
-  const SKIP = new Set(["entries"]);
-  const parts: string[] = [];
+  // update — 1. item-level diff keys (pre-formatted readable strings)
   for (const [key, vals] of Object.entries(c)) {
-    if (SKIP.has(key)) continue;
+    if (isItemDiffKey(key)) {
+      const v = vals as any;
+      const txt = (v?.new ?? v?.old ?? "") as string;
+      if (txt) return txt;
+    }
+  }
+
+  // update — 2. first meaningful scalar change (skip same-value fields)
+  const SKIP = new Set(["entries", "voucherType", "voucherNumber"]);
+  for (const [key, vals] of Object.entries(c)) {
+    if (SKIP.has(key) || isItemDiffKey(key)) continue;
     const v = vals as any;
-    const label = key === "date" ? "Date"
-      : key === "amount" ? "Amount"
-      : key === "description" ? "Description"
-      : key === "location" ? "Location"
-      : key === "optional" ? "Status"
-      : fieldLabel(key);
-    const oldVal = fmtValue(v?.old);
-    const newVal = fmtValue(v?.new);
-    parts.push(`${label}: ${oldVal} → ${newVal}`);
-    if (parts.length >= 2) break;
+    const oldFmt = fmtBusinessValue(key, v?.old);
+    const newFmt = fmtBusinessValue(key, v?.new);
+    if (oldFmt === newFmt) continue;
+    const label = BUSINESS_FIELD_LABELS[key] ?? fieldLabel(key);
+    if (v?.old !== undefined && v?.new !== undefined) {
+      return `Changed ${typePart}${refPart} ${label.toLowerCase()} from ${oldFmt} to ${newFmt}.`;
+    }
   }
-  if (c.entries && !parts.length) parts.push("Entries changed");
-  if (!parts.length) {
-    const n = Object.keys(c).length;
-    return `${n} field${n !== 1 ? "s" : ""} changed`;
-  }
-  return parts.join(", ");
+
+  // No meaningful changes detected
+  return `Updated ${typePart}${refPart}.`;
 }
+
+// Keep legacy name as alias so any other callers are not broken
+export const getChangesSummary = getDetailsSentence;
 
 export function tableShortName(t: string) {
   return t.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
@@ -297,12 +312,17 @@ function fmtBusinessValue(field: string, value: any): string {
 
 function getHeaderSentence(log: any): string {
   const changes = log.changes || {};
-  const user = log.username || "Unknown user";
+  const rawUser = log.username;
+  const user =
+    rawUser && rawUser !== "unknown" && rawUser !== "User"
+      ? rawUser
+      : log.userId
+        ? `User #${log.userId}`
+        : "Unknown user";
   const verb = log.action === "create" ? "created" : log.action === "delete" ? "deleted" : "updated";
   const vType = changes.voucherType?.new ?? changes.voucherType?.old ?? changes.type?.new ?? changes.type?.old ?? "";
-  const module = tableShortName(log.tableName);
-  const singular = module.replace(/s$/, "");
-  const typePart = vType ? `${vType} ${singular}` : singular;
+  const module = tableShortName(log.tableName).replace(/s$/, "");
+  const typePart = vType ? `${vType} ${module.toLowerCase()}` : module.toLowerCase();
   const ref = log.recordIdentifier ?? (log.recordId ? `#${log.recordId}` : "");
   return `${user} ${verb} ${typePart}${ref ? ` ${ref}` : ""} on ${fmtDate(log.createdAt)}.`;
 }
@@ -365,10 +385,26 @@ export function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void
   const technicalFields = Object.entries(scalarChanges).filter(([k, v]) => isLikelyTechnical(k, v));
 
   const renderRow = (field: string, vals: any) => {
+    // Item-level diff keys — pre-formatted readable strings
+    if (isItemDiffKey(field)) {
+      const isAdded = field.startsWith("item_added_");
+      const isRemoved = field.startsWith("item_removed_");
+      const text = (vals as any)?.new ?? (vals as any)?.old ?? "";
+      if (!text) return null;
+      return (
+        <div key={field} className="flex gap-2 text-sm py-1.5 border-b last:border-0 items-start">
+          <span className={`font-bold shrink-0 select-none ${isAdded ? "text-green-600 dark:text-green-400" : isRemoved ? "text-destructive" : "text-muted-foreground"}`}>
+            {isAdded ? "+" : isRemoved ? "−" : "~"}
+          </span>
+          <span className={isAdded ? "text-green-700 dark:text-green-300" : isRemoved ? "text-destructive/90" : ""}>{text}</span>
+        </div>
+      );
+    }
+
     const label = BUSINESS_FIELD_LABELS[field] ?? fieldLabel(field);
     const oldFmt = fmtBusinessValue(field, vals?.old);
     const newFmt = fmtBusinessValue(field, vals?.new);
-    // skip fake changes (value didn't actually change in display)
+    // skip unchanged fields on updates
     if (isUpdate && oldFmt === newFmt) return null;
 
     return (
@@ -431,21 +467,31 @@ export function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void
         </div>
 
         {/* Business details section */}
-        {hasMainContent && (
-          <div className="space-y-1.5">
-            <p className="text-sm font-semibold">
-              {isDelete ? "Deleted record details" : isCreate ? "Created record details" : "What changed"}
+        <div className="space-y-1.5">
+          <p className="text-sm font-semibold">
+            {isDelete ? "Deleted record details" : isCreate ? "Created record details" : "What changed"}
+          </p>
+          {isDelete && (
+            <p className="text-xs text-muted-foreground">
+              This record was deleted. Before deletion, it contained:
             </p>
-            {isDelete && (
-              <p className="text-xs text-muted-foreground">
-                This record was deleted. Before deletion, it contained:
-              </p>
-            )}
+          )}
+          {hasMainContent ? (
             <div className="rounded-md border px-3 divide-y">
               {renderedRows}
             </div>
-          </div>
-        )}
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {isUpdate
+                ? Object.keys(changes).length > 0
+                  ? "No meaningful field changes were captured for this log."
+                  : "Legacy audit log: field-level details were not captured."
+                : isDelete
+                  ? "Legacy audit log: details were not captured for this deletion."
+                  : null}
+            </p>
+          )}
+        </div>
 
         {/* Accounting / entry details */}
         {hasEntries && (
@@ -547,21 +593,41 @@ export function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void
 
             {showFull && (
               <div className="mt-2 rounded-md border divide-y text-sm">
-                {/* All readable fields */}
+                {/* All readable fields — unchanged fields filtered out for updates */}
                 {readableFields.length > 0 && (
                   <div className="px-3 py-2 divide-y">
                     {readableFields.map(([field, vals]) => {
+                      // Item-level diff keys rendered as coloured lines
+                      if (isItemDiffKey(field)) {
+                        const isAdded = field.startsWith("item_added_");
+                        const isRemoved = field.startsWith("item_removed_");
+                        const text = (vals as any)?.new ?? (vals as any)?.old ?? "";
+                        if (!text) return null;
+                        return (
+                          <div key={field} className="flex gap-2 py-1.5 items-start">
+                            <span className={`font-bold shrink-0 select-none ${isAdded ? "text-green-600 dark:text-green-400" : isRemoved ? "text-destructive" : "text-muted-foreground"}`}>
+                              {isAdded ? "+" : isRemoved ? "−" : "~"}
+                            </span>
+                            <span className={isAdded ? "text-green-700 dark:text-green-300" : isRemoved ? "text-destructive/90" : ""}>{text}</span>
+                          </div>
+                        );
+                      }
+
                       const label = BUSINESS_FIELD_LABELS[field] ?? fieldLabel(field);
+                      const oldFmt = fmtBusinessValue(field, (vals as any)?.old);
+                      const newFmt = fmtBusinessValue(field, (vals as any)?.new);
+                      // Filter out unchanged fields on updates
+                      if (isUpdate && oldFmt === newFmt) return null;
                       return (
                         <div key={field} className="flex gap-3 py-1.5 items-start">
                           <span className="text-muted-foreground w-40 shrink-0">{label}</span>
-                          {isCreate && <span>{fmtBusinessValue(field, (vals as any)?.new)}</span>}
-                          {isDelete && <span>{fmtBusinessValue(field, (vals as any)?.old)}</span>}
+                          {isCreate && <span>{newFmt}</span>}
+                          {isDelete && <span>{oldFmt}</span>}
                           {isUpdate && (
                             <span className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-destructive">{fmtBusinessValue(field, (vals as any)?.old)}</span>
+                              <span className="text-destructive">{oldFmt}</span>
                               <span className="text-muted-foreground">→</span>
-                              <span>{fmtBusinessValue(field, (vals as any)?.new)}</span>
+                              <span>{newFmt}</span>
                             </span>
                           )}
                         </div>
@@ -738,43 +804,48 @@ export function EditLogTable({ companyId }: { companyId?: number }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="whitespace-nowrap">Date</TableHead>
+                <TableHead className="whitespace-nowrap">Date & Time</TableHead>
                 <TableHead>User</TableHead>
                 <TableHead>Action</TableHead>
                 <TableHead>Module</TableHead>
-                <TableHead>Record</TableHead>
-                <TableHead>Summary</TableHead>
+                <TableHead>Details</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {auditLogs.map((log: any) => (
-                <TableRow
-                  key={log.id}
-                  className="group cursor-pointer hover-elevate"
-                  onClick={() => setSelectedLog(log)}
-                  data-testid={`log-row-${log.id}`}
-                >
-                  <TableCell className="text-xs whitespace-nowrap text-muted-foreground">{fmtDate(log.createdAt)}</TableCell>
-                  <TableCell className="text-sm font-medium">
-                    {log.username && log.username !== "unknown" ? log.username : <span className="text-muted-foreground italic">Unknown</span>}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={log.action === "delete" ? "destructive" : log.action === "create" ? "default" : "secondary"} className="capitalize text-xs">
-                      {log.action}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{tableShortName(log.tableName)}</TableCell>
-                  <TableCell className="text-sm font-mono" data-testid={`log-record-${log.id}`}>
-                    <span className="flex items-center gap-1 text-foreground">
-                      {getRecordLabel(log)}
-                      <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity flex-shrink-0" />
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground max-w-xs truncate" data-testid={`log-changes-${log.id}`}>
-                    {getChangesSummary(log)}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {auditLogs.map((log: any) => {
+                const rawUser = log.username;
+                const displayUser =
+                  rawUser && rawUser !== "unknown" && rawUser !== "User"
+                    ? rawUser
+                    : log.userId
+                      ? `User #${log.userId}`
+                      : null;
+                return (
+                  <TableRow
+                    key={log.id}
+                    className="group cursor-pointer hover-elevate"
+                    onClick={() => setSelectedLog(log)}
+                    data-testid={`log-row-${log.id}`}
+                  >
+                    <TableCell className="text-xs whitespace-nowrap text-muted-foreground">{fmtDate(log.createdAt)}</TableCell>
+                    <TableCell className="text-sm font-medium">
+                      {displayUser ?? <span className="text-muted-foreground italic">Unknown</span>}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={log.action === "delete" ? "destructive" : log.action === "create" ? "default" : "secondary"} className="capitalize text-xs">
+                        {log.action}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{tableShortName(log.tableName)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-sm" data-testid={`log-details-${log.id}`}>
+                      <span className="flex items-center gap-1">
+                        <span className="truncate">{getDetailsSentence(log)}</span>
+                        <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity flex-shrink-0" />
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
