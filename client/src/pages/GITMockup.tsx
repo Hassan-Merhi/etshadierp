@@ -1039,36 +1039,31 @@ function TabTruckLocation() {
           <thead>
             <tr className="bg-yellow-400 text-yellow-950 font-bold border-b-2 border-yellow-600">
               <th className="py-1.5 px-3 text-center">CONTAINER #</th>
-              <th className="py-1.5 px-3 text-center">COMPANY</th>
               <th className="py-1.5 px-3 text-center">NUMBER PLATE</th>
               <th className="py-1.5 px-3 text-center">LOCATION</th>
               <th className="py-1.5 px-3 text-center">AGENT</th>
               <th className="py-1.5 px-3 text-center">TRANSPORTER</th>
-              <th className="py-1.5 px-3 text-center">BORDER DT.</th>
               <th className="py-1.5 px-3 text-center">STATUS</th>
             </tr>
           </thead>
           <tbody>
-            {/* With truck: one section per shop name (sorted alphabetically) */}
             {shops.flatMap(shop => {
               const shopRows = withTruck.filter(r => (r.shopName ?? r.companyName ?? "Unknown") === shop);
               const hdrRow = (
                 <tr key={`hdr-${shop}`} className="bg-yellow-300 border-t border-yellow-500">
-                  <td colSpan={8} className="py-1 px-3 font-bold text-yellow-900 text-center tracking-wide uppercase">
+                  <td colSpan={6} className="py-1 px-3 font-bold text-yellow-900 text-center tracking-wide uppercase">
                     {shop} — {shopRows.length} container{shopRows.length !== 1 ? "s" : ""} on road
                   </td>
                 </tr>
               );
               const dataRows = shopRows.map(r => (
                 <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/40">
-                  <td className="py-0.5 px-3 font-mono font-semibold tracking-tight">{r.containerNumber}</td>
-                  <td className="py-0.5 px-3 font-medium">{r.shopName ?? r.companyName}</td>
-                  <td className="py-0.5 px-3 font-mono">{r.numberPlate ?? <span className="text-muted-foreground">—</span>}</td>
-                  <td className="py-0.5 px-3">{r.trackingLocation ?? <span className="text-muted-foreground">—</span>}</td>
-                  <td className="py-0.5 px-3">{r.agent ?? <span className="text-muted-foreground">—</span>}</td>
-                  <td className="py-0.5 px-3">{r.transporter ?? <span className="text-muted-foreground">—</span>}</td>
-                  <td className="py-0.5 px-3">{fmtD(r.borderDate)}</td>
-                  <td className="py-0.5 px-3">
+                  <td className="py-0.5 px-3 text-center font-mono font-semibold tracking-tight">{r.containerNumber}</td>
+                  <td className="py-0.5 px-3 text-center font-mono">{r.numberPlate ?? <span className="text-muted-foreground">—</span>}</td>
+                  <td className="py-0.5 px-3 text-center">{r.trackingLocation ?? <span className="text-muted-foreground">—</span>}</td>
+                  <td className="py-0.5 px-3 text-center">{r.agent ?? <span className="text-muted-foreground">—</span>}</td>
+                  <td className="py-0.5 px-3 text-center">{r.transporter ?? <span className="text-muted-foreground">—</span>}</td>
+                  <td className="py-0.5 px-3 text-center">
                     <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", (STATUS_BADGE as Record<string, string>)[r.status] ?? "bg-muted text-foreground")}>
                       {r.status}
                     </span>
@@ -1077,35 +1072,6 @@ function TabTruckLocation() {
               ));
               return [hdrRow, ...dataRows];
             })}
-
-            {/* No Truck Assigned section */}
-            <tr className="bg-muted/60 border-t-2">
-              <td colSpan={8} className="py-1 px-3 font-bold text-muted-foreground text-center tracking-wide uppercase text-xs">
-                No Truck Assigned — {noTruck.length} container{noTruck.length !== 1 ? "s" : ""}
-              </td>
-            </tr>
-            {noTruck.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="py-2 px-3 text-muted-foreground italic text-center text-xs">
-                  — all containers have a truck assigned —
-                </td>
-              </tr>
-            ) : noTruck.map(r => (
-              <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/40">
-                <td className="py-0.5 px-3 font-mono font-semibold tracking-tight">{r.containerNumber}</td>
-                <td className="py-0.5 px-3 font-medium">{r.shopName ?? r.companyName}</td>
-                <td className="py-0.5 px-3 text-muted-foreground">—</td>
-                <td className="py-0.5 px-3">{r.trackingLocation ?? <span className="text-muted-foreground">—</span>}</td>
-                <td className="py-0.5 px-3">{r.agent ?? <span className="text-muted-foreground">—</span>}</td>
-                <td className="py-0.5 px-3">{r.transporter ?? <span className="text-muted-foreground">—</span>}</td>
-                <td className="py-0.5 px-3">{fmtD(r.borderDate)}</td>
-                <td className="py-0.5 px-3">
-                  <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", (STATUS_BADGE as Record<string, string>)[r.status] ?? "bg-muted text-foreground")}>
-                    {r.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
           </tbody>
         </table>
       </div>
