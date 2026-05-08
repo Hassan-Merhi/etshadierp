@@ -210,6 +210,18 @@ export type RawContainerRow = {
   docsSentDate: string | null;
   freightStatus: string | null;
   trackingLink: string | null;
+  // ParcelsApp tracking fields
+  trackingProvider: string | null;
+  trackingEnabled: boolean;
+  trackingAutoUpdate: boolean;
+  trackingCarrierHint: string | null;
+  trackingLastCheckedAt: Date | null;
+  trackingLastStatus: string | null;
+  trackingLastLocation: string | null;
+  trackingLastEventDate: Date | null;
+  trackingLastDescription: string | null;
+  trackingError: string | null;
+  trackingChangedAt: Date | null;
   createdAt: Date;
 };
 
@@ -258,6 +270,18 @@ export async function fetchActiveContainers(
       docsSentDate: containers.docsSentDate,
       freightStatus: containers.freightStatus,
       trackingLink: containers.trackingLink,
+      // ParcelsApp tracking fields
+      trackingProvider: containers.trackingProvider,
+      trackingEnabled: containers.trackingEnabled,
+      trackingAutoUpdate: containers.trackingAutoUpdate,
+      trackingCarrierHint: containers.trackingCarrierHint,
+      trackingLastCheckedAt: containers.trackingLastCheckedAt,
+      trackingLastStatus: containers.trackingLastStatus,
+      trackingLastLocation: containers.trackingLastLocation,
+      trackingLastEventDate: containers.trackingLastEventDate,
+      trackingLastDescription: containers.trackingLastDescription,
+      trackingError: containers.trackingError,
+      trackingChangedAt: containers.trackingChangedAt,
       createdAt: containers.createdAt,
     })
     .from(containers)

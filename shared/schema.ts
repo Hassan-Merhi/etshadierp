@@ -544,6 +544,18 @@ export const containers = pgTable("containers", {
   docsSentDate: date("docs_sent_date"),
   freightStatus: text("freight_status"),
   trackingLink: text("tracking_link"),
+  // ParcelsApp auto-tracking fields
+  trackingProvider: text("tracking_provider"),
+  trackingEnabled: boolean("tracking_enabled").notNull().default(false),
+  trackingAutoUpdate: boolean("tracking_auto_update").notNull().default(true),
+  trackingCarrierHint: text("tracking_carrier_hint"),
+  trackingLastCheckedAt: timestamp("tracking_last_checked_at", { withTimezone: true }),
+  trackingLastStatus: text("tracking_last_status"),
+  trackingLastLocation: text("tracking_last_location"),
+  trackingLastEventDate: timestamp("tracking_last_event_date", { withTimezone: true }),
+  trackingLastDescription: text("tracking_last_description"),
+  trackingError: text("tracking_error"),
+  trackingChangedAt: timestamp("tracking_changed_at", { withTimezone: true }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   companyIdx: index("containers_company_idx").on(t.companyId),
@@ -561,6 +573,35 @@ export const insertContainerSchema = createInsertSchema(containers).omit({
 
 export type InsertContainer = z.infer<typeof insertContainerSchema>;
 export type Container = typeof containers.$inferSelect;
+
+// ─── Container Tracking Events ────────────────────────────────────────────────
+
+export const containerTrackingEvents = pgTable("container_tracking_events", {
+  id: serial("id").primaryKey(),
+  containerId: integer("container_id").notNull(),
+  provider: text("provider").notNull().default("parcelsapp"),
+  eventTime: timestamp("event_time", { withTimezone: true }),
+  eventStatus: text("event_status"),
+  eventLocation: text("event_location"),
+  eventDescription: text("event_description"),
+  rawEventJson: jsonb("raw_event_json"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type ContainerTrackingEvent = typeof containerTrackingEvents.$inferSelect;
+
+export const containerTrackingChecks = pgTable("container_tracking_checks", {
+  id: serial("id").primaryKey(),
+  containerId: integer("container_id").notNull(),
+  provider: text("provider").notNull().default("parcelsapp"),
+  status: text("status").notNull(),
+  checkedAt: timestamp("checked_at").notNull(),
+  errorMessage: text("error_message"),
+  rawResponseJson: jsonb("raw_response_json"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type ContainerTrackingCheck = typeof containerTrackingChecks.$inferSelect;
 
 // ─── Agent / Declarant Mapping ───────────────────────────────────────────────
 // Maps a free-text agent name (as stored in containers.agent) to a specific

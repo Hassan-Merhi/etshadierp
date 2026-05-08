@@ -803,6 +803,20 @@ export function startScheduler() {
     timezone: "America/New_York",
   });
 
+  // ParcelsApp container auto-tracking — runs every 6 hours
+  cron.schedule("0 */6 * * *", async () => {
+    console.log("[ContainerTracking] 6-hour auto-tracking cron fired.");
+    try {
+      const { trackDueContainers } = await import("./containerTrackingService");
+      await trackDueContainers();
+    } catch (err: any) {
+      console.error("[ContainerTracking] Cron error:", err?.message);
+    }
+  }, {
+    timezone: "America/New_York",
+  });
+
+  console.log("[ContainerTracking] Auto-tracking scheduler started — runs every 6 hours.");
   console.log("[DailyExport] Scheduler started — time-configurable via export settings (checked every hour).");
   console.log("[WhatsApp] Monthly net-position scheduler started — runs on the 1st of each month at 7:00 AM EST.");
   console.log("[StockReport] Independent scheduler started — checks every hour.");

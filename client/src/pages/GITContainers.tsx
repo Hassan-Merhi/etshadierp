@@ -54,6 +54,10 @@ import {
   Pencil,
   Building2,
   Globe,
+  Satellite,
+  RefreshCw,
+  History,
+  Loader2,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
@@ -81,6 +85,18 @@ interface EnrichedContainerRow {
   docsSentDate: string | null;
   freightStatus: string | null;
   trackingLink: string | null;
+  // ParcelsApp auto-tracking
+  trackingProvider: string | null;
+  trackingEnabled: boolean;
+  trackingAutoUpdate: boolean;
+  trackingCarrierHint: string | null;
+  trackingLastCheckedAt: string | null;
+  trackingLastStatus: string | null;
+  trackingLastLocation: string | null;
+  trackingLastEventDate: string | null;
+  trackingLastDescription: string | null;
+  trackingError: string | null;
+  trackingChangedAt: string | null;
   maxOffloadDate: string | null;
   daysDelayed: number | null;
   docsReadyNotSent: boolean;
@@ -254,10 +270,17 @@ function ContainerDrawer({
   const queryClient = useQueryClient();
   const [form, setForm] = useState<DrawerForm | null>(null);
   const [lastId, setLastId] = useState<number | null>(null);
+  const [trackEnabled, setTrackEnabled] = useState(false);
+  const [trackAutoUpdate, setTrackAutoUpdate] = useState(true);
+  const [trackCarrierHint, setTrackCarrierHint] = useState("");
+  const [showEvents, setShowEvents] = useState(false);
 
   useEffect(() => {
     if (open && container && container.id !== lastId) {
       setForm(seedForm(container));
+      setTrackEnabled(container.trackingEnabled ?? false);
+      setTrackAutoUpdate(container.trackingAutoUpdate ?? true);
+      setTrackCarrierHint(container.trackingCarrierHint ?? "");
       setLastId(container.id);
     }
   }, [open, container?.id]);
@@ -305,6 +328,51 @@ function ContainerDrawer({
       });
     },
   });
+
+  const trackingSettingsMutation = useMutation({
+    mutationFn: (data: Record<string, unknown>) =>
+      apiRequest("PATCH", `/api/container-tracking/${container!.id}/settings`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [queryKey] });
+      toast({ title: "Tracking settings saved" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Save failed", description: err?.message ?? "Unknown error", variant: "destructive" });
+    },
+  });
+
+  const trackNowMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", `/api/container-tracking/${container!.id}/track-now`, {}),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: [queryKey] });
+      toast({
+        title: "Tracking refreshed",
+        description: data?.lastStatus
+          ? `Status: ${data.lastStatus}${data.lastLocation ? ` — ${data.lastLocation}` : ""}`
+          : "Tracking data updated.",
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "Track Now failed", description: err?.message ?? "Unknown error", variant: "destructive" });
+    },
+  });
+
+  const eventsQueryKey = container?.id ? `/api/container-tracking/${container.id}/events` : null;
+  const { data: events, isLoading: eventsLoading } = useQuery<any[]>({
+    queryKey: [eventsQueryKey],
+    enabled: showEvents && !!eventsQueryKey,
+    staleTime: 30_000,
+  });
+
+  function handleSaveTrackingSettings() {
+    if (!container) return;
+    trackingSettingsMutation.mutate({
+      trackingEnabled: trackEnabled,
+      trackingAutoUpdate: trackAutoUpdate,
+      trackingCarrierHint: trackCarrierHint || null,
+    });
+  }
 
   function handleSave() {
     if (!container || !form) return;
@@ -594,6 +662,165 @@ function ContainerDrawer({
               disabled={!canEdit}
               data-testid="input-drawer-notes"
             />
+          </div>
+
+          <Separator />
+
+          {/* ── Auto Tracking (ParcelsApp) ── */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Satellite className="h-3.5 w-3.5 text-muted-foreground" />
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Auto Tracking
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Enabled</Label>
+                <div className="flex items-center gap-2 pt-1">
+                  <Switch
+                    checked={trackEnabled}
+                    onCheckedChange={setTrackEnabled}
+                    data-testid="switch-tracking-enabled"
+                  />
+                  <span className="text-sm">{trackEnabled ? "Yes" : "No"}</span>
+                </div>
+              </div>
+              {trackEnabled && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Auto Update</Label>
+                  <div className="flex items-center gap-2 pt-1">
+                    <Switch
+                      checked={trackAutoUpdate}
+                      onCheckedChange={setTrackAutoUpdate}
+                      data-testid="switch-tracking-auto-update"
+                    />
+                    <span className="text-sm">{trackAutoUpdate ? "Every 6h" : "Manual"}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {trackEnabled && (
+              <div className="space-y-1">
+                <Label className="text-xs">Destination Country (hint)</Label>
+                <Input
+                  placeholder="e.g. Democratic Republic of the Congo"
+                  value={trackCarrierHint}
+                  onChange={(e) => setTrackCarrierHint(e.target.value)}
+                  data-testid="input-tracking-carrier-hint"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Helps ParcelsApp resolve the correct carrier. Leave blank to use default.
+                </p>
+              </div>
+            )}
+
+            {/* Last tracking result */}
+            {container && (container.trackingLastStatus || container.trackingLastLocation || container.trackingError) && (
+              <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Last Result</p>
+                {container.trackingLastCheckedAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Checked: {new Date(container.trackingLastCheckedAt).toLocaleString()}
+                  </p>
+                )}
+                {container.trackingLastStatus && (
+                  <p className="text-xs">
+                    <span className="text-muted-foreground">Status: </span>
+                    <span className="font-medium">{container.trackingLastStatus}</span>
+                  </p>
+                )}
+                {container.trackingLastLocation && (
+                  <p className="text-xs">
+                    <span className="text-muted-foreground">Location: </span>
+                    <span className="font-medium">{container.trackingLastLocation}</span>
+                  </p>
+                )}
+                {container.trackingLastDescription && (
+                  <p className="text-xs text-muted-foreground">{container.trackingLastDescription}</p>
+                )}
+                {container.trackingError && (
+                  <p className="text-xs text-red-600 dark:text-red-400">
+                    Error: {container.trackingError}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSaveTrackingSettings}
+                disabled={trackingSettingsMutation.isPending}
+                data-testid="button-save-tracking-settings"
+              >
+                {trackingSettingsMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                Save Settings
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => trackNowMutation.mutate()}
+                disabled={trackNowMutation.isPending}
+                data-testid="button-track-now"
+              >
+                {trackNowMutation.isPending
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                  : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
+                Track Now
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowEvents((v) => !v)}
+                data-testid="button-view-events"
+              >
+                <History className="h-3.5 w-3.5 mr-1" />
+                {showEvents ? "Hide Events" : "View Events"}
+              </Button>
+            </div>
+
+            {/* Inline events list */}
+            {showEvents && (
+              <div className="rounded-md border overflow-hidden">
+                <div className="px-3 py-2 bg-muted/40 border-b">
+                  <p className="text-xs font-semibold">Tracking History</p>
+                </div>
+                {eventsLoading ? (
+                  <div className="p-4 text-xs text-muted-foreground text-center">
+                    <Loader2 className="h-4 w-4 animate-spin mx-auto mb-1" />
+                    Loading events…
+                  </div>
+                ) : !events || events.length === 0 ? (
+                  <div className="p-4 text-xs text-muted-foreground text-center">
+                    No tracking events recorded yet.
+                  </div>
+                ) : (
+                  <div className="divide-y max-h-64 overflow-y-auto">
+                    {events.map((ev: any) => (
+                      <div key={ev.id} className="px-3 py-2 space-y-0.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium">{ev.eventStatus ?? "—"}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {ev.eventTime ? new Date(ev.eventTime).toLocaleDateString() : "—"}
+                          </span>
+                        </div>
+                        {ev.eventLocation && (
+                          <p className="text-xs text-muted-foreground">{ev.eventLocation}</p>
+                        )}
+                        {ev.eventDescription && (
+                          <p className="text-xs text-muted-foreground truncate">{ev.eventDescription}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* ── Save / Cancel ── */}
@@ -1099,8 +1326,9 @@ export default function GITContainers() {
                         {c.dutyFee ? `$${fmt(parseNum(c.dutyFee))}` : "—"}
                       </TableCell>
                       <TableCell>
-                        {c.trackingLink
-                          ? <a
+                        <div className="flex items-center gap-1.5">
+                          {c.trackingLink && (
+                            <a
                               href={c.trackingLink}
                               target="_blank"
                               rel="noopener noreferrer"
@@ -1109,7 +1337,19 @@ export default function GITContainers() {
                             >
                               <ExternalLink className="h-3.5 w-3.5" />
                             </a>
-                          : <span className="text-muted-foreground">—</span>}
+                          )}
+                          {c.trackingEnabled && (
+                            <span
+                              title={`Auto-tracking enabled${c.trackingLastStatus ? ` — ${c.trackingLastStatus}` : ""}`}
+                              className="text-sky-500"
+                            >
+                              <Satellite className="h-3.5 w-3.5" />
+                            </span>
+                          )}
+                          {!c.trackingLink && !c.trackingEnabled && (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="max-w-28 truncate text-muted-foreground">
                         {c.trackingDescription ?? "—"}

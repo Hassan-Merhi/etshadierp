@@ -2823,6 +2823,47 @@ let migrationsDone = false;
     `ALTER TABLE containers ADD COLUMN IF NOT EXISTS docs_sent_date date`,
     `ALTER TABLE containers ADD COLUMN IF NOT EXISTS freight_status text`,
     `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_link text`,
+
+    // ParcelsApp auto-tracking — new columns on containers
+    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_provider text`,
+    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_enabled boolean NOT NULL DEFAULT false`,
+    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_auto_update boolean NOT NULL DEFAULT true`,
+    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_carrier_hint text`,
+    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_last_checked_at timestamptz`,
+    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_last_status text`,
+    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_last_location text`,
+    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_last_event_date timestamptz`,
+    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_last_description text`,
+    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_error text`,
+    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_changed_at timestamptz`,
+
+    // ParcelsApp — container_tracking_events table
+    `CREATE TABLE IF NOT EXISTS container_tracking_events (
+      id serial PRIMARY KEY,
+      container_id integer NOT NULL,
+      provider text NOT NULL DEFAULT 'parcelsapp',
+      event_time timestamptz,
+      event_status text,
+      event_location text,
+      event_description text,
+      raw_event_json jsonb,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS cte_container_id_idx ON container_tracking_events (container_id)`,
+    `CREATE INDEX IF NOT EXISTS cte_event_time_idx ON container_tracking_events (container_id, event_time DESC)`,
+
+    // ParcelsApp — container_tracking_checks table
+    `CREATE TABLE IF NOT EXISTS container_tracking_checks (
+      id serial PRIMARY KEY,
+      container_id integer NOT NULL,
+      provider text NOT NULL DEFAULT 'parcelsapp',
+      status text NOT NULL,
+      checked_at timestamp NOT NULL,
+      error_message text,
+      raw_response_json jsonb,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS ctc_container_id_idx ON container_tracking_checks (container_id)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
