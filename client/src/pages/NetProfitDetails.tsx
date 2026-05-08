@@ -15,6 +15,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   ArrowLeft,
   Plus,
   Minus,
@@ -28,6 +35,7 @@ import {
   Download,
   MessageSquare,
   ExternalLink,
+  MoreHorizontal,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -395,58 +403,65 @@ export default function NetProfitDetails() {
             )}
           </div>
 
-          <Button
-            variant="outline"
-            size="default"
-            data-testid="button-export-excel"
-            onClick={() => {
-              const url = toDate
-                ? `/api/stats/net-position-excel?toDate=${toDate}`
-                : "/api/stats/net-position-excel";
-              window.open(url, "_blank");
-            }}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-
-          <Button
-            variant="outline"
-            size="default"
-            data-testid="button-export-monthly-excel"
-            title="Export a month-by-month net position snapshot to Excel"
-            onClick={() => {
-              const today = new Date().toLocaleDateString("en-CA");
-              const start = fromDate || fromInput || (() => {
-                const d = new Date();
-                d.setFullYear(d.getFullYear() - 1);
-                return d.toLocaleDateString("en-CA");
-              })();
-              const end = toDate || toInput || today;
-              window.open(
-                `/api/reports/net-position-monthly-excel?startDate=${start}&endDate=${end}`,
-                "_blank"
-              );
-            }}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Monthly Excel
-          </Button>
-          <Button
-            variant="outline"
-            size="default"
-            data-testid="button-send-whatsapp"
-            title="Send monthly net position Excel to WhatsApp group"
-            onClick={() => sendWhatsApp.mutate()}
-            disabled={sendWhatsApp.isPending}
-          >
-            <MessageSquare className="h-4 w-4 mr-2 text-green-600" />
-            {sendWhatsApp.isPending ? "Sending…" : "WhatsApp"}
-          </Button>
-          <Button onClick={() => refetch()} variant="outline" size="default" data-testid="button-refresh">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="default" data-testid="button-actions-menu">
+                <MoreHorizontal className="h-4 w-4 mr-2" />
+                Actions
+                <ChevronDown className="h-3 w-3 ml-1 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem
+                data-testid="button-export-excel"
+                onClick={() => {
+                  const url = toDate
+                    ? `/api/stats/net-position-excel?toDate=${toDate}`
+                    : "/api/stats/net-position-excel";
+                  window.open(url, "_blank");
+                }}
+              >
+                <Download className="h-4 w-4 mr-2 shrink-0" />
+                Export (full)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                data-testid="button-export-monthly-excel"
+                onClick={() => {
+                  const today = new Date().toLocaleDateString("en-CA");
+                  const start = fromDate || fromInput || (() => {
+                    const d = new Date();
+                    d.setFullYear(d.getFullYear() - 1);
+                    return d.toLocaleDateString("en-CA");
+                  })();
+                  const end = toDate || toInput || today;
+                  window.open(
+                    `/api/reports/net-position-monthly-excel?startDate=${start}&endDate=${end}`,
+                    "_blank"
+                  );
+                }}
+              >
+                <Download className="h-4 w-4 mr-2 shrink-0" />
+                Monthly Excel
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                data-testid="button-send-whatsapp"
+                disabled={sendWhatsApp.isPending}
+                onClick={() => sendWhatsApp.mutate()}
+              >
+                <MessageSquare className="h-4 w-4 mr-2 shrink-0 text-green-600" />
+                {sendWhatsApp.isPending ? "Sending…" : "Send to WhatsApp"}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                data-testid="button-refresh"
+                onClick={() => refetch()}
+              >
+                <RefreshCw className="h-4 w-4 mr-2 shrink-0" />
+                Refresh
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
