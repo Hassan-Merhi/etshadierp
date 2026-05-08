@@ -219,6 +219,9 @@ function RealWorkbookBlock({
     if (existing) existing.rows.push(r);
     else shopGroups.push({ name: key, rows: [r] });
   }
+  shopGroups.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" })
+  );
   const hasShops = shopGroups.length > 1;
 
   const columnHeaders = (
@@ -263,7 +266,7 @@ function RealWorkbookBlock({
             return (
               <div key={name}>
                 {/* Shop sub-header */}
-                <div className="flex items-center justify-between px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 border-b border-yellow-300 dark:border-yellow-700">
+                <div className="flex items-center justify-center gap-3 px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 border-b border-yellow-300 dark:border-yellow-700">
                   <span className="text-xs font-bold uppercase tracking-wide text-yellow-900 dark:text-yellow-300">{name}</span>
                   <span className="text-xs text-yellow-800 dark:text-yellow-400">{shopRows.length} container{shopRows.length !== 1 ? "s" : ""} — ${fmt(st.amount, 2)}</span>
                 </div>
