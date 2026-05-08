@@ -1817,10 +1817,17 @@ export function registerAdminRoutes(app: Express) {
   app.get(
     "/api/settings/role-permissions",
     requireAuth,
-    requireRole("Admin"),
+    requireRole("Admin", "Owner"),
     async (req, res) => {
       try {
-        const companyId = req.session.currentCompanyId;
+        // Allow Developer/Admin to query any company via ?companyId=N; others use session
+        let companyId = req.session.currentCompanyId;
+        if (
+          (req.user?.role === "Developer" || req.user?.role === "Admin") &&
+          req.query.companyId
+        ) {
+          companyId = parseInt(req.query.companyId as string);
+        }
         if (!companyId) {
           return res.status(400).json({ message: "No company selected" });
         }
@@ -1837,7 +1844,7 @@ export function registerAdminRoutes(app: Express) {
   app.put(
     "/api/settings/role-permissions",
     requireAuth,
-    requireRole("Admin"),
+    requireRole("Admin", "Owner"),
     async (req, res) => {
       try {
         const companyId = req.session.currentCompanyId;

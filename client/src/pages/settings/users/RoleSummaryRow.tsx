@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2, MapPin, Monitor, Calendar, PackageMinus } from "lucide-react";
+import { Edit, Trash2, MapPin, Monitor, Calendar, PackageMinus, ShieldCheck, ChevronDown, ChevronRight } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { AdvancedRestrictionsPanel } from "@/components/AdvancedRestrictionsPanel";
 
 interface RoleSummaryRowProps {
   role: any;
@@ -11,6 +14,8 @@ interface RoleSummaryRowProps {
   onDelete: () => void;
 }
 
+const NON_RESTRICTABLE_ROLES = ["Developer", "Admin"];
+
 export function RoleSummaryRow({
   role,
   companyName,
@@ -19,14 +24,17 @@ export function RoleSummaryRow({
   onEdit,
   onDelete,
 }: RoleSummaryRowProps) {
+  const [restrictionsOpen, setRestrictionsOpen] = useState(false);
   const isPOS = role.role === "POS";
   const isPrivileged = ["Admin", "Owner", "Developer"].includes(role.role);
+  const canShowRestrictions = !NON_RESTRICTABLE_ROLES.includes(role.role) && role.companyId;
 
   return (
     <div
       className={`rounded-md border bg-card transition-colors ${isEditing ? "border-primary/50 bg-accent/30" : ""}`}
       data-testid={`role-item-${role.id}`}
     >
+      {/* Main row */}
       <div className="flex items-start gap-2 px-3 py-2.5">
         <div className="flex-1 min-w-0 space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
@@ -72,6 +80,18 @@ export function RoleSummaryRow({
         </div>
 
         <div className="flex items-center gap-0.5 shrink-0">
+          {canShowRestrictions && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setRestrictionsOpen((v) => !v)}
+              title="Advanced Restrictions"
+              data-testid={`button-restrictions-${role.id}`}
+              className={restrictionsOpen ? "text-primary" : ""}
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -91,6 +111,34 @@ export function RoleSummaryRow({
           </Button>
         </div>
       </div>
+
+      {/* Advanced Restrictions collapsible */}
+      {canShowRestrictions && restrictionsOpen && (
+        <div className="border-t px-3 py-3">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Advanced Restrictions
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-xs px-2"
+              onClick={() => setRestrictionsOpen(false)}
+              data-testid={`button-close-restrictions-${role.id}`}
+            >
+              Close
+            </Button>
+          </div>
+          <AdvancedRestrictionsPanel
+            role={role.role}
+            companyId={role.companyId}
+            companyName={companyName}
+          />
+        </div>
+      )}
     </div>
   );
 }
