@@ -1200,7 +1200,7 @@ function TabTruckLocation() {
           <div key={cg.id} className="space-y-1">
             {companyMode === "all" && (
               <div className="px-3 py-1.5 rounded-t-md bg-muted/60 border border-b-0 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                {cg.name} — {cg.rows.length} on road
+                {cg.name} — {cg.rows.length} on the road
               </div>
             )}
             <div className={cn("rounded-md border overflow-hidden", companyMode === "all" && "rounded-t-none")}>
@@ -1222,7 +1222,7 @@ function TabTruckLocation() {
                     const hdrRow = (
                       <tr key={`hdr-${cg.id}-${shop}`} className="bg-yellow-300 border-t border-yellow-500">
                         <td colSpan={7} className="py-1 px-3 font-bold text-yellow-900 text-center tracking-wide uppercase">
-                          {shop} — {shopRows.length} container{shopRows.length !== 1 ? "s" : ""} on road
+                          {shop} — {shopRows.length} container{shopRows.length !== 1 ? "s" : ""} on the road
                         </td>
                       </tr>
                     );
@@ -1899,11 +1899,11 @@ function TabWhatsApp() {
   // ── Optional: Truck / Location section ───────────────────────────────────────
   const truckLines: string[] = inclTrucks ? (() => {
     const withTruck = containers.filter(r => !!(r.numberPlate ?? "").trim());
-    if (withTruck.length === 0) return [``, `*TRUCK / LOCATION STATUS*`, `• No containers on road`];
+    if (withTruck.length === 0) return [``, `*TRUCK / LOCATION STATUS*`, `• No containers on the road`];
     const tps = [...new Set(withTruck.map(r => r.transporter ?? "Unknown"))].sort();
     return [
       ``,
-      `*TRUCK / LOCATION STATUS (${withTruck.length} on road)*`,
+      `*TRUCK / LOCATION STATUS (${withTruck.length} on the road)*`,
       ...tps.flatMap(tp => {
         const rows = withTruck.filter(r => (r.transporter ?? "Unknown") === tp);
         return [
