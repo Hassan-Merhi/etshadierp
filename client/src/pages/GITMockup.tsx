@@ -5,8 +5,8 @@
  * Tabs:
  *   1. GIT Summary  — real data: status/cost/delay stat cards + company/transporter/agent breakdowns
  *   2. GIT Detail   — real data: Workbook View (grouped by company) + Flat Table toggle
- *   3. At Port / Sea — sample data: grouped by status: Sea/OTW | At Port | Left Dar
- *   4. Truck / Location — sample data
+ *   3. At Port / Sea — real data: grouped by status: OTW/Sea | At Port | Left Dar | At Border/In Transit | Arrived
+ *   4. Truck / Location — real data: grouped by transporter (with truck) + no-truck section
  *   5. Agent / Duty  — real data: FIFO duty allocation per agent
  *   6. WhatsApp Preview — sample data: formatted text message
  */
@@ -1097,114 +1097,211 @@ function TabSummary() {
   );
 }
 
-// ─── Tab 3: At Port / Sea / Left Dar ─────────────────────────────────────────
+// ─── Tab 3: At Port / Sea / Left Dar / In Transit ────────────────────────────
+//
+// Self-contained: fetches /api/git/containers and groups client-side by status
+// bucket. My Company / All Accessible Companies selector.
+// Read-only — no mutations.
 
-function TabPortReport({ active }: { active: GITRow[] }) {
-  const seaOtw  = active.filter(r => r.status === "OTW" || r.status === "Sea");
-  const atPort  = active.filter(r => r.status === "At Port");
-  const leftDar = active.filter(r => r.status === "Left Dar");
+type PortBucket = {
+  key: string;
+  label: string;
+  statuses: string[];
+  headerBg: string;
+  headerText: string;
+};
 
-  type SubGroup = { title: string; rows: GITRow[]; headerBg: string; headerText: string };
-  const sections: SubGroup[] = [
-    { title: "OTW / AT SEA",  rows: seaOtw,  headerBg: "bg-blue-600",   headerText: "text-white" },
-    { title: "AT PORT",       rows: atPort,  headerBg: "bg-amber-500",  headerText: "text-white" },
-    { title: "LEFT DAR",      rows: leftDar, headerBg: "bg-violet-600", headerText: "text-white" },
-  ];
+const PORT_BUCKETS: PortBucket[] = [
+  { key: "otw-sea",    label: "OTW / AT SEA",          statuses: ["OTW", "Sea"],              headerBg: "bg-blue-600",    headerText: "text-white" },
+  { key: "at-port",    label: "AT PORT",                statuses: ["At Port"],                 headerBg: "bg-amber-500",   headerText: "text-white" },
+  { key: "left-dar",   label: "LEFT DAR",               statuses: ["Left Dar"],                headerBg: "bg-violet-600",  headerText: "text-white" },
+  { key: "in-transit", label: "AT BORDER / IN TRANSIT", statuses: ["At Border", "In Transit"], headerBg: "bg-emerald-600", headerText: "text-white" },
+  { key: "arrived",    label: "ARRIVED",                statuses: ["Arrived"],                 headerBg: "bg-slate-500",   headerText: "text-white" },
+];
 
-  const totalCost = [...seaOtw, ...atPort, ...leftDar].reduce((s, r) => s + r.amount, 0);
+function TabPortReport() {
+  const [companyMode, setCompanyMode] = useState<CompanyViewMode>("session");
+
+  const queryUrl = companyMode === "all"
+    ? "/api/git/containers?allCompanies=true"
+    : "/api/git/containers";
+
+  const { data, isLoading, isError, error } = useQuery<GitContainersResponse>({
+    queryKey: [queryUrl],
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  const allContainers: EnrichedContainerApi[] = data?.containers ?? [];
+
+  const modeSelector = (
+    <div className="flex items-center gap-2 mb-3">
+      <span className="text-xs text-muted-foreground">Viewing:</span>
+      <Button
+        size="sm"
+        variant={companyMode === "session" ? "default" : "outline"}
+        onClick={() => setCompanyMode("session")}
+        data-testid="btn-port-mode-session"
+      >My Company</Button>
+      <Button
+        size="sm"
+        variant={companyMode === "all" ? "default" : "outline"}
+        onClick={() => setCompanyMode("all")}
+        data-testid="btn-port-mode-all"
+      >All Accessible Companies</Button>
+    </div>
+  );
+
+  if (isLoading) return (
+    <div className="space-y-3">
+      {modeSelector}
+      {[...Array(3)].map((_, i) => (
+        <Skeleton key={i} className="h-24 w-full rounded-md" />
+      ))}
+    </div>
+  );
+
+  if (isError) return (
+    <div className="space-y-3">
+      {modeSelector}
+      <div className="flex items-start gap-2 px-3 py-2.5 rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-sm">
+        <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+        <div>
+          <div className="font-semibold">Failed to load container data</div>
+          <div className="text-xs mt-0.5">{(error as Error)?.message ?? "Network or server error."}</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const bucketed = PORT_BUCKETS.map(b => ({
+    ...b,
+    rows: allContainers.filter(r => b.statuses.includes(r.status)),
+  }));
+
+  const totalCount = allContainers.length;
+  const totalCost  = allContainers.reduce((s, r) => s + parseNum(r.grandTotal), 0);
 
   return (
     <div className="space-y-4">
+      {modeSelector}
+
       {/* Summary strip */}
       <div className="flex gap-4 flex-wrap p-3 rounded-md border bg-muted/30 text-sm">
-        {[
-          { label: "OTW / At Sea", value: seaOtw.length,  color: "text-blue-600 font-bold" },
-          { label: "At Port",      value: atPort.length,  color: "text-amber-600 font-bold" },
-          { label: "Left Dar",     value: leftDar.length, color: "text-violet-600 font-bold" },
-          { label: "Total",        value: seaOtw.length + atPort.length + leftDar.length, color: "font-bold" },
-          { label: "Total Cost",   value: `$${fmt(totalCost, 0)}`, color: "text-green-600 font-bold" },
-        ].map(s => (
-          <div key={s.label} className="flex items-center gap-1.5">
-            <span className="text-muted-foreground text-xs">{s.label}:</span>
-            <span className={cn("text-sm", s.color)}>{s.value}</span>
+        {bucketed.map(b => (
+          <div key={b.key} className="flex items-center gap-1.5">
+            <span className="text-muted-foreground text-xs">{b.label}:</span>
+            <span className="text-sm font-bold">{b.rows.length}</span>
           </div>
         ))}
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground text-xs">Total:</span>
+          <span className="text-sm font-bold">{totalCount}</span>
+        </div>
+        {totalCost > 0 && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground text-xs">Total Cost:</span>
+            <span className="text-sm font-bold text-green-600">${fmt(totalCost, 0)}</span>
+          </div>
+        )}
       </div>
 
-      {sections.map(sec => {
-        if (sec.rows.length === 0) return (
-          <div key={sec.title} className="rounded-md border overflow-hidden">
-            <div className={cn("px-3 py-1.5 text-xs font-bold", sec.headerBg, sec.headerText)}>
-              {sec.title} — 0 containers
-            </div>
-            <div className="py-4 text-center text-xs text-muted-foreground italic bg-muted/10">No containers</div>
-          </div>
-        );
+      {totalCount === 0 && (
+        <div className="py-10 text-center text-muted-foreground text-sm">
+          No active containers found.
+        </div>
+      )}
 
-        // Sub-group by company within each section
-        const companies = [...new Set(sec.rows.map(r => r.company))];
+      {bucketed.map(b => {
+        const bucketTotal = b.rows.reduce((s, r) => s + parseNum(r.grandTotal), 0);
+        const companies   = [...new Set(b.rows.map(r => r.companyName))];
 
         return (
-          <div key={sec.title} className="rounded-md border overflow-hidden">
-            <div className={cn("flex items-center justify-between px-3 py-1.5", sec.headerBg, sec.headerText)}>
-              <span className="text-sm font-bold">{sec.title}</span>
-              <span className="text-xs font-semibold opacity-90">{sec.rows.length} containers — ${fmt(sec.rows.reduce((s, r) => s + r.amount, 0), 0)}</span>
+          <div key={b.key} className="rounded-md border overflow-hidden">
+            <div className={cn("flex items-center justify-between px-3 py-1.5", b.headerBg, b.headerText)}>
+              <span className="text-sm font-bold">{b.label}</span>
+              <span className="text-xs font-semibold opacity-90">
+                {b.rows.length} container{b.rows.length !== 1 ? "s" : ""}
+                {bucketTotal > 0 ? ` — $${fmt(bucketTotal, 0)}` : ""}
+              </span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs whitespace-nowrap border-collapse">
-                <thead>
-                  <tr className="bg-muted/60 border-b text-muted-foreground">
-                    <th className="py-1 px-2 font-semibold text-left">CONTAINER #</th>
-                    <th className="py-1 px-2 font-semibold text-left">CO.</th>
-                    <th className="py-1 px-2 font-semibold text-right">AMOUNT</th>
-                    <th className="py-1 px-2 font-semibold text-left">ETA DAS</th>
-                    <th className="py-1 px-2 font-semibold text-left">TRANSPORTER</th>
-                    <th className="py-1 px-2 font-semibold text-left">TRUCK #</th>
-                    <th className="py-1 px-2 font-semibold text-left">LOCATION</th>
-                    <th className="py-1 px-2 font-semibold text-left">BORDER DT.</th>
-                    <th className="py-1 px-2 font-semibold text-left">MAX OFFLOAD</th>
-                    <th className="py-1 px-2 font-semibold text-center">DOCS RCVD</th>
-                    <th className="py-1 px-2 font-semibold text-center">DOCS→TRUCK</th>
-                    <th className="py-1 px-2 font-semibold text-left">AGENT</th>
-                    <th className="py-1 px-2 font-semibold text-left">NOTES</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {companies.map(company => {
-                    const compRows = sec.rows.filter(r => r.company === company);
-                    return compRows.map((r, idx) => {
-                      const mo = maxOffload(r.borderDate, r.transporter);
-                      const del = daysDelayed(r.borderDate, r.transporter);
-                      const isFirstInCompany = idx === 0;
-                      return (
-                        <tr key={r.containerNumber} className={cn("border-b last:border-b-0 hover:brightness-95", getRowBg(r), isFirstInCompany && idx !== 0 ? "border-t-2 border-muted" : "")}>
-                          <td className="py-0.5 px-2 font-mono font-bold">{r.containerNumber}</td>
-                          <td className="py-0.5 px-2 font-medium">{r.company}</td>
-                          <td className="py-0.5 px-2 text-right font-semibold">${fmt(r.amount, 0)}</td>
-                          <td className="py-0.5 px-2">{fmtD(r.eta)}</td>
-                          <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>
-                          <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
-                          <td className="py-0.5 px-2">{r.location ?? "—"}</td>
-                          <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
-                          <td className={cn("py-0.5 px-2", del ? "text-red-600 font-bold" : "")}>
-                            {fmtD(mo)}
-                            {del && <span className="ml-1 text-[10px]">+{del}d</span>}
-                          </td>
-                          <td className="py-0.5 px-2 text-center">
-                            {r.docsReceived ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" /> : <XCircle className="h-3.5 w-3.5 text-red-500 mx-auto" />}
-                          </td>
-                          <td className="py-0.5 px-2 text-center">
-                            {r.docsSentToTruck ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" /> : r.docsReceived ? <span className="text-amber-700 text-[10px] font-medium">READY</span> : "—"}
-                          </td>
-                          <td className="py-0.5 px-2">{r.agent ?? "—"}</td>
-                          <td className="py-0.5 px-2 max-w-40 truncate text-muted-foreground italic">{r.notes ?? "—"}</td>
-                        </tr>
-                      );
-                    });
-                  })}
-                </tbody>
-              </table>
-            </div>
+
+            {b.rows.length === 0 ? (
+              <div className="py-3 text-center text-xs text-muted-foreground italic bg-muted/10">
+                No containers
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs whitespace-nowrap border-collapse">
+                  <thead>
+                    <tr className="bg-muted/60 border-b text-muted-foreground">
+                      <th className="py-1 px-2 font-semibold text-left">CONTAINER #</th>
+                      <th className="py-1 px-2 font-semibold text-left">CO.</th>
+                      <th className="py-1 px-2 font-semibold text-right">AMOUNT</th>
+                      <th className="py-1 px-2 font-semibold text-left">ETA DAS</th>
+                      <th className="py-1 px-2 font-semibold text-left">TRANSPORTER</th>
+                      <th className="py-1 px-2 font-semibold text-left">TRUCK #</th>
+                      <th className="py-1 px-2 font-semibold text-left">LOCATION</th>
+                      <th className="py-1 px-2 font-semibold text-left">BORDER DT.</th>
+                      <th className="py-1 px-2 font-semibold text-left">MAX OFFLOAD</th>
+                      <th className="py-1 px-2 font-semibold text-center">DOCS RCVD</th>
+                      <th className="py-1 px-2 font-semibold text-center">DOCS→TRUCK</th>
+                      <th className="py-1 px-2 font-semibold text-left">AGENT</th>
+                      <th className="py-1 px-2 font-semibold text-left">NOTES</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {companies.map(company => {
+                      const compRows = b.rows.filter(r => r.companyName === company);
+                      return compRows.map((r, idx) => {
+                        const rowBg = getRealRowBg(r);
+                        return (
+                          <tr
+                            key={r.id}
+                            className={cn(
+                              "border-b last:border-b-0 hover:brightness-95",
+                              rowBg,
+                              idx === 0 ? "border-t border-muted/60" : ""
+                            )}
+                          >
+                            <td className="py-0.5 px-2 font-mono font-bold">{r.containerNumber}</td>
+                            <td className="py-0.5 px-2 font-medium">{r.companyName}</td>
+                            <td className="py-0.5 px-2 text-right font-semibold">
+                              {parseNum(r.grandTotal) > 0 ? `$${fmt(parseNum(r.grandTotal), 0)}` : "—"}
+                            </td>
+                            <td className="py-0.5 px-2">{fmtD(r.eta)}</td>
+                            <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>
+                            <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
+                            <td className="py-0.5 px-2">{r.trackingLocation ?? "—"}</td>
+                            <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
+                            <td className={cn("py-0.5 px-2", r.daysDelayed ? "text-red-600 font-bold" : "")}>
+                              {fmtD(r.maxOffloadDate)}
+                              {r.daysDelayed ? <span className="ml-1 text-[10px]">+{r.daysDelayed}d</span> : null}
+                            </td>
+                            <td className="py-0.5 px-2 text-center">
+                              {r.docReceived
+                                ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
+                                : <XCircle className="h-3.5 w-3.5 text-red-500 mx-auto" />}
+                            </td>
+                            <td className="py-0.5 px-2 text-center">
+                              {r.docsSentDate
+                                ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
+                                : r.docReceived
+                                  ? <span className="text-amber-700 text-[10px] font-medium">READY</span>
+                                  : "—"}
+                            </td>
+                            <td className="py-0.5 px-2">{r.agent ?? "—"}</td>
+                            <td className="py-0.5 px-2 max-w-40 truncate text-muted-foreground italic">
+                              {r.trackingDescription ?? "—"}
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         );
       })}
@@ -1213,62 +1310,169 @@ function TabPortReport({ active }: { active: GITRow[] }) {
 }
 
 // ─── Tab 4: Truck / Location Overview ────────────────────────────────────────
+//
+// Self-contained: fetches /api/git/containers and groups by transporter (where
+// numberPlate is set) + a "No Truck Assigned" section.
+// Read-only — no mutations.
 
 function TabTruckLocation() {
+  const [companyMode, setCompanyMode] = useState<CompanyViewMode>("session");
+
+  const queryUrl = companyMode === "all"
+    ? "/api/git/containers?allCompanies=true"
+    : "/api/git/containers";
+
+  const { data, isLoading, isError, error } = useQuery<GitContainersResponse>({
+    queryKey: [queryUrl],
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  const allContainers: EnrichedContainerApi[] = data?.containers ?? [];
+  const withTruck = allContainers.filter(r => !!(r.numberPlate ?? "").trim());
+  const noTruck   = allContainers.filter(r => !(r.numberPlate ?? "").trim());
+  const transporters = [...new Set(withTruck.map(r => r.transporter ?? "Unknown"))].sort();
+
+  const modeSelector = (
+    <div className="flex items-center gap-2 mb-3">
+      <span className="text-xs text-muted-foreground">Viewing:</span>
+      <Button
+        size="sm"
+        variant={companyMode === "session" ? "default" : "outline"}
+        onClick={() => setCompanyMode("session")}
+        data-testid="btn-truck-mode-session"
+      >My Company</Button>
+      <Button
+        size="sm"
+        variant={companyMode === "all" ? "default" : "outline"}
+        onClick={() => setCompanyMode("all")}
+        data-testid="btn-truck-mode-all"
+      >All Accessible Companies</Button>
+    </div>
+  );
+
+  if (isLoading) return (
+    <div className="space-y-3">
+      {modeSelector}
+      <Skeleton className="h-48 w-full rounded-md" />
+    </div>
+  );
+
+  if (isError) return (
+    <div className="space-y-3">
+      {modeSelector}
+      <div className="flex items-start gap-2 px-3 py-2.5 rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-sm">
+        <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+        <div>
+          <div className="font-semibold">Failed to load container data</div>
+          <div className="text-xs mt-0.5">{(error as Error)?.message ?? "Network or server error."}</div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-1">
-      {/* Column header row — mimics Excel spreadsheet header */}
-      <div className="overflow-x-auto rounded-md border">
+    <div className="space-y-3">
+      {modeSelector}
+
+      {/* Summary strip */}
+      <div className="flex gap-4 flex-wrap p-3 rounded-md border bg-muted/30 text-sm">
+        <div className="flex items-center gap-1.5">
+          <Truck className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-muted-foreground text-xs">With Truck:</span>
+          <span className="font-bold">{withTruck.length}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground text-xs">No Truck:</span>
+          <span className="font-bold">{noTruck.length}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground text-xs">Transporters:</span>
+          <span className="font-bold">{transporters.length}</span>
+        </div>
+      </div>
+
+      {allContainers.length === 0 && (
+        <div className="py-10 text-center text-muted-foreground text-sm">
+          No active containers found.
+        </div>
+      )}
+
+      <div className="rounded-md border overflow-hidden">
         <table className="w-full text-xs whitespace-nowrap border-collapse">
           <thead>
             <tr className="bg-yellow-400 text-yellow-950 font-bold border-b-2 border-yellow-600">
-              <th className="py-1.5 px-3 text-left w-40">CONTAINER #</th>
-              <th className="py-1.5 px-3 text-left w-24">COMPANY</th>
-              <th className="py-1.5 px-3 text-left w-28">NUMBER PLATE</th>
-              <th className="py-1.5 px-3 text-left w-36">LOCATION</th>
-              <th className="py-1.5 px-3 text-left w-24">AGENT</th>
+              <th className="py-1.5 px-3 text-left">CONTAINER #</th>
+              <th className="py-1.5 px-3 text-left">COMPANY</th>
+              <th className="py-1.5 px-3 text-left">NUMBER PLATE</th>
+              <th className="py-1.5 px-3 text-left">LOCATION</th>
+              <th className="py-1.5 px-3 text-left">AGENT</th>
+              <th className="py-1.5 px-3 text-left">TRANSPORTER</th>
+              <th className="py-1.5 px-3 text-left">BORDER DT.</th>
+              <th className="py-1.5 px-3 text-left">STATUS</th>
             </tr>
           </thead>
           <tbody>
-            {TRUCK_GROUP_DEFS.map((gd) => {
-              const rows = TRUCK_ROWS.filter(r => r.group === gd.id);
-              return (
-                <>
-                  {/* Group header row — yellow, full-width label */}
-                  <tr key={`hdr-${gd.id}`} className="bg-yellow-300 border-t border-yellow-500">
-                    <td colSpan={5} className="py-1 px-3 font-bold text-yellow-900 text-center tracking-wide uppercase">
-                      {gd.label}
-                    </td>
-                  </tr>
-                  {rows.length === 0 ? (
-                    <tr key={`empty-${gd.id}`} className="border-b">
-                      <td colSpan={5} className="py-1.5 px-3 text-muted-foreground italic text-center">
-                        — no containers —
-                      </td>
-                    </tr>
-                  ) : (
-                    rows.map((r, i) => (
-                      <tr
-                        key={`${gd.id}-${i}`}
-                        className="border-b last:border-b-0 hover:bg-muted/40"
-                      >
-                        <td className="py-0.5 px-3 font-mono font-semibold tracking-tight">{r.containerNumber}</td>
-                        <td className="py-0.5 px-3 font-medium">{r.company}</td>
-                        <td className="py-0.5 px-3 font-mono">{r.numberPlate ?? <span className="text-muted-foreground">—</span>}</td>
-                        <td className="py-0.5 px-3">{r.location ?? <span className="text-muted-foreground">—</span>}</td>
-                        <td className="py-0.5 px-3 font-medium">{r.agent ?? <span className="text-muted-foreground">—</span>}</td>
-                      </tr>
-                    ))
-                  )}
-                </>
+            {/* With truck: one section per transporter (sorted alphabetically) */}
+            {transporters.flatMap(tp => {
+              const tpRows = withTruck.filter(r => (r.transporter ?? "Unknown") === tp);
+              const hdrRow = (
+                <tr key={`hdr-${tp}`} className="bg-yellow-300 border-t border-yellow-500">
+                  <td colSpan={8} className="py-1 px-3 font-bold text-yellow-900 text-center tracking-wide uppercase">
+                    {tp} — {tpRows.length} container{tpRows.length !== 1 ? "s" : ""} on road
+                  </td>
+                </tr>
               );
+              const dataRows = tpRows.map(r => (
+                <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/40">
+                  <td className="py-0.5 px-3 font-mono font-semibold tracking-tight">{r.containerNumber}</td>
+                  <td className="py-0.5 px-3 font-medium">{r.companyName}</td>
+                  <td className="py-0.5 px-3 font-mono">{r.numberPlate ?? <span className="text-muted-foreground">—</span>}</td>
+                  <td className="py-0.5 px-3">{r.trackingLocation ?? <span className="text-muted-foreground">—</span>}</td>
+                  <td className="py-0.5 px-3">{r.agent ?? <span className="text-muted-foreground">—</span>}</td>
+                  <td className="py-0.5 px-3">{r.transporter ?? <span className="text-muted-foreground">—</span>}</td>
+                  <td className="py-0.5 px-3">{fmtD(r.borderDate)}</td>
+                  <td className="py-0.5 px-3">
+                    <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", (STATUS_BADGE as Record<string, string>)[r.status] ?? "bg-muted text-foreground")}>
+                      {r.status}
+                    </span>
+                  </td>
+                </tr>
+              ));
+              return [hdrRow, ...dataRows];
             })}
+
+            {/* No Truck Assigned section */}
+            <tr className="bg-muted/60 border-t-2">
+              <td colSpan={8} className="py-1 px-3 font-bold text-muted-foreground text-center tracking-wide uppercase text-xs">
+                No Truck Assigned — {noTruck.length} container{noTruck.length !== 1 ? "s" : ""}
+              </td>
+            </tr>
+            {noTruck.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="py-2 px-3 text-muted-foreground italic text-center text-xs">
+                  — all containers have a truck assigned —
+                </td>
+              </tr>
+            ) : noTruck.map(r => (
+              <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/40">
+                <td className="py-0.5 px-3 font-mono font-semibold tracking-tight">{r.containerNumber}</td>
+                <td className="py-0.5 px-3 font-medium">{r.companyName}</td>
+                <td className="py-0.5 px-3 text-muted-foreground">—</td>
+                <td className="py-0.5 px-3">{r.trackingLocation ?? <span className="text-muted-foreground">—</span>}</td>
+                <td className="py-0.5 px-3">{r.agent ?? <span className="text-muted-foreground">—</span>}</td>
+                <td className="py-0.5 px-3">{r.transporter ?? <span className="text-muted-foreground">—</span>}</td>
+                <td className="py-0.5 px-3">{fmtD(r.borderDate)}</td>
+                <td className="py-0.5 px-3">
+                  <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", (STATUS_BADGE as Record<string, string>)[r.status] ?? "bg-muted text-foreground")}>
+                    {r.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-muted-foreground px-1 pt-1">
-        Real implementation: derived from the containers table — active statuses only, truck/location/agent fields.
-      </p>
     </div>
   );
 }
@@ -2010,8 +2214,8 @@ export default function GITMockup() {
         <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-blue-300 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-700 text-sm text-blue-800 dark:text-blue-300">
           <Info className="h-4 w-4 shrink-0" />
           <span>
-            <strong>Summary, Detail & Agent/Duty tabs</strong> use real database data.{" "}
-            <span className="text-blue-600 dark:text-blue-400">At Port/Sea, Truck/Location, and WhatsApp tabs use sample data.</span>
+            <strong>Summary, Detail, At Port/Sea, Truck/Location & Agent/Duty tabs</strong> use real database data.{" "}
+            <span className="text-blue-600 dark:text-blue-400">WhatsApp tab uses sample data.</span>
           </span>
           <Badge variant="outline" className="ml-auto text-xs shrink-0 border-blue-400 text-blue-700 dark:text-blue-400">
             <FileSpreadsheet className="h-3 w-3 mr-1" />
@@ -2038,7 +2242,7 @@ export default function GITMockup() {
           </TabsContent>
 
           <TabsContent value="port" className="mt-4">
-            <TabPortReport active={mockActive} />
+            <TabPortReport />
           </TabsContent>
 
           <TabsContent value="trucks" className="mt-4">
