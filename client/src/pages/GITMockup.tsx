@@ -199,6 +199,37 @@ function WorkbookDataRow({ r }: { r: EnrichedContainerApi }) {
 
 const WORKBOOK_COLS = 18;
 
+function groupBySupplier(rows: EnrichedContainerApi[]) {
+  const groups: Array<{ name: string; rows: EnrichedContainerApi[] }> = [];
+  for (const r of rows) {
+    const key = r.supplierName ?? "Unknown";
+    const existing = groups.find(g => g.name === key);
+    if (existing) existing.rows.push(r);
+    else groups.push({ name: key, rows: [r] });
+  }
+  groups.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  return groups;
+}
+
+function SupplierGroupedRows({ rows }: { rows: EnrichedContainerApi[] }) {
+  const groups = groupBySupplier(rows);
+  if (groups.length <= 1) return <>{rows.map(r => <WorkbookDataRow key={r.id} r={r} />)}</>;
+  return (
+    <>
+      {groups.map(({ name, rows: sRows }) => (
+        <>
+          <tr key={`sup-${name}`} className="bg-muted/40 border-t border-border">
+            <td colSpan={WORKBOOK_COLS} className="py-0.5 px-2 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              {name} — {sRows.length}
+            </td>
+          </tr>
+          {sRows.map(r => <WorkbookDataRow key={r.id} r={r} />)}
+        </>
+      ))}
+    </>
+  );
+}
+
 function RealWorkbookBlock({
   companyName, rows, headerBg, headerText,
 }: {
@@ -277,7 +308,7 @@ function RealWorkbookBlock({
                   <table className="w-full text-xs whitespace-nowrap border-collapse">
                     <thead>{columnHeaders}</thead>
                     <tbody>
-                      {shopRows.map(r => <WorkbookDataRow key={r.id} r={r} />)}
+                      <SupplierGroupedRows rows={shopRows} />
                       <tr className="bg-yellow-50 dark:bg-yellow-900/10 border-t border-yellow-200 dark:border-yellow-800 text-xs font-semibold text-yellow-900 dark:text-yellow-300">
                         <td className="py-1 px-2">SUB-TOTAL — {shopRows.length} CTR</td>
                         <td />
@@ -313,7 +344,7 @@ function RealWorkbookBlock({
               {rows.length === 0 ? (
                 <tr><td colSpan={WORKBOOK_COLS} className="py-3 text-center text-muted-foreground italic text-xs">No containers</td></tr>
               ) : (
-                rows.map(r => <WorkbookDataRow key={r.id} r={r} />)
+                <SupplierGroupedRows rows={rows} />
               )}
               {rows.length > 0 && (
                 <tr className={cn("border-t-2 text-xs font-bold", headerBg, headerText)}>
