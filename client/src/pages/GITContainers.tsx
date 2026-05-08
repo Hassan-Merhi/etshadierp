@@ -1228,12 +1228,10 @@ export default function GITContainers() {
                 <TableHead>Docs</TableHead>
                 <TableHead>Docs Sent</TableHead>
                 <TableHead>Ready/Unsent</TableHead>
-                <TableHead>Freight</TableHead>
                 <TableHead>Transporter</TableHead>
                 <TableHead className="text-right">Transport Fee</TableHead>
                 <TableHead>Agent</TableHead>
                 <TableHead className="text-right">Duty Fee</TableHead>
-                <TableHead>Tracking</TableHead>
                 <TableHead>Notes</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
@@ -1241,7 +1239,7 @@ export default function GITContainers() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={23} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={21} className="text-center py-8 text-muted-foreground">
                     {allContainers.length === 0
                       ? "No active containers found."
                       : "No containers match the current filters."}
@@ -1303,14 +1301,6 @@ export default function GITContainers() {
                           : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell>
-                        {c.freightStatus
-                          ? <span className={cn(
-                              "px-1.5 py-0.5 rounded text-xs font-medium",
-                              FREIGHT_META[c.freightStatus]?.color
-                            )}>{c.freightStatus}</span>
-                          : <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell>
                         {c.transporter ?? <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="text-right">
@@ -1321,32 +1311,6 @@ export default function GITContainers() {
                       </TableCell>
                       <TableCell className="text-right">
                         {c.dutyFee ? `$${fmt(parseNum(c.dutyFee))}` : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          {c.trackingLink && (
-                            <a
-                              href={c.trackingLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </a>
-                          )}
-                          {c.trackingEnabled && (
-                            <span
-                              title={`Auto-tracking enabled${c.trackingLastStatus ? ` — ${c.trackingLastStatus}` : ""}`}
-                              className="text-sky-500"
-                            >
-                              <Satellite className="h-3.5 w-3.5" />
-                            </span>
-                          )}
-                          {!c.trackingLink && !c.trackingEnabled && (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </div>
                       </TableCell>
                       <TableCell className="max-w-28 truncate text-muted-foreground">
                         {c.trackingDescription ?? "—"}
