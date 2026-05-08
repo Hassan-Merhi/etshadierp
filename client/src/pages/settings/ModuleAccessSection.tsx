@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Loader2, Info } from "lucide-react";
 import { FEATURE_PAGE_INFO, FEATURE_KEYS, type FeatureKey } from "@shared/schema";
 
-const CONFIGURABLE_ROLES = ["Owner", "Manager", "POS1", "POS2", "POS3", "POS4", "POS5", "POS6"];
+const CONFIGURABLE_ROLES = ["Owner", "Manager", "POS", "Normal User"];
 
 export function ModuleAccessSection() {
   const { selectedCompany } = useCompany();

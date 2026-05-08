@@ -248,7 +248,7 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
     });
 
     // Roles that can be configured (exclude Admin since they always have full access)
-    const configurableRoles = ["Owner", "Manager", "POS1", "POS2", "POS3", "POS4", "POS5", "POS6"];
+    const configurableRoles = ["Owner", "Manager", "POS", "Normal User"];
 
     // Parent Company setting query and mutation
     const { data: parentCompanyData } = useQuery<{ parentCompanyId: number | null }>({

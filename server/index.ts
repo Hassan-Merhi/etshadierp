@@ -2697,6 +2697,21 @@ let migrationsDone = false;
     // NOTE: CONCURRENTLY cannot run inside an explicit transaction; our migration runner
     // issues each statement in auto-commit mode so this is safe.
     `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS vouchers_company_client_sale_unique ON vouchers (company_id, client_sale_id) WHERE client_sale_id IS NOT NULL`,
+
+    // ── Consolidate POS1–POS6 into a single POS role + posStation column (May 2026) ──
+    // pos_station column already exists on user_company_roles (added earlier in this list).
+    // These UPDATE statements are idempotent: if the role is already 'POS' they are no-ops.
+    `UPDATE user_company_roles SET role = 'POS', pos_station = 1 WHERE role = 'POS1'`,
+    `UPDATE user_company_roles SET role = 'POS', pos_station = 2 WHERE role = 'POS2'`,
+    `UPDATE user_company_roles SET role = 'POS', pos_station = 3 WHERE role = 'POS3'`,
+    `UPDATE user_company_roles SET role = 'POS', pos_station = 4 WHERE role = 'POS4'`,
+    `UPDATE user_company_roles SET role = 'POS', pos_station = 5 WHERE role = 'POS5'`,
+    `UPDATE user_company_roles SET role = 'POS', pos_station = 6 WHERE role = 'POS6'`,
+    // Rename legacy 'User' role to 'Normal User' for clarity
+    `UPDATE user_company_roles SET role = 'Normal User' WHERE role = 'User'`,
+    // Migrate role_feature_permissions table as well
+    `UPDATE role_feature_permissions SET role = 'POS' WHERE role IN ('POS1','POS2','POS3','POS4','POS5','POS6')`,
+    `UPDATE role_feature_permissions SET role = 'Normal User' WHERE role = 'User'`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

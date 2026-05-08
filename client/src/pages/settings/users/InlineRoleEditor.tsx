@@ -17,8 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, X, MapPin } from "lucide-react";
 
 const ROLE_OPTIONS = [
-  "Admin", "Owner", "Manager",
-  "POS1", "POS2", "POS3", "POS4", "POS5", "POS6",
+  "Admin", "Owner", "Manager", "POS", "Normal User",
 ];
 
 interface InlineRoleEditorProps {
@@ -202,7 +201,7 @@ export function InlineRoleEditor({
             </SelectTrigger>
             <SelectContent>
               {ROLE_OPTIONS.map((r) => (
-                <SelectItem key={r} value={r}>{r.startsWith("POS") ? `POS ${r.slice(3)}` : r}</SelectItem>
+                <SelectItem key={r} value={r}>{r}</SelectItem>
               ))}
             </SelectContent>
           </Select>

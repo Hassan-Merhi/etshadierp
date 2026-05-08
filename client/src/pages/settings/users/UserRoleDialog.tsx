@@ -33,10 +33,10 @@ import { Switch } from "@/components/ui/switch";
 
 const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
   (data) => {
-    if (data.role.startsWith("POS") && !data.assignedLocationId) return false;
+    if (data.role === "POS" && !data.assignedLocationId) return false;
     return true;
   },
-  { message: "POS roles require an assigned location", path: ["assignedLocationId"] }
+  { message: "POS role requires an assigned location", path: ["assignedLocationId"] }
 );
 type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
 
@@ -59,7 +59,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
 
   const selectedRole = form.watch("role");
   const selectedCompanyId = form.watch("companyId");
-  const isPOSRole = selectedRole?.startsWith("POS");
+  const isPOSRole = selectedRole === "POS";
 
   useEffect(() => {
     if (open) {
@@ -74,7 +74,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
           daybookEditDays: editingRole.daybookEditDays ?? 0,
           cashAccountId: editingRole.cashAccountId,
         });
-        if (editingRole.role?.startsWith("POS")) {
+        if (editingRole.role === "POS") {
           fetch(`/api/user-locations/${editingRole.userId}/${editingRole.companyId}`)
             .then((r) => r.json())
             .then((locs) => {
@@ -131,7 +131,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
         const res = await apiRequest("POST", "/api/user-company-roles", data);
         result = await res.json();
       }
-      if (data.role?.startsWith("POS") && selectedLocationIds.length > 0) {
+      if (data.role === "POS" && selectedLocationIds.length > 0) {
         await apiRequest("PUT", `/api/user-locations/${data.userId}/${data.companyId}`, {
           locationIds: selectedLocationIds,
         });
@@ -205,12 +205,8 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
                       <SelectItem value="Admin">Admin</SelectItem>
                       <SelectItem value="Owner">Owner</SelectItem>
                       <SelectItem value="Manager">Manager</SelectItem>
-                      <SelectItem value="POS1">POS 1</SelectItem>
-                      <SelectItem value="POS2">POS 2</SelectItem>
-                      <SelectItem value="POS3">POS 3</SelectItem>
-                      <SelectItem value="POS4">POS 4</SelectItem>
-                      <SelectItem value="POS5">POS 5</SelectItem>
-                      <SelectItem value="POS6">POS 6</SelectItem>
+                      <SelectItem value="POS">POS</SelectItem>
+                      <SelectItem value="Normal User">Normal User</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
