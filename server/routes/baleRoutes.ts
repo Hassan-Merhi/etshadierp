@@ -911,8 +911,9 @@ export function registerBaleRoutes(app: Express) {
           product = await storage.getBaleProductByArticleCode(directBale.articleCode, companyId);
         }
 
-        let directWorkerName: string | null = null;
-        if (directBale.finalizedBy) {
+        // Use stored workerName first (denormalized); fall back to join if not yet populated
+        let directWorkerName: string | null = directBale.workerName ?? null;
+        if (!directWorkerName && directBale.finalizedBy) {
           const [wk] = await db.select({ fullName: factoryWorkers.fullName }).from(factoryWorkers).where(eq(factoryWorkers.id, directBale.finalizedBy)).limit(1);
           if (wk) directWorkerName = wk.fullName;
         }
@@ -977,8 +978,9 @@ export function registerBaleRoutes(app: Express) {
         // Use the name stored on the bale row directly — this matches what the bale history page shows.
         const resolvedProductName = factoryBale.productName;
 
-        let workerName: string | null = null;
-        if (factoryBale.finalizedBy) {
+        // Use stored workerName first (denormalized); fall back to join if not yet populated
+        let workerName: string | null = factoryBale.workerName ?? null;
+        if (!workerName && factoryBale.finalizedBy) {
           const [wk] = await db.select({ fullName: factoryWorkers.fullName }).from(factoryWorkers).where(eq(factoryWorkers.id, factoryBale.finalizedBy)).limit(1);
           if (wk) workerName = wk.fullName;
         }

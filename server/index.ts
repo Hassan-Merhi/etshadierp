@@ -2534,6 +2534,8 @@ let migrationsDone = false;
       `ALTER TABLE factory_raw_material_adjustments ADD COLUMN IF NOT EXISTS reference varchar(200)`,
       `ALTER TABLE factory_mix_batches ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
       `ALTER TABLE factory_bales ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE factory_bales ADD COLUMN IF NOT EXISTS worker_name TEXT`,
+      `UPDATE factory_bales fb SET worker_name = fw.full_name FROM factory_workers fw WHERE fb.finalized_by = fw.id AND fb.worker_name IS NULL`,
       `ALTER TABLE customer_proformas ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
       `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
 

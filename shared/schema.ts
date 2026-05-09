@@ -3002,6 +3002,7 @@ export const factoryBales = pgTable("factory_bales", {
   pressedAt: timestamp("pressed_at"),
   finalizedAt: timestamp("finalized_at"),
   finalizedBy: integer("finalized_by"),
+  workerName: text("worker_name"),
   stockEntryDate: date("stock_entry_date"),
   importBatchId: integer("import_batch_id"),
   deletedAt: timestamp("deleted_at"),

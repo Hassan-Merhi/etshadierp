@@ -1597,7 +1597,9 @@ export function registerFactoryBalesRoutes(app: Express) {
       if (!workerId) return res.status(400).json({ message: "workerId is required" });
       const [bale] = await db.select().from(factoryBales).where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));
       if (!bale) return res.status(404).json({ message: "Bale not found" });
-      const [updated] = await db.update(factoryBales).set({ finalizedBy: parseInt(workerId), updatedAt: new Date() }).where(eq(factoryBales.id, id)).returning();
+      const numericWorkerId = parseInt(workerId);
+      const [worker] = await db.select({ fullName: factoryWorkers.fullName }).from(factoryWorkers).where(eq(factoryWorkers.id, numericWorkerId)).limit(1);
+      const [updated] = await db.update(factoryBales).set({ finalizedBy: numericWorkerId, workerName: worker?.fullName ?? null, updatedAt: new Date() }).where(eq(factoryBales.id, id)).returning();
       res.json(updated);
     } catch (error: any) {
       console.error("Error assigning worker to bale:", error);
@@ -1615,8 +1617,9 @@ export function registerFactoryBalesRoutes(app: Express) {
       if (!workerId) return res.status(400).json({ message: "workerId is required" });
       const numericIds = baleIds.map(Number).filter(n => !isNaN(n));
       const numericWorkerId = parseInt(workerId);
+      const [worker] = await db.select({ fullName: factoryWorkers.fullName }).from(factoryWorkers).where(eq(factoryWorkers.id, numericWorkerId)).limit(1);
       await db.update(factoryBales)
-        .set({ finalizedBy: numericWorkerId, updatedAt: new Date() })
+        .set({ finalizedBy: numericWorkerId, workerName: worker?.fullName ?? null, updatedAt: new Date() })
         .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, numericIds)));
       res.json({ updated: numericIds.length, workerId: numericWorkerId });
     } catch (error: any) {

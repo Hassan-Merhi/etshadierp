@@ -139,12 +139,26 @@ export function registerFactoryStockRoutes(app: Express) {
           : [];
         const categoryMap = new Map<number, any>(factoryCats.map((c: any) => [c.id, c]));
 
+        // Pre-resolve worker names for items that have finalizedBy set
+        const workerIdSet = new Set<number>();
+        for (const item of items) {
+          if (item.finalizedBy) workerIdSet.add(Number(item.finalizedBy));
+        }
+        const workerNameMap = new Map<number, string>();
+        if (workerIdSet.size > 0) {
+          const wkRows = await tx.select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
+            .from(factoryWorkers)
+            .where(inArray(factoryWorkers.id, Array.from(workerIdSet)));
+          for (const w of wkRows) workerNameMap.set(w.id, w.fullName);
+        }
+
         for (const item of items) {
           const qty = parseInt(item.quantity || item.qty || "1");
           const weight = parseFloat(item.weightPerBale || "25");
           const product = productMap.get(item.productId);
           if (!product) throw new Error(`Product ID ${item.productId} not found`);
           const categoryName: string | null = product.categoryId ? (categoryMap.get(product.categoryId)?.name || null) : null;
+          const resolvedWorkerName: string | null = item.finalizedBy ? (workerNameMap.get(Number(item.finalizedBy)) ?? null) : null;
 
           for (let i = 0; i < qty; i++) {
             const refNum = `REF${String(nextNumber + baleIndex).padStart(5, '0')}`;
@@ -171,6 +185,7 @@ export function registerFactoryStockRoutes(app: Express) {
                 status: "IN_STOCK",
                 finalizedAt: finalizedAtTs,
                 finalizedBy: item.finalizedBy ?? null,
+                workerName: resolvedWorkerName,
                 stockEntryDate: effectiveDateStr,
               })
               .returning();
