@@ -71,12 +71,16 @@ function getApiKey(): string | null {
 async function initiateTracking(
   trackingId: string,
   destinationCountry = "United States",
+  carrier?: string,
 ): Promise<{ uuid: string; done: boolean; shipments: ParcelsAppShipment[]; fromCache: boolean }> {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("PARCELSAPP_API_KEY is not configured");
 
+  const shipmentEntry: Record<string, string> = { trackingId, destinationCountry };
+  if (carrier) shipmentEntry.carrier = carrier;
+
   const body = {
-    shipments: [{ trackingId, destinationCountry }],
+    shipments: [shipmentEntry],
     language: "en",
     apiKey,
   };
@@ -150,10 +154,14 @@ function sleep(ms: number): Promise<void> {
 /**
  * Full track-and-poll flow for a single container number.
  * Initiates, then polls up to POLL_MAX_ATTEMPTS×POLL_INTERVAL_MS.
+ * @param carrier  Optional carrier/shipping-line hint (e.g. "MAERSK", "MSC"). Sent as
+ *                 the `carrier` field in the ParcelsApp request body, separate from
+ *                 `destinationCountry`.
  */
 export async function trackContainer(
   containerNumber: string,
   destinationCountry = "United States",
+  carrier?: string,
 ): Promise<ParcelsAppTrackResult> {
   const apiKey = getApiKey();
   if (!apiKey) {
@@ -168,7 +176,7 @@ export async function trackContainer(
   let rawResponse: unknown = null;
 
   try {
-    const initiated = await initiateTracking(containerNumber, destinationCountry);
+    const initiated = await initiateTracking(containerNumber, destinationCountry, carrier);
     rawResponse = initiated;
 
     if (initiated.done) {

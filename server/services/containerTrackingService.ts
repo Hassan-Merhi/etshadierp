@@ -195,7 +195,9 @@ async function trackOneContainer(
   error: string | null;
 }> {
   const now = new Date();
-  const result = await trackContainer(containerNumber, carrierHint ?? "United States");
+  // destinationCountry stays as "United States" (ParcelsApp default).
+  // carrierHint is passed as the separate `carrier` field — NOT as destinationCountry.
+  const result = await trackContainer(containerNumber, "United States", carrierHint);
 
   const checkData: {
     containerId: number;
