@@ -1142,7 +1142,7 @@ function TabTruckLocation() {
         scale: 2,
         useCORS: true,
         allowTaint: true,
-        backgroundColor: "#0d1117",
+        backgroundColor: "#f8fafc",
         logging: false,
         width: el.scrollWidth,
         height: el.scrollHeight,
@@ -1321,39 +1321,39 @@ function TabTruckLocation() {
           position: "absolute",
           left: "-9999px",
           top: 0,
-          backgroundColor: "#ffffff",
-          color: "#111827",
+          backgroundColor: "#f8fafc",
+          color: "#1e293b",
           fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
-          fontSize: "14px",
-          width: "1920px",
-          padding: "40px 48px 32px",
+          fontSize: "20px",
+          width: "900px",
+          padding: "40px 44px 32px",
           boxSizing: "border-box",
         }}
         aria-hidden="true"
       >
         {/* ── Centered header block ── */}
-        <div style={{ textAlign: "center", marginBottom: "28px", paddingBottom: "20px", borderBottom: "3px solid #f59e0b" }}>
-          <div style={{ fontSize: "32px", fontWeight: 900, color: "#111827", letterSpacing: "-0.5px", lineHeight: 1.2 }}>
+        <div style={{ textAlign: "center", marginBottom: "30px", paddingBottom: "22px", borderBottom: "4px solid #f59e0b" }}>
+          <div style={{ fontSize: "40px", fontWeight: 900, color: "#0f172a", letterSpacing: "-0.5px", lineHeight: 1.15 }}>
             HMD International Group
           </div>
-          <div style={{ fontSize: "16px", fontWeight: 700, color: "#d97706", marginTop: "6px", letterSpacing: "1px", textTransform: "uppercase" }}>
+          <div style={{ fontSize: "20px", fontWeight: 700, color: "#b45309", marginTop: "8px", letterSpacing: "1.2px", textTransform: "uppercase" }}>
             Truck / Location Status — Live Tracking Report
           </div>
-          <div style={{ fontSize: "14px", color: "#6b7280", marginTop: "8px" }}>
+          <div style={{ fontSize: "18px", color: "#475569", marginTop: "10px", fontWeight: 500 }}>
             {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
             {" · "}
             {new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}
           </div>
           <div style={{
             display: "inline-block",
-            marginTop: "10px",
-            padding: "5px 18px",
+            marginTop: "14px",
+            padding: "8px 24px",
             backgroundColor: "#fef3c7",
-            border: "1px solid #f59e0b",
-            borderRadius: "20px",
-            fontSize: "14px",
-            fontWeight: 700,
-            color: "#92400e",
+            border: "2px solid #f59e0b",
+            borderRadius: "24px",
+            fontSize: "18px",
+            fontWeight: 800,
+            color: "#78350f",
           }}>
             {withTruck.length} Container{withTruck.length !== 1 ? "s" : ""} on the road
           </div>
@@ -1365,12 +1365,12 @@ function TabTruckLocation() {
             (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
           );
           const cell: React.CSSProperties = {
-            padding: "10px 12px",
-            fontSize: "13px",
+            padding: "13px 12px",
+            fontSize: "17px",
             overflow: "hidden",
             whiteSpace: "nowrap",
-            borderBottom: "1px solid #e5e7eb",
-            color: "#111827",
+            borderBottom: "1px solid #cbd5e1",
+            color: "#1e293b",
           };
           const hdrCols = [
             { label: "#",           align: "center" as const },
@@ -1385,24 +1385,24 @@ function TabTruckLocation() {
           return (
             <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
               <colgroup>
-                <col style={{ width: "44px" }} />
-                <col style={{ width: "180px" }} />
-                <col style={{ width: "190px" }} />
-                <col style={{ width: "140px" }} />
-                <col style={{ width: "230px" }} />
-                <col style={{ width: "170px" }} />
-                <col style={{ width: "160px" }} />
+                <col style={{ width: "36px" }} />
                 <col style={{ width: "130px" }} />
+                <col style={{ width: "115px" }} />
+                <col style={{ width: "100px" }} />
+                <col style={{ width: "135px" }} />
+                <col style={{ width: "100px" }} />
+                <col style={{ width: "115px" }} />
+                <col style={{ width: "80px" }} />
               </colgroup>
               <thead>
                 <tr style={{ backgroundColor: "#1e3a5f" }}>
                   {hdrCols.map(h => (
                     <th key={h.label} style={{
-                      padding: "12px 12px",
+                      padding: "15px 12px",
                       textAlign: h.align,
                       color: "#ffffff",
                       fontWeight: 700,
-                      fontSize: "12px",
+                      fontSize: "16px",
                       textTransform: "uppercase",
                       letterSpacing: "0.8px",
                     }}>
@@ -1418,46 +1418,46 @@ function TabTruckLocation() {
                   return [
                     <tr key={`hd-shop-${shop}`}>
                       <td colSpan={8} style={{
-                        padding: "9px 12px",
+                        padding: "12px 14px",
                         backgroundColor: "#fef3c7",
                         fontWeight: 800,
-                        color: "#92400e",
-                        fontSize: "13px",
-                        letterSpacing: "0.4px",
+                        color: "#78350f",
+                        fontSize: "17px",
+                        letterSpacing: "0.5px",
                         textAlign: "center",
                         textTransform: "uppercase",
                         borderTop: "2px solid #f59e0b",
                         borderBottom: "2px solid #f59e0b",
                       }}>
                         {shop}
-                        <span style={{ fontWeight: 500, color: "#b45309", marginLeft: "10px", fontSize: "12px", textTransform: "none" }}>
+                        <span style={{ fontWeight: 500, color: "#92400e", marginLeft: "12px", fontSize: "15px", textTransform: "none" }}>
                           ({shopRows.length} container{shopRows.length !== 1 ? "s" : ""})
                         </span>
                       </td>
                     </tr>,
                     ...shopRows.map(r => {
                       idx++;
-                      const rowBg = idx % 2 === 0 ? "#f9fafb" : "#ffffff";
+                      const rowBg = idx % 2 === 0 ? "#f1f5f9" : "#f8fafc";
                       return (
                         <tr key={`hd-row-${r.id}`} style={{ backgroundColor: rowBg }}>
-                          <td style={{ ...cell, textAlign: "center", color: "#9ca3af", fontSize: "12px" }}>{idx}</td>
-                          <td style={{ ...cell, textAlign: "center", fontFamily: "monospace", fontWeight: 700, color: "#1d4ed8", fontSize: "13px" }}>{r.containerNumber}</td>
-                          <td style={{ ...cell, textAlign: "center" }}>{r.supplierName ?? "—"}</td>
-                          <td style={{ ...cell, textAlign: "center", fontFamily: "monospace", fontWeight: 600, color: "#7c3aed" }}>{r.numberPlate ?? "—"}</td>
-                          <td style={{ ...cell, textAlign: "center", fontWeight: 600, color: "#065f46" }}>{r.trackingLocation ?? "—"}</td>
-                          <td style={{ ...cell, textAlign: "center" }}>{r.agent ?? "—"}</td>
-                          <td style={{ ...cell, textAlign: "center", color: "#b45309", fontWeight: 600 }}>{r.transporter ?? "—"}</td>
+                          <td style={{ ...cell, textAlign: "center", color: "#94a3b8", fontSize: "15px" }}>{idx}</td>
+                          <td style={{ ...cell, textAlign: "center", fontFamily: "monospace", fontWeight: 700, color: "#1d4ed8", fontSize: "17px" }}>{r.containerNumber}</td>
+                          <td style={{ ...cell, textAlign: "center", fontWeight: 500 }}>{r.supplierName ?? "—"}</td>
+                          <td style={{ ...cell, textAlign: "center", fontFamily: "monospace", fontWeight: 700, color: "#6d28d9" }}>{r.numberPlate ?? "—"}</td>
+                          <td style={{ ...cell, textAlign: "center", fontWeight: 700, color: "#065f46" }}>{r.trackingLocation ?? "—"}</td>
+                          <td style={{ ...cell, textAlign: "center", fontWeight: 500 }}>{r.agent ?? "—"}</td>
+                          <td style={{ ...cell, textAlign: "center", color: "#92400e", fontWeight: 700 }}>{r.transporter ?? "—"}</td>
                           <td style={{ ...cell, textAlign: "center" }}>
                             <span style={{
                               display: "inline-block",
-                              padding: "3px 9px",
-                              borderRadius: "4px",
-                              fontSize: "11px",
-                              fontWeight: 700,
+                              padding: "5px 10px",
+                              borderRadius: "5px",
+                              fontSize: "14px",
+                              fontWeight: 800,
                               backgroundColor: "#dbeafe",
                               color: "#1e40af",
                               textTransform: "uppercase",
-                              letterSpacing: "0.5px",
+                              letterSpacing: "0.6px",
                             }}>
                               {r.status}
                             </span>
@@ -1474,17 +1474,17 @@ function TabTruckLocation() {
 
         {/* ── Footer ── */}
         <div style={{
-          marginTop: "24px",
-          paddingTop: "14px",
-          borderTop: "1px solid #e5e7eb",
+          marginTop: "26px",
+          paddingTop: "16px",
+          borderTop: "1px solid #cbd5e1",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
         }}>
-          <div style={{ fontSize: "11px", color: "#9ca3af" }}>
+          <div style={{ fontSize: "14px", color: "#64748b" }}>
             HMD International Group — ERP System — Auto-generated report
           </div>
-          <div style={{ fontSize: "11px", color: "#9ca3af" }}>
+          <div style={{ fontSize: "14px", color: "#64748b" }}>
             {new Date().toISOString().replace("T", " ").substring(0, 16)} UTC
           </div>
         </div>
