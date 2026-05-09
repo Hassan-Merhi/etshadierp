@@ -252,7 +252,9 @@ async function trackOneContainer(
   // Save events
   await saveTrackingEvents(containerId, shipment);
 
-  // Build the update — always update tracking fields; update eta only when the API provides one
+  // Build the update — always update read-only tracking display fields;
+  // update eta only when the API provides one.
+  // NOTE: trackingLocation and trackingDescription are manually entered by users — never overwrite them.
   const updateSet: Record<string, unknown> = {
     trackingLastCheckedAt: now,
     trackingLastStatus: lastStatus,
@@ -261,8 +263,6 @@ async function trackOneContainer(
     trackingLastDescription: lastDescription,
     trackingError: null,
     trackingChangedAt: now,
-    trackingLocation: lastLocation ?? undefined,
-    trackingDescription: lastDescription ?? undefined,
   };
 
   if (estimatedDeliveryDate) {
