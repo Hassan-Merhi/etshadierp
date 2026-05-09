@@ -1289,6 +1289,12 @@ export default function GITContainers() {
               </p>
             )}
 
+            {importResult.updated === 0 && importResult.skipped > 0 && importResult.notFound === 0 && importResult.errors.length === 0 && (
+              <p className="text-xs text-amber-700 dark:text-amber-300 pl-6">
+                All rows were skipped. Make sure your file uses the correct column headers — download the <strong>Template</strong> as a reference.
+              </p>
+            )}
+
             {importResult.errors.length > 0 && (
               <div className="pl-6 space-y-0.5 max-h-40 overflow-y-auto">
                 <p className="text-xs font-semibold text-amber-800 dark:text-amber-400 mb-1">

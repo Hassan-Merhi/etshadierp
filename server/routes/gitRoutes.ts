@@ -1046,10 +1046,15 @@ export function registerGitRoutes(app: Express) {
           shippingcarrier: "trackingCarrierHint",
         };
 
-        const VALID_STATUSES = new Set([
+        // Status values — stored with exact casing; compare case-insensitively so
+        // user input like "otw" or "AT PORT" still works.
+        const STATUS_CANONICAL: Record<string, string> = {};
+        for (const s of [
           "OTW", "Sea", "At Port", "Left Dar", "At Border", "In Transit", "Arrived",
-          "Offloaded", "OFFLOADED", "Closed", "Completed",
-        ]);
+          "Offloaded", "Closed", "Completed",
+        ]) {
+          STATUS_CANONICAL[s.toLowerCase()] = s;
+        }
         const VALID_FREIGHT = new Set(["Yes", "No", "Pending"]);
 
         // Fetch all containers accessible to this session company
@@ -1112,15 +1117,16 @@ export function registerGitRoutes(app: Express) {
 
           const updateData: Record<string, any> = {};
 
-          // ── Status (optional) ────────────────────────────────────────────────
+          // ── Status (optional, case-insensitive) ─────────────────────────────
           const statusVal = toOptStr(rawMap.status);
           if (statusVal) {
-            if (!VALID_STATUSES.has(statusVal)) {
-              errors.push(`Row ${rowNum}: invalid status "${statusVal}" — row skipped`);
+            const canonical = STATUS_CANONICAL[statusVal.toLowerCase()];
+            if (!canonical) {
+              errors.push(`Row ${rowNum} (${ctrNum}): invalid status "${statusVal}" — valid values: ${Object.values(STATUS_CANONICAL).join(", ")}`);
               skipped++;
               continue;
             }
-            updateData.status = statusVal;
+            updateData.status = canonical;
           }
 
           // ── Optional text fields: 0 / "0" treated as blank ──────────────────
@@ -1194,7 +1200,11 @@ export function registerGitRoutes(app: Express) {
           // When ETA is set via import, mark it as manual so ParcelsApp doesn't overwrite it immediately
           if (updateData.eta) updateData.etaSource = "manual";
 
-          if (Object.keys(updateData).length === 0) { skipped++; continue; }
+          if (Object.keys(updateData).length === 0) {
+            errors.push(`Row ${rowNum} (${ctrNum}): no fields to update — fill in at least one column besides Container # (Status, ETA, Location, etc.)`);
+            skipped++;
+            continue;
+          }
 
           await db.update(containers).set(updateData).where(eq(containers.id, match.id));
           updated++;
