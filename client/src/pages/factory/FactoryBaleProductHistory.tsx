@@ -913,20 +913,17 @@ export function FactoryBaleProductAllMonths() {
                       </TableCell>
                     )}
                     <TableCell data-testid={`text-status-${bale.id}`}>
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {bale.status === "DELETED" || bale.status === "REMOVED" ? (
-                          <Badge variant="destructive">Deleted</Badge>
-                        ) : bale.status === "DISPATCHED" ? (
-                          <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">Dispatched</Badge>
-                        ) : (
-                          <Badge variant="secondary">{bale.status}</Badge>
-                        )}
-                        {bale.isInLoadingOrder && (
-                          <Badge variant="outline" className="text-[10px] px-1 py-0 border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 no-default-active-elevate font-normal">
-                            Loading
-                          </Badge>
-                        )}
-                      </div>
+                      {bale.status === "IN_STOCK" && bale.isInLoadingOrder ? (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 no-default-active-elevate">
+                          Loading
+                        </Badge>
+                      ) : bale.status === "DELETED" || bale.status === "REMOVED" ? (
+                        <Badge variant="destructive">Deleted</Badge>
+                      ) : bale.status === "DISPATCHED" ? (
+                        <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">Dispatched</Badge>
+                      ) : (
+                        <Badge variant="secondary">{bale.status}</Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground" data-testid={`text-date-${bale.id}`}>
                       {formatDateTime(bale.createdAt)}
