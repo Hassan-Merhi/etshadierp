@@ -104,10 +104,14 @@ async function initiateTracking(
     fromCache?: boolean;
   };
 
-  if (!data.uuid) throw new Error("ParcelsApp POST: no uuid in response");
+  // ParcelsApp sometimes returns done=true with shipments immediately (cache hit)
+  // but omits the uuid entirely. Accept that as a completed response.
+  if (!data.uuid && !data.done) {
+    throw new Error("ParcelsApp POST: no uuid in response");
+  }
 
   return {
-    uuid: data.uuid,
+    uuid: data.uuid ?? "",
     done: data.done ?? false,
     shipments: data.shipments ?? [],
     fromCache: data.fromCache ?? false,
