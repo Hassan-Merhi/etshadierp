@@ -1152,28 +1152,25 @@ export default function FactoryLocationInventory() {
                 No locations match your search.
               </div>
             ) : (
-              <div className="rounded-md border overflow-hidden">
-                {filteredLocations.map((location, idx) => (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {filteredLocations.map((location) => (
                   <div
                     key={location.id}
-                    className={`flex items-center justify-between px-4 py-3.5 cursor-pointer hover-elevate ${idx > 0 ? "border-t" : ""}`}
+                    className="relative flex flex-col items-center justify-center text-center px-4 py-5 rounded-md border bg-background cursor-pointer hover-elevate gap-2"
                     onClick={() => handleLocationClick(location)}
                     data-testid={`row-location-${location.id}`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="p-1.5 rounded-md bg-muted">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <span className="font-medium">{location.name}</span>
-                    </div>
+                    <MapPin className="h-5 w-5 text-muted-foreground" />
+                    <span className="font-medium text-sm leading-snug">{location.name}</span>
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="absolute top-1.5 right-1.5 h-7 w-7 opacity-50"
                       onClick={(e) => openRenameDialog(location, e)}
                       data-testid={`button-rename-location-${location.id}`}
                       title="Rename location"
                     >
-                      <Pencil className="h-4 w-4" />
+                      <Pencil className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 ))}
