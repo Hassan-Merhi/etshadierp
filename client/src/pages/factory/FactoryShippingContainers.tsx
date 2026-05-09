@@ -14,16 +14,18 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Plus, Search, Filter, ChevronDown, ChevronRight, FileText, Circle,
+  Plus, Search, Filter, ChevronDown, ChevronRight,
   CheckCircle2, XCircle, MessageCircle, Download, Copy, ExternalLink,
-  Upload, Eye, Trash2, RotateCcw, Package, Ship, Check, X, Paperclip,
-  Calendar, AlertCircle,
+  Upload, Eye, Trash2, RotateCcw, Check, X, Paperclip,
+  AlertCircle, RefreshCw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -48,7 +50,7 @@ interface ContainerRecord {
   clientName: string;
   containerNumber: string;
   destination: string;
-  containerArrivedDate: string;
+  containerArrivedDate: string;   // stored as YYYY-MM-DD or ""
   loadingDate: string;
   finalizedDate: string | null;
   shippingCompany: string;
@@ -153,33 +155,9 @@ const INITIAL_RECORDS: ContainerRecord[] = [
     finalizedDate: "2026-04-22",
     shippingCompany: "MSC Shipping",
     documents: [
-      {
-        id: "doc-001",
-        name: "Commercial Invoice",
-        fileName: "INV-2026-0038.pdf",
-        fileType: "PDF",
-        fileSize: "245 KB",
-        source: "invoice",
-        url: "#",
-      },
-      {
-        id: "doc-002",
-        name: "Packing List",
-        fileName: "packing-list-0038.pdf",
-        fileType: "PDF",
-        fileSize: "118 KB",
-        source: "container",
-        url: "#",
-      },
-      {
-        id: "doc-003",
-        name: "Certificate of Origin",
-        fileName: "cert-origin-0038.pdf",
-        fileType: "PDF",
-        fileSize: "89 KB",
-        source: "container",
-        url: "#",
-      },
+      { id: "doc-001", name: "Commercial Invoice", fileName: "INV-2026-0038.pdf", fileType: "PDF", fileSize: "245 KB", source: "invoice", url: "#" },
+      { id: "doc-002", name: "Packing List",       fileName: "packing-list-0038.pdf", fileType: "PDF", fileSize: "118 KB", source: "container", url: "#" },
+      { id: "doc-003", name: "Certificate of Origin", fileName: "cert-origin-0038.pdf", fileType: "PDF", fileSize: "89 KB", source: "container", url: "#" },
     ],
     note: "",
     isDone: false,
@@ -221,15 +199,7 @@ const INITIAL_RECORDS: ContainerRecord[] = [
     finalizedDate: "2026-04-01",
     shippingCompany: "Hapag-Lloyd",
     documents: [
-      {
-        id: "doc-004",
-        name: "Commercial Invoice",
-        fileName: "INV-2026-0030.pdf",
-        fileType: "PDF",
-        fileSize: "302 KB",
-        source: "invoice",
-        url: "#",
-      },
+      { id: "doc-004", name: "Commercial Invoice", fileName: "INV-2026-0030.pdf", fileType: "PDF", fileSize: "302 KB", source: "invoice", url: "#" },
     ],
     note: "Client confirmed receipt",
     isDone: true,
@@ -240,35 +210,41 @@ const INITIAL_RECORDS: ContainerRecord[] = [
   },
 ];
 
-// ─── Status helpers ────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<string, string> = {
-  active: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-  finalized: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
-  pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+  active:   "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  finalized:"bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+  pending:  "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
   verified: "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300",
 };
 
-function fmtDate(d: string | null | undefined) {
+/** Format a YYYY-MM-DD string → dd/mm/yy, returns "—" for empty/null */
+function fmtDate(d: string | null | undefined): string {
   if (!d) return "—";
-  const [y, m, day] = d.split("-");
-  return `${day}/${m}/${y?.slice(2)}`;
+  const parts = d.split("-");
+  if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return "—";
+  const [y, m, day] = parts;
+  return `${day}/${m}/${y.slice(2)}`;
 }
+
+// ─── Sticky column helpers ─────────────────────────────────────────────────────
+// Three left-sticky columns: Invoice # (130px) | Client (144px) | Container # (120px)
+const stickyHeadBase = "sticky z-20 bg-background border-r border-border/50 text-xs";
+const stickyCellBase = "sticky z-10 bg-background border-r border-border/50";
+
+const INV_LEFT  = 0;
+const CLI_LEFT  = 130;
+const CTR_LEFT  = 130 + 144;   // 274
 
 // ─── Document Status Indicator ─────────────────────────────────────────────────
 
 function DocIndicator({ count, onClick }: { count: number; onClick: () => void }) {
   return (
-    <button
-      onClick={onClick}
-      className="flex items-center gap-1.5 group"
-      data-testid="button-open-docs"
-    >
-      {count > 0 ? (
-        <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-      ) : (
-        <XCircle className="h-4 w-4 text-red-500 shrink-0" />
-      )}
+    <button onClick={onClick} className="flex items-center gap-1.5 group" data-testid="button-open-docs">
+      {count > 0
+        ? <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+        : <XCircle className="h-4 w-4 text-red-500 shrink-0" />}
       <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors underline underline-offset-2">
         {count > 0 ? `${count} file${count !== 1 ? "s" : ""}` : "None"}
       </span>
@@ -276,13 +252,84 @@ function DocIndicator({ count, onClick }: { count: number; onClick: () => void }
   );
 }
 
+// ─── Inline editable text cell ────────────────────────────────────────────────
+
+function EditableCellInput({
+  value, placeholder, onSave, testId,
+}: {
+  value: string; placeholder?: string; onSave: (v: string) => void; testId?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  if (!editing) {
+    return (
+      <span
+        className="cursor-pointer hover:underline hover:text-foreground text-sm"
+        onClick={() => { setDraft(value); setEditing(true); }}
+        data-testid={testId}
+      >
+        {value || <span className="text-muted-foreground italic text-xs">{placeholder || "—"}</span>}
+      </span>
+    );
+  }
+  return (
+    <Input
+      autoFocus
+      className="h-7 text-xs w-36"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => { onSave(draft); setEditing(false); }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") { onSave(draft); setEditing(false); }
+        if (e.key === "Escape") setEditing(false);
+      }}
+    />
+  );
+}
+
+// ─── Inline date cell — stores ISO, displays dd/mm/yy ─────────────────────────
+
+function DateCellInput({
+  value, placeholder, onSave, testId,
+}: {
+  value: string; placeholder?: string; onSave: (v: string) => void; testId?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  if (!editing) {
+    const display = fmtDate(value);
+    return (
+      <span
+        className="cursor-pointer hover:underline hover:text-foreground text-sm"
+        onClick={() => { setDraft(value); setEditing(true); }}
+        data-testid={testId}
+      >
+        {display !== "—" ? display : <span className="text-muted-foreground italic text-xs">{placeholder || "—"}</span>}
+      </span>
+    );
+  }
+  return (
+    <Input
+      autoFocus
+      type="date"
+      className="h-7 text-xs w-36"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => { onSave(draft); setEditing(false); }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") { onSave(draft); setEditing(false); }
+        if (e.key === "Escape") setEditing(false);
+      }}
+    />
+  );
+}
+
 // ─── Add Record Dialog ─────────────────────────────────────────────────────────
 
 function AddRecordDialog({
-  open,
-  onClose,
-  usedInvoiceIds,
-  onAdd,
+  open, onClose, usedInvoiceIds, onAdd,
 }: {
   open: boolean;
   onClose: () => void;
@@ -291,62 +338,42 @@ function AddRecordDialog({
 }) {
   const { toast } = useToast();
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
-  const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10));
-  const [containerNumber, setContainerNumber] = useState("");
-  const [destination, setDestination] = useState("");
-  const [containerArrivedDate, setContainerArrivedDate] = useState("");
-  const [shippingCompany, setShippingCompany] = useState("");
-  const [note, setNote] = useState("");
+  const [orderDate, setOrderDate]                   = useState(new Date().toISOString().slice(0, 10));
+  const [containerNumber, setContainerNumber]       = useState("");
+  const [destination, setDestination]               = useState("");
+  const [containerArrivedDate, setArrivedDate]      = useState("");
+  const [shippingCompany, setShippingCompany]       = useState("");
+  const [note, setNote]                             = useState("");
 
   const selectedInvoice = MOCK_INVOICES.find((i) => i.id === selectedInvoiceId);
 
+  function reset() {
+    setSelectedInvoiceId(""); setContainerNumber(""); setDestination("");
+    setArrivedDate(""); setShippingCompany(""); setNote("");
+  }
+
   function handleAdd() {
-    if (!selectedInvoiceId) {
-      toast({ title: "Select a commercial invoice", variant: "destructive" });
-      return;
-    }
-    if (!orderDate) {
-      toast({ title: "Enter an order date", variant: "destructive" });
-      return;
-    }
+    if (!selectedInvoiceId) { toast({ title: "Select a commercial invoice", variant: "destructive" }); return; }
+    if (!orderDate)          { toast({ title: "Enter an order date", variant: "destructive" }); return; }
     const inv = MOCK_INVOICES.find((i) => i.id === selectedInvoiceId)!;
-    const newRecord: ContainerRecord = {
+    onAdd({
       id: `cr-${Date.now()}`,
-      orderDate,
-      invoiceNumber: inv.invoiceNumber,
-      commercialInvoiceId: inv.id,
-      clientName: inv.clientName,
-      containerNumber,
-      destination,
-      containerArrivedDate,
-      loadingDate: inv.loadingDate,
-      finalizedDate: inv.finalizedDate,
-      shippingCompany,
-      documents: [],
-      note,
-      isDone: false,
-      doneAt: null,
-      doneBy: null,
-      whatsappSentAt: null,
-      status: inv.status,
-    };
-    onAdd(newRecord);
+      orderDate, invoiceNumber: inv.invoiceNumber, commercialInvoiceId: inv.id,
+      clientName: inv.clientName, containerNumber, destination,
+      containerArrivedDate, loadingDate: inv.loadingDate, finalizedDate: inv.finalizedDate,
+      shippingCompany, documents: [], note,
+      isDone: false, doneAt: null, doneBy: null, whatsappSentAt: null, status: inv.status,
+    });
+    reset();
     onClose();
-    setSelectedInvoiceId("");
-    setContainerNumber("");
-    setDestination("");
-    setContainerArrivedDate("");
-    setShippingCompany("");
-    setNote("");
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); onClose(); } }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Add Container Record
+            <Plus className="h-4 w-4" /> Add Container Record
           </DialogTitle>
         </DialogHeader>
 
@@ -363,7 +390,7 @@ function AddRecordDialog({
                 <SelectValue placeholder="Select invoice…" />
               </SelectTrigger>
               <SelectContent>
-                {MOCK_INVOICES.filter((inv) => ["active", "finalized", "pending", "verified"].includes(inv.status)).map((inv) => {
+                {MOCK_INVOICES.filter((inv) => ["active","finalized","pending","verified"].includes(inv.status)).map((inv) => {
                   const isUsed = usedInvoiceIds.has(inv.id);
                   return (
                     <SelectItem key={inv.id} value={inv.id} disabled={isUsed}>
@@ -382,16 +409,10 @@ function AddRecordDialog({
 
           {selectedInvoice && (
             <div className="rounded-md border bg-muted/30 p-3 space-y-1.5 text-xs">
-              <p className="font-semibold text-muted-foreground uppercase tracking-wide">Auto-filled from invoice</p>
+              <p className="font-semibold text-muted-foreground uppercase tracking-wide text-xs">Auto-filled from invoice</p>
               <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <span className="text-muted-foreground">Client:</span>{" "}
-                  <span className="font-medium">{selectedInvoice.clientName}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Loading Date:</span>{" "}
-                  <span className="font-medium">{fmtDate(selectedInvoice.loadingDate)}</span>
-                </div>
+                <div><span className="text-muted-foreground">Client:</span> <span className="font-medium">{selectedInvoice.clientName}</span></div>
+                <div><span className="text-muted-foreground">Loading Date:</span> <span className="font-medium">{fmtDate(selectedInvoice.loadingDate)}</span></div>
                 <div>
                   <span className="text-muted-foreground">Finalized:</span>{" "}
                   {selectedInvoice.finalizedDate
@@ -420,7 +441,7 @@ function AddRecordDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Container Arrived Date</Label>
-              <Input type="date" value={containerArrivedDate} onChange={(e) => setContainerArrivedDate(e.target.value)} data-testid="input-arrived-date" />
+              <Input type="date" value={containerArrivedDate} onChange={(e) => setArrivedDate(e.target.value)} data-testid="input-arrived-date" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Shipping Company</Label>
@@ -435,7 +456,7 @@ function AddRecordDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={() => { reset(); onClose(); }}>Cancel</Button>
           <Button onClick={handleAdd} data-testid="button-confirm-add">Add Record</Button>
         </DialogFooter>
       </DialogContent>
@@ -443,58 +464,10 @@ function AddRecordDialog({
   );
 }
 
-// ─── Edit Row Inline (inline editing for selected fields) ─────────────────────
-
-function EditableCellInput({
-  value,
-  placeholder,
-  type,
-  onSave,
-  testId,
-}: {
-  value: string;
-  placeholder?: string;
-  type?: string;
-  onSave: (v: string) => void;
-  testId?: string;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-
-  if (!editing) {
-    return (
-      <span
-        className="cursor-pointer hover:underline hover:text-foreground text-sm"
-        onClick={() => { setDraft(value); setEditing(true); }}
-        data-testid={testId}
-      >
-        {value || <span className="text-muted-foreground italic">{placeholder || "—"}</span>}
-      </span>
-    );
-  }
-  return (
-    <Input
-      autoFocus
-      type={type || "text"}
-      className="h-7 text-xs w-36"
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => { onSave(draft); setEditing(false); }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") { onSave(draft); setEditing(false); }
-        if (e.key === "Escape") setEditing(false);
-      }}
-    />
-  );
-}
-
 // ─── Documents Modal ──────────────────────────────────────────────────────────
 
 function DocumentsModal({
-  open,
-  record,
-  onClose,
-  onUpdate,
+  open, record, onClose, onUpdate,
 }: {
   open: boolean;
   record: ContainerRecord | null;
@@ -504,14 +477,20 @@ function DocumentsModal({
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [newDocName, setNewDocName] = useState("");
-  const [pendingFile, setPendingFile] = useState<{ name: string; fileName: string } | null>(null);
+  const [pendingFile, setPendingFile] = useState<{ fileName: string } | null>(null);
+
+  // Fix #5: reset upload state when switching between rows
+  useEffect(() => {
+    setPendingFile(null);
+    setNewDocName("");
+  }, [record?.id]);
 
   if (!record) return null;
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setPendingFile({ name: "", fileName: file.name });
+    setPendingFile({ fileName: file.name });
     setNewDocName(file.name.replace(/\.[^.]+$/, ""));
     e.target.value = "";
   }
@@ -533,10 +512,6 @@ function DocumentsModal({
     toast({ title: "Document added (mock)", description: newDoc.name });
   }
 
-  function handleRemoveDoc(docId: string) {
-    onUpdate(record.id, record.documents.filter((d) => d.id !== docId));
-  }
-
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="max-w-lg">
@@ -544,9 +519,7 @@ function DocumentsModal({
           <DialogTitle className="flex items-center gap-2">
             <Paperclip className="h-4 w-4" />
             Documents
-            <span className="font-mono text-sm text-muted-foreground font-normal">
-              {record.invoiceNumber}
-            </span>
+            <span className="font-mono text-sm text-muted-foreground font-normal">{record.invoiceNumber}</span>
           </DialogTitle>
         </DialogHeader>
 
@@ -576,9 +549,7 @@ function DocumentsModal({
                   {record.documents.map((doc) => (
                     <TableRow key={doc.id} data-testid={`row-doc-${doc.id}`}>
                       <TableCell className="text-sm font-medium">{doc.name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">{doc.fileType}</Badge>
-                      </TableCell>
+                      <TableCell><Badge variant="outline" className="text-xs">{doc.fileType}</Badge></TableCell>
                       <TableCell className="text-xs text-muted-foreground">{doc.fileSize}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className={cn("text-xs", doc.source === "invoice" ? "border-violet-300 text-violet-700" : "border-blue-300 text-blue-700")}>
@@ -588,16 +559,9 @@ function DocumentsModal({
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Button size="icon" variant="ghost" asChild data-testid={`button-view-doc-${doc.id}`}>
-                            <a href={doc.url} target="_blank" rel="noreferrer">
-                              <Eye className="h-3.5 w-3.5" />
-                            </a>
+                            <a href={doc.url} target="_blank" rel="noreferrer"><Eye className="h-3.5 w-3.5" /></a>
                           </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => handleRemoveDoc(doc.id)}
-                            data-testid={`button-remove-doc-${doc.id}`}
-                          >
+                          <Button size="icon" variant="ghost" onClick={() => onUpdate(record.id, record.documents.filter((d) => d.id !== doc.id))} data-testid={`button-remove-doc-${doc.id}`}>
                             <Trash2 className="h-3.5 w-3.5 text-red-500" />
                           </Button>
                         </div>
@@ -613,13 +577,7 @@ function DocumentsModal({
 
           <div className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Upload Document</p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              onChange={handleFileSelect}
-              data-testid="input-file-upload"
-            />
+            <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} data-testid="input-file-upload" />
             {pendingFile ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground border rounded-md px-2 py-1.5">
@@ -628,34 +586,20 @@ function DocumentsModal({
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Display Name</Label>
-                  <Input
-                    value={newDocName}
-                    onChange={(e) => setNewDocName(e.target.value)}
-                    placeholder="e.g. Packing List"
-                    className="h-8 text-sm"
-                    data-testid="input-doc-name"
-                  />
+                  <Input value={newDocName} onChange={(e) => setNewDocName(e.target.value)} placeholder="e.g. Packing List" className="h-8 text-sm" data-testid="input-doc-name" />
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" onClick={handleAddDoc} data-testid="button-confirm-upload">
-                    <Check className="h-3.5 w-3.5 mr-1" />
-                    Add Document
+                    <Check className="h-3.5 w-3.5 mr-1" /> Add Document
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setPendingFile(null)}>
-                    <X className="h-3.5 w-3.5 mr-1" />
-                    Cancel
+                    <X className="h-3.5 w-3.5 mr-1" /> Cancel
                   </Button>
                 </div>
               </div>
             ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                data-testid="button-upload-doc"
-              >
-                <Upload className="h-3.5 w-3.5 mr-1" />
-                Choose File
+              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} data-testid="button-upload-doc">
+                <Upload className="h-3.5 w-3.5 mr-1" /> Choose File
               </Button>
             )}
           </div>
@@ -671,107 +615,92 @@ function DocumentsModal({
 
 // ─── WhatsApp Package Modal ───────────────────────────────────────────────────
 
-const DEFAULT_WA_MESSAGE = (r: ContainerRecord) =>
-  `Hello,\n\nPlease find attached the documents for:\n\nClient: ${r.clientName}\nInvoice: ${r.invoiceNumber}\nContainer: ${r.containerNumber || "—"}\nDestination: ${r.destination || "—"}\nShipping Company: ${r.shippingCompany || "—"}\n\nDocuments attached:\n${r.documents.map((d) => `- ${d.name}`).join("\n") || "- (no documents)"}\n\nThank you.`;
+const buildDefaultMessage = (r: ContainerRecord, selectedNames: string[]) =>
+  `Hello,\n\nPlease find attached the documents for:\n\nClient: ${r.clientName}\nInvoice: ${r.invoiceNumber}\nContainer: ${r.containerNumber || "—"}\nDestination: ${r.destination || "—"}\nShipping Company: ${r.shippingCompany || "—"}\n\nDocuments attached:\n${selectedNames.length > 0 ? selectedNames.map((n) => `- ${n}`).join("\n") : "- (none selected)"}\n\nThank you.`;
 
 interface WhatsAppFile {
-  id: string;
-  name: string;
-  fileType: string;
-  source: string;
-  checked: boolean;
+  id: string; name: string; fileType: string; source: string; checked: boolean;
+}
+
+function buildFileList(record: ContainerRecord): WhatsAppFile[] {
+  return [
+    { id: "stmt", name: "Customer Statement",                    fileType: "PDF", source: "Auto-generated",    checked: true },
+    { id: "cinv", name: `Commercial Invoice — ${record.invoiceNumber}`, fileType: "PDF", source: "Commercial Invoice", checked: true },
+    ...record.documents.map((d) => ({
+      id: d.id, name: d.name, fileType: d.fileType,
+      source: d.source === "invoice" ? "Commercial Invoice" : "Container",
+      checked: true,
+    })),
+  ];
 }
 
 function WhatsAppModal({
-  open,
-  record,
-  onClose,
-  onMarkDone,
+  open, record, onClose, onMarkDone,
 }: {
   open: boolean;
   record: ContainerRecord | null;
   onClose: () => void;
-  onMarkDone: (id: string) => void;
+  onMarkDone: (id: string, sentAt: string) => void;
 }) {
   const { toast } = useToast();
-  const [message, setMessage] = useState("");
   const [files, setFiles] = useState<WhatsAppFile[]>([]);
+  const [message, setMessage] = useState("");
 
   const invoice = record ? MOCK_INVOICES.find((i) => i.id === record.commercialInvoiceId) : null;
 
-  // Re-initialise message and file list each time the modal opens for a record
+  // Fix #6: re-initialise when modal opens OR when document count changes (live refresh)
   useEffect(() => {
     if (!open || !record) return;
-    setMessage(DEFAULT_WA_MESSAGE(record));
-    setFiles([
-      {
-        id: "stmt",
-        name: "Customer Statement",
-        fileType: "PDF",
-        source: "Auto-generated",
-        checked: true,
-      },
-      {
-        id: "cinv",
-        name: `Commercial Invoice — ${record.invoiceNumber}`,
-        fileType: "PDF",
-        source: "Commercial Invoice",
-        checked: true,
-      },
-      ...record.documents.map((d) => ({
-        id: d.id,
-        name: d.name,
-        fileType: d.fileType,
-        source: d.source === "invoice" ? "Commercial Invoice" : "Container",
-        checked: true,
-      })),
-    ]);
+    const fl = buildFileList(record);
+    setFiles(fl);
+    setMessage(buildDefaultMessage(record, fl.filter((f) => f.checked).map((f) => f.name)));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, record?.id]);
+  }, [open, record?.id, record?.documents.length]);
 
+  // Keep message in sync when files are toggled
   function toggleFile(id: string) {
-    setFiles((prev) => prev.map((f) => f.id === id ? { ...f, checked: !f.checked } : f));
+    setFiles((prev) => {
+      const next = prev.map((f) => f.id === id ? { ...f, checked: !f.checked } : f);
+      if (record) setMessage(buildDefaultMessage(record, next.filter((f) => f.checked).map((f) => f.name)));
+      return next;
+    });
+  }
+
+  function handleRefresh() {
+    if (!record) return;
+    const fl = buildFileList(record);
+    setFiles(fl);
+    setMessage(buildDefaultMessage(record, fl.filter((f) => f.checked).map((f) => f.name)));
+    toast({ title: "File list refreshed" });
   }
 
   function handleCopyMessage() {
-    navigator.clipboard.writeText(message).then(() => {
-      toast({ title: "Message copied to clipboard" });
-    });
+    navigator.clipboard.writeText(message).then(() => toast({ title: "Message copied to clipboard" }));
   }
 
   function handleDownloadZip() {
-    toast({
-      title: "Mock: ZIP package prepared",
-      description: `${files.filter((f) => f.checked).length} file(s) would be included. Connect to backend for real download.`,
-    });
+    toast({ title: "Mock: ZIP package prepared", description: `${files.filter((f) => f.checked).length} file(s) would be included.` });
   }
 
   function handleOpenWhatsApp() {
     const phone = invoice?.whatsappContact?.replace(/\D/g, "") ?? "";
-    const url = phone
-      ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
-      : "https://web.whatsapp.com";
+    const url = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}` : "https://web.whatsapp.com";
     window.open(url, "_blank");
-    toast({
-      title: "WhatsApp opened",
-      description: "Attach the downloaded ZIP/files, paste the message, then send.",
-    });
+    toast({ title: "WhatsApp opened", description: "Attach the downloaded files, paste the message, then send." });
   }
 
   function handleMarkDone() {
     if (!record) return;
-    onMarkDone(record.id);
+    const sentAt = new Date().toISOString().slice(0, 10);
+    onMarkDone(record.id, sentAt);
     onClose();
     toast({ title: "Marked as done", description: `${record.invoiceNumber} moved to Done section.` });
   }
 
-  const checkedFiles = files.filter((f) => f.checked);
+  const checkedCount = files.filter((f) => f.checked).length;
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => { if (!v) onClose(); }}
-    >
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -797,9 +726,15 @@ function WhatsAppModal({
             <Separator />
 
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Files to Include ({checkedFiles.length} selected)
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Files to Include ({checkedCount} selected)
+                </p>
+                {/* Fix #6: Refresh files button */}
+                <Button size="sm" variant="ghost" onClick={handleRefresh} data-testid="button-refresh-files">
+                  <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh Files
+                </Button>
+              </div>
               <div className="border rounded-md overflow-hidden">
                 <Table>
                   <TableHeader>
@@ -815,22 +750,14 @@ function WhatsAppModal({
                     {files.map((f) => (
                       <TableRow key={f.id} data-testid={`row-wa-file-${f.id}`} className={!f.checked ? "opacity-50" : ""}>
                         <TableCell>
-                          <Checkbox
-                            checked={f.checked}
-                            onCheckedChange={() => toggleFile(f.id)}
-                            data-testid={`checkbox-file-${f.id}`}
-                          />
+                          <Checkbox checked={f.checked} onCheckedChange={() => toggleFile(f.id)} data-testid={`checkbox-file-${f.id}`} />
                         </TableCell>
                         <TableCell className="text-sm font-medium">{f.name}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">{f.fileType}</Badge>
-                        </TableCell>
+                        <TableCell><Badge variant="outline" className="text-xs">{f.fileType}</Badge></TableCell>
                         <TableCell className="text-xs text-muted-foreground">{f.source}</TableCell>
                         <TableCell>
                           <Button size="icon" variant="ghost" asChild>
-                            <a href="#" onClick={(e) => e.preventDefault()}>
-                              <Eye className="h-3.5 w-3.5" />
-                            </a>
+                            <a href="#" onClick={(e) => e.preventDefault()}><Eye className="h-3.5 w-3.5" /></a>
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -844,21 +771,15 @@ function WhatsAppModal({
 
             <div className="space-y-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">WhatsApp Message</p>
-              <Textarea
-                rows={10}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                className="text-sm font-mono"
-                data-testid="textarea-wa-message"
-              />
+              <Textarea rows={10} value={message} onChange={(e) => setMessage(e.target.value)} className="text-sm font-mono" data-testid="textarea-wa-message" />
             </div>
 
             <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-3 text-xs text-blue-800 dark:text-blue-300">
               <p className="font-semibold mb-1">How to send:</p>
               <ol className="list-decimal list-inside space-y-0.5">
                 <li>Download the ZIP package below.</li>
-                <li>Click "Open WhatsApp" — the message will pre-fill if possible.</li>
-                <li>Attach the downloaded ZIP/files manually in WhatsApp.</li>
+                <li>Click "Open WhatsApp" — the message will pre-fill if a contact is set.</li>
+                <li>Attach the downloaded files manually in WhatsApp.</li>
                 <li>Review the message, then click Send.</li>
                 <li>Come back here and click "I Sent It — Mark as Done".</li>
               </ol>
@@ -866,25 +787,16 @@ function WhatsAppModal({
 
             <div className="flex flex-wrap gap-2">
               <Button onClick={handleDownloadZip} data-testid="button-download-zip">
-                <Download className="h-3.5 w-3.5 mr-1" />
-                Download ZIP Package
+                <Download className="h-3.5 w-3.5 mr-1" /> Download ZIP Package
               </Button>
               <Button variant="outline" onClick={handleCopyMessage} data-testid="button-copy-message">
-                <Copy className="h-3.5 w-3.5 mr-1" />
-                Copy Message
+                <Copy className="h-3.5 w-3.5 mr-1" /> Copy Message
               </Button>
               <Button variant="outline" onClick={handleOpenWhatsApp} data-testid="button-open-whatsapp">
-                <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                Open WhatsApp
+                <ExternalLink className="h-3.5 w-3.5 mr-1" /> Open WhatsApp
               </Button>
-              <Button
-                variant="default"
-                className="ml-auto"
-                onClick={handleMarkDone}
-                data-testid="button-mark-done-wa"
-              >
-                <Check className="h-3.5 w-3.5 mr-1" />
-                I Sent It — Mark as Done
+              <Button className="ml-auto" onClick={handleMarkDone} data-testid="button-mark-done-wa">
+                <Check className="h-3.5 w-3.5 mr-1" /> I Sent It — Mark as Done
               </Button>
             </div>
           </div>
@@ -898,20 +810,26 @@ function WhatsAppModal({
 
 export default function FactoryShippingContainers() {
   const { toast } = useToast();
-  const [records, setRecords] = useState<ContainerRecord[]>(INITIAL_RECORDS);
-  const [search, setSearch] = useState("");
-  const [filterDocs, setFilterDocs] = useState<"all" | "has" | "missing">("all");
-  const [filterFinalized, setFilterFinalized] = useState<"all" | "yes" | "no">("all");
-  const [showFilters, setShowFilters] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
-  const [docsRecord, setDocsRecord] = useState<ContainerRecord | null>(null);
-  const [waRecord, setWaRecord] = useState<ContainerRecord | null>(null);
-  const [doneExpanded, setDoneExpanded] = useState(false);
+  const [records, setRecords]             = useState<ContainerRecord[]>(INITIAL_RECORDS);
+  const [search, setSearch]               = useState("");
+  const [filterDocs, setFilterDocs]       = useState<"all" | "has" | "missing">("all");
+  const [filterFinalized, setFinalized]   = useState<"all" | "yes" | "no">("all");
+  const [showFilters, setShowFilters]     = useState(false);
+  const [addOpen, setAddOpen]             = useState(false);
+  const [docsRecordId, setDocsRecordId]   = useState<string | null>(null);
+  const [waRecordId, setWaRecordId]       = useState<string | null>(null);
+  const [doneExpanded, setDoneExpanded]   = useState(false);
+  // Fix #3: confirmation before mark as done
+  const [pendingDoneId, setPendingDoneId] = useState<string | null>(null);
 
   const active = records.filter((r) => !r.isDone);
-  const done = records.filter((r) => r.isDone);
+  const done   = records.filter((r) => r.isDone);
 
   const usedInvoiceIds = new Set(records.map((r) => r.commercialInvoiceId));
+
+  // Fix #6: always pass the live record so WhatsApp modal sees latest documents
+  const docsRecord = docsRecordId ? records.find((r) => r.id === docsRecordId) ?? null : null;
+  const waRecord   = waRecordId   ? records.find((r) => r.id === waRecordId)   ?? null : null;
 
   function updateRecord(id: string, patch: Partial<ContainerRecord>) {
     setRecords((prev) => prev.map((r) => r.id === id ? { ...r, ...patch } : r));
@@ -919,15 +837,14 @@ export default function FactoryShippingContainers() {
 
   function updateDocs(id: string, docs: MockDocument[]) {
     updateRecord(id, { documents: docs });
-    setDocsRecord((prev) => prev?.id === id ? { ...prev, documents: docs } : prev);
   }
 
-  function markDone(id: string) {
+  function markDone(id: string, sentAt?: string) {
     updateRecord(id, {
       isDone: true,
       doneAt: new Date().toISOString().slice(0, 10),
       doneBy: "You",
-      whatsappSentAt: new Date().toISOString().slice(0, 10),
+      whatsappSentAt: sentAt ?? null,
     });
   }
 
@@ -947,18 +864,12 @@ export default function FactoryShippingContainers() {
         !r.shippingCompany.toLowerCase().includes(q)
       ) return false;
     }
-    if (filterDocs === "has" && r.documents.length === 0) return false;
-    if (filterDocs === "missing" && r.documents.length > 0) return false;
+    if (filterDocs === "has"     && r.documents.length === 0) return false;
+    if (filterDocs === "missing" && r.documents.length >  0) return false;
     if (filterFinalized === "yes" && !r.finalizedDate) return false;
-    if (filterFinalized === "no" && r.finalizedDate) return false;
+    if (filterFinalized === "no"  &&  r.finalizedDate) return false;
     return true;
   });
-
-  function clearFilters() {
-    setSearch("");
-    setFilterDocs("all");
-    setFilterFinalized("all");
-  }
 
   const hasActiveFilters = filterDocs !== "all" || filterFinalized !== "all";
 
@@ -974,10 +885,8 @@ export default function FactoryShippingContainers() {
         {/* ── Top Controls ── */}
         <div className="flex items-center gap-2 flex-wrap">
           <Button onClick={() => setAddOpen(true)} data-testid="button-add-record">
-            <Plus className="h-4 w-4 mr-1" />
-            Add Container Record
+            <Plus className="h-4 w-4 mr-1" /> Add Container Record
           </Button>
-
           <div className="relative flex-1 min-w-48">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -988,7 +897,6 @@ export default function FactoryShippingContainers() {
               data-testid="input-search"
             />
           </div>
-
           <Button
             variant={showFilters ? "secondary" : "outline"}
             onClick={() => setShowFilters((v) => !v)}
@@ -1006,9 +914,7 @@ export default function FactoryShippingContainers() {
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Documents</p>
               <Select value={filterDocs} onValueChange={(v: any) => setFilterDocs(v)}>
-                <SelectTrigger className="h-8 text-xs w-36" data-testid="select-filter-docs">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="h-8 text-xs w-36" data-testid="select-filter-docs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="has">Has Documents</SelectItem>
@@ -1018,10 +924,8 @@ export default function FactoryShippingContainers() {
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Finalized</p>
-              <Select value={filterFinalized} onValueChange={(v: any) => setFilterFinalized(v)}>
-                <SelectTrigger className="h-8 text-xs w-36" data-testid="select-filter-finalized">
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={filterFinalized} onValueChange={(v: any) => setFinalized(v)}>
+                <SelectTrigger className="h-8 text-xs w-36" data-testid="select-filter-finalized"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="yes">Finalized</SelectItem>
@@ -1030,39 +934,63 @@ export default function FactoryShippingContainers() {
               </Select>
             </div>
             <div className="flex items-end">
-              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={clearFilters} data-testid="button-clear-filters">
+              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setFilterDocs("all"); setFinalized("all"); }} data-testid="button-clear-filters">
                 Clear All
               </Button>
             </div>
           </div>
         )}
 
-        {/* ── Status Legend ── */}
+        {/* ── Legend ── */}
         <div className="flex items-center gap-4 flex-wrap text-xs text-muted-foreground">
           <span className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> Has documents</span>
           <span className="flex items-center gap-1"><XCircle className="h-3.5 w-3.5 text-red-500" /> No documents</span>
-          <span>Click any editable cell (Container #, Destination, Shipping Co., Note) to edit inline.</span>
+          <span>Click editable cells (Container #, Destination, Shipping Co., Note, Arrived) to edit inline.</span>
         </div>
 
         {/* ── Main Table ── */}
+        {/* Fix #1: sticky left columns, table starts scrolled left */}
         <div className="rounded-md border overflow-x-auto">
-          <Table className="text-xs whitespace-nowrap">
+          <Table className="text-xs" style={{ minWidth: "1100px" }}>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-xs">Order Date</TableHead>
-                <TableHead className="text-xs">Invoice #</TableHead>
-                <TableHead className="text-xs">Client</TableHead>
-                <TableHead className="text-xs">Status</TableHead>
-                <TableHead className="text-xs">Container #</TableHead>
-                <TableHead className="text-xs">Destination</TableHead>
-                <TableHead className="text-xs">Arrived</TableHead>
-                <TableHead className="text-xs">Loading Date</TableHead>
-                <TableHead className="text-xs">Finalized</TableHead>
-                <TableHead className="text-xs">Shipping Co.</TableHead>
-                <TableHead className="text-xs">Documents</TableHead>
-                <TableHead className="text-xs">Note</TableHead>
-                <TableHead className="text-xs">WhatsApp</TableHead>
-                <TableHead className="text-xs">Done</TableHead>
+                <TableHead className="text-xs w-20 min-w-[80px]">Order Date</TableHead>
+
+                {/* Sticky: Invoice # */}
+                <TableHead
+                  className={stickyHeadBase}
+                  style={{ left: INV_LEFT, minWidth: "130px", width: "130px" }}
+                >
+                  Invoice #
+                </TableHead>
+
+                {/* Sticky: Client */}
+                <TableHead
+                  className={stickyHeadBase}
+                  style={{ left: CLI_LEFT, minWidth: "144px", width: "144px" }}
+                >
+                  Client
+                </TableHead>
+
+                <TableHead className="text-xs w-20 min-w-[80px]">Status</TableHead>
+
+                {/* Sticky: Container # */}
+                <TableHead
+                  className={stickyHeadBase}
+                  style={{ left: CTR_LEFT, minWidth: "120px", width: "120px" }}
+                >
+                  Container #
+                </TableHead>
+
+                <TableHead className="text-xs min-w-[120px]">Destination</TableHead>
+                <TableHead className="text-xs min-w-[90px]">Arrived</TableHead>
+                <TableHead className="text-xs min-w-[90px]">Loading</TableHead>
+                <TableHead className="text-xs min-w-[90px]">Finalized</TableHead>
+                <TableHead className="text-xs min-w-[110px]">Shipping Co.</TableHead>
+                <TableHead className="text-xs min-w-[90px]">Documents</TableHead>
+                <TableHead className="text-xs min-w-[110px]">Note</TableHead>
+                <TableHead className="text-xs min-w-[90px]">WhatsApp</TableHead>
+                <TableHead className="text-xs min-w-[80px]">Done</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1076,29 +1004,33 @@ export default function FactoryShippingContainers() {
                 filtered.map((r) => (
                   <TableRow key={r.id} data-testid={`row-record-${r.id}`}>
                     {/* Order Date */}
-                    <TableCell>{fmtDate(r.orderDate)}</TableCell>
+                    <TableCell className="text-xs whitespace-nowrap">{fmtDate(r.orderDate)}</TableCell>
 
-                    {/* Invoice # */}
-                    <TableCell className="font-mono font-medium">{r.invoiceNumber}</TableCell>
+                    {/* Sticky: Invoice # */}
+                    <TableCell className={stickyCellBase} style={{ left: INV_LEFT }}>
+                      <span className="font-mono font-medium text-xs whitespace-nowrap">{r.invoiceNumber}</span>
+                    </TableCell>
 
-                    {/* Client */}
-                    <TableCell className="font-medium max-w-36 truncate">{r.clientName}</TableCell>
+                    {/* Sticky: Client */}
+                    <TableCell className={cn(stickyCellBase, "font-medium text-xs max-w-[144px] truncate")} style={{ left: CLI_LEFT }}>
+                      {r.clientName}
+                    </TableCell>
 
                     {/* Status */}
                     <TableCell>
-                      <Badge className={cn("text-xs capitalize no-default-active-elevate", STATUS_COLORS[r.status])}>
+                      <Badge className={cn("text-xs capitalize no-default-active-elevate whitespace-nowrap", STATUS_COLORS[r.status])}>
                         {r.status}
                       </Badge>
                     </TableCell>
 
-                    {/* Container # (editable) */}
-                    <TableCell>
+                    {/* Sticky: Container # (editable) */}
+                    <TableCell className={stickyCellBase} style={{ left: CTR_LEFT }}>
                       <EditableCellInput
                         value={r.containerNumber}
                         placeholder="Enter #"
                         onSave={(v) => {
                           updateRecord(r.id, { containerNumber: v });
-                          toast({ title: "Container number updated", description: "Also synced to loading record in final implementation." });
+                          toast({ title: "Container number updated", description: "Will sync to loading record in final version." });
                         }}
                         testId={`cell-container-${r.id}`}
                       />
@@ -1109,36 +1041,29 @@ export default function FactoryShippingContainers() {
                       <EditableCellInput
                         value={r.destination}
                         placeholder="Enter destination"
-                        onSave={(v) => {
-                          updateRecord(r.id, { destination: v });
-                          toast({ title: "Destination updated" });
-                        }}
+                        onSave={(v) => { updateRecord(r.id, { destination: v }); toast({ title: "Destination updated" }); }}
                         testId={`cell-destination-${r.id}`}
                       />
                     </TableCell>
 
-                    {/* Arrived */}
+                    {/* Fix #2: Arrived date — stores ISO, displays formatted */}
                     <TableCell>
-                      <EditableCellInput
-                        value={fmtDate(r.containerArrivedDate)}
+                      <DateCellInput
+                        value={r.containerArrivedDate}
                         placeholder="Not arrived"
                         onSave={(v) => updateRecord(r.id, { containerArrivedDate: v })}
                         testId={`cell-arrived-${r.id}`}
                       />
                     </TableCell>
 
-                    {/* Loading Date (auto-filled, read-only) */}
-                    <TableCell>
-                      <span className="text-muted-foreground">{fmtDate(r.loadingDate)}</span>
-                    </TableCell>
+                    {/* Loading Date (read-only) */}
+                    <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{fmtDate(r.loadingDate)}</TableCell>
 
-                    {/* Finalized (auto-filled, read-only) */}
-                    <TableCell>
-                      {r.finalizedDate ? (
-                        <span className="text-green-700 dark:text-green-400 font-medium">{fmtDate(r.finalizedDate)}</span>
-                      ) : (
-                        <span className="text-amber-600 dark:text-amber-400 italic text-xs">Not finalized</span>
-                      )}
+                    {/* Finalized (read-only) */}
+                    <TableCell className="whitespace-nowrap">
+                      {r.finalizedDate
+                        ? <span className="text-green-700 dark:text-green-400 font-medium text-xs">{fmtDate(r.finalizedDate)}</span>
+                        : <span className="text-amber-600 dark:text-amber-400 italic text-xs">Not finalized</span>}
                     </TableCell>
 
                     {/* Shipping Company (editable) */}
@@ -1146,24 +1071,18 @@ export default function FactoryShippingContainers() {
                       <EditableCellInput
                         value={r.shippingCompany}
                         placeholder="Enter company"
-                        onSave={(v) => {
-                          updateRecord(r.id, { shippingCompany: v });
-                          toast({ title: "Shipping company updated" });
-                        }}
+                        onSave={(v) => { updateRecord(r.id, { shippingCompany: v }); toast({ title: "Shipping company updated" }); }}
                         testId={`cell-shipping-${r.id}`}
                       />
                     </TableCell>
 
                     {/* Documents */}
                     <TableCell>
-                      <DocIndicator
-                        count={r.documents.length}
-                        onClick={() => setDocsRecord(r)}
-                      />
+                      <DocIndicator count={r.documents.length} onClick={() => setDocsRecordId(r.id)} />
                     </TableCell>
 
                     {/* Note (editable) */}
-                    <TableCell className="max-w-32">
+                    <TableCell>
                       <EditableCellInput
                         value={r.note}
                         placeholder="Add note"
@@ -1177,28 +1096,23 @@ export default function FactoryShippingContainers() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="border-green-300 text-green-700 dark:border-green-700 dark:text-green-400"
-                        onClick={() => setWaRecord(r)}
+                        className="border-green-300 text-green-700 dark:border-green-700 dark:text-green-400 whitespace-nowrap"
+                        onClick={() => setWaRecordId(r.id)}
                         data-testid={`button-prepare-wa-${r.id}`}
                       >
-                        <MessageCircle className="h-3.5 w-3.5 mr-1" />
-                        Prepare
+                        <MessageCircle className="h-3.5 w-3.5 mr-1" /> Prepare
                       </Button>
                     </TableCell>
 
-                    {/* Done */}
+                    {/* Fix #3: Done — confirm before marking */}
                     <TableCell>
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => {
-                          markDone(r.id);
-                          toast({ title: "Marked as done", description: `${r.invoiceNumber} moved to Done section.` });
-                        }}
+                        onClick={() => setPendingDoneId(r.id)}
                         data-testid={`button-mark-done-${r.id}`}
                       >
-                        <Check className="h-3.5 w-3.5 mr-1" />
-                        Done
+                        <Check className="h-3.5 w-3.5 mr-1" /> Done
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -1229,53 +1143,50 @@ export default function FactoryShippingContainers() {
                 No done containers yet.
               </div>
             ) : (
-              <Table className="text-xs">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">Invoice #</TableHead>
-                    <TableHead className="text-xs">Client</TableHead>
-                    <TableHead className="text-xs">Container #</TableHead>
-                    <TableHead className="text-xs">Destination</TableHead>
-                    <TableHead className="text-xs">Done Date</TableHead>
-                    <TableHead className="text-xs">Done By</TableHead>
-                    <TableHead className="w-24" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {done.map((r) => (
-                    <TableRow key={r.id} className="opacity-70" data-testid={`row-done-${r.id}`}>
-                      <TableCell className="font-mono">{r.invoiceNumber}</TableCell>
-                      <TableCell>{r.clientName}</TableCell>
-                      <TableCell className="font-mono">{r.containerNumber || "—"}</TableCell>
-                      <TableCell>{r.destination || "—"}</TableCell>
-                      <TableCell>{fmtDate(r.doneAt)}</TableCell>
-                      <TableCell>{r.doneBy || "—"}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setDocsRecord(r)}
-                            data-testid={`button-view-done-${r.id}`}
-                          >
-                            <Eye className="h-3.5 w-3.5 mr-1" />
-                            View
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => restore(r.id)}
-                            data-testid={`button-restore-${r.id}`}
-                          >
-                            <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                            Restore
-                          </Button>
-                        </div>
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table className="text-xs">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">Invoice #</TableHead>
+                      <TableHead className="text-xs">Client</TableHead>
+                      <TableHead className="text-xs">Container #</TableHead>
+                      <TableHead className="text-xs">Destination</TableHead>
+                      {/* Fix #4: Done date + WA sent date + Done by */}
+                      <TableHead className="text-xs">Done Date</TableHead>
+                      <TableHead className="text-xs">WA Sent</TableHead>
+                      <TableHead className="text-xs">Done By</TableHead>
+                      <TableHead className="w-28" />
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {done.map((r) => (
+                      <TableRow key={r.id} className="opacity-70" data-testid={`row-done-${r.id}`}>
+                        <TableCell className="font-mono">{r.invoiceNumber}</TableCell>
+                        <TableCell>{r.clientName}</TableCell>
+                        <TableCell className="font-mono">{r.containerNumber || "—"}</TableCell>
+                        <TableCell>{r.destination || "—"}</TableCell>
+                        <TableCell className="whitespace-nowrap">{fmtDate(r.doneAt)}</TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {r.whatsappSentAt
+                            ? <span className="text-green-700 dark:text-green-400">{fmtDate(r.whatsappSentAt)}</span>
+                            : <span className="text-muted-foreground italic">—</span>}
+                        </TableCell>
+                        <TableCell>{r.doneBy || "—"}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button size="sm" variant="ghost" onClick={() => setDocsRecordId(r.id)} data-testid={`button-view-done-${r.id}`}>
+                              <Eye className="h-3.5 w-3.5 mr-1" /> View
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => restore(r.id)} data-testid={`button-restore-${r.id}`}>
+                              <RotateCcw className="h-3.5 w-3.5 mr-1" /> Restore
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )
           )}
         </div>
@@ -1284,7 +1195,7 @@ export default function FactoryShippingContainers() {
         <div className="flex items-start gap-2 p-3 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">
           <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
           <p>
-            <strong>Mockup mode.</strong> Data is stored in memory only — changes will reset on refresh.
+            <strong>Mockup mode.</strong> Data is stored in memory only — changes reset on refresh.
             Document uploads, ZIP downloads, and WhatsApp sending are simulated.
             After approval, this page will be connected to the real backend.
           </p>
@@ -1297,25 +1208,51 @@ export default function FactoryShippingContainers() {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         usedInvoiceIds={usedInvoiceIds}
-        onAdd={(r) => {
-          setRecords((prev) => [r, ...prev]);
-          toast({ title: "Record added", description: r.invoiceNumber });
-        }}
+        onAdd={(r) => { setRecords((prev) => [r, ...prev]); toast({ title: "Record added", description: r.invoiceNumber }); }}
       />
 
       <DocumentsModal
         open={!!docsRecord}
         record={docsRecord}
-        onClose={() => setDocsRecord(null)}
+        onClose={() => setDocsRecordId(null)}
         onUpdate={updateDocs}
       />
 
       <WhatsAppModal
         open={!!waRecord}
         record={waRecord}
-        onClose={() => setWaRecord(null)}
-        onMarkDone={markDone}
+        onClose={() => setWaRecordId(null)}
+        onMarkDone={(id, sentAt) => markDone(id, sentAt)}
       />
+
+      {/* Fix #3: Confirm before marking done */}
+      <AlertDialog open={!!pendingDoneId} onOpenChange={(v) => { if (!v) setPendingDoneId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark as Done?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you sent this package and want to mark it as done?
+              The row will be moved to the Done / Hidden section. You can restore it later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingDoneId) {
+                  markDone(pendingDoneId);
+                  const inv = records.find((r) => r.id === pendingDoneId)?.invoiceNumber ?? "";
+                  toast({ title: "Marked as done", description: `${inv} moved to Done section.` });
+                  setPendingDoneId(null);
+                }
+              }}
+              data-testid="button-confirm-done"
+            >
+              Yes, Mark as Done
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
