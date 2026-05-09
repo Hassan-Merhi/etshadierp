@@ -30,14 +30,43 @@ const INACTIVE_SET = new Set<string>(INACTIVE_STATUSES);
 
 const COOLDOWN_HOURS = 4;
 
-// Only track containers whose carrier hint matches one of these (case-insensitive).
-// Containers with no hint or a different carrier are skipped.
+// Only track containers whose carrier is MAERSK, CMA, or MSC —
+// either from a manual hint or auto-detected from the container number prefix.
 const ALLOWED_CARRIERS = ["maersk", "cma", "msc"];
 
-function isAllowedCarrier(hint: string | null | undefined): boolean {
-  if (!hint) return false;
-  const lower = hint.trim().toLowerCase();
-  return ALLOWED_CARRIERS.some((c) => lower.includes(c));
+// Container number prefix → canonical carrier name.
+// First 4 letters of a standard ISO container number identify the owner.
+const PREFIX_TO_CARRIER: Record<string, string> = {
+  // Maersk
+  MAEU: "MAERSK", MRKU: "MAERSK", MSKU: "MAERSK",
+  TRHU: "MAERSK", TEMU: "MAERSK", SEAU: "MAERSK", SUDU: "MAERSK",
+  // CMA CGM (includes APL which CMA owns)
+  CMAU: "CMA", CGMU: "CMA", APMU: "CMA", APHU: "CMA", CXDU: "CMA",
+  // MSC
+  MSCU: "MSC", MEDU: "MSC", MSDU: "MSC",
+};
+
+/**
+ * Infer the carrier from the first 4 characters of a container number.
+ * Returns "MAERSK", "CMA", "MSC", or null if unknown.
+ */
+function detectCarrierFromNumber(containerNumber: string): string | null {
+  const prefix = containerNumber.trim().toUpperCase().slice(0, 4);
+  return PREFIX_TO_CARRIER[prefix] ?? null;
+}
+
+/**
+ * Returns the effective carrier hint — manual hint first, then auto-detected.
+ * Returns null if neither is available or if the carrier is not in the allowed list.
+ */
+function resolveCarrier(hint: string | null | undefined, containerNumber: string): string | null {
+  if (hint) {
+    const lower = hint.trim().toLowerCase();
+    if (ALLOWED_CARRIERS.some((c) => lower.includes(c))) return hint.trim();
+  }
+  const detected = detectCarrierFromNumber(containerNumber);
+  if (detected) return detected;
+  return null;
 }
 
 // ─── Main public entry points ─────────────────────────────────────────────────
@@ -86,7 +115,9 @@ export async function trackDueContainers(): Promise<void> {
     return;
   }
 
-  const eligible = rows.filter((r) => isAllowedCarrier(r.trackingCarrierHint));
+  const eligible = rows
+    .map((r) => ({ ...r, carrier: resolveCarrier(r.trackingCarrierHint, r.containerNumber) }))
+    .filter((r) => r.carrier !== null);
   const skippedCarrier = rows.length - eligible.length;
   if (skippedCarrier > 0) {
     console.log(`[ContainerTracking] Skipping ${skippedCarrier} container(s) — carrier not MAERSK/CMA/MSC.`);
@@ -95,7 +126,7 @@ export async function trackDueContainers(): Promise<void> {
 
   for (const row of eligible) {
     try {
-      await trackOneContainer(row.id, row.containerNumber, row.trackingCarrierHint ?? undefined);
+      await trackOneContainer(row.id, row.containerNumber, row.carrier!);
       // Small delay between containers to be polite to the API
       await sleep(1_500);
     } catch (err: any) {
@@ -139,7 +170,9 @@ export async function trackAllEnabledNow(): Promise<number> {
       notInArray(containers.status, [...INACTIVE_STATUSES]),
     );
 
-  const eligible = rows.filter((r) => isAllowedCarrier(r.trackingCarrierHint));
+  const eligible = rows
+    .map((r) => ({ ...r, carrier: resolveCarrier(r.trackingCarrierHint, r.containerNumber) }))
+    .filter((r) => r.carrier !== null);
 
   if (eligible.length === 0) return 0;
 
@@ -149,7 +182,7 @@ export async function trackAllEnabledNow(): Promise<number> {
     console.log(`[BulkTracking] Starting manual run for ${eligible.length} containers (${skipped} skipped — carrier not MAERSK/CMA/MSC)…`);
     for (const row of eligible) {
       try {
-        await trackOneContainer(row.id, row.containerNumber, row.trackingCarrierHint ?? undefined);
+        await trackOneContainer(row.id, row.containerNumber, row.carrier!);
         await sleep(2_000);
       } catch (err: any) {
         console.error(`[BulkTracking] Error tracking ${row.containerNumber}:`, err?.message);
