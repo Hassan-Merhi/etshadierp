@@ -62,6 +62,7 @@ const POSImport = lazy(() => import("@/pages/pos/POSImport"));
 const ContainerDetail = lazy(() => import("@/pages/ContainerDetail"));
 const LocationInventory = lazy(() => import("@/pages/LocationInventory"));
 const FactoryLocationInventory = lazy(() => import("@/pages/factory/FactoryLocationInventory"));
+const FactoryLocationInventoryMockup = lazy(() => import("@/pages/factory/FactoryLocationInventoryMockup"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const VoucherEdit = lazy(() => import("@/pages/VoucherEdit"));
 const Payroll = lazy(() => import("@/pages/Payroll"));
@@ -971,6 +972,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/bales-hub" component={FactoryBalesHub} />
                     <Route path="/factory/reprint-labels" component={FactoryReprintLabels} />
                     <Route path="/factory/location-inventory" component={FactoryLocationInventory} />
+                    <Route path="/factory/location-inventory-mockup" component={FactoryLocationInventoryMockup} />
                     <Route path="/factory/bale-product-history/:productId/:locationId/:year/all" component={FactoryBaleProductAllMonths} />
                     <Route path="/factory/bale-product-history/:productId/:locationId/:year/:month" component={FactoryBaleProductMonthDetail} />
                     <Route path="/factory/bale-product-history/:productId/:locationId" component={FactoryBaleProductHistory} />
