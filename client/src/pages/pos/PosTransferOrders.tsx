@@ -216,14 +216,17 @@ function EditableTransferDetail({
   const searchBarRef = useRef<HTMLInputElement>(null);
   const deltaRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
+  // Use the transfer's source location for inventory lookup so multi-location users
+  // only see items from the location this transfer is sending FROM.
+  const inventoryLocationId = detail.sourceLocationId ?? posUser.assignedLocationId;
   const { data: rawInventory = [] } = useQuery<InventoryItem[]>({
-    queryKey: ["/api/inventory", posUser.assignedLocationId],
+    queryKey: ["/api/inventory", inventoryLocationId],
     queryFn: async () => {
-      if (!posUser.assignedLocationId) return [];
-      const res = await fetch(`/api/locations/${posUser.assignedLocationId}/inventory`, { credentials: "include" });
+      if (!inventoryLocationId) return [];
+      const res = await fetch(`/api/locations/${inventoryLocationId}/inventory`, { credentials: "include" });
       return res.ok ? res.json() : [];
     },
-    enabled: !!posUser.assignedLocationId,
+    enabled: !!inventoryLocationId,
   });
 
   const revisionMutation = useMutation({
