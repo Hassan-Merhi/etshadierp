@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useParams, useLocation } from "wouter";
-import { ArrowLeft, Calendar, Package } from "lucide-react";
+import { ArrowLeft, Calendar, Package, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -482,6 +483,22 @@ export function FactoryBaleProductMonthDetail() {
   const data = responseData?.bales;
   const sellingPricePerBale = parseFloat(responseData?.sellingPrice || "0");
 
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const filteredData = (data || []).filter((bale) => {
+    const effectiveStatus = bale.status === "IN_STOCK" && bale.isInLoadingOrder ? "LOADING" : bale.status;
+    if (statusFilter !== "all" && effectiveStatus !== statusFilter) return false;
+    if (searchTerm) {
+      const t = searchTerm.toLowerCase();
+      if (
+        !bale.baleCode?.toLowerCase().includes(t) &&
+        !bale.referenceNumber?.toLowerCase().includes(t)
+      ) return false;
+    }
+    return true;
+  });
+
   const monthNames = [
     "",
     "January",
@@ -553,7 +570,40 @@ export function FactoryBaleProductMonthDetail() {
             Bales for {monthName} {year}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
+          {/* Filter bar — A3 */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search bale code or ref #..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+                data-testid="input-bale-search"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[160px]" data-testid="select-status-filter">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="IN_STOCK">In Stock</SelectItem>
+                <SelectItem value="LOADING">Loading</SelectItem>
+                <SelectItem value="SOLD">Sold</SelectItem>
+                <SelectItem value="DISPATCHED">Dispatched</SelectItem>
+                <SelectItem value="DELETED">Deleted</SelectItem>
+              </SelectContent>
+            </Select>
+            {(searchTerm || statusFilter !== "all") && (
+              <Button variant="ghost" size="sm" onClick={() => { setSearchTerm(""); setStatusFilter("all"); }} data-testid="button-clear-filters">
+                Clear
+              </Button>
+            )}
+            <span className="text-sm text-muted-foreground ml-auto">{filteredData.length} bale(s)</span>
+          </div>
+
           <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
@@ -569,7 +619,9 @@ export function FactoryBaleProductMonthDetail() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data?.map((bale) => (
+                {filteredData.map((bale) => {
+                  const isLoading = bale.status === "IN_STOCK" && bale.isInLoadingOrder;
+                  return (
                   <TableRow key={bale.id} data-testid={`row-bale-${bale.id}`}>
                     <TableCell
                       className="font-medium font-mono"
@@ -590,7 +642,7 @@ export function FactoryBaleProductMonthDetail() {
                       className="text-right font-mono"
                       data-testid={`text-weight-${bale.id}`}
                     >
-                      {formatNumber(bale.weightKg)}
+                      {formatNumber(Number(bale.weightKg))}
                     </TableCell>
                     {!hiddenCost.includes("bale_history_cost_per_kg") && (
                       <TableCell
@@ -617,26 +669,24 @@ export function FactoryBaleProductMonthDetail() {
                       </TableCell>
                     )}
                     <TableCell data-testid={`text-status-${bale.id}`}>
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {bale.status === "DELETED" || bale.status === "REMOVED" ? (
-                          <Badge variant="destructive">Deleted</Badge>
-                        ) : bale.status === "DISPATCHED" ? (
-                          <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">Dispatched</Badge>
-                        ) : (
-                          <Badge variant="secondary">{bale.status}</Badge>
-                        )}
-                        {bale.isInLoadingOrder && (
-                          <Badge variant="outline" className="text-[10px] px-1 py-0 border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 no-default-active-elevate font-normal">
-                            Loading
-                          </Badge>
-                        )}
-                      </div>
+                      {isLoading ? (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 no-default-active-elevate">
+                          Loading
+                        </Badge>
+                      ) : bale.status === "DELETED" || bale.status === "REMOVED" ? (
+                        <Badge variant="destructive">Deleted</Badge>
+                      ) : bale.status === "DISPATCHED" ? (
+                        <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">Dispatched</Badge>
+                      ) : (
+                        <Badge variant="secondary">{bale.status}</Badge>
+                      )}
                     </TableCell>
                     <TableCell data-testid={`text-date-${bale.id}`}>
                       {formatDateTime(bale.createdAt)}
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
                 {(!data || data.length === 0) && (
                   <TableRow>
                     <TableCell
@@ -653,7 +703,9 @@ export function FactoryBaleProductMonthDetail() {
           </div>
 
           <div className="md:hidden space-y-2">
-            {data?.map((bale) => (
+            {filteredData.map((bale) => {
+              const isLoading = bale.status === "IN_STOCK" && bale.isInLoadingOrder;
+              return (
               <div
                 key={bale.id}
                 className="p-3 rounded-md border text-sm"
@@ -666,12 +718,15 @@ export function FactoryBaleProductMonthDetail() {
                   >
                     {bale.baleCode}
                   </span>
-                  <Badge
-                    variant="secondary"
-                    data-testid={`text-mobile-status-${bale.id}`}
-                  >
-                    {bale.status}
-                  </Badge>
+                  {isLoading ? (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 no-default-active-elevate" data-testid={`text-mobile-status-${bale.id}`}>
+                      Loading
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" data-testid={`text-mobile-status-${bale.id}`}>
+                      {bale.status}
+                    </Badge>
+                  )}
                 </div>
                 <div className="text-xs mb-2">
                   <button
@@ -685,7 +740,7 @@ export function FactoryBaleProductMonthDetail() {
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
                     <div className="text-muted-foreground">Weight</div>
-                    <div className="font-mono">{formatNumber(bale.weightKg)} KG</div>
+                    <div className="font-mono">{formatNumber(Number(bale.weightKg))} KG</div>
                   </div>
                   {!hiddenCost.includes("bale_history_cost_per_kg") && (
                     <div>
@@ -710,13 +765,14 @@ export function FactoryBaleProductMonthDetail() {
                   {formatDateTime(bale.createdAt)}
                 </div>
               </div>
-            ))}
-            {(!data || data.length === 0) && (
+              );
+            })}
+            {filteredData.length === 0 && (
               <div
                 className="text-center text-muted-foreground py-8"
                 data-testid="text-no-data-mobile"
               >
-                No bales found for this month
+                No bales found
               </div>
             )}
           </div>

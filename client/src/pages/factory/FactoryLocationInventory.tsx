@@ -1200,7 +1200,7 @@ export default function FactoryLocationInventory() {
     .sort((a, b) => a.categoryName.localeCompare(b.categoryName))
     .map((g) => g.categoryName);
 
-  const statsBales = activeInventoryData.reduce((s, p) => s + p.baleCount, 0);
+  const statsBales = activeInventoryData.reduce((s, p) => s + p.baleCount - (p.loadingCount ?? 0), 0);
   const statsKg = activeInventoryData.reduce((s, p) => s + p.totalWeight, 0);
   const statsCostValue = activeInventoryData.reduce((s, p) => s + p.baleCount * p.productionPrice, 0);
   const statsSellValue = activeInventoryData.reduce((s, p) => s + p.baleCount * parseFloat(p.sellingPrice || "0"), 0);
@@ -1246,14 +1246,7 @@ export default function FactoryLocationInventory() {
           {prod.articleCode && <div className="text-xs text-muted-foreground font-mono mt-0.5">{prod.articleCode}</div>}
         </td>
         <td className="text-right px-3 font-mono whitespace-nowrap">
-          <div className="flex items-center justify-end gap-1.5">
-            <span>{prod.baleCount}</span>
-            {(prod.loadingCount ?? 0) > 0 && (
-              <Badge variant="outline" className="text-[10px] px-1 py-0 border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 no-default-active-elevate font-normal">
-                {prod.loadingCount} loading
-              </Badge>
-            )}
-          </div>
+          <span>{prod.baleCount - (prod.loadingCount ?? 0)}</span>
         </td>
         {proformaMode && (
           <td className="text-right px-3">
@@ -1331,12 +1324,7 @@ export default function FactoryLocationInventory() {
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-muted-foreground">Bales: </span>
-            <span className="font-mono">{prod.baleCount}</span>
-            {(prod.loadingCount ?? 0) > 0 && (
-              <Badge variant="outline" className="text-[10px] px-1 py-0 border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 no-default-active-elevate font-normal">
-                {prod.loadingCount} loading
-              </Badge>
-            )}
+            <span className="font-mono">{prod.baleCount - (prod.loadingCount ?? 0)}</span>
           </div>
           <div className="text-right"><span className="text-muted-foreground">Wt/Bale: </span><span className="font-mono">{fmt(weightPerBale)} KG</span></div>
           <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
