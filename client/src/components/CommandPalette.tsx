@@ -47,7 +47,6 @@ interface CommandPaletteProps {
   hasFactoryAccess?: boolean;
   hasPropertiesAccess?: boolean;
   isAdminOwner?: boolean;
-  hasDashboardAccess?: boolean;
   user?: any;
 }
 
@@ -235,7 +234,6 @@ export function CommandPalette({
   hasFactoryAccess = false,
   hasPropertiesAccess = false,
   isAdminOwner = false,
-  hasDashboardAccess = false,
   user,
 }: CommandPaletteProps) {
   const [internalOpen, setInternalOpen] = useState(false);
@@ -283,11 +281,8 @@ export function CommandPalette({
   );
 
   const factoryPages = useMemo(() => {
-    const dashExtra = hasDashboardAccess
-      ? [{ label: "Factory Dashboard", description: DESCRIPTIONS["/factory/dashboard"], path: "/factory/dashboard", icon: LayoutDashboard }]
-      : [];
-    return buildEntries(factoryVis.sections, [...dashExtra, ...FACTORY_EXTRAS_ALWAYS, ...FACTORY_HUB_TABS]);
-  }, [factoryVis.sections, hasDashboardAccess]);
+    return buildEntries(factoryVis.sections, [...FACTORY_EXTRAS_ALWAYS, ...FACTORY_HUB_TABS]);
+  }, [factoryVis.sections]);
 
   const propertiesPages = useMemo(
     () => buildEntries(

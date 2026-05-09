@@ -6,7 +6,6 @@ import {
   ScanLine,
   Users,
   Factory,
-  LayoutDashboard,
   BookOpen,
   Landmark,
   FileText,
@@ -79,13 +78,6 @@ interface FactoryNavSection extends NavSection {
 }
 
 export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
-  {
-    label: "Overview",
-    color: NAV_COLOR.overview,
-    items: [
-      { title: "Production Analytics", url: "/factory/production-report", icon: BarChart3 },
-    ],
-  },
   {
     label: "Operations",
     color: NAV_COLOR.operations,
@@ -184,22 +176,20 @@ export const FACTORY_NAV_PAGES: { key: string; label: string; group: string }[] 
   ...FACTORY_NAV_SECTIONS.flatMap(s =>
     s.items.map(item => ({ key: item.url.replace(/^\//, ""), label: item.title, group: s.label }))
   ),
-  { key: "factory/dashboard", label: "Dashboard", group: "Overview" },
   { key: "factory/daybook",   label: "Daybook",   group: "Other"    },
   { key: "factory/chat",      label: "Chat",      group: "Other"    },
   { key: "factory/settings",  label: "Settings",  group: "Other"    },
 ];
 
 const FACTORY_PINNED_DEFAULTS: NavItem[] = [
-  { title: "Dashboard", url: "/factory/dashboard", icon: LayoutDashboard },
-  { title: "Daybook",   url: "/factory/daybook",   icon: BookOpen        },
-  { title: "Agents",    url: "/factory/agents",    icon: UserRound       },
+  { title: "Production Analytics", url: "/factory/production-report", icon: BarChart3 },
+  { title: "Daybook",              url: "/factory/daybook",           icon: BookOpen  },
+  { title: "Agents",               url: "/factory/agents",            icon: UserRound },
 ];
 
 export function useFactoryVisibleSections(user?: any): {
   sections: FactoryNavSection[];
   isPinnedVisible: (item: NavItem) => boolean;
-  hasDashboard: boolean;
   isAdmin: boolean;
   isDeveloper: boolean;
 } {
@@ -219,10 +209,8 @@ export function useFactoryVisibleSections(user?: any): {
     enabled: !!user,
   });
 
-  const hasDashboard = !!(isAdmin || (myAccess && !myAccess.fullAccess && myAccess.pageKeys.includes("factory/dashboard")));
-
   const isPinnedVisible = (item: NavItem): boolean => {
-    if (item.url === "/factory/dashboard") return hasDashboard;
+    if (item.url === "/factory/production-report") return true;
     if (item.url === "/factory/daybook") {
       return settings?.daybookEnabled !== false && !myAccess?.hiddenCostFields?.includes("hide_tab_daybook");
     }
@@ -257,7 +245,7 @@ export function useFactoryVisibleSections(user?: any): {
       }),
     })).filter(s => s.items.length > 0);
 
-  return { sections, isPinnedVisible, hasDashboard, isAdmin, isDeveloper };
+  return { sections, isPinnedVisible, isAdmin, isDeveloper };
 }
 
 export function FactorySidebar({ user }: { user?: any }) {

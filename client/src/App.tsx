@@ -524,7 +524,6 @@ function AuthenticatedApp() {
   const hasErpAccess = !myAccess || myAccess.hasErpAccess;
   const hasFactoryAccess = !myAccess || myAccess.hasFactoryAccess;
   const isAdminOwner = user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer";
-  const hasDashboardAccess = isAdminOwner || (myAccess && !myAccess.fullAccess && myAccess.pageKeys.includes("factory/dashboard"));
 
   const handleLogout = async () => {
     try {
@@ -801,7 +800,7 @@ function AuthenticatedApp() {
   const isFactoryCompany = selectedCompany?.companyType === "factory" || selectedCompany?.companyType === "factory_v2";
   const isFactoryRoute = currentLocation.startsWith("/factory/");
 
-  const factoryDefaultPage = hasDashboardAccess ? "/factory/dashboard" : "/factory/stock-entry";
+  const factoryDefaultPage = "/factory/production-report";
 
   if (isFactoryCompany && !isFactoryRoute && currentLocation !== "/my-settings") {
     return <Redirect to={factoryDefaultPage} />;
@@ -956,7 +955,6 @@ function AuthenticatedApp() {
                   <ErrorBoundary resetKey={currentLocation}>
                   <Suspense fallback={<div className="flex items-center justify-center h-48 text-muted-foreground text-sm">Loading...</div>}>
                   <Switch>
-                    {hasDashboardAccess && <Route path="/factory/dashboard" component={FactoryDashboardIntel} />}
                     <Route path="/factory/daybook" component={FactoryDaybook} />
                     <Route path="/factory/transporters" component={FactoryTransporters} />
                     <Route path="/factory/finance"><Redirect to="/factory/workers" /></Route>
@@ -1070,7 +1068,6 @@ function AuthenticatedApp() {
           hasErpAccess={false}
           hasFactoryAccess={hasFactoryAccess}
           isAdminOwner={user?.role === "Admin" || user?.role === "Developer"}
-          hasDashboardAccess={hasDashboardAccess}
           user={user}
         />
         {leaveConfirmDialog}
@@ -1132,7 +1129,6 @@ function AuthenticatedApp() {
         hasErpAccess={hasErpAccess}
         hasFactoryAccess={false}
         isAdminOwner={user?.role === "Admin" || user?.role === "Developer"}
-        hasDashboardAccess={hasDashboardAccess}
         user={user}
       />
       {leaveConfirmDialog}
