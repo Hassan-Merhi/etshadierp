@@ -333,6 +333,29 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       // 9b. Fill remaining codes from proforma line names (last resort)
       allLines.forEach(l => { if (!productNamesMap[l.articleCode]) productNamesMap[l.articleCode] = l.productName; });
 
+      // 9c. Final fallback — look up product_name stored on factory_bales for any codes
+      //     that are still unmapped after the products-table and proforma-line lookups.
+      //     This catches bales whose article_code has no matching row in factory_bale_products
+      //     (e.g. legacy codes, renamed products, or manually-entered codes).
+      const unmappedCodes = Array.from(allCodes).filter(c => !productNamesMap[c]);
+      if (unmappedCodes.length > 0) {
+        const unmappedArr = sqlArray(unmappedCodes);
+        const baleNamesRaw = await db.execute(
+          sql`SELECT DISTINCT ON (article_code) article_code AS "articleCode", product_name AS "productName"
+              FROM factory_bales
+              WHERE company_id = ${companyId}
+                AND article_code = ANY(${unmappedArr})
+                AND product_name IS NOT NULL
+                AND product_name != ''
+              ORDER BY article_code, created_at DESC`,
+        );
+        ((baleNamesRaw as any).rows ?? (baleNamesRaw as unknown as any[])).forEach((r: any) => {
+          if (r.articleCode && r.productName && !productNamesMap[r.articleCode]) {
+            productNamesMap[r.articleCode] = r.productName;
+          }
+        });
+      }
+
       // 9. Build per-article aggregates
       const orderCountByProforma = new Map<number, number>();
       const ordersByProformaId = new Map<number, OrderRow[]>();
