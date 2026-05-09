@@ -818,6 +818,13 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
   const [statusFilter, setStatusFilter] = useState<"all" | "applied" | "pending">("all");
   const [dateFilter, setDateFilter] = useState(format(new Date(), "yyyy-MM-dd"));
 
+  // Fetch all locations accessible to this POS user so multi-location users
+  // see orders involving any of their locations (as source or destination).
+  const { data: myLocations = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ["/api/my-locations"],
+  });
+  const myLocationIds = new Set(myLocations.map((l) => l.id));
+
   const { data: allTransfers = [], isLoading } = useQuery<TransferSummary[]>({
     queryKey: ["/api/stock-transfers/list", dateFilter],
     queryFn: async () => {
@@ -836,12 +843,18 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
         const tDate = String(t.voucherDate ?? "").slice(0, 10);
         if (tDate !== dateFilter) return false;
       }
+      // Only show transfers involving at least one of the user's locations
+      if (myLocationIds.size > 0) {
+        const srcMatch = t.sourceLocationId != null && myLocationIds.has(t.sourceLocationId);
+        const dstMatch = myLocationIds.has(t.destinationLocationId);
+        if (!srcMatch && !dstMatch) return false;
+      }
       const s = search.toLowerCase().trim();
       if (!s) return true;
       return t.voucherNumber?.toLowerCase().includes(s) ||
         t.stockItemNames?.some(n => n.toLowerCase().includes(s));
     });
-  }, [allTransfers, search, statusFilter, dateFilter]);
+  }, [allTransfers, search, statusFilter, dateFilter, myLocationIds]);
 
   const openView = (voucherId: number) => {
     setViewVoucherId(voucherId);
