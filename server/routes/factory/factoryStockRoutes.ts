@@ -747,6 +747,25 @@ export function registerFactoryStockRoutes(app: Express) {
           )
         );
 
+      // Find which of these IN_STOCK bales are currently scanned into a LOADING order.
+      // V5 orders keep bales IN_STOCK during loading (unlike V2/V3 which flip to RESERVED_FOR_ORDER),
+      // so we cross-reference customer_order_bales → customer_orders to detect them.
+      const baleIds = bales.map((b) => b.id);
+      const loadingBaleIds = new Set<number>();
+      if (baleIds.length > 0) {
+        const loadingRows = await db
+          .select({ baleId: customerOrderBales.baleId })
+          .from(customerOrderBales)
+          .innerJoin(customerOrders, eq(customerOrderBales.orderId, customerOrders.id))
+          .where(
+            and(
+              eq(customerOrders.status, "LOADING"),
+              inArray(customerOrderBales.baleId, baleIds),
+            )
+          );
+        for (const r of loadingRows) loadingBaleIds.add(r.baleId);
+      }
+
       // Fetch ALL products for the company so we can also match by articleCode
       // (bales imported historically may have productId=null but articleCode set)
       const allProducts = await db.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId));
@@ -780,6 +799,7 @@ export function registerFactoryStockRoutes(app: Express) {
         totalWeight: number;
         totalCost: number;
         baleCount: number;
+        loadingCount: number;
         sellingPrice: string;
         productionPrice: number;
         referenceNumbers: string[];
@@ -796,11 +816,13 @@ export function registerFactoryStockRoutes(app: Express) {
         const categoryName = product?.categoryId ? (categoryMap.get(product.categoryId) || b.category || null) : (b.category || null);
         const categoryId = product?.categoryId || null;
         const refNum: string = (b as any).referenceNumber || "";
+        const isLoading = loadingBaleIds.has(b.id);
         if (existing) {
           existing.quantity += qty;
           existing.totalWeight += weight;
           existing.totalCost += productionPrice;
           existing.baleCount += 1;
+          if (isLoading) existing.loadingCount += 1;
           if (refNum) existing.referenceNumbers.push(refNum);
         } else {
           grouped.set(groupKey, {
@@ -813,6 +835,7 @@ export function registerFactoryStockRoutes(app: Express) {
             totalWeight: weight,
             totalCost: productionPrice,
             baleCount: 1,
+            loadingCount: isLoading ? 1 : 0,
             sellingPrice,
             productionPrice,
             referenceNumbers: refNum ? [refNum] : [],
