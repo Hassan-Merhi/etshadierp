@@ -1005,24 +1005,24 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     setWaSending(true);
     try {
       const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(printRef.current, {
+      const el = printRef.current;
+      const canvas = await html2canvas(el, {
         scale: 2,
         useCORS: true,
+        allowTaint: true,
         backgroundColor: "#0f172a",
         logging: false,
-        windowWidth: printRef.current.scrollWidth,
-        windowHeight: printRef.current.scrollHeight,
+        width: el.scrollWidth,
+        height: el.scrollHeight,
+        windowWidth: el.scrollWidth,
+        windowHeight: el.scrollHeight,
       });
       const imageBase64 = canvas.toDataURL("image/png");
       const today = new Date().toISOString().substring(0, 10);
-      const res = await apiRequest("POST", "/api/git/send-containers-whatsapp", {
+      await apiRequest("POST", "/api/git/send-containers-whatsapp", {
         imageBase64,
-        fileName: `Containers_${today}.png`,
+        fileName: `ContainersOTW_${today}.png`,
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Failed" }));
-        throw new Error(err.message || "Failed to send");
-      }
       toast({ title: "Sent", description: "Container report sent to WhatsApp group." });
     } catch (err: any) {
       toast({ title: "Failed to send", description: err.message, variant: "destructive" });
@@ -1569,57 +1569,95 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
         sessionCompanyId={sessionCompanyId}
       />
 
-      {/* ── Hidden print template for WhatsApp image capture ── */}
+      {/* ── Hidden Full-HD print template for WhatsApp image capture ── */}
       <div
         ref={printRef}
         style={{
           position: "absolute",
           left: "-9999px",
           top: 0,
-          backgroundColor: "#0f172a",
-          color: "#f1f5f9",
-          fontFamily: "system-ui, -apple-system, sans-serif",
-          fontSize: "12px",
-          width: "1280px",
-          padding: "16px",
+          backgroundColor: "#0d1117",
+          color: "#e6edf3",
+          fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
+          fontSize: "14px",
+          width: "1920px",
+          padding: "32px 36px 28px",
           boxSizing: "border-box",
         }}
         aria-hidden="true"
       >
-        {/* Header */}
-        <div style={{ marginBottom: "12px" }}>
-          <div style={{ fontSize: "18px", fontWeight: 700, color: "#f1f5f9" }}>
-            Containers OTW
+        {/* ── Header bar ── */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "24px",
+          paddingBottom: "16px",
+          borderBottom: "2px solid #21262d",
+        }}>
+          <div>
+            <div style={{ fontSize: "26px", fontWeight: 800, color: "#e6edf3", letterSpacing: "-0.5px" }}>
+              HMD International Group
+            </div>
+            <div style={{ fontSize: "15px", fontWeight: 500, color: "#3b82f6", marginTop: "3px", letterSpacing: "0.3px" }}>
+              CONTAINERS ON THE WAY — LIVE TRACKING REPORT
+            </div>
           </div>
-          <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
-            {filtered.length} container{filtered.length !== 1 ? "s" : ""} &nbsp;·&nbsp;
-            {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-            {" "}
-            {new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: "22px", fontWeight: 700, color: "#f1f5f9" }}>
+              {filtered.length} Container{filtered.length !== 1 ? "s" : ""}
+            </div>
+            <div style={{ fontSize: "13px", color: "#8b949e", marginTop: "2px" }}>
+              {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+              {" · "}
+              {new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}
+            </div>
           </div>
         </div>
 
-        {/* Table */}
+        {/* ── Table ── */}
         <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
           <colgroup>
-            <col style={{ width: "28px" }} />
+            <col style={{ width: "40px" }} />
+            <col style={{ width: "160px" }} />
+            <col style={{ width: "160px" }} />
+            <col style={{ width: "140px" }} />
             <col style={{ width: "110px" }} />
+            <col style={{ width: "180px" }} />
             <col style={{ width: "100px" }} />
-            <col style={{ width: "90px" }} />
             <col style={{ width: "80px" }} />
             <col style={{ width: "120px" }} />
-            <col style={{ width: "65px" }} />
-            <col style={{ width: "55px" }} />
-            <col style={{ width: "80px" }} />
-            <col style={{ width: "110px" }} />
-            <col style={{ width: "90px" }} />
+            <col style={{ width: "160px" }} />
+            <col style={{ width: "120px" }} />
             <col />
           </colgroup>
           <thead>
-            <tr style={{ backgroundColor: "#1e3a5f" }}>
-              {["#", "Container #", "Supplier", "Shop", "Truck #", "Location", "ETA", "Delayed", "Status", "Transporter", "Agent", "Notes"].map((h) => (
-                <th key={h} style={{ padding: "6px 4px", textAlign: "left", color: "#93c5fd", fontWeight: 600, fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>
-                  {h}
+            <tr style={{ backgroundColor: "#161b22" }}>
+              {[
+                { label: "#",            align: "center" as const },
+                { label: "Container #",  align: "left"   as const },
+                { label: "Supplier",     align: "left"   as const },
+                { label: "Shop",         align: "left"   as const },
+                { label: "Truck #",      align: "left"   as const },
+                { label: "Location",     align: "left"   as const },
+                { label: "ETA",          align: "left"   as const },
+                { label: "Delay",        align: "center" as const },
+                { label: "Status",       align: "left"   as const },
+                { label: "Transporter",  align: "left"   as const },
+                { label: "Agent",        align: "left"   as const },
+                { label: "Notes",        align: "left"   as const },
+              ].map((h) => (
+                <th key={h.label} style={{
+                  padding: "10px 8px",
+                  textAlign: h.align,
+                  color: "#58a6ff",
+                  fontWeight: 700,
+                  fontSize: "12px",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.6px",
+                  borderBottom: "2px solid #30363d",
+                }}>
+                  {h.label}
                 </th>
               ))}
             </tr>
@@ -1634,35 +1672,59 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
               }
               let idx = 0;
               return groups.map((g) => [
-                <tr key={`grp-${g.company}`} style={{ backgroundColor: "#fbbf24" }}>
-                  <td colSpan={12} style={{ padding: "5px 6px", fontWeight: 700, color: "#0f172a", fontSize: "11px" }}>
+                /* Company group header */
+                <tr key={`grp-${g.company}`}>
+                  <td colSpan={12} style={{
+                    padding: "8px 10px",
+                    backgroundColor: "#1f2937",
+                    fontWeight: 700,
+                    color: "#fbbf24",
+                    fontSize: "13px",
+                    letterSpacing: "0.3px",
+                    borderTop: "1px solid #374151",
+                    borderBottom: "1px solid #374151",
+                  }}>
                     {g.company}
+                    <span style={{ fontWeight: 400, color: "#9ca3af", marginLeft: "8px", fontSize: "12px" }}>
+                      ({g.rows.length} container{g.rows.length !== 1 ? "s" : ""})
+                    </span>
                   </td>
                 </tr>,
+                /* Data rows */
                 ...g.rows.map((c, i) => {
                   idx++;
-                  const rowBg = i % 2 === 0 ? "#0f172a" : "#1e293b";
+                  const rowBg = i % 2 === 0 ? "#0d1117" : "#161b22";
                   const etaDate = c.eta ? new Date(c.eta) : null;
-                  let delayed = "";
+                  let delayDays = 0;
                   if (etaDate && !isNaN(etaDate.getTime()) && !c.numberPlate) {
-                    const t = new Date(); t.setHours(0,0,0,0);
-                    const d = Math.floor((t.getTime() - etaDate.getTime()) / 86400000);
-                    if (d > 0) delayed = `+${d}d`;
+                    const t = new Date(); t.setHours(0, 0, 0, 0);
+                    delayDays = Math.floor((t.getTime() - etaDate.getTime()) / 86400000);
                   }
+                  const delayed = delayDays > 0 ? `+${delayDays}d` : "";
+
+                  const cell: React.CSSProperties = {
+                    padding: "9px 8px",
+                    fontSize: "13px",
+                    overflow: "hidden",
+                    whiteSpace: "nowrap",
+                    borderBottom: "1px solid #21262d",
+                    color: "#e6edf3",
+                  };
+
                   return (
                     <tr key={c.id} style={{ backgroundColor: rowBg }}>
-                      <td style={{ padding: "4px 4px", color: "#94a3b8", fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{idx}</td>
-                      <td style={{ padding: "4px 4px", fontFamily: "monospace", fontWeight: 600, fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{c.containerNumber}</td>
-                      <td style={{ padding: "4px 4px", fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{c.supplierName ?? "—"}</td>
-                      <td style={{ padding: "4px 4px", fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{c.shopName ?? "—"}</td>
-                      <td style={{ padding: "4px 4px", fontFamily: "monospace", fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{c.numberPlate ?? "—"}</td>
-                      <td style={{ padding: "4px 4px", fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{c.trackingLocation ?? "—"}</td>
-                      <td style={{ padding: "4px 4px", fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{c.eta ? c.eta.substring(0,10) : "—"}</td>
-                      <td style={{ padding: "4px 4px", fontSize: "10px", color: delayed ? "#f87171" : "#94a3b8", fontWeight: delayed ? 600 : 400, overflow: "hidden", whiteSpace: "nowrap" }}>{delayed || "—"}</td>
-                      <td style={{ padding: "4px 4px", fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{c.status}</td>
-                      <td style={{ padding: "4px 4px", fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{c.transporter ?? "—"}</td>
-                      <td style={{ padding: "4px 4px", fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{c.agent ?? "—"}</td>
-                      <td style={{ padding: "4px 4px", fontSize: "10px", color: "#94a3b8", overflow: "hidden", whiteSpace: "nowrap" }}>{c.trackingDescription ?? "—"}</td>
+                      <td style={{ ...cell, textAlign: "center", color: "#6e7681", fontSize: "12px" }}>{idx}</td>
+                      <td style={{ ...cell, fontFamily: "monospace", fontWeight: 700, color: "#79c0ff", fontSize: "13px" }}>{c.containerNumber}</td>
+                      <td style={{ ...cell }}>{c.supplierName ?? "—"}</td>
+                      <td style={{ ...cell }}>{c.shopName ?? "—"}</td>
+                      <td style={{ ...cell, fontFamily: "monospace", color: "#d2a8ff" }}>{c.numberPlate ?? "—"}</td>
+                      <td style={{ ...cell, color: "#7ee787" }}>{c.trackingLocation ?? "—"}</td>
+                      <td style={{ ...cell, color: "#8b949e" }}>{c.eta ? c.eta.substring(0, 10) : "—"}</td>
+                      <td style={{ ...cell, textAlign: "center", color: delayed ? "#f85149" : "#6e7681", fontWeight: delayed ? 700 : 400, fontSize: "13px" }}>{delayed || "—"}</td>
+                      <td style={{ ...cell }}>{c.status}</td>
+                      <td style={{ ...cell, color: "#ffa657" }}>{c.transporter ?? "—"}</td>
+                      <td style={{ ...cell }}>{c.agent ?? "—"}</td>
+                      <td style={{ ...cell, color: "#8b949e" }}>{c.trackingDescription ?? "—"}</td>
                     </tr>
                   );
                 }),
@@ -1670,6 +1732,23 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
             })()}
           </tbody>
         </table>
+
+        {/* ── Footer ── */}
+        <div style={{
+          marginTop: "20px",
+          paddingTop: "12px",
+          borderTop: "1px solid #21262d",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}>
+          <div style={{ fontSize: "11px", color: "#6e7681" }}>
+            HMD International Group — ERP System — Auto-generated report
+          </div>
+          <div style={{ fontSize: "11px", color: "#6e7681" }}>
+            {new Date().toISOString().replace("T", " ").substring(0, 16)} UTC
+          </div>
+        </div>
       </div>
 
     </div>
