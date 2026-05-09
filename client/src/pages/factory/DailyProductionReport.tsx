@@ -69,6 +69,34 @@ function fmtKg(n: number | null | undefined) {
   const r = Math.round(n * 10) / 10;
   return `${r.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} kg`;
 }
+function fmtSalary(n: number): string {
+  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function daysInCalendarMonth(isoDate: string): number {
+  const [yr, mo] = isoDate.substring(0, 7).split("-").map(Number);
+  return new Date(yr, mo, 0).getDate();
+}
+function computeWorkerExpectedSalary(
+  worker: { baseSalary: string; salaryType: string; attendance: Record<string, string> },
+  dates: { date: string; isWeekend: boolean }[],
+): number {
+  if (worker.salaryType !== "Monthly") return 0;
+  const monthly = parseFloat(worker.baseSalary || "0");
+  if (!monthly || !dates.length) return 0;
+  let earned = 0;
+  for (const d of dates) {
+    const dailyRate = monthly / daysInCalendarMonth(d.date);
+    if (d.isWeekend) {
+      earned += dailyRate;
+    } else {
+      const status = worker.attendance[d.date];
+      if (status === "Present") earned += dailyRate;
+      else if (status === "HalfDay") earned += dailyRate * 0.5;
+      else if (status === "Leave") earned += dailyRate;
+    }
+  }
+  return earned;
+}
 
 type Preset = "today" | "yesterday" | "month" | "lastmonth" | "year" | "alltime" | "custom";
 
@@ -836,6 +864,33 @@ export default function DailyProductionReport() {
     staleTime: 30_000,
   });
 
+  const { data: attendanceData } = useQuery<{
+    dates: { date: string; isWeekend: boolean }[];
+    workers: { baseSalary: string; salaryType: string; attendance: Record<string, string>; paidSalary: string }[];
+  }>({
+    queryKey: ["/api/factory/workers/attendance-report", from, to],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/factory/workers/attendance-report?startDate=${from}&endDate=${to}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) throw new Error("Failed to load attendance");
+      return res.json();
+    },
+    enabled: !!from && !!to,
+  });
+
+  const salaryKpi = useMemo(() => {
+    if (!attendanceData || !attendanceData.dates.length) return null;
+    let totalExpected = 0;
+    let totalPaid = 0;
+    for (const w of attendanceData.workers) {
+      totalExpected += computeWorkerExpectedSalary(w, attendanceData.dates);
+      totalPaid     += parseFloat(w.paidSalary || "0");
+    }
+    return { totalExpected, totalPaid, totalRemaining: totalExpected - totalPaid };
+  }, [attendanceData]);
+
   const presets: { key: Preset; label: string }[] = [
     { key: "today", label: "Today" },
     { key: "yesterday", label: "Yesterday" },
@@ -1041,6 +1096,47 @@ export default function DailyProductionReport() {
           )}
         </CardContent>
       </Card>
+
+      {/* ── Salary KPIs ── */}
+      {(salaryKpi || preset !== "alltime") && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Card data-testid="card-expected-salary">
+            <CardContent className="py-3 px-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Expected Salary</p>
+              {salaryKpi ? (
+                <p className="text-xl font-bold tabular-nums text-foreground" data-testid="text-expected-salary">
+                  {fmtSalary(salaryKpi.totalExpected)}
+                </p>
+              ) : (
+                <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="border-amber-300 dark:border-amber-700" data-testid="card-remaining-salary">
+            <CardContent className="py-3 px-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Remaining Salary</p>
+              {salaryKpi ? (
+                <p
+                  className={
+                    salaryKpi.totalRemaining < 0
+                      ? "text-xl font-bold tabular-nums text-blue-600 dark:text-blue-400"
+                      : salaryKpi.totalRemaining === 0
+                        ? "text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400"
+                        : "text-xl font-bold tabular-nums text-amber-600 dark:text-amber-400"
+                  }
+                  data-testid="text-remaining-salary"
+                >
+                  {salaryKpi.totalRemaining < 0
+                    ? `Overpaid ${fmtSalary(Math.abs(salaryKpi.totalRemaining))}`
+                    : fmtSalary(salaryKpi.totalRemaining)}
+                </p>
+              ) : (
+                <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* ── Four colored boxes ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
