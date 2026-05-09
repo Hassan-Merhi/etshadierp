@@ -14,7 +14,11 @@ import {
 } from "../../shared/schema";
 import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
-import { trackOneContainerById } from "../services/containerTrackingService";
+import {
+  trackOneContainerById,
+  trackAllEnabledNow,
+  setBulkTrackingEnabled,
+} from "../services/containerTrackingService";
 import { testConnection } from "../lib/parcelsAppClient";
 
 const ALLOWED_ROLES = ["Admin", "Developer", "Owner"] as const;
@@ -101,6 +105,46 @@ export function registerContainerTrackingRoutes(app: Express) {
       res.json(events);
     } catch (err: any) {
       res.status(500).json({ message: err?.message ?? "Failed to load events" });
+    }
+  });
+
+  // POST /api/container-tracking/bulk-settings — enable or disable tracking for all active containers
+  app.post("/api/container-tracking/bulk-settings", requireAuth, async (req: Request, res: Response) => {
+    if (!requireAllowedRole(req, res)) return;
+
+    const { trackingEnabled } = req.body;
+    if (typeof trackingEnabled !== "boolean") {
+      res.status(400).json({ message: "trackingEnabled must be a boolean" });
+      return;
+    }
+
+    try {
+      const updated = await setBulkTrackingEnabled(trackingEnabled);
+      res.json({ updated, trackingEnabled });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Bulk update failed" });
+    }
+  });
+
+  // POST /api/container-tracking/bulk-track-now — immediately trigger tracking for all enabled containers
+  app.post("/api/container-tracking/bulk-track-now", requireAuth, async (req: Request, res: Response) => {
+    if (!requireAllowedRole(req, res)) return;
+
+    if (!process.env.PARCELSAPP_API_KEY) {
+      res.status(400).json({ message: "PARCELSAPP_API_KEY is not configured" });
+      return;
+    }
+
+    try {
+      const queued = await trackAllEnabledNow();
+      res.json({
+        queued,
+        message: queued === 0
+          ? "No containers have auto-tracking enabled."
+          : `Tracking started for ${queued} container${queued !== 1 ? "s" : ""}. Results will appear shortly.`,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Bulk track failed" });
     }
   });
 

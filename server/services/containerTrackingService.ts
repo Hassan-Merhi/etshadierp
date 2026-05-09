@@ -92,6 +92,60 @@ export async function trackDueContainers(): Promise<void> {
 }
 
 /**
+ * Enable or disable auto-tracking for all non-inactive containers.
+ * Returns the number of rows updated.
+ */
+export async function setBulkTrackingEnabled(enabled: boolean): Promise<number> {
+  const result = await db
+    .update(containers)
+    .set({ trackingEnabled: enabled })
+    .where(notInArray(containers.status, [...INACTIVE_STATUSES]))
+    .returning({ id: containers.id });
+  return result.length;
+}
+
+/**
+ * Immediately trigger tracking for every non-inactive container that has
+ * trackingEnabled = true. Bypasses the normal 4-hour cooldown.
+ * Starts tracking in the background and returns the count right away.
+ */
+export async function trackAllEnabledNow(): Promise<number> {
+  if (!process.env.PARCELSAPP_API_KEY) return 0;
+
+  const rows = await db
+    .select({
+      id: containers.id,
+      containerNumber: containers.containerNumber,
+      trackingCarrierHint: containers.trackingCarrierHint,
+    })
+    .from(containers)
+    .where(
+      and(
+        eq(containers.trackingEnabled, true),
+        notInArray(containers.status, [...INACTIVE_STATUSES]),
+      ),
+    );
+
+  if (rows.length === 0) return 0;
+
+  // Fire and forget — caller gets the count back immediately
+  (async () => {
+    console.log(`[BulkTracking] Starting manual run for ${rows.length} containers…`);
+    for (const row of rows) {
+      try {
+        await trackOneContainer(row.id, row.containerNumber, row.trackingCarrierHint ?? undefined);
+        await sleep(2_000);
+      } catch (err: any) {
+        console.error(`[BulkTracking] Error tracking ${row.containerNumber}:`, err?.message);
+      }
+    }
+    console.log(`[BulkTracking] Manual run complete for ${rows.length} containers.`);
+  })().catch((err: any) => console.error("[BulkTracking] Unexpected error:", err?.message));
+
+  return rows.length;
+}
+
+/**
  * Manually trigger tracking for a single container by ID.
  * Used by the "Track Now" API endpoint.
  * Returns a summary of the result.

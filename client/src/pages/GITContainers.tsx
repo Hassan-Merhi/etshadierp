@@ -869,6 +869,7 @@ export default function GITContainers() {
   const [drawerContainer, setDrawerContainer] = useState<EnrichedContainerRow | null>(null);
   const [importResult, setImportResult] = useState<{ updated: number; skipped: number; notFound: number; errors: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
 
   const role = user?.role;
   const isAllowed = !!role && ["Admin", "Developer", "Owner"].includes(role);
@@ -919,6 +920,49 @@ export default function GITContainers() {
     importMutation.mutate(file);
     e.target.value = "";
   }
+
+  const bulkEnableMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await apiRequest("POST", "/api/container-tracking/bulk-settings", { trackingEnabled: enabled });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Failed" }));
+        throw new Error(err.message || "Failed");
+      }
+      return res.json() as Promise<{ updated: number; trackingEnabled: boolean }>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [queryUrl] });
+      toast({
+        title: data.trackingEnabled
+          ? `Auto-tracking enabled for ${data.updated} containers`
+          : `Auto-tracking disabled for ${data.updated} containers`,
+      });
+    },
+    onError: (err: any) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
+  });
+
+  const bulkTrackMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/container-tracking/bulk-track-now", {});
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Failed" }));
+        throw new Error(err.message || "Failed");
+      }
+      return res.json() as Promise<{ queued: number; message: string }>;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: data.queued === 0 ? "No containers to track" : `Tracking started`,
+        description: data.message,
+      });
+      if (data.queued > 0) {
+        setTimeout(() => queryClient.invalidateQueries({ queryKey: [queryUrl] }), 20_000);
+      }
+    },
+    onError: (err: any) => toast({ title: "Track All failed", description: err.message, variant: "destructive" }),
+  });
+
+  const trackingEnabledCount = allContainers.filter((c) => c.trackingEnabled).length;
 
   const filtered = useMemo(() => {
     return allContainers.filter((c) => {
@@ -1149,6 +1193,53 @@ export default function GITContainers() {
             )}
             Import Excel
           </Button>
+
+          {/* ── Bulk tracking controls ── */}
+          {isAllowed && (
+            <>
+              <div className="w-px h-6 bg-border hidden sm:block self-center" />
+              <Button
+                variant="outline"
+                size="default"
+                onClick={() => bulkEnableMutation.mutate(trackingEnabledCount < allContainers.length)}
+                disabled={bulkEnableMutation.isPending || allContainers.length === 0}
+                data-testid="button-bulk-enable-tracking"
+                title={
+                  trackingEnabledCount === allContainers.length && allContainers.length > 0
+                    ? "Disable auto-tracking for all active containers"
+                    : "Enable auto-tracking for all active containers"
+                }
+              >
+                {bulkEnableMutation.isPending
+                  ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  : <Satellite className="h-4 w-4 mr-1" />}
+                {trackingEnabledCount === allContainers.length && allContainers.length > 0
+                  ? "Disable All Tracking"
+                  : `Enable All Tracking`}
+                {allContainers.length > 0 && (
+                  <span className="ml-1 text-xs text-muted-foreground">
+                    ({trackingEnabledCount}/{allContainers.length})
+                  </span>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="default"
+                onClick={() => bulkTrackMutation.mutate()}
+                disabled={bulkTrackMutation.isPending || trackingEnabledCount === 0}
+                data-testid="button-bulk-track-now"
+                title="Immediately pull tracking updates for all auto-tracking containers, instead of waiting for the automatic 6-hour cycle"
+              >
+                {bulkTrackMutation.isPending
+                  ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  : <RefreshCw className="h-4 w-4 mr-1" />}
+                Track All Now
+                {trackingEnabledCount > 0 && (
+                  <span className="ml-1 text-xs text-muted-foreground">({trackingEnabledCount})</span>
+                )}
+              </Button>
+            </>
+          )}
         </div>
 
         {/* ── Expandable Filters ── */}
