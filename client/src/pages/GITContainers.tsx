@@ -38,6 +38,13 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Ship,
   Truck,
   Package,
@@ -837,6 +844,7 @@ export default function GITContainers() {
 
   const role = user?.role;
   const isAllowed = !!role && ["Admin", "Developer", "Owner"].includes(role);
+  const isDevMode = import.meta.env.DEV;
 
   const queryUrl = allCompanies
     ? "/api/git/containers?allCompanies=true"
@@ -1124,17 +1132,7 @@ export default function GITContainers() {
             <ChevronDown className={cn("h-3.5 w-3.5 ml-1 transition-transform", showFilters && "rotate-180")} />
           </Button>
 
-          {/* Excel import controls */}
-          <a
-            href="/api/git/containers/import-template.xlsx"
-            download
-            data-testid="link-download-template"
-          >
-            <Button variant="outline" size="default" type="button">
-              <Download className="h-4 w-4 mr-1" />
-              Template
-            </Button>
-          </a>
+          {/* Hidden file input for Excel import — always present so the ref works */}
           <input
             ref={fileInputRef}
             type="file"
@@ -1143,66 +1141,69 @@ export default function GITContainers() {
             onChange={handleFileChange}
             data-testid="input-import-excel"
           />
-          <Button
-            variant="outline"
-            size="default"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importMutation.isPending}
-            data-testid="button-import-excel"
-          >
-            {importMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-            ) : (
-              <Upload className="h-4 w-4 mr-1" />
-            )}
-            Import Excel
-          </Button>
 
-          {/* ── Bulk tracking controls ── */}
-          {isAllowed && (
-            <>
-              <div className="w-px h-6 bg-border hidden sm:block self-center" />
-              <Button
-                variant="outline"
-                size="default"
-                onClick={() => bulkEnableMutation.mutate(trackingEnabledCount < allContainers.length)}
-                disabled={bulkEnableMutation.isPending || allContainers.length === 0}
-                data-testid="button-bulk-enable-tracking"
-                title={
-                  trackingEnabledCount === allContainers.length && allContainers.length > 0
-                    ? "Disable auto-tracking for all active containers"
-                    : "Enable auto-tracking for all active containers"
-                }
-              >
-                {bulkEnableMutation.isPending
-                  ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  : <Satellite className="h-4 w-4 mr-1" />}
-                {trackingEnabledCount === allContainers.length && allContainers.length > 0
-                  ? "Disable All Tracking"
-                  : `Enable All Tracking`}
-                {allContainers.length > 0 && (
-                  <span className="ml-1 text-xs text-muted-foreground">
-                    ({trackingEnabledCount}/{allContainers.length})
-                  </span>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                size="default"
-                onClick={() => bulkTrackMutation.mutate()}
-                disabled={bulkTrackMutation.isPending || allContainers.length === 0}
-                data-testid="button-bulk-track-now"
-                title="Immediately pull tracking updates for all auto-tracking containers, instead of waiting for the automatic 6-hour cycle"
-              >
-                {bulkTrackMutation.isPending
-                  ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  : <RefreshCw className="h-4 w-4 mr-1" />}
-                Track All Now
-                {trackingEnabledCount > 0 && (
-                  <span className="ml-1 text-xs text-muted-foreground">({trackingEnabledCount})</span>
-                )}
-              </Button>
-            </>
+          {/* ── Actions dropdown — dev mode only ── */}
+          {isDevMode && isAllowed && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="default" data-testid="button-actions-menu">
+                  Actions
+                  <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem asChild>
+                  <a
+                    href="/api/git/containers/import-template.xlsx"
+                    download
+                    className="flex items-center gap-2 cursor-pointer"
+                    data-testid="link-download-template"
+                  >
+                    <Download className="h-4 w-4" />
+                    Template
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={importMutation.isPending}
+                  data-testid="button-import-excel"
+                  className="gap-2"
+                >
+                  {importMutation.isPending
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <Upload className="h-4 w-4" />}
+                  Import Excel
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => bulkEnableMutation.mutate(trackingEnabledCount < allContainers.length)}
+                  disabled={bulkEnableMutation.isPending || allContainers.length === 0}
+                  data-testid="button-bulk-enable-tracking"
+                  className="gap-2"
+                >
+                  {bulkEnableMutation.isPending
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <Satellite className="h-4 w-4" />}
+                  {trackingEnabledCount === allContainers.length && allContainers.length > 0
+                    ? `Disable All Tracking (${trackingEnabledCount}/${allContainers.length})`
+                    : `Enable All Tracking (${trackingEnabledCount}/${allContainers.length})`}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => bulkTrackMutation.mutate()}
+                  disabled={bulkTrackMutation.isPending || allContainers.length === 0}
+                  data-testid="button-bulk-track-now"
+                  className="gap-2"
+                >
+                  {bulkTrackMutation.isPending
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <RefreshCw className="h-4 w-4" />}
+                  Track All Now
+                  {trackingEnabledCount > 0 && (
+                    <span className="text-xs text-muted-foreground ml-auto">({trackingEnabledCount})</span>
+                  )}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
 
