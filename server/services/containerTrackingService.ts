@@ -105,8 +105,9 @@ export async function setBulkTrackingEnabled(enabled: boolean): Promise<number> 
 }
 
 /**
- * Immediately trigger tracking for every non-inactive container that has
- * trackingEnabled = true. Bypasses the normal 4-hour cooldown.
+ * Immediately trigger tracking for every non-inactive container.
+ * Bypasses the normal 4-hour cooldown and ignores the trackingEnabled flag —
+ * "Track All Now" is an explicit manual override that covers all active containers.
  * Starts tracking in the background and returns the count right away.
  */
 export async function trackAllEnabledNow(): Promise<number> {
@@ -120,10 +121,7 @@ export async function trackAllEnabledNow(): Promise<number> {
     })
     .from(containers)
     .where(
-      and(
-        eq(containers.trackingEnabled, true),
-        notInArray(containers.status, [...INACTIVE_STATUSES]),
-      ),
+      notInArray(containers.status, [...INACTIVE_STATUSES]),
     );
 
   if (rows.length === 0) return 0;
@@ -253,8 +251,7 @@ async function trackOneContainer(
   await saveTrackingEvents(containerId, shipment);
 
   // Build the update — always update read-only tracking display fields;
-  // update eta only when the API provides one.
-  // NOTE: trackingLocation and trackingDescription are manually entered by users — never overwrite them.
+  // update eta and location when the API provides them.
   const updateSet: Record<string, unknown> = {
     trackingLastCheckedAt: now,
     trackingLastStatus: lastStatus,
@@ -268,6 +265,12 @@ async function trackOneContainer(
   if (estimatedDeliveryDate) {
     updateSet.eta = estimatedDeliveryDate;
     updateSet.etaSource = "api";
+  }
+
+  // Also push the API-derived location into the main visible Location column
+  // so users see it in the table without opening the drawer.
+  if (lastLocation) {
+    updateSet.trackingLocation = lastLocation;
   }
 
   // Update container tracking fields
