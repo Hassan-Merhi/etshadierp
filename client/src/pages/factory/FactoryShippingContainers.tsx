@@ -868,6 +868,7 @@ export default function FactoryShippingContainers() {
   const [waRowId, setWaRowId] = useState<number | null>(null);
   const [doneExpanded, setDoneExpanded] = useState(false);
   const [pendingDoneId, setPendingDoneId] = useState<number | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
   // ── Data ──────────────────────────────────────────────────────────────────────
   const { data: rows = [], isLoading } = useQuery<ShippingRow[]>({
@@ -913,6 +914,15 @@ export default function FactoryShippingContainers() {
       toast({ title: "Restored to active" });
     },
     onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteRowMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `${LIST_KEY}/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [LIST_KEY] });
+      toast({ title: "Container record deleted" });
+    },
+    onError: (e: any) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
   });
 
   // ── Filtering ─────────────────────────────────────────────────────────────────
@@ -1148,16 +1158,26 @@ export default function FactoryShippingContainers() {
                       </Button>
                     </TableCell>
 
-                    {/* Done */}
+                    {/* Done + Delete */}
                     <TableCell>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setPendingDoneId(r.id)}
-                        data-testid={`button-mark-done-${r.id}`}
-                      >
-                        <Check className="h-3.5 w-3.5 mr-1" /> Done
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setPendingDoneId(r.id)}
+                          data-testid={`button-mark-done-${r.id}`}
+                        >
+                          <Check className="h-3.5 w-3.5 mr-1" /> Done
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setPendingDeleteId(r.id)}
+                          data-testid={`button-delete-row-${r.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -1228,6 +1248,14 @@ export default function FactoryShippingContainers() {
                             >
                               <RotateCcw className="h-3.5 w-3.5 mr-1" /> Restore
                             </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setPendingDeleteId(r.id)}
+                              data-testid={`button-delete-done-${r.id}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1257,6 +1285,33 @@ export default function FactoryShippingContainers() {
         onClose={() => setWaRowId(null)}
         onMarkDone={(id, markWaSent) => doneMutation.mutate({ id, markWaSent })}
       />
+
+      {/* Confirm delete */}
+      <AlertDialog open={!!pendingDeleteId} onOpenChange={(v) => { if (!v) setPendingDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the shipping container record and all its attached documents. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground"
+              onClick={() => {
+                if (pendingDeleteId) {
+                  deleteRowMutation.mutate(pendingDeleteId);
+                  setPendingDeleteId(null);
+                }
+              }}
+              data-testid="button-confirm-delete-row"
+            >
+              Yes, Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Confirm before marking done */}
       <AlertDialog open={!!pendingDoneId} onOpenChange={(v) => { if (!v) setPendingDoneId(null); }}>

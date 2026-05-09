@@ -339,6 +339,40 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
     }
   });
 
+  // ── DELETE a row (hard delete — also removes its documents) ──────────────────
+  app.delete("/api/factory/shipping-container-rows/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+
+      const [existing] = await db
+        .select({ id: factoryShippingContainerRows.id })
+        .from(factoryShippingContainerRows)
+        .where(and(
+          eq(factoryShippingContainerRows.id, id),
+          eq(factoryShippingContainerRows.companyId, companyId),
+        ));
+      if (!existing) return res.status(404).json({ message: "Row not found" });
+
+      // Remove attached documents first (FK constraint)
+      await db
+        .delete(factoryShippingContainerDocuments)
+        .where(eq(factoryShippingContainerDocuments.scrId, id));
+
+      await db
+        .delete(factoryShippingContainerRows)
+        .where(eq(factoryShippingContainerRows.id, id));
+
+      res.json({ ok: true });
+    } catch (error: any) {
+      console.error("Error deleting shipping container row:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // ── GET documents for a row ───────────────────────────────────────────────────
   app.get("/api/factory/shipping-container-rows/:id/documents", requireAuth, async (req: any, res: any) => {
     try {
