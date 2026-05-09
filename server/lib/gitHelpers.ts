@@ -6,8 +6,8 @@
  */
 
 import { db } from "../db";
-import { containers, companies, userCompanyRoles, suppliers } from "../../shared/schema";
-import { and, eq, inArray } from "drizzle-orm";
+import { containers, companies, userCompanyRoles, suppliers, purchaseOrders, containerCharges } from "../../shared/schema";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 // ── Status constants ──────────────────────────────────────────────────────────
 
@@ -261,7 +261,11 @@ export async function fetchActiveContainers(
       supplierName: suppliers.legalName,
       status: containers.status,
       importDate: containers.importDate,
-      grandTotal: containers.grandTotal,
+      grandTotal: sql<string>`COALESCE(
+        (SELECT COALESCE(SUM(po.items_total::numeric), 0) FROM purchase_orders po WHERE po.container_id = ${containers.id})
+        + (SELECT COALESCE(SUM(cc.amount::numeric), 0) FROM container_charges cc WHERE cc.container_id = ${containers.id}),
+        0
+      )::text`,
       itemName: containers.itemName,
       shopName: containers.shopName,
       eta: containers.eta,

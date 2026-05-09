@@ -519,9 +519,11 @@ export default function ContainerDetail() {
   const { container, pos, charges } = containerData;
   const supplier = suppliers.find((s: any) => s.id === container.supplierId);
 
-  const itemsTotal = parseFloat(container.itemsTotal || "0");
-  const chargesTotal = parseFloat(container.chargesTotal || "0");
-  const grandTotal = parseFloat(container.grandTotal || "0");
+  // Compute totals live from the actual PO and charges data so they are
+  // always accurate, even when the stored container totals are stale.
+  const itemsTotal = pos.reduce((sum: number, po: any) => sum + parseFloat(po.itemsTotal || "0"), 0);
+  const chargesTotal = charges.reduce((sum: number, c: any) => sum + parseFloat(c.amount || "0"), 0);
+  const grandTotal = itemsTotal + chargesTotal;
   
   // Calculate total bales from all line items
   const totalBales = pos.reduce((total: number, po: any) => {
