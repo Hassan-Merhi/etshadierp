@@ -115,17 +115,22 @@ export default function FactoryBaleProductHistory() {
   });
   const hiddenCost = myAccess?.hiddenCostFields ?? [];
 
-  const { data, isLoading } = useQuery<BaleProductHistoryResponse>({
+  const { data, isLoading, isError } = useQuery<BaleProductHistoryResponse>({
     queryKey: ["/api/factory/bale-product-history", productId, locationId, { year: selectedYear }],
     queryFn: async () => {
       const response = await fetch(
         `/api/factory/bale-product-history/${productId}/${locationId}?year=${selectedYear}`,
         { credentials: "include" }
       );
-      if (!response.ok) throw new Error("Failed to fetch");
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ message: "Failed to load" }));
+        throw new Error(err.message || "Failed to load");
+      }
       return response.json();
     },
     enabled: parseInt(productId) > 0 && parseInt(locationId) > 0,
+    retry: false,
+    staleTime: 60 * 1000,
   });
 
   const years = [];
@@ -166,6 +171,31 @@ export default function FactoryBaleProductHistory() {
       </div>
     );
   }
+
+  if (isError) {
+    return (
+      <div className="container mx-auto p-3 sm:p-6 space-y-4">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/factory/location-inventory")}
+            data-testid="button-back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <PageHeader title="Bale Stock History" />
+        </div>
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground" data-testid="text-error-state">
+            Unable to load bale history. The product or location may not exist for this company.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const hasAnyData = data?.monthlyData && data.monthlyData.some((m) => m.balesIn > 0);
 
   return (
     <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
@@ -230,6 +260,16 @@ export default function FactoryBaleProductHistory() {
           </Button>
         </CardHeader>
         <CardContent>
+          {!hasAnyData && (
+            <p className="text-sm text-muted-foreground text-center py-6" data-testid="text-no-data">
+              No bales recorded in {selectedYear}.
+              {(data?.grandTotal.balesNet ?? 0) > 0 && (
+                <span className="block mt-1">
+                  Current stock (all-time): <strong>{formatNumber(data!.grandTotal.balesNet, 0)}</strong> bales in stock.
+                </span>
+              )}
+            </p>
+          )}
           <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">

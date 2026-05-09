@@ -757,7 +757,7 @@ export function registerFactoryProductsRoutes(app: Express) {
       const [location] = await db
         .select({ id: locations.id, name: locations.name })
         .from(locations)
-        .where(and(eq(locations.id, locationId), eq(locations.companyId, companyId)));
+        .where(eq(locations.id, locationId));
 
       if (!location) return res.status(404).json({ message: "Location not found" });
 
