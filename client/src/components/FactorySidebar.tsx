@@ -31,7 +31,6 @@ import {
   LayoutGrid,
   Scale,
   Store,
-  Table,
   TableProperties,
   KeyRound,
   FileSpreadsheet,
@@ -85,7 +84,6 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     color: NAV_COLOR.overview,
     items: [
       { title: "Production Analytics", url: "/factory/production-report", icon: BarChart3 },
-      { title: "Factory Sheets",        url: "/factory/status-builder",    icon: Table         },
     ],
   },
   {

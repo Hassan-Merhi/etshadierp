@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import FactoryFinancialSnapshot from "@/pages/factory/FactoryFinancialSnapshot";
 import FactoryShippingContainers from "@/pages/factory/FactoryShippingContainers";
+import FactoryStatusBuilder from "@/pages/factory/FactoryStatusBuilder";
 import { addDays, format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -919,6 +920,7 @@ export default function DailyProductionReport() {
           <TabsTrigger value="snapshot" data-testid="tab-snapshot">Financial Snapshot</TabsTrigger>
           <TabsTrigger value="ledger" data-testid="tab-ledger">Bale Ledger</TabsTrigger>
           <TabsTrigger value="shipping" data-testid="tab-shipping">Shipping Containers</TabsTrigger>
+          <TabsTrigger value="sheets" data-testid="tab-sheets">Factory Sheets</TabsTrigger>
         </TabsList>
 
         {/* ── Production tab ── */}
@@ -1501,6 +1503,11 @@ export default function DailyProductionReport() {
         {/* ── Shipping Containers tab ── */}
         <TabsContent value="shipping" className="flex-1 overflow-y-auto p-4 mt-0 data-[state=inactive]:hidden">
           <FactoryShippingContainers />
+        </TabsContent>
+
+        {/* ── Factory Sheets tab ── */}
+        <TabsContent value="sheets" className="flex-1 overflow-hidden flex flex-col mt-0 data-[state=inactive]:hidden">
+          <FactoryStatusBuilder />
         </TabsContent>
       </Tabs>
     </div>

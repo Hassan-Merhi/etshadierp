@@ -811,7 +811,7 @@ export default function FactoryStatusBuilder() {
   // ── Render ─────────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground">
+      <div className="flex items-center justify-center min-h-[200px] text-muted-foreground">
         Loading pages…
       </div>
     );
@@ -821,7 +821,7 @@ export default function FactoryStatusBuilder() {
   const totalRow = activeSheet ? calcTotal(localSheets, activeSheet) : [];
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col flex-1 min-h-0 bg-background">
 
       {/* Link dialog */}
       <LinkDialog
