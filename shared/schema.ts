@@ -5158,3 +5158,74 @@ export const stockItemMergeLogs = pgTable("stock_item_merge_logs", {
 export const insertStockItemMergeLogSchema = createInsertSchema(stockItemMergeLogs).omit({ id: true, mergedAt: true });
 export type InsertStockItemMergeLog = z.infer<typeof insertStockItemMergeLogSchema>;
 export type StockItemMergeLog = typeof stockItemMergeLogs.$inferSelect;
+
+// ── Factory Shipping Container Rows (May 2026) ────────────────────────────────
+// One row per commercial invoice shipment. Logistical tracking only.
+// Container#, shippingCompany, destination stay on customer_orders (source of truth).
+export const factoryShippingContainerRows = pgTable("factory_shipping_container_rows", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  customerOrderId: integer("customer_order_id").notNull().references(() => customerOrders.id, { onDelete: "restrict" }),
+  orderDate: date("order_date").notNull(),
+  containerArrivedDate: date("container_arrived_date"),
+  note: text("note"),
+  isDone: boolean("is_done").notNull().default(false),
+  doneAt: timestamp("done_at"),
+  doneBy: text("done_by"),
+  whatsappSentAt: timestamp("whatsapp_sent_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  companyIdx: index("fscr_company_idx").on(t.companyId),
+  orderUnique: uniqueIndex("fscr_company_order_unique").on(t.companyId, t.customerOrderId),
+}));
+
+export const insertFactoryShippingContainerRowSchema = createInsertSchema(factoryShippingContainerRows).omit({
+  id: true, createdAt: true, updatedAt: true,
+}).extend({
+  companyId: z.number().min(1),
+  customerOrderId: z.number().min(1),
+  orderDate: z.string().min(1),
+  containerArrivedDate: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
+});
+export type InsertFactoryShippingContainerRow = z.infer<typeof insertFactoryShippingContainerRowSchema>;
+export type FactoryShippingContainerRow = typeof factoryShippingContainerRows.$inferSelect;
+
+// ── Factory Shipping Container Documents (May 2026) ───────────────────────────
+// Uploaded files attached to a shipping container row.
+// file_data stores base64 content (source of truth — disk is ephemeral cache).
+export const factoryShippingContainerDocuments = pgTable("factory_shipping_container_documents", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  scrId: integer("scr_id").notNull().references(() => factoryShippingContainerRows.id, { onDelete: "cascade" }),
+  displayName: text("display_name").notNull(),
+  fileName: text("file_name").notNull(),
+  originalName: text("original_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileType: text("file_type"),
+  fileSize: integer("file_size"),
+  fileData: text("file_data"),
+  uploadedBy: text("uploaded_by"),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+}, (t) => ({
+  scrIdx: index("fscd_scr_idx").on(t.scrId),
+  companyIdx: index("fscd_company_idx").on(t.companyId),
+}));
+
+export const insertFactoryShippingContainerDocumentSchema = createInsertSchema(factoryShippingContainerDocuments).omit({
+  id: true, uploadedAt: true,
+}).extend({
+  companyId: z.number().min(1),
+  scrId: z.number().min(1),
+  displayName: z.string().min(1),
+  fileName: z.string().min(1),
+  originalName: z.string().min(1),
+  fileUrl: z.string().min(1),
+  fileType: z.string().optional().nullable(),
+  fileSize: z.number().optional().nullable(),
+  fileData: z.string().optional().nullable(),
+  uploadedBy: z.string().optional().nullable(),
+});
+export type InsertFactoryShippingContainerDocument = z.infer<typeof insertFactoryShippingContainerDocumentSchema>;
+export type FactoryShippingContainerDocument = typeof factoryShippingContainerDocuments.$inferSelect;

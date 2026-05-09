@@ -2865,6 +2865,40 @@ let migrationsDone = false;
       created_at timestamp NOT NULL DEFAULT now()
     )`,
     `CREATE INDEX IF NOT EXISTS ctc_container_id_idx ON container_tracking_checks (container_id)`,
+
+    // Factory Shipping Container Rows + Documents (May 2026)
+    `CREATE TABLE IF NOT EXISTS factory_shipping_container_rows (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      customer_order_id integer NOT NULL REFERENCES customer_orders(id) ON DELETE RESTRICT,
+      order_date date NOT NULL,
+      container_arrived_date date,
+      note text,
+      is_done boolean NOT NULL DEFAULT false,
+      done_at timestamp,
+      done_by text,
+      whatsapp_sent_at timestamp,
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS fscr_company_order_unique ON factory_shipping_container_rows (company_id, customer_order_id)`,
+    `CREATE INDEX IF NOT EXISTS fscr_company_idx ON factory_shipping_container_rows (company_id)`,
+    `CREATE TABLE IF NOT EXISTS factory_shipping_container_documents (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      scr_id integer NOT NULL REFERENCES factory_shipping_container_rows(id) ON DELETE CASCADE,
+      display_name text NOT NULL,
+      file_name text NOT NULL,
+      original_name text NOT NULL,
+      file_url text NOT NULL,
+      file_type text,
+      file_size integer,
+      file_data text,
+      uploaded_by text,
+      uploaded_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS fscd_scr_idx ON factory_shipping_container_documents (scr_id)`,
+    `CREATE INDEX IF NOT EXISTS fscd_company_idx ON factory_shipping_container_documents (company_id)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

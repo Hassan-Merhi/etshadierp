@@ -12,6 +12,7 @@ import { registerFactoryEmployeesPosRoutes } from "./factory/factoryEmployeesPos
 import { registerFactoryTransporterRoutes } from "./factory/factoryTransporterRoutes";
 import { registerFactoryStockAllocationV2Routes } from "./factory/factoryStockAllocationV2Routes";
 import { registerFactoryStockAllocationV5Routes } from "./factory/factoryStockAllocationV5Routes";
+import { registerFactoryShippingContainerRoutes } from "./factory/factoryShippingContainerRoutes";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
@@ -102,4 +103,5 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   registerFactoryTransporterRoutes(app);
   registerFactoryStockAllocationV2Routes(app);
   registerFactoryStockAllocationV5Routes(app);
+  registerFactoryShippingContainerRoutes(app);
 }
