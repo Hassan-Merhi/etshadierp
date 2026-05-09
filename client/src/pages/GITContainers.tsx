@@ -214,9 +214,9 @@ interface DrawerForm {
   dutyFee: string;
   docReceived: boolean;
   docsSentDate: string;
-  freightStatus: string;
   trackingLink: string;
   trackingDescription: string;
+  shopName: string;
 }
 
 function seedForm(c: EnrichedContainerRow): DrawerForm {
@@ -232,9 +232,9 @@ function seedForm(c: EnrichedContainerRow): DrawerForm {
     dutyFee: c.dutyFee ?? "",
     docReceived: c.docReceived === true,
     docsSentDate: c.docsSentDate ?? "",
-    freightStatus: c.freightStatus ?? "Pending",
     trackingLink: c.trackingLink ?? "",
     trackingDescription: c.trackingDescription ?? "",
+    shopName: c.shopName ?? "",
   };
 }
 
@@ -378,9 +378,9 @@ function ContainerDrawer({
       dutyFee: form.dutyFee || null,
       docReceived: form.docReceived,
       docsSentDate: form.docsSentDate || null,
-      freightStatus: form.freightStatus || null,
       trackingLink: form.trackingLink || null,
       trackingDescription: form.trackingDescription || null,
+      shopName: form.shopName || null,
     });
   }
 
@@ -456,42 +456,16 @@ function ContainerDrawer({
 
           <Separator />
 
-          {/* ── Status + Freight Status ── */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Status</Label>
-              <Select
-                value={form.status}
-                onValueChange={(v) => set("status", v)}
-                disabled={!canEdit}
-              >
-                <SelectTrigger data-testid="select-drawer-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ALL_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Freight Status</Label>
-              <Select
-                value={form.freightStatus}
-                onValueChange={(v) => set("freightStatus", v)}
-                disabled={!canEdit}
-              >
-                <SelectTrigger data-testid="select-drawer-freight">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Yes">Yes</SelectItem>
-                  <SelectItem value="No">No</SelectItem>
-                  <SelectItem value="Pending">Pending</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          {/* ── Shop Name ── */}
+          <div className="space-y-1">
+            <Label className="text-xs">Shop Name</Label>
+            <Input
+              placeholder="e.g. ABC SHOP"
+              value={form.shopName}
+              onChange={(e) => set("shopName", e.target.value)}
+              disabled={!canEdit}
+              data-testid="input-drawer-shop-name"
+            />
           </div>
 
           {/* ── ETA DAS ── */}
