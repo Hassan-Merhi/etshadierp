@@ -654,10 +654,10 @@ function WhatsAppModal({
   const [message, setMessage] = useState("");
   const [initialised, setInitialised] = useState(false);
 
-  const previewKey = [LIST_KEY, rowId, "whatsapp-preview"];
+  const previewUrl = rowId ? `${LIST_KEY}/${rowId}/whatsapp-preview` : null;
   const { data: preview, isLoading, refetch } = useQuery<WhatsAppPreview>({
-    queryKey: previewKey,
-    enabled: open && !!rowId,
+    queryKey: [previewUrl],
+    enabled: open && !!rowId && !!previewUrl,
   });
 
   // Initialise file list and message when preview data arrives
