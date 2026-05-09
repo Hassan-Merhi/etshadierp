@@ -5,7 +5,7 @@
  * Access: Admin, Developer, Owner only.
  */
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
@@ -69,8 +69,9 @@ import {
   Upload,
   FileSpreadsheet,
   X,
+  MessageCircle,
+  Send,
 } from "lucide-react";
-import { useRef } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -839,8 +840,10 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerContainer, setDrawerContainer] = useState<EnrichedContainerRow | null>(null);
   const [importResult, setImportResult] = useState<{ updated: number; skipped: number; notFound: number; errors: string[] } | null>(null);
+  const [waSending, setWaSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const queryClient = useQueryClient();
+  const printRef     = useRef<HTMLDivElement>(null);
+  const queryClient  = useQueryClient();
 
   const role = user?.role;
   const isAllowed = !!role && ["Admin", "Developer", "Owner"].includes(role);
@@ -997,6 +1000,37 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     setSearch("");
   }
 
+  async function sendToWhatsApp() {
+    if (!printRef.current) return;
+    setWaSending(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(printRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#0f172a",
+        logging: false,
+        windowWidth: printRef.current.scrollWidth,
+        windowHeight: printRef.current.scrollHeight,
+      });
+      const imageBase64 = canvas.toDataURL("image/png");
+      const today = new Date().toISOString().substring(0, 10);
+      const res = await apiRequest("POST", "/api/git/send-containers-whatsapp", {
+        imageBase64,
+        fileName: `Containers_${today}.png`,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Failed" }));
+        throw new Error(err.message || "Failed to send");
+      }
+      toast({ title: "Sent", description: "Container report sent to WhatsApp group." });
+    } catch (err: any) {
+      toast({ title: "Failed to send", description: err.message, variant: "destructive" });
+    } finally {
+      setWaSending(false);
+    }
+  }
+
   // ── Access denied ──
   if (user && !isAllowed) {
     return (
@@ -1133,6 +1167,22 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
             Filters
             <ChevronDown className={cn("h-3.5 w-3.5 ml-1 transition-transform", showFilters && "rotate-180")} />
           </Button>
+
+          {/* ── Send to WhatsApp ── */}
+          {isAllowed && (
+            <Button
+              variant="outline"
+              size="default"
+              onClick={sendToWhatsApp}
+              disabled={waSending || filtered.length === 0}
+              data-testid="button-send-wa-containers"
+            >
+              {waSending
+                ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                : <MessageCircle className="h-4 w-4 mr-1.5" />}
+              {waSending ? "Sending…" : "Send to WhatsApp"}
+            </Button>
+          )}
 
           {/* Hidden file input for Excel import — always present so the ref works */}
           <input
@@ -1518,6 +1568,109 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
         queryKey={queryUrl}
         sessionCompanyId={sessionCompanyId}
       />
+
+      {/* ── Hidden print template for WhatsApp image capture ── */}
+      <div
+        ref={printRef}
+        style={{
+          position: "absolute",
+          left: "-9999px",
+          top: 0,
+          backgroundColor: "#0f172a",
+          color: "#f1f5f9",
+          fontFamily: "system-ui, -apple-system, sans-serif",
+          fontSize: "12px",
+          width: "1280px",
+          padding: "16px",
+          boxSizing: "border-box",
+        }}
+        aria-hidden="true"
+      >
+        {/* Header */}
+        <div style={{ marginBottom: "12px" }}>
+          <div style={{ fontSize: "18px", fontWeight: 700, color: "#f1f5f9" }}>
+            Containers OTW
+          </div>
+          <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
+            {filtered.length} container{filtered.length !== 1 ? "s" : ""} &nbsp;·&nbsp;
+            {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+            {" "}
+            {new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}
+          </div>
+        </div>
+
+        {/* Table */}
+        <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+          <colgroup>
+            <col style={{ width: "28px" }} />
+            <col style={{ width: "110px" }} />
+            <col style={{ width: "100px" }} />
+            <col style={{ width: "90px" }} />
+            <col style={{ width: "80px" }} />
+            <col style={{ width: "120px" }} />
+            <col style={{ width: "65px" }} />
+            <col style={{ width: "55px" }} />
+            <col style={{ width: "80px" }} />
+            <col style={{ width: "110px" }} />
+            <col style={{ width: "90px" }} />
+            <col />
+          </colgroup>
+          <thead>
+            <tr style={{ backgroundColor: "#1e3a5f" }}>
+              {["#", "Container #", "Supplier", "Shop", "Truck #", "Location", "ETA", "Delayed", "Status", "Transporter", "Agent", "Notes"].map((h) => (
+                <th key={h} style={{ padding: "6px 4px", textAlign: "left", color: "#93c5fd", fontWeight: 600, fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {(() => {
+              const groups: { company: string; rows: EnrichedContainerRow[] }[] = [];
+              for (const c of filtered) {
+                const last = groups[groups.length - 1];
+                if (last && last.company === c.companyName) last.rows.push(c);
+                else groups.push({ company: c.companyName, rows: [c] });
+              }
+              let idx = 0;
+              return groups.map((g) => [
+                <tr key={`grp-${g.company}`} style={{ backgroundColor: "#fbbf24" }}>
+                  <td colSpan={12} style={{ padding: "5px 6px", fontWeight: 700, color: "#0f172a", fontSize: "11px" }}>
+                    {g.company}
+                  </td>
+                </tr>,
+                ...g.rows.map((c, i) => {
+                  idx++;
+                  const rowBg = i % 2 === 0 ? "#0f172a" : "#1e293b";
+                  const etaDate = c.eta ? new Date(c.eta) : null;
+                  let delayed = "";
+                  if (etaDate && !isNaN(etaDate.getTime()) && !c.numberPlate) {
+                    const t = new Date(); t.setHours(0,0,0,0);
+                    const d = Math.floor((t.getTime() - etaDate.getTime()) / 86400000);
+                    if (d > 0) delayed = `+${d}d`;
+                  }
+                  return (
+                    <tr key={c.id} style={{ backgroundColor: rowBg }}>
+                      <td style={{ padding: "4px 4px", color: "#94a3b8", fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{idx}</td>
+                      <td style={{ padding: "4px 4px", fontFamily: "monospace", fontWeight: 600, fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{c.containerNumber}</td>
+                      <td style={{ padding: "4px 4px", fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{c.supplierName ?? "—"}</td>
+                      <td style={{ padding: "4px 4px", fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{c.shopName ?? "—"}</td>
+                      <td style={{ padding: "4px 4px", fontFamily: "monospace", fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{c.numberPlate ?? "—"}</td>
+                      <td style={{ padding: "4px 4px", fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{c.trackingLocation ?? "—"}</td>
+                      <td style={{ padding: "4px 4px", fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{c.eta ? c.eta.substring(0,10) : "—"}</td>
+                      <td style={{ padding: "4px 4px", fontSize: "10px", color: delayed ? "#f87171" : "#94a3b8", fontWeight: delayed ? 600 : 400, overflow: "hidden", whiteSpace: "nowrap" }}>{delayed || "—"}</td>
+                      <td style={{ padding: "4px 4px", fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{c.status}</td>
+                      <td style={{ padding: "4px 4px", fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{c.transporter ?? "—"}</td>
+                      <td style={{ padding: "4px 4px", fontSize: "10px", overflow: "hidden", whiteSpace: "nowrap" }}>{c.agent ?? "—"}</td>
+                      <td style={{ padding: "4px 4px", fontSize: "10px", color: "#94a3b8", overflow: "hidden", whiteSpace: "nowrap" }}>{c.trackingDescription ?? "—"}</td>
+                    </tr>
+                  );
+                }),
+              ]);
+            })()}
+          </tbody>
+        </table>
+      </div>
 
     </div>
   );

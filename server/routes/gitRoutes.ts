@@ -1229,4 +1229,82 @@ export function registerGitRoutes(app: Express) {
       }
     },
   );
+
+  // ── Containers WhatsApp Settings ────────────────────────────────────────────
+
+  app.get("/api/git/containers-wa-settings", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { getContainersWaSettings, getWaSettings } = await import("../services/whatsappService");
+      const [settings, main] = await Promise.all([getContainersWaSettings(), getWaSettings()]);
+      res.json({
+        groupChatId:     settings?.groupChatId     ?? "",
+        scheduleEnabled: settings?.scheduleEnabled ?? false,
+        scheduleHour:    settings?.scheduleHour    ?? 8,
+        lastSentAt:      settings?.lastSentAt      ?? null,
+        hasCredentials:  !!(main?.instanceId && main?.apiToken),
+        waEnabled:       main?.enabled             ?? false,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/git/containers-wa-settings", requireAuth, requireRole(["Admin", "Developer", "Owner"]), async (req: Request, res: Response) => {
+    try {
+      const { groupChatId = "", scheduleEnabled = false, scheduleHour = 8 } = req.body;
+      const { updateContainersWaSettings } = await import("../services/whatsappService");
+      await updateContainersWaSettings(String(groupChatId), Boolean(scheduleEnabled), Number(scheduleHour));
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Send containers table to WhatsApp ───────────────────────────────────────
+
+  app.post("/api/git/send-containers-whatsapp", requireAuth, requireRole(["Admin", "Developer", "Owner"]), async (req: Request, res: Response) => {
+    try {
+      const { imageBase64, fileName } = req.body ?? {};
+      const { getContainersWaSettings, sendWhatsAppFileToChatId } = await import("../services/whatsappService");
+      const settings = await getContainersWaSettings();
+
+      if (!settings?.groupChatId) {
+        return res.status(400).json({ message: "No WhatsApp group configured. Go to Settings → Containers WhatsApp to configure it." });
+      }
+      if (!settings.instanceId || !settings.apiToken) {
+        return res.status(400).json({ message: "WhatsApp credentials not configured." });
+      }
+      if (!settings.enabled) {
+        return res.status(400).json({ message: "WhatsApp sending is disabled." });
+      }
+
+      let buffer: Buffer;
+      let finalFileName: string;
+      let mimeType: string;
+      const today = new Date().toISOString().substring(0, 10);
+
+      if (imageBase64) {
+        const base64Data = String(imageBase64).replace(/^data:image\/\w+;base64,/, "");
+        buffer       = Buffer.from(base64Data, "base64");
+        finalFileName = String(fileName || `Containers_${today}.png`);
+        mimeType      = "image/png";
+      } else {
+        const { generateContainersPdf } = await import("../helpers/generateContainersPdf");
+        const pdf    = await generateContainersPdf();
+        buffer       = pdf.buffer;
+        finalFileName = `Containers_${today}.pdf`;
+        mimeType      = "application/pdf";
+      }
+
+      const caption = `Containers OTW — ${today}`;
+      const result  = await sendWhatsAppFileToChatId(settings.groupChatId, buffer, finalFileName, caption, mimeType);
+      if (!result.success) {
+        return res.status(500).json({ message: result.error || "Failed to send" });
+      }
+      res.json({ ok: true, message: "Sent to WhatsApp group." });
+    } catch (err: any) {
+      console.error("[ContainersWA] send error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
 }

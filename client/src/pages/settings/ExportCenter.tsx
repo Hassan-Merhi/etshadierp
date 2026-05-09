@@ -25,6 +25,7 @@ import {
 import { StockReportSection } from "./StockReportSection";
 import { WhatsAppExportSection } from "./WhatsAppExportSection";
 import { PosWhatsAppSection } from "./PosWhatsAppSection";
+import { ContainersWhatsAppSection } from "./ContainersWhatsAppSection";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -712,6 +713,10 @@ export function ExportCenter() {
             <MessageCircle className="h-3.5 w-3.5 text-green-600" />
             WhatsApp Groups
           </TabsTrigger>
+          <TabsTrigger value="containers-wa" data-testid="tab-containers-wa" className="flex items-center gap-1.5">
+            <MessageCircle className="h-3.5 w-3.5 text-green-600" />
+            Containers WA
+          </TabsTrigger>
         </TabsList>
 
         {/* ══════════════════════════════════════════════════════════════
@@ -1282,6 +1287,21 @@ export function ExportCenter() {
         ══════════════════════════════════════════════════════════════ */}
         <TabsContent value="wa-groups" className="space-y-4 mt-4">
           <PosWhatsAppSection />
+        </TabsContent>
+
+        {/* ══════════════════════════════════════════════════════════════
+            CONTAINERS WHATSAPP TAB
+        ══════════════════════════════════════════════════════════════ */}
+        <TabsContent value="containers-wa" className="space-y-4 mt-4">
+          <div>
+            <h3 className="text-base font-semibold mb-1">Containers OTW — WhatsApp</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Configure a WhatsApp group to receive the Containers OTW table.
+              Use the <strong>Send to WhatsApp</strong> button on the Containers page for a manual image send,
+              or enable the daily schedule to send a PDF report automatically each day.
+            </p>
+          </div>
+          <ContainersWhatsAppSection />
         </TabsContent>
 
       </Tabs>

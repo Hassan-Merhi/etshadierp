@@ -783,6 +783,7 @@ export function startScheduler() {
     await checkAndRunStockReport();
     await checkAndRunNetPositionExport();
     await checkAndRunScheduledDailyExport();
+    await checkAndRunContainersWhatsApp();
   }, {
     timezone: "America/New_York",
   });
@@ -890,6 +891,51 @@ async function purgeOldSoftDeletes(): Promise<void> {
     console.log("[Purge] 30-day soft-delete purge complete.");
   } catch (err: any) {
     console.error("[Purge] Error during soft-delete purge:", err.message);
+  }
+}
+
+// ── Containers WhatsApp scheduled send ────────────────────────────────────────
+
+async function checkAndRunContainersWhatsApp(): Promise<void> {
+  try {
+    const { getContainersWaSettings, sendWhatsAppFileToChatId, markContainersWaSent } = await import("./whatsappService");
+    const settings = await getContainersWaSettings();
+
+    if (!settings?.scheduleEnabled || !settings?.groupChatId) return;
+    if (!settings?.instanceId || !settings?.apiToken || !settings?.enabled) return;
+
+    const nowHour = new Date().getHours();
+    if (nowHour !== settings.scheduleHour) return;
+
+    // Skip if already sent within the last 12 hours
+    if (settings.lastSentAt) {
+      const hoursSince = (Date.now() - new Date(settings.lastSentAt).getTime()) / (1000 * 60 * 60);
+      if (hoursSince < 12) {
+        console.log("[ContainersWA] Already sent within 12 h — skipping.");
+        return;
+      }
+    }
+
+    console.log("[ContainersWA] Scheduled send triggered.");
+    const { generateContainersPdf } = await import("../helpers/generateContainersPdf");
+    const { buffer, rowCount } = await generateContainersPdf();
+
+    const today    = new Date().toISOString().substring(0, 10);
+    const caption  = `Containers OTW — ${today} (${rowCount} container${rowCount !== 1 ? "s" : ""})`;
+    const fileName = `Containers_${today}.pdf`;
+
+    const result = await sendWhatsAppFileToChatId(
+      settings.groupChatId, buffer, fileName, caption, "application/pdf",
+    );
+
+    if (result.success) {
+      await markContainersWaSent();
+      console.log(`[ContainersWA] PDF sent to ${settings.groupChatId} — ${rowCount} containers.`);
+    } else {
+      console.error("[ContainersWA] Scheduled send failed:", result.error);
+    }
+  } catch (err: any) {
+    console.error("[ContainersWA] Error:", err?.message);
   }
 }
 

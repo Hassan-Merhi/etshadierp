@@ -367,6 +367,63 @@ export async function sendWhatsAppFileToChatId(
   return sendGreenApiFileUpload({ settings, chatId, buffer, fileName, caption, mimeType });
 }
 
+// ─── Containers WhatsApp settings ────────────────────────────────────────────
+
+export interface ContainersWaSettings {
+  groupChatId:     string;
+  scheduleEnabled: boolean;
+  scheduleHour:    number;
+  lastSentAt:      string | null;
+  instanceId:      string;
+  apiToken:        string;
+  enabled:         boolean;
+}
+
+export async function getContainersWaSettings(): Promise<ContainersWaSettings | null> {
+  const res = await pool.query(
+    `SELECT instance_id, api_token, enabled,
+            containers_wa_group_chat_id,
+            containers_wa_schedule_enabled,
+            containers_wa_schedule_hour,
+            containers_wa_last_sent_at
+     FROM whatsapp_settings WHERE id = 1`,
+  );
+  if (!res.rows?.length) return null;
+  const r = res.rows[0];
+  return {
+    instanceId:      r.instance_id      ?? "",
+    apiToken:        r.api_token        ?? "",
+    enabled:         r.enabled          ?? false,
+    groupChatId:     r.containers_wa_group_chat_id      ?? "",
+    scheduleEnabled: r.containers_wa_schedule_enabled   ?? false,
+    scheduleHour:    r.containers_wa_schedule_hour      ?? 8,
+    lastSentAt:      r.containers_wa_last_sent_at
+      ? new Date(r.containers_wa_last_sent_at).toISOString()
+      : null,
+  };
+}
+
+export async function updateContainersWaSettings(
+  groupChatId:     string,
+  scheduleEnabled: boolean,
+  scheduleHour:    number,
+): Promise<void> {
+  await pool.query(
+    `UPDATE whatsapp_settings
+     SET containers_wa_group_chat_id      = $1,
+         containers_wa_schedule_enabled   = $2,
+         containers_wa_schedule_hour      = $3
+     WHERE id = 1`,
+    [groupChatId, scheduleEnabled, scheduleHour],
+  );
+}
+
+export async function markContainersWaSent(): Promise<void> {
+  await pool.query(
+    `UPDATE whatsapp_settings SET containers_wa_last_sent_at = NOW() WHERE id = 1`,
+  );
+}
+
 /**
  * Send a file to ALL active recipients via the main WhatsApp instance (id=1).
  * Uses the shared sendGreenApiFileUpload helper (form-data package).
