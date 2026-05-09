@@ -2064,7 +2064,7 @@ export default function StockTransferOrder() {
           }
         }}
       >
-        <DialogContent className="max-w-4xl flex flex-col" style={{ maxHeight: "80vh" }}>
+        <DialogContent className="max-w-7xl w-[95vw] flex flex-col" style={{ maxHeight: "90vh" }}>
           <DialogHeader>
             <DialogTitle>Stock Movement — {historyItem?.name}</DialogTitle>
             <DialogDescription className="flex items-center gap-1.5 text-sm">
