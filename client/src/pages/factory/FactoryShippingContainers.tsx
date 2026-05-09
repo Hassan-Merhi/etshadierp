@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -699,10 +699,11 @@ function WhatsAppModal({
 
   const invoice = record ? MOCK_INVOICES.find((i) => i.id === record.commercialInvoiceId) : null;
 
-  function initState() {
-    if (!record) return;
+  // Re-initialise message and file list each time the modal opens for a record
+  useEffect(() => {
+    if (!open || !record) return;
     setMessage(DEFAULT_WA_MESSAGE(record));
-    const allFiles: WhatsAppFile[] = [
+    setFiles([
       {
         id: "stmt",
         name: "Customer Statement",
@@ -724,9 +725,9 @@ function WhatsAppModal({
         source: d.source === "invoice" ? "Commercial Invoice" : "Container",
         checked: true,
       })),
-    ];
-    setFiles(allFiles);
-  }
+    ]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, record?.id]);
 
   function toggleFile(id: string) {
     setFiles((prev) => prev.map((f) => f.id === id ? { ...f, checked: !f.checked } : f));
@@ -780,10 +781,7 @@ function WhatsAppModal({
         </DialogHeader>
 
         {record && (
-          <div
-            className="space-y-4"
-            ref={(el) => { if (el && open) initState(); }}
-          >
+          <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3 text-sm rounded-md border bg-muted/30 p-3">
               <div><span className="text-xs text-muted-foreground">Client</span><p className="font-medium">{record.clientName}</p></div>
               <div><span className="text-xs text-muted-foreground">Invoice</span><p className="font-mono font-medium">{record.invoiceNumber}</p></div>
