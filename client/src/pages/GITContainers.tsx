@@ -61,13 +61,8 @@ import {
   Download,
   Upload,
   FileSpreadsheet,
+  X,
 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useRef } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
@@ -1243,6 +1238,70 @@ export default function GITContainers() {
           )}
         </div>
 
+        {/* ── Import result banner (inline, dismissible) ── */}
+        {importResult && (
+          <div className={cn(
+            "rounded-md border p-3 space-y-2",
+            importResult.updated > 0
+              ? "border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-800"
+              : "border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800",
+          )}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                {importResult.updated > 0
+                  ? <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+                  : <XCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                }
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className={cn(
+                    "text-sm font-semibold",
+                    importResult.updated > 0 ? "text-green-800 dark:text-green-300" : "text-amber-800 dark:text-amber-300",
+                  )}>
+                    {importResult.updated > 0 ? "Import complete" : "Import finished — no rows updated"}
+                  </span>
+                  <span className="text-xs text-green-700 dark:text-green-400 font-medium">
+                    {importResult.updated} updated
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {importResult.skipped} skipped
+                  </span>
+                  {importResult.notFound > 0 && (
+                    <span className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                      {importResult.notFound} not found
+                    </span>
+                  )}
+                </div>
+              </div>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6 shrink-0"
+                onClick={() => setImportResult(null)}
+                data-testid="button-dismiss-import-result"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+
+            {importResult.updated === 0 && importResult.notFound > 0 && (
+              <p className="text-xs text-amber-700 dark:text-amber-300 pl-6">
+                Container numbers in your file did not match any containers in the system. Check that the <strong>Container #</strong> column matches exactly (including spacing and capitalisation).
+              </p>
+            )}
+
+            {importResult.errors.length > 0 && (
+              <div className="pl-6 space-y-0.5 max-h-40 overflow-y-auto">
+                <p className="text-xs font-semibold text-amber-800 dark:text-amber-400 mb-1">
+                  Row details ({importResult.errors.length})
+                </p>
+                {importResult.errors.map((e, i) => (
+                  <p key={i} className="text-xs text-amber-700 dark:text-amber-300 font-mono">{e}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Expandable Filters ── */}
         {showFilters && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 p-3 rounded-md border bg-muted/30">
@@ -1483,59 +1542,6 @@ export default function GITContainers() {
         sessionCompanyId={sessionCompanyId}
       />
 
-      {/* ── Import result dialog ── */}
-      <Dialog open={!!importResult} onOpenChange={(o) => { if (!o) setImportResult(null); }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileSpreadsheet className="h-5 w-5 text-green-600" />
-              Import Result
-            </DialogTitle>
-          </DialogHeader>
-          {importResult && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-md border p-3 text-center">
-                  <p className="text-2xl font-bold text-green-600">{importResult.updated}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Updated</p>
-                </div>
-                <div className="rounded-md border p-3 text-center">
-                  <p className="text-2xl font-bold text-muted-foreground">{importResult.skipped}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Skipped</p>
-                </div>
-                <div className="rounded-md border p-3 text-center">
-                  <p className="text-2xl font-bold text-amber-600">{importResult.notFound}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Not Found</p>
-                </div>
-              </div>
-
-              {importResult.updated === 0 && importResult.notFound > 0 && (
-                <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800 p-3 text-sm text-red-800 dark:text-red-300">
-                  <p className="font-semibold mb-1">No containers were updated.</p>
-                  <p className="text-xs">The container numbers in your Excel file did not match any containers in the system. Make sure the <strong>Container #</strong> column contains the exact same numbers stored here (including spaces and capitalisation).</p>
-                </div>
-              )}
-
-              {importResult.errors.length > 0 && (
-                <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3 space-y-1 max-h-56 overflow-y-auto">
-                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-400 mb-1">
-                    Row details ({importResult.errors.length})
-                  </p>
-                  {importResult.errors.map((e, i) => (
-                    <p key={i} className="text-xs text-amber-700 dark:text-amber-300 font-mono">{e}</p>
-                  ))}
-                </div>
-              )}
-
-              {importResult.updated > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  The page has been refreshed with the latest data.
-                </p>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
