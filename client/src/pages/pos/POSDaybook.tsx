@@ -140,6 +140,15 @@ export default function POSDaybook() {
   const isAdminOrOwner = currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
   const isPOS = currentUser?.role === "POS";
   const canEditDaybook = isAdminOrOwner || daybookEditDays > 0;
+
+  // For POS users, fetch all their assigned locations so multi-location users
+  // see transactions from every location they manage, not just their primary one.
+  const { data: myLocations = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ["/api/my-locations"],
+    enabled: isPOS,
+  });
+  // Build a fast-lookup set of allowed location IDs for this POS user
+  const myLocationIds = new Set(myLocations.map((l) => l.id));
   
   // Check if user can see profit/cost (Admin or Owner only)
   const canSeeProfitCost = isAdminOrOwner;
@@ -171,11 +180,13 @@ export default function POSDaybook() {
       // Bypass location filter when viewing specific historical voucher
       if (bypassLocationFilter) return true;
       
-      // If user has an assigned location (POS users), only show transactions from that location
-      if (currentUser?.assignedLocationId !== undefined && currentUser?.assignedLocationId !== null) {
-        return v.locationId === currentUser.assignedLocationId;
+      // POS users: show transactions from all their assigned locations
+      if (isPOS) {
+        // While locations are still loading, show nothing to avoid flicker
+        if (myLocationIds.size === 0) return false;
+        return myLocationIds.has(v.locationId);
       }
-      
+
       // Non-POS users see all transactions
       return true;
     })
