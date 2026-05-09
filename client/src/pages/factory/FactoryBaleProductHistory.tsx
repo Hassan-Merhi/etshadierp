@@ -237,7 +237,7 @@ export default function FactoryBaleProductHistory() {
                   <TableHead>Month</TableHead>
                   <TableHead className="text-right text-green-600 dark:text-green-400">Bales IN</TableHead>
                   <TableHead className="text-right text-red-500 dark:text-red-400">Bales OUT</TableHead>
-                  <TableHead className="text-right text-orange-500 dark:text-orange-400">Pending</TableHead>
+                  <TableHead className="text-right text-orange-500 dark:text-orange-400">Loading</TableHead>
                   <TableHead className="text-right font-semibold">Net (In Stock)</TableHead>
                   <TableHead className="text-right">KG In</TableHead>
                   <TableHead className="text-right">KG Net</TableHead>
@@ -339,7 +339,7 @@ export default function FactoryBaleProductHistory() {
                       </div>
                     </div>
                     <div>
-                      <div className="text-orange-500 dark:text-orange-400">Pending</div>
+                      <div className="text-orange-500 dark:text-orange-400">Loading</div>
                       <div className="font-mono text-orange-500 dark:text-orange-400">
                         {month.balesPending > 0 ? formatNumber(month.balesPending, 0) : "-"}
                       </div>
