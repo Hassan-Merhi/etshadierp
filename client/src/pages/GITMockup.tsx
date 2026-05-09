@@ -11,8 +11,10 @@
  *   6. WhatsApp Preview — sample data: formatted text message
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,7 +28,7 @@ import {
   Ship, Truck, Package, AlertTriangle, FileX, Clock, DollarSign,
   Search, ExternalLink, CheckCircle2, XCircle, MessageSquare,
   FileSpreadsheet, LayoutGrid, List, Info, AlertCircle, ChevronDown, ChevronUp,
-  Building2, Layers,
+  Building2, Layers, Loader2, MessageCircle,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
