@@ -252,6 +252,7 @@ export function CommandPalette({
   );
 
   useEffect(() => {
+    if (!isAdminOwner) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "/") {
         e.preventDefault();
@@ -260,7 +261,7 @@ export function CommandPalette({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, setOpen]);
+  }, [open, setOpen, isAdminOwner]);
 
   const navigate = useCallback(
     (path: string) => {

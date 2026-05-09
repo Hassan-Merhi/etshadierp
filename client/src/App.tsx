@@ -660,6 +660,7 @@ function AuthenticatedApp() {
                 <SidebarTrigger data-testid="button-sidebar-toggle" />
                 <div className="flex items-center gap-2 ml-auto">
                   <PendingSyncIndicator />
+                  {(user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer") && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -672,6 +673,7 @@ function AuthenticatedApp() {
                       Ctrl /
                     </kbd>
                   </Button>
+                  )}
                 </div>
               </header>
               <OfflineBanner />
@@ -721,6 +723,7 @@ function AuthenticatedApp() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">
+                  {(user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer") && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -733,6 +736,7 @@ function AuthenticatedApp() {
                       Ctrl /
                     </kbd>
                   </Button>
+                  )}
                   <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>
                   <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
                     <LogOut className="h-4 w-4" />
@@ -924,6 +928,7 @@ function AuthenticatedApp() {
                       Switch to ERP
                     </Button>
                   )}
+                  {(user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer") && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -936,6 +941,7 @@ function AuthenticatedApp() {
                       Ctrl /
                     </kbd>
                   </Button>
+                  )}
                   <PendingSyncIndicator />
                   <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>
                   <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
@@ -1088,6 +1094,7 @@ function AuthenticatedApp() {
               <SidebarTrigger data-testid="button-sidebar-toggle" />
               <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">
                 <PendingSyncIndicator />
+                {(user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer") && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1100,6 +1107,7 @@ function AuthenticatedApp() {
                     Ctrl /
                   </kbd>
                 </Button>
+                )}
                 <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>
                 <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
                   <LogOut className="h-4 w-4" />
