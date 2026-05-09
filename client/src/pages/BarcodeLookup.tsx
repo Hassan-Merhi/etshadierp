@@ -374,92 +374,85 @@ export default function BarcodeLookup() {
         <div className="space-y-4">
           {articleResult.product ? (
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 flex-wrap">
-                  <Package className="h-5 w-5" />
+              <CardHeader className="pb-3">
+                {/* Bale name — shown first, prominently */}
+                <CardTitle className="text-xl flex items-center gap-2 flex-wrap">
+                  <Package className="h-5 w-5 shrink-0" />
                   {(articleResult.product as any).name}
                   <Badge variant={(articleResult.product as any).active ? "default" : "secondary"}>
                     {(articleResult.product as any).active ? "Active" : "Inactive"}
                   </Badge>
                 </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-6 flex-wrap text-sm">
+                <div className="flex gap-6 flex-wrap text-sm pt-1">
                   <div>
                     <p className="text-muted-foreground">Article Code</p>
                     <p className="font-mono font-medium">{(articleResult.product as any).articleCode || (articleResult.product as any).code}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Total Labels Printed</p>
+                    <p className="text-muted-foreground">Total References</p>
                     <p className="font-medium">{articleResult.labelPrints.length.toLocaleString()}</p>
                   </div>
                 </div>
-              </CardContent>
+              </CardHeader>
+
+              {/* Bale references — directly under the name, no separate card */}
+              {articleResult.labelPrints.length > 0 ? (
+                <CardContent className="p-0">
+                  <div className="border-t">
+                    <div className="px-6 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-muted/30">
+                      Bale References
+                    </div>
+                    <Table>
+                      <TableHeader className="sticky top-0 z-30 bg-background">
+                        <TableRow>
+                          <TableHead>Reference No.</TableHead>
+                          <TableHead>Approx. Weight (KG)</TableHead>
+                          <TableHead>Printed At</TableHead>
+                          <TableHead>Scanned</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {articleResult.labelPrints.map((lp) => (
+                          <TableRow
+                            key={lp.id}
+                            className="cursor-pointer hover-elevate"
+                            data-testid={`row-label-${lp.id}`}
+                            onClick={() => {
+                              setSearchMode("reference");
+                              setSearchValue(lp.referenceNumber);
+                              referenceLookup.mutate(lp.referenceNumber);
+                            }}
+                          >
+                            <TableCell className="font-mono font-medium">{lp.referenceNumber}</TableCell>
+                            <TableCell>{smartNum(lp.approxWeightKg)}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {lp.printedAt ? new Date(lp.printedAt).toLocaleDateString() : "—"}
+                            </TableCell>
+                            <TableCell>
+                              {lp.scannedAt ? (
+                                <Badge variant="default" className="gap-1">
+                                  <CheckCircle2 className="h-3 w-3" /> Scanned
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline">Not Scanned</Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              ) : (
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">No bale references found for this article code.</p>
+                </CardContent>
+              )}
             </Card>
           ) : (
             <Card>
               <CardContent className="py-4">
                 <p className="text-sm text-muted-foreground">No product found for article code "<span className="font-mono">{searchValue}</span>"</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {articleResult.labelPrints.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Hash className="h-5 w-5" />
-                  Bale Labels ({articleResult.labelPrints.length.toLocaleString()})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader className="sticky top-0 z-30 bg-background">
-                    <TableRow>
-                      <TableHead>Reference No.</TableHead>
-                      <TableHead>Approx. Weight (KG)</TableHead>
-                      <TableHead>Printed At</TableHead>
-                      <TableHead>Scanned</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {articleResult.labelPrints.map((lp) => (
-                      <TableRow
-                        key={lp.id}
-                        className="cursor-pointer hover-elevate"
-                        data-testid={`row-label-${lp.id}`}
-                        onClick={() => {
-                          setSearchMode("reference");
-                          setSearchValue(lp.referenceNumber);
-                          referenceLookup.mutate(lp.referenceNumber);
-                        }}
-                      >
-                        <TableCell className="font-mono font-medium">{lp.referenceNumber}</TableCell>
-                        <TableCell>{smartNum(lp.approxWeightKg)}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {lp.printedAt ? new Date(lp.printedAt).toLocaleDateString() : "—"}
-                        </TableCell>
-                        <TableCell>
-                          {lp.scannedAt ? (
-                            <Badge variant="default" className="gap-1">
-                              <CheckCircle2 className="h-3 w-3" /> Scanned
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline">Not Scanned</Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
-
-          {articleResult.labelPrints.length === 0 && articleResult.product && (
-            <Card>
-              <CardContent className="py-6">
-                <p className="text-center text-muted-foreground">No label prints found for this article code.</p>
               </CardContent>
             </Card>
           )}
