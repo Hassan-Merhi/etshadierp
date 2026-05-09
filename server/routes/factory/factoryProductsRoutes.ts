@@ -957,12 +957,33 @@ export function registerFactoryProductsRoutes(app: Express) {
         .where(and(...conditions))
         .orderBy(desc(factoryBales.createdAt));
 
+      // Find which IN_STOCK bales are currently scanned into a LOADING order
+      // (V5 bales stay IN_STOCK during loading — need cross-reference to detect)
+      const inStockIds = bales.filter((b) => b.status === "IN_STOCK").map((b) => b.id);
+      const loadingBaleIds = new Set<number>();
+      if (inStockIds.length > 0) {
+        const loadingRows = await db
+          .select({ baleId: customerOrderBales.baleId })
+          .from(customerOrderBales)
+          .innerJoin(customerOrders, eq(customerOrderBales.orderId, customerOrders.id))
+          .where(
+            and(
+              eq(customerOrders.status, "LOADING"),
+              inArray(customerOrderBales.baleId, inStockIds),
+            )
+          );
+        for (const r of loadingRows) loadingBaleIds.add(r.baleId);
+      }
+
       const [product] = await db
         .select({ sellingPrice: factoryBaleProducts.sellingPrice })
         .from(factoryBaleProducts)
         .where(and(eq(factoryBaleProducts.id, productId), eq(factoryBaleProducts.companyId, companyId)));
 
-      res.json({ bales, sellingPrice: product?.sellingPrice || "0" });
+      res.json({
+        bales: bales.map((b) => ({ ...b, isInLoadingOrder: loadingBaleIds.has(b.id) })),
+        sellingPrice: product?.sellingPrice || "0",
+      });
     } catch (error: any) {
       console.error("Error fetching all bale details:", error);
       res.status(500).json({ message: error.message });
