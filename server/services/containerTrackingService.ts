@@ -350,12 +350,12 @@ async function trackOneContainer(
   // Save events
   await saveTrackingEvents(containerId, shipment);
 
-  // Build the update — always update read-only tracking display fields;
-  // update eta and location when the API provides them.
+  // Only write ETA back to the container — location is managed manually.
+  // We still store status/description/date so the "Last Result" panel is useful,
+  // but trackingLastLocation is intentionally NOT written.
   const updateSet: Record<string, unknown> = {
     trackingLastCheckedAt: now,
     trackingLastStatus: lastStatus,
-    trackingLastLocation: lastLocation,
     trackingLastEventDate: lastEventDate,
     trackingLastDescription: lastDescription,
     trackingError: null,

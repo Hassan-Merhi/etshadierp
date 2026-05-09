@@ -112,15 +112,22 @@ async function initiateTracking(
     fromCache?: boolean;
   };
 
-  // ParcelsApp sometimes returns done=true with shipments immediately (cache hit)
-  // but omits the uuid entirely. Accept that as a completed response.
-  if (!data.uuid && !data.done) {
+  // ParcelsApp has three valid POST response shapes:
+  //  A. { uuid, done:false }           → need to poll
+  //  B. { done:true, shipments }       → cache hit, use immediately (uuid may be absent)
+  //  C. { shipments } (no uuid, done not set) → data already available, treat as done
+  // Only throw if there is truly nothing usable.
+  const hasShipments = (data.shipments?.length ?? 0) > 0;
+  if (!data.uuid && !data.done && !hasShipments) {
     throw new Error("ParcelsApp POST: no uuid in response");
   }
 
+  // If shipments are present but uuid / done are missing, treat as immediately done.
+  const effectiveDone = data.done ?? hasShipments;
+
   return {
     uuid: data.uuid ?? "",
-    done: data.done ?? false,
+    done: effectiveDone,
     shipments: data.shipments ?? [],
     fromCache: data.fromCache ?? false,
   };
