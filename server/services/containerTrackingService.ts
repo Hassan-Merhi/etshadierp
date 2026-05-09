@@ -50,6 +50,11 @@ const PREFIX_TO_CARRIER: Record<string, string> = {
   TCNU: "AUTO", TGBU: "AUTO", ECMU: "AUTO", TXGI: "AUTO",
 };
 
+// Minimum length a container number must have to be worth attempting.
+// Real ISO container numbers are 11 characters (4 letter prefix + 6 digits + check digit).
+// Anything shorter is almost certainly a placeholder like "NB NUMBER".
+const MIN_CONTAINER_NUMBER_LENGTH = 9;
+
 /**
  * Infer the carrier from the first 4 characters of a container number.
  * Returns the carrier name, "AUTO" (track without hint), or null (skip entirely).
@@ -60,28 +65,36 @@ function detectCarrierFromNumber(containerNumber: string): string | null {
 }
 
 /**
- * Returns the effective carrier hint to pass to ParcelsApp, or null to skip tracking.
+ * Returns the effective carrier hint to pass to ParcelsApp, or {track:false} to skip.
+ * - Skips placeholder container numbers that are too short to be real.
  * - Manual hint takes priority if it matches an allowed carrier.
- * - Falls back to auto-detection from the container number prefix.
- * - Returns undefined (not null) for "AUTO" prefixes — ParcelsApp will detect the carrier itself.
- * - Returns null if the container should not be tracked at all.
+ * - Known prefix → use that carrier hint.
+ * - Unknown prefix (e.g. CANU, GCXU, RRSU) → track with AUTO so ParcelsApp detects the carrier.
  */
 function resolveCarrier(
   hint: string | null | undefined,
   containerNumber: string,
 ): { track: boolean; carrier: string | undefined } {
-  // Manual hint wins if it's an allowed carrier
+  // Skip obvious placeholder numbers
+  if (containerNumber.trim().length < MIN_CONTAINER_NUMBER_LENGTH) {
+    return { track: false, carrier: undefined };
+  }
+
+  // Manual hint wins if it mentions a supported carrier
   if (hint) {
     const lower = hint.trim().toLowerCase();
     if (ALLOWED_CARRIERS.some((c) => lower.includes(c))) {
       return { track: true, carrier: hint.trim() };
     }
   }
-  // Auto-detect from prefix
+
+  // Known prefix → use the mapped carrier (or AUTO for leasing companies)
   const detected = detectCarrierFromNumber(containerNumber);
-  if (!detected) return { track: false, carrier: undefined };
-  if (detected === "AUTO") return { track: true, carrier: undefined }; // let ParcelsApp figure it out
-  return { track: true, carrier: detected };
+  if (detected === "AUTO") return { track: true, carrier: undefined };
+  if (detected) return { track: true, carrier: detected };
+
+  // Unknown prefix — try anyway with ParcelsApp auto-detect
+  return { track: true, carrier: undefined };
 }
 
 // ─── Main public entry points ─────────────────────────────────────────────────

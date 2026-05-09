@@ -682,7 +682,7 @@ function ContainerDrawer({
             )}
 
             {/* Last tracking result */}
-            {container && (container.trackingLastStatus || container.trackingLastLocation || container.trackingError) && (
+            {container && (container.trackingLastStatus || container.trackingError) && (
               <div className="rounded-md border bg-muted/30 p-3 space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Last Result</p>
                 {container.trackingLastCheckedAt && (
@@ -694,12 +694,6 @@ function ContainerDrawer({
                   <p className="text-xs">
                     <span className="text-muted-foreground">Status: </span>
                     <span className="font-medium">{container.trackingLastStatus}</span>
-                  </p>
-                )}
-                {container.trackingLastLocation && (
-                  <p className="text-xs">
-                    <span className="text-muted-foreground">Location: </span>
-                    <span className="font-medium">{container.trackingLastLocation}</span>
                   </p>
                 )}
                 {container.trackingLastDescription && (
