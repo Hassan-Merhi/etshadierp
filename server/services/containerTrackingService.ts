@@ -247,6 +247,12 @@ async function trackOneContainer(
   const lastDescription = shipment.states?.[0]?.description ?? null;
   const estimatedDeliveryDate = deriveEstimatedDeliveryDate(shipment);
 
+  // Log full attributes so we can see exactly what ParcelsApp returned
+  console.log(
+    `[ContainerTracking] ${containerNumber} raw attributes:`,
+    JSON.stringify(shipment.attributes ?? {}),
+  );
+
   // Save events
   await saveTrackingEvents(containerId, shipment);
 

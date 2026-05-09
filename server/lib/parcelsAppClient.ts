@@ -34,7 +34,15 @@ export interface ParcelsAppShipment {
     weight?: string;
     origin?: string;
     destination?: string;
+    // ETA — ParcelsApp uses different field names depending on carrier/version
     estimatedDeliveryDate?: string;
+    estimatedDelivery?: string;
+    deliveryDate?: string;
+    expectedDelivery?: string;
+    estimatedArrival?: string;
+    arrivalDate?: string;
+    eta?: string;
+    [key: string]: string | undefined; // catch any other attribute fields
   };
   states?: Array<{
     date: string;
@@ -301,14 +309,33 @@ export function deriveLastEventDate(shipment: ParcelsAppShipment): Date | null {
 
 /**
  * Derives the estimated delivery date from shipment attributes.
+ * Checks multiple field names since ParcelsApp varies by carrier/version.
  * Returns an ISO date string (YYYY-MM-DD) or null if not available.
  */
 export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): string | null {
-  const raw = shipment.attributes?.estimatedDeliveryDate;
-  if (!raw) return null;
-  const d = new Date(raw);
-  if (isNaN(d.getTime())) return null;
-  return d.toISOString().slice(0, 10);
+  const attrs = shipment.attributes;
+  if (!attrs) return null;
+
+  // Try all known field names ParcelsApp uses for ETA
+  const candidates = [
+    attrs.estimatedDeliveryDate,
+    attrs.estimatedDelivery,
+    attrs.deliveryDate,
+    attrs.expectedDelivery,
+    attrs.estimatedArrival,
+    attrs.arrivalDate,
+    attrs.eta,
+  ];
+
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const d = new Date(raw);
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().slice(0, 10);
+    }
+  }
+
+  return null;
 }
 
 /**
