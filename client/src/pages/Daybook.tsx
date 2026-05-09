@@ -2258,8 +2258,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                         const offloadDesc = [o.containerNumber, o.locationName].filter(Boolean).join(" — ");
                                         return (
                                           <TableRow key={`${groupKey}-offload-${o.id}`} className="bg-muted/20">
-                                            <TableCell className="sticky left-0 bg-muted/20 z-10 pl-14">
-                                              <span className="text-sm text-foreground">{offloadDesc || "—"}</span>
+                                            <TableCell className="sticky left-0 bg-muted/20 z-10 pl-14 max-w-0 w-full overflow-hidden">
+                                              <div className="truncate text-sm text-foreground" title={offloadDesc || "—"}>{offloadDesc || "—"}</div>
                                             </TableCell>
                                             <TableCell />
                                             {!hideAmounts && (
@@ -2282,8 +2282,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                             : null);
                                         return (
                                           <TableRow key={`${groupKey}-v-${voucher.id}`} className="bg-muted/20">
-                                            <TableCell className="sticky left-0 bg-muted/20 z-10 pl-14">
-                                              <span className="text-sm text-foreground truncate max-w-xs">{vDesc || voucher.voucherNumber}</span>
+                                            <TableCell className="sticky left-0 bg-muted/20 z-10 pl-14 max-w-0 w-full overflow-hidden">
+                                              <div className="truncate text-sm text-foreground" title={vDesc || voucher.voucherNumber}>{vDesc || voucher.voucherNumber}</div>
                                             </TableCell>
                                             <TableCell />
                                             {!hideAmounts && (
