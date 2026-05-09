@@ -1325,8 +1325,8 @@ function TabTruckLocation() {
           color: "#1e293b",
           fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
           fontSize: "22px",
-          width: "1100px",
-          padding: "44px 40px 36px",
+          width: "1600px",
+          padding: "44px 48px 36px",
           boxSizing: "border-box",
         }}
         aria-hidden="true"
@@ -1385,14 +1385,14 @@ function TabTruckLocation() {
           return (
             <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
               <colgroup>
-                <col style={{ width: "42px" }} />
-                <col style={{ width: "175px" }} />
-                <col style={{ width: "155px" }} />
-                <col style={{ width: "145px" }} />
-                <col style={{ width: "165px" }} />
-                <col style={{ width: "120px" }} />
-                <col style={{ width: "140px" }} />
-                <col style={{ width: "78px" }} />
+                <col style={{ width: "52px" }} />
+                <col style={{ width: "270px" }} />
+                <col style={{ width: "230px" }} />
+                <col style={{ width: "210px" }} />
+                <col style={{ width: "240px" }} />
+                <col style={{ width: "180px" }} />
+                <col style={{ width: "230px" }} />
+                <col style={{ width: "92px" }} />
               </colgroup>
               <thead>
                 <tr style={{ backgroundColor: "#1e3a5f" }}>
