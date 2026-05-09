@@ -416,6 +416,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const posLocation = isPOS && posLocationId ? locations.find(l => l.id === posLocationId) : null;
   const posLocationName = posLocation?.name || "";
 
+  // Fetch all locations this POS user has access to (for multi-location source selection)
+  const { data: myLocations = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ["/api/my-locations"],
+    enabled: isPOS,
+  });
+
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees", selectedCompany?.id],
   });
@@ -2006,19 +2012,25 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const transferSidebarRef = useRef<HTMLDivElement>(null);
   const transferFocusIdRef = useRef(0);
 
-  // For POS users, auto-set source location to their assigned location when locations load
+  // For multi-location POS users: which location they are sending FROM
+  const [posSelectedSourceId, setPosSelectedSourceId] = useState<number | null>(posLocationId ?? null);
+  const posSelectedSourceName = isPOS
+    ? (locations.find(l => l.id === posSelectedSourceId)?.name || posLocationName)
+    : "";
+
+  // For POS users, auto-set source location when posSelectedSourceId or locations change
   useEffect(() => {
-    if (isPOS && posLocationId && posLocationName) {
-      // Update all entries to use POS user's location as source
+    if (isPOS && posSelectedSourceId && posSelectedSourceName) {
+      // Update all entries to use the chosen source location
       const entries = stockTransferForm.getValues("entries");
       entries.forEach((_, index) => {
-        stockTransferForm.setValue(`entries.${index}.sourceLocationId`, posLocationId);
-        stockTransferForm.setValue(`entries.${index}.sourceLocationName`, posLocationName);
+        stockTransferForm.setValue(`entries.${index}.sourceLocationId`, posSelectedSourceId);
+        stockTransferForm.setValue(`entries.${index}.sourceLocationName`, posSelectedSourceName);
       });
       // Set inventory source for sidebar
-      setTransferInventorySource(posLocationId);
+      setTransferInventorySource(posSelectedSourceId);
     }
-  }, [isPOS, posLocationId, posLocationName]);
+  }, [isPOS, posSelectedSourceId, posSelectedSourceName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Stock Transfer Import state
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -4677,7 +4689,36 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 {isPOS && (
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">From:</span>
-                    <span className="font-medium">{posLocationName}</span>
+                    {myLocations.length > 1 ? (
+                      <Select
+                        value={posSelectedSourceId?.toString() || ""}
+                        onValueChange={(v) => {
+                          const newId = parseInt(v);
+                          const newName = locations.find(l => l.id === newId)?.name || "";
+                          setPosSelectedSourceId(newId);
+                          setTransferInventorySource(newId);
+                          const curEntries = stockTransferForm.getValues("entries");
+                          curEntries.forEach((_, index) => {
+                            stockTransferForm.setValue(`entries.${index}.sourceLocationId`, newId);
+                            stockTransferForm.setValue(`entries.${index}.sourceLocationName`, newName);
+                            stockTransferForm.setValue(`entries.${index}.stockItemId`, 0);
+                            stockTransferForm.setValue(`entries.${index}.stockItemName`, "");
+                            stockTransferForm.setValue(`entries.${index}.quantity`, "");
+                          });
+                        }}
+                      >
+                        <SelectTrigger className="w-[160px]" data-testid="select-source-location-pos">
+                          <SelectValue placeholder="Select source..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {myLocations.map(l => (
+                            <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <span className="font-medium">{posSelectedSourceName || posLocationName}</span>
+                    )}
                   </div>
                 )}
                 
@@ -4871,8 +4912,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 setShowSourceSidebar(false);
                                 if (entry?.sourceLocationId > 0) {
                                   setTransferInventorySource(entry.sourceLocationId);
-                                } else if (isPOS && posLocationId) {
-                                  setTransferInventorySource(posLocationId);
+                                } else if (isPOS && posSelectedSourceId) {
+                                  setTransferInventorySource(posSelectedSourceId);
                                 }
                               }}
                               onBlur={() => {
@@ -5138,8 +5179,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   setShowSourceSidebar(false);
                                   if (transferEntries[index]?.sourceLocationId > 0) {
                                     setTransferInventorySource(transferEntries[index].sourceLocationId);
-                                  } else if (isPOS && posLocationId) {
-                                    setTransferInventorySource(posLocationId);
+                                  } else if (isPOS && posSelectedSourceId) {
+                                    setTransferInventorySource(posSelectedSourceId);
                                   } else {
                                     setTransferInventorySource(0);
                                   }
