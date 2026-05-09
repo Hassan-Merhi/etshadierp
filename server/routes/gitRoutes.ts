@@ -169,7 +169,7 @@ async function buildAgentsForCompany(cid: number) {
       dutyFee: containers.dutyFee,
       agent: containers.agent,
       status: containers.status,
-      supplierName: suppliers.name,
+      supplierName: suppliers.legalName,
     })
     .from(containers)
     .leftJoin(suppliers, eq(containers.supplierId, suppliers.id))
