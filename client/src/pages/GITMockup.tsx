@@ -1104,6 +1104,9 @@ function TabPortReport() {
 
 function TabTruckLocation() {
   const [companyMode, setCompanyMode] = useState<CompanyViewMode>("session");
+  const [waSending, setWaSending]     = useState(false);
+  const printRef                      = useRef<HTMLDivElement>(null);
+  const { toast }                     = useToast();
 
   const queryUrl = companyMode === "all"
     ? "/api/git/containers?allCompanies=true&includeOffloaded=true"
@@ -1129,8 +1132,39 @@ function TabTruckLocation() {
   }
   companyGroups.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
 
+  async function sendToWhatsApp() {
+    if (!printRef.current) return;
+    setWaSending(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const el = printRef.current;
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#0d1117",
+        logging: false,
+        width: el.scrollWidth,
+        height: el.scrollHeight,
+        windowWidth: el.scrollWidth,
+        windowHeight: el.scrollHeight,
+      });
+      const imageBase64 = canvas.toDataURL("image/png");
+      const today = new Date().toISOString().substring(0, 10);
+      await apiRequest("POST", "/api/git/send-containers-whatsapp", {
+        imageBase64,
+        fileName: `TruckLocation_${today}.png`,
+      });
+      toast({ title: "Sent", description: "Truck / Location report sent to WhatsApp group." });
+    } catch (err: any) {
+      toast({ title: "Failed to send", description: err.message, variant: "destructive" });
+    } finally {
+      setWaSending(false);
+    }
+  }
+
   const modeSelector = (
-    <div className="flex items-center gap-2 mb-3">
+    <div className="flex items-center gap-2 flex-wrap">
       <span className="text-xs text-muted-foreground">Viewing:</span>
       <Button
         size="sm"
@@ -1169,7 +1203,23 @@ function TabTruckLocation() {
 
   return (
     <div className="space-y-3">
-      {modeSelector}
+
+      {/* Toolbar: mode selector + summary + send button */}
+      <div className="flex items-center gap-2 flex-wrap justify-between">
+        {modeSelector}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={sendToWhatsApp}
+          disabled={waSending || withTruck.length === 0}
+          data-testid="button-send-wa-truck-location"
+        >
+          {waSending
+            ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            : <MessageCircle className="h-4 w-4 mr-1.5" />}
+          {waSending ? "Sending…" : "Send to WhatsApp"}
+        </Button>
+      </div>
 
       {/* Summary strip */}
       <div className="flex gap-4 flex-wrap p-3 rounded-md border bg-muted/30 text-sm">
@@ -1263,6 +1313,180 @@ function TabTruckLocation() {
           </div>
         );
       })}
+
+      {/* ── Hidden Full-HD print template for WhatsApp image capture ── */}
+      <div
+        ref={printRef}
+        style={{
+          position: "absolute",
+          left: "-9999px",
+          top: 0,
+          backgroundColor: "#0d1117",
+          color: "#e6edf3",
+          fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
+          fontSize: "14px",
+          width: "1920px",
+          padding: "32px 36px 28px",
+          boxSizing: "border-box",
+        }}
+        aria-hidden="true"
+      >
+        {/* Header */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "24px",
+          paddingBottom: "16px",
+          borderBottom: "2px solid #21262d",
+        }}>
+          <div>
+            <div style={{ fontSize: "26px", fontWeight: 800, color: "#e6edf3", letterSpacing: "-0.5px" }}>
+              HMD International Group
+            </div>
+            <div style={{ fontSize: "15px", fontWeight: 500, color: "#f59e0b", marginTop: "3px", letterSpacing: "0.3px" }}>
+              TRUCK / LOCATION STATUS — LIVE TRACKING REPORT
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: "22px", fontWeight: 700, color: "#f1f5f9" }}>
+              {withTruck.length} Container{withTruck.length !== 1 ? "s" : ""} on the road
+            </div>
+            <div style={{ fontSize: "13px", color: "#8b949e", marginTop: "2px" }}>
+              {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+              {" · "}
+              {new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}
+            </div>
+          </div>
+        </div>
+
+        {/* Table — grouped by shop */}
+        {(() => {
+          const allShops = [...new Set(withTruck.map(r => r.shopName ?? r.companyName ?? "Unknown"))].sort(
+            (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+          );
+          const cell: React.CSSProperties = {
+            padding: "9px 10px",
+            fontSize: "13px",
+            overflow: "hidden",
+            whiteSpace: "nowrap",
+            borderBottom: "1px solid #21262d",
+            color: "#e6edf3",
+          };
+          return (
+            <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ width: "40px" }} />
+                <col style={{ width: "170px" }} />
+                <col style={{ width: "180px" }} />
+                <col style={{ width: "130px" }} />
+                <col style={{ width: "220px" }} />
+                <col style={{ width: "160px" }} />
+                <col style={{ width: "150px" }} />
+                <col style={{ width: "120px" }} />
+              </colgroup>
+              <thead>
+                <tr style={{ backgroundColor: "#161b22" }}>
+                  {[
+                    { label: "#",           align: "center" as const },
+                    { label: "Container #", align: "left"   as const },
+                    { label: "Supplier",    align: "left"   as const },
+                    { label: "Truck #",     align: "left"   as const },
+                    { label: "Location",    align: "left"   as const },
+                    { label: "Agent",       align: "left"   as const },
+                    { label: "Transporter", align: "left"   as const },
+                    { label: "Status",      align: "left"   as const },
+                  ].map(h => (
+                    <th key={h.label} style={{
+                      padding: "10px 10px",
+                      textAlign: h.align,
+                      color: "#58a6ff",
+                      fontWeight: 700,
+                      fontSize: "12px",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.6px",
+                      borderBottom: "2px solid #30363d",
+                    }}>
+                      {h.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {allShops.flatMap(shop => {
+                  const shopRows = withTruck.filter(r => (r.shopName ?? r.companyName ?? "Unknown") === shop);
+                  let idx = 0;
+                  return [
+                    <tr key={`hd-shop-${shop}`}>
+                      <td colSpan={8} style={{
+                        padding: "8px 10px",
+                        backgroundColor: "#1f2937",
+                        fontWeight: 700,
+                        color: "#fbbf24",
+                        fontSize: "13px",
+                        letterSpacing: "0.3px",
+                        borderTop: "1px solid #374151",
+                        borderBottom: "1px solid #374151",
+                      }}>
+                        {shop}
+                        <span style={{ fontWeight: 400, color: "#9ca3af", marginLeft: "8px", fontSize: "12px" }}>
+                          ({shopRows.length} container{shopRows.length !== 1 ? "s" : ""})
+                        </span>
+                      </td>
+                    </tr>,
+                    ...shopRows.map(r => {
+                      idx++;
+                      const rowBg = idx % 2 === 0 ? "#161b22" : "#0d1117";
+                      return (
+                        <tr key={`hd-row-${r.id}`} style={{ backgroundColor: rowBg }}>
+                          <td style={{ ...cell, textAlign: "center", color: "#6e7681", fontSize: "12px" }}>{idx}</td>
+                          <td style={{ ...cell, fontFamily: "monospace", fontWeight: 700, color: "#79c0ff", fontSize: "13px" }}>{r.containerNumber}</td>
+                          <td style={{ ...cell }}>{r.supplierName ?? "—"}</td>
+                          <td style={{ ...cell, fontFamily: "monospace", color: "#d2a8ff" }}>{r.numberPlate ?? "—"}</td>
+                          <td style={{ ...cell, color: "#7ee787" }}>{r.trackingLocation ?? "—"}</td>
+                          <td style={{ ...cell }}>{r.agent ?? "—"}</td>
+                          <td style={{ ...cell, color: "#ffa657" }}>{r.transporter ?? "—"}</td>
+                          <td style={{ ...cell }}>
+                            <span style={{
+                              display: "inline-block",
+                              padding: "2px 7px",
+                              borderRadius: "4px",
+                              fontSize: "11px",
+                              fontWeight: 600,
+                              backgroundColor: "#21262d",
+                              color: "#c9d1d9",
+                            }}>
+                              {r.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    }),
+                  ];
+                })}
+              </tbody>
+            </table>
+          );
+        })()}
+
+        {/* Footer */}
+        <div style={{
+          marginTop: "20px",
+          paddingTop: "12px",
+          borderTop: "1px solid #21262d",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}>
+          <div style={{ fontSize: "11px", color: "#6e7681" }}>
+            HMD International Group — ERP System — Auto-generated report
+          </div>
+          <div style={{ fontSize: "11px", color: "#6e7681" }}>
+            {new Date().toISOString().replace("T", " ").substring(0, 16)} UTC
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }
