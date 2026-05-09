@@ -269,6 +269,18 @@ export function deriveLastEventDate(shipment: ParcelsAppShipment): Date | null {
 }
 
 /**
+ * Derives the estimated delivery date from shipment attributes.
+ * Returns an ISO date string (YYYY-MM-DD) or null if not available.
+ */
+export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): string | null {
+  const raw = shipment.attributes?.estimatedDeliveryDate;
+  if (!raw) return null;
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+/**
  * Tests the API key by calling the account endpoint.
  * Returns { ok, plan, limit, current } or { ok: false, error }.
  */

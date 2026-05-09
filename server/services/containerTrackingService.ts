@@ -21,6 +21,7 @@ import {
   deriveLastStatus,
   deriveLastLocation,
   deriveLastEventDate,
+  deriveEstimatedDeliveryDate,
   type ParcelsAppShipment,
 } from "../lib/parcelsAppClient";
 
@@ -190,29 +191,37 @@ async function trackOneContainer(
   const lastLocation = deriveLastLocation(shipment);
   const lastEventDate = deriveLastEventDate(shipment);
   const lastDescription = shipment.states?.[0]?.description ?? null;
+  const estimatedDeliveryDate = deriveEstimatedDeliveryDate(shipment);
 
   // Save events
   await saveTrackingEvents(containerId, shipment);
 
+  // Build the update — always update tracking fields; update eta only when the API provides one
+  const updateSet: Record<string, unknown> = {
+    trackingLastCheckedAt: now,
+    trackingLastStatus: lastStatus,
+    trackingLastLocation: lastLocation,
+    trackingLastEventDate: lastEventDate,
+    trackingLastDescription: lastDescription,
+    trackingError: null,
+    trackingChangedAt: now,
+    trackingLocation: lastLocation ?? undefined,
+    trackingDescription: lastDescription ?? undefined,
+  };
+
+  if (estimatedDeliveryDate) {
+    updateSet.eta = estimatedDeliveryDate;
+    updateSet.etaSource = "api";
+  }
+
   // Update container tracking fields
   await db
     .update(containers)
-    .set({
-      trackingLastCheckedAt: now,
-      trackingLastStatus: lastStatus,
-      trackingLastLocation: lastLocation,
-      trackingLastEventDate: lastEventDate,
-      trackingLastDescription: lastDescription,
-      trackingError: null,
-      trackingChangedAt: now,
-      // Also update the visible tracking fields that the existing UI shows
-      trackingLocation: lastLocation ?? undefined,
-      trackingDescription: lastDescription ?? undefined,
-    })
+    .set(updateSet as any)
     .where(eq(containers.id, containerId));
 
   console.log(
-    `[ContainerTracking] ${containerNumber} → status: ${lastStatus ?? "unknown"}, location: ${lastLocation ?? "unknown"}`,
+    `[ContainerTracking] ${containerNumber} → status: ${lastStatus ?? "unknown"}, location: ${lastLocation ?? "unknown"}, eta: ${estimatedDeliveryDate ?? "not provided"}`,
   );
 
   return {
