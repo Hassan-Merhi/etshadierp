@@ -1321,91 +1321,90 @@ function TabTruckLocation() {
           position: "absolute",
           left: "-9999px",
           top: 0,
-          backgroundColor: "#0d1117",
-          color: "#e6edf3",
+          backgroundColor: "#ffffff",
+          color: "#111827",
           fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
           fontSize: "14px",
           width: "1920px",
-          padding: "32px 36px 28px",
+          padding: "40px 48px 32px",
           boxSizing: "border-box",
         }}
         aria-hidden="true"
       >
-        {/* Header */}
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: "24px",
-          paddingBottom: "16px",
-          borderBottom: "2px solid #21262d",
-        }}>
-          <div>
-            <div style={{ fontSize: "26px", fontWeight: 800, color: "#e6edf3", letterSpacing: "-0.5px" }}>
-              HMD International Group
-            </div>
-            <div style={{ fontSize: "15px", fontWeight: 500, color: "#f59e0b", marginTop: "3px", letterSpacing: "0.3px" }}>
-              TRUCK / LOCATION STATUS — LIVE TRACKING REPORT
-            </div>
+        {/* ── Centered header block ── */}
+        <div style={{ textAlign: "center", marginBottom: "28px", paddingBottom: "20px", borderBottom: "3px solid #f59e0b" }}>
+          <div style={{ fontSize: "32px", fontWeight: 900, color: "#111827", letterSpacing: "-0.5px", lineHeight: 1.2 }}>
+            HMD International Group
           </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: "22px", fontWeight: 700, color: "#f1f5f9" }}>
-              {withTruck.length} Container{withTruck.length !== 1 ? "s" : ""} on the road
-            </div>
-            <div style={{ fontSize: "13px", color: "#8b949e", marginTop: "2px" }}>
-              {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
-              {" · "}
-              {new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}
-            </div>
+          <div style={{ fontSize: "16px", fontWeight: 700, color: "#d97706", marginTop: "6px", letterSpacing: "1px", textTransform: "uppercase" }}>
+            Truck / Location Status — Live Tracking Report
+          </div>
+          <div style={{ fontSize: "14px", color: "#6b7280", marginTop: "8px" }}>
+            {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+            {" · "}
+            {new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}
+          </div>
+          <div style={{
+            display: "inline-block",
+            marginTop: "10px",
+            padding: "5px 18px",
+            backgroundColor: "#fef3c7",
+            border: "1px solid #f59e0b",
+            borderRadius: "20px",
+            fontSize: "14px",
+            fontWeight: 700,
+            color: "#92400e",
+          }}>
+            {withTruck.length} Container{withTruck.length !== 1 ? "s" : ""} on the road
           </div>
         </div>
 
-        {/* Table — grouped by shop */}
+        {/* ── Table — grouped by shop ── */}
         {(() => {
           const allShops = [...new Set(withTruck.map(r => r.shopName ?? r.companyName ?? "Unknown"))].sort(
             (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
           );
           const cell: React.CSSProperties = {
-            padding: "9px 10px",
+            padding: "10px 12px",
             fontSize: "13px",
             overflow: "hidden",
             whiteSpace: "nowrap",
-            borderBottom: "1px solid #21262d",
-            color: "#e6edf3",
+            borderBottom: "1px solid #e5e7eb",
+            color: "#111827",
           };
+          const hdrCols = [
+            { label: "#",           align: "center" as const },
+            { label: "Container #", align: "center" as const },
+            { label: "Supplier",    align: "center" as const },
+            { label: "Truck #",     align: "center" as const },
+            { label: "Location",    align: "center" as const },
+            { label: "Agent",       align: "center" as const },
+            { label: "Transporter", align: "center" as const },
+            { label: "Status",      align: "center" as const },
+          ];
           return (
             <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
               <colgroup>
-                <col style={{ width: "40px" }} />
-                <col style={{ width: "170px" }} />
+                <col style={{ width: "44px" }} />
                 <col style={{ width: "180px" }} />
-                <col style={{ width: "130px" }} />
-                <col style={{ width: "220px" }} />
+                <col style={{ width: "190px" }} />
+                <col style={{ width: "140px" }} />
+                <col style={{ width: "230px" }} />
+                <col style={{ width: "170px" }} />
                 <col style={{ width: "160px" }} />
-                <col style={{ width: "150px" }} />
-                <col style={{ width: "120px" }} />
+                <col style={{ width: "130px" }} />
               </colgroup>
               <thead>
-                <tr style={{ backgroundColor: "#161b22" }}>
-                  {[
-                    { label: "#",           align: "center" as const },
-                    { label: "Container #", align: "left"   as const },
-                    { label: "Supplier",    align: "left"   as const },
-                    { label: "Truck #",     align: "left"   as const },
-                    { label: "Location",    align: "left"   as const },
-                    { label: "Agent",       align: "left"   as const },
-                    { label: "Transporter", align: "left"   as const },
-                    { label: "Status",      align: "left"   as const },
-                  ].map(h => (
+                <tr style={{ backgroundColor: "#1e3a5f" }}>
+                  {hdrCols.map(h => (
                     <th key={h.label} style={{
-                      padding: "10px 10px",
+                      padding: "12px 12px",
                       textAlign: h.align,
-                      color: "#58a6ff",
+                      color: "#ffffff",
                       fontWeight: 700,
                       fontSize: "12px",
                       textTransform: "uppercase",
-                      letterSpacing: "0.6px",
-                      borderBottom: "2px solid #30363d",
+                      letterSpacing: "0.8px",
                     }}>
                       {h.label}
                     </th>
@@ -1419,42 +1418,46 @@ function TabTruckLocation() {
                   return [
                     <tr key={`hd-shop-${shop}`}>
                       <td colSpan={8} style={{
-                        padding: "8px 10px",
-                        backgroundColor: "#1f2937",
-                        fontWeight: 700,
-                        color: "#fbbf24",
+                        padding: "9px 12px",
+                        backgroundColor: "#fef3c7",
+                        fontWeight: 800,
+                        color: "#92400e",
                         fontSize: "13px",
-                        letterSpacing: "0.3px",
-                        borderTop: "1px solid #374151",
-                        borderBottom: "1px solid #374151",
+                        letterSpacing: "0.4px",
+                        textAlign: "center",
+                        textTransform: "uppercase",
+                        borderTop: "2px solid #f59e0b",
+                        borderBottom: "2px solid #f59e0b",
                       }}>
                         {shop}
-                        <span style={{ fontWeight: 400, color: "#9ca3af", marginLeft: "8px", fontSize: "12px" }}>
+                        <span style={{ fontWeight: 500, color: "#b45309", marginLeft: "10px", fontSize: "12px", textTransform: "none" }}>
                           ({shopRows.length} container{shopRows.length !== 1 ? "s" : ""})
                         </span>
                       </td>
                     </tr>,
                     ...shopRows.map(r => {
                       idx++;
-                      const rowBg = idx % 2 === 0 ? "#161b22" : "#0d1117";
+                      const rowBg = idx % 2 === 0 ? "#f9fafb" : "#ffffff";
                       return (
                         <tr key={`hd-row-${r.id}`} style={{ backgroundColor: rowBg }}>
-                          <td style={{ ...cell, textAlign: "center", color: "#6e7681", fontSize: "12px" }}>{idx}</td>
-                          <td style={{ ...cell, fontFamily: "monospace", fontWeight: 700, color: "#79c0ff", fontSize: "13px" }}>{r.containerNumber}</td>
-                          <td style={{ ...cell }}>{r.supplierName ?? "—"}</td>
-                          <td style={{ ...cell, fontFamily: "monospace", color: "#d2a8ff" }}>{r.numberPlate ?? "—"}</td>
-                          <td style={{ ...cell, color: "#7ee787" }}>{r.trackingLocation ?? "—"}</td>
-                          <td style={{ ...cell }}>{r.agent ?? "—"}</td>
-                          <td style={{ ...cell, color: "#ffa657" }}>{r.transporter ?? "—"}</td>
-                          <td style={{ ...cell }}>
+                          <td style={{ ...cell, textAlign: "center", color: "#9ca3af", fontSize: "12px" }}>{idx}</td>
+                          <td style={{ ...cell, textAlign: "center", fontFamily: "monospace", fontWeight: 700, color: "#1d4ed8", fontSize: "13px" }}>{r.containerNumber}</td>
+                          <td style={{ ...cell, textAlign: "center" }}>{r.supplierName ?? "—"}</td>
+                          <td style={{ ...cell, textAlign: "center", fontFamily: "monospace", fontWeight: 600, color: "#7c3aed" }}>{r.numberPlate ?? "—"}</td>
+                          <td style={{ ...cell, textAlign: "center", fontWeight: 600, color: "#065f46" }}>{r.trackingLocation ?? "—"}</td>
+                          <td style={{ ...cell, textAlign: "center" }}>{r.agent ?? "—"}</td>
+                          <td style={{ ...cell, textAlign: "center", color: "#b45309", fontWeight: 600 }}>{r.transporter ?? "—"}</td>
+                          <td style={{ ...cell, textAlign: "center" }}>
                             <span style={{
                               display: "inline-block",
-                              padding: "2px 7px",
+                              padding: "3px 9px",
                               borderRadius: "4px",
                               fontSize: "11px",
-                              fontWeight: 600,
-                              backgroundColor: "#21262d",
-                              color: "#c9d1d9",
+                              fontWeight: 700,
+                              backgroundColor: "#dbeafe",
+                              color: "#1e40af",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
                             }}>
                               {r.status}
                             </span>
@@ -1469,19 +1472,19 @@ function TabTruckLocation() {
           );
         })()}
 
-        {/* Footer */}
+        {/* ── Footer ── */}
         <div style={{
-          marginTop: "20px",
-          paddingTop: "12px",
-          borderTop: "1px solid #21262d",
+          marginTop: "24px",
+          paddingTop: "14px",
+          borderTop: "1px solid #e5e7eb",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
         }}>
-          <div style={{ fontSize: "11px", color: "#6e7681" }}>
+          <div style={{ fontSize: "11px", color: "#9ca3af" }}>
             HMD International Group — ERP System — Auto-generated report
           </div>
-          <div style={{ fontSize: "11px", color: "#6e7681" }}>
+          <div style={{ fontSize: "11px", color: "#9ca3af" }}>
             {new Date().toISOString().replace("T", " ").substring(0, 16)} UTC
           </div>
         </div>
