@@ -115,10 +115,32 @@ export function registerFactoryDaybookRoutes(app: Express) {
         });
       }
 
+      // ── 1c. Safety-net: drop payroll-referenced daybook entries whose payroll was deleted ─
+      // This covers PAYROLL_PAYMENT and PAYROLL_GENERATED entries left behind after undo/delete.
+      const payrollRefIds = daybookRows
+        .filter((r: any) => r.referenceTable === "factory_payrolls" && r.referenceId != null)
+        .map((r: any) => r.referenceId as number);
+
+      const validPayrollIds = new Set<number>();
+      if (payrollRefIds.length > 0) {
+        const livePayrolls = await db
+          .select({ id: factoryPayrolls.id })
+          .from(factoryPayrolls)
+          .where(inArray(factoryPayrolls.id, payrollRefIds));
+        livePayrolls.forEach((p: any) => validPayrollIds.add(p.id));
+      }
+
       const filteredDaybookRows = daybookRows
         .filter((r: any) => {
-          if (r.referenceTable !== "vouchers" || r.referenceId == null) return true;
-          return validVoucherIds.has(r.referenceId);
+          // Drop voucher-backed entries whose voucher was deleted
+          if (r.referenceTable === "vouchers" && r.referenceId != null) {
+            return validVoucherIds.has(r.referenceId);
+          }
+          // Drop payroll-backed entries whose payroll was deleted
+          if (r.referenceTable === "factory_payrolls" && r.referenceId != null) {
+            return validPayrollIds.has(r.referenceId);
+          }
+          return true;
         })
         .map((r: any) => ({
           ...r,

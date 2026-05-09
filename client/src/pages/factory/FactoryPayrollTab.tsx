@@ -476,6 +476,7 @@ export default function FactoryPayrollTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/advances/unvouchered"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
@@ -496,6 +497,10 @@ export default function FactoryPayrollTab() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances/unvouchered"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       const msg = data.previousStatus === "PAID"
         ? "Payroll reverted to Draft — payment and accounting entries removed"
         : "Payroll deleted and advances restored";
@@ -517,9 +522,11 @@ export default function FactoryPayrollTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/advances/unvouchered"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       toast({ title: "Batch deleted", description: "All records reversed and accounting entries removed." });
       setDeleteBatchGroup(null);
     },

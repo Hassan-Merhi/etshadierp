@@ -945,6 +945,31 @@ export function registerGitRoutes(app: Express) {
           return String(v).trim();
         }
 
+        /**
+         * Convert a value to a YYYY-MM-DD date string.
+         * Handles JS Date objects, properly-formatted strings, AND Excel serial numbers
+         * (which appear as plain integers like 46043 when the cell has no date format).
+         */
+        function toDateStr(v: any): string {
+          const s = toStr(v);
+          if (!s) return s;
+          // Already a valid ISO date
+          if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+          // Excel serial number (e.g. 46043 → 2026-02-07)
+          const n = Number(s);
+          if (!isNaN(n) && Number.isInteger(n) && n > 1000 && n < 200000) {
+            try {
+              const parsed = XLSX.SSF.parse_date_code(n);
+              if (parsed && parsed.y > 1900 && parsed.y < 2100) {
+                const mm = String(parsed.m).padStart(2, "0");
+                const dd = String(parsed.d).padStart(2, "0");
+                return `${parsed.y}-${mm}-${dd}`;
+              }
+            } catch { /* fall through */ }
+          }
+          return s;
+        }
+
         // Normalise column header → internal key
         const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
         const COL: Record<string, string> = {
@@ -1054,8 +1079,8 @@ export function registerGitRoutes(app: Express) {
             updateData.status = row.status;
           }
           if (row.numberPlate !== undefined && row.numberPlate !== "") updateData.numberPlate = row.numberPlate;
-          if (row.eta) updateData.eta = row.eta;
-          if (row.borderDate) updateData.borderDate = row.borderDate;
+          if (row.eta) updateData.eta = toDateStr(row.eta);
+          if (row.borderDate) updateData.borderDate = toDateStr(row.borderDate);
           if (row.transporter !== undefined && row.transporter !== "") updateData.transporter = row.transporter;
           if (row.trackingLocation !== undefined && row.trackingLocation !== "") updateData.trackingLocation = row.trackingLocation;
           if (row.agent !== undefined && row.agent !== "") updateData.agent = row.agent;
@@ -1076,7 +1101,7 @@ export function registerGitRoutes(app: Express) {
             if (v === "yes" || v === "true" || v === "1") updateData.docReceived = true;
             else if (v === "no" || v === "false" || v === "0") updateData.docReceived = false;
           }
-          if (row.docsSentDate !== undefined && row.docsSentDate !== "") updateData.docsSentDate = row.docsSentDate;
+          if (row.docsSentDate !== undefined && row.docsSentDate !== "") updateData.docsSentDate = toDateStr(row.docsSentDate);
           if (row.trackingLink !== undefined && row.trackingLink !== "") updateData.trackingLink = row.trackingLink;
           if (row.trackingCarrierHint !== undefined && row.trackingCarrierHint !== "") updateData.trackingCarrierHint = row.trackingCarrierHint;
           if (row.trackingEnabled !== undefined && row.trackingEnabled !== "") {

@@ -255,19 +255,22 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
             .where(inArray(factoryWorkerAdvances.id, advanceIds));
         }
 
+        // Write a per-worker PAYROLL_GENERATED entry with referenceId so undo can clean it up
+        const today = getClientDate(req);
+        await writeDaybookEntry(db, {
+          companyId,
+          txDate: today,
+          txType: "PAYROLL_GENERATED",
+          referenceId: record.id,
+          referenceTable: "factory_payrolls",
+          description: `Payroll generated — Worker #${worker.id} (${worker.fullName || worker.employeeCode || ""}). Period: ${startDate} to ${endDate}. Net: $${netSalary.toFixed(2)}`,
+          amountCurrency: netSalary,
+          amountUsd: netSalary,
+          createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+        });
+
         payrollRecords.push(record);
       }
-
-      const today = getClientDate(req);
-      const totalNet = payrollRecords.reduce((sum: number, r: any) => sum + parseFloat(r.netSalary || "0"), 0);
-      await writeDaybookEntry(db, {
-        companyId,
-        txDate: today,
-        txType: "PAYROLL_GENERATED",
-        description: `Payroll generated for ${payrollRecords.length} workers. Period: ${startDate} to ${endDate}. Total: $${totalNet.toFixed(2)}`,
-        amountCurrency: totalNet,
-        amountUsd: totalNet,
-      });
 
       res.json(payrollRecords);
     } catch (error: any) {
@@ -542,6 +545,16 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
             }
           }
         }
+
+        // Delete any daybook entries referencing this payroll (e.g. PAYROLL_GENERATED written at generate time)
+        await tx.delete(factoryDaybookEntries).where(
+          and(
+            eq(factoryDaybookEntries.companyId, companyId),
+            eq(factoryDaybookEntries.referenceId, id),
+            eq(factoryDaybookEntries.referenceTable, "factory_payrolls"),
+          )
+        );
+
         await tx.delete(factoryPayrolls).where(eq(factoryPayrolls.id, id));
       });
 
