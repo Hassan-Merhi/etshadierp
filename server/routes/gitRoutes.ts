@@ -929,7 +929,11 @@ export function registerGitRoutes(app: Express) {
         }
 
         const workbook = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        // Prefer a sheet named "Containers" (case-insensitive), fallback to first sheet
+        const sheetName =
+          workbook.SheetNames.find((n) => n.toLowerCase() === "containers") ??
+          workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
         const rawRows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
         /** Convert any value to a plain string — handles JS Date objects from Excel */
@@ -946,13 +950,31 @@ export function registerGitRoutes(app: Express) {
         }
 
         /**
+         * For optional text fields: treats numeric 0 (Excel blank) as empty string.
+         */
+        function toOptStr(v: any): string {
+          if (v === null || v === undefined || v === 0 || v === "") return "";
+          const s = String(v).trim();
+          return s === "0" ? "" : s;
+        }
+
+        /**
          * Convert a value to a YYYY-MM-DD date string.
          * Handles JS Date objects, properly-formatted strings, AND Excel serial numbers
          * (which appear as plain integers like 46043 when the cell has no date format).
+         * Treats 0 / "0" / blank as empty (Excel stores empty date cells as 0).
          */
         function toDateStr(v: any): string {
-          const s = toStr(v);
-          if (!s) return s;
+          // Numeric 0 = blank date cell in Excel
+          if (v === null || v === undefined || v === "" || v === 0) return "";
+          if (v instanceof Date) {
+            const y = v.getUTCFullYear();
+            const m = String(v.getUTCMonth() + 1).padStart(2, "0");
+            const d = String(v.getUTCDate()).padStart(2, "0");
+            return `${y}-${m}-${d}`;
+          }
+          const s = String(v).trim();
+          if (!s || s === "0") return "";
           // Already a valid ISO date
           if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
           // Excel serial number (e.g. 46043 → 2026-02-07)
@@ -1045,70 +1067,130 @@ export function registerGitRoutes(app: Express) {
 
         for (let i = 0; i < rawRows.length; i++) {
           const raw = rawRows[i];
-          const rowNum = i + 3; // 1 header + 1 hint = data starts at row 3
+          // Sheet row number = 1 (header) + 1 (hint row) + i + 1 (1-based) = i + 3
+          const rowNum = i + 3;
 
-          // Map raw keys to internal keys
+          // Build two maps from each raw column:
+          //   rawMap  — raw cell value (for date/number fields that need special parsing)
+          //   row     — string representation of each mapped field (for text/status fields)
+          const rawMap: Record<string, any> = {};
           const row: Record<string, string> = {};
           for (const [rawKey, rawVal] of Object.entries(raw)) {
             const mapped = COL[norm(rawKey)];
-            if (mapped) row[mapped] = toStr(rawVal);
+            if (mapped) {
+              rawMap[mapped] = rawVal;
+              row[mapped] = toStr(rawVal);
+            }
           }
 
-          const ctrNum = row.containerNumber?.toUpperCase();
+          // ── Container number is the only required field ──────────────────────
+          const ctrNum = row.containerNumber?.trim().toUpperCase() ?? "";
+
+          // Skip blank rows
           if (!ctrNum) { skipped++; continue; }
 
-          // Skip the two example rows that ship with the template
-          const knownExamples = ["MSKU1234567", "TCNU9876543"];
-          if (knownExamples.includes(ctrNum)) { skipped++; continue; }
+          // Skip example/hint rows: the template ships with a hint row (row 2) that
+          // says "Required — used to match" and two example data rows (MSKU…/TCNU…).
+          // Detect any row whose container-number cell is obviously descriptive text.
+          const knownExamples = new Set(["MSKU1234567", "TCNU9876543"]);
+          if (knownExamples.has(ctrNum)) { skipped++; continue; }
+          const lowerCtr = ctrNum.toLowerCase();
+          if (
+            lowerCtr.includes("required") ||
+            lowerCtr.includes("used to match") ||
+            lowerCtr.includes("container #") ||
+            lowerCtr.includes("yyyy-mm-dd") ||
+            lowerCtr.startsWith("e.g")
+          ) { skipped++; continue; }
 
           const match = byNumber.get(ctrNum);
           if (!match) {
             notFound++;
-            errors.push(`Row ${rowNum}: "${ctrNum}" not found`);
+            errors.push(`Row ${rowNum}: "${ctrNum}" not found in system`);
             continue;
           }
 
           const updateData: Record<string, any> = {};
 
-          if (row.status) {
-            if (!VALID_STATUSES.has(row.status)) {
-              errors.push(`Row ${rowNum}: invalid status "${row.status}" — skipped`);
+          // ── Status (optional) ────────────────────────────────────────────────
+          const statusVal = toOptStr(rawMap.status);
+          if (statusVal) {
+            if (!VALID_STATUSES.has(statusVal)) {
+              errors.push(`Row ${rowNum}: invalid status "${statusVal}" — row skipped`);
               skipped++;
               continue;
             }
-            updateData.status = row.status;
+            updateData.status = statusVal;
           }
-          if (row.numberPlate !== undefined && row.numberPlate !== "") updateData.numberPlate = row.numberPlate;
-          if (row.eta) updateData.eta = toDateStr(row.eta);
-          if (row.borderDate) updateData.borderDate = toDateStr(row.borderDate);
-          if (row.transporter !== undefined && row.transporter !== "") updateData.transporter = row.transporter;
-          if (row.trackingLocation !== undefined && row.trackingLocation !== "") updateData.trackingLocation = row.trackingLocation;
-          if (row.agent !== undefined && row.agent !== "") updateData.agent = row.agent;
-          if (row.dutyFee !== undefined && row.dutyFee !== "") {
-            const n = parseFloat(row.dutyFee);
+
+          // ── Optional text fields: 0 / "0" treated as blank ──────────────────
+          const numberPlate = toOptStr(rawMap.numberPlate);
+          if (numberPlate) updateData.numberPlate = numberPlate;
+
+          const transporter = toOptStr(rawMap.transporter);
+          if (transporter) updateData.transporter = transporter;
+
+          const trackingLocation = toOptStr(rawMap.trackingLocation);
+          if (trackingLocation) updateData.trackingLocation = trackingLocation;
+
+          const agent = toOptStr(rawMap.agent);
+          if (agent) updateData.agent = agent;
+
+          const trackingDescription = toOptStr(rawMap.trackingDescription);
+          if (trackingDescription) updateData.trackingDescription = trackingDescription;
+
+          const trackingLink = toOptStr(rawMap.trackingLink);
+          if (trackingLink) updateData.trackingLink = trackingLink;
+
+          const trackingCarrierHint = toOptStr(rawMap.trackingCarrierHint);
+          if (trackingCarrierHint) updateData.trackingCarrierHint = trackingCarrierHint;
+
+          // ── Date fields: serial numbers + blanks safely handled ──────────────
+          const etaDate = toDateStr(rawMap.eta);
+          if (etaDate) updateData.eta = etaDate;
+
+          const borderDate = toDateStr(rawMap.borderDate);
+          if (borderDate) updateData.borderDate = borderDate;
+
+          const docsSentDate = toDateStr(rawMap.docsSentDate);
+          if (docsSentDate) updateData.docsSentDate = docsSentDate;
+
+          // ── Numeric money fields: 0 is a valid value ─────────────────────────
+          if (rawMap.dutyFee !== undefined && rawMap.dutyFee !== "") {
+            const n = parseFloat(String(rawMap.dutyFee));
             if (!isNaN(n)) updateData.dutyFee = n.toString();
           }
-          if (row.transportFee !== undefined && row.transportFee !== "") {
-            const n = parseFloat(row.transportFee);
+          if (rawMap.transportFee !== undefined && rawMap.transportFee !== "") {
+            const n = parseFloat(String(rawMap.transportFee));
             if (!isNaN(n)) updateData.transportFee = n.toString();
           }
-          if (row.trackingDescription !== undefined && row.trackingDescription !== "") updateData.trackingDescription = row.trackingDescription;
-          if (row.freightStatus) {
-            if (VALID_FREIGHT.has(row.freightStatus)) updateData.freightStatus = row.freightStatus;
+
+          // ── Freight status (optional) ─────────────────────────────────────────
+          const freightStatus = toOptStr(rawMap.freightStatus);
+          if (freightStatus && VALID_FREIGHT.has(freightStatus)) {
+            updateData.freightStatus = freightStatus;
           }
-          if (row.docReceived !== undefined && row.docReceived !== "") {
-            const v = row.docReceived.toLowerCase();
-            if (v === "yes" || v === "true" || v === "1") updateData.docReceived = true;
-            else if (v === "no" || v === "false" || v === "0") updateData.docReceived = false;
+
+          // ── Docs Received: YES/Y/1/true → true, NO/N/0/false/blank → false ───
+          if (rawMap.docReceived !== undefined) {
+            const v = String(rawMap.docReceived).trim().toLowerCase();
+            if (v === "yes" || v === "y" || v === "true" || v === "1") {
+              updateData.docReceived = true;
+            } else if (v === "no" || v === "n" || v === "false" || v === "0" || v === "") {
+              updateData.docReceived = false;
+            }
           }
-          if (row.docsSentDate !== undefined && row.docsSentDate !== "") updateData.docsSentDate = toDateStr(row.docsSentDate);
-          if (row.trackingLink !== undefined && row.trackingLink !== "") updateData.trackingLink = row.trackingLink;
-          if (row.trackingCarrierHint !== undefined && row.trackingCarrierHint !== "") updateData.trackingCarrierHint = row.trackingCarrierHint;
-          if (row.trackingEnabled !== undefined && row.trackingEnabled !== "") {
-            const v = row.trackingEnabled.toLowerCase();
-            if (v === "yes" || v === "true" || v === "1" || v === "on") updateData.trackingEnabled = true;
-            else if (v === "no" || v === "false" || v === "0" || v === "off") updateData.trackingEnabled = false;
+
+          // ── Tracking enabled ─────────────────────────────────────────────────
+          if (rawMap.trackingEnabled !== undefined && rawMap.trackingEnabled !== "") {
+            const v = String(rawMap.trackingEnabled).trim().toLowerCase();
+            if (v === "yes" || v === "y" || v === "true" || v === "1" || v === "on") {
+              updateData.trackingEnabled = true;
+            } else if (v === "no" || v === "n" || v === "false" || v === "0" || v === "off") {
+              updateData.trackingEnabled = false;
+            }
           }
+
           // When ETA is set via import, mark it as manual so ParcelsApp doesn't overwrite it immediately
           if (updateData.eta) updateData.etaSource = "manual";
 
