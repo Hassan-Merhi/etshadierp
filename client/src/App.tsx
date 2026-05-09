@@ -38,7 +38,6 @@ import { apiRequest } from "@/lib/queryClient";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const ContainerDashboard = lazy(() => import("@/pages/ContainerDashboard"));
 const ContainersOTW = lazy(() => import("@/pages/GITContainers"));
 const GITMockup = lazy(() => import("@/pages/GITMockup"));
 const TrackingHub = lazy(() => import("@/pages/TrackingHub"));
@@ -274,7 +273,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
   // All other users see full interface
   return (
     <Switch>
-      <Route path="/" component={ContainerDashboard} />
+      <Route path="/" component={ContainersOTW} />
       <Route path="/tracking" component={TrackingHub} />
       <Route path="/financial-overview" component={Dashboard} />
       <Route path="/pos">{() => <POS />}</Route>
