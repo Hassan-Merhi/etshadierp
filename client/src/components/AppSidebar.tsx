@@ -56,7 +56,7 @@ import {
 } from "@/components/sidebar/sidebarPrimitives";
 
 const defaultPinnedItems: NavItem[] = [
-  { title: "Tracking",    url: "/",                    icon: Ship            },
+  { title: "Tracking",    url: "/tracking",             icon: Ship            },
   { title: "Dashboard",   url: "/financial-overview",  icon: LayoutDashboard },
   { title: "Agents",      url: "/agents",              icon: UserRound       },
   { title: "Daybook",     url: "/daybook",             icon: Book            },
@@ -282,22 +282,6 @@ export function AppSidebar({ user }: { user?: any }) {
         )}
 
         <div className="mt-4 pt-3 border-t border-sidebar-border/60 space-y-0.5">
-          {(user?.role === "Developer" || user?.role === "Admin" || user?.role === "Owner") && (
-            <SidebarFlatLink
-              href="/containers-otw"
-              icon={Ship}
-              label="Containers OTW"
-              testId="link-containers-otw"
-            />
-          )}
-          {(user?.role === "Developer" || user?.role === "Admin" || user?.role === "Owner") && (
-            <SidebarFlatLink
-              href="/git"
-              icon={Globe}
-              label="GIT Workbook"
-              testId="link-git"
-            />
-          )}
           {isItemVisible({ title: "Chat", url: "/chat", icon: MessageCircle }) && (
             <SidebarFlatLink
               href="/chat"

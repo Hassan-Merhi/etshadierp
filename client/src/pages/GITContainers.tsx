@@ -825,7 +825,7 @@ function ContainerDrawer({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function GITContainers() {
+export default function GITContainers({ embedded = false }: { embedded?: boolean } = {}) {
   const { data: user } = useQuery<AuthUser>({ queryKey: ["/api/auth/me"] });
 
   const [allCompanies, setAllCompanies] = useState(false);
@@ -1001,7 +1001,7 @@ export default function GITContainers() {
   if (user && !isAllowed) {
     return (
       <div className="flex flex-col h-full overflow-hidden">
-        <PageHeader title="Containers OTW" subtitle="Active container logistics and tracking" />
+        {!embedded && <PageHeader title="Containers OTW" subtitle="Active container logistics and tracking" />}
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center space-y-2">
             <AlertTriangle className="h-8 w-8 text-muted-foreground mx-auto" />
@@ -1019,7 +1019,7 @@ export default function GITContainers() {
   if (!user || isLoading) {
     return (
       <div className="flex flex-col h-full overflow-hidden">
-        <PageHeader title="Containers OTW" subtitle="Active container logistics and tracking" />
+        {!embedded && <PageHeader title="Containers OTW" subtitle="Active container logistics and tracking" />}
         <div className="flex-1 flex items-center justify-center">
           <p className="text-sm text-muted-foreground">Loading containers…</p>
         </div>
@@ -1031,7 +1031,7 @@ export default function GITContainers() {
   if (isError) {
     return (
       <div className="flex flex-col h-full overflow-hidden">
-        <PageHeader title="Containers OTW" subtitle="Active container logistics and tracking" />
+        {!embedded && <PageHeader title="Containers OTW" subtitle="Active container logistics and tracking" />}
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center space-y-2">
             <AlertTriangle className="h-8 w-8 text-red-500 mx-auto" />
@@ -1050,10 +1050,12 @@ export default function GITContainers() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <PageHeader
-        title="Containers OTW"
-        subtitle="Active container logistics and tracking"
-      />
+      {!embedded && (
+        <PageHeader
+          title="Containers OTW"
+          subtitle="Active container logistics and tracking"
+        />
+      )}
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
 

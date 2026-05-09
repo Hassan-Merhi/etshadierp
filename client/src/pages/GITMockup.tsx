@@ -2133,13 +2133,15 @@ function TabWhatsApp() {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function GITMockup() {
+export default function GITMockup({ embedded = false }: { embedded?: boolean } = {}) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <PageHeader
-        title="GIT"
-        subtitle="Daily goods-in-transit workbook — spreadsheet replacement"
-      />
+      {!embedded && (
+        <PageHeader
+          title="GIT"
+          subtitle="Daily goods-in-transit workbook — spreadsheet replacement"
+        />
+      )}
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
 

@@ -936,7 +936,9 @@ export function registerGitRoutes(app: Express) {
           workbook.SheetNames.find((n) => n.toLowerCase() === "containers") ??
           workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
-        const rawRows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        // range: 2 = start from 0-indexed row 2 of the sheet (sheet row 3),
+        // skipping row 1 (header, handled by sheet_to_json) and row 2 (instruction/hint row).
+        const rawRows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "", range: 2 });
 
         /** Convert any value to a plain string — handles JS Date objects from Excel */
         function toStr(v: any): string {

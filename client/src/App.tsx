@@ -41,6 +41,7 @@ const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const ContainerDashboard = lazy(() => import("@/pages/ContainerDashboard"));
 const ContainersOTW = lazy(() => import("@/pages/GITContainers"));
 const GITMockup = lazy(() => import("@/pages/GITMockup"));
+const TrackingHub = lazy(() => import("@/pages/TrackingHub"));
 const POS = lazy(() => import("@/pages/pos/POS"));
 const StockItems = lazy(() => import("@/pages/StockItems"));
 const Containers = lazy(() => import("@/pages/Containers"));
@@ -276,6 +277,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
   return (
     <Switch>
       <Route path="/" component={ContainerDashboard} />
+      <Route path="/tracking" component={TrackingHub} />
       <Route path="/financial-overview" component={Dashboard} />
       <Route path="/pos">{() => <POS />}</Route>
       <Route path="/pos/edit/:id">{(params) => <POS editVoucherId={params.id} />}</Route>
