@@ -246,6 +246,9 @@ export async function trackOneContainerById(containerId: number): Promise<{
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
+// Canonical carriers tried as fallbacks (order matters — most common first)
+const FALLBACK_CARRIERS = ["MAERSK", "MSC", "CMA"];
+
 async function trackOneContainer(
   containerId: number,
   containerNumber: string,
@@ -259,35 +262,60 @@ async function trackOneContainer(
   error: string | null;
 }> {
   const now = new Date();
-  // destinationCountry stays as "United States" (ParcelsApp default).
-  // carrierHint is passed as the separate `carrier` field — NOT as destinationCountry.
-  const result = await trackContainer(containerNumber, "United States", carrierHint);
 
-  const checkData: {
-    containerId: number;
-    provider: string;
-    status: string;
-    checkedAt: Date;
-    errorMessage: string | null;
-    rawResponseJson: unknown;
-  } = {
-    containerId,
-    provider: "parcelsapp",
-    status: result.success ? "success" : result.timedOut ? "timeout" : "error",
-    checkedAt: now,
-    errorMessage: result.error ?? null,
-    rawResponseJson: result.rawResponse,
-  };
+  // Build ordered list of carriers to attempt:
+  // 1. Primary hint (if provided)
+  // 2. Remaining fallback carriers not already covered
+  // 3. No hint at all (ParcelsApp auto-detect)
+  const attempts: Array<string | undefined> = [];
+  if (carrierHint) attempts.push(carrierHint);
+  for (const fb of FALLBACK_CARRIERS) {
+    if (!carrierHint || fb.toLowerCase() !== carrierHint.toLowerCase()) {
+      attempts.push(fb);
+    }
+  }
+  attempts.push(undefined); // final fallback: no hint
 
-  // Save check record
-  try {
-    await db.insert(containerTrackingChecks).values(checkData);
-  } catch (err: any) {
-    console.warn("[ContainerTracking] Failed to save check record:", err?.message);
+  let lastResult: Awaited<ReturnType<typeof trackContainer>> | null = null;
+
+  for (let i = 0; i < attempts.length; i++) {
+    const carrier = attempts[i];
+    if (i > 0) {
+      // Small pause before each retry so we don't hammer the API
+      await sleep(3_000);
+      console.log(`[ContainerTracking] ${containerNumber}: retrying with carrier=${carrier ?? "auto"}…`);
+    }
+
+    const result = await trackContainer(containerNumber, "United States", carrier);
+    lastResult = result;
+
+    // Save each check attempt to the audit log
+    try {
+      await db.insert(containerTrackingChecks).values({
+        containerId,
+        provider: "parcelsapp",
+        status: result.success ? "success" : result.timedOut ? "timeout" : "error",
+        checkedAt: now,
+        errorMessage: result.error ?? null,
+        rawResponseJson: result.rawResponse,
+      });
+    } catch (err: any) {
+      console.warn("[ContainerTracking] Failed to save check record:", err?.message);
+    }
+
+    if (result.success && result.shipment) {
+      // Got usable data — stop trying
+      if (i > 0) {
+        console.log(`[ContainerTracking] ${containerNumber}: succeeded on fallback carrier=${carrier ?? "auto"}`);
+      }
+      break;
+    }
   }
 
+  const result = lastResult!;
+
   if (!result.success || !result.shipment) {
-    // Save failed state to container
+    // All attempts failed
     await db
       .update(containers)
       .set({
