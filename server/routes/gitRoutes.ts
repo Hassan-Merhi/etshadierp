@@ -829,6 +829,7 @@ export function registerGitRoutes(app: Express) {
           "Tracking Description",
           "Tracking Enabled",
           "Tracking Carrier Hint",
+          "Shop Name",
         ];
 
         // Header row — dark blue
@@ -862,6 +863,7 @@ export function registerGitRoutes(app: Express) {
           "",
           "Yes / No — enable ParcelsApp auto-tracking",
           "e.g. MAERSK, MSC, COSCO — leave blank to auto-detect",
+          "e.g. ABC SHOP",
         ];
         const hintRow = ws.addRow(hints);
         hintRow.eachCell((cell: any) => {
@@ -876,7 +878,7 @@ export function registerGitRoutes(app: Express) {
           "MSKU1234567", "In Transit", "T840 EFX", "2026-05-20", "2026-05-15",
           "FARHAT", "NAKONDE", "NCA", "8500", "1200",
           "Yes", "Yes", "2026-05-10", "",
-          "Cleared border — heading inland", "Yes", "MAERSK",
+          "Cleared border — heading inland", "Yes", "MAERSK", "ABC SHOP",
         ]);
         ex1.eachCell((cell: any) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
@@ -888,7 +890,7 @@ export function registerGitRoutes(app: Express) {
           "TCNU9876543", "At Port", "", "2026-05-25", "",
           "CONTINENTAL", "LEFT DAR", "FARHAT AGENCY", "8500", "",
           "Pending", "No", "", "",
-          "Awaiting customs clearance", "No", "",
+          "Awaiting customs clearance", "No", "", "XYZ STORE",
         ]);
         ex2.eachCell((cell: any) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
@@ -899,8 +901,8 @@ export function registerGitRoutes(app: Express) {
         ex1.getCell(1).font = { bold: true, italic: true, color: { argb: "5D4037" } };
         ex1.getCell(1).note = "Example row — delete before importing";
 
-        // Column widths (17 columns)
-        const colWidths = [20, 28, 18, 20, 20, 18, 16, 18, 12, 14, 14, 14, 24, 30, 35, 14, 22];
+        // Column widths (18 columns)
+        const colWidths = [20, 28, 18, 20, 20, 18, 16, 18, 12, 14, 14, 14, 24, 30, 35, 14, 22, 20];
         colWidths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -1044,6 +1046,11 @@ export function registerGitRoutes(app: Express) {
           carrier: "trackingCarrierHint",
           shippingline: "trackingCarrierHint",
           shippingcarrier: "trackingCarrierHint",
+          shopname: "shopName",
+          shop: "shopName",
+          store: "shopName",
+          storename: "shopName",
+          clientshop: "shopName",
         };
 
         // Status values — stored with exact casing; compare case-insensitively so
@@ -1150,6 +1157,9 @@ export function registerGitRoutes(app: Express) {
 
           const trackingCarrierHint = toOptStr(rawMap.trackingCarrierHint);
           if (trackingCarrierHint) updateData.trackingCarrierHint = trackingCarrierHint;
+
+          const shopName = toOptStr(rawMap.shopName);
+          if (shopName) updateData.shopName = shopName;
 
           // ── Date fields: serial numbers + blanks safely handled ──────────────
           const etaDate = toDateStr(rawMap.eta);
