@@ -827,6 +827,8 @@ export function registerGitRoutes(app: Express) {
           "Docs Sent Date (YYYY-MM-DD)",
           "Tracking Link",
           "Tracking Description",
+          "Tracking Enabled",
+          "Tracking Carrier Hint",
         ];
 
         // Header row — dark blue
@@ -858,6 +860,8 @@ export function registerGitRoutes(app: Express) {
           "YYYY-MM-DD",
           "https://…",
           "",
+          "Yes / No — enable ParcelsApp auto-tracking",
+          "e.g. MAERSK, MSC, COSCO — leave blank to auto-detect",
         ];
         const hintRow = ws.addRow(hints);
         hintRow.eachCell((cell: any) => {
@@ -872,7 +876,7 @@ export function registerGitRoutes(app: Express) {
           "MSKU1234567", "In Transit", "T840 EFX", "2026-05-20", "2026-05-15",
           "FARHAT", "NAKONDE", "NCA", "8500", "1200",
           "Yes", "Yes", "2026-05-10", "",
-          "Cleared border — heading inland",
+          "Cleared border — heading inland", "Yes", "MAERSK",
         ]);
         ex1.eachCell((cell: any) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
@@ -884,7 +888,7 @@ export function registerGitRoutes(app: Express) {
           "TCNU9876543", "At Port", "", "2026-05-25", "",
           "CONTINENTAL", "LEFT DAR", "FARHAT AGENCY", "8500", "",
           "Pending", "No", "", "",
-          "Awaiting customs clearance",
+          "Awaiting customs clearance", "No", "",
         ]);
         ex2.eachCell((cell: any) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
@@ -895,8 +899,8 @@ export function registerGitRoutes(app: Express) {
         ex1.getCell(1).font = { bold: true, italic: true, color: { argb: "5D4037" } };
         ex1.getCell(1).note = "Example row — delete before importing";
 
-        // Column widths
-        const colWidths = [20, 28, 18, 20, 20, 18, 16, 18, 12, 14, 14, 14, 24, 30, 35];
+        // Column widths (17 columns)
+        const colWidths = [20, 28, 18, 20, 20, 18, 16, 18, 12, 14, 14, 14, 24, 30, 35, 14, 22];
         colWidths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -927,6 +931,19 @@ export function registerGitRoutes(app: Express) {
         const workbook = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const rawRows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+        /** Convert any value to a plain string — handles JS Date objects from Excel */
+        function toStr(v: any): string {
+          if (v === null || v === undefined) return "";
+          if (v instanceof Date) {
+            // Format as YYYY-MM-DD in UTC to avoid timezone shifts
+            const y = v.getUTCFullYear();
+            const m = String(v.getUTCMonth() + 1).padStart(2, "0");
+            const d = String(v.getUTCDate()).padStart(2, "0");
+            return `${y}-${m}-${d}`;
+          }
+          return String(v).trim();
+        }
 
         // Normalise column header → internal key
         const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -969,6 +986,17 @@ export function registerGitRoutes(app: Express) {
           trackinglink: "trackingLink",
           link: "trackingLink",
           tracklink: "trackingLink",
+          trackingenabled: "trackingEnabled",
+          autotrackingenabled: "trackingEnabled",
+          autotracking: "trackingEnabled",
+          tracking: "trackingEnabled",
+          trackingon: "trackingEnabled",
+          trackon: "trackingEnabled",
+          trackingcarrierhint: "trackingCarrierHint",
+          carrierhint: "trackingCarrierHint",
+          carrier: "trackingCarrierHint",
+          shippingline: "trackingCarrierHint",
+          shippingcarrier: "trackingCarrierHint",
         };
 
         const VALID_STATUSES = new Set([
@@ -998,7 +1026,7 @@ export function registerGitRoutes(app: Express) {
           const row: Record<string, string> = {};
           for (const [rawKey, rawVal] of Object.entries(raw)) {
             const mapped = COL[norm(rawKey)];
-            if (mapped) row[mapped] = String(rawVal ?? "").trim();
+            if (mapped) row[mapped] = toStr(rawVal);
           }
 
           const ctrNum = row.containerNumber?.toUpperCase();
@@ -1050,6 +1078,14 @@ export function registerGitRoutes(app: Express) {
           }
           if (row.docsSentDate !== undefined && row.docsSentDate !== "") updateData.docsSentDate = row.docsSentDate;
           if (row.trackingLink !== undefined && row.trackingLink !== "") updateData.trackingLink = row.trackingLink;
+          if (row.trackingCarrierHint !== undefined && row.trackingCarrierHint !== "") updateData.trackingCarrierHint = row.trackingCarrierHint;
+          if (row.trackingEnabled !== undefined && row.trackingEnabled !== "") {
+            const v = row.trackingEnabled.toLowerCase();
+            if (v === "yes" || v === "true" || v === "1" || v === "on") updateData.trackingEnabled = true;
+            else if (v === "no" || v === "false" || v === "0" || v === "off") updateData.trackingEnabled = false;
+          }
+          // When ETA is set via import, mark it as manual so ParcelsApp doesn't overwrite it immediately
+          if (updateData.eta) updateData.etaSource = "manual";
 
           if (Object.keys(updateData).length === 0) { skipped++; continue; }
 
