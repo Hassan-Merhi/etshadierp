@@ -822,8 +822,11 @@ export function registerGitRoutes(app: Express) {
           "Agent",
           "Duty Fee",
           "Transport Fee",
-          "Tracking Description",
           "Freight Status",
+          "Docs Received",
+          "Docs Sent Date (YYYY-MM-DD)",
+          "Tracking Link",
+          "Tracking Description",
         ];
 
         // Header row — dark blue
@@ -850,8 +853,11 @@ export function registerGitRoutes(app: Express) {
           "",
           "number",
           "number",
-          "",
           "Yes / No / Pending",
+          "Yes / No",
+          "YYYY-MM-DD",
+          "https://…",
+          "",
         ];
         const hintRow = ws.addRow(hints);
         hintRow.eachCell((cell: any) => {
@@ -865,7 +871,8 @@ export function registerGitRoutes(app: Express) {
         const ex1 = ws.addRow([
           "MSKU1234567", "In Transit", "T840 EFX", "2026-05-20", "2026-05-15",
           "FARHAT", "NAKONDE", "NCA", "8500", "1200",
-          "Cleared border — heading inland", "Yes",
+          "Yes", "Yes", "2026-05-10", "",
+          "Cleared border — heading inland",
         ]);
         ex1.eachCell((cell: any) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
@@ -874,9 +881,10 @@ export function registerGitRoutes(app: Express) {
 
         // Example row 2
         const ex2 = ws.addRow([
-          "TCNU9876543", "At Port", "T191 BAV", "2026-05-25", "",
+          "TCNU9876543", "At Port", "", "2026-05-25", "",
           "CONTINENTAL", "LEFT DAR", "FARHAT AGENCY", "8500", "",
-          "Awaiting customs clearance", "Pending",
+          "Pending", "No", "", "",
+          "Awaiting customs clearance",
         ]);
         ex2.eachCell((cell: any) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
@@ -888,7 +896,7 @@ export function registerGitRoutes(app: Express) {
         ex1.getCell(1).note = "Example row — delete before importing";
 
         // Column widths
-        const colWidths = [20, 28, 18, 20, 20, 18, 16, 18, 12, 14, 35, 14];
+        const colWidths = [20, 28, 18, 20, 20, 18, 16, 18, 12, 14, 14, 14, 24, 30, 35];
         colWidths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -950,6 +958,17 @@ export function registerGitRoutes(app: Express) {
           description: "trackingDescription",
           freightstatus: "freightStatus",
           freight: "freightStatus",
+          docsreceived: "docReceived",
+          docs: "docReceived",
+          docreceived: "docReceived",
+          documentsreceived: "docReceived",
+          docssentdate: "docsSentDate",
+          docssentdateyyyymmdd: "docsSentDate",
+          docssent: "docsSentDate",
+          sentdate: "docsSentDate",
+          trackinglink: "trackingLink",
+          link: "trackingLink",
+          tracklink: "trackingLink",
         };
 
         const VALID_STATUSES = new Set([
@@ -1024,6 +1043,13 @@ export function registerGitRoutes(app: Express) {
           if (row.freightStatus) {
             if (VALID_FREIGHT.has(row.freightStatus)) updateData.freightStatus = row.freightStatus;
           }
+          if (row.docReceived !== undefined && row.docReceived !== "") {
+            const v = row.docReceived.toLowerCase();
+            if (v === "yes" || v === "true" || v === "1") updateData.docReceived = true;
+            else if (v === "no" || v === "false" || v === "0") updateData.docReceived = false;
+          }
+          if (row.docsSentDate !== undefined && row.docsSentDate !== "") updateData.docsSentDate = row.docsSentDate;
+          if (row.trackingLink !== undefined && row.trackingLink !== "") updateData.trackingLink = row.trackingLink;
 
           if (Object.keys(updateData).length === 0) { skipped++; continue; }
 
