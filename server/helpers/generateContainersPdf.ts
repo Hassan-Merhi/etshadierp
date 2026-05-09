@@ -55,7 +55,7 @@ export async function generateContainersPdf(): Promise<ContainersPdfResult> {
     `SELECT c.container_number,
             co.name          AS company_name,
             c.shop_name,
-            s.name           AS supplier_name,
+            s.legal_name     AS supplier_name,
             c.number_plate,
             c.tracking_location,
             c.eta::text      AS eta,
