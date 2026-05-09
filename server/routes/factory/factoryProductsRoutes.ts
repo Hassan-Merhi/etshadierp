@@ -772,12 +772,22 @@ export function registerFactoryProductsRoutes(app: Express) {
           month: sql<number>`EXTRACT(MONTH FROM ${factoryBales.createdAt})`.as("month"),
           balesIn: sql<number>`COUNT(*)::int`.as("bales_in"),
           balesOut: sql<number>`SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED','DELETED','DISPATCHED') THEN 1 ELSE 0 END)::int`.as("bales_out"),
-          // balesPending = bales from this month that are currently IN_STOCK (= Net for this month)
-          balesPending: sql<number>`SUM(CASE WHEN ${factoryBales.status} = 'IN_STOCK' THEN 1 ELSE 0 END)::int`.as("bales_pending"),
+          // balesInStock = all IN_STOCK bales from this month
+          balesInStock: sql<number>`SUM(CASE WHEN ${factoryBales.status} = 'IN_STOCK' THEN 1 ELSE 0 END)::int`.as("bales_in_stock"),
+          // balesLoading = IN_STOCK bales that are assigned to a LOADING order
+          balesLoading: sql<number>`SUM(CASE WHEN ${factoryBales.status} = 'IN_STOCK' AND EXISTS (
+            SELECT 1 FROM customer_order_bales cob
+            JOIN customer_orders co ON co.id = cob.order_id
+            WHERE cob.bale_id = ${factoryBales.id} AND co.status = 'LOADING' AND co.company_id = ${companyId}
+          ) THEN 1 ELSE 0 END)::int`.as("bales_loading"),
           totalWeightIn: sql<number>`COALESCE(SUM(${factoryBales.weightKg}::numeric), 0)`.as("total_weight_in"),
           totalWeightOut: sql<number>`COALESCE(SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED','DELETED','DISPATCHED') THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as("total_weight_out"),
-          // Weight of bales from this month that are currently IN_STOCK
-          totalWeightInStock: sql<number>`COALESCE(SUM(CASE WHEN ${factoryBales.status} = 'IN_STOCK' THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as("total_weight_in_stock"),
+          // Weight of bales from this month that are currently IN_STOCK and not in a loading order
+          totalWeightInStock: sql<number>`COALESCE(SUM(CASE WHEN ${factoryBales.status} = 'IN_STOCK' AND NOT EXISTS (
+            SELECT 1 FROM customer_order_bales cob
+            JOIN customer_orders co ON co.id = cob.order_id
+            WHERE cob.bale_id = ${factoryBales.id} AND co.status = 'LOADING' AND co.company_id = ${companyId}
+          ) THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as("total_weight_in_stock"),
           totalCost: sql<number>`COALESCE(SUM(${factoryBales.totalCost}::numeric), 0)`.as("total_cost"),
         })
         .from(factoryBales)
@@ -793,11 +803,24 @@ export function registerFactoryProductsRoutes(app: Express) {
         .orderBy(sql`EXTRACT(MONTH FROM ${factoryBales.createdAt})`);
 
       // Grand Total Net = actual current IN_STOCK bale count (all-time, not year-filtered)
-      // This matches Location Inventory which uses status='IN_STOCK'
+      // Excludes bales currently in a LOADING order
       const [inStockSnapshot] = await db
         .select({
-          balesNet: sql<number>`COUNT(*)::int`.as("bales_net"),
-          totalWeightNet: sql<number>`COALESCE(SUM(${factoryBales.weightKg}::numeric), 0)`.as("total_weight_net"),
+          balesNet: sql<number>`SUM(CASE WHEN NOT EXISTS (
+            SELECT 1 FROM customer_order_bales cob
+            JOIN customer_orders co ON co.id = cob.order_id
+            WHERE cob.bale_id = ${factoryBales.id} AND co.status = 'LOADING' AND co.company_id = ${companyId}
+          ) THEN 1 ELSE 0 END)::int`.as("bales_net"),
+          balesLoading: sql<number>`SUM(CASE WHEN EXISTS (
+            SELECT 1 FROM customer_order_bales cob
+            JOIN customer_orders co ON co.id = cob.order_id
+            WHERE cob.bale_id = ${factoryBales.id} AND co.status = 'LOADING' AND co.company_id = ${companyId}
+          ) THEN 1 ELSE 0 END)::int`.as("bales_loading"),
+          totalWeightNet: sql<number>`COALESCE(SUM(CASE WHEN NOT EXISTS (
+            SELECT 1 FROM customer_order_bales cob
+            JOIN customer_orders co ON co.id = cob.order_id
+            WHERE cob.bale_id = ${factoryBales.id} AND co.status = 'LOADING' AND co.company_id = ${companyId}
+          ) THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as("total_weight_net"),
         })
         .from(factoryBales)
         .where(and(
@@ -808,14 +831,16 @@ export function registerFactoryProductsRoutes(app: Express) {
         ));
 
       const realInStockCount = Number(inStockSnapshot?.balesNet ?? 0);
+      const realLoadingCount = Number(inStockSnapshot?.balesLoading ?? 0);
       const realInStockWeightKg = Number(inStockSnapshot?.totalWeightNet ?? 0);
 
       const monthlyData = rows.map((r: any) => {
         const balesIn = Number(r.balesIn);
         const balesOut = Number(r.balesOut);
-        const balesPending = Number(r.balesPending);
-        // Net (In Stock) for a month = bales from that month still currently IN_STOCK
-        const balesNet = balesPending;
+        const balesLoading = Number(r.balesLoading);
+        const balesInStock = Number(r.balesInStock);
+        // Net = in-stock bales that are NOT in a loading order
+        const balesNet = balesInStock - balesLoading;
         const totalWeightIn = Number(r.totalWeightIn);
         const totalWeightOut = Number(r.totalWeightOut);
         const totalWeightInStock = Number(r.totalWeightInStock);
@@ -825,7 +850,7 @@ export function registerFactoryProductsRoutes(app: Express) {
           baleCount: balesIn,
           balesIn,
           balesOut,
-          balesPending,
+          balesPending: balesLoading,
           balesNet,
           totalWeight: totalWeightIn,
           totalWeightOut,
