@@ -778,7 +778,7 @@ export function registerFactoryProductsRoutes(app: Express) {
           balesLoading: sql<number>`SUM(CASE WHEN ${factoryBales.status} = 'IN_STOCK' AND EXISTS (
             SELECT 1 FROM customer_order_bales cob
             JOIN customer_orders co ON co.id = cob.order_id
-            WHERE cob.bale_id = ${factoryBales.id} AND co.status = 'LOADING' AND co.company_id = ${companyId}
+            WHERE cob.bale_id = ${sql.raw('factory_bales.id')} AND co.status = 'LOADING' AND co.company_id = ${companyId}
           ) THEN 1 ELSE 0 END)::int`.as("bales_loading"),
           totalWeightIn: sql<number>`COALESCE(SUM(${factoryBales.weightKg}::numeric), 0)`.as("total_weight_in"),
           totalWeightOut: sql<number>`COALESCE(SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED','DELETED','DISPATCHED') THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as("total_weight_out"),
@@ -786,7 +786,7 @@ export function registerFactoryProductsRoutes(app: Express) {
           totalWeightInStock: sql<number>`COALESCE(SUM(CASE WHEN ${factoryBales.status} = 'IN_STOCK' AND NOT EXISTS (
             SELECT 1 FROM customer_order_bales cob
             JOIN customer_orders co ON co.id = cob.order_id
-            WHERE cob.bale_id = ${factoryBales.id} AND co.status = 'LOADING' AND co.company_id = ${companyId}
+            WHERE cob.bale_id = ${sql.raw('factory_bales.id')} AND co.status = 'LOADING' AND co.company_id = ${companyId}
           ) THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as("total_weight_in_stock"),
           totalCost: sql<number>`COALESCE(SUM(${factoryBales.totalCost}::numeric), 0)`.as("total_cost"),
         })
@@ -809,17 +809,17 @@ export function registerFactoryProductsRoutes(app: Express) {
           balesNet: sql<number>`SUM(CASE WHEN NOT EXISTS (
             SELECT 1 FROM customer_order_bales cob
             JOIN customer_orders co ON co.id = cob.order_id
-            WHERE cob.bale_id = ${factoryBales.id} AND co.status = 'LOADING' AND co.company_id = ${companyId}
+            WHERE cob.bale_id = ${sql.raw('factory_bales.id')} AND co.status = 'LOADING' AND co.company_id = ${companyId}
           ) THEN 1 ELSE 0 END)::int`.as("bales_net"),
           balesLoading: sql<number>`SUM(CASE WHEN EXISTS (
             SELECT 1 FROM customer_order_bales cob
             JOIN customer_orders co ON co.id = cob.order_id
-            WHERE cob.bale_id = ${factoryBales.id} AND co.status = 'LOADING' AND co.company_id = ${companyId}
+            WHERE cob.bale_id = ${sql.raw('factory_bales.id')} AND co.status = 'LOADING' AND co.company_id = ${companyId}
           ) THEN 1 ELSE 0 END)::int`.as("bales_loading"),
           totalWeightNet: sql<number>`COALESCE(SUM(CASE WHEN NOT EXISTS (
             SELECT 1 FROM customer_order_bales cob
             JOIN customer_orders co ON co.id = cob.order_id
-            WHERE cob.bale_id = ${factoryBales.id} AND co.status = 'LOADING' AND co.company_id = ${companyId}
+            WHERE cob.bale_id = ${sql.raw('factory_bales.id')} AND co.status = 'LOADING' AND co.company_id = ${companyId}
           ) THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as("total_weight_net"),
         })
         .from(factoryBales)
