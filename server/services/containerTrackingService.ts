@@ -267,12 +267,6 @@ async function trackOneContainer(
     updateSet.etaSource = "api";
   }
 
-  // Also push the API-derived location into the main visible Location column
-  // so users see it in the table without opening the drawer.
-  if (lastLocation) {
-    updateSet.trackingLocation = lastLocation;
-  }
-
   // Update container tracking fields
   await db
     .update(containers)
