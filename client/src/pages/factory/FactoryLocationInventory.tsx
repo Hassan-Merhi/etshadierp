@@ -6,7 +6,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,7 +21,7 @@ import { PageHeader } from "@/components/PageHeader";
 import {
   MapPin, Layers, Package, Search, Printer, ArrowUpDown,
   FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check, Trash2, Pencil, Tag, Zap, Eye,
-  AlertTriangle
+  AlertTriangle, ArrowLeft, TrendingUp, Weight, DollarSign,
 } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { useEscapeBack } from "@/hooks/use-escape-back";
@@ -105,6 +105,44 @@ function applySortProducts(items: FactoryBaleProduct[], field: SortField, dir: S
 const SPECIAL_FACTORY_CATS = ["Wipers", "Garbage"];
 function isSpecialFactoryCategory(name: string) {
   return SPECIAL_FACTORY_CATS.some((s) => s.toLowerCase() === name.trim().toLowerCase());
+}
+
+const CATEGORY_COLORS: Record<string, string> = {
+  "Adult":   "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30",
+  "Uniform": "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30",
+  "AS MIX":  "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30",
+  "Kids":    "bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30",
+  "Ladies":  "bg-pink-500/15 text-pink-600 dark:text-pink-400 border-pink-500/30",
+  "Winter":  "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30",
+  "Wipers":  "bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30",
+  "Garbage": "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30",
+};
+function catColor(cat: string | null) {
+  return CATEGORY_COLORS[cat ?? ""] ?? "bg-muted text-muted-foreground border-border";
+}
+
+interface StatCardProps {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  sub?: string;
+  accent?: string;
+}
+function StatCard({ icon, label, value, sub, accent }: StatCardProps) {
+  return (
+    <Card className="flex-1 min-w-[140px]">
+      <CardContent className="pt-4 pb-3 px-4">
+        <div className="flex items-start justify-between mb-2">
+          <div className={`p-1.5 rounded-md ${accent ?? "bg-muted"}`}>
+            {icon}
+          </div>
+        </div>
+        <div className="text-2xl font-bold font-mono leading-tight">{value}</div>
+        <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
+        {sub && <div className="text-xs text-muted-foreground/70 mt-0.5">{sub}</div>}
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function FactoryLocationInventory() {
@@ -1058,97 +1096,96 @@ export default function FactoryLocationInventory() {
   // ─── View 1: Location list ────────────────────────────────────────────────
   if (!selectedLocation) {
     return (
-      <div className="p-4 md:p-6 max-w-4xl mx-auto">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6 flex-wrap">
+      <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
+
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
-            <PageHeader title="Location Inventory" subtitle="Physical bales on ground by location" />
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight">Location Inventory</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Physical bales on ground by location</p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const p = new URLSearchParams();
-              if (hideAvgCost) p.set("includeCost", "0");
-              if (hideSellingPrice) p.set("includeSellPrice", "0");
-              const qs = p.toString();
-              window.open(`/api/factory/location-inventory/export/all${qs ? "?" + qs : ""}`, "_blank");
-            }}
-            data-testid="button-export-all-locations"
-          >
-            <FileSpreadsheet className="h-4 w-4 mr-1" /> Export All (Excel)
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const p = new URLSearchParams();
+                if (hideAvgCost) p.set("includeCost", "0");
+                if (hideSellingPrice) p.set("includeSellPrice", "0");
+                const qs = p.toString();
+                window.open(`/api/factory/location-inventory/export/all${qs ? "?" + qs : ""}`, "_blank");
+              }}
+              data-testid="button-export-all-locations"
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-1.5" /> Export All (Excel)
+            </Button>
+          </div>
         </div>
 
-        <Card className="p-4 w-full">
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input
-              placeholder="Search locations..."
-              value={locationSearch}
-              onChange={(e) => setLocationSearch(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-locations"
-            />
-          </div>
+        {/* Search + list */}
+        <Card>
+          <CardContent className="pt-4 pb-4 px-4">
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search locations..."
+                value={locationSearch}
+                onChange={(e) => setLocationSearch(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-locations"
+              />
+            </div>
 
-          {locationsLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : locations.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No locations found.</div>
-          ) : (
-            <div className="rounded-md border overflow-hidden w-full">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 sticky top-0 z-30">
-                  <tr className="h-12">
-                    <th className="text-left px-3 font-medium">Name</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredLocations.length === 0 ? (
-                    <tr>
-                      <td className="text-center py-8 text-muted-foreground">No locations found matching your search</td>
-                    </tr>
-                  ) : (
-                    filteredLocations.map((location) => (
-                      <tr
-                        key={location.id}
-                        className="border-t hover-elevate cursor-pointer h-12"
-                        onClick={() => handleLocationClick(location)}
-                        data-testid={`row-location-${location.id}`}
-                      >
-                        <td className="px-3 font-medium">
-                          <div className="flex items-center gap-2 justify-between">
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-4 w-4 text-muted-foreground" />
-                              {location.name}
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={(e) => openRenameDialog(location, e)}
-                              data-testid={`button-rename-location-${location.id}`}
-                              title="Rename location"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {!locationsLoading && filteredLocations.length > 0 && (
-            <div className="mt-4 text-sm text-muted-foreground">
-              Showing {filteredLocations.length} of {locations.length} locations
-            </div>
-          )}
+            {locationsLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+              </div>
+            ) : locations.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                <MapPin className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                No locations found.
+              </div>
+            ) : filteredLocations.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground text-sm">
+                No locations match your search.
+              </div>
+            ) : (
+              <div className="rounded-md border overflow-hidden">
+                {filteredLocations.map((location, idx) => (
+                  <div
+                    key={location.id}
+                    className={`flex items-center justify-between px-4 py-3.5 cursor-pointer hover-elevate ${idx > 0 ? "border-t" : ""}`}
+                    onClick={() => handleLocationClick(location)}
+                    data-testid={`row-location-${location.id}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-1.5 rounded-md bg-muted">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <span className="font-medium">{location.name}</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => openRenameDialog(location, e)}
+                      data-testid={`button-rename-location-${location.id}`}
+                      title="Rename location"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!locationsLoading && filteredLocations.length > 0 && (
+              <div className="mt-3 text-xs text-muted-foreground">
+                {filteredLocations.length} of {locations.length} location{locations.length !== 1 ? "s" : ""}
+              </div>
+            )}
+          </CardContent>
         </Card>
 
         <Dialog open={renameDialogOpen} onOpenChange={(open) => { if (!open) setRenameDialogOpen(false); }}>
@@ -1231,12 +1268,19 @@ export default function FactoryLocationInventory() {
             <Checkbox checked={isSelected} onCheckedChange={() => toggleSelection(prod)} data-testid={`checkbox-product${testIdSuffix}-${prod.productId}`} />
           </td>
         )}
-        <td className="px-3 text-muted-foreground text-xs">{prod.category || "Uncategorized"}</td>
+        <td className="px-3">
+          <Badge
+            variant="outline"
+            className={`text-xs font-medium no-default-active-elevate whitespace-nowrap ${catColor(prod.category)}`}
+          >
+            {prod.category || "Uncategorized"}
+          </Badge>
+        </td>
         <td className="px-3">
           <div className="flex items-center gap-1.5 flex-wrap">
             <button
               onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation.id}`)}
-              className={`text-left font-medium ${proformaMode ? "" : "hover:underline cursor-pointer"}`}
+              className={`text-left font-medium leading-snug ${proformaMode ? "" : "hover:underline cursor-pointer"}`}
               data-testid={`link-product${testIdSuffix}-${prod.productId}`}
             >
               {prod.productName}
@@ -1344,37 +1388,52 @@ export default function FactoryLocationInventory() {
   };
 
   return (
-    <div className={`p-4 md:p-6 max-w-6xl mx-auto ${proformaMode && selections.size > 0 ? "pb-24" : ""}`}>
+    <div className={`p-4 md:p-6 max-w-6xl mx-auto space-y-5 ${proformaMode && selections.size > 0 ? "pb-24" : ""}`}>
+
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleBackToLocations}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            data-testid="breadcrumb-locations"
-          >
-            Locations
-          </button>
-          <span className="text-muted-foreground text-sm">/</span>
-          <h1 className="text-xl md:text-2xl font-bold" data-testid="text-page-title">{selectedLocation.name}</h1>
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
-            onClick={(e) => openRenameDialog(selectedLocation, e)}
-            data-testid="button-rename-selected-location"
-            title="Rename location"
+            onClick={handleBackToLocations}
+            data-testid="breadcrumb-locations"
+            title="Back to locations"
           >
-            <Pencil className="h-4 w-4" />
+            <ArrowLeft className="h-5 w-5" />
           </Button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl md:text-2xl font-bold tracking-tight" data-testid="text-page-title">
+                {selectedLocation.name}
+              </h1>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => openRenameDialog(selectedLocation, e)}
+                data-testid="button-rename-selected-location"
+                title="Rename location"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex items-center gap-1.5 mt-1">
+              <Badge variant="outline" className="text-xs font-medium no-default-active-elevate">
+                <MapPin className="h-3 w-3 mr-1" />
+                Location Inventory
+              </Badge>
+              <span className="text-xs text-muted-foreground" data-testid="text-subtitle">Physical bales · IN_STOCK</span>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant={proformaMode ? "destructive" : "outline"}
             size="sm"
             onClick={toggleProformaMode}
             data-testid="button-toggle-proforma-mode"
           >
-            <ClipboardList className="h-4 w-4 mr-1" />
+            <ClipboardList className="h-4 w-4 mr-1.5" />
             {proformaMode ? "Exit Proforma" : "Proforma Mode"}
           </Button>
           <Button variant="outline" size="icon" onClick={() => handlePrint()} data-testid="button-print" title="Print">
@@ -1398,38 +1457,47 @@ export default function FactoryLocationInventory() {
         </div>
       </div>
 
-      <p className="text-sm text-muted-foreground mb-4" data-testid="text-subtitle">
-        Physical bales on ground · IN_STOCK
-      </p>
-
-      {/* Stat chips */}
+      {/* KPI cards */}
       {!inventoryLoading && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
-            <Package className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-muted-foreground">Bales:</span>
-            <span className="font-mono font-semibold" data-testid="stat-total-bales">{statsBales.toLocaleString()}</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
-            <span className="text-muted-foreground">Total KG:</span>
-            <span className="font-mono font-semibold" data-testid="stat-total-kg">{fmt(statsKg)}</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
-            <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-muted-foreground">Categories:</span>
-            <span className="font-mono font-semibold" data-testid="stat-categories">{categoryGroups.length}</span>
-          </div>
+        <div className="flex flex-wrap gap-3">
+          <StatCard
+            icon={<Package className="h-4 w-4 text-blue-400" />}
+            label="Total Bales"
+            value={statsBales.toLocaleString()}
+            sub={`${activeInventoryData.filter(p => p.baleCount > 0).length} products`}
+            accent="bg-blue-500/10"
+          />
+          <StatCard
+            icon={<Weight className="h-4 w-4 text-emerald-400" />}
+            label="Total KG"
+            value={fmt(statsKg)}
+            sub={statsBales > 0 ? `~${fmt(statsKg / statsBales)} KG / bale` : undefined}
+            accent="bg-emerald-500/10"
+          />
+          <StatCard
+            icon={<Layers className="h-4 w-4 text-purple-400" />}
+            label="Categories"
+            value={String(categoryGroups.length)}
+            sub={`${activeInventoryData.length} products total`}
+            accent="bg-purple-500/10"
+          />
           {!hideAvgCost && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
-              <span className="text-muted-foreground">Cost Value:</span>
-              <span className="font-mono font-semibold" data-testid="stat-cost-value">{formatAmount(statsCostValue)}</span>
-            </div>
+            <StatCard
+              icon={<DollarSign className="h-4 w-4 text-amber-400" />}
+              label="Cost Value"
+              value={formatAmount(statsCostValue)}
+              sub="production price basis"
+              accent="bg-amber-500/10"
+            />
           )}
           {!hideSellingPrice && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
-              <span className="text-muted-foreground">Sell Value:</span>
-              <span className="font-mono font-semibold" data-testid="stat-sell-value">{formatAmount(statsSellValue)}</span>
-            </div>
+            <StatCard
+              icon={<TrendingUp className="h-4 w-4 text-green-400" />}
+              label="Sell Value"
+              value={formatAmount(statsSellValue)}
+              sub="at current selling price"
+              accent="bg-green-500/10"
+            />
           )}
         </div>
       )}
