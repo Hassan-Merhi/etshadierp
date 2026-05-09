@@ -126,7 +126,6 @@ const ProductionSummary = lazy(() => import("@/pages/factory/ProductionSummary")
 const FactorySuppliers = lazy(() => import("@/pages/factory/FactorySuppliers"));
 const FactoryContainers = lazy(() => import("@/pages/factory/FactoryContainers"));
 const FactoryContainerCreate = lazy(() => import("@/pages/factory/FactoryContainerCreate"));
-const FactoryShippingContainers = lazy(() => import("@/pages/factory/FactoryShippingContainers"));
 const BarcodeManager = lazy(() => import("@/pages/BarcodeManager"));
 const TestDataImport = lazy(() => import("@/pages/TestDataImport"));
 const ImportCycleDiagnostics = lazy(() => import("@/pages/ImportCycleDiagnostics"));
@@ -965,7 +964,6 @@ function AuthenticatedApp() {
                     <Route path="/factory/suppliers" component={FactorySuppliers} />
                     <Route path="/factory/containers/new" component={FactoryContainerCreate} />
                     <Route path="/factory/containers" component={FactoryContainers} />
-                    <Route path="/factory/shipping-containers" component={FactoryShippingContainers} />
                     <Route path="/factory/bale-products" component={BaleProducts} />
                     <Route path="/factory/raw-stock/opening-balance/:id/edit" component={FactoryOpeningBalanceEdit} />
                     <Route path="/factory/raw-stock" component={ProductionRawStock} />

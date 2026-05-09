@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -948,13 +947,8 @@ export default function FactoryShippingContainers() {
   const hasActiveFilters = filterDocs !== "all" || filterFinalized !== "all";
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <PageHeader
-        title="Shipping Containers"
-        subtitle="Track commercial invoice shipments and prepare WhatsApp document packages"
-      />
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <>
+      <div className="space-y-4">
 
         {/* ── Top Controls ── */}
         <div className="flex items-center gap-2 flex-wrap">
@@ -1338,6 +1332,6 @@ export default function FactoryShippingContainers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 }
