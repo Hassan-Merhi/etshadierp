@@ -546,7 +546,7 @@ export const containers = pgTable("containers", {
   trackingLink: text("tracking_link"),
   // ParcelsApp auto-tracking fields
   trackingProvider: text("tracking_provider"),
-  trackingEnabled: boolean("tracking_enabled").notNull().default(false),
+  trackingEnabled: boolean("tracking_enabled").notNull().default(true),
   trackingAutoUpdate: boolean("tracking_auto_update").notNull().default(true),
   trackingCarrierHint: text("tracking_carrier_hint"),
   trackingLastCheckedAt: timestamp("tracking_last_checked_at", { withTimezone: true }),

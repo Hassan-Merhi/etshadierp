@@ -1222,7 +1222,7 @@ export default function GITContainers() {
                 variant="outline"
                 size="default"
                 onClick={() => bulkTrackMutation.mutate()}
-                disabled={bulkTrackMutation.isPending || trackingEnabledCount === 0}
+                disabled={bulkTrackMutation.isPending || allContainers.length === 0}
                 data-testid="button-bulk-track-now"
                 title="Immediately pull tracking updates for all auto-tracking containers, instead of waiting for the automatic 6-hour cycle"
               >

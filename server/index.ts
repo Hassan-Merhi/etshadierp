@@ -2826,7 +2826,7 @@ let migrationsDone = false;
 
     // ParcelsApp auto-tracking — new columns on containers
     `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_provider text`,
-    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_enabled boolean NOT NULL DEFAULT false`,
+    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_enabled boolean NOT NULL DEFAULT true`,
     `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_auto_update boolean NOT NULL DEFAULT true`,
     `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_carrier_hint text`,
     `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_last_checked_at timestamptz`,
@@ -2899,6 +2899,9 @@ let migrationsDone = false;
     )`,
     `CREATE INDEX IF NOT EXISTS fscd_scr_idx ON factory_shipping_container_documents (scr_id)`,
     `CREATE INDEX IF NOT EXISTS fscd_company_idx ON factory_shipping_container_documents (company_id)`,
+
+    // Enable auto-tracking on all existing containers so "Track All Now" works immediately
+    `UPDATE containers SET tracking_enabled = true WHERE tracking_enabled = false AND status NOT IN ('Offloaded','Closed','Completed')`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
