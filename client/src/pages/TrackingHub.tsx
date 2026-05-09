@@ -1,7 +1,19 @@
+import { lazy, Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/PageHeader";
-import GITContainers from "@/pages/GITContainers";
-import GITMockup from "@/pages/GITMockup";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const GITContainers = lazy(() => import("@/pages/GITContainers"));
+const GITMockup = lazy(() => import("@/pages/GITMockup"));
+
+function TabFallback() {
+  return (
+    <div className="p-4 space-y-3">
+      <Skeleton className="h-10 w-full" />
+      <Skeleton className="h-64 w-full" />
+    </div>
+  );
+}
 
 export default function TrackingHub() {
   return (
@@ -20,11 +32,15 @@ export default function TrackingHub() {
           </TabsList>
 
           <TabsContent value="containers-otw" className="flex-1 overflow-hidden m-0 p-0">
-            <GITContainers embedded />
+            <Suspense fallback={<TabFallback />}>
+              <GITContainers embedded />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="git-tracking" className="flex-1 overflow-hidden m-0 p-0">
-            <GITMockup embedded />
+            <Suspense fallback={<TabFallback />}>
+              <GITMockup embedded />
+            </Suspense>
           </TabsContent>
         </Tabs>
       </div>
