@@ -14,7 +14,7 @@ const BASE_URL =
   "https://parcelsapp.com/api/v3";
 
 const POLL_INTERVAL_MS = 5_000;
-const POLL_MAX_ATTEMPTS = 12; // 60 seconds max
+const POLL_MAX_ATTEMPTS = 18; // 90 seconds max
 
 export interface ParcelsAppEvent {
   date: string | null;
@@ -191,20 +191,28 @@ export async function trackContainer(
       };
     }
 
-    // Poll until done
+    // Poll until done — also track the best partial shipment seen so far
+    let bestShipment: ParcelsAppShipment | null = null;
+
     for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
       await sleep(POLL_INTERVAL_MS);
       try {
         const polled = await pollTracking(initiated.uuid);
         rawResponse = polled;
 
+        // Keep the richest shipment seen across all polls
+        const candidate =
+          polled.shipments.find((s) => s.trackingId === containerNumber) ??
+          polled.shipments[0] ??
+          null;
+        if (candidate && (candidate.states?.length ?? 0) >= (bestShipment?.states?.length ?? 0)) {
+          bestShipment = candidate;
+        }
+
         if (polled.done) {
-          const shipment = polled.shipments.find(
-            (s) => s.trackingId === containerNumber,
-          ) ?? polled.shipments[0] ?? null;
           return {
             success: true,
-            shipment,
+            shipment: bestShipment,
             rawResponse: polled,
             timedOut: false,
           };
@@ -212,6 +220,17 @@ export async function trackContainer(
       } catch (pollErr: any) {
         console.warn(`[ParcelsApp] Poll attempt ${attempt + 1} error: ${pollErr?.message}`);
       }
+    }
+
+    // Timed out — but if we received any shipment data during polling, use it
+    if (bestShipment) {
+      console.warn(`[ParcelsApp] ${containerNumber}: timed out but returning partial data (${bestShipment.states?.length ?? 0} events)`);
+      return {
+        success: true,
+        shipment: bestShipment,
+        rawResponse,
+        timedOut: true,
+      };
     }
 
     return {
