@@ -34,21 +34,25 @@ const COOLDOWN_HOURS = 4;
 // either from a manual hint or auto-detected from the container number prefix.
 const ALLOWED_CARRIERS = ["maersk", "cma", "msc"];
 
-// Container number prefix → canonical carrier name.
-// First 4 letters of a standard ISO container number identify the owner.
+// Container number prefix → canonical carrier name (or "AUTO" to let ParcelsApp detect).
+// First 4 letters of a standard ISO container number identify the owner/lessor.
 const PREFIX_TO_CARRIER: Record<string, string> = {
-  // Maersk
+  // Maersk (including Hamburg Sud subsidiary)
   MAEU: "MAERSK", MRKU: "MAERSK", MSKU: "MAERSK",
-  TRHU: "MAERSK", TEMU: "MAERSK", SEAU: "MAERSK", SUDU: "MAERSK",
+  TRHU: "MAERSK", TEMU: "MAERSK", SEAU: "MAERSK",
+  SUDU: "MAERSK", HASU: "MAERSK",
   // CMA CGM (includes APL which CMA owns)
   CMAU: "CMA", CGMU: "CMA", APMU: "CMA", APHU: "CMA", CXDU: "CMA",
+  CAAU: "CMA",
   // MSC
   MSCU: "MSC", MEDU: "MSC", MSDU: "MSC",
+  // Leasing companies (Triton, Textainer, etc.) — let ParcelsApp auto-detect carrier
+  TCNU: "AUTO", TGBU: "AUTO", ECMU: "AUTO", TXGI: "AUTO",
 };
 
 /**
  * Infer the carrier from the first 4 characters of a container number.
- * Returns "MAERSK", "CMA", "MSC", or null if unknown.
+ * Returns the carrier name, "AUTO" (track without hint), or null (skip entirely).
  */
 function detectCarrierFromNumber(containerNumber: string): string | null {
   const prefix = containerNumber.trim().toUpperCase().slice(0, 4);
@@ -56,17 +60,28 @@ function detectCarrierFromNumber(containerNumber: string): string | null {
 }
 
 /**
- * Returns the effective carrier hint — manual hint first, then auto-detected.
- * Returns null if neither is available or if the carrier is not in the allowed list.
+ * Returns the effective carrier hint to pass to ParcelsApp, or null to skip tracking.
+ * - Manual hint takes priority if it matches an allowed carrier.
+ * - Falls back to auto-detection from the container number prefix.
+ * - Returns undefined (not null) for "AUTO" prefixes — ParcelsApp will detect the carrier itself.
+ * - Returns null if the container should not be tracked at all.
  */
-function resolveCarrier(hint: string | null | undefined, containerNumber: string): string | null {
+function resolveCarrier(
+  hint: string | null | undefined,
+  containerNumber: string,
+): { track: boolean; carrier: string | undefined } {
+  // Manual hint wins if it's an allowed carrier
   if (hint) {
     const lower = hint.trim().toLowerCase();
-    if (ALLOWED_CARRIERS.some((c) => lower.includes(c))) return hint.trim();
+    if (ALLOWED_CARRIERS.some((c) => lower.includes(c))) {
+      return { track: true, carrier: hint.trim() };
+    }
   }
+  // Auto-detect from prefix
   const detected = detectCarrierFromNumber(containerNumber);
-  if (detected) return detected;
-  return null;
+  if (!detected) return { track: false, carrier: undefined };
+  if (detected === "AUTO") return { track: true, carrier: undefined }; // let ParcelsApp figure it out
+  return { track: true, carrier: detected };
 }
 
 // ─── Main public entry points ─────────────────────────────────────────────────
@@ -116,17 +131,17 @@ export async function trackDueContainers(): Promise<void> {
   }
 
   const eligible = rows
-    .map((r) => ({ ...r, carrier: resolveCarrier(r.trackingCarrierHint, r.containerNumber) }))
-    .filter((r) => r.carrier !== null);
+    .map((r) => ({ ...r, resolved: resolveCarrier(r.trackingCarrierHint, r.containerNumber) }))
+    .filter((r) => r.resolved.track);
   const skippedCarrier = rows.length - eligible.length;
   if (skippedCarrier > 0) {
-    console.log(`[ContainerTracking] Skipping ${skippedCarrier} container(s) — carrier not MAERSK/CMA/MSC.`);
+    console.log(`[ContainerTracking] Skipping ${skippedCarrier} container(s) — unrecognised carrier/prefix.`);
   }
   console.log(`[ContainerTracking] ${eligible.length} container(s) due for tracking.`);
 
   for (const row of eligible) {
     try {
-      await trackOneContainer(row.id, row.containerNumber, row.carrier!);
+      await trackOneContainer(row.id, row.containerNumber, row.resolved.carrier);
       // Small delay between containers to be polite to the API
       await sleep(1_500);
     } catch (err: any) {
@@ -171,18 +186,18 @@ export async function trackAllEnabledNow(): Promise<number> {
     );
 
   const eligible = rows
-    .map((r) => ({ ...r, carrier: resolveCarrier(r.trackingCarrierHint, r.containerNumber) }))
-    .filter((r) => r.carrier !== null);
+    .map((r) => ({ ...r, resolved: resolveCarrier(r.trackingCarrierHint, r.containerNumber) }))
+    .filter((r) => r.resolved.track);
 
   if (eligible.length === 0) return 0;
 
   // Fire and forget — caller gets the count back immediately
   (async () => {
     const skipped = rows.length - eligible.length;
-    console.log(`[BulkTracking] Starting manual run for ${eligible.length} containers (${skipped} skipped — carrier not MAERSK/CMA/MSC)…`);
+    console.log(`[BulkTracking] Starting manual run for ${eligible.length} containers (${skipped} skipped — unrecognised carrier/prefix)…`);
     for (const row of eligible) {
       try {
-        await trackOneContainer(row.id, row.containerNumber, row.carrier!);
+        await trackOneContainer(row.id, row.containerNumber, row.resolved.carrier);
         await sleep(2_000);
       } catch (err: any) {
         console.error(`[BulkTracking] Error tracking ${row.containerNumber}:`, err?.message);
