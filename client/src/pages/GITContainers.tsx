@@ -336,16 +336,17 @@ function ContainerDrawer({
   });
 
   const trackNowMutation = useMutation({
-    mutationFn: () =>
-      apiRequest("POST", `/api/container-tracking/${container!.id}/track-now`, {}),
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: [queryKey] });
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/container-tracking/${container!.id}/track-now`, {});
+      return res.json() as Promise<{ started: boolean; containerNumber: string; message: string }>;
+    },
+    onSuccess: (data) => {
       toast({
-        title: "Tracking refreshed",
-        description: data?.lastStatus
-          ? `Status: ${data.lastStatus}${data.lastLocation ? ` — ${data.lastLocation}` : ""}`
-          : "Tracking data updated.",
+        title: `Tracking started for ${data.containerNumber}`,
+        description: data.message,
       });
+      // ParcelsApp polling takes up to 60 s — refresh after 70 s to pick up results
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: [queryKey] }), 70_000);
     },
     onError: (err: any) => {
       toast({ title: "Track Now failed", description: err?.message ?? "Unknown error", variant: "destructive" });
@@ -1488,7 +1489,7 @@ export default function GITContainers() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileSpreadsheet className="h-5 w-5 text-green-600" />
-              Import Complete
+              Import Result
             </DialogTitle>
           </DialogHeader>
           {importResult && (
@@ -1507,17 +1508,30 @@ export default function GITContainers() {
                   <p className="text-xs text-muted-foreground mt-0.5">Not Found</p>
                 </div>
               </div>
+
+              {importResult.updated === 0 && importResult.notFound > 0 && (
+                <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800 p-3 text-sm text-red-800 dark:text-red-300">
+                  <p className="font-semibold mb-1">No containers were updated.</p>
+                  <p className="text-xs">The container numbers in your Excel file did not match any containers in the system. Make sure the <strong>Container #</strong> column contains the exact same numbers stored here (including spaces and capitalisation).</p>
+                </div>
+              )}
+
               {importResult.errors.length > 0 && (
-                <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3 space-y-1 max-h-48 overflow-y-auto">
-                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-400 mb-1">Issues</p>
+                <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3 space-y-1 max-h-56 overflow-y-auto">
+                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-400 mb-1">
+                    Row details ({importResult.errors.length})
+                  </p>
                   {importResult.errors.map((e, i) => (
-                    <p key={i} className="text-xs text-amber-700 dark:text-amber-300">{e}</p>
+                    <p key={i} className="text-xs text-amber-700 dark:text-amber-300 font-mono">{e}</p>
                   ))}
                 </div>
               )}
-              <p className="text-xs text-muted-foreground">
-                The page has been refreshed with the latest data.
-              </p>
+
+              {importResult.updated > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  The page has been refreshed with the latest data.
+                </p>
+              )}
             </div>
           )}
         </DialogContent>

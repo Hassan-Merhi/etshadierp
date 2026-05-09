@@ -64,7 +64,8 @@ export function registerContainerTrackingRoutes(app: Express) {
     }
   });
 
-  // POST /api/container-tracking/:id/track-now — manually trigger tracking
+  // POST /api/container-tracking/:id/track-now — immediately start tracking (fire-and-forget)
+  // Returns 202 right away; polling takes up to 60 s so we never make the browser wait.
   app.post("/api/container-tracking/:id/track-now", requireAuth, async (req: Request, res: Response) => {
     if (!requireAllowedRole(req, res)) return;
 
@@ -74,13 +75,47 @@ export function registerContainerTrackingRoutes(app: Express) {
       return;
     }
 
+    if (!process.env.PARCELSAPP_API_KEY) {
+      res.status(400).json({ message: "ParcelsApp API key is not configured on this server. Please add PARCELSAPP_API_KEY to your environment variables." });
+      return;
+    }
+
+    // Quick validation — check the container exists and is not inactive
     try {
-      const result = await trackOneContainerById(containerId);
-      res.json(result);
+      const [row] = await db
+        .select({ id: containers.id, containerNumber: containers.containerNumber, status: containers.status })
+        .from(containers)
+        .where(eq(containers.id, containerId))
+        .limit(1);
+
+      if (!row) {
+        res.status(404).json({ message: "Container not found" });
+        return;
+      }
+
+      const INACTIVE = new Set(["Offloaded", "Closed", "Completed"]);
+      if (INACTIVE.has(row.status)) {
+        res.status(409).json({
+          message: `Container status is "${row.status}" — tracking updates are disabled for closed containers`,
+        });
+        return;
+      }
+
+      // Respond immediately — tracking runs in the background (up to 60 s)
+      res.status(202).json({
+        started: true,
+        containerNumber: row.containerNumber,
+        message: "Tracking started. Results will appear in about a minute — refresh the page to see updates.",
+      });
+
+      // Fire-and-forget
+      trackOneContainerById(containerId).catch((err: any) =>
+        console.error(`[TrackNow] ${row.containerNumber}:`, err?.message),
+      );
     } catch (err: any) {
-      const msg: string = err?.message ?? "Tracking failed";
-      const status = msg.includes("not found") ? 404 : msg.includes("disabled") ? 409 : 500;
-      res.status(status).json({ message: msg });
+      if (!res.headersSent) {
+        res.status(500).json({ message: err?.message ?? "Tracking failed" });
+      }
     }
   });
 
