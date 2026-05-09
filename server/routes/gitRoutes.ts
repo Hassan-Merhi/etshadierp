@@ -1249,7 +1249,7 @@ export function registerGitRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/git/containers-wa-settings", requireAuth, requireRole(["Admin", "Developer", "Owner"]), async (req: Request, res: Response) => {
+  app.patch("/api/git/containers-wa-settings", requireAuth, requireRole("Admin", "Developer", "Owner"), async (req: Request, res: Response) => {
     try {
       const { groupChatId = "", scheduleEnabled = false, scheduleHour = 8 } = req.body;
       const { updateContainersWaSettings } = await import("../services/whatsappService");
@@ -1262,7 +1262,7 @@ export function registerGitRoutes(app: Express) {
 
   // ── Send containers table to WhatsApp ───────────────────────────────────────
 
-  app.post("/api/git/send-containers-whatsapp", requireAuth, requireRole(["Admin", "Developer", "Owner"]), async (req: Request, res: Response) => {
+  app.post("/api/git/send-containers-whatsapp", requireAuth, requireRole("Admin", "Developer", "Owner"), async (req: Request, res: Response) => {
     try {
       const { imageBase64, fileName } = req.body ?? {};
       const { getContainersWaSettings, sendWhatsAppFileToChatId } = await import("../services/whatsappService");
