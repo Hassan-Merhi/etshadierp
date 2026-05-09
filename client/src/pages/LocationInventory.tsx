@@ -1695,15 +1695,17 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => openWaGroupDialog(location, e)}
-                                data-testid={`button-wa-group-location-${location.id}`}
-                                title={(location as any).whatsappGroupChatId ? "Change WhatsApp group" : "Set WhatsApp group"}
-                              >
-                                <MessageCircle className={`h-4 w-4 ${(location as any).whatsappGroupChatId ? "text-green-600 dark:text-green-400" : ""}`} />
-                              </Button>
+                              {!posUser && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => openWaGroupDialog(location, e)}
+                                  data-testid={`button-wa-group-location-${location.id}`}
+                                  title={(location as any).whatsappGroupChatId ? "Change WhatsApp group" : "Set WhatsApp group"}
+                                >
+                                  <MessageCircle className={`h-4 w-4 ${(location as any).whatsappGroupChatId ? "text-green-600 dark:text-green-400" : ""}`} />
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -2010,15 +2012,17 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               >
                 <Pencil className="h-4 w-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => openWaGroupDialog(selectedLocationLocal, e)}
-                data-testid="button-wa-group-selected-location"
-                title={(selectedLocationLocal as any).whatsappGroupChatId ? "Change WhatsApp group" : "Set WhatsApp group"}
-              >
-                <MessageCircle className={`h-4 w-4 ${(selectedLocationLocal as any).whatsappGroupChatId ? "text-green-600 dark:text-green-400" : ""}`} />
-              </Button>
+              {!posUser && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => openWaGroupDialog(selectedLocationLocal, e)}
+                  data-testid="button-wa-group-selected-location"
+                  title={(selectedLocationLocal as any).whatsappGroupChatId ? "Change WhatsApp group" : "Set WhatsApp group"}
+                >
+                  <MessageCircle className={`h-4 w-4 ${(selectedLocationLocal as any).whatsappGroupChatId ? "text-green-600 dark:text-green-400" : ""}`} />
+                </Button>
+              )}
             </div>
             <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
               {/* Export dropdown */}
