@@ -30,6 +30,16 @@ const INACTIVE_SET = new Set<string>(INACTIVE_STATUSES);
 
 const COOLDOWN_HOURS = 4;
 
+// Only track containers whose carrier hint matches one of these (case-insensitive).
+// Containers with no hint or a different carrier are skipped.
+const ALLOWED_CARRIERS = ["maersk", "cma", "msc"];
+
+function isAllowedCarrier(hint: string | null | undefined): boolean {
+  if (!hint) return false;
+  const lower = hint.trim().toLowerCase();
+  return ALLOWED_CARRIERS.some((c) => lower.includes(c));
+}
+
 // ─── Main public entry points ─────────────────────────────────────────────────
 
 /**
@@ -76,9 +86,14 @@ export async function trackDueContainers(): Promise<void> {
     return;
   }
 
-  console.log(`[ContainerTracking] ${rows.length} container(s) due for tracking.`);
+  const eligible = rows.filter((r) => isAllowedCarrier(r.trackingCarrierHint));
+  const skippedCarrier = rows.length - eligible.length;
+  if (skippedCarrier > 0) {
+    console.log(`[ContainerTracking] Skipping ${skippedCarrier} container(s) — carrier not MAERSK/CMA/MSC.`);
+  }
+  console.log(`[ContainerTracking] ${eligible.length} container(s) due for tracking.`);
 
-  for (const row of rows) {
+  for (const row of eligible) {
     try {
       await trackOneContainer(row.id, row.containerNumber, row.trackingCarrierHint ?? undefined);
       // Small delay between containers to be polite to the API
@@ -124,12 +139,15 @@ export async function trackAllEnabledNow(): Promise<number> {
       notInArray(containers.status, [...INACTIVE_STATUSES]),
     );
 
-  if (rows.length === 0) return 0;
+  const eligible = rows.filter((r) => isAllowedCarrier(r.trackingCarrierHint));
+
+  if (eligible.length === 0) return 0;
 
   // Fire and forget — caller gets the count back immediately
   (async () => {
-    console.log(`[BulkTracking] Starting manual run for ${rows.length} containers…`);
-    for (const row of rows) {
+    const skipped = rows.length - eligible.length;
+    console.log(`[BulkTracking] Starting manual run for ${eligible.length} containers (${skipped} skipped — carrier not MAERSK/CMA/MSC)…`);
+    for (const row of eligible) {
       try {
         await trackOneContainer(row.id, row.containerNumber, row.trackingCarrierHint ?? undefined);
         await sleep(2_000);
@@ -137,10 +155,10 @@ export async function trackAllEnabledNow(): Promise<number> {
         console.error(`[BulkTracking] Error tracking ${row.containerNumber}:`, err?.message);
       }
     }
-    console.log(`[BulkTracking] Manual run complete for ${rows.length} containers.`);
+    console.log(`[BulkTracking] Manual run complete for ${eligible.length} containers.`);
   })().catch((err: any) => console.error("[BulkTracking] Unexpected error:", err?.message));
 
-  return rows.length;
+  return eligible.length;
 }
 
 /**
