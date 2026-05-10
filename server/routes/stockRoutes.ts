@@ -104,7 +104,7 @@ export function registerStockRoutes(app: Express) {
       const parsed = insertStockGradeSchema.parse({ ...req.body, companyId });
       const [created] = await db.insert(stockGrades).values(parsed).returning();
       try {
-        await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "create", tableName: "stock_grades", recordId: created.id, recordIdentifier: created.name, changes: { name: { new: created.name } } });
+        await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "create", tableName: "stock_grades", recordId: created.id, recordIdentifier: created.name, changes: { name: { old: null, new: created.name } } });
       } catch { /* non-fatal */ }
       res.status(201).json(created);
     } catch (error: any) { res.status(400).json({ message: error.message }); }
@@ -170,7 +170,7 @@ export function registerStockRoutes(app: Express) {
       const parsed = insertStockCategorySchema.parse({ ...req.body, companyId });
       const [created] = await db.insert(stockCategories).values(parsed).returning();
       try {
-        await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "create", tableName: "stock_categories", recordId: created.id, recordIdentifier: created.name, changes: { name: { new: created.name } } });
+        await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "create", tableName: "stock_categories", recordId: created.id, recordIdentifier: created.name, changes: { name: { old: null, new: created.name } } });
       } catch { /* non-fatal */ }
       res.status(201).json(created);
     } catch (error: any) { res.status(400).json({ message: error.message }); }
