@@ -1,11 +1,21 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Plus, Edit, Check, X, EyeOff, Eye, Tag, Layers } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Plus, Edit, Check, X, EyeOff, Eye, Tag, Layers,
+  Download, Upload, AlertCircle, CheckCircle2,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -24,6 +34,18 @@ interface StockCategory {
   companyId: number;
   createdAt: string;
 }
+
+interface ImportSummary {
+  message: string;
+  rowsProcessed: number;
+  itemsUpdated: number;
+  gradesCreated: number;
+  categoriesCreated: number;
+  skipped: number;
+  errors: { row: number; reason: string }[];
+}
+
+// ── Individual grade/category list ──────────────────────────────────────────
 
 function MetaList({
   title,
@@ -126,7 +148,7 @@ function MetaList({
 
   return (
     <Card className="p-5">
-      <div className="flex items-center justify-between mb-4 gap-2">
+      <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <Icon className="h-5 w-5 text-muted-foreground" />
           <h3 className="text-base font-semibold">{title}</h3>
@@ -241,15 +263,190 @@ function MetaList({
   );
 }
 
+// ── Bulk Export / Import section ─────────────────────────────────────────────
+
+function BulkExportImport() {
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [resultDialog, setResultDialog] = useState<ImportSummary | null>(null);
+
+  const handleExport = async () => {
+    try {
+      const res = await fetch("/api/stock-items/export-grade-category-template", {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Export failed" }));
+        toast({ title: "Export failed", description: err.message, variant: "destructive" });
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "grade-category-template.xlsx";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      toast({ title: "Export failed", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset file input so same file can be re-selected if needed
+    e.target.value = "";
+
+    setIsImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/stock-items/import-grade-category-template", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      const data: ImportSummary = await res.json();
+
+      if (!res.ok) {
+        toast({ title: "Import failed", description: (data as any).message, variant: "destructive" });
+        return;
+      }
+
+      // Invalidate stock items, grades, categories
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-grades"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-categories"] });
+
+      setResultDialog(data);
+    } catch (error: any) {
+      toast({ title: "Import failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  return (
+    <>
+      <Card className="p-5">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h3 className="text-base font-semibold mb-1">Bulk Grade &amp; Category Assignment</h3>
+            <p className="text-sm text-muted-foreground max-w-lg">
+              Export all stock items to Excel, edit the{" "}
+              <span className="font-medium">Current Grade</span> and{" "}
+              <span className="font-medium">Current Category</span> columns, then import to
+              update in bulk. Only Grade and Category are changed — quantities, prices, and stock
+              balances are not affected.
+            </p>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              data-testid="button-export-grade-category"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export Template
+            </Button>
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isImporting}
+              data-testid="button-import-grade-category"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              {isImporting ? "Importing..." : "Import Template"}
+            </Button>
+          </div>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xlsx,.xls"
+          className="hidden"
+          onChange={handleFileChange}
+          data-testid="input-import-grade-category-file"
+        />
+      </Card>
+
+      {/* Result dialog */}
+      <Dialog open={!!resultDialog} onOpenChange={() => setResultDialog(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              Import Complete
+            </DialogTitle>
+            <DialogDescription>
+              Grade and category assignments have been updated. Only Grade and Category were
+              changed — all other stock item data is unchanged.
+            </DialogDescription>
+          </DialogHeader>
+
+          {resultDialog && (
+            <div className="space-y-4">
+              {/* Summary numbers */}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: "Rows Processed", value: resultDialog.rowsProcessed },
+                  { label: "Items Updated", value: resultDialog.itemsUpdated },
+                  { label: "Grades Created", value: resultDialog.gradesCreated },
+                  { label: "Categories Created", value: resultDialog.categoriesCreated },
+                  { label: "Rows Skipped", value: resultDialog.skipped },
+                  { label: "Errors", value: resultDialog.errors.length },
+                ].map(({ label, value }) => (
+                  <div key={label} className="rounded-md border px-3 py-2">
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    <p className="text-lg font-semibold">{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Error list */}
+              {resultDialog.errors.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-2 flex items-center gap-1">
+                    <AlertCircle className="h-4 w-4 text-destructive" />
+                    Skipped rows
+                  </p>
+                  <div className="max-h-48 overflow-y-auto space-y-1 rounded-md border p-2">
+                    {resultDialog.errors.map((e, idx) => (
+                      <p key={idx} className="text-xs text-muted-foreground">
+                        <span className="font-medium">Row {e.row}:</span> {e.reason}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <Button className="w-full" onClick={() => setResultDialog(null)} data-testid="button-import-result-close">
+                Done
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+// ── Main export ───────────────────────────────────────────────────────────────
+
 export function GradesCategoriesManager() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold mb-1">Grades & Categories</h2>
+        <h2 className="text-lg font-semibold mb-1">Grades &amp; Categories</h2>
         <p className="text-sm text-muted-foreground">
           Manage stock item grades and categories. These are optional metadata fields that can be assigned to any stock item.
         </p>
       </div>
+
+      <BulkExportImport />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <MetaList

@@ -1308,6 +1308,206 @@ export function registerStockRoutes(app: Express) {
     },
   );
 
+  // ── Grade/Category Template Export ───────────────────────────────────────────
+
+  app.get("/api/stock-items/export-grade-category-template", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // Fetch all stock items joined with group, grade, category names
+      const rows = await db
+        .select({
+          id: stockItems.id,
+          code: stockItems.code,
+          name: stockItems.name,
+          stockGroupName: sql<string>`COALESCE(${stockGroups.name}, '')`,
+          uom: stockItems.uom,
+          active: stockItems.active,
+          sellingPrice: stockItems.sellingPrice,
+          gradeName: sql<string | null>`${stockGrades.name}`,
+          categoryName: sql<string | null>`${stockCategories.name}`,
+        })
+        .from(stockItems)
+        .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
+        .leftJoin(stockGrades, eq(stockItems.gradeId, stockGrades.id))
+        .leftJoin(stockCategories, eq(stockItems.categoryId, stockCategories.id))
+        .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)))
+        .orderBy(asc(stockItems.code));
+
+      const data = rows.map((r) => ({
+        "Item ID": r.id,
+        "Item Code": r.code,
+        "Item Name": r.name,
+        "Stock Group": r.stockGroupName,
+        "UOM": r.uom,
+        "Active": r.active ? "Yes" : "No",
+        "Selling Price": r.sellingPrice ?? "0",
+        "Current Grade": r.gradeName ?? "",
+        "Current Category": r.categoryName ?? "",
+      }));
+
+      const wb = createWorkbook();
+      const ws = jsonToSheet(wb, data, "Stock Items");
+
+      // Style header row bold
+      const headerRow = ws.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.commit();
+
+      // Lock all columns except Grade and Category (columns H and I = 8, 9)
+      // Just widen the editable columns as a visual hint
+      ws.getColumn(8).width = 20; // Current Grade
+      ws.getColumn(9).width = 22; // Current Category
+      ws.columns.forEach((col, i) => {
+        if (i < 7) col.width = Math.max(col.width || 12, 15);
+      });
+
+      const buffer = await writeWorkbook(wb);
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", "attachment; filename=\"grade-category-template.xlsx\"");
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Grade/Category Template Import ────────────────────────────────────────────
+
+  app.post("/api/stock-items/import-grade-category-template", requireAuth, requireNonPOS, upload.single("file"), async (req: any, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+      const wb = await readExcel(req.file.buffer);
+      const sheetName = wb.SheetNames[0];
+      if (!sheetName) return res.status(400).json({ message: "Excel file has no sheets" });
+
+      const rows = sheetToJson<Record<string, any>>(wb.Sheets[sheetName]);
+
+      // Pre-fetch all stock items for this company (by code)
+      const allItems = await db
+        .select({ id: stockItems.id, code: stockItems.code })
+        .from(stockItems)
+        .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)));
+      const itemByCode = new Map<string, number>(allItems.map((i) => [i.code.toLowerCase().trim(), i.id]));
+
+      // Pre-fetch all grades and categories for this company (including inactive)
+      const allGrades = await db.select().from(stockGrades).where(eq(stockGrades.companyId, companyId));
+      const allCategories = await db.select().from(stockCategories).where(eq(stockCategories.companyId, companyId));
+      const gradeByName = new Map<string, typeof allGrades[0]>(allGrades.map((g) => [g.name.toLowerCase().trim(), g]));
+      const categoryByName = new Map<string, typeof allCategories[0]>(allCategories.map((c) => [c.name.toLowerCase().trim(), c]));
+
+      const summary = {
+        rowsProcessed: 0,
+        itemsUpdated: 0,
+        gradesCreated: 0,
+        categoriesCreated: 0,
+        skipped: 0,
+        errors: [] as { row: number; reason: string }[],
+      };
+
+      for (let i = 0; i < rows.length; i++) {
+        const rowNum = i + 2; // 1-indexed, row 1 is header
+        const row = rows[i];
+        summary.rowsProcessed++;
+
+        // Read Item Code (required)
+        const rawCode = String(row["Item Code"] ?? "").trim();
+        if (!rawCode) {
+          summary.skipped++;
+          summary.errors.push({ row: rowNum, reason: "Item Code is empty — row skipped" });
+          continue;
+        }
+
+        const stockItemId = itemByCode.get(rawCode.toLowerCase());
+        if (!stockItemId) {
+          summary.skipped++;
+          summary.errors.push({ row: rowNum, reason: `Item Code "${rawCode}" not found in this company` });
+          continue;
+        }
+
+        // Resolve grade
+        const rawGrade = String(row["Current Grade"] ?? "").trim();
+        let gradeId: number | null = null;
+        if (rawGrade) {
+          const gradeKey = rawGrade.toLowerCase();
+          let grade = gradeByName.get(gradeKey);
+          if (!grade) {
+            // Create new grade
+            const [created] = await db
+              .insert(stockGrades)
+              .values({ name: rawGrade, companyId, active: true })
+              .returning();
+            gradeByName.set(gradeKey, created);
+            summary.gradesCreated++;
+            grade = created;
+          } else if (!grade.active) {
+            // Reactivate inactive grade
+            await db.update(stockGrades).set({ active: true }).where(eq(stockGrades.id, grade.id));
+            grade.active = true;
+          }
+          gradeId = grade.id;
+        }
+
+        // Resolve category
+        const rawCategory = String(row["Current Category"] ?? "").trim();
+        let categoryId: number | null = null;
+        if (rawCategory) {
+          const catKey = rawCategory.toLowerCase();
+          let category = categoryByName.get(catKey);
+          if (!category) {
+            const [created] = await db
+              .insert(stockCategories)
+              .values({ name: rawCategory, companyId, active: true })
+              .returning();
+            categoryByName.set(catKey, created);
+            summary.categoriesCreated++;
+            category = created;
+          } else if (!category.active) {
+            await db.update(stockCategories).set({ active: true }).where(eq(stockCategories.id, category.id));
+            category.active = true;
+          }
+          categoryId = category.id;
+        }
+
+        // Update stock item — only gradeId and categoryId
+        await db
+          .update(stockItems)
+          .set({ gradeId, categoryId })
+          .where(eq(stockItems.id, stockItemId));
+
+        summary.itemsUpdated++;
+      }
+
+      // Audit log
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId,
+          action: "create",
+          tableName: "stock_items",
+          recordIdentifier: "bulk-grade-category-import",
+          changes: {
+            itemsUpdated: { old: null, new: summary.itemsUpdated },
+            gradesCreated: { old: null, new: summary.gradesCreated },
+            categoriesCreated: { old: null, new: summary.categoriesCreated },
+            skipped: { old: null, new: summary.skipped },
+          },
+        });
+      } catch { /* non-fatal */ }
+
+      res.json({
+        message: `Import complete: ${summary.itemsUpdated} updated, ${summary.gradesCreated} grades created, ${summary.categoriesCreated} categories created, ${summary.skipped} skipped`,
+        ...summary,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Update stock item
   app.patch(
     "/api/stock-items/:id",
