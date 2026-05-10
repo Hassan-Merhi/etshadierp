@@ -31,6 +31,10 @@ interface StockItem {
   containerNumber: string;
   supplierName: string;
   importDate: string;
+  gradeId: number | null;
+  gradeName: string | null;
+  categoryId: number | null;
+  categoryName: string | null;
 }
 
 interface GroupedStockItem {
@@ -38,6 +42,8 @@ interface GroupedStockItem {
   totalQuantity: number;
   totalCost: number;
   containerCount: number;
+  gradeName: string | null;
+  categoryName: string | null;
   containers: {
     containerNumber: string;
     quantity: number;
@@ -52,19 +58,21 @@ function StockOTWContent() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedGrade, setSelectedGrade] = useState<string>("all");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
-  const { 
-    data: containers = [], 
+  const {
+    data: containers = [],
     isLoading: loadingContainers,
-    error: containersError 
+    error: containersError,
   } = useQuery<Container[]>({
     queryKey: ["/api/containers"],
   });
 
-  const { 
+  const {
     data: suppliers = [],
-    error: suppliersError 
+    error: suppliersError,
   } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
   });
@@ -72,7 +80,7 @@ function StockOTWContent() {
   // Filter only OTW containers
   const otwContainers = useMemo(
     () => containers.filter((c) => c.status === "OTW"),
-    [containers]
+    [containers],
   );
 
   // Fetch details for each OTW container using useQueries
@@ -85,7 +93,7 @@ function StockOTWContent() {
 
   const isLoadingDetails = containerDetailsQueries.some((q) => q.isLoading);
   const isLoading = loadingContainers || isLoadingDetails;
-  
+
   // Check for errors
   const hasDetailsErrors = containerDetailsQueries.some((q) => q.error);
   const hasErrors = containersError || suppliersError || hasDetailsErrors;
@@ -93,13 +101,13 @@ function StockOTWContent() {
   // Compile all stock items from OTW containers
   const stockItems: StockItem[] = useMemo(() => {
     const items: StockItem[] = [];
-    
+
     containerDetailsQueries.forEach((query, index) => {
       if (query.data) {
         const containerData = query.data as ContainerDetailData;
         const container = otwContainers[index];
         const supplier = suppliers.find((s) => s.id === container.supplierId);
-        
+
         containerData.pos.forEach((po: any) => {
           po.items.forEach((item: any) => {
             items.push({
@@ -111,50 +119,58 @@ function StockOTWContent() {
               containerNumber: container.containerNumber,
               supplierName: supplier?.legalName || "Unknown",
               importDate: container.importDate,
+              gradeId: item.gradeId ?? null,
+              gradeName: item.gradeName ?? null,
+              categoryId: item.categoryId ?? null,
+              categoryName: item.categoryName ?? null,
             });
           });
         });
       }
     });
-    
+
     return items;
   }, [containerDetailsQueries, otwContainers, suppliers]);
 
   // Group items by stock item name
   const groupedItems: GroupedStockItem[] = useMemo(() => {
     const grouped = new Map<string, GroupedStockItem>();
-    
+
     stockItems.forEach((item) => {
       const name = item.stockItemName;
       const qty = parseFloat(item.quantity || "0");
       const cost = parseFloat(item.totalCost || "0");
-      
+
       if (!grouped.has(name)) {
         grouped.set(name, {
           stockItemName: name,
           totalQuantity: 0,
           totalCost: 0,
           containerCount: 0,
+          gradeName: item.gradeName ?? null,
+          categoryName: item.categoryName ?? null,
           containers: [],
         });
       }
-      
+
       const group = grouped.get(name)!;
+      // Carry first non-null grade/category (stock_item metadata is stable per item name)
+      if (!group.gradeName && item.gradeName) group.gradeName = item.gradeName;
+      if (!group.categoryName && item.categoryName) group.categoryName = item.categoryName;
+
       group.totalQuantity += isNaN(qty) ? 0 : qty;
       group.totalCost += isNaN(cost) ? 0 : cost;
-      
+
       // Check if this container already exists in the group
       const existingContainer = group.containers.find(
-        c => c.containerNumber === item.containerNumber
+        (c) => c.containerNumber === item.containerNumber,
       );
-      
+
       const itemRate = parseFloat(item.rate || "0");
       if (existingContainer) {
-        // Add to existing container
         existingContainer.quantity += isNaN(qty) ? 0 : qty;
         existingContainer.cost += isNaN(cost) ? 0 : cost;
       } else {
-        // Add new container
         group.containers.push({
           containerNumber: item.containerNumber,
           quantity: isNaN(qty) ? 0 : qty,
@@ -164,30 +180,51 @@ function StockOTWContent() {
         });
       }
     });
-    
-    // Calculate container count and unique suppliers for each group
+
     grouped.forEach((group) => {
       group.containerCount = group.containers.length;
     });
-    
+
     return Array.from(grouped.values());
   }, [stockItems]);
 
-  // Apply search filter
+  // Derive unique grade/category options from grouped items (only what's present in OTW)
+  const gradeOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    groupedItems.forEach((item) => {
+      if (item.gradeName) seen.set(item.gradeName, item.gradeName);
+    });
+    return Array.from(seen.values()).sort();
+  }, [groupedItems]);
+
+  const categoryOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    groupedItems.forEach((item) => {
+      if (item.categoryName) seen.set(item.categoryName, item.categoryName);
+    });
+    return Array.from(seen.values()).sort();
+  }, [groupedItems]);
+
+  // Apply search + grade + category filters
   const filteredItems = groupedItems.filter((item) => {
+    if (selectedGrade !== "all" && item.gradeName !== selectedGrade) return false;
+    if (selectedCategory !== "all" && item.categoryName !== selectedCategory) return false;
     if (searchTerm === "") return true;
     const search = searchTerm.toLowerCase();
     return (
       item.stockItemName.toLowerCase().includes(search) ||
-      item.containers.some(c => 
-        c.containerNumber.toLowerCase().includes(search) ||
-        c.supplierName.toLowerCase().includes(search)
+      (item.gradeName?.toLowerCase().includes(search) ?? false) ||
+      (item.categoryName?.toLowerCase().includes(search) ?? false) ||
+      item.containers.some(
+        (c) =>
+          c.containerNumber.toLowerCase().includes(search) ||
+          c.supplierName.toLowerCase().includes(search),
       )
     );
   });
 
   const toggleItemExpanded = (itemName: string) => {
-    setExpandedItems(prev => {
+    setExpandedItems((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(itemName)) {
         newSet.delete(itemName);
@@ -208,9 +245,12 @@ function StockOTWContent() {
     (sum, c) => sum + parseFloat((c as any).grandTotal || "0"),
     0,
   );
-  // When no search filter is applied, show the authoritative container grand total so both pages agree.
+  // When no filters are applied, show the authoritative container grand total so both pages agree.
   // When filtered, fall back to the item-level partial total.
-  const displayTotal = searchTerm.trim() === "" ? containerGrandTotal : totalValue;
+  const isFiltered = searchTerm.trim() !== "" || selectedGrade !== "all" || selectedCategory !== "all";
+  const displayTotal = isFiltered ? totalValue : containerGrandTotal;
+
+  const hasFilters = gradeOptions.length > 0 || categoryOptions.length > 0;
 
   if (isLoading) {
     return (
@@ -242,7 +282,7 @@ function StockOTWContent() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Containers OTW</CardTitle>
             <Ship className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -250,14 +290,12 @@ function StockOTWContent() {
             <div className="text-2xl font-bold" data-testid="text-containers-count">
               {otwContainers.length}
             </div>
-            <p className="text-xs text-muted-foreground">
-              In transit
-            </p>
+            <p className="text-xs text-muted-foreground">In transit</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Items</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -265,14 +303,12 @@ function StockOTWContent() {
             <div className="text-2xl font-bold font-mono" data-testid="text-total-items">
               {uniqueItemCount}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Unique stock items
-            </p>
+            <p className="text-xs text-muted-foreground">Unique stock items</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Quantity</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -280,23 +316,49 @@ function StockOTWContent() {
             <div className="text-2xl font-bold font-mono" data-testid="text-total-quantity">
               {Math.round(totalQuantity).toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Total bales/units
-            </p>
+            <p className="text-xs text-muted-foreground">Total bales/units</p>
           </CardContent>
         </Card>
       </div>
 
       {stockItems.length > 0 && (
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by code, name, container, or supplier..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-            data-testid="input-search"
-          />
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, container, supplier, grade or category..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+              data-testid="input-search"
+            />
+          </div>
+          {gradeOptions.length > 0 && (
+            <select
+              value={selectedGrade}
+              onChange={(e) => setSelectedGrade(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              data-testid="select-grade-filter"
+            >
+              <option value="all">All Grades</option>
+              {gradeOptions.map((g) => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
+          )}
+          {categoryOptions.length > 0 && (
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              data-testid="select-category-filter"
+            >
+              <option value="all">All Categories</option>
+              {categoryOptions.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          )}
         </div>
       )}
 
@@ -306,7 +368,7 @@ function StockOTWContent() {
             <Ship className="w-16 h-16 text-muted-foreground mb-4" />
             <h2 className="text-xl font-semibold mb-2">No stock on the way</h2>
             <p className="text-muted-foreground">
-              {stockItems.length === 0 
+              {stockItems.length === 0
                 ? "There are no containers currently in transit"
                 : "No items match your search criteria"}
             </p>
@@ -318,6 +380,7 @@ function StockOTWContent() {
             <CardTitle>Stock Items ({uniqueItemCount})</CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Desktop table */}
             <div className="border rounded-md hidden md:block">
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
@@ -334,14 +397,14 @@ function StockOTWContent() {
                     const isExpanded = expandedItems.has(item.stockItemName);
                     return (
                       <Fragment key={item.stockItemName}>
-                        <TableRow 
+                        <TableRow
                           data-testid={`row-item-${index}`}
                           className="hover-elevate cursor-pointer"
                           onClick={() => toggleItemExpanded(item.stockItemName)}
                         >
                           <TableCell>
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="icon"
                               className="h-6 w-6"
                               data-testid={`button-expand-${index}`}
@@ -354,9 +417,21 @@ function StockOTWContent() {
                             </Button>
                           </TableCell>
                           <TableCell className="font-medium">
-                            {item.stockItemName}
+                            <div>{item.stockItemName}</div>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {item.gradeName && (
+                                <Badge variant="outline" className="text-xs" data-testid={`grade-${index}`}>
+                                  {item.gradeName}
+                                </Badge>
+                              )}
+                              {item.categoryName && (
+                                <Badge variant="secondary" className="text-xs" data-testid={`category-${index}`}>
+                                  {item.categoryName}
+                                </Badge>
+                              )}
+                            </div>
                             <div className="text-xs text-muted-foreground mt-0.5">
-                              {item.containerCount} container{item.containerCount !== 1 ? 's' : ''}
+                              {item.containerCount} container{item.containerCount !== 1 ? "s" : ""}
                             </div>
                           </TableCell>
                           <TableCell className="text-right font-mono font-semibold">
@@ -367,36 +442,34 @@ function StockOTWContent() {
                           </TableCell>
                           <TableCell className="text-sm">
                             {(() => {
-                              const uniqueSuppliers = Array.from(new Set(item.containers.map(c => c.supplierName)));
-                              if (uniqueSuppliers.length === 1) {
-                                return uniqueSuppliers[0];
-                              } else {
-                                return `${uniqueSuppliers[0]} +${uniqueSuppliers.length - 1}`;
-                              }
+                              const uniqueSuppliers = Array.from(
+                                new Set(item.containers.map((c) => c.supplierName)),
+                              );
+                              if (uniqueSuppliers.length === 1) return uniqueSuppliers[0];
+                              return `${uniqueSuppliers[0]} +${uniqueSuppliers.length - 1}`;
                             })()}
                           </TableCell>
                         </TableRow>
-                        {isExpanded && item.containers.map((container, containerIndex) => (
-                          <TableRow 
-                            key={`${item.stockItemName}-${containerIndex}`}
-                            className="bg-muted/30"
-                            data-testid={`row-container-${index}-${containerIndex}`}
-                          >
-                            <TableCell></TableCell>
-                            <TableCell className="pl-8 text-sm text-muted-foreground">
-                              {container.containerNumber}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm">
-                              {Math.round(container.quantity).toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm">
-                              {formatAmount(container.rate)}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {container.supplierName}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {isExpanded &&
+                          item.containers.map((container, containerIndex) => (
+                            <TableRow
+                              key={`${item.stockItemName}-${containerIndex}`}
+                              className="bg-muted/30"
+                              data-testid={`row-container-${index}-${containerIndex}`}
+                            >
+                              <TableCell></TableCell>
+                              <TableCell className="pl-8 text-sm text-muted-foreground">
+                                {container.containerNumber}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {Math.round(container.quantity).toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {formatAmount(container.rate)}
+                              </TableCell>
+                              <TableCell className="text-sm">{container.supplierName}</TableCell>
+                            </TableRow>
+                          ))}
                       </Fragment>
                     );
                   })}
@@ -405,18 +478,25 @@ function StockOTWContent() {
                   <TableRow className="font-semibold">
                     <TableCell></TableCell>
                     <TableCell>Total</TableCell>
-                    <TableCell className="text-right font-mono" data-testid="text-summary-quantity">{Math.round(totalQuantity).toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-mono" data-testid="text-summary-value">{formatAmount(displayTotal)}</TableCell>
+                    <TableCell className="text-right font-mono" data-testid="text-summary-quantity">
+                      {Math.round(totalQuantity).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right font-mono" data-testid="text-summary-value">
+                      {formatAmount(displayTotal)}
+                    </TableCell>
                     <TableCell></TableCell>
                   </TableRow>
                 </TableFooter>
               </Table>
             </div>
 
+            {/* Mobile cards */}
             <div className="md:hidden space-y-2">
               {filteredItems.map((item, index) => {
                 const isExpanded = expandedItems.has(item.stockItemName);
-                const uniqueSuppliers = Array.from(new Set(item.containers.map(c => c.supplierName)));
+                const uniqueSuppliers = Array.from(
+                  new Set(item.containers.map((c) => c.supplierName)),
+                );
                 return (
                   <div key={item.stockItemName} data-testid={`row-item-${index}`}>
                     <div
@@ -432,14 +512,36 @@ function StockOTWContent() {
                           )}
                           <div className="min-w-0">
                             <div className="font-medium text-sm truncate">{item.stockItemName}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {item.containerCount} container{item.containerCount !== 1 ? 's' : ''} | {uniqueSuppliers.length === 1 ? uniqueSuppliers[0] : `${uniqueSuppliers[0]} +${uniqueSuppliers.length - 1}`}
+                            {(item.gradeName || item.categoryName) && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {item.gradeName && (
+                                  <Badge variant="outline" className="text-xs" data-testid={`grade-mobile-${index}`}>
+                                    {item.gradeName}
+                                  </Badge>
+                                )}
+                                {item.categoryName && (
+                                  <Badge variant="secondary" className="text-xs" data-testid={`category-mobile-${index}`}>
+                                    {item.categoryName}
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {item.containerCount} container{item.containerCount !== 1 ? "s" : ""} |{" "}
+                              {uniqueSuppliers.length === 1
+                                ? uniqueSuppliers[0]
+                                : `${uniqueSuppliers[0]} +${uniqueSuppliers.length - 1}`}
                             </div>
                           </div>
                         </div>
                       </div>
                       <div className="flex justify-between mt-2 text-sm pl-6">
-                        <span className="text-muted-foreground">Qty: <span className="font-mono font-semibold text-foreground">{Math.round(item.totalQuantity).toLocaleString()}</span></span>
+                        <span className="text-muted-foreground">
+                          Qty:{" "}
+                          <span className="font-mono font-semibold text-foreground">
+                            {Math.round(item.totalQuantity).toLocaleString()}
+                          </span>
+                        </span>
                         <span className="font-mono">{formatAmount(item.totalCost)}</span>
                       </div>
                     </div>
@@ -466,7 +568,6 @@ function StockOTWContent() {
                 );
               })}
             </div>
-            
           </CardContent>
         </Card>
       )}
