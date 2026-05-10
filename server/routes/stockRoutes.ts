@@ -786,6 +786,67 @@ export function registerStockRoutes(app: Express) {
     }
   });
 
+  // ── Grade/Category Template Export ───────────────────────────────────────────
+  // MUST be defined before /api/stock-items/:id to avoid route conflict
+
+  app.get("/api/stock-items/export-grade-category-template", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const rows = await db
+        .select({
+          id: stockItems.id,
+          code: stockItems.code,
+          name: stockItems.name,
+          stockGroupName: sql<string>`COALESCE(${stockGroups.name}, '')`,
+          uom: stockItems.uom,
+          active: stockItems.active,
+          sellingPrice: stockItems.sellingPrice,
+          gradeName: sql<string | null>`${stockGrades.name}`,
+          categoryName: sql<string | null>`${stockCategories.name}`,
+        })
+        .from(stockItems)
+        .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
+        .leftJoin(stockGrades, eq(stockItems.gradeId, stockGrades.id))
+        .leftJoin(stockCategories, eq(stockItems.categoryId, stockCategories.id))
+        .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)))
+        .orderBy(asc(stockItems.code));
+
+      const data = rows.map((r) => ({
+        "Item ID": r.id,
+        "Item Code": r.code,
+        "Item Name": r.name,
+        "Stock Group": r.stockGroupName,
+        "UOM": r.uom,
+        "Active": r.active ? "Yes" : "No",
+        "Selling Price": r.sellingPrice ?? "0",
+        "Current Grade": r.gradeName ?? "",
+        "Current Category": r.categoryName ?? "",
+      }));
+
+      const wb = createWorkbook();
+      const ws = jsonToSheet(wb, data, "Stock Items");
+
+      const headerRow = ws.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.commit();
+
+      ws.getColumn(8).width = 20;
+      ws.getColumn(9).width = 22;
+      ws.columns.forEach((col, i) => {
+        if (i < 7) col.width = Math.max(col.width || 12, 15);
+      });
+
+      const buffer = await writeWorkbook(wb);
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", "attachment; filename=\"grade-category-template.xlsx\"");
+      res.send(buffer);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get single stock item by ID
   app.get("/api/stock-items/:id", requireAuth, async (req, res) => {
     try {
@@ -1307,70 +1368,6 @@ export function registerStockRoutes(app: Express) {
       }
     },
   );
-
-  // ── Grade/Category Template Export ───────────────────────────────────────────
-
-  app.get("/api/stock-items/export-grade-category-template", requireAuth, requireNonPOS, async (req, res) => {
-    try {
-      const companyId = req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-
-      // Fetch all stock items joined with group, grade, category names
-      const rows = await db
-        .select({
-          id: stockItems.id,
-          code: stockItems.code,
-          name: stockItems.name,
-          stockGroupName: sql<string>`COALESCE(${stockGroups.name}, '')`,
-          uom: stockItems.uom,
-          active: stockItems.active,
-          sellingPrice: stockItems.sellingPrice,
-          gradeName: sql<string | null>`${stockGrades.name}`,
-          categoryName: sql<string | null>`${stockCategories.name}`,
-        })
-        .from(stockItems)
-        .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
-        .leftJoin(stockGrades, eq(stockItems.gradeId, stockGrades.id))
-        .leftJoin(stockCategories, eq(stockItems.categoryId, stockCategories.id))
-        .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)))
-        .orderBy(asc(stockItems.code));
-
-      const data = rows.map((r) => ({
-        "Item ID": r.id,
-        "Item Code": r.code,
-        "Item Name": r.name,
-        "Stock Group": r.stockGroupName,
-        "UOM": r.uom,
-        "Active": r.active ? "Yes" : "No",
-        "Selling Price": r.sellingPrice ?? "0",
-        "Current Grade": r.gradeName ?? "",
-        "Current Category": r.categoryName ?? "",
-      }));
-
-      const wb = createWorkbook();
-      const ws = jsonToSheet(wb, data, "Stock Items");
-
-      // Style header row bold
-      const headerRow = ws.getRow(1);
-      headerRow.font = { bold: true };
-      headerRow.commit();
-
-      // Lock all columns except Grade and Category (columns H and I = 8, 9)
-      // Just widen the editable columns as a visual hint
-      ws.getColumn(8).width = 20; // Current Grade
-      ws.getColumn(9).width = 22; // Current Category
-      ws.columns.forEach((col, i) => {
-        if (i < 7) col.width = Math.max(col.width || 12, 15);
-      });
-
-      const buffer = await writeWorkbook(wb);
-      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", "attachment; filename=\"grade-category-template.xlsx\"");
-      res.send(buffer);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
 
   // ── Grade/Category Template Import ────────────────────────────────────────────
 
