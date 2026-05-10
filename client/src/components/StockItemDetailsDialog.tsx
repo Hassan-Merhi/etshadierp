@@ -42,6 +42,8 @@ interface StockItem {
   barcode: string | null;
   uom: string;
   stockGroupId: number | null;
+  gradeId: number | null;
+  categoryId: number | null;
   sellingPrice: string;
   active: boolean;
 }
@@ -50,6 +52,18 @@ interface StockGroup {
   id: number;
   code: string;
   name: string;
+}
+
+interface StockGrade {
+  id: number;
+  name: string;
+  active: boolean;
+}
+
+interface StockCategory {
+  id: number;
+  name: string;
+  active: boolean;
 }
 
 interface Transaction {
@@ -88,6 +102,8 @@ export function StockItemDetailsDialog({
   const [editedBarcode, setEditedBarcode] = useState("");
   const [editedUom, setEditedUom] = useState("");
   const [editedStockGroupId, setEditedStockGroupId] = useState<number | null>(null);
+  const [editedGradeId, setEditedGradeId] = useState<number | null>(null);
+  const [editedCategoryId, setEditedCategoryId] = useState<number | null>(null);
   const [editedSellingPrice, setEditedSellingPrice] = useState("");
   
   const [editingTransaction, setEditingTransaction] = useState<number | null>(null);
@@ -113,6 +129,28 @@ export function StockItemDetailsDialog({
   // Fetch stock groups
   const { data: stockGroups = [] } = useQuery<StockGroup[]>({
     queryKey: ["/api/stock-groups"],
+    enabled: open,
+  });
+
+  // Fetch grades (include inactive so currently-assigned inactive grades still show)
+  const { data: stockGrades = [] } = useQuery<StockGrade[]>({
+    queryKey: ["/api/stock-grades", { includeInactive: true }],
+    queryFn: async () => {
+      const res = await fetch("/api/stock-grades?includeInactive=true", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load grades");
+      return res.json();
+    },
+    enabled: open,
+  });
+
+  // Fetch categories (include inactive so currently-assigned inactive categories still show)
+  const { data: stockCategories = [] } = useQuery<StockCategory[]>({
+    queryKey: ["/api/stock-categories", { includeInactive: true }],
+    queryFn: async () => {
+      const res = await fetch("/api/stock-categories?includeInactive=true", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load categories");
+      return res.json();
+    },
     enabled: open,
   });
 
@@ -301,6 +339,8 @@ export function StockItemDetailsDialog({
       setEditedBarcode(stockItem.barcode || "");
       setEditedUom(stockItem.uom);
       setEditedStockGroupId(stockItem.stockGroupId);
+      setEditedGradeId(stockItem.gradeId ?? null);
+      setEditedCategoryId(stockItem.categoryId ?? null);
       setEditedSellingPrice(stockItem.sellingPrice || "0");
       setIsEditingDetails(true);
     }
@@ -339,6 +379,8 @@ export function StockItemDetailsDialog({
       barcode: editedBarcode?.trim() || null,
       uom: editedUom.trim(),
       stockGroupId: editedStockGroupId,
+      gradeId: editedGradeId,
+      categoryId: editedCategoryId,
       sellingPrice: editedSellingPrice || "0",
     };
     updateItemMutation.mutate(updates);
@@ -587,6 +629,62 @@ export function StockItemDetailsDialog({
                     </p>
                   )}
                 </div>
+
+                {stockGrades.length > 0 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="grade">Grade</Label>
+                    {isEditingDetails ? (
+                      <Select
+                        value={editedGradeId?.toString() || "none"}
+                        onValueChange={(value) => setEditedGradeId(value === "none" ? null : parseInt(value))}
+                      >
+                        <SelectTrigger data-testid="select-grade">
+                          <SelectValue placeholder="Select grade" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">— No Grade —</SelectItem>
+                          {stockGrades.map((grade) => (
+                            <SelectItem key={grade.id} value={grade.id.toString()}>
+                              {grade.name}{!grade.active ? " (inactive)" : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-sm p-2 bg-muted rounded" data-testid="text-grade">
+                        {stockGrades.find((g) => g.id === stockItem.gradeId)?.name || "—"}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {stockCategories.length > 0 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Category</Label>
+                    {isEditingDetails ? (
+                      <Select
+                        value={editedCategoryId?.toString() || "none"}
+                        onValueChange={(value) => setEditedCategoryId(value === "none" ? null : parseInt(value))}
+                      >
+                        <SelectTrigger data-testid="select-category">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">— No Category —</SelectItem>
+                          {stockCategories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id.toString()}>
+                              {cat.name}{!cat.active ? " (inactive)" : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-sm p-2 bg-muted rounded" data-testid="text-category">
+                        {stockCategories.find((c) => c.id === stockItem.categoryId)?.name || "—"}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="sellingPrice">Selling Price</Label>

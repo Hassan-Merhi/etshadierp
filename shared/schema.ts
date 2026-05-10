@@ -390,12 +390,52 @@ export const insertStockGroupSchema = createInsertSchema(stockGroups).omit({
 export type InsertStockGroup = z.infer<typeof insertStockGroupSchema>;
 export type StockGroup = typeof stockGroups.$inferSelect;
 
+export const stockGrades = pgTable("stock_grades", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  name: text("name").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertStockGradeSchema = createInsertSchema(stockGrades).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  name: z.string().min(1, "Name is required"),
+});
+
+export type InsertStockGrade = z.infer<typeof insertStockGradeSchema>;
+export type StockGrade = typeof stockGrades.$inferSelect;
+
+export const stockCategories = pgTable("stock_categories", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  name: text("name").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertStockCategorySchema = createInsertSchema(stockCategories).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  name: z.string().min(1, "Name is required"),
+});
+
+export type InsertStockCategory = z.infer<typeof insertStockCategorySchema>;
+export type StockCategory = typeof stockCategories.$inferSelect;
+
 export const stockItems = pgTable("stock_items", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
   code: varchar("code", { length: 50 }).notNull(),
   name: text("name").notNull(),
   stockGroupId: integer("stock_group_id"),
+  gradeId: integer("grade_id"),
+  categoryId: integer("category_id"),
   uom: text("uom").notNull(),
   openingQty: decimal("opening_qty", { precision: 15, scale: 3 }).default("0"),
   openingRate: decimal("opening_rate", { precision: 15, scale: 2 }).default("0"),

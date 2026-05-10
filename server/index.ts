@@ -2908,6 +2908,23 @@ let migrationsDone = false;
 
     // Enable auto-tracking on all existing containers so "Track All Now" works immediately
     `UPDATE containers SET tracking_enabled = true WHERE tracking_enabled = false AND status NOT IN ('Offloaded','Closed','Completed')`,
+    // Stock Grades and Categories (May 2026)
+    `CREATE TABLE IF NOT EXISTS stock_grades (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      name text NOT NULL,
+      active boolean NOT NULL DEFAULT true,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE TABLE IF NOT EXISTS stock_categories (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      name text NOT NULL,
+      active boolean NOT NULL DEFAULT true,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS grade_id integer`,
+    `ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS category_id integer`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

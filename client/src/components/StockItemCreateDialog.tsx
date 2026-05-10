@@ -42,11 +42,23 @@ interface StockGroup {
   name: string;
 }
 
+interface StockGrade {
+  id: number;
+  name: string;
+}
+
+interface StockCategory {
+  id: number;
+  name: string;
+}
+
 // Extend the schema to make companyId optional for the form
 // (companyId is added during submission); stockGroupId is required
 const formSchema = insertStockItemSchema.extend({
   stockGroupId: z.number({ required_error: "Stock Group is required", invalid_type_error: "Stock Group is required" }),
   companyId: z.number().optional(),
+  gradeId: z.number().nullable().optional(),
+  categoryId: z.number().nullable().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -64,6 +76,16 @@ export function StockItemCreateDialog({
     enabled: open,
   });
 
+  const { data: stockGrades = [] } = useQuery<StockGrade[]>({
+    queryKey: ["/api/stock-grades"],
+    enabled: open,
+  });
+
+  const { data: stockCategories = [] } = useQuery<StockCategory[]>({
+    queryKey: ["/api/stock-categories"],
+    enabled: open,
+  });
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -71,6 +93,8 @@ export function StockItemCreateDialog({
       name: "",
       uom: "",
       stockGroupId: undefined,
+      gradeId: null,
+      categoryId: null,
       sellingPrice: "0.00",
       openingQty: "0",
       openingRate: "0.00",
@@ -235,6 +259,68 @@ export function StockItemCreateDialog({
                 )}
               />
             </div>
+
+            {stockGrades.length > 0 && (
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="gradeId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Grade</FormLabel>
+                      <Select
+                        value={field.value?.toString() || "none"}
+                        onValueChange={(value) => field.onChange(value === "none" ? null : parseInt(value))}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-grade">
+                            <SelectValue placeholder="Select grade (optional)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">— No Grade —</SelectItem>
+                          {stockGrades.map((grade) => (
+                            <SelectItem key={grade.id} value={grade.id.toString()}>
+                              {grade.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="categoryId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Select
+                        value={field.value?.toString() || "none"}
+                        onValueChange={(value) => field.onChange(value === "none" ? null : parseInt(value))}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-category">
+                            <SelectValue placeholder="Select category (optional)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">— No Category —</SelectItem>
+                          {stockCategories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id.toString()}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <FormField

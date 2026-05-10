@@ -3,6 +3,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import StockItems from "@/pages/StockItems";
 import StockQuery from "@/pages/StockQuery";
 import OffloadItemSearch from "@/pages/OffloadItemSearch";
+import { GradesCategoriesManager } from "@/components/GradesCategoriesManager";
 
 export default function StockHub() {
   const search = useSearch();
@@ -18,6 +19,7 @@ export default function StockHub() {
           <TabsTrigger value="items" data-testid="tab-stock-items">Items</TabsTrigger>
           <TabsTrigger value="query" data-testid="tab-stock-query">Query</TabsTrigger>
           <TabsTrigger value="offload" data-testid="tab-offload-search">Offload Search</TabsTrigger>
+          <TabsTrigger value="grades" data-testid="tab-grades-categories">Grades & Categories</TabsTrigger>
         </TabsList>
 
         <TabsContent value="items">
@@ -30,6 +32,10 @@ export default function StockHub() {
 
         <TabsContent value="offload">
           <OffloadItemSearch />
+        </TabsContent>
+
+        <TabsContent value="grades">
+          <GradesCategoriesManager />
         </TabsContent>
       </Tabs>
     </div>

@@ -62,6 +62,8 @@ interface StockItem {
   barcode: string | null;
   uom: string;
   stockGroupId: number | null;
+  gradeId: number | null;
+  categoryId: number | null;
   sellingPrice: string;
   active: boolean;
   companyId: number;
@@ -71,6 +73,18 @@ interface StockGroup {
   id: number;
   code: string;
   name: string;
+}
+
+interface StockGrade {
+  id: number;
+  name: string;
+  active: boolean;
+}
+
+interface StockCategory {
+  id: number;
+  name: string;
+  active: boolean;
 }
 
 interface PagedStockItemsResponse {
@@ -89,6 +103,8 @@ export default function StockItems() {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<number | null>(null);
+  const [selectedGradeFilter, setSelectedGradeFilter] = useState<number | null>(null);
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedStockItemId, setSelectedStockItemId] = useState<number | null>(null);
   const [selectedStockItemName, setSelectedStockItemName] = useState<string>("");
@@ -118,13 +134,13 @@ export default function StockItems() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Reset page when group filter changes
-  useEffect(() => { setCurrentPage(1); }, [selectedGroupFilter]);
+  // Reset page when filters change
+  useEffect(() => { setCurrentPage(1); }, [selectedGroupFilter, selectedGradeFilter, selectedCategoryFilter]);
 
   // Paginated query — drives the main table
   const pagedQueryKey = [
     "/api/stock-items",
-    { page: currentPage, pageSize: PAGE_SIZE, search: debouncedSearch, stockGroupId: selectedGroupFilter },
+    { page: currentPage, pageSize: PAGE_SIZE, search: debouncedSearch, stockGroupId: selectedGroupFilter, gradeId: selectedGradeFilter, categoryId: selectedCategoryFilter },
   ];
   const { data: pagedData, isLoading } = useQuery<PagedStockItemsResponse>({
     queryKey: pagedQueryKey,
@@ -135,6 +151,8 @@ export default function StockItems() {
       });
       if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
       if (selectedGroupFilter !== null) params.set("stockGroupId", String(selectedGroupFilter));
+      if (selectedGradeFilter !== null) params.set("gradeId", String(selectedGradeFilter));
+      if (selectedCategoryFilter !== null) params.set("categoryId", String(selectedCategoryFilter));
       const res = await fetch(`/api/stock-items?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch stock items");
       return res.json();
@@ -154,6 +172,14 @@ export default function StockItems() {
 
   const { data: stockGroups = [] } = useQuery<StockGroup[]>({
     queryKey: ["/api/stock-groups"],
+  });
+
+  const { data: stockGrades = [] } = useQuery<StockGrade[]>({
+    queryKey: ["/api/stock-grades"],
+  });
+
+  const { data: stockCategories = [] } = useQuery<StockCategory[]>({
+    queryKey: ["/api/stock-categories"],
   });
 
   const { data: locations = [] } = useQuery<Location[]>({
@@ -259,6 +285,18 @@ export default function StockItems() {
     return group ? group.name : "Unknown";
   };
 
+  const getGradeName = (gradeId: number | null) => {
+    if (!gradeId) return null;
+    const grade = stockGrades.find(g => g.id === gradeId);
+    return grade ? grade.name : null;
+  };
+
+  const getCategoryName = (categoryId: number | null) => {
+    if (!categoryId) return null;
+    const cat = stockCategories.find(c => c.id === categoryId);
+    return cat ? cat.name : null;
+  };
+
   const exportSalesHistory = async () => {
     if (!navigator.onLine) { toast({ title: "Not available offline", description: "Exports require a connection", variant: "destructive" }); return; }
     try {
@@ -317,6 +355,8 @@ export default function StockItems() {
         const row: Record<string, string> = {
           Code: item.code, Name: item.name, Barcode: item.barcode || "", UOM: item.uom,
           "Stock Group": getStockGroupName(item.stockGroupId),
+          "Grade": getGradeName(item.gradeId) || "",
+          "Category": getCategoryName(item.categoryId) || "",
           "Default Selling Price": formatAmount(defaultPrice),
           "Cost Dubai": costDubai ? formatAmount(costDubai) : "",
         };
@@ -414,6 +454,38 @@ export default function StockItems() {
               <option key={group.id} value={group.id}>{group.name}</option>
             ))}
           </select>
+          {stockGrades.length > 0 && (
+            <select
+              value={selectedGradeFilter === null ? "all" : selectedGradeFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedGradeFilter(val === "all" ? null : parseInt(val));
+              }}
+              className="w-full md:w-auto px-3 py-2 border border-input rounded-md text-sm bg-background text-foreground"
+              data-testid="select-grade-filter"
+            >
+              <option value="all">All Grades</option>
+              {stockGrades.map(grade => (
+                <option key={grade.id} value={grade.id}>{grade.name}</option>
+              ))}
+            </select>
+          )}
+          {stockCategories.length > 0 && (
+            <select
+              value={selectedCategoryFilter === null ? "all" : selectedCategoryFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedCategoryFilter(val === "all" ? null : parseInt(val));
+              }}
+              className="w-full md:w-auto px-3 py-2 border border-input rounded-md text-sm bg-background text-foreground"
+              data-testid="select-category-filter"
+            >
+              <option value="all">All Categories</option>
+              {stockCategories.map(cat => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+          )}
         </div>
 
         {isLoading ? (
@@ -437,6 +509,8 @@ export default function StockItems() {
                   </th>
                   <th className="text-left px-3 font-medium sticky left-0 bg-muted z-10">Name</th>
                   <th className="text-left px-3 font-medium">Stock Group</th>
+                  {stockGrades.length > 0 && <th className="text-left px-3 font-medium">Grade</th>}
+                  {stockCategories.length > 0 && <th className="text-left px-3 font-medium">Category</th>}
                   <th className="text-left px-3 font-medium">Status</th>
                   <th className="text-center px-3 font-medium">Actions</th>
                 </tr>
@@ -444,7 +518,7 @@ export default function StockItems() {
               <tbody>
                 {displayItems.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={5 + (stockGrades.length > 0 ? 1 : 0) + (stockCategories.length > 0 ? 1 : 0)} className="text-center py-8 text-muted-foreground">
                       {debouncedSearch ? "No items found matching your search" : "No stock items found"}
                     </td>
                   </tr>
@@ -481,6 +555,32 @@ export default function StockItems() {
                         >
                           {getStockGroupName(item.stockGroupId)}
                         </td>
+                        {stockGrades.length > 0 && (
+                          <td
+                            className="px-3 text-sm cursor-pointer"
+                            onClick={() => handleStockItemClick(item.id, item.name)}
+                            data-testid={`grade-${item.id}`}
+                          >
+                            {getGradeName(item.gradeId) ? (
+                              <Badge variant="outline" className="text-xs">{getGradeName(item.gradeId)}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
+                          </td>
+                        )}
+                        {stockCategories.length > 0 && (
+                          <td
+                            className="px-3 text-sm cursor-pointer"
+                            onClick={() => handleStockItemClick(item.id, item.name)}
+                            data-testid={`category-${item.id}`}
+                          >
+                            {getCategoryName(item.categoryId) ? (
+                              <Badge variant="secondary" className="text-xs">{getCategoryName(item.categoryId)}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
+                          </td>
+                        )}
                         <td
                           className="px-3 cursor-pointer"
                           onClick={() => handleStockItemClick(item.id, item.name)}
@@ -547,6 +647,12 @@ export default function StockItems() {
                           <div><span className="text-muted-foreground">UOM: </span><span>{item.uom}</span></div>
                           <div><span className="text-muted-foreground">Group: </span><span data-testid={`group-mobile-${item.id}`}>{getStockGroupName(item.stockGroupId)}</span></div>
                           {!hideStockRates && <div><span className="text-muted-foreground">Price: </span><span>{formatAmount(item.sellingPrice)}</span></div>}
+                          {stockGrades.length > 0 && getGradeName(item.gradeId) && (
+                            <div><span className="text-muted-foreground">Grade: </span><span data-testid={`grade-mobile-${item.id}`}>{getGradeName(item.gradeId)}</span></div>
+                          )}
+                          {stockCategories.length > 0 && getCategoryName(item.categoryId) && (
+                            <div><span className="text-muted-foreground">Category: </span><span data-testid={`category-mobile-${item.id}`}>{getCategoryName(item.categoryId)}</span></div>
+                          )}
                         </div>
                         <div className="flex items-center justify-between mt-2">
                           <Badge variant={item.active ? "default" : "secondary"} data-testid={`status-mobile-${item.id}`}>

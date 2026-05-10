@@ -19,6 +19,7 @@ import {
   locations, employees, userLocations, auditLog, interCompanyTransfers,
   insertInterCompanyTransferSchema, FEATURE_KEYS,
   locationPriceGroups,
+  stockGrades, stockCategories, insertStockGradeSchema, insertStockCategorySchema,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
@@ -82,6 +83,138 @@ export function registerStockRoutes(app: Express) {
     },
   );
 
+  // ── Stock Grades ────────────────────────────────────────────────────────────
+
+  app.get("/api/stock-grades", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const includeInactive = req.query.includeInactive === "true";
+      const conds = [eq(stockGrades.companyId, companyId)];
+      if (!includeInactive) conds.push(eq(stockGrades.active, true));
+      const rows = await db.select().from(stockGrades).where(and(...conds)).orderBy(asc(stockGrades.name));
+      res.json(rows);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.post("/api/stock-grades", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const parsed = insertStockGradeSchema.parse({ ...req.body, companyId });
+      const [created] = await db.insert(stockGrades).values(parsed).returning();
+      try {
+        await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "create", tableName: "stock_grades", recordId: created.id, recordIdentifier: created.name, changes: { name: { new: created.name } } });
+      } catch { /* non-fatal */ }
+      res.status(201).json(created);
+    } catch (error: any) { res.status(400).json({ message: error.message }); }
+  });
+
+  app.patch("/api/stock-grades/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const [existing] = await db.select().from(stockGrades).where(and(eq(stockGrades.id, id), eq(stockGrades.companyId, companyId)));
+      if (!existing) return res.status(404).json({ message: "Stock grade not found" });
+      const updates: any = {};
+      if (req.body.name !== undefined) {
+        const n = String(req.body.name).trim();
+        if (!n) return res.status(400).json({ message: "Name is required" });
+        updates.name = n;
+      }
+      if (req.body.active !== undefined) updates.active = req.body.active;
+      const [updated] = await db.update(stockGrades).set(updates).where(eq(stockGrades.id, id)).returning();
+      try {
+        await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "update", tableName: "stock_grades", recordId: id, recordIdentifier: updated.name, changes: Object.fromEntries(Object.entries(updates).map(([k, v]) => [k, { old: (existing as any)[k], new: v }])) });
+      } catch { /* non-fatal */ }
+      res.json(updated);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.delete("/api/stock-grades/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const [existing] = await db.select().from(stockGrades).where(and(eq(stockGrades.id, id), eq(stockGrades.companyId, companyId)));
+      if (!existing) return res.status(404).json({ message: "Stock grade not found" });
+      await db.update(stockGrades).set({ active: false }).where(eq(stockGrades.id, id));
+      try {
+        await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "update", tableName: "stock_grades", recordId: id, recordIdentifier: existing.name, changes: { active: { old: true, new: false } } });
+      } catch { /* non-fatal */ }
+      res.json({ message: "Stock grade deactivated" });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  // ── Stock Categories ─────────────────────────────────────────────────────────
+
+  app.get("/api/stock-categories", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const includeInactive = req.query.includeInactive === "true";
+      const conds = [eq(stockCategories.companyId, companyId)];
+      if (!includeInactive) conds.push(eq(stockCategories.active, true));
+      const rows = await db.select().from(stockCategories).where(and(...conds)).orderBy(asc(stockCategories.name));
+      res.json(rows);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.post("/api/stock-categories", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const parsed = insertStockCategorySchema.parse({ ...req.body, companyId });
+      const [created] = await db.insert(stockCategories).values(parsed).returning();
+      try {
+        await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "create", tableName: "stock_categories", recordId: created.id, recordIdentifier: created.name, changes: { name: { new: created.name } } });
+      } catch { /* non-fatal */ }
+      res.status(201).json(created);
+    } catch (error: any) { res.status(400).json({ message: error.message }); }
+  });
+
+  app.patch("/api/stock-categories/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const [existing] = await db.select().from(stockCategories).where(and(eq(stockCategories.id, id), eq(stockCategories.companyId, companyId)));
+      if (!existing) return res.status(404).json({ message: "Stock category not found" });
+      const updates: any = {};
+      if (req.body.name !== undefined) {
+        const n = String(req.body.name).trim();
+        if (!n) return res.status(400).json({ message: "Name is required" });
+        updates.name = n;
+      }
+      if (req.body.active !== undefined) updates.active = req.body.active;
+      const [updated] = await db.update(stockCategories).set(updates).where(eq(stockCategories.id, id)).returning();
+      try {
+        await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "update", tableName: "stock_categories", recordId: id, recordIdentifier: updated.name, changes: Object.fromEntries(Object.entries(updates).map(([k, v]) => [k, { old: (existing as any)[k], new: v }])) });
+      } catch { /* non-fatal */ }
+      res.json(updated);
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
+  app.delete("/api/stock-categories/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const [existing] = await db.select().from(stockCategories).where(and(eq(stockCategories.id, id), eq(stockCategories.companyId, companyId)));
+      if (!existing) return res.status(404).json({ message: "Stock category not found" });
+      await db.update(stockCategories).set({ active: false }).where(eq(stockCategories.id, id));
+      try {
+        await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "update", tableName: "stock_categories", recordId: id, recordIdentifier: existing.name, changes: { active: { old: true, new: false } } });
+      } catch { /* non-fatal */ }
+      res.json({ message: "Stock category deactivated" });
+    } catch (error: any) { res.status(500).json({ message: error.message }); }
+  });
+
   // Stock Items
   app.get("/api/stock-items", requireAuth, async (req: any, res: any) => {
     try {
@@ -113,6 +246,13 @@ export function registerStockRoutes(app: Express) {
       }
       if (stockGroupId && stockGroupId !== "all") {
         conditions.push(eq(stockItems.stockGroupId, parseInt(stockGroupId as string)));
+      }
+      const { gradeId, categoryId } = req.query;
+      if (gradeId && gradeId !== "all") {
+        conditions.push(eq(stockItems.gradeId, parseInt(gradeId as string)));
+      }
+      if (categoryId && categoryId !== "all") {
+        conditions.push(eq(stockItems.categoryId, parseInt(categoryId as string)));
       }
       if (active === "true") {
         conditions.push(eq(stockItems.active, true));
@@ -1247,6 +1387,14 @@ export function registerStockRoutes(app: Express) {
 
         if (req.body.active !== undefined) {
           updates.active = req.body.active;
+        }
+
+        if (req.body.gradeId !== undefined) {
+          updates.gradeId = req.body.gradeId === null ? null : parseInt(req.body.gradeId);
+        }
+
+        if (req.body.categoryId !== undefined) {
+          updates.categoryId = req.body.categoryId === null ? null : parseInt(req.body.categoryId);
         }
 
         // If updating code, check for duplicates
