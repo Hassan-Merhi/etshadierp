@@ -143,14 +143,30 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
         "--disable-accelerated-2d-canvas",
         "--no-first-run",
         "--no-zygote",
-        // Removed --single-process: causes crashes in containerised production.
-        // The following flags improve stability and reduce bot-detection signals.
-        "--disable-extensions",
+        "--single-process",    // KEEP: prevents multiple Chrome processes; critical for memory on 2GB hosts
+        // Anti-detection
         "--disable-blink-features=AutomationControlled",
         "--window-size=1280,800",
+        // Memory reduction
+        "--disable-extensions",
+        "--disable-background-networking",
+        "--disable-background-timer-throttling",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-breakpad",
+        "--disable-client-side-phishing-detection",
+        "--disable-component-update",
+        "--disable-default-apps",
+        "--disable-domain-reliability",
+        "--disable-hang-monitor",
         "--disable-infobars",
         "--disable-notifications",
         "--disable-popup-blocking",
+        "--disable-print-preview",
+        "--disable-renderer-backgrounding",
+        "--disable-sync",
+        "--metrics-recording-only",
+        "--safebrowsing-disable-auto-update",
+        "--password-store=basic",
       ],
     });
 

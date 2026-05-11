@@ -84,6 +84,9 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
       signal: AbortSignal.timeout(TIMEOUT_MS),
       redirect: "follow",
     });
+    // Discard the body immediately — we only need the Set-Cookie headers.
+    // Not consuming the body would hold the TCP connection open and leak memory.
+    await pageRes.body?.cancel().catch(() => {});
     // Collect all Set-Cookie values as a single Cookie header string
     const raw = pageRes.headers.get("set-cookie") ?? "";
     sessionCookies = raw
