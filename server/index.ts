@@ -2950,6 +2950,21 @@ let migrationsDone = false;
     `ALTER TABLE container_documents ADD COLUMN IF NOT EXISTS file_data text`,
     // ETA column on shipping container rows (manual date entry)
     `ALTER TABLE factory_shipping_container_rows ADD COLUMN IF NOT EXISTS eta date`,
+    // One-time cleanup: remove ghost rows from factory_shipping_container_documents.
+    // These are rows created before the file_data column was added (so file_data IS NULL)
+    // and that have no recoverable content (disk is ephemeral). They show up as broken
+    // "1 file" entries in the Documents column.
+    `DELETE FROM factory_shipping_container_documents
+       WHERE file_data IS NULL
+         AND (
+           file_name  IS NULL OR trim(file_name)  = '' OR file_name  = '-'
+           OR display_name IS NULL OR trim(display_name) = ''
+           OR original_name IS NULL OR trim(original_name) = ''
+           OR file_url IS NULL OR trim(file_url) = '' OR file_url = '-'
+         )`,
+    // Broader ghost sweep: delete any row where file_data IS NULL regardless of metadata,
+    // because without stored file_data the file cannot be served (disk is ephemeral).
+    `DELETE FROM factory_shipping_container_documents WHERE file_data IS NULL`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

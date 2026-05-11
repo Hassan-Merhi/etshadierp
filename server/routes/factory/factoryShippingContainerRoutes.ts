@@ -126,11 +126,15 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
           documentCount: sql<number>`(
             SELECT COUNT(*)::int FROM factory_shipping_container_documents fscd
             WHERE fscd.scr_id = ${factoryShippingContainerRows.id}
+              AND fscd.file_data IS NOT NULL
+              AND length(fscd.file_data) > 0
               AND fscd.file_name IS NOT NULL
-              AND fscd.file_name <> ''
+              AND trim(fscd.file_name) <> ''
               AND fscd.file_name <> '-'
-              AND (fscd.original_name IS NOT NULL AND fscd.original_name <> '')
-              AND (fscd.file_data IS NOT NULL OR (fscd.file_url IS NOT NULL AND fscd.file_url <> '' AND fscd.file_url <> '-'))
+              AND (
+                (fscd.display_name IS NOT NULL AND trim(fscd.display_name) <> '')
+                OR (fscd.original_name IS NOT NULL AND trim(fscd.original_name) <> '')
+              )
           )`,
           shippingInvoiceFileName: factoryShippingContainerRows.shippingInvoiceFileName,
           shippingInvoiceOriginalName: factoryShippingContainerRows.shippingInvoiceOriginalName,
@@ -424,17 +428,20 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         ))
         .orderBy(factoryShippingContainerDocuments.uploadedAt);
 
-      // Stronger ghost detection: missing/blank/dash fileName, missing both
-      // fileData and fileUrl, or missing both originalName and displayName.
+      // Ghost detection: a doc is a ghost if it has no stored file_data.
+      // file_data is the source of truth — disk is ephemeral and cannot be relied upon.
+      // A row with file_data IS NULL was created before DB storage was added and
+      // cannot be served. Any row with blank/dash fileName or missing display name
+      // is also a ghost.
       function detectGhost(doc: typeof allDocs[0], hasFileData: string | null): boolean {
-        const fn = doc.fileName ?? "";
-        const badFileName = !fn || fn.trim() === "" || fn.trim() === "-";
-        const noData = !hasFileData;
-        const noUrl = !doc.fileUrl || doc.fileUrl.trim() === "" || doc.fileUrl.trim() === "-";
+        if (!hasFileData || hasFileData.trim() === "") return true;
+        const fn = (doc.fileName ?? "").trim();
+        if (!fn || fn === "-") return true;
         const noName =
           (!doc.originalName || doc.originalName.trim() === "") &&
           (!doc.displayName || doc.displayName.trim() === "");
-        return badFileName || (noData && noUrl) || noName;
+        if (noName) return true;
+        return false;
       }
 
       const docs = allDocs.map(({ hasFileData, ...doc }) => {
@@ -444,6 +451,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
             ...doc,
             isGhost: true,
             displayName: "Broken record",
+            originalName: "",
             fileType: null,
             fileSize: null,
             uploadedBy: null,
