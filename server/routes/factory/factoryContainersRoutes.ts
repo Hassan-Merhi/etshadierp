@@ -320,36 +320,86 @@ export function registerFactoryContainersRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
-
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const updateData = { ...req.body, updatedAt: new Date() };
 
-      if (updateData.currencyCode || updateData.ratePerKg || updateData.fxRateSource) {
+      const b = req.body;
+
+      // Helper: coerce empty-string / undefined to null for numeric/integer columns
+      const dec = (v: any) => (v === "" || v === undefined || v === null) ? null : String(v);
+      const int = (v: any) => {
+        if (v === "" || v === undefined || v === null) return null;
+        const n = parseInt(v);
+        return isNaN(n) ? null : n;
+      };
+      const str = (v: any) => (v === "" || v === undefined) ? null : String(v);
+
+      // Build a strict whitelist — only valid factoryContainers columns
+      const updateData: Record<string, any> = {
+        updatedAt: new Date(),
+      };
+
+      if (b.containerNumber !== undefined) updateData.containerNumber = String(b.containerNumber || "");
+      if (b.supplierId     !== undefined) updateData.supplierId     = int(b.supplierId);
+      if (b.origin         !== undefined) updateData.origin         = str(b.origin);
+      if (b.totalKg        !== undefined) updateData.totalKg        = dec(b.totalKg);
+      if (b.ratePerKg      !== undefined) updateData.ratePerKg      = dec(b.ratePerKg);
+      if (b.arrivalDate    !== undefined) updateData.arrivalDate    = str(b.arrivalDate);
+      if (b.destination    !== undefined) updateData.destination    = str(b.destination);
+      if (b.notes          !== undefined) updateData.notes          = str(b.notes);
+      if (b.status         !== undefined) updateData.status         = String(b.status || "PENDING");
+      if (b.currencyCode   !== undefined) updateData.currencyCode   = String(b.currencyCode || "USD");
+      if (b.fxRateSource   !== undefined) updateData.fxRateSource   = String(b.fxRateSource || "auto");
+      if (b.fxRateToUsd    !== undefined) updateData.fxRateToUsd    = dec(b.fxRateToUsd) ?? "1";
+      // Freight
+      if (b.freight              !== undefined) updateData.freight              = dec(b.freight) ?? "0";
+      if (b.freightCurrencyCode  !== undefined) updateData.freightCurrencyCode  = str(b.freightCurrencyCode);
+      if (b.freightAccountId     !== undefined) updateData.freightAccountId     = int(b.freightAccountId);
+      if (b.freightSupplierId    !== undefined) updateData.freightSupplierId    = int(b.freightSupplierId);
+      // Other charges
+      if (b.otherCharges             !== undefined) updateData.otherCharges             = dec(b.otherCharges) ?? "0";
+      if (b.otherChargesCurrencyCode !== undefined) updateData.otherChargesCurrencyCode = str(b.otherChargesCurrencyCode);
+      if (b.otherChargesAccountId    !== undefined) updateData.otherChargesAccountId    = int(b.otherChargesAccountId);
+      if (b.otherChargesSupplierId   !== undefined) updateData.otherChargesSupplierId   = int(b.otherChargesSupplierId);
+      // Commission
+      if (b.commissionAmount       !== undefined) updateData.commissionAmount       = dec(b.commissionAmount) ?? "0";
+      if (b.commissionCurrencyCode !== undefined) updateData.commissionCurrencyCode = str(b.commissionCurrencyCode);
+      if (b.commissionAccountId    !== undefined) updateData.commissionAccountId    = int(b.commissionAccountId);
+      if (b.commissionSupplierId   !== undefined) updateData.commissionSupplierId   = int(b.commissionSupplierId);
+      if (b.commissionNotes        !== undefined) updateData.commissionNotes        = str(b.commissionNotes);
+      // Duty
+      if (b.dutyAmount    !== undefined) updateData.dutyAmount    = dec(b.dutyAmount);
+      if (b.dutyAccountId !== undefined) updateData.dutyAccountId = int(b.dutyAccountId);
+      if (b.dutyStatus    !== undefined) updateData.dutyStatus    = String(b.dutyStatus || "NONE");
+      if (b.dutyNotes     !== undefined) updateData.dutyNotes     = str(b.dutyNotes);
+
+      // FX rate computation (same logic as before)
+      const needsFxCalc = updateData.currencyCode || updateData.ratePerKg || updateData.fxRateSource;
+      if (needsFxCalc) {
         const [existing] = await db.select().from(factoryContainers)
           .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId)));
         if (!existing) return res.status(404).json({ message: "Container not found" });
 
         const currencyCode = updateData.currencyCode || existing.currencyCode || "USD";
         const fxRateSource = updateData.fxRateSource || existing.fxRateSource || "auto";
-        const importDate = updateData.arrivalDate || existing.arrivalDate || getClientDate(req);
+        const importDate   = updateData.arrivalDate   || existing.arrivalDate   || getClientDate(req);
 
         if (fxRateSource === "auto") {
           try {
             const fxRate = await getOrFetchFxRateToUsd(companyId, currencyCode, importDate);
-            updateData.fxRateToUsd = fxRate;
+            updateData.fxRateToUsd       = fxRate;
             updateData.fxRateToUsdImport = fxRate;
-            updateData.fxRateDateImport = importDate;
-            updateData.fxRateSource = "auto";
+            updateData.fxRateDateImport  = importDate;
+            updateData.fxRateSource      = "auto";
             const ratePerKg = parseFloat(updateData.ratePerKg || existing.ratePerKg || "0");
             const fxRateNum = parseFloat(fxRate);
             updateData.ratePerKgUsd = String(currencyCode === "USD" ? ratePerKg : ratePerKg * fxRateNum);
           } catch {}
         } else {
           const fxRateNum = parseFloat(updateData.fxRateToUsd || existing.fxRateToUsd || "1");
-          const ratePerKg = parseFloat(updateData.ratePerKg || existing.ratePerKg || "0");
+          const ratePerKg = parseFloat(updateData.ratePerKg   || existing.ratePerKg   || "0");
           updateData.fxRateToUsdImport = String(fxRateNum);
-          updateData.fxRateDateImport = importDate;
-          updateData.fxRateSource = "manual";
+          updateData.fxRateDateImport  = importDate;
+          updateData.fxRateSource      = "manual";
           updateData.ratePerKgUsd = String(currencyCode === "USD" ? ratePerKg : ratePerKg * fxRateNum);
         }
       }
