@@ -759,19 +759,24 @@ function ContainerDrawer({
                 {/* Row helper */}
                 {(() => {
                   const Row = ({
-                    label, badge, badgeColor, detail, testId,
+                    label, badge, badgeColor, detail, detailNode, testId,
                   }: {
                     label: string;
                     badge: string;
                     badgeColor: string;
                     detail?: string;
+                    detailNode?: React.ReactNode;
                     testId?: string;
                   }) => (
                     <div className="flex items-start gap-2 flex-wrap" data-testid={testId}>
                       <span className="text-xs text-muted-foreground flex-1 min-w-0">{label}</span>
                       <div className="flex flex-col items-end gap-0.5 shrink-0">
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badgeColor}`}>{badge}</span>
-                        {detail && <span className="text-xs text-muted-foreground/70">{detail}</span>}
+                        {detailNode
+                          ? <span className="text-xs text-muted-foreground/70 text-right">{detailNode}</span>
+                          : detail
+                            ? <span className="text-xs text-muted-foreground/70">{detail}</span>
+                            : null}
                       </div>
                     </div>
                   );
@@ -786,11 +791,13 @@ function ContainerDrawer({
                       <Row
                         testId="row-scraper"
                         label="1. ParcelsApp web scraper (no quota)"
-                        badge={scraperOk ? "Ready" : "Not installed"}
+                        badge={scraperOk ? "Ready" : "Installing…"}
                         badgeColor={scraperOk
                           ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                          : "bg-muted text-muted-foreground"}
-                        detail={scraperOk ? "Puppeteer stealth — bypasses reCaptcha" : undefined}
+                          : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"}
+                        detail={scraperOk
+                          ? "Puppeteer stealth — bypasses reCaptcha"
+                          : "Chrome is downloading in the background — restart app to re-check"}
                       />
 
                       {/* 2. 17track */}
@@ -806,15 +813,29 @@ function ContainerDrawer({
                         }
                         badgeColor={
                           !trackingStatus.seventeenTrackConfigured
-                            ? "bg-muted text-muted-foreground"
+                            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
                             : trackingStatus.seventeenTrackQuotaExhausted
                               ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
                               : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
                         }
-                        detail={
-                          trackingStatus.seventeenTrackConfigured
-                            ? `${trackingStatus.seventeenTrackUsageThisMonth} / ${trackingStatus.seventeenTrackMonthlyLimit} used this month`
-                            : "Set SEVENTEENTRACK_API_KEY to enable"
+                        detailNode={
+                          !trackingStatus.seventeenTrackConfigured ? (
+                            <>
+                              Free — 100 tracks/month.{" "}
+                              <a
+                                href="https://17track.net/en/api"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline text-primary"
+                              >
+                                Get API key
+                              </a>
+                              {" → add as "}
+                              <span className="font-mono">SEVENTEENTRACK_API_KEY</span>
+                            </>
+                          ) : trackingStatus.seventeenTrackConfigured ? (
+                            <>{trackingStatus.seventeenTrackUsageThisMonth} / {trackingStatus.seventeenTrackMonthlyLimit} used this month</>
+                          ) : undefined
                         }
                       />
 
@@ -845,11 +866,12 @@ function ContainerDrawer({
                         }
                       />
 
-                      {/* Alert if scraper detected as blocked (shown only when scraper last check was blocked) */}
+                      {/* Alert if no provider is active */}
                       {!scraperOk && !stOk && !paOk && (
                         <div className="flex items-start gap-1.5 pt-1">
                           <span className="text-xs text-red-600 dark:text-red-400">
                             No active tracking provider — containers will not update automatically.
+                            {" "}Quickest fix: get a free 17track API key above.
                           </span>
                         </div>
                       )}

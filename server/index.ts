@@ -3175,6 +3175,12 @@ let migrationsDone = false;
     console.error("✗ DB warmup failed after 3 attempts — queries will connect lazily");
   };
 
+  // Ensure Puppeteer's Chrome binary is present before the server starts
+  // accepting tracking requests.  Runs in background — does not block startup.
+  import("./lib/parcelsAppScraper").then(({ ensureChromiumAvailable }) => {
+    ensureChromiumAvailable().catch(() => {});
+  }).catch(() => {});
+
   const doListen = () => {
     server.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
       log(`serving on port ${port}`);

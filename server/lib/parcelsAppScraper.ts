@@ -10,6 +10,7 @@
  * blocked=true so the caller knows to fall back to the next provider.
  */
 
+import { existsSync } from "fs";
 import type { ParcelsAppShipment } from "./parcelsAppClient";
 
 export interface ScraperResult {
@@ -30,9 +31,51 @@ export function isScraperAvailable(): boolean {
     require.resolve("puppeteer-extra");
     require.resolve("puppeteer-extra-plugin-stealth");
     require.resolve("puppeteer");
-    return true;
+    const puppeteer = require("puppeteer");
+    const chromePath: string =
+      typeof puppeteer.executablePath === "function"
+        ? puppeteer.executablePath()
+        : "";
+    return !!chromePath && existsSync(chromePath);
   } catch {
     return false;
+  }
+}
+
+/**
+ * Download the Puppeteer-managed Chrome binary if it is missing.
+ * Safe to call on every server startup — exits immediately if Chrome
+ * is already present.  Logs progress so deployment issues are visible.
+ */
+export async function ensureChromiumAvailable(): Promise<void> {
+  try {
+    require.resolve("puppeteer");
+    const puppeteer = require("puppeteer");
+    const chromePath: string =
+      typeof puppeteer.executablePath === "function"
+        ? puppeteer.executablePath()
+        : "";
+    if (!chromePath) {
+      console.log("[Puppeteer] Could not determine Chrome path — skipping download.");
+      return;
+    }
+    if (existsSync(chromePath)) {
+      console.log("[Puppeteer] Chrome binary found — scraper ready.");
+      return;
+    }
+    console.log("[Puppeteer] Chrome binary not found at", chromePath, "— downloading now (this may take a minute)...");
+    const { execSync } = require("child_process");
+    execSync("npx puppeteer browsers install chrome", {
+      stdio: "inherit",
+      timeout: 180_000,
+    });
+    if (existsSync(chromePath)) {
+      console.log("[Puppeteer] Chrome download complete — scraper ready.");
+    } else {
+      console.warn("[Puppeteer] Chrome still not found after download — scraper will be unavailable.");
+    }
+  } catch (err: any) {
+    console.warn("[Puppeteer] Chrome setup skipped:", err?.message ?? err);
   }
 }
 
