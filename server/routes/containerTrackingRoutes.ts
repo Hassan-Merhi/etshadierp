@@ -81,6 +81,15 @@ export function registerContainerTrackingRoutes(app: Express) {
 
     const now = new Date();
     const nextReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+    const parcelsAppRemaining = Math.max(0, parcelsAppMonthlyLimit - parcelsAppUsageThisMonth);
+
+    // Smart scheduler budget
+    const remainingDays = Math.max(
+      1,
+      Math.ceil((nextReset.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)),
+    );
+    const dailyBudget = Math.floor(parcelsAppRemaining / remainingDays);
+    const perRunBudget = Math.max(1, Math.floor(dailyBudget / 4));
 
     res.json({
       configured: maerskConfigured || maerskPublicEnabled || cmaPublicEnabled || parcelsAppConfigured,
@@ -93,9 +102,12 @@ export function registerContainerTrackingRoutes(app: Express) {
       fallbackProvider: "parcelsapp",
       parcelsAppUsageThisMonth,
       parcelsAppMonthlyLimit,
-      parcelsAppRemaining: Math.max(0, parcelsAppMonthlyLimit - parcelsAppUsageThisMonth),
+      parcelsAppRemaining,
       parcelsAppQuotaExhausted: parcelsAppUsageThisMonth >= parcelsAppMonthlyLimit,
       parcelsAppNextResetDate: nextReset.toISOString().slice(0, 10),
+      schedulerRemainingDays: remainingDays,
+      schedulerDailyBudget: dailyBudget,
+      schedulerPerRunBudget: perRunBudget,
     });
   });
 
@@ -149,12 +161,32 @@ export function registerContainerTrackingRoutes(app: Express) {
         return;
       }
 
+      // Quota check upfront so we can respond before firing background job
+      const { used, limit } = await getParcelsAppUsageStats();
+      const remaining = Math.max(0, limit - used);
+      const hasDirectProvider =
+        isMaerskConfigured() || isMaerskPublicEnabled() || isCmaPublicEnabled();
+
+      if (remaining === 0 && !hasDirectProvider) {
+        res.status(402).json({
+          message: `ParcelsApp monthly quota exhausted (${used}/${limit}). Track Now is not available until next month.`,
+        });
+        return;
+      }
+
+      const quotaWarning =
+        remaining > 0 && remaining <= Math.ceil(limit * 0.1)
+          ? `ParcelsApp quota is low — ${remaining} of ${limit} credits remaining this month.`
+          : undefined;
+
       res.status(202).json({
         started: true,
         containerNumber: row.containerNumber,
         message: "Tracking started. Results will appear in about a minute — refresh the page to see updates.",
+        quotaWarning,
       });
 
+      // Fire tracking in background — quota was already validated above
       trackOneContainerById(containerId).catch((err: any) =>
         console.error(`[TrackNow] ${row.containerNumber}:`, err?.message),
       );

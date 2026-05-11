@@ -112,6 +112,11 @@ interface EnrichedContainerRow {
   trackingLastDescription: string | null;
   trackingError: string | null;
   trackingChangedAt: string | null;
+  trackingDetectedCarrier: string | null;
+  trackingFallbackUsed: boolean | null;
+  trackingFallbackReason: string | null;
+  trackingNextCheckAt: string | null;
+  trackingLastSkipReason: string | null;
   maxOffloadDate: string | null;
   daysDelayed: number | null;
   docsReadyNotSent: boolean;
@@ -182,6 +187,67 @@ function fmtDate(d: string | null | undefined) {
   if (parts.length !== 3) return d;
   const [y, m, day] = parts;
   return `${day}/${m}/${y.slice(2)}`;
+}
+
+// ─── Client-side priority helper (mirrors server trackingPriority.ts) ─────────
+
+type PriorityTier = "high" | "medium" | "low";
+
+interface UIPriority {
+  tier: PriorityTier;
+  label: string;
+  reason: string;
+  intervalHours: number;
+}
+
+function getContainerPriority(c: EnrichedContainerRow): UIPriority {
+  const statusLower = c.status.toLowerCase();
+  const now = new Date();
+  const etaDate = c.eta ? new Date(c.eta) : null;
+  const daysUntilEta =
+    etaDate !== null
+      ? Math.ceil((etaDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      : null;
+  const etaPassed = daysUntilEta !== null && daysUntilEta < 0;
+  const hasTruck = !!(c.numberPlate && c.numberPlate.trim());
+
+  if (etaPassed && !hasTruck)
+    return { tier: "high", label: "High", reason: "ETA passed — no truck assigned", intervalHours: 24 };
+  if (c.isOverdue)
+    return { tier: "high", label: "High", reason: "Container is overdue", intervalHours: 24 };
+  if (c.docsReadyNotSent)
+    return { tier: "high", label: "High", reason: "Docs ready — not yet sent", intervalHours: 24 };
+  if (statusLower === "at port")
+    return { tier: "high", label: "High", reason: "At Port — arrival imminent", intervalHours: 24 };
+  if (statusLower === "left dar")
+    return { tier: "high", label: "High", reason: "Left Dar — final delivery leg", intervalHours: 24 };
+  if (statusLower === "at border")
+    return { tier: "high", label: "High", reason: "At Border — clearing customs", intervalHours: 24 };
+  if (statusLower === "in transit")
+    return { tier: "high", label: "High", reason: "In Transit — active movement", intervalHours: 24 };
+  if (daysUntilEta !== null && daysUntilEta >= 0 && daysUntilEta <= 3)
+    return { tier: "high", label: "High", reason: `ETA in ${daysUntilEta} day${daysUntilEta !== 1 ? "s" : ""}`, intervalHours: 24 };
+  if (daysUntilEta !== null && daysUntilEta >= 0 && daysUntilEta <= 7)
+    return { tier: "medium", label: "Medium", reason: `ETA in ${daysUntilEta} days`, intervalHours: 48 };
+  if (statusLower === "arrived")
+    return { tier: "medium", label: "Medium", reason: "Arrived — awaiting offload", intervalHours: 48 };
+  if (daysUntilEta !== null && daysUntilEta >= 0 && daysUntilEta <= 14)
+    return { tier: "medium", label: "Medium", reason: `ETA in ${daysUntilEta} days`, intervalHours: 48 };
+  if (daysUntilEta !== null && daysUntilEta > 14) {
+    const intervalHours = daysUntilEta > 21 ? 120 : 96;
+    return { tier: "low", label: "Low", reason: `ETA in ${daysUntilEta} days`, intervalHours };
+  }
+  return { tier: "low", label: "Low", reason: "No ETA set", intervalHours: 120 };
+}
+
+function fmtSkipReason(raw: string | null): string | null {
+  if (!raw) return null;
+  if (raw === "skipped_recent") return "Checked recently — waiting for next interval";
+  if (raw === "skipped_priority_budget") return "Lower priority — skipped this run to save quota";
+  if (raw === "skipped_disabled") return "Auto-update is turned off";
+  if (raw === "skipped_quota") return "ParcelsApp monthly quota exhausted";
+  if (raw === "invalid_container_number") return "Container number is not a valid format";
+  return raw;
 }
 
 // ─── Summary Card ─────────────────────────────────────────────────────────────
@@ -341,13 +407,16 @@ function ContainerDrawer({
   const trackNowMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/container-tracking/${container!.id}/track-now`, {});
-      return res.json() as Promise<{ started: boolean; containerNumber: string; message: string }>;
+      return res.json() as Promise<{ started: boolean; containerNumber: string; message: string; quotaWarning?: string }>;
     },
     onSuccess: (data) => {
       toast({
         title: `Tracking started for ${data.containerNumber}`,
         description: data.message,
       });
+      if (data.quotaWarning) {
+        setTimeout(() => toast({ title: "Quota low", description: data.quotaWarning, variant: "destructive" }), 400);
+      }
       // ParcelsApp polling takes up to 60 s — refresh after 70 s to pick up results
       setTimeout(() => queryClient.invalidateQueries({ queryKey: [queryKey] }), 70_000);
     },
@@ -374,6 +443,9 @@ function ContainerDrawer({
     maerskConfigured: boolean;
     maerskPublicEnabled: boolean;
     cmaPublicEnabled: boolean;
+    schedulerRemainingDays: number;
+    schedulerDailyBudget: number;
+    schedulerPerRunBudget: number;
   }>({
     queryKey: ["/api/container-tracking/status"],
     staleTime: 5 * 60_000,
@@ -714,6 +786,66 @@ function ContainerDrawer({
               </div>
             )}
 
+            {/* Smart priority panel — only shown for non-inactive containers */}
+            {container && !isContainerInactive && (
+              <div className="rounded-md border bg-muted/20 px-3 py-2.5 space-y-2" data-testid="panel-priority">
+                {(() => {
+                  const p = getContainerPriority(container);
+                  const tierColor =
+                    p.tier === "high"
+                      ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                      : p.tier === "medium"
+                        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                        : "bg-muted text-muted-foreground";
+                  return (
+                    <>
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <p className="text-xs font-medium text-muted-foreground">Scheduler priority</p>
+                        <span
+                          className={`text-xs font-medium px-2 py-0.5 rounded-full ${tierColor}`}
+                          data-testid="badge-priority-tier"
+                        >
+                          {p.label}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground" data-testid="text-priority-reason">
+                        {p.reason}
+                      </p>
+                      <p className="text-xs text-muted-foreground" data-testid="text-priority-interval">
+                        Minimum check interval: every {p.intervalHours}h
+                      </p>
+                      {container.trackingNextCheckAt && (
+                        <p className="text-xs text-muted-foreground" data-testid="text-next-check">
+                          Next scheduled check:{" "}
+                          <span className="font-medium">
+                            {new Date(container.trackingNextCheckAt).toLocaleString()}
+                          </span>
+                        </p>
+                      )}
+                      {container.trackingLastSkipReason && (
+                        <p className="text-xs text-muted-foreground" data-testid="text-last-skip-reason">
+                          Last skip reason:{" "}
+                          <span className="font-medium">
+                            {fmtSkipReason(container.trackingLastSkipReason)}
+                          </span>
+                        </p>
+                      )}
+                      {trackingStatus?.schedulerPerRunBudget !== undefined && (
+                        <p className="text-xs text-muted-foreground" data-testid="text-scheduler-budget">
+                          Budget this run: up to {trackingStatus.schedulerPerRunBudget} container
+                          {trackingStatus.schedulerPerRunBudget !== 1 ? "s" : ""} per 6h cycle
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground/70 italic" data-testid="text-scheduler-note">
+                        The scheduler reviews this container every 6 hours, but only runs live
+                        tracking when it is due or high-priority to save ParcelsApp credits.
+                      </p>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Enabled</Label>
@@ -787,14 +919,14 @@ function ContainerDrawer({
                 </div>
 
                 {/* Detected carrier */}
-                {(container as any).trackingDetectedCarrier && (
+                {container.trackingDetectedCarrier && (
                   <p className="text-xs text-muted-foreground" data-testid="text-detected-carrier">
-                    Carrier detected: <span className="font-medium">{(container as any).trackingDetectedCarrier}</span>
+                    Carrier detected: <span className="font-medium">{container.trackingDetectedCarrier}</span>
                   </p>
                 )}
 
                 {/* Fallback note */}
-                {(container as any).trackingFallbackUsed && (
+                {container.trackingFallbackUsed && (
                   <div
                     className="flex items-start gap-1.5 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-2 py-1.5"
                     data-testid="banner-tracking-fallback"
@@ -802,7 +934,7 @@ function ContainerDrawer({
                     <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0 mt-px" />
                     <p className="text-xs text-amber-700 dark:text-amber-300">
                       {(() => {
-                        const r = (container as any).trackingFallbackReason as string | null;
+                        const r = container.trackingFallbackReason;
                         if (!r) return "Fallback provider used";
                         if (r === "maersk_not_configured" || r === "maersk_official_not_configured")
                           return "Maersk API not configured — used ParcelsApp fallback";

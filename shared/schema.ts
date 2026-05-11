@@ -600,6 +600,9 @@ export const containers = pgTable("containers", {
   trackingDetectedCarrier: text("tracking_detected_carrier"),
   trackingFallbackUsed: boolean("tracking_fallback_used").default(false),
   trackingFallbackReason: text("tracking_fallback_reason"),
+  // Smart priority scheduler fields
+  trackingNextCheckAt: timestamp("tracking_next_check_at", { withTimezone: true }),
+  trackingLastSkipReason: text("tracking_last_skip_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   companyIdx: index("containers_company_idx").on(t.companyId),

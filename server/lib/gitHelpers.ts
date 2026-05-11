@@ -224,6 +224,11 @@ export type RawContainerRow = {
   trackingLastDescription: string | null;
   trackingError: string | null;
   trackingChangedAt: Date | null;
+  trackingDetectedCarrier: string | null;
+  trackingFallbackUsed: boolean | null;
+  trackingFallbackReason: string | null;
+  trackingNextCheckAt: Date | null;
+  trackingLastSkipReason: string | null;
   createdAt: Date;
 };
 
@@ -295,6 +300,11 @@ export async function fetchActiveContainers(
       trackingLastDescription: containers.trackingLastDescription,
       trackingError: containers.trackingError,
       trackingChangedAt: containers.trackingChangedAt,
+      trackingDetectedCarrier: containers.trackingDetectedCarrier,
+      trackingFallbackUsed: containers.trackingFallbackUsed,
+      trackingFallbackReason: containers.trackingFallbackReason,
+      trackingNextCheckAt: containers.trackingNextCheckAt,
+      trackingLastSkipReason: containers.trackingLastSkipReason,
       createdAt: containers.createdAt,
     })
     .from(containers)
