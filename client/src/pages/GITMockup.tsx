@@ -154,7 +154,6 @@ const COMPANY_COLORS: { bg: string; text: string }[] = [
 function getRealRowBg(r: EnrichedContainerApi): string {
   if (r.isOverdue)                                      return "bg-red-50 dark:bg-red-950/20";
   if (r.daysDelayed !== null && r.daysDelayed > 0)      return "bg-orange-50 dark:bg-orange-950/20";
-  if (r.docsReadyNotSent)                               return "bg-amber-50 dark:bg-amber-950/20";
   return "";
 }
 
@@ -179,9 +178,7 @@ function WorkbookDataRow({ r }: { r: EnrichedContainerApi }) {
       <td className="py-0.5 px-2 text-center">
         {docsSent
           ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
-          : r.docsReadyNotSent
-            ? <span className="text-amber-700 text-[10px] font-medium">READY</span>
-            : "—"}
+          : "—"}
       </td>
       <td className="py-0.5 px-2">{r.freightStatus ?? "—"}</td>
       <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>
@@ -550,9 +547,7 @@ function TabDetail() {
                         <TableCell className="text-center">
                           {docsSent
                             ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
-                            : r.docsReadyNotSent
-                              ? <span className="text-amber-700 text-[10px] font-medium">READY</span>
-                              : "—"}
+                            : "—"}
                         </TableCell>
                         <TableCell>{r.transporter ?? "—"}</TableCell>
                         <TableCell className="text-right">{parseNum(r.transportFee) > 0 ? `$${fmt(parseNum(r.transportFee), 0)}` : "—"}</TableCell>
@@ -684,7 +679,6 @@ function TabSummary() {
       arrived:           byStatus["Arrived"] ?? 0,
       delayed:           allContainers.filter(r => r.daysDelayed !== null && r.daysDelayed > 0).length,
       overdue:           allContainers.filter(r => r.isOverdue).length,
-      docsReadyNotSent:  allContainers.filter(r => r.docsReadyNotSent).length,
       totalCost:         allContainers.reduce((s, r) => s + parseNum(r.grandTotal), 0),
       totalFee:          allContainers.reduce((s, r) => s + parseNum(r.transportFee), 0),
       totalDuty:         allContainers.reduce((s, r) => s + parseNum(r.dutyFee), 0),
@@ -708,10 +702,6 @@ function TabSummary() {
   const byCompany   = useMemo(() => makeBreakdown(r => r.companyName), [allContainers]);
   const byTransport = useMemo(() => makeBreakdown(r => r.transporter ?? "—"), [allContainers]);
   const byAgent     = useMemo(() => makeBreakdown(r => r.agent ?? "—"), [allContainers]);
-
-  const attentionRows = useMemo(() =>
-    allContainers.filter(r => r.docsReadyNotSent),
-  [allContainers]);
 
   const modeSelector = (
     <div className="flex items-center gap-2 flex-wrap" data-testid="summary-mode-selector">
@@ -792,10 +782,6 @@ function TabSummary() {
           <span className={cn("font-bold", stats.delayed > 0 ? "text-red-600" : "")}>{stats.delayed}</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-muted-foreground text-xs">Docs Pending</span>
-          <span className={cn("font-bold", stats.docsReadyNotSent > 0 ? "text-amber-600" : "")}>{stats.docsReadyNotSent}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
           <span className="text-muted-foreground text-xs">Overdue</span>
           <span className={cn("font-bold", stats.overdue > 0 ? "text-orange-600" : "")}>{stats.overdue}</span>
         </div>
@@ -835,44 +821,6 @@ function TabSummary() {
           </table>
         </div>
       </div>
-
-      {/* Attention section */}
-      {attentionRows.length > 0 && (() => {
-        const shopMap = new Map<string, EnrichedContainerApi[]>();
-        for (const r of attentionRows) {
-          const key = r.shopName ?? r.companyName ?? "Other";
-          if (!shopMap.has(key)) shopMap.set(key, []);
-          shopMap.get(key)!.push(r);
-        }
-        const shopEntries = [...shopMap.entries()].sort(([a], [b]) =>
-          a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
-        );
-        return (
-          <div className="rounded-md border border-amber-200 dark:border-amber-800 overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800">
-              <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-              <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">
-                Docs ready — not sent to transporter yet
-              </span>
-              <span className="ml-auto text-xs text-amber-600 dark:text-amber-400 font-medium">{attentionRows.length} container{attentionRows.length !== 1 ? "s" : ""}</span>
-            </div>
-            <div className="divide-y divide-amber-100 dark:divide-amber-900">
-              {shopEntries.map(([shop, ctrs]) => (
-                <div key={shop} className="px-3 py-2">
-                  <div className="text-[10px] font-bold uppercase tracking-widest text-amber-700 dark:text-amber-400 mb-1.5">{shop} — {ctrs.length}</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {ctrs.map(r => (
-                      <span key={r.id} className="font-mono text-xs font-semibold bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded px-2 py-0.5 text-foreground">
-                        {r.containerNumber}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
 
       {/* Breakdown tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -2110,7 +2058,6 @@ function TabWhatsApp() {
 
   // ── Attention lists ──────────────────────────────────────────────────────────
   const delayed   = containers.filter(r => r.daysDelayed !== null && r.daysDelayed > 0);
-  const docsReady = containers.filter(r => r.docsReadyNotSent);
   const docsMiss  = containers.filter(r => !r.docReceived);
   const overdue   = containers.filter(r => r.isOverdue);
 
@@ -2213,11 +2160,6 @@ function TabWhatsApp() {
       ``,
       `! *OFFLOAD OVERDUE — ${overdue.length}*`,
       ...overdue.map(r => `• ${r.containerNumber} [${r.companyName}]`),
-    ] : []),
-    ...(docsReady.length > 0 ? [
-      ``,
-      `*DOCS READY — NOT SENT TO TRUCK (${docsReady.length})*`,
-      ...docsReady.map(r => `• ${r.containerNumber} → ${r.transporter ?? "no transporter"}`),
     ] : []),
     ...(docsMiss.length > 0 ? [
       ``,

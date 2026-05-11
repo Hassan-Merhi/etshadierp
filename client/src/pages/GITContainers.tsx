@@ -536,14 +536,6 @@ function ContainerDrawer({
                 </p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Docs Ready / Not Sent</p>
-                <p className="text-sm font-medium">
-                  {container.docsReadyNotSent
-                    ? <span className="text-amber-600">Yes</span>
-                    : <span className="text-muted-foreground">—</span>}
-                </p>
-              </div>
-              <div>
                 <p className="text-xs text-muted-foreground">Offload Overdue</p>
                 <p className="text-sm font-medium">
                   {container.isOverdue
@@ -1214,7 +1206,6 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
       if (agentFilter !== "ALL" && c.agent !== agentFilter) return false;
       if (docsFilter === "MISSING" && c.docReceived) return false;
       if (docsFilter === "RECEIVED" && !c.docReceived) return false;
-      if (docsFilter === "READY_NOT_SENT" && !c.docsReadyNotSent) return false;
       if (delayedFilter === "YES" && !(c.daysDelayed && c.daysDelayed > 0)) return false;
       if (delayedFilter === "OVERDUE" && !c.isOverdue) return false;
       if (search) {
@@ -1244,7 +1235,6 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const inTransit      = allContainers.filter((c) => ["At Border", "In Transit"].includes(c.status)).length;
   const arrived        = allContainers.filter((c) => c.status === "Arrived").length;
   const delayed        = allContainers.filter((c) => c.daysDelayed !== null && c.daysDelayed > 0).length;
-  const docsReadyNS    = allContainers.filter((c) => c.docsReadyNotSent).length;
   const offloadOverdue = allContainers.filter((c) => c.isOverdue).length;
   const totalCost      = allContainers.reduce((s, c) => s + parseNum(c.grandTotal), 0);
   const totalTransport = allContainers.reduce((s, c) => s + parseNum(c.transportFee), 0);
@@ -1406,7 +1396,6 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
           {inTransit > 0 && <SummaryCard label="In Transit" value={inTransit} icon={<Truck className="h-4 w-4 text-indigo-600" />} accent="bg-indigo-100 dark:bg-indigo-900/30" />}
           {arrived > 0 && <SummaryCard label="Arrived" value={arrived} icon={<CheckCircle2 className="h-4 w-4 text-green-600" />} accent="bg-green-100 dark:bg-green-900/30" />}
           {delayed > 0 && <SummaryCard label="Delayed" value={delayed} icon={<Clock className="h-4 w-4 text-red-600" />} accent="bg-red-100 dark:bg-red-900/30" />}
-          {docsReadyNS > 0 && <SummaryCard label="Docs Ready / Unsent" value={docsReadyNS} icon={<FileX className="h-4 w-4 text-amber-600" />} accent="bg-amber-100 dark:bg-amber-900/30" />}
           {offloadOverdue > 0 && <SummaryCard label="Offload Overdue" value={offloadOverdue} icon={<AlertTriangle className="h-4 w-4 text-red-600" />} accent="bg-red-100 dark:bg-red-900/30" />}
           <SummaryCard label="Container Cost" value={`$${fmt(totalCost)}`} icon={<DollarSign className="h-4 w-4 text-green-600" />} accent="bg-green-100 dark:bg-green-900/30" />
           <SummaryCard label="Transport + Duty" value={`$${fmt(totalTransport + totalDuty)}`} icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} />
@@ -1650,7 +1639,6 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                   <SelectItem value="ALL">All</SelectItem>
                   <SelectItem value="MISSING">Docs Missing</SelectItem>
                   <SelectItem value="RECEIVED">Docs Received</SelectItem>
-                  <SelectItem value="READY_NOT_SENT">Ready / Not Sent</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1692,10 +1680,6 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
               Offload Overdue
             </span>
             <span className="flex items-center gap-1">
-              <span className="inline-block w-3 h-3 rounded-sm bg-amber-200 dark:bg-amber-900/40" />
-              Docs Ready / Not Sent
-            </span>
-            <span className="flex items-center gap-1">
               <span className="inline-block w-3 h-3 rounded-sm bg-rose-200 dark:bg-rose-900/40" />
               Docs Missing — At Port
             </span>
@@ -1721,7 +1705,6 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                 <TableHead>Delayed</TableHead>
                 <TableHead>Docs</TableHead>
                 <TableHead>Docs Sent</TableHead>
-                <TableHead>Ready/Unsent</TableHead>
                 <TableHead>Transporter</TableHead>
                 <TableHead className="text-right">Transport Fee</TableHead>
                 <TableHead>Agent</TableHead>
@@ -1733,7 +1716,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={21} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={20} className="text-center py-8 text-muted-foreground">
                     {allContainers.length === 0
                       ? "No active containers found."
                       : "No containers match the current filters."}
@@ -1744,8 +1727,6 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                   const statusMeta = STATUS_META[c.status] ?? STATUS_META["Closed"];
                   const rowBg = c.isOverdue
                     ? "bg-red-50/50 dark:bg-red-950/20"
-                    : c.docsReadyNotSent
-                    ? "bg-amber-50/50 dark:bg-amber-950/20"
                     : !c.docReceived && c.status === "At Port"
                     ? "bg-rose-50/50 dark:bg-rose-950/20"
                     : "";
@@ -1789,11 +1770,6 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                           : <XCircle className="h-3.5 w-3.5 text-red-500" />}
                       </TableCell>
                       <TableCell>{fmtDate(c.docsSentDate)}</TableCell>
-                      <TableCell>
-                        {c.docsReadyNotSent
-                          ? <span className="text-amber-600 font-medium">Yes</span>
-                          : <span className="text-muted-foreground">—</span>}
-                      </TableCell>
                       <TableCell>
                         {c.transporter ?? <span className="text-muted-foreground">—</span>}
                       </TableCell>
