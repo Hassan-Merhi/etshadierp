@@ -364,25 +364,16 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
     }
   }
 
-  // Last resort: look in states for the most recent future-facing event date
-  // Only use this if the container hasn't arrived yet (no gate-out/delivery events)
+  // Last resort: use the most recent state date — always, regardless of whether
+  // the container has arrived. A past date (e.g. gate-out date) is still
+  // meaningful to show in the ETA column so it's never left blank after tracking.
   if (shipment.states?.length) {
-    const arrivedKeywords = /gate.?out|deliver|customs.?release/i;
-    const hasArrived = shipment.states.some(
-      (s) => arrivedKeywords.test(s.status ?? "") || arrivedKeywords.test(s.description ?? ""),
-    );
-
-    if (!hasArrived) {
-      const etaEventKeywords = /estimat|eta|arrival|discharg|berth|port/i;
-      const etaState = shipment.states.find(
-        (s) => etaEventKeywords.test(s.status ?? "") || etaEventKeywords.test(s.description ?? ""),
-      );
-      if (etaState?.date) {
-        const d = new Date(etaState.date);
-        if (!isNaN(d.getTime()) && d.getTime() > Date.now()) {
-          return d.toISOString().slice(0, 10);
-        }
-      }
+    const sorted = shipment.states
+      .filter((s) => !!s.date)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    if (sorted[0]?.date) {
+      const d = new Date(sorted[0].date);
+      if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
     }
   }
 

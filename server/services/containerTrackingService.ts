@@ -587,6 +587,15 @@ async function trackOneContainer(
       if (result.eta) {
         updateSet.eta = result.eta;
         updateSet.etaSource = "api";
+      } else if (result.events?.length) {
+        // Fallback: use the most recent event date so the column is never blank
+        const best = result.events
+          .filter((e) => e.date)
+          .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0))[0];
+        if (best?.date) {
+          updateSet.eta = best.date.toISOString().slice(0, 10);
+          updateSet.etaSource = "event";
+        }
       }
 
       await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
