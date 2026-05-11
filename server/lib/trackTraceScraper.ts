@@ -173,87 +173,93 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
       } catch { /* ignore */ }
     });
 
-    // ── Step 1: load the base container page (no hash) ───────────────────────
-    const baseUrl = "https://www.track-trace.com/container";
-    console.log(`[TrackTrace] Navigating to ${baseUrl}`);
+    // ── Step 1: navigate directly with hash (SPA hash-triggered search) ────────
+    // track-trace.com reads the #hash on load and auto-submits the search.
+    // We use networkidle2 so we wait for the AJAX tracking call to finish.
+    const hashUrl = `https://www.track-trace.com/container#${encodeURIComponent(containerNumber)}`;
+    console.log(`[TrackTrace] Navigating to ${hashUrl}`);
     try {
-      await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT_MS });
-    } catch (e) {
-      console.log(`[TrackTrace] domcontentloaded timed out — continuing`);
+      await page.goto(hashUrl, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT_MS });
+    } catch {
+      console.log(`[TrackTrace] networkidle2 timed out — continuing`);
     }
 
-    // Let any JS init code run
-    await new Promise((r) => setTimeout(r, 2000));
+    // Extra settle for any deferred JS / iframe loads
+    await new Promise((r) => setTimeout(r, 6000));
 
-    // ── Step 2: find the input and type the container number ─────────────────
+    // ── Step 2 & 3: form interaction — ALL via evaluate(), no ElementHandles ──
+    // ElementHandles are tied to a specific frame. If the page or an iframe
+    // navigates while we hold an ElementHandle, Puppeteer throws
+    // "Attempted to use detached Frame". Using evaluate() runs JS inside the
+    // page and returns plain values — no frame reference to go stale.
+    //
+    // Helper: try to fill + submit the form in a given frame's context.
+    async function tryFillAndSubmit(frame: any): Promise<boolean> {
+      return frame.evaluate(
+        (cn: string, sels: string[]) => {
+          for (const sel of sels) {
+            const el = document.querySelector(sel) as HTMLInputElement | null;
+            if (!el) continue;
+            const r = el.getBoundingClientRect();
+            if (r.width === 0 && r.height === 0) continue; // not visible
+            el.focus();
+            el.value = cn;
+            el.dispatchEvent(new Event("input",  { bubbles: true }));
+            el.dispatchEvent(new Event("change", { bubbles: true }));
+            const form = el.closest("form");
+            if (form) {
+              form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+              (form as HTMLFormElement).submit();
+              return true;
+            }
+            el.dispatchEvent(new KeyboardEvent("keydown",  { key: "Enter", keyCode: 13, bubbles: true, cancelable: true }));
+            el.dispatchEvent(new KeyboardEvent("keypress", { key: "Enter", keyCode: 13, bubbles: true, cancelable: true }));
+            el.dispatchEvent(new KeyboardEvent("keyup",    { key: "Enter", keyCode: 13, bubbles: true }));
+            return true;
+          }
+          return false;
+        },
+        containerNumber,
+        INPUT_SELECTORS,
+      ).catch(() => false);
+    }
+
+    // Check if the hash-navigation already loaded results
+    const preCheckText: string = await page.evaluate(
+      () => document.body?.innerText?.slice(0, 1000) ?? "",
+    ).catch(() => "");
+    const alreadyHasResults =
+      preCheckText.includes(containerNumber) ||
+      /transit|departed|arrived|discharged|loaded|delivered|customs|gate|vessel|port/i.test(preCheckText);
+
     let inputFound = false;
-    for (const sel of INPUT_SELECTORS) {
-      try {
-        const el = await page.$(sel);
-        if (!el) continue;
-        // Make sure it's visible
-        const box = await el.boundingBox().catch(() => null);
-        if (!box) continue;
-        await el.click({ clickCount: 3 });
-        await new Promise((r) => setTimeout(r, 200));
-        await el.type(containerNumber, { delay: 60 });
-        console.log(`[TrackTrace] Typed "${containerNumber}" into ${sel}`);
-        inputFound = true;
-        break;
-      } catch { /* try next */ }
-    }
+    if (!alreadyHasResults) {
+      console.log(`[TrackTrace] Hash-nav didn't auto-load results — trying form fill`);
 
-    if (!inputFound) {
-      console.log(`[TrackTrace] No input field found — falling back to hash URL`);
-      try {
-        await page.goto(`${baseUrl}#${encodeURIComponent(containerNumber)}`, {
-          waitUntil: "domcontentloaded",
-          timeout: NAV_TIMEOUT_MS,
-        });
-      } catch { /* ignore timeout */ }
-    } else {
-      // ── Step 3: submit and wait for the navigation/frame-swap to settle ─────
-      // We race Enter-press against waitForNavigation so that if the page
-      // navigates (causing a frame detach) we catch it before touching any DOM.
-      console.log(`[TrackTrace] Pressing Enter and waiting for navigation to settle…`);
-      await Promise.all([
-        page.keyboard.press("Enter"),
-        page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 15_000 })
-          .catch(() => { /* no full navigation — AJAX site, that's fine */ }),
-      ]);
-      console.log(`[TrackTrace] Post-Enter navigation settled (url: ${page.url()})`);
+      // Try main frame first
+      inputFound = await tryFillAndSubmit(page.mainFrame()).catch(() => false);
+      console.log(`[TrackTrace] Main-frame form fill: ${inputFound}`);
 
-      // Extra settle for any AJAX rendering
-      await new Promise((r) => setTimeout(r, 2000));
-
-      // If the page URL didn't change (pure AJAX), try a visible submit button
-      const urlAfter = page.url();
-      const didNavigate = urlAfter !== baseUrl && !urlAfter.endsWith("/container");
-      if (!didNavigate) {
-        const btnSelectors = [
-          "button[type='submit']",
-          "input[type='submit']",
-          "#track-btn",
-          ".track-btn",
-        ];
-        for (const bSel of btnSelectors) {
+      // If not found in main frame, search all child frames (iframes)
+      if (!inputFound) {
+        for (const frame of page.frames()) {
+          if (frame === page.mainFrame()) continue;
           try {
-            const btn = await page.$(bSel);
-            if (!btn) continue;
-            const box = await btn.boundingBox().catch(() => null);
-            if (!box) continue;
-            const txt: string = await page
-              .evaluate((el: Element) => el.textContent ?? "", btn)
-              .catch(() => "");
-            if (/track|search|go|submit/i.test(txt) || bSel.includes("submit")) {
-              await btn.click();
-              console.log(`[TrackTrace] Clicked submit button: ${bSel} "${txt.trim()}"`);
-              await new Promise((r) => setTimeout(r, 2000));
+            const found = await tryFillAndSubmit(frame);
+            if (found) {
+              inputFound = true;
+              console.log(`[TrackTrace] Found + filled form in child frame: ${frame.url()}`);
               break;
             }
-          } catch { /* try next */ }
+          } catch { /* frame may have navigated away, try next */ }
         }
       }
+
+      // Wait for AJAX / iframe reload after submission
+      await new Promise((r) => setTimeout(r, 6000));
+    } else {
+      inputFound = true;
+      console.log(`[TrackTrace] Hash-nav already loaded results — skipping form fill`);
     }
 
     // ── Step 4: wait for results to appear ───────────────────────────────────
