@@ -212,34 +212,47 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
         });
       } catch { /* ignore timeout */ }
     } else {
-      // ── Step 3: submit (Enter, then look for a submit button as fallback) ──
-      await page.keyboard.press("Enter");
-      console.log(`[TrackTrace] Pressed Enter to submit`);
+      // ── Step 3: submit and wait for the navigation/frame-swap to settle ─────
+      // We race Enter-press against waitForNavigation so that if the page
+      // navigates (causing a frame detach) we catch it before touching any DOM.
+      console.log(`[TrackTrace] Pressing Enter and waiting for navigation to settle…`);
+      await Promise.all([
+        page.keyboard.press("Enter"),
+        page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 15_000 })
+          .catch(() => { /* no full navigation — AJAX site, that's fine */ }),
+      ]);
+      console.log(`[TrackTrace] Post-Enter navigation settled (url: ${page.url()})`);
 
-      // If Enter didn't submit, try clicking a Track/Search button
-      await new Promise((r) => setTimeout(r, 1500));
-      const btnSelectors = [
-        "button[type='submit']",
-        "input[type='submit']",
-        "button:contains('Track')",
-        "a:contains('Track')",
-        "#track-btn",
-        ".track-btn",
-        "button",
-      ];
-      for (const bSel of btnSelectors) {
-        try {
-          const btn = await page.$(bSel);
-          if (!btn) continue;
-          const box = await btn.boundingBox().catch(() => null);
-          if (!box) continue;
-          const txt: string = await page.evaluate((el: Element) => el.textContent ?? "", btn);
-          if (/track|search|go|submit/i.test(txt) || bSel.includes("submit")) {
-            await btn.click();
-            console.log(`[TrackTrace] Clicked submit button: ${bSel} "${txt.trim()}"`);
-            break;
-          }
-        } catch { /* try next */ }
+      // Extra settle for any AJAX rendering
+      await new Promise((r) => setTimeout(r, 2000));
+
+      // If the page URL didn't change (pure AJAX), try a visible submit button
+      const urlAfter = page.url();
+      const didNavigate = urlAfter !== baseUrl && !urlAfter.endsWith("/container");
+      if (!didNavigate) {
+        const btnSelectors = [
+          "button[type='submit']",
+          "input[type='submit']",
+          "#track-btn",
+          ".track-btn",
+        ];
+        for (const bSel of btnSelectors) {
+          try {
+            const btn = await page.$(bSel);
+            if (!btn) continue;
+            const box = await btn.boundingBox().catch(() => null);
+            if (!box) continue;
+            const txt: string = await page
+              .evaluate((el: Element) => el.textContent ?? "", btn)
+              .catch(() => "");
+            if (/track|search|go|submit/i.test(txt) || bSel.includes("submit")) {
+              await btn.click();
+              console.log(`[TrackTrace] Clicked submit button: ${bSel} "${txt.trim()}"`);
+              await new Promise((r) => setTimeout(r, 2000));
+              break;
+            }
+          } catch { /* try next */ }
+        }
       }
     }
 
