@@ -126,6 +126,10 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
             SELECT COUNT(*)::int FROM factory_shipping_container_documents fscd
             WHERE fscd.scr_id = ${factoryShippingContainerRows.id}
           )`,
+          shippingInvoiceFileName: factoryShippingContainerRows.shippingInvoiceFileName,
+          shippingInvoiceOriginalName: factoryShippingContainerRows.shippingInvoiceOriginalName,
+          shippingInvoiceFileUrl: factoryShippingContainerRows.shippingInvoiceFileUrl,
+          shippingInvoiceFileType: factoryShippingContainerRows.shippingInvoiceFileType,
         })
         .from(factoryShippingContainerRows)
         .innerJoin(customerOrders, eq(factoryShippingContainerRows.customerOrderId, customerOrders.id))
@@ -581,6 +585,140 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       res.send(buffer);
     } catch (error: any) {
       console.error("Error serving document:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── POST upload shipping-company invoice ──────────────────────────────────────
+  app.post(
+    "/api/factory/shipping-container-rows/:id/shipping-invoice",
+    requireAuth,
+    scrUpload.single("file"),
+    async (req: any, res: any) => {
+      try {
+        const companyId = getCompanyId(req);
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+        if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+        const [row] = await db
+          .select({ id: factoryShippingContainerRows.id })
+          .from(factoryShippingContainerRows)
+          .where(and(eq(factoryShippingContainerRows.id, id), eq(factoryShippingContainerRows.companyId, companyId)));
+        if (!row) return res.status(404).json({ message: "Row not found" });
+
+        const ext = path.extname(req.file.originalname);
+        const generatedFilename = `si-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+        const fileUrl = `/api/factory/shipping-invoice-docs/${generatedFilename}`;
+        const fileData = req.file.buffer.toString("base64");
+
+        // Disk cache (non-fatal)
+        try {
+          const dir = path.join(process.cwd(), "uploads", "shipping-invoice-docs");
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+          fs.writeFileSync(path.join(dir, generatedFilename), req.file.buffer);
+        } catch (e) {
+          console.warn("Shipping invoice disk cache write failed (non-fatal):", e);
+        }
+
+        await db
+          .update(factoryShippingContainerRows)
+          .set({
+            shippingInvoiceFileName: generatedFilename,
+            shippingInvoiceOriginalName: req.file.originalname,
+            shippingInvoiceFileUrl: fileUrl,
+            shippingInvoiceFileData: fileData,
+            shippingInvoiceFileType: req.file.mimetype,
+            updatedAt: new Date(),
+          })
+          .where(eq(factoryShippingContainerRows.id, id));
+
+        res.json({ fileUrl, originalName: req.file.originalname, fileType: req.file.mimetype });
+      } catch (error: any) {
+        console.error("Error uploading shipping invoice:", error);
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
+  // ── DELETE shipping-company invoice ───────────────────────────────────────────
+  app.delete(
+    "/api/factory/shipping-container-rows/:id/shipping-invoice",
+    requireAuth,
+    async (req: any, res: any) => {
+      try {
+        const companyId = getCompanyId(req);
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+
+        const [row] = await db
+          .select({ id: factoryShippingContainerRows.id, fileName: factoryShippingContainerRows.shippingInvoiceFileName })
+          .from(factoryShippingContainerRows)
+          .where(and(eq(factoryShippingContainerRows.id, id), eq(factoryShippingContainerRows.companyId, companyId)));
+        if (!row) return res.status(404).json({ message: "Row not found" });
+
+        // Remove disk cache (non-fatal)
+        if (row.fileName) {
+          try {
+            const diskPath = path.join(process.cwd(), "uploads", "shipping-invoice-docs", row.fileName);
+            if (fs.existsSync(diskPath)) fs.unlinkSync(diskPath);
+          } catch {}
+        }
+
+        await db
+          .update(factoryShippingContainerRows)
+          .set({
+            shippingInvoiceFileName: null,
+            shippingInvoiceOriginalName: null,
+            shippingInvoiceFileUrl: null,
+            shippingInvoiceFileData: null,
+            shippingInvoiceFileType: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(factoryShippingContainerRows.id, id));
+
+        res.json({ ok: true });
+      } catch (error: any) {
+        console.error("Error deleting shipping invoice:", error);
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
+  // ── GET serve shipping-company invoice file ───────────────────────────────────
+  app.get("/api/factory/shipping-invoice-docs/:filename", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const filename = req.params.filename;
+
+      // Try disk cache first
+      const diskPath = path.join(process.cwd(), "uploads", "shipping-invoice-docs", filename);
+      if (fs.existsSync(diskPath)) return res.sendFile(diskPath);
+
+      // Fall back to DB
+      const [row] = await db
+        .select({
+          shippingInvoiceFileData: factoryShippingContainerRows.shippingInvoiceFileData,
+          shippingInvoiceFileType: factoryShippingContainerRows.shippingInvoiceFileType,
+          shippingInvoiceOriginalName: factoryShippingContainerRows.shippingInvoiceOriginalName,
+          companyId: factoryShippingContainerRows.companyId,
+        })
+        .from(factoryShippingContainerRows)
+        .where(eq(factoryShippingContainerRows.shippingInvoiceFileName, filename));
+
+      if (!row) return res.status(404).json({ message: "File not found" });
+      if (row.companyId !== companyId) return res.status(403).json({ message: "Forbidden" });
+      if (!row.shippingInvoiceFileData) return res.status(404).json({ message: "File data unavailable" });
+
+      const buffer = Buffer.from(row.shippingInvoiceFileData, "base64");
+      if (row.shippingInvoiceFileType) res.setHeader("Content-Type", row.shippingInvoiceFileType);
+      res.setHeader("Content-Disposition", `inline; filename="${row.shippingInvoiceOriginalName}"`);
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Error serving shipping invoice:", error);
       res.status(500).json({ message: error.message });
     }
   });

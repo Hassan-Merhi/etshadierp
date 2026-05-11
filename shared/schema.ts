@@ -5221,6 +5221,12 @@ export const factoryShippingContainerRows = pgTable("factory_shipping_container_
   doneAt: timestamp("done_at"),
   doneBy: text("done_by"),
   whatsappSentAt: timestamp("whatsapp_sent_at"),
+  // Shipping-company invoice (a separate PDF uploaded by the user)
+  shippingInvoiceFileName: text("shipping_invoice_file_name"),
+  shippingInvoiceOriginalName: text("shipping_invoice_original_name"),
+  shippingInvoiceFileUrl: text("shipping_invoice_file_url"),
+  shippingInvoiceFileData: text("shipping_invoice_file_data"),
+  shippingInvoiceFileType: text("shipping_invoice_file_type"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({

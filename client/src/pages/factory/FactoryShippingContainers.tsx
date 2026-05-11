@@ -57,6 +57,9 @@ interface ShippingRow {
   shippingCompany: string | null;
   destination: string | null;
   documentCount: number;
+  shippingInvoiceFileUrl: string | null;
+  shippingInvoiceOriginalName: string | null;
+  shippingInvoiceFileType: string | null;
 }
 
 interface AvailableInvoice {
@@ -865,6 +868,8 @@ export default function FactoryShippingContainers() {
   const [addOpen, setAddOpen] = useState(false);
   const [docsRowId, setDocsRowId] = useState<number | null>(null);
   const [waRowId, setWaRowId] = useState<number | null>(null);
+  const shippingInvoiceInputRef = useRef<HTMLInputElement>(null);
+  const [shippingInvoiceUploadingId, setShippingInvoiceUploadingId] = useState<number | null>(null);
   const [doneExpanded, setDoneExpanded] = useState(false);
   const [pendingDoneId, setPendingDoneId] = useState<number | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
@@ -923,6 +928,48 @@ export default function FactoryShippingContainers() {
     },
     onError: (e: any) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
   });
+
+  const uploadShippingInvoiceMutation = useMutation({
+    mutationFn: async ({ id, file }: { id: number; file: File }) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`${LIST_KEY}/${id}/shipping-invoice`, {
+        method: "POST",
+        body: fd,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Upload failed" }));
+        throw new Error(err.message || "Upload failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [LIST_KEY] });
+      toast({ title: "Shipping invoice uploaded" });
+      setShippingInvoiceUploadingId(null);
+    },
+    onError: (e: any) => {
+      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+      setShippingInvoiceUploadingId(null);
+    },
+  });
+
+  const deleteShippingInvoiceMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `${LIST_KEY}/${id}/shipping-invoice`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [LIST_KEY] });
+      toast({ title: "Shipping invoice removed" });
+    },
+    onError: (e: any) => toast({ title: "Remove failed", description: e.message, variant: "destructive" }),
+  });
+
+  function handleShippingInvoiceFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || shippingInvoiceUploadingId === null) return;
+    uploadShippingInvoiceMutation.mutate({ id: shippingInvoiceUploadingId, file });
+    e.target.value = "";
+  }
 
   // ── Filtering ─────────────────────────────────────────────────────────────────
 
@@ -1032,6 +1079,7 @@ export default function FactoryShippingContainers() {
                 <TableHead className="text-xs min-w-[90px]">Finalized</TableHead>
                 <TableHead className="text-xs min-w-[110px]">Shipping Co.</TableHead>
                 <TableHead className="text-xs min-w-[90px]">Documents</TableHead>
+                <TableHead className="text-xs min-w-[110px]">Shipping Invoice</TableHead>
                 <TableHead className="text-xs min-w-[110px]">Note</TableHead>
                 <TableHead className="text-xs min-w-[90px]">WhatsApp</TableHead>
                 <TableHead className="text-xs min-w-[80px]">Done</TableHead>
@@ -1040,13 +1088,13 @@ export default function FactoryShippingContainers() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={14} className="text-center py-10 text-muted-foreground">
+                  <TableCell colSpan={15} className="text-center py-10 text-muted-foreground">
                     <Loader2 className="h-5 w-5 animate-spin mx-auto" />
                   </TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={14} className="text-center py-10 text-muted-foreground">
+                  <TableCell colSpan={15} className="text-center py-10 text-muted-foreground">
                     {active.length === 0 ? "No active records. Add one above." : "No records match the current filters."}
                   </TableCell>
                 </TableRow>
@@ -1127,6 +1175,51 @@ export default function FactoryShippingContainers() {
                     {/* Documents */}
                     <TableCell>
                       <DocIndicator count={r.documentCount} onClick={() => setDocsRowId(r.id)} />
+                    </TableCell>
+
+                    {/* Shipping Invoice (PDF uploaded for shipping company) */}
+                    <TableCell>
+                      {r.shippingInvoiceFileUrl ? (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            asChild
+                            title={r.shippingInvoiceOriginalName || "View"}
+                            data-testid={`button-view-si-${r.id}`}
+                          >
+                            <a href={r.shippingInvoiceFileUrl} target="_blank" rel="noreferrer">
+                              <Eye className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                            </a>
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => deleteShippingInvoiceMutation.mutate(r.id)}
+                            disabled={deleteShippingInvoiceMutation.isPending}
+                            title="Remove shipping invoice"
+                            data-testid={`button-delete-si-${r.id}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="Upload shipping invoice PDF"
+                          onClick={() => {
+                            setShippingInvoiceUploadingId(r.id);
+                            shippingInvoiceInputRef.current?.click();
+                          }}
+                          disabled={uploadShippingInvoiceMutation.isPending && shippingInvoiceUploadingId === r.id}
+                          data-testid={`button-upload-si-${r.id}`}
+                        >
+                          {uploadShippingInvoiceMutation.isPending && shippingInvoiceUploadingId === r.id
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <Upload className="h-3.5 w-3.5 text-muted-foreground" />}
+                        </Button>
+                      )}
                     </TableCell>
 
                     {/* Note (editable → stays on row) */}
@@ -1262,6 +1355,16 @@ export default function FactoryShippingContainers() {
         </div>
 
       </div>
+
+      {/* Hidden file input for shipping invoice upload */}
+      <input
+        ref={shippingInvoiceInputRef}
+        type="file"
+        accept="application/pdf,image/*"
+        className="hidden"
+        onChange={handleShippingInvoiceFileChange}
+        data-testid="input-shipping-invoice-file"
+      />
 
       {/* ── Dialogs ── */}
       <AddRecordDialog open={addOpen} onClose={() => setAddOpen(false)} />

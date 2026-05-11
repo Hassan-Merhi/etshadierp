@@ -2935,6 +2935,12 @@ let migrationsDone = false;
     // Smart priority scheduler columns (May 2026)
     `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_next_check_at timestamptz`,
     `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_last_skip_reason text`,
+    // Shipping company invoice columns on shipping container rows (May 2026)
+    `ALTER TABLE factory_shipping_container_rows ADD COLUMN IF NOT EXISTS shipping_invoice_file_name text`,
+    `ALTER TABLE factory_shipping_container_rows ADD COLUMN IF NOT EXISTS shipping_invoice_original_name text`,
+    `ALTER TABLE factory_shipping_container_rows ADD COLUMN IF NOT EXISTS shipping_invoice_file_url text`,
+    `ALTER TABLE factory_shipping_container_rows ADD COLUMN IF NOT EXISTS shipping_invoice_file_data text`,
+    `ALTER TABLE factory_shipping_container_rows ADD COLUMN IF NOT EXISTS shipping_invoice_file_type text`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
