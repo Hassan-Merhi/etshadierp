@@ -10,12 +10,13 @@
  *   - Skip records NEVER count against ParcelsApp quota.
  *
  * Provider order per carrier:
- *   MAERSK: 1. Maersk official API (if credentials set)
- *           2. Maersk public page  (if MAERSK_PUBLIC_TRACKING_ENABLED=true)
- *           3. ParcelsApp fallback (1 attempt — hint or auto)
- *   CMA:    1. CMA public page     (if CMA_PUBLIC_TRACKING_ENABLED=true)
- *           2. ParcelsApp fallback (1 attempt — hint or auto)
- *   Other:  → ParcelsApp (1 attempt — auto-detect)
+ *   MAERSK   → http_scraper (fast-fail, no network) → maersk_direct (Puppeteer intercepts Maersk API)
+ *   CMA      → http_scraper (fast-fail, no network) → parcelsapp API directly (skips browser scrapers)
+ *   MSC      → http_scraper (direct MSC API)        → parcelsapp_scraper → 17track → parcelsapp API
+ *   HAPAG    → http_scraper (direct Hapag API)      → parcelsapp_scraper → 17track → parcelsapp API
+ *   COSCO    → http_scraper (direct COSCO API)      → parcelsapp_scraper → 17track → parcelsapp API
+ *   EVERGREEN→ http_scraper (direct Evergreen API)  → parcelsapp_scraper → 17track → parcelsapp API
+ *   Others   → http_scraper (ParcelsApp page HTML)  → parcelsapp_scraper → 17track → parcelsapp API
  *
  * Rules:
  *   - Offloaded/Closed/Completed (any casing) are NEVER tracked.
@@ -917,56 +918,16 @@ async function trackViaParcelsApp(
       };
     }
 
-    console.log(`[ContainerTracking] ${containerNumber}: maersk_direct got no data (${mdResult.error}) — trying track-trace...`);
+    console.log(`[ContainerTracking] ${containerNumber}: maersk_direct got no data (${mdResult.error}) — trying ParcelsApp scraper...`);
   }
 
-  // ── Attempt 2: track-trace.com Puppeteer scraper (no quota, no bot blocks) ───
-  if (isTrackTraceScraper()) {
-    console.log(`[ContainerTracking] ${containerNumber}: trying track-trace.com scraper...`);
-    const ttResult = await scrapeTrackTrace(containerNumber);
-
-    await saveTrackingCheck(
-      containerId,
-      "track_trace",
-      ttResult.success ? "success" : ttResult.blocked ? "blocked" : "error",
-      ttResult.error ?? null,
-      ttResult.rawResponse ?? null,
-    );
-
-    if (ttResult.success && ttResult.shipment) {
-      const shipment = ttResult.shipment;
-      const lastStatus      = deriveLastStatus(shipment);
-      const lastLocation    = deriveLastLocation(shipment);
-      const lastEventDate   = deriveLastEventDate(shipment);
-      const lastDescription = shipment.states?.[0]?.description ?? null;
-      const { eta: finalEta, source: etaSrc } = resolveEtaFromShipment(shipment, currentEta);
-
-      await saveParcelsAppEvents(containerId, shipment);
-
-      const updateSet: Record<string, unknown> = {
-        trackingLastCheckedAt: now,
-        trackingLastStatus: lastStatus,
-        trackingLastEventDate: lastEventDate,
-        trackingLastDescription: lastDescription,
-        trackingError: null,
-        trackingChangedAt: now,
-        trackingProvider: "track_trace",
-        trackingDetectedCarrier: detectedCarrier,
-        trackingFallbackUsed: !!fallbackReason,
-        trackingFallbackReason: fallbackReason,
-      };
-      if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
-      await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
-      await logAndConfirmEta(
-        containerId, containerNumber, currentEta, finalEta, etaSrc, "track_trace",
-        !finalEta ? "no ETA derived from track-trace" : undefined,
-      );
-
-      console.log(`[ContainerTracking] ${containerNumber} → track_trace: status=${lastStatus ?? "?"}`);
-      return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
-    }
-
-    console.log(`[ContainerTracking] ${containerNumber}: track-trace got no data (${ttResult.error}) — trying ParcelsApp scraper...`);
+  // ── CMA fast-path: skip browser scrapers, go directly to ParcelsApp API ──────
+  // CMA CGM is protected by DataDome — no browser scraper can bypass it.
+  // ParcelsApp API supports CMA directly, so we skip the useless scraper steps.
+  const CMA_PREFIXES = /^(CMAU|CMDU|APZU)/i;
+  if (CMA_PREFIXES.test(containerNumber)) {
+    console.log(`[ContainerTracking] ${containerNumber}: CMA detected — skipping browser scrapers, going direct to ParcelsApp API...`);
+    return await trackViaParcelsAppApi(containerId, containerNumber, detectedCarrier, fallbackReason, now, currentEta);
   }
 
   // ── Attempt 2: Puppeteer stealth scraper (ParcelsApp, no API key, no quota cost) ──

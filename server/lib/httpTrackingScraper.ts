@@ -349,11 +349,18 @@ export async function httpScrapeTracking(containerNumber: string): Promise<HttpS
       result = await tryEvergreen(containerNumber);
       break;
     case "MAERSK":
-      result = await tryMaerskHtml(containerNumber);
+      // Maersk's page is SSR-less — no data in HTML.
+      // The real data comes from maersk_direct (Puppeteer intercept) which
+      // runs after this scraper in the provider chain.
+      result = { success: false, shipment: null, error: "Maersk page: no tracking data in HTML" };
+      break;
+    case "CMA":
+      // CMA CGM is protected by DataDome — their page/HTML yields nothing.
+      // ParcelsApp API handles CMA directly and is called after this scraper.
+      result = { success: false, shipment: null, error: "CMA page: DataDome protected, use ParcelsApp API" };
       break;
     default:
-      // For CMA, YANGMING, OOCL, and unknowns — handled by other providers
-      // or Puppeteer/17track. Fall through to ParcelsApp page HTML.
+      // For YANGMING, OOCL, and unknowns — try ParcelsApp page HTML.
       result = await tryPageHtml(containerNumber);
   }
 
