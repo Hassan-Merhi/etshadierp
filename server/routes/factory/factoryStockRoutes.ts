@@ -1684,7 +1684,7 @@ export function registerFactoryStockRoutes(app: Express) {
       }
 
       const rows = await db
-        .select({ articleCode: factoryBales.articleCode, count: sql<number>`COUNT(*)::int` })
+        .select({ articleCode: factoryBales.articleCode, count: sql<number>`SUM(COALESCE(quantity, 1))::int` })
         .from(factoryBales)
         .where(and(...conditions))
         .groupBy(factoryBales.articleCode);

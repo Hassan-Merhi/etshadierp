@@ -3316,7 +3316,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           ? sql`AND erp_location_id = ${order.locationId}`
           : sql``;
         const inStockRaw = await db.execute(
-          sql`SELECT article_code AS "articleCode", COUNT(*)::int AS count
+          sql`SELECT article_code AS "articleCode", SUM(COALESCE(quantity, 1))::int AS count
               FROM factory_bales
               WHERE company_id = ${companyId}
                 AND status = 'IN_STOCK'
