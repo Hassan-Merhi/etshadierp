@@ -1,7 +1,7 @@
 /**
  * containerTrackingService.ts — Container tracking with smart priority scheduler.
  *
- * Scheduler (every 6 hours):
+ * Scheduler (every Tuesday at 8:00 AM EST):
  *   - Scores every active container by priority (High/Medium/Low).
  *   - Applies per-priority cooldown intervals (24h / 48h / 72-120h).
  *   - Caps each run to a per-run budget derived from remaining monthly quota.
@@ -191,7 +191,7 @@ async function setSchedulerMeta(
 // ─── Public entry points ───────────────────────────────────────────────────────
 
 /**
- * Smart priority scheduler — called every 6 hours.
+ * Smart priority scheduler — called every Tuesday at 8:00 AM EST.
  *
  * For each active, tracking-enabled container:
  *   1. Skip invalid container numbers → saves invalid_container_number record.

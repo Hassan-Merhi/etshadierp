@@ -953,7 +953,7 @@ function ContainerDrawer({
                         </p>
                       )}
                       <p className="text-xs text-muted-foreground/70 italic" data-testid="text-scheduler-note">
-                        The scheduler reviews this container every 6 hours, but only runs live
+                        The scheduler runs every Tuesday at 8:00 AM EST, but only runs live
                         tracking when it is due or high-priority to save ParcelsApp credits.
                       </p>
                     </>
