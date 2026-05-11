@@ -248,7 +248,9 @@ export function registerStockRoutes(app: Express) {
         conditions.push(eq(stockItems.stockGroupId, parseInt(stockGroupId as string)));
       }
       const { gradeId, categoryId } = req.query;
-      if (gradeId && gradeId !== "all") {
+      if (gradeId === "none") {
+        conditions.push(isNull(stockItems.gradeId));
+      } else if (gradeId && gradeId !== "all") {
         conditions.push(eq(stockItems.gradeId, parseInt(gradeId as string)));
       }
       if (categoryId && categoryId !== "all") {

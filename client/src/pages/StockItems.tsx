@@ -103,7 +103,7 @@ export default function StockItems() {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<number | null>(null);
-  const [selectedGradeFilter, setSelectedGradeFilter] = useState<number | null>(null);
+  const [selectedGradeFilter, setSelectedGradeFilter] = useState<number | "none" | null>(null);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedStockItemId, setSelectedStockItemId] = useState<number | null>(null);
@@ -453,6 +453,18 @@ export default function StockItems() {
             {stockGroups.map(group => (
               <option key={group.id} value={group.id}>{group.name}</option>
             ))}
+          </select>
+          <select
+            value={selectedGradeFilter === null ? "all" : selectedGradeFilter}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSelectedGradeFilter(val === "all" ? null : val === "none" ? "none" : parseInt(val));
+            }}
+            className="w-full md:w-auto px-3 py-2 border border-input rounded-md text-sm bg-background text-foreground"
+            data-testid="select-grade-filter"
+          >
+            <option value="all">All Grades</option>
+            <option value="none">No Grade</option>
           </select>
           {stockCategories.length > 0 && (
             <select
