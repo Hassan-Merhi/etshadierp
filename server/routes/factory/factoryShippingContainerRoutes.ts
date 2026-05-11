@@ -580,8 +580,11 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       if (!docRow.fileData) return res.status(404).json({ message: "File data unavailable" });
 
       const buffer = Buffer.from(docRow.fileData, "base64");
-      if (docRow.fileType) res.setHeader("Content-Type", docRow.fileType);
-      res.setHeader("Content-Disposition", `attachment; filename="${docRow.originalName}"`);
+      const ct = docRow.fileType || "application/octet-stream";
+      res.setHeader("Content-Type", ct);
+      const isInline = ct.startsWith("image/") || ct === "application/pdf";
+      const disposition = isInline ? "inline" : "attachment";
+      res.setHeader("Content-Disposition", `${disposition}; filename="${docRow.originalName}"`);
       res.send(buffer);
     } catch (error: any) {
       console.error("Error serving document:", error);
