@@ -42,6 +42,7 @@ import {
 } from "../lib/parcelsAppClient";
 import { scrapeTracking, isScraperAvailable } from "../lib/parcelsAppScraper";
 import { httpScrapeTracking, isHttpScraperAvailable } from "../lib/httpTrackingScraper";
+import { scrapeTrackTrace, isTrackTraceScraper } from "../lib/trackTraceScraper";
 import * as seventeenTrack from "../lib/trackingProviders/seventeenTrackProvider";
 import { resolveProvider } from "../lib/trackingProviders/providerResolver";
 import { isConfigured as isMaerskConfigured } from "../lib/trackingProviders/maerskProvider";
@@ -835,10 +836,59 @@ async function trackViaParcelsApp(
       return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
     }
 
-    console.log(`[ContainerTracking] ${containerNumber}: HTTP scraper got no data (${httpResult.error}) — trying Puppeteer...`);
+    console.log(`[ContainerTracking] ${containerNumber}: HTTP scraper got no data (${httpResult.error}) — trying track-trace...`);
   }
 
-  // ── Attempt 1: Puppeteer stealth scraper (no API key, no quota cost) ─────────
+  // ── Attempt 1: track-trace.com Puppeteer scraper (no quota, no bot blocks) ───
+  if (isTrackTraceScraper()) {
+    console.log(`[ContainerTracking] ${containerNumber}: trying track-trace.com scraper...`);
+    const ttResult = await scrapeTrackTrace(containerNumber);
+
+    await saveTrackingCheck(
+      containerId,
+      "track_trace",
+      ttResult.success ? "success" : ttResult.blocked ? "blocked" : "error",
+      ttResult.error ?? null,
+      ttResult.rawResponse ?? null,
+    );
+
+    if (ttResult.success && ttResult.shipment) {
+      const shipment = ttResult.shipment;
+      const lastStatus      = deriveLastStatus(shipment);
+      const lastLocation    = deriveLastLocation(shipment);
+      const lastEventDate   = deriveLastEventDate(shipment);
+      const lastDescription = shipment.states?.[0]?.description ?? null;
+      const { eta: finalEta, source: etaSrc } = resolveEtaFromShipment(shipment, currentEta);
+
+      await saveParcelsAppEvents(containerId, shipment);
+
+      const updateSet: Record<string, unknown> = {
+        trackingLastCheckedAt: now,
+        trackingLastStatus: lastStatus,
+        trackingLastEventDate: lastEventDate,
+        trackingLastDescription: lastDescription,
+        trackingError: null,
+        trackingChangedAt: now,
+        trackingProvider: "track_trace",
+        trackingDetectedCarrier: detectedCarrier,
+        trackingFallbackUsed: !!fallbackReason,
+        trackingFallbackReason: fallbackReason,
+      };
+      if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
+      await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+      await logAndConfirmEta(
+        containerId, containerNumber, currentEta, finalEta, etaSrc, "track_trace",
+        !finalEta ? "no ETA derived from track-trace" : undefined,
+      );
+
+      console.log(`[ContainerTracking] ${containerNumber} → track_trace: status=${lastStatus ?? "?"}`);
+      return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
+    }
+
+    console.log(`[ContainerTracking] ${containerNumber}: track-trace got no data (${ttResult.error}) — trying ParcelsApp scraper...`);
+  }
+
+  // ── Attempt 2: Puppeteer stealth scraper (ParcelsApp, no API key, no quota cost) ──
   if (isScraperAvailable()) {
     console.log(`[ContainerTracking] ${containerNumber}: trying ParcelsApp web scraper...`);
     const scraped = await scrapeTracking(containerNumber);
