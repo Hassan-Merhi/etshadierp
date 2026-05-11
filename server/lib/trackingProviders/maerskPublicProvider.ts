@@ -156,7 +156,15 @@ function parseResponse(
     entry.estimatedTimeOfArrival ??
     entry.estimatedArrival ??
     entry.plannedArrivalDate ??
+    entry.predictedETA ??
+    entry.latestEstimatedArrival ??
+    entry.scheduledArrival ??
+    entry.portCalls?.[0]?.eta ??
+    entry.legs?.[entry.legs?.length - 1]?.eta ??
+    entry.legs?.[entry.legs?.length - 1]?.estimatedArrival ??
+    entry.containers?.[0]?.eta ??
     d.eta ??
+    d.estimatedTimeOfArrival ??
     null;
   const etaDate = parseDate(etaRaw);
   const eta = etaDate ? etaDate.toISOString().slice(0, 10) : null;

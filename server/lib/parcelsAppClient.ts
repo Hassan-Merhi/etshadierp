@@ -321,24 +321,68 @@ export function deriveLastEventDate(shipment: ParcelsAppShipment): Date | null {
  */
 export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): string | null {
   const attrs = shipment.attributes;
-  if (!attrs) return null;
 
-  // Try all known field names ParcelsApp uses for ETA
-  const candidates = [
-    attrs.estimatedDeliveryDate,
-    attrs.estimatedDelivery,
-    attrs.deliveryDate,
-    attrs.expectedDelivery,
-    attrs.estimatedArrival,
-    attrs.arrivalDate,
-    attrs.eta,
-  ];
+  if (attrs) {
+    // All known field names ParcelsApp uses for ETA across carrier integrations
+    const candidates = [
+      attrs.estimatedDeliveryDate,
+      attrs.estimatedDelivery,
+      attrs.deliveryDate,
+      attrs.expectedDelivery,
+      attrs.estimatedArrival,
+      attrs.estimatedTimeOfArrival,
+      attrs.scheduledArrival,
+      attrs.plannedArrival,
+      attrs.plannedArrivalDate,
+      attrs.predictedETA,
+      attrs.arrivalDate,
+      attrs.eta,
+      attrs.ETA,
+      attrs.ata,                // Actual Time of Arrival
+      attrs.ATA,
+      attrs.actualArrivalDate,
+      attrs.actualDeliveryDate,
+      attrs.dischargeDate,
+    ];
 
-  for (const raw of candidates) {
-    if (!raw) continue;
-    const d = new Date(raw);
-    if (!isNaN(d.getTime())) {
-      return d.toISOString().slice(0, 10);
+    for (const raw of candidates) {
+      if (!raw) continue;
+      const d = new Date(raw);
+      if (!isNaN(d.getTime())) {
+        return d.toISOString().slice(0, 10);
+      }
+    }
+
+    // Catch-all: scan every attribute key for anything that looks like an ETA field
+    const etaKeyPattern = /eta|arrival|deliver|discharge|berth/i;
+    for (const [key, val] of Object.entries(attrs)) {
+      if (!val || !etaKeyPattern.test(key)) continue;
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) {
+        return d.toISOString().slice(0, 10);
+      }
+    }
+  }
+
+  // Last resort: look in states for the most recent future-facing event date
+  // Only use this if the container hasn't arrived yet (no gate-out/delivery events)
+  if (shipment.states?.length) {
+    const arrivedKeywords = /gate.?out|deliver|customs.?release/i;
+    const hasArrived = shipment.states.some(
+      (s) => arrivedKeywords.test(s.status ?? "") || arrivedKeywords.test(s.description ?? ""),
+    );
+
+    if (!hasArrived) {
+      const etaEventKeywords = /estimat|eta|arrival|discharg|berth|port/i;
+      const etaState = shipment.states.find(
+        (s) => etaEventKeywords.test(s.status ?? "") || etaEventKeywords.test(s.description ?? ""),
+      );
+      if (etaState?.date) {
+        const d = new Date(etaState.date);
+        if (!isNaN(d.getTime()) && d.getTime() > Date.now()) {
+          return d.toISOString().slice(0, 10);
+        }
+      }
     }
   }
 
