@@ -195,6 +195,84 @@ async function tryEvergreen(containerNumber: string): Promise<HttpScraperResult>
   }
 }
 
+// ── Maersk HTML page (Next.js embedded data) ──────────────────────────────────
+
+async function tryMaerskHtml(containerNumber: string): Promise<HttpScraperResult> {
+  try {
+    const ctrl = abort(15_000);
+    const resp = await fetch(
+      `https://www.maersk.com/tracking/${encodeURIComponent(containerNumber)}`,
+      {
+        headers: {
+          ...BASE_HEADERS,
+          "Accept": "text/html,application/xhtml+xml,*/*;q=0.9",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Sec-Fetch-Dest": "document",
+          "Sec-Fetch-Mode": "navigate",
+          "Sec-Fetch-Site": "none",
+          "Upgrade-Insecure-Requests": "1",
+        },
+        signal: ctrl.signal,
+        redirect: "follow",
+      },
+    );
+    if (!resp.ok) return { success: false, shipment: null, error: `Maersk page HTTP ${resp.status}` };
+    const html = await resp.text();
+
+    // Next.js pages embed data in <script id="__NEXT_DATA__">
+    const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if (nextMatch) {
+      try {
+        const nextData = JSON.parse(nextMatch[1]);
+        const props = nextData?.props?.pageProps ?? {};
+        const td = props?.tracking ?? props?.trackingData ?? props?.container ?? props?.shipment;
+        if (td) {
+          const rawEvents: any[] = td.events ?? td.movements ?? td.milestones ?? td.containers?.[0]?.events ?? [];
+          if (rawEvents.length > 0) {
+            const events = rawEvents.map((e: any) => ({
+              date: e.eventDateTime ?? e.eventDate ?? e.timestamp ?? e.date ?? "",
+              status: e.activityName ?? e.eventCode ?? e.status ?? e.description ?? "",
+              location: e.location?.portName ?? e.portName ?? (typeof e.location === "string" ? e.location : "") ?? "",
+            }));
+            const latest = events[0];
+            const etaRaw = td.eta ?? td.estimatedTimeOfArrival ?? td.estimatedArrival ?? null;
+            return {
+              success: true,
+              shipment: toShipment(containerNumber, latest?.status ?? null, latest?.location ?? null, etaRaw, events),
+              rawResponse: { source: "maersk_next_data", events: events.length },
+            };
+          }
+        }
+      } catch { /* parse error — continue */ }
+    }
+
+    // application/json script tags (some Next.js versions)
+    for (const m of html.matchAll(/<script[^>]+type="application\/json"[^>]*>([\s\S]*?)<\/script>/gi)) {
+      try {
+        const data = JSON.parse(m[1]);
+        const events: any[] = data?.events ?? data?.movements ?? [];
+        if (events.length > 0) {
+          const mapped = events.map((e: any) => ({
+            date: e.date ?? e.eventDateTime ?? "",
+            status: e.status ?? e.activityName ?? "",
+            location: e.location ?? e.portName ?? "",
+          }));
+          return {
+            success: true,
+            shipment: toShipment(containerNumber, mapped[0]?.status ?? null, mapped[0]?.location ?? null, null, mapped),
+            rawResponse: { source: "maersk_json_script" },
+          };
+        }
+      } catch { /* next */ }
+    }
+
+    const isBlocked = /captcha|datadome|challenge|cloudflare|blocked/i.test(html.slice(0, 2000));
+    return { success: false, shipment: null, error: isBlocked ? "Maersk page: bot challenge" : "Maersk page: no tracking data in HTML" };
+  } catch (err: any) {
+    return { success: false, shipment: null, error: `Maersk page: ${err?.message ?? "error"}` };
+  }
+}
+
 // ── ParcelsApp page HTML fallback (for unknown carriers) ──────────────────────
 
 async function tryPageHtml(containerNumber: string): Promise<HttpScraperResult> {
@@ -269,10 +347,12 @@ export async function httpScrapeTracking(containerNumber: string): Promise<HttpS
     case "EVERGREEN":
       result = await tryEvergreen(containerNumber);
       break;
+    case "MAERSK":
+      result = await tryMaerskHtml(containerNumber);
+      break;
     default:
-      // For MAERSK, CMA, YANGMING, OOCL, and unknowns — those have dedicated
-      // direct providers or are handled by Puppeteer/17track. Fall through
-      // to the ParcelsApp page HTML as a best-effort attempt.
+      // For CMA, YANGMING, OOCL, and unknowns — handled by other providers
+      // or Puppeteer/17track. Fall through to ParcelsApp page HTML.
       result = await tryPageHtml(containerNumber);
   }
 
