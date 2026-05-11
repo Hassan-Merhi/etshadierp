@@ -1391,10 +1391,20 @@ export default function FactoryContainerLoadingScan() {
                             if (inStock === null) return <span className="text-muted-foreground">—</span>;
                             const needsMore = line.status === "short" || line.status === "none";
                             const shortage = needsMore && inStock < line.remaining;
+                            const listParams = new URLSearchParams({
+                              articleCode: line.articleCode,
+                              productName: line.productName,
+                              back: window.location.pathname + window.location.search,
+                            });
+                            if (stockLocationId) listParams.set("locationId", String(stockLocationId));
                             return (
-                              <span className={shortage ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-muted-foreground"}>
+                              <button
+                                className={`underline underline-offset-2 cursor-pointer hover-elevate rounded px-0.5 ${shortage ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-muted-foreground"}`}
+                                onClick={() => navigate(`/factory/stock-bale-list?${listParams}`)}
+                                data-testid={`button-stock-detail-${line.articleCode}`}
+                              >
                                 {inStock}
-                              </span>
+                              </button>
                             );
                           })()}
                         </TableCell>

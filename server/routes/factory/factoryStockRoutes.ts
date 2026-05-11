@@ -1658,6 +1658,70 @@ export function registerFactoryStockRoutes(app: Express) {
     }
   });
 
+  // GET /api/factory/bale-stock-list?articleCode=HMD123&locationId=3
+  // Returns array of IN_STOCK bales with referenceNumber, weightKg, etc. for a single articleCode.
+  app.get("/api/factory/bale-stock-list", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const articleCode = (req.query.articleCode as string || "").trim();
+      if (!articleCode) return res.status(400).json({ message: "articleCode is required" });
+
+      const rawLocationId = req.query.locationId;
+      const locationId = rawLocationId ? parseInt(rawLocationId as string) : null;
+
+      const conditions: any[] = [
+        eq(factoryBales.companyId, companyId),
+        eq(factoryBales.status, "IN_STOCK"),
+        isNull(factoryBales.deletedAt),
+        eq(factoryBales.articleCode, articleCode),
+      ];
+      if (locationId && !isNaN(locationId)) {
+        conditions.push(eq(factoryBales.erpLocationId, locationId));
+      }
+
+      const bales = await db
+        .select({
+          id: factoryBales.id,
+          referenceNumber: factoryBales.referenceNumber,
+          baleCode: factoryBales.baleCode,
+          weightKg: factoryBales.weightKg,
+          stockEntryDate: factoryBales.stockEntryDate,
+          finalizedAt: factoryBales.finalizedAt,
+          workerName: factoryBales.workerName,
+        })
+        .from(factoryBales)
+        .where(and(...conditions))
+        .orderBy(factoryBales.referenceNumber);
+
+      // Filter out bales currently locked in an active LOADING order
+      const baleIds = bales.map(b => b.id).filter((id): id is number => id != null);
+      let loadingBaleIds = new Set<number>();
+      if (baleIds.length > 0) {
+        const loadingRows = await db
+          .select({ baleId: customerOrderBales.baleId })
+          .from(customerOrderBales)
+          .innerJoin(customerOrders, eq(customerOrderBales.orderId, customerOrders.id))
+          .where(and(
+            eq(customerOrders.status, "LOADING"),
+            inArray(customerOrderBales.baleId, baleIds),
+          ));
+        loadingBaleIds = new Set(loadingRows.map(r => r.baleId));
+      }
+
+      const result = bales.map(b => ({
+        ...b,
+        lockedInLoading: b.id ? loadingBaleIds.has(b.id) : false,
+      }));
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching bale stock list:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // GET /api/factory/bale-stock-count?articleCodes=HMD123,HMD456&locationId=3
   // Returns { HMD123: 4, HMD456: 0, ... } — IN_STOCK bale counts per article code
   // Optional locationId filters to only bales at that ERP location (mirrors location-inventory page).
