@@ -180,12 +180,19 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
     let capturedData: unknown = null;
     let isBlocked = false;
 
-    // Intercept ParcelsApp API responses (v2 and v3)
+    // Intercept ParcelsApp API responses (v2 and v3, all known endpoints)
     page.on("response", async (response: any) => {
       const url: string = response.url();
       if (
         url.includes("parcelsapp.com") &&
-        (url.includes("/api/v2/parcel") || url.includes("/api/v3/shipment") || url.includes("/api/v3/track"))
+        (
+          url.includes("/api/v2/parcel") ||
+          url.includes("/api/v2/shipment") ||
+          url.includes("/api/v3/shipment") ||
+          url.includes("/api/v3/shipments") ||
+          url.includes("/api/v3/track") ||
+          url.includes("/api/v3/parcel")
+        )
       ) {
         try {
           const json = await response.json().catch(() => null);

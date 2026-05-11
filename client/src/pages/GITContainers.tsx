@@ -456,39 +456,51 @@ function ContainerDrawer({
     },
   });
 
+  type TrackNowResult = {
+    success: boolean;
+    containerNumber: string;
+    provider: string | null;
+    lastStatus: string | null;
+    oldEta: string | null;
+    newEta: string | null;
+    etaChanged: boolean;
+    attempts: Array<{ provider: string; status: string; error: string | null }>;
+    error: string | null;
+    quotaWarning?: string;
+  };
+
   const trackNowMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/container-tracking/${container!.id}/track-now`, {});
-      return res.json() as Promise<{ started: boolean; containerNumber: string; message: string; quotaWarning?: string }>;
+      return res.json() as Promise<TrackNowResult>;
     },
     onSuccess: (data) => {
-      toast({
-        title: `Tracking started for ${data.containerNumber}`,
-        description: data.message,
-      });
+      const ALL_KEYS = ["/api/git/containers", "/api/containers", "/api/containers/active"];
+      ALL_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
+
+      if (data.success) {
+        const etaLine = data.etaChanged
+          ? `ETA: ${data.newEta ?? "—"} (was ${data.oldEta ?? "none"})`
+          : data.newEta
+            ? `ETA unchanged: ${data.newEta}`
+            : "No ETA returned — previous ETA kept";
+        toast({
+          title: `Tracked: ${data.containerNumber}`,
+          description: `${data.provider ?? "unknown"} — ${etaLine}`,
+        });
+      } else {
+        const tried = data.attempts.length > 0
+          ? data.attempts.map((a) => `${a.provider}: ${a.status}`).join(" → ")
+          : "No providers available";
+        toast({
+          title: "All providers failed",
+          description: tried,
+          variant: "destructive",
+        });
+      }
       if (data.quotaWarning) {
         setTimeout(() => toast({ title: "Quota low", description: data.quotaWarning, variant: "destructive" }), 400);
       }
-      // Poll every 8 s for up to 120 s until trackingLastCheckedAt changes,
-      // then invalidate all container queries so the UI reflects the new ETA.
-      const snapshotCheckedAt = container?.trackingLastCheckedAt ?? null;
-      let attempts = 0;
-      const POLL_MS = 8_000;
-      const MAX_ATTEMPTS = 15; // 15 × 8 s = 120 s
-      const ALL_KEYS = ["/api/git/containers", "/api/containers", "/api/containers/active"];
-      const poll = setInterval(async () => {
-        attempts++;
-        // Refetch so we can compare trackingLastCheckedAt
-        await queryClient.invalidateQueries({ queryKey: ["/api/git/containers"] });
-        const rows = queryClient.getQueryData<any[]>(["/api/git/containers"]);
-        const updated = rows?.find((c: any) => c.id === container?.id);
-        const done = updated && updated.trackingLastCheckedAt !== snapshotCheckedAt;
-        if (done || attempts >= MAX_ATTEMPTS) {
-          clearInterval(poll);
-          // Invalidate all related caches so every panel refreshes
-          ALL_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
-        }
-      }, POLL_MS);
     },
     onError: (err: any) => {
       toast({ title: "Track Now failed", description: err?.message ?? "Unknown error", variant: "destructive" });

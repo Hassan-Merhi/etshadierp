@@ -84,17 +84,22 @@ export function anyDirectProviderPossible(): boolean {
 export function resolveProvider(containerNumber: string): ProviderResolution {
   const detectedCarrier = detectCarrier(containerNumber);
   const tryDirect: Array<() => Promise<CarrierTrackResult>> = [];
+  const directNames: string[] = [];
 
   // ── Maersk ────────────────────────────────────────────────────────────────
   if (detectedCarrier === "MAERSK") {
-    // 1. Official API — only if credentials are configured
     if (maerskProvider.isConfigured()) {
       tryDirect.push(() => maerskProvider.track(containerNumber));
+      directNames.push("maersk");
     }
-    // 2. Public page — only if flag enabled (and official API didn't cover it)
     if (maerskPublicProvider.isEnabled()) {
       tryDirect.push(() => maerskPublicProvider.track(containerNumber));
+      directNames.push("maersk_public");
     }
+    console.log(
+      `[ProviderResolver] container=${containerNumber} prefix=${containerNumber.slice(0, 4).toUpperCase()} ` +
+        `detectedCarrier=MAERSK directProviders=[${directNames.join(", ") || "none"}]`,
+    );
     return { detectedCarrier, tryDirect };
   }
 
@@ -102,10 +107,19 @@ export function resolveProvider(containerNumber: string): ProviderResolution {
   if (detectedCarrier === "CMA") {
     if (cmaPublicProvider.isEnabled()) {
       tryDirect.push(() => cmaPublicProvider.track(containerNumber));
+      directNames.push("cma_public");
     }
+    console.log(
+      `[ProviderResolver] container=${containerNumber} prefix=${containerNumber.slice(0, 4).toUpperCase()} ` +
+        `detectedCarrier=CMA directProviders=[${directNames.join(", ") || "none"}]`,
+    );
     return { detectedCarrier, tryDirect };
   }
 
-  // All other carriers (MSC, HAPAG, leasing, unknown) → ParcelsApp only
+  // All other carriers (MSC, HAPAG, leasing, unknown) → ParcelsApp fallback
+  console.log(
+    `[ProviderResolver] container=${containerNumber} prefix=${containerNumber.slice(0, 4).toUpperCase()} ` +
+      `detectedCarrier=${detectedCarrier ?? "unknown"} directProviders=[] → http/scraper/parcelsapp fallback`,
+  );
   return { detectedCarrier, tryDirect: [] };
 }

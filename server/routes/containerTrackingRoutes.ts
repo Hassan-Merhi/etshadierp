@@ -53,7 +53,8 @@ function anyProviderAvailable(): boolean {
     isCmaPublicEnabled() ||
     !!process.env.PARCELSAPP_API_KEY ||
     is17trackConfigured() ||
-    isScraperAvailable()
+    isScraperAvailable() ||
+    isHttpScraperAvailable()   // always true — built-in HTTP endpoints need no config
   );
 }
 
@@ -189,7 +190,7 @@ export function registerContainerTrackingRoutes(app: Express) {
       const { used, limit } = await getParcelsAppUsageStats();
       const remaining = Math.max(0, limit - used);
       const hasDirectProvider = isMaerskConfigured() || isMaerskPublicEnabled() || isCmaPublicEnabled();
-      const hasFallbackProvider = is17trackConfigured() || isScraperAvailable();
+      const hasFallbackProvider = is17trackConfigured() || isScraperAvailable() || isHttpScraperAvailable();
 
       if (remaining === 0 && !hasDirectProvider && !hasFallbackProvider) {
         res.status(402).json({
@@ -198,24 +199,15 @@ export function registerContainerTrackingRoutes(app: Express) {
         return;
       }
 
-      const quotaWarning =
-        remaining > 0 && remaining <= Math.ceil(limit * 0.1)
-          ? `ParcelsApp quota is low — ${remaining} of ${limit} credits remaining this month.`
-          : remaining === 0 && hasFallbackProvider
-            ? `ParcelsApp quota exhausted — using ${isScraperAvailable() ? "web scraper" : "17track"} as fallback.`
-            : undefined;
-
-      res.status(202).json({
-        started: true,
-        containerNumber: row.containerNumber,
-        message: "Tracking started. Results will appear in about a minute — refresh the page to see updates.",
-        quotaWarning,
-      });
-
-      // Fire tracking in background — quota was already validated above
-      trackOneContainerById(containerId).catch((err: any) =>
-        console.error(`[TrackNow] ${row.containerNumber}:`, err?.message),
+      // Run tracking synchronously so the response carries real results
+      console.log(`[TrackNow] ${row.containerNumber}: starting synchronous track...`);
+      const trackResult = await trackOneContainerById(containerId);
+      console.log(
+        `[TrackNow] ${row.containerNumber}: done — success=${trackResult.success} ` +
+          `provider=${trackResult.provider ?? "none"} oldEta=${trackResult.oldEta ?? "null"} newEta=${trackResult.newEta ?? "null"}`,
       );
+
+      res.json(trackResult);
     } catch (err: any) {
       if (!res.headersSent) {
         res.status(500).json({ message: err?.message ?? "Tracking failed" });

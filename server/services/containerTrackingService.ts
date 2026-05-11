@@ -476,21 +476,30 @@ export async function trackAllEnabledNow(): Promise<number> {
  *
  * Allows with warning if quota is low but remaining > 0.
  */
-export async function trackOneContainerById(containerId: number): Promise<{
+export interface TrackNowResult {
   success: boolean;
+  containerNumber: string;
+  provider: string | null;
   lastStatus: string | null;
   lastLocation: string | null;
   lastDescription: string | null;
   lastCheckedAt: Date;
+  oldEta: string | null;
+  newEta: string | null;
+  etaChanged: boolean;
+  attempts: Array<{ provider: string; status: string; error: string | null }>;
   error: string | null;
   quotaWarning?: string;
-}> {
+}
+
+export async function trackOneContainerById(containerId: number): Promise<TrackNowResult> {
   const [row] = await db
     .select({
       id: containers.id,
       containerNumber: containers.containerNumber,
       trackingCarrierHint: containers.trackingCarrierHint,
       status: containers.status,
+      eta: containers.eta,
     })
     .from(containers)
     .where(eq(containers.id, containerId))
@@ -515,11 +524,55 @@ export async function trackOneContainerById(containerId: number): Promise<{
     quotaWarning = `ParcelsApp quota is low — ${remaining} of ${limit} credits remaining this month.`;
   }
 
+  const oldEta = row.eta ?? null;
+  const trackStartedAt = new Date();
+
   const result = await trackOneContainer(row.id, row.containerNumber, row.trackingCarrierHint ?? undefined);
-  // Manual track: clear skip reason, set next check based on 24h (manual always implies high attention)
+
+  // Manual track: clear skip reason, set next check to 24 h from now
   await setSchedulerMeta(row.id, null, new Date(Date.now() + 24 * 60 * 60 * 1000));
 
-  return { ...result, quotaWarning };
+  // Read back the persisted values so we can report exactly what was saved
+  const [postRow] = await db
+    .select({ eta: containers.eta, trackingProvider: containers.trackingProvider })
+    .from(containers)
+    .where(eq(containers.id, containerId))
+    .limit(1);
+
+  const newEta = postRow?.eta ?? null;
+  const finalProvider = postRow?.trackingProvider ?? null;
+
+  // Collect every provider attempt recorded during this tracking run
+  const attemptRows = await db
+    .select({
+      provider: containerTrackingChecks.provider,
+      status: containerTrackingChecks.status,
+      error: containerTrackingChecks.errorMessage,
+    })
+    .from(containerTrackingChecks)
+    .where(
+      and(
+        eq(containerTrackingChecks.containerId, containerId),
+        gte(containerTrackingChecks.checkedAt, trackStartedAt),
+      ),
+    )
+    .orderBy(containerTrackingChecks.checkedAt);
+
+  return {
+    success: result.success,
+    containerNumber: row.containerNumber,
+    provider: finalProvider,
+    lastStatus: result.lastStatus,
+    lastLocation: result.lastLocation,
+    lastDescription: result.lastDescription,
+    lastCheckedAt: result.lastCheckedAt,
+    oldEta,
+    newEta,
+    etaChanged: newEta !== oldEta,
+    attempts: attemptRows,
+    error: result.error,
+    quotaWarning,
+  };
 }
 
 // ─── ETA resolution helpers ───────────────────────────────────────────────────
