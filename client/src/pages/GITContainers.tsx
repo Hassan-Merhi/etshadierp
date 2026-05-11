@@ -363,6 +363,26 @@ function ContainerDrawer({
     staleTime: 30_000,
   });
 
+  const { data: trackingStatus } = useQuery<{
+    configured: boolean;
+    parcelsAppConfigured: boolean;
+    parcelsAppUsageThisMonth: number;
+    parcelsAppMonthlyLimit: number;
+    parcelsAppRemaining: number;
+    parcelsAppQuotaExhausted: boolean;
+    parcelsAppNextResetDate: string;
+    maerskConfigured: boolean;
+    maerskPublicEnabled: boolean;
+    cmaPublicEnabled: boolean;
+  }>({
+    queryKey: ["/api/container-tracking/status"],
+    staleTime: 5 * 60_000,
+  });
+
+  const isContainerInactive = container
+    ? ["offloaded", "closed", "completed"].includes(container.status.toLowerCase())
+    : false;
+
   function handleSaveTrackingSettings() {
     if (!container) return;
     trackingSettingsMutation.mutate({
@@ -647,6 +667,53 @@ function ContainerDrawer({
               </p>
             </div>
 
+            {/* Inactive container warning */}
+            {isContainerInactive && (
+              <div className="flex items-start gap-1.5 rounded-md bg-muted/50 border px-2 py-1.5" data-testid="banner-tracking-inactive">
+                <AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0 mt-px" />
+                <p className="text-xs text-muted-foreground">
+                  Tracking is disabled — container is {container?.status?.toLowerCase()}.
+                </p>
+              </div>
+            )}
+
+            {/* ParcelsApp quota gauge */}
+            {trackingStatus?.parcelsAppConfigured && (
+              <div className="rounded-md border bg-muted/20 px-3 py-2 space-y-1.5" data-testid="panel-quota">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <p className="text-xs font-medium text-muted-foreground">ParcelsApp quota this month</p>
+                  {trackingStatus.parcelsAppQuotaExhausted && (
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" data-testid="badge-quota-exhausted">
+                      Paused
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 rounded-full bg-muted h-1.5 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        trackingStatus.parcelsAppQuotaExhausted
+                          ? "bg-red-500"
+                          : trackingStatus.parcelsAppUsageThisMonth / trackingStatus.parcelsAppMonthlyLimit > 0.8
+                            ? "bg-amber-500"
+                            : "bg-emerald-500"
+                      }`}
+                      style={{
+                        width: `${Math.min(100, Math.round((trackingStatus.parcelsAppUsageThisMonth / trackingStatus.parcelsAppMonthlyLimit) * 100))}%`,
+                      }}
+                      data-testid="bar-quota-used"
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground tabular-nums shrink-0" data-testid="text-quota-used">
+                    {trackingStatus.parcelsAppUsageThisMonth} / {trackingStatus.parcelsAppMonthlyLimit}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground" data-testid="text-quota-remaining">
+                  {trackingStatus.parcelsAppRemaining} remaining — resets {trackingStatus.parcelsAppNextResetDate}
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Enabled</Label>
@@ -799,7 +866,8 @@ function ContainerDrawer({
                 size="sm"
                 variant="outline"
                 onClick={() => trackNowMutation.mutate()}
-                disabled={trackNowMutation.isPending}
+                disabled={trackNowMutation.isPending || isContainerInactive}
+                title={isContainerInactive ? "Tracking is disabled for offloaded/closed/completed containers" : undefined}
                 data-testid="button-track-now"
               >
                 {trackNowMutation.isPending

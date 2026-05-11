@@ -4,18 +4,17 @@
  * Provider order per carrier:
  *   MAERSK: 1. Maersk official API (if credentials set)
  *           2. Maersk public page  (if MAERSK_PUBLIC_TRACKING_ENABLED=true)
- *           3. ParcelsApp fallback
+ *           3. ParcelsApp fallback (1 attempt — hint or auto)
  *   CMA:    1. CMA public page     (if CMA_PUBLIC_TRACKING_ENABLED=true)
- *           2. ParcelsApp fallback
- *   Other:  → ParcelsApp fallback only
+ *           2. ParcelsApp fallback (1 attempt — hint or auto)
+ *   Other:  → ParcelsApp fallback (1 attempt — auto-detect)
  *
  * Rules:
- *   - NEVER overwrite status when current status is Offloaded, Closed, or Completed.
- *   - Manual status always wins over API status.
- *   - tracking_enabled must be true for auto-tracking.
- *   - Minimum 4-hour cooldown between automatic checks per container.
+ *   - Containers with status Offloaded/Closed/Completed (any casing) are NEVER tracked.
+ *   - Container number must match ^[A-Z]{4}\d{7}$ — rejects placeholders like "NO NUMBER".
+ *   - ParcelsApp quota is calculated from DB (not memory) — survives server restarts.
+ *   - ParcelsApp makes exactly ONE attempt per container check (carrier hint or auto).
  *   - Credentials and API keys are never logged or sent to the frontend.
- *   - ParcelsApp monthly quota (PARCELSAPP_MONTHLY_LIMIT, default 500) is enforced.
  */
 
 import { db } from "../db";
@@ -24,7 +23,7 @@ import {
   containerTrackingEvents,
   containerTrackingChecks,
 } from "../../shared/schema";
-import { and, eq, isNull, or, lt, notInArray } from "drizzle-orm";
+import { and, eq, isNull, or, lt, sql, inArray, gte } from "drizzle-orm";
 import {
   trackContainer,
   normaliseEvents,
@@ -34,55 +33,83 @@ import {
   deriveEstimatedDeliveryDate,
   type ParcelsAppShipment,
 } from "../lib/parcelsAppClient";
-import { resolveProvider, anyDirectProviderPossible } from "../lib/trackingProviders/providerResolver";
+import { resolveProvider } from "../lib/trackingProviders/providerResolver";
 import { isConfigured as isMaerskConfigured } from "../lib/trackingProviders/maerskProvider";
 import { isEnabled as isMaerskPublicEnabled } from "../lib/trackingProviders/maerskPublicProvider";
 import { isEnabled as isCmaPublicEnabled } from "../lib/trackingProviders/cmaPublicProvider";
 import type { CarrierTrackResult } from "../lib/trackingProviders/types";
 
-const INACTIVE_STATUSES = ["Offloaded", "Closed", "Completed"] as const;
-const INACTIVE_SET = new Set<string>(INACTIVE_STATUSES);
+// ── Inactive status — case-insensitive throughout ─────────────────────────────
+
+const INACTIVE_LOWER = ["offloaded", "closed", "completed"] as const;
+
+/** True for any casing of Offloaded / Closed / Completed. */
+function isInactiveStatus(status: string): boolean {
+  return INACTIVE_LOWER.includes(status.toLowerCase() as any);
+}
+
+/** Drizzle SQL fragment: WHERE LOWER(status) NOT IN ('offloaded','closed','completed') */
+const activeStatusFilter = sql`LOWER(${containers.status}) NOT IN ('offloaded','closed','completed')`;
+
+// ── Container number validation ────────────────────────────────────────────────
+
+/**
+ * ISO 6346 container number: exactly 4 uppercase letters + 7 digits.
+ * Rejects: "NO NUMBER", "NO NUMBER #2", "CONT-2024-005", blanks, etc.
+ */
+const VALID_CONTAINER_REGEX = /^[A-Z]{4}\d{7}$/;
+
+function isValidContainerNumber(containerNumber: string | null | undefined): boolean {
+  if (!containerNumber) return false;
+  return VALID_CONTAINER_REGEX.test(containerNumber.trim().toUpperCase());
+}
 
 const COOLDOWN_HOURS = 4;
-const MIN_CONTAINER_NUMBER_LENGTH = 9;
 
-// ── ParcelsApp monthly quota tracking ────────────────────────────────────────
+// ── ParcelsApp quota — sourced from DB, not memory ───────────────────────────
 
-let _parcelsAppUsageThisMonth = 0;
-let _parcelsAppMonthKey = "";
+/**
+ * Count ParcelsApp credits used this calendar month.
+ * Only rows where provider='parcelsapp' AND status IN ('success','error','timeout')
+ * count as a consumed credit. Skipped/invalid rows never count.
+ */
+export async function getParcelsAppUsageStats(): Promise<{ used: number; limit: number }> {
+  const limit = Math.max(1, parseInt(process.env.PARCELSAPP_MONTHLY_LIMIT ?? "500") || 500);
 
-function getParcelsMonthKey(): string {
-  const d = new Date();
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  try {
+    const now = new Date();
+    const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+
+    const result = await db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(containerTrackingChecks)
+      .where(
+        and(
+          eq(containerTrackingChecks.provider, "parcelsapp"),
+          inArray(containerTrackingChecks.status, ["success", "error", "timeout"]),
+          gte(containerTrackingChecks.checkedAt, startOfMonth),
+        ),
+      );
+
+    const used = result[0]?.count ?? 0;
+    return { used, limit };
+  } catch (err: any) {
+    console.warn("[ContainerTracking] Could not read quota from DB:", err?.message);
+    return { used: 0, limit };
+  }
 }
 
-/** Increments usage counter and returns true if still within quota. */
-function consumeParcelsAppQuota(): boolean {
-  const key = getParcelsMonthKey();
-  if (key !== _parcelsAppMonthKey) {
-    _parcelsAppMonthKey = key;
-    _parcelsAppUsageThisMonth = 0;
-  }
-  const limit = Math.max(1, parseInt(process.env.PARCELSAPP_MONTHLY_LIMIT ?? "500") || 500);
-  if (_parcelsAppUsageThisMonth >= limit) return false;
-  _parcelsAppUsageThisMonth++;
-  return true;
-}
-
-/** Expose current usage stats for the status endpoint (no keys, counts only). */
-export function getParcelsAppUsageStats(): { used: number; limit: number } {
-  const key = getParcelsMonthKey();
-  if (key !== _parcelsAppMonthKey) {
-    _parcelsAppMonthKey = key;
-    _parcelsAppUsageThisMonth = 0;
-  }
-  const limit = Math.max(1, parseInt(process.env.PARCELSAPP_MONTHLY_LIMIT ?? "500") || 500);
-  return { used: _parcelsAppUsageThisMonth, limit };
+/**
+ * Returns true if ParcelsApp quota is available for this month.
+ * Queries the DB — accurate even after server restarts.
+ */
+async function checkParcelsAppQuota(): Promise<boolean> {
+  const { used, limit } = await getParcelsAppUsageStats();
+  return used < limit;
 }
 
 // ── Provider availability ─────────────────────────────────────────────────────
 
-/** Returns true if at least one tracking provider is configured or enabled. */
 function anyProviderConfigured(): boolean {
   return (
     isMaerskConfigured() ||
@@ -90,11 +117,6 @@ function anyProviderConfigured(): boolean {
     isCmaPublicEnabled() ||
     !!process.env.PARCELSAPP_API_KEY
   );
-}
-
-/** Returns true if this container number looks like a real ISO number worth tracking. */
-function isTrackableNumber(containerNumber: string): boolean {
-  return containerNumber.trim().length >= MIN_CONTAINER_NUMBER_LENGTH;
 }
 
 // ── Fallback reason derivation ────────────────────────────────────────────────
@@ -111,6 +133,7 @@ function deriveFallbackReason(result: CarrierTrackResult): string {
 
 /**
  * Track all due containers — called by the scheduler every 6 hours.
+ * Only selects containers where LOWER(status) NOT IN ('offloaded','closed','completed').
  */
 export async function trackDueContainers(): Promise<void> {
   console.log("[ContainerTracking] Starting auto-tracking run...");
@@ -134,7 +157,7 @@ export async function trackDueContainers(): Promise<void> {
       .where(
         and(
           eq(containers.trackingEnabled, true),
-          notInArray(containers.status, [...INACTIVE_STATUSES]),
+          activeStatusFilter,
           or(
             isNull(containers.trackingLastCheckedAt),
             lt(containers.trackingLastCheckedAt, cutoff),
@@ -151,10 +174,16 @@ export async function trackDueContainers(): Promise<void> {
     return;
   }
 
-  const eligible = rows.filter((r) => isTrackableNumber(r.containerNumber));
-  const skipped = rows.length - eligible.length;
-  if (skipped > 0) {
-    console.log(`[ContainerTracking] Skipping ${skipped} container(s) — placeholder numbers.`);
+  const eligible = rows.filter((r) => isValidContainerNumber(r.containerNumber));
+  const skippedInvalid = rows.length - eligible.length;
+  if (skippedInvalid > 0) {
+    console.log(
+      `[ContainerTracking] Skipping ${skippedInvalid} container(s) — invalid/placeholder numbers: ` +
+        rows
+          .filter((r) => !isValidContainerNumber(r.containerNumber))
+          .map((r) => r.containerNumber)
+          .join(", "),
+    );
   }
   console.log(`[ContainerTracking] ${eligible.length} container(s) due for tracking.`);
 
@@ -172,12 +201,13 @@ export async function trackDueContainers(): Promise<void> {
 
 /**
  * Enable or disable auto-tracking for all non-inactive containers.
+ * Uses case-insensitive status filter.
  */
 export async function setBulkTrackingEnabled(enabled: boolean): Promise<number> {
   const result = await db
     .update(containers)
     .set({ trackingEnabled: enabled })
-    .where(notInArray(containers.status, [...INACTIVE_STATUSES]))
+    .where(activeStatusFilter)
     .returning({ id: containers.id });
   return result.length;
 }
@@ -197,16 +227,16 @@ export async function trackAllEnabledNow(): Promise<number> {
       trackingCarrierHint: containers.trackingCarrierHint,
     })
     .from(containers)
-    .where(notInArray(containers.status, [...INACTIVE_STATUSES]));
+    .where(activeStatusFilter);
 
-  const eligible = rows.filter((r) => isTrackableNumber(r.containerNumber));
+  const eligible = rows.filter((r) => isValidContainerNumber(r.containerNumber));
   if (eligible.length === 0) return 0;
 
   (async () => {
-    const skipped = rows.length - eligible.length;
+    const skippedInvalid = rows.length - eligible.length;
     console.log(
       `[BulkTracking] Manual run for ${eligible.length} containers` +
-        (skipped > 0 ? ` (${skipped} skipped — placeholder numbers)` : "") +
+        (skippedInvalid > 0 ? ` (${skippedInvalid} skipped — invalid numbers)` : "") +
         "…",
     );
     for (const row of eligible) {
@@ -226,6 +256,7 @@ export async function trackAllEnabledNow(): Promise<number> {
 /**
  * Manually trigger tracking for a single container by ID.
  * Used by the "Track Now" API endpoint.
+ * Rejects inactive containers with any casing of Offloaded/Closed/Completed.
  */
 export async function trackOneContainerById(containerId: number): Promise<{
   success: boolean;
@@ -248,9 +279,9 @@ export async function trackOneContainerById(containerId: number): Promise<{
 
   if (!row) throw new Error("Container not found");
 
-  if (INACTIVE_SET.has(row.status)) {
+  if (isInactiveStatus(row.status)) {
     throw new Error(
-      `Container status is "${row.status}" — tracking updates are disabled for closed containers`,
+      "Tracking is disabled for offloaded/closed/completed containers.",
     );
   }
 
@@ -272,6 +303,28 @@ async function trackOneContainer(
   error: string | null;
 }> {
   const now = new Date();
+
+  // ── Guard: reject invalid container numbers before any API call ────────────
+  if (!isValidContainerNumber(containerNumber)) {
+    const errMsg = `Invalid container number format: "${containerNumber}" (must be 4 letters + 7 digits)`;
+    console.log(`[ContainerTracking] ${containerNumber}: skipped — ${errMsg}`);
+
+    await saveTrackingCheck(containerId, "skipped", "invalid_container_number", errMsg, null);
+    await db
+      .update(containers)
+      .set({ trackingLastCheckedAt: now, trackingError: errMsg } as any)
+      .where(eq(containers.id, containerId));
+
+    return {
+      success: false,
+      lastStatus: null,
+      lastLocation: null,
+      lastDescription: null,
+      lastCheckedAt: now,
+      error: errMsg,
+    };
+  }
+
   const { detectedCarrier, tryDirect } = resolveProvider(containerNumber);
 
   // ── Step 1: attempt each direct provider in order ──────────────────────────
@@ -348,10 +401,7 @@ async function trackOneContainer(
   );
 }
 
-// ─── ParcelsApp fallback ───────────────────────────────────────────────────────
-
-// Canonical carriers tried as fallbacks (order matters — most common first)
-const FALLBACK_CARRIERS = ["MAERSK", "MSC", "CMA"];
+// ─── ParcelsApp fallback — single attempt per container check ──────────────────
 
 async function trackViaParcelsApp(
   containerId: number,
@@ -389,11 +439,20 @@ async function trackViaParcelsApp(
     };
   }
 
-  // Check monthly quota before calling ParcelsApp
-  if (!consumeParcelsAppQuota()) {
-    const { used, limit } = getParcelsAppUsageStats();
+  // Check monthly quota before calling ParcelsApp (DB-sourced — survives restarts)
+  const quotaOk = await checkParcelsAppQuota();
+  if (!quotaOk) {
+    const { used, limit } = await getParcelsAppUsageStats();
     const quotaError = `ParcelsApp monthly quota exhausted (${used}/${limit})`;
     console.warn(`[ContainerTracking] ${containerNumber}: ${quotaError}`);
+
+    await saveTrackingCheck(
+      containerId,
+      "skipped",
+      "skipped_quota",
+      quotaError,
+      null,
+    );
 
     await db
       .update(containers)
@@ -416,52 +475,24 @@ async function trackViaParcelsApp(
     };
   }
 
-  // Determine carrier hint for ParcelsApp.
+  // ── Single ParcelsApp attempt — carrier hint OR auto-detect ───────────────
+  // One credit per container check. Never retries with alternative carriers.
   const hintCarrier =
     detectedCarrier && detectedCarrier !== "OTHER" ? detectedCarrier : undefined;
 
-  const attempts: Array<string | undefined> = [];
-  if (hintCarrier) attempts.push(hintCarrier);
-  for (const fb of FALLBACK_CARRIERS) {
-    if (!hintCarrier || fb.toLowerCase() !== hintCarrier.toLowerCase()) {
-      attempts.push(fb);
-    }
-  }
-  attempts.push(undefined); // final: no hint, ParcelsApp auto-detect
+  console.log(
+    `[ContainerTracking] ${containerNumber}: ParcelsApp attempt carrier=${hintCarrier ?? "auto"}`,
+  );
 
-  let lastResult: Awaited<ReturnType<typeof trackContainer>> | null = null;
+  const result = await trackContainer(containerNumber, "United States", hintCarrier);
 
-  for (let i = 0; i < attempts.length; i++) {
-    const carrier = attempts[i];
-    if (i > 0) {
-      await sleep(3_000);
-      console.log(
-        `[ContainerTracking] ${containerNumber}: ParcelsApp retry carrier=${carrier ?? "auto"}…`,
-      );
-    }
-
-    const result = await trackContainer(containerNumber, "United States", carrier);
-    lastResult = result;
-
-    await saveTrackingCheck(
-      containerId,
-      "parcelsapp",
-      result.success ? "success" : result.timedOut ? "timeout" : "error",
-      result.error ?? null,
-      result.rawResponse,
-    );
-
-    if (result.success && result.shipment) {
-      if (i > 0) {
-        console.log(
-          `[ContainerTracking] ${containerNumber}: ParcelsApp succeeded on carrier=${carrier ?? "auto"}`,
-        );
-      }
-      break;
-    }
-  }
-
-  const result = lastResult!;
+  await saveTrackingCheck(
+    containerId,
+    "parcelsapp",
+    result.success ? "success" : result.timedOut ? "timeout" : "error",
+    result.error ?? null,
+    result.rawResponse,
+  );
 
   if (!result.success || !result.shipment) {
     await db

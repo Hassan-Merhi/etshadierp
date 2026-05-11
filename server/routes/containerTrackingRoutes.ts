@@ -1,7 +1,7 @@
 /**
  * containerTrackingRoutes.ts — API endpoints for container tracking.
  *
- * Provider order: Maersk official → Maersk public → CMA public → ParcelsApp.
+ * Status check: Offloaded/Closed/Completed in any casing are always rejected.
  * API keys are NEVER exposed to the client.
  * All routes require Admin, Developer, or Owner role.
  */
@@ -27,6 +27,11 @@ import { isEnabled as isMaerskPublicEnabled } from "../lib/trackingProviders/mae
 import { isEnabled as isCmaPublicEnabled } from "../lib/trackingProviders/cmaPublicProvider";
 
 const ALLOWED_ROLES = ["Admin", "Developer", "Owner"] as const;
+
+const INACTIVE_LOWER = ["offloaded", "closed", "completed"];
+function isInactiveStatus(status: string): boolean {
+  return INACTIVE_LOWER.includes(status.toLowerCase());
+}
 
 function requireAllowedRole(req: Request, res: Response): boolean {
   const role = (req.user as any)?.role;
@@ -56,10 +61,10 @@ const updateTrackingSettingsSchema = z.object({
 export function registerContainerTrackingRoutes(app: Express) {
 
   // GET /api/container-tracking/status — provider config (no keys exposed)
-  app.get("/api/container-tracking/status", requireAuth, (req: Request, res: Response) => {
+  app.get("/api/container-tracking/status", requireAuth, async (req: Request, res: Response) => {
     if (!requireAllowedRole(req, res)) return;
 
-    const maerskConfigured   = isMaerskConfigured();
+    const maerskConfigured    = isMaerskConfigured();
     const maerskPublicEnabled = isMaerskPublicEnabled();
     const cmaPublicEnabled    = isCmaPublicEnabled();
     const parcelsAppConfigured = !!process.env.PARCELSAPP_API_KEY;
@@ -70,8 +75,12 @@ export function registerContainerTrackingRoutes(app: Express) {
     if (maerskPublicEnabled) directProviders.push("maersk_public");
     if (cmaPublicEnabled)    directProviders.push("cma_public");
 
+    // Quota from DB — accurate even after server restarts
     const { used: parcelsAppUsageThisMonth, limit: parcelsAppMonthlyLimit } =
-      getParcelsAppUsageStats();
+      await getParcelsAppUsageStats();
+
+    const now = new Date();
+    const nextReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
     res.json({
       configured: maerskConfigured || maerskPublicEnabled || cmaPublicEnabled || parcelsAppConfigured,
@@ -84,6 +93,9 @@ export function registerContainerTrackingRoutes(app: Express) {
       fallbackProvider: "parcelsapp",
       parcelsAppUsageThisMonth,
       parcelsAppMonthlyLimit,
+      parcelsAppRemaining: Math.max(0, parcelsAppMonthlyLimit - parcelsAppUsageThisMonth),
+      parcelsAppQuotaExhausted: parcelsAppUsageThisMonth >= parcelsAppMonthlyLimit,
+      parcelsAppNextResetDate: nextReset.toISOString().slice(0, 10),
     });
   });
 
@@ -129,10 +141,10 @@ export function registerContainerTrackingRoutes(app: Express) {
         return;
       }
 
-      const INACTIVE = new Set(["Offloaded", "Closed", "Completed"]);
-      if (INACTIVE.has(row.status)) {
+      // Case-insensitive inactive check
+      if (isInactiveStatus(row.status)) {
         res.status(409).json({
-          message: `Container status is "${row.status}" — tracking updates are disabled for closed containers`,
+          message: "Tracking is disabled for offloaded/closed/completed containers.",
         });
         return;
       }
@@ -211,7 +223,7 @@ export function registerContainerTrackingRoutes(app: Express) {
       res.json({
         queued,
         message: queued === 0
-          ? "No containers have auto-tracking enabled."
+          ? "No containers eligible for tracking (all may be offloaded or have invalid numbers)."
           : `Tracking started for ${queued} container${queued !== 1 ? "s" : ""}. Results will appear shortly.`,
       });
     } catch (err: any) {

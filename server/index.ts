@@ -2929,6 +2929,9 @@ let migrationsDone = false;
     `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_detected_carrier text`,
     `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_fallback_used boolean NOT NULL DEFAULT false`,
     `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_fallback_reason text`,
+    // P0 data fix (May 2026): disable tracking on offloaded/closed/completed containers
+    // Case-insensitive so it handles OFFLOADED, Offloaded, offloaded, CLOSED, COMPLETED, etc.
+    `UPDATE containers SET tracking_enabled = false, tracking_auto_update = false WHERE LOWER(status) IN ('offloaded','closed','completed') AND (tracking_enabled = true OR tracking_auto_update = true)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
