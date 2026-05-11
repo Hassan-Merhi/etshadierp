@@ -270,7 +270,7 @@ export function registerStockRoutes(app: Express) {
         .select()
         .from(stockItems)
         .where(where)
-        .orderBy(asc(stockItems.code))
+        .orderBy(asc(stockItems.name))
         .limit(pageSizeNum)
         .offset(offset);
 

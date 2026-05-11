@@ -454,22 +454,6 @@ export default function StockItems() {
               <option key={group.id} value={group.id}>{group.name}</option>
             ))}
           </select>
-          {stockGrades.length > 0 && (
-            <select
-              value={selectedGradeFilter === null ? "all" : selectedGradeFilter}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSelectedGradeFilter(val === "all" ? null : parseInt(val));
-              }}
-              className="w-full md:w-auto px-3 py-2 border border-input rounded-md text-sm bg-background text-foreground"
-              data-testid="select-grade-filter"
-            >
-              <option value="all">All Grades</option>
-              {stockGrades.map(grade => (
-                <option key={grade.id} value={grade.id}>{grade.name}</option>
-              ))}
-            </select>
-          )}
           {stockCategories.length > 0 && (
             <select
               value={selectedCategoryFilter === null ? "all" : selectedCategoryFilter}
@@ -509,7 +493,6 @@ export default function StockItems() {
                   </th>
                   <th className="text-left px-3 font-medium sticky left-0 bg-muted z-10">Name</th>
                   <th className="text-left px-3 font-medium">Stock Group</th>
-                  {stockGrades.length > 0 && <th className="text-left px-3 font-medium">Grade</th>}
                   {stockCategories.length > 0 && <th className="text-left px-3 font-medium">Category</th>}
                   <th className="text-left px-3 font-medium">Status</th>
                   <th className="text-center px-3 font-medium">Actions</th>
@@ -518,7 +501,7 @@ export default function StockItems() {
               <tbody>
                 {displayItems.length === 0 ? (
                   <tr>
-                    <td colSpan={5 + (stockGrades.length > 0 ? 1 : 0) + (stockCategories.length > 0 ? 1 : 0)} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={5 + (stockCategories.length > 0 ? 1 : 0)} className="text-center py-8 text-muted-foreground">
                       {debouncedSearch ? "No items found matching your search" : "No stock items found"}
                     </td>
                   </tr>
@@ -555,19 +538,6 @@ export default function StockItems() {
                         >
                           {getStockGroupName(item.stockGroupId)}
                         </td>
-                        {stockGrades.length > 0 && (
-                          <td
-                            className="px-3 text-sm cursor-pointer"
-                            onClick={() => handleStockItemClick(item.id, item.name)}
-                            data-testid={`grade-${item.id}`}
-                          >
-                            {getGradeName(item.gradeId) ? (
-                              <Badge variant="outline" className="text-xs">{getGradeName(item.gradeId)}</Badge>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">—</span>
-                            )}
-                          </td>
-                        )}
                         {stockCategories.length > 0 && (
                           <td
                             className="px-3 text-sm cursor-pointer"
@@ -647,9 +617,6 @@ export default function StockItems() {
                           <div><span className="text-muted-foreground">UOM: </span><span>{item.uom}</span></div>
                           <div><span className="text-muted-foreground">Group: </span><span data-testid={`group-mobile-${item.id}`}>{getStockGroupName(item.stockGroupId)}</span></div>
                           {!hideStockRates && <div><span className="text-muted-foreground">Price: </span><span>{formatAmount(item.sellingPrice)}</span></div>}
-                          {stockGrades.length > 0 && getGradeName(item.gradeId) && (
-                            <div><span className="text-muted-foreground">Grade: </span><span data-testid={`grade-mobile-${item.id}`}>{getGradeName(item.gradeId)}</span></div>
-                          )}
                           {stockCategories.length > 0 && getCategoryName(item.categoryId) && (
                             <div><span className="text-muted-foreground">Category: </span><span data-testid={`category-mobile-${item.id}`}>{getCategoryName(item.categoryId)}</span></div>
                           )}
