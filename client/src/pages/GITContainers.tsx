@@ -1652,6 +1652,22 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
             </Button>
           )}
 
+          {/* ── Track All Now — visible standalone button ── */}
+          {isAllowed && (
+            <Button
+              variant="outline"
+              size="default"
+              onClick={() => bulkTrackMutation.mutate()}
+              disabled={bulkTrackMutation.isPending || allContainers.length === 0}
+              data-testid="button-track-all-now"
+            >
+              {bulkTrackMutation.isPending
+                ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                : <RefreshCw className="h-4 w-4 mr-1.5" />}
+              {bulkTrackMutation.isPending ? "Tracking…" : `Track All${trackingEnabledCount > 0 ? ` (${trackingEnabledCount})` : ""}`}
+            </Button>
+          )}
+
           {/* Hidden file input for Excel import — always present so the ref works */}
           <input
             ref={fileInputRef}
