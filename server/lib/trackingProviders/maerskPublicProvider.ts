@@ -14,9 +14,14 @@
 
 import type { CarrierTrackResult, TrackingEvent } from "./types";
 
-const PUBLIC_BASE = "https://www.maersk.com/api/tracking";
-const TIMEOUT_MS = 10_000;
-const RATE_LIMIT_MS = 60 * 60 * 1_000;
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+  "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+const PUBLIC_BASE     = "https://www.maersk.com/api/tracking";
+const PUBLIC_PAGE     = "https://www.maersk.com/tracking";
+const TIMEOUT_MS      = 12_000;
+const RATE_LIMIT_MS   = 20 * 60 * 1_000;   // 20 min (was 60 min)
 
 const _lastAttempt = new Map<string, number>();
 
@@ -58,12 +63,54 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
 
   _lastAttempt.set(containerNumber, Date.now());
 
+  // ── Step 1: load tracking page to obtain session cookies ──────────────────
+  // Akamai/DataDome requires a real session. We GET the public tracking page
+  // first (cheap, HTML only) so the server sees a session cookie chain before
+  // we call the JSON API.
+  let sessionCookies = "";
+  try {
+    const pageRes = await fetch(`${PUBLIC_PAGE}/${encodeURIComponent(containerNumber)}`, {
+      headers: {
+        "User-Agent": BROWSER_UA,
+        "Accept": "text/html,application/xhtml+xml,*/*;q=0.9",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Upgrade-Insecure-Requests": "1",
+      },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      redirect: "follow",
+    });
+    // Collect all Set-Cookie values as a single Cookie header string
+    const raw = pageRes.headers.get("set-cookie") ?? "";
+    sessionCookies = raw
+      .split(/,(?=[^;]+?=)/)     // split multiple cookies (not expires commas)
+      .map((c) => c.split(";")[0].trim())
+      .filter(Boolean)
+      .join("; ");
+    console.log(`[MaerskPublic] ${containerNumber}: prefetch done — ${sessionCookies ? "cookies acquired" : "no cookies"}`);
+  } catch {
+    // Non-fatal — we still try the API without cookies
+  }
+
+  // ── Step 2: call the JSON API with the session cookies ────────────────────
   try {
     const url = `${PUBLIC_BASE}/${encodeURIComponent(containerNumber)}`;
     const res = await fetch(url, {
       headers: {
-        Accept: "application/json",
-        "User-Agent": "Mozilla/5.0 (compatible; container-tracking/1.0)",
+        "Accept": "application/json, */*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "User-Agent": BROWSER_UA,
+        "Referer": `${PUBLIC_PAGE}/${encodeURIComponent(containerNumber)}`,
+        "Origin": "https://www.maersk.com",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "Cache-Control": "no-cache",
+        ...(sessionCookies ? { "Cookie": sessionCookies } : {}),
       },
       signal: AbortSignal.timeout(TIMEOUT_MS),
       redirect: "follow",

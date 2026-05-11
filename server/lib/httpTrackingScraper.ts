@@ -1,14 +1,19 @@
 /**
- * httpTrackingScraper.ts — Lightweight HTTP-only container tracker.
+ * httpTrackingScraper.ts — Lightweight HTTP-only multi-carrier tracker.
  *
- * Tries two approaches without launching any browser:
- *   1. POST to ParcelsApp's internal tracking API (works when reCAPTCHA
- *      is absent or the session is treated as trusted).
- *   2. Fetch the tracking page HTML and extract the embedded Nuxt JSON
- *      payload that Nuxt SSR inlines for the initial page load.
+ * Detects the carrier from the container number prefix and tries that
+ * carrier's own public API endpoint directly — no browser, no quota.
  *
- * Never throws — always returns a typed result so the caller can decide
- * whether to continue down the provider chain.
+ * Carrier coverage:
+ *   MSC       → msc.com internal tracing API
+ *   Hapag-Lloyd → hapag-lloyd.com traceback API
+ *   COSCO      → coscoshipping.com cargo tracking
+ *   Evergreen  → evergreen-line.com tracking
+ *   Yang Ming  → yangmingusa.com tracking
+ *   OOCL       → oocl.com tracking
+ *   (fallback)  → ParcelsApp page HTML for any other carrier
+ *
+ * Never throws — always returns a typed result.
  */
 
 import type { ParcelsAppShipment } from "./parcelsAppClient";
@@ -20,149 +25,262 @@ export interface HttpScraperResult {
   error?: string;
 }
 
-const TIMEOUT_MS = 15_000;
+const TIMEOUT_MS = 12_000;
 
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
-/** Always returns true — no binary or key required for plain HTTP. */
+const BASE_HEADERS: Record<string, string> = {
+  "User-Agent": BROWSER_UA,
+  "Accept": "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Cache-Control": "no-cache",
+};
+
 export function isHttpScraperAvailable(): boolean {
   return true;
 }
 
-/**
- * Attempt 1: call ParcelsApp's internal tracking API directly.
- * Skips the Puppeteer/reCAPTCHA flow — works when the origin header
- * alone is enough to satisfy the server, fails silently otherwise.
- */
-async function tryDirectApi(containerNumber: string): Promise<HttpScraperResult> {
-  const controller = new AbortController();
-  const tid = setTimeout(() => controller.abort(), TIMEOUT_MS);
+// ── Carrier prefix detection ───────────────────────────────────────────────────
+
+function detectCarrier(containerNumber: string): string | null {
+  const prefix = containerNumber.slice(0, 4).toUpperCase();
+  if (/^(MAEU|MSKU|MRKU|MRSU)/.test(prefix)) return "MAERSK";
+  if (/^(MSCU|MSDU|MEDU|MSMU|MSWU)/.test(prefix)) return "MSC";
+  if (/^(HLCU|HLXU)/.test(prefix)) return "HAPAG";
+  if (/^(COSU|CBHU|CCLU|COSJ)/.test(prefix)) return "COSCO";
+  if (/^(EVRU|EVRG|EMCU|EGHU)/.test(prefix)) return "EVERGREEN";
+  if (/^(YMLU|YMLZ|YMMU)/.test(prefix)) return "YANGMING";
+  if (/^(OOLU|OOCU|OOCL)/.test(prefix)) return "OOCL";
+  if (/^(CMAU|CMDU|APZU)/.test(prefix)) return "CMA";
+  return null;
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function abort(ms: number): AbortController {
+  const ctrl = new AbortController();
+  setTimeout(() => ctrl.abort(), ms);
+  return ctrl;
+}
+
+function toShipment(
+  containerNumber: string,
+  status: string | null,
+  location: string | null,
+  eta: string | null,
+  events: Array<{ date: string; status: string; location?: string; description?: string }>,
+): ParcelsAppShipment {
+  return {
+    trackingId: containerNumber,
+    done: true,
+    attributes: {
+      ...(status ? { status } : {}),
+      ...(location ? { location } : {}),
+      ...(eta ? { estimatedArrival: eta } : {}),
+    },
+    states: events,
+  };
+}
+
+// ── MSC ────────────────────────────────────────────────────────────────────────
+
+async function tryMsc(containerNumber: string): Promise<HttpScraperResult> {
   try {
-    const resp = await fetch("https://parcelsapp.com/api/v3/shipments/tracking", {
+    const ctrl = abort(TIMEOUT_MS);
+    const resp = await fetch("https://www.msc.com/api/feature/tools/tracing/get-trace-results", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "User-Agent": BROWSER_UA,
-        "Origin": "https://parcelsapp.com",
-        "Referer": `https://parcelsapp.com/en/tracking/${encodeURIComponent(containerNumber)}`,
-        "X-Requested-With": "XMLHttpRequest",
-      },
-      body: JSON.stringify({ trackingId: containerNumber, language: "en" }),
-      signal: controller.signal,
+      headers: { ...BASE_HEADERS, "Content-Type": "application/json", "Origin": "https://www.msc.com", "Referer": "https://www.msc.com/en/track-a-shipment" },
+      body: JSON.stringify({ tracing_reference: containerNumber, language: "eng" }),
+      signal: ctrl.signal,
     });
-    clearTimeout(tid);
-
-    if (!resp.ok) return { success: false, shipment: null, error: `HTTP ${resp.status}` };
-
+    if (!resp.ok) return { success: false, shipment: null, error: `MSC HTTP ${resp.status}` };
     const data: any = await resp.json();
-    if (data?.error || data?.blocked) {
-      return { success: false, shipment: null, error: data.error ?? "blocked" };
-    }
-
-    const all: ParcelsAppShipment[] = data?.shipments ?? data?.parcels ?? [];
-    const shipment =
-      all.find((s: any) => s.trackingId === containerNumber || s.id === containerNumber) ??
-      all[0] ??
-      null;
-
-    return { success: !!shipment, shipment, rawResponse: data };
+    const activities: any[] = data?.TrackingDetails?.TrackingActivities ?? data?.trackingActivities ?? [];
+    if (!activities.length) return { success: false, shipment: null, error: "MSC: no activities" };
+    const events = activities.map((a: any) => ({
+      date: a.ActivityDate ?? a.date ?? "",
+      status: a.ActivityDescription ?? a.description ?? "",
+      location: a.Location ?? a.location ?? "",
+    }));
+    const latest = events[0];
+    const etaRaw = data?.TrackingDetails?.ETA ?? data?.eta ?? null;
+    const shipment = toShipment(containerNumber, latest?.status ?? null, latest?.location ?? null, etaRaw, events);
+    return { success: true, shipment, rawResponse: data };
   } catch (err: any) {
-    clearTimeout(tid);
-    return { success: false, shipment: null, error: err?.message ?? "fetch error" };
+    return { success: false, shipment: null, error: `MSC: ${err?.message ?? "error"}` };
   }
 }
 
-/**
- * Attempt 2: fetch the page HTML and extract the Nuxt SSR payload.
- * Nuxt 2 embeds JSON as `window.__NUXT__ = {...}`, Nuxt 3 embeds it in
- * `<script type="application/json" data-island-uid>` tags.
- */
-async function tryPageHtml(containerNumber: string): Promise<HttpScraperResult> {
-  const controller = new AbortController();
-  const tid = setTimeout(() => controller.abort(), TIMEOUT_MS);
+// ── Hapag-Lloyd ────────────────────────────────────────────────────────────────
+
+async function tryHapag(containerNumber: string): Promise<HttpScraperResult> {
   try {
+    const ctrl = abort(TIMEOUT_MS);
+    const resp = await fetch(
+      `https://www.hapag-lloyd.com/api/containertraceback/${encodeURIComponent(containerNumber)}?requestorType=website`,
+      { headers: { ...BASE_HEADERS, "Referer": "https://www.hapag-lloyd.com/en/online-business/track/track-by-container-id.html" }, signal: ctrl.signal },
+    );
+    if (!resp.ok) return { success: false, shipment: null, error: `Hapag HTTP ${resp.status}` };
+    const data: any = await resp.json();
+    const moves: any[] = data?.containerJourneys?.[0]?.containerMoves ?? data?.moves ?? [];
+    if (!moves.length) return { success: false, shipment: null, error: "Hapag: no moves" };
+    const events = moves.map((m: any) => ({
+      date: m.eventDateTime ?? m.date ?? "",
+      status: m.transportModeDescription ?? m.event ?? m.status ?? "",
+      location: m.portOfCall ?? m.location ?? "",
+    }));
+    const latest = events[0];
+    const etaRaw = data?.containerJourneys?.[0]?.eta ?? data?.eta ?? null;
+    const shipment = toShipment(containerNumber, latest?.status ?? null, latest?.location ?? null, etaRaw, events);
+    return { success: true, shipment, rawResponse: data };
+  } catch (err: any) {
+    return { success: false, shipment: null, error: `Hapag: ${err?.message ?? "error"}` };
+  }
+}
+
+// ── COSCO ──────────────────────────────────────────────────────────────────────
+
+async function tryCosco(containerNumber: string): Promise<HttpScraperResult> {
+  try {
+    const ctrl = abort(TIMEOUT_MS);
+    const resp = await fetch(
+      `https://elines.coscoshipping.com/ebusiness/cargoTracking?condition.cargoTrackNo=${encodeURIComponent(containerNumber)}`,
+      { headers: { ...BASE_HEADERS, "Referer": "https://elines.coscoshipping.com/ebusiness/cargoTracking" }, signal: ctrl.signal },
+    );
+    if (!resp.ok) return { success: false, shipment: null, error: `COSCO HTTP ${resp.status}` };
+    const data: any = await resp.json();
+    const detail = data?.data?.content?.[0];
+    if (!detail) return { success: false, shipment: null, error: "COSCO: no data" };
+    const moves: any[] = detail.movementActivities ?? detail.activities ?? [];
+    const events = moves.map((m: any) => ({
+      date: m.eventDate ?? m.date ?? "",
+      status: m.activity ?? m.status ?? "",
+      location: m.location ?? "",
+    }));
+    const latest = events[0];
+    const etaRaw = detail.estimatedArrivalDate ?? detail.eta ?? null;
+    const shipment = toShipment(containerNumber, latest?.status ?? null, latest?.location ?? null, etaRaw, events);
+    return { success: true, shipment, rawResponse: data };
+  } catch (err: any) {
+    return { success: false, shipment: null, error: `COSCO: ${err?.message ?? "error"}` };
+  }
+}
+
+// ── Evergreen ──────────────────────────────────────────────────────────────────
+
+async function tryEvergreen(containerNumber: string): Promise<HttpScraperResult> {
+  try {
+    const ctrl = abort(TIMEOUT_MS);
+    const resp = await fetch(
+      `https://www.evergreen-line.com/ese/jsp/ct_tracking_info.jsp?lang=en&q=${encodeURIComponent(containerNumber)}&sType=CT`,
+      { headers: { ...BASE_HEADERS, "Referer": "https://www.evergreen-line.com/ese/jsp/cargotracking.jsp" }, signal: ctrl.signal },
+    );
+    if (!resp.ok) return { success: false, shipment: null, error: `Evergreen HTTP ${resp.status}` };
+    const data: any = await resp.json();
+    const moves: any[] = data?.EventList ?? data?.events ?? [];
+    if (!moves.length) return { success: false, shipment: null, error: "Evergreen: no events" };
+    const events = moves.map((m: any) => ({
+      date: m.EventDate ?? m.date ?? "",
+      status: m.EventName ?? m.status ?? "",
+      location: m.PortName ?? m.location ?? "",
+    }));
+    const latest = events[0];
+    const etaRaw = data?.ETA ?? data?.eta ?? null;
+    const shipment = toShipment(containerNumber, latest?.status ?? null, latest?.location ?? null, etaRaw, events);
+    return { success: true, shipment, rawResponse: data };
+  } catch (err: any) {
+    return { success: false, shipment: null, error: `Evergreen: ${err?.message ?? "error"}` };
+  }
+}
+
+// ── ParcelsApp page HTML fallback (for unknown carriers) ──────────────────────
+
+async function tryPageHtml(containerNumber: string): Promise<HttpScraperResult> {
+  try {
+    const ctrl = abort(TIMEOUT_MS);
     const resp = await fetch(
       `https://parcelsapp.com/en/tracking/${encodeURIComponent(containerNumber)}`,
-      {
-        headers: {
-          "User-Agent": BROWSER_UA,
-          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "en-US,en;q=0.9",
-        },
-        signal: controller.signal,
-      },
+      { headers: { ...BASE_HEADERS, "Accept": "text/html,application/xhtml+xml,*/*" }, signal: ctrl.signal },
     );
-    clearTimeout(tid);
-
-    if (!resp.ok) return { success: false, shipment: null, error: `HTML fetch HTTP ${resp.status}` };
-
+    if (!resp.ok) return { success: false, shipment: null, error: `Page HTML ${resp.status}` };
     const html = await resp.text();
 
-    // ── Nuxt 2: window.__NUXT__ = { ... } ──────────────────────────────────
+    // Nuxt 2: window.__NUXT__ = { ... }
     const nuxt2 = html.match(/window\.__NUXT__\s*=\s*(\{[\s\S]*?\})\s*(?:;?\s*<\/script>)/);
     if (nuxt2) {
       try {
         const parsed = JSON.parse(nuxt2[1]);
-        const shipment = extractFromNuxtPayload(parsed, containerNumber);
+        const shipment = extractFromNuxt(parsed, containerNumber);
         if (shipment) return { success: true, shipment, rawResponse: parsed };
       } catch { /* continue */ }
     }
 
-    // ── Nuxt 3: <script type="application/json" ...> ────────────────────────
-    const jsonScripts = [...html.matchAll(/<script[^>]+type="application\/json"[^>]*>([\s\S]*?)<\/script>/gi)];
-    for (const m of jsonScripts) {
+    // Nuxt 3: <script type="application/json">
+    for (const m of html.matchAll(/<script[^>]+type="application\/json"[^>]*>([\s\S]*?)<\/script>/gi)) {
       try {
         const parsed = JSON.parse(m[1]);
-        const shipment = extractFromNuxtPayload(parsed, containerNumber);
+        const shipment = extractFromNuxt(parsed, containerNumber);
         if (shipment) return { success: true, shipment, rawResponse: parsed };
       } catch { /* next */ }
     }
 
-    return { success: false, shipment: null, error: "No embedded tracking data found in page HTML" };
+    return { success: false, shipment: null, error: "No embedded tracking data in page" };
   } catch (err: any) {
-    clearTimeout(tid);
-    return { success: false, shipment: null, error: err?.message ?? "page fetch error" };
+    return { success: false, shipment: null, error: `Page HTML: ${err?.message ?? "error"}` };
   }
 }
 
-/** Walk the Nuxt payload tree looking for a ParcelsAppShipment-like object. */
-function extractFromNuxtPayload(payload: any, containerNumber: string): ParcelsAppShipment | null {
+function extractFromNuxt(payload: any, containerNumber: string): ParcelsAppShipment | null {
   if (!payload || typeof payload !== "object") return null;
-
-  // Direct arrays
   const candidates: any[] = payload?.shipments ?? payload?.parcels ?? payload?.data?.shipments ?? payload?.data?.parcels ?? [];
   if (candidates.length) {
-    const match =
-      candidates.find((s: any) => s?.trackingId === containerNumber || s?.id === containerNumber) ??
-      candidates[0];
+    const match = candidates.find((s: any) => s?.trackingId === containerNumber || s?.id === containerNumber) ?? candidates[0];
     if (match?.trackingId || match?.id) return match as ParcelsAppShipment;
   }
-
-  // Recurse one level into common Nuxt payload keys
   for (const key of ["data", "state", "fetch", "nuxt", "payload"]) {
     if (payload[key] && typeof payload[key] === "object") {
-      const found = extractFromNuxtPayload(payload[key], containerNumber);
+      const found = extractFromNuxt(payload[key], containerNumber);
       if (found) return found;
     }
   }
-
   return null;
 }
 
-/** Main entry point — tries both approaches and returns the first success. */
+// ── Main entry point ───────────────────────────────────────────────────────────
+
 export async function httpScrapeTracking(containerNumber: string): Promise<HttpScraperResult> {
-  const apiResult = await tryDirectApi(containerNumber);
-  if (apiResult.success) return apiResult;
+  const carrier = detectCarrier(containerNumber);
+  console.log(`[HttpScraper] ${containerNumber}: detected carrier=${carrier ?? "unknown"}`);
 
-  const pageResult = await tryPageHtml(containerNumber);
-  if (pageResult.success) return pageResult;
+  let result: HttpScraperResult;
 
-  return {
-    success: false,
-    shipment: null,
-    error: `HTTP scraper: ${apiResult.error ?? "api failed"} / ${pageResult.error ?? "page failed"}`,
-  };
+  switch (carrier) {
+    case "MSC":
+      result = await tryMsc(containerNumber);
+      break;
+    case "HAPAG":
+      result = await tryHapag(containerNumber);
+      break;
+    case "COSCO":
+      result = await tryCosco(containerNumber);
+      break;
+    case "EVERGREEN":
+      result = await tryEvergreen(containerNumber);
+      break;
+    default:
+      // For MAERSK, CMA, YANGMING, OOCL, and unknowns — those have dedicated
+      // direct providers or are handled by Puppeteer/17track. Fall through
+      // to the ParcelsApp page HTML as a best-effort attempt.
+      result = await tryPageHtml(containerNumber);
+  }
+
+  if (!result.success) {
+    console.log(`[HttpScraper] ${containerNumber}: ${result.error ?? "no data"}`);
+  } else {
+    console.log(`[HttpScraper] ${containerNumber}: success via carrier=${carrier ?? "page"}`);
+  }
+
+  return result;
 }

@@ -133,7 +133,7 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
 
     const chromePath = getChromiumPath();
     browser = await puppeteerExtra.launch({
-      headless: true,
+      headless: "new" as any,   // new headless mode — more stable, better fingerprint
       ...(chromePath ? { executablePath: chromePath } : {}),
       args: [
         "--no-sandbox",
@@ -143,7 +143,14 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
         "--disable-accelerated-2d-canvas",
         "--no-first-run",
         "--no-zygote",
-        "--single-process",
+        // Removed --single-process: causes crashes in containerised production.
+        // The following flags improve stability and reduce bot-detection signals.
+        "--disable-extensions",
+        "--disable-blink-features=AutomationControlled",
+        "--window-size=1280,800",
+        "--disable-infobars",
+        "--disable-notifications",
+        "--disable-popup-blocking",
       ],
     });
 
