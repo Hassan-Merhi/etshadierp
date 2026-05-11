@@ -1,10 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Ship, Package, Boxes, Building2 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Ship, Package, Boxes, Building2, ChevronDown } from "lucide-react";
 import { useLocation } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -47,17 +48,8 @@ function num(v: string | null | undefined): number {
 }
 
 const CCY_SYMBOLS: Record<string, string> = {
-  USD: "$",
-  EUR: "€",
-  GBP: "£",
-  AUD: "A$",
-  CAD: "C$",
-  CHF: "CHF",
-  JPY: "¥",
-  CNY: "¥",
-  AED: "AED",
-  SAR: "SAR",
-  LBP: "LL",
+  USD: "$", EUR: "€", GBP: "£", AUD: "A$", CAD: "C$",
+  CHF: "CHF", JPY: "¥", CNY: "¥", AED: "AED", SAR: "SAR", LBP: "LL",
 };
 
 function ccySymbol(code: string | null | undefined): string {
@@ -79,48 +71,29 @@ function addToCurrency(map: Record<string, number>, ccy: string, amount: number)
 function computeContainerByCurrency(c: FactoryContainer): Record<string, number> {
   const amounts: Record<string, number> = {};
   const containerCcy = c.currencyCode || "USD";
-
-  // Goods value: use confirmed finalPayableAmount, or fall back to ratePerKg × totalKg estimate
   const goodsValue = num(c.finalPayableAmount) > 0
     ? num(c.finalPayableAmount)
     : num(c.ratePerKg) * num(c.totalKg);
   addToCurrency(amounts, containerCcy, goodsValue);
-
-  // Freight
-  const freightCcy = c.freightCurrencyCode || containerCcy;
-  addToCurrency(amounts, freightCcy, num(c.freight));
-
-  // Commission
-  const commCcy = c.commissionCurrencyCode || "USD";
-  addToCurrency(amounts, commCcy, num(c.commissionAmount));
-
-  // Other charges (in container's currency)
+  addToCurrency(amounts, c.freightCurrencyCode || containerCcy, num(c.freight));
+  addToCurrency(amounts, c.commissionCurrencyCode || "USD", num(c.commissionAmount));
   addToCurrency(amounts, containerCcy, num(c.otherCharges));
-
-  // Additional & pre-registered charges (in container's currency)
   addToCurrency(amounts, containerCcy, num(c.additionalChargesSum));
   addToCurrency(amounts, containerCcy, num(c.preRegisteredChargesSum));
-
   return amounts;
 }
 
-function mergeCurrencyMaps(
-  target: Record<string, number>,
-  source: Record<string, number>
-) {
+function mergeCurrencyMaps(target: Record<string, number>, source: Record<string, number>) {
   for (const [ccy, amt] of Object.entries(source)) {
     target[ccy] = (target[ccy] || 0) + amt;
   }
 }
 
-function renderCurrencyBreakdown(
-  amounts: Record<string, number>,
-  className = ""
-): React.ReactNode {
+function CurrencyInline({ amounts }: { amounts: Record<string, number> }) {
   const entries = Object.entries(amounts).filter(([, v]) => v > 0);
   if (entries.length === 0) return <span className="text-muted-foreground">—</span>;
   return (
-    <div className={`flex flex-col items-end gap-0.5 ${className}`}>
+    <div className="flex flex-col items-end gap-0.5">
       {entries.map(([ccy, amt]) => (
         <span key={ccy} className="font-mono text-sm font-semibold whitespace-nowrap">
           {fmtCcy(ccySymbol(ccy), amt)}
@@ -143,6 +116,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default function FactoryStockOTW() {
   const [, navigate] = useLocation();
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
 
   const { data: containers = [], isLoading } = useQuery<FactoryContainer[]>({
     queryKey: ["/api/factory/containers"],
@@ -150,12 +124,11 @@ export default function FactoryStockOTW() {
 
   const otwContainers = useMemo(
     () => containers.filter((c) => STATUS_ACTIVE.has(c.status)),
-    [containers]
+    [containers],
   );
 
   const supplierGroups = useMemo<SupplierGroup[]>(() => {
     const map = new Map<string, SupplierGroup>();
-
     for (const c of otwContainers) {
       const key = String(c.supplierId ?? "none");
       if (!map.has(key)) {
@@ -172,39 +145,43 @@ export default function FactoryStockOTW() {
       group.totalKg += num(c.totalKg);
       mergeCurrencyMaps(group.totalsByCurrency, computeContainerByCurrency(c));
     }
-
-    return Array.from(map.values()).sort((a, b) =>
-      a.supplierName.localeCompare(b.supplierName)
-    );
+    return Array.from(map.values()).sort((a, b) => a.supplierName.localeCompare(b.supplierName));
   }, [otwContainers]);
 
   const grandTotals = useMemo(() => {
     const totalsByCurrency: Record<string, number> = {};
-    let containers = 0;
+    let count = 0;
     let kg = 0;
     for (const g of supplierGroups) {
-      containers += g.containers.length;
+      count += g.containers.length;
       kg += g.totalKg;
       mergeCurrencyMaps(totalsByCurrency, g.totalsByCurrency);
     }
-    return { containers, kg, totalsByCurrency };
+    return { containers: count, kg, totalsByCurrency };
   }, [supplierGroups]);
 
-  const fmtKg = (n: number) =>
-    n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  const fmtKg = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+
+  function toggleGroup(key: string) {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="p-6 space-y-3">
         <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-48 w-full" />
+        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-4">
       <div className="flex items-center gap-3">
         <Ship className="h-6 w-6 text-muted-foreground" />
         <div>
@@ -224,79 +201,119 @@ export default function FactoryStockOTW() {
         </Card>
       ) : (
         <>
-          {supplierGroups.map((group) => (
-            <Card key={group.supplierId ?? "none"} data-testid={`card-supplier-${group.supplierId ?? "none"}`}>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  {group.supplierName}
-                  <Badge variant="secondary" className="ml-1 text-xs">
-                    {group.containers.length} container{group.containers.length !== 1 ? "s" : ""}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="table-responsive">
-                  <Table>
-                    <TableHeader className="sticky top-0 z-30 bg-background">
-                      <TableRow>
-                        <TableHead>Container</TableHead>
-                        <TableHead className="text-right">KG</TableHead>
-                        <TableHead className="text-right">Value</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {group.containers.map((c) => {
-                        const byCurrency = computeContainerByCurrency(c);
-                        const isEstimated = num(c.finalPayableAmount) === 0 && num(c.ratePerKg) > 0;
-                        return (
-                          <TableRow
-                            key={c.id}
-                            className="cursor-pointer hover-elevate"
-                            onClick={() => navigate(`/containers/${c.id}`)}
-                            data-testid={`row-container-${c.id}`}
-                          >
-                            <TableCell className="font-mono text-sm font-medium">
-                              {c.containerNumber}
+          <Card>
+            {supplierGroups.map((group, idx) => {
+              const key = String(group.supplierId ?? "none");
+              const isOpen = openGroups.has(key);
+              const isLast = idx === supplierGroups.length - 1;
+
+              return (
+                <Collapsible key={key} open={isOpen} onOpenChange={() => toggleGroup(key)}>
+                  <CollapsibleTrigger asChild>
+                    <div
+                      className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover-elevate transition-colors
+                        ${!isLast ? "border-b" : ""}
+                        ${isOpen ? "bg-muted/30" : ""}`}
+                      data-testid={`row-supplier-${key}`}
+                    >
+                      {/* Supplier name */}
+                      <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="font-medium text-sm flex-1 min-w-0 truncate">
+                        {group.supplierName}
+                      </span>
+
+                      {/* Container count */}
+                      <Badge variant="secondary" className="text-xs shrink-0">
+                        {group.containers.length} ctr{group.containers.length !== 1 ? "s" : ""}
+                      </Badge>
+
+                      {/* Total KG */}
+                      <span className="text-sm font-mono text-muted-foreground shrink-0 hidden sm:block w-28 text-right">
+                        {fmtKg(group.totalKg)} kg
+                      </span>
+
+                      {/* Total value */}
+                      <div className="shrink-0 min-w-[100px] text-right">
+                        <CurrencyInline amounts={group.totalsByCurrency} />
+                      </div>
+
+                      {/* Chevron */}
+                      <ChevronDown
+                        className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                      />
+                    </div>
+                  </CollapsibleTrigger>
+
+                  <CollapsibleContent>
+                    <div className={`border-t bg-muted/10 ${!isLast ? "border-b" : ""}`}>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Container</TableHead>
+                            <TableHead>Origin</TableHead>
+                            <TableHead className="text-right">KG</TableHead>
+                            <TableHead className="text-right">Value</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {group.containers.map((c) => {
+                            const byCurrency = computeContainerByCurrency(c);
+                            const isEstimated = num(c.finalPayableAmount) === 0 && num(c.ratePerKg) > 0;
+                            return (
+                              <TableRow
+                                key={c.id}
+                                className="cursor-pointer hover-elevate"
+                                onClick={() => navigate(`/containers/${c.id}`)}
+                                data-testid={`row-container-${c.id}`}
+                              >
+                                <TableCell className="font-mono text-sm font-medium">
+                                  {c.containerNumber}
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {c.origin || "—"}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  {fmtKg(num(c.totalKg))}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex flex-col items-end gap-0.5">
+                                    <CurrencyInline amounts={byCurrency} />
+                                    {isEstimated && (
+                                      <span className="text-xs text-muted-foreground italic">est.</span>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="text-xs">
+                                    {STATUS_LABEL[c.status] || c.status}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                        <tfoot>
+                          <TableRow className="bg-muted/30 font-medium">
+                            <TableCell colSpan={2} className="text-sm text-muted-foreground">
+                              Supplier total
                             </TableCell>
                             <TableCell className="text-right font-mono text-sm">
-                              {fmtKg(num(c.totalKg))}
+                              {fmtKg(group.totalKg)} kg
                             </TableCell>
                             <TableCell className="text-right">
-                              <div className="flex flex-col items-end gap-0.5">
-                                {renderCurrencyBreakdown(byCurrency)}
-                                {isEstimated && (
-                                  <span className="text-xs text-muted-foreground italic">est.</span>
-                                )}
-                              </div>
+                              <CurrencyInline amounts={group.totalsByCurrency} />
                             </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="text-xs">
-                                {STATUS_LABEL[c.status] || c.status}
-                              </Badge>
-                            </TableCell>
+                            <TableCell />
                           </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                    <tfoot>
-                      <TableRow className="bg-muted/40 font-medium">
-                        <TableCell className="text-sm">Supplier Total</TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          {fmtKg(group.totalKg)} kg
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {renderCurrencyBreakdown(group.totalsByCurrency)}
-                        </TableCell>
-                        <TableCell />
-                      </TableRow>
-                    </tfoot>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                        </tfoot>
+                      </Table>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
+          </Card>
 
           {/* Grand total bar */}
           <div
