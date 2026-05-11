@@ -175,6 +175,23 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
     console.log(`[TrackTrace] Waiting 4 s for hash pre-fill…`);
     await new Promise((r) => setTimeout(r, 4_000));
 
+    // Set up new-tab listener BEFORE clicking — "Track direct" opens a popup/tab
+    let newTabUrl: string | null = null;
+    const newTabPromise = new Promise<string | null>((resolve) => {
+      const handler = (target: any) => {
+        try {
+          const url: string = target.url?.() ?? "";
+          if (url && url.startsWith("http") && !url.includes("track-trace.com")) {
+            browser.off("targetcreated", handler);
+            resolve(url);
+          }
+        } catch { /* ignore */ }
+      };
+      browser.on("targetcreated", handler);
+      // Auto-resolve after 12 s if no new tab opens
+      setTimeout(() => { browser.off("targetcreated", handler); resolve(null); }, 12_000);
+    });
+
     // Inspect the page to find the "Track direct" link href and form action
     const pageInfo: { directHref: string | null; formAction: string | null; inputValue: string | null } =
       await page.evaluate((cn: string) => {
@@ -238,36 +255,33 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
       console.log(`[TrackTrace] Submit fallback: ${submitResult}`);
     }
 
-    // Poll for carrier iframe src — track-trace injects iframes as about:blank
-    // then fills them asynchronously. Poll every 1.5 s for up to 20 s.
-    console.log(`[TrackTrace] Polling for carrier iframe src (up to 20 s)…`);
-    const AD_PATTERN = /google|doubleclick|facebook|analytics|adnxs|adsystem|youtube|twitter|about:blank/i;
-    let carrierIframeSrc: string | null = null;
-    const pollStart = Date.now();
-    while (Date.now() - pollStart < 20_000) {
-      const srcs: string[] = await page.evaluate(() =>
-        Array.from(document.querySelectorAll("iframe"))
-          .map((f) => (f as HTMLIFrameElement).src ?? "")
-      ).catch(() => [] as string[]);
+    // Wait for new tab OR try reading iframe contentDocument (same-origin about:blank)
+    console.log(`[TrackTrace] Waiting for new tab or iframe content (up to 12 s)…`);
+    newTabUrl = await newTabPromise;
+    console.log(`[TrackTrace] New tab URL: ${newTabUrl ?? "none"}`);
 
-      const real = srcs.find((s) => s && s.length > 10 && !AD_PATTERN.test(s));
-      if (real) { carrierIframeSrc = real; break; }
-      await new Promise((r) => setTimeout(r, 1_500));
-    }
+    // Also try reading iframe contentDocument — works if track-trace writes
+    // content into about:blank iframes via document.write() (same-origin)
+    const iframeTexts: string[] = await page.evaluate(() =>
+      Array.from(document.querySelectorAll("iframe")).map((f) => {
+        try { return (f as HTMLIFrameElement).contentDocument?.body?.innerText?.slice(0, 2000) ?? ""; }
+        catch { return "cross-origin"; }
+      })
+    ).catch(() => [] as string[]);
+    const iframeContent = iframeTexts.filter((t) => t && t !== "cross-origin" && t.trim().length > 20).join("\n");
+    if (iframeContent) console.log(`[TrackTrace] Iframe content found: ${iframeContent.slice(0, 300)}`);
 
-    console.log(`[TrackTrace] Carrier iframe src: ${carrierIframeSrc ?? "none found"}`);
-
-    if (carrierIframeSrc) {
-      console.log(`[TrackTrace] Navigating to carrier page: ${carrierIframeSrc}`);
+    if (newTabUrl) {
+      // Navigate main page to the carrier URL that opened in the new tab
+      console.log(`[TrackTrace] Following new tab → ${newTabUrl}`);
       try {
-        await page.goto(carrierIframeSrc, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT_MS });
+        await page.goto(newTabUrl, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT_MS });
       } catch {
         console.log(`[TrackTrace] Carrier page nav timed out — continuing`);
       }
       await new Promise((r) => setTimeout(r, 6_000));
-    } else {
-      // Iframes never loaded a real URL — give page a final extra settle
-      await new Promise((r) => setTimeout(r, 3_000));
+    } else if (!iframeContent) {
+      await new Promise((r) => setTimeout(r, 2_000));
     }
 
     // ── Step 3: read everything via page.evaluate() ────────────────────────────
