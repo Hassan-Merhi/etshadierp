@@ -103,8 +103,8 @@ export default function StockItems() {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<number | null>(null);
-  const [selectedGradeFilter, setSelectedGradeFilter] = useState<number | "none" | null>(null);
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<number | null>(null);
+  const [selectedGradeFilter, setSelectedGradeFilter] = useState<number | null>(null);
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<number | "none" | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedStockItemId, setSelectedStockItemId] = useState<number | null>(null);
   const [selectedStockItemName, setSelectedStockItemName] = useState<string>("");
@@ -455,33 +455,20 @@ export default function StockItems() {
             ))}
           </select>
           <select
-            value={selectedGradeFilter === null ? "all" : selectedGradeFilter}
+            value={selectedCategoryFilter === null ? "all" : selectedCategoryFilter}
             onChange={(e) => {
               const val = e.target.value;
-              setSelectedGradeFilter(val === "all" ? null : val === "none" ? "none" : parseInt(val));
+              setSelectedCategoryFilter(val === "all" ? null : val === "none" ? "none" : parseInt(val));
             }}
             className="w-full md:w-auto px-3 py-2 border border-input rounded-md text-sm bg-background text-foreground"
-            data-testid="select-grade-filter"
+            data-testid="select-category-filter"
           >
-            <option value="all">All Grades</option>
-            <option value="none">No Grade</option>
+            <option value="all">All Categories</option>
+            <option value="none">No Category</option>
+            {stockCategories.map(cat => (
+              <option key={cat.id} value={cat.id}>{cat.name}</option>
+            ))}
           </select>
-          {stockCategories.length > 0 && (
-            <select
-              value={selectedCategoryFilter === null ? "all" : selectedCategoryFilter}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSelectedCategoryFilter(val === "all" ? null : parseInt(val));
-              }}
-              className="w-full md:w-auto px-3 py-2 border border-input rounded-md text-sm bg-background text-foreground"
-              data-testid="select-category-filter"
-            >
-              <option value="all">All Categories</option>
-              {stockCategories.map(cat => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))}
-            </select>
-          )}
         </div>
 
         {isLoading ? (

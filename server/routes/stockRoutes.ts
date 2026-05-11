@@ -253,7 +253,9 @@ export function registerStockRoutes(app: Express) {
       } else if (gradeId && gradeId !== "all") {
         conditions.push(eq(stockItems.gradeId, parseInt(gradeId as string)));
       }
-      if (categoryId && categoryId !== "all") {
+      if (categoryId === "none") {
+        conditions.push(isNull(stockItems.categoryId));
+      } else if (categoryId && categoryId !== "all") {
         conditions.push(eq(stockItems.categoryId, parseInt(categoryId as string)));
       }
       if (active === "true") {
