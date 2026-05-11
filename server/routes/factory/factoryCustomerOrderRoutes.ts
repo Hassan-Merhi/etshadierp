@@ -3313,21 +3313,43 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (allCodes.length > 0) {
         const codesList = sql.join(allCodes.map((c: string) => sql`${c}`), sql`,`);
         const locationFilter = order.locationId
-          ? sql`AND erp_location_id = ${order.locationId}`
+          ? sql`AND fb.erp_location_id = ${order.locationId}`
           : sql``;
         const inStockRaw = await db.execute(
-          sql`SELECT article_code AS "articleCode", SUM(COALESCE(quantity, 1))::int AS count
-              FROM factory_bales
-              WHERE company_id = ${companyId}
-                AND status = 'IN_STOCK'
-                AND deleted_at IS NULL
-                AND article_code IN (${codesList})
+          sql`SELECT fb.article_code AS "articleCode", SUM(COALESCE(fb.quantity, 1))::int AS count
+              FROM factory_bales fb
+              WHERE fb.company_id = ${companyId}
+                AND fb.status = 'IN_STOCK'
+                AND fb.deleted_at IS NULL
+                AND fb.article_code IN (${codesList})
                 ${locationFilter}
-              GROUP BY article_code`,
+              GROUP BY fb.article_code`,
         );
         const inStockRows = (inStockRaw as any).rows ?? (inStockRaw as unknown as any[]);
         for (const r of inStockRows) {
           if (r.articleCode) stockQtyMap[r.articleCode] = Number(r.count);
+        }
+
+        // Subtract bales already scanned into any active LOADING order
+        // (V5 bales stay IN_STOCK during loading, so we must deduct them manually)
+        const loadingRaw = await db.execute(
+          sql`SELECT fb.article_code AS "articleCode", SUM(COALESCE(fb.quantity, 1))::int AS count
+              FROM factory_bales fb
+              JOIN customer_order_bales cob ON cob.bale_id = fb.id
+              JOIN customer_orders co ON co.id = cob.order_id
+              WHERE fb.company_id = ${companyId}
+                AND fb.status = 'IN_STOCK'
+                AND fb.deleted_at IS NULL
+                AND fb.article_code IN (${codesList})
+                AND co.status = 'LOADING'
+                ${locationFilter}
+              GROUP BY fb.article_code`,
+        );
+        const loadingRows = (loadingRaw as any).rows ?? (loadingRaw as unknown as any[]);
+        for (const r of loadingRows) {
+          if (r.articleCode && stockQtyMap[r.articleCode] !== undefined) {
+            stockQtyMap[r.articleCode] = Math.max(0, stockQtyMap[r.articleCode] - Number(r.count));
+          }
         }
       }
 
