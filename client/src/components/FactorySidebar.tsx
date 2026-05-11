@@ -210,7 +210,9 @@ export function useFactoryVisibleSections(user?: any): {
   });
 
   const isPinnedVisible = (item: NavItem): boolean => {
-    if (item.url === "/factory/production-report") return true;
+    if (item.url === "/factory/production-report") {
+      return !myAccess?.hiddenCostFields?.includes("hide_tab_production_analytics");
+    }
     if (item.url === "/factory/daybook") {
       return settings?.daybookEnabled !== false && !myAccess?.hiddenCostFields?.includes("hide_tab_daybook");
     }
