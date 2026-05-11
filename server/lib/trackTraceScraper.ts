@@ -238,38 +238,36 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
       console.log(`[TrackTrace] Submit fallback: ${submitResult}`);
     }
 
-    // Wait for AJAX / iframe injection after the click
-    console.log(`[TrackTrace] Waiting 8 s for iframes to inject…`);
-    await new Promise((r) => setTimeout(r, 8_000));
+    // Poll for carrier iframe src — track-trace injects iframes as about:blank
+    // then fills them asynchronously. Poll every 1.5 s for up to 20 s.
+    console.log(`[TrackTrace] Polling for carrier iframe src (up to 20 s)…`);
+    const AD_PATTERN = /google|doubleclick|facebook|analytics|adnxs|adsystem|youtube|twitter|about:blank/i;
+    let carrierIframeSrc: string | null = null;
+    const pollStart = Date.now();
+    while (Date.now() - pollStart < 20_000) {
+      const srcs: string[] = await page.evaluate(() =>
+        Array.from(document.querySelectorAll("iframe"))
+          .map((f) => (f as HTMLIFrameElement).src ?? "")
+      ).catch(() => [] as string[]);
 
-    // Read iframe URLs — track-trace loads carrier tracking in cross-origin iframes.
-    // We can't read iframe content, but we CAN navigate Puppeteer to the iframe URL.
-    const iframeSrcs: string[] = await page.evaluate(() =>
-      Array.from(document.querySelectorAll("iframe"))
-        .map((f) => (f as HTMLIFrameElement).src ?? "")
-        .filter((s) => {
-          if (!s || s.length < 10) return false;
-          // Skip ads / analytics iframes
-          if (/google|doubleclick|facebook|analytics|adnxs|adsystem|youtube|twitter/i.test(s)) return false;
-          return true;
-        }),
-    ).catch(() => [] as string[]);
+      const real = srcs.find((s) => s && s.length > 10 && !AD_PATTERN.test(s));
+      if (real) { carrierIframeSrc = real; break; }
+      await new Promise((r) => setTimeout(r, 1_500));
+    }
 
-    console.log(`[TrackTrace] Iframes found: ${JSON.stringify(iframeSrcs)}`);
+    console.log(`[TrackTrace] Carrier iframe src: ${carrierIframeSrc ?? "none found"}`);
 
-    // If we got a meaningful carrier iframe URL, navigate to it and read that page
-    if (iframeSrcs.length > 0) {
-      const carrierUrl = iframeSrcs[0];
-      console.log(`[TrackTrace] Navigating to carrier iframe: ${carrierUrl}`);
+    if (carrierIframeSrc) {
+      console.log(`[TrackTrace] Navigating to carrier page: ${carrierIframeSrc}`);
       try {
-        await page.goto(carrierUrl, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT_MS });
+        await page.goto(carrierIframeSrc, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT_MS });
       } catch {
-        console.log(`[TrackTrace] Carrier iframe nav timed out — continuing`);
+        console.log(`[TrackTrace] Carrier page nav timed out — continuing`);
       }
       await new Promise((r) => setTimeout(r, 6_000));
     } else {
-      // No iframe found — wait a bit more for possible same-page AJAX render
-      await new Promise((r) => setTimeout(r, 4_000));
+      // Iframes never loaded a real URL — give page a final extra settle
+      await new Promise((r) => setTimeout(r, 3_000));
     }
 
     // ── Step 3: read everything via page.evaluate() ────────────────────────────
