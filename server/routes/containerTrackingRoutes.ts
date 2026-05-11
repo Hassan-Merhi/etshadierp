@@ -1,8 +1,9 @@
 /**
- * containerTrackingRoutes.ts — API endpoints for ParcelsApp container tracking.
+ * containerTrackingRoutes.ts — API endpoints for container tracking.
  *
+ * Provider order: Maersk direct API → ParcelsApp fallback.
+ * API keys are NEVER exposed to the client.
  * All routes require Admin, Developer, or Owner role.
- * The PARCELSAPP_API_KEY is never exposed to the client.
  */
 
 import type { Express, Request, Response } from "express";
@@ -20,20 +21,18 @@ import {
   setBulkTrackingEnabled,
 } from "../services/containerTrackingService";
 import { testConnection } from "../lib/parcelsAppClient";
+import { isConfigured as isMaerskConfigured } from "../lib/trackingProviders/maerskProvider";
 
 const ALLOWED_ROLES = ["Admin", "Developer", "Owner"] as const;
-type AllowedRole = (typeof ALLOWED_ROLES)[number];
 
 function requireAllowedRole(req: Request, res: Response): boolean {
   const role = (req.user as any)?.role;
-  if (!ALLOWED_ROLES.includes(role)) {
+  if (!ALLOWED_ROLES.includes(role as any)) {
     res.status(403).json({ message: "Insufficient permissions" });
     return false;
   }
   return true;
 }
-
-// ─── Zod schemas ──────────────────────────────────────────────────────────────
 
 const updateTrackingSettingsSchema = z.object({
   trackingEnabled: z.boolean().optional(),
@@ -42,18 +41,28 @@ const updateTrackingSettingsSchema = z.object({
   trackingProvider: z.string().max(50).nullable().optional(),
 });
 
-// ─── Register routes ──────────────────────────────────────────────────────────
-
 export function registerContainerTrackingRoutes(app: Express) {
 
-  // GET /api/container-tracking/status — API key config status (no key value exposed)
+  // GET /api/container-tracking/status — provider config (no keys exposed)
   app.get("/api/container-tracking/status", requireAuth, (req: Request, res: Response) => {
     if (!requireAllowedRole(req, res)) return;
-    const hasKey = !!process.env.PARCELSAPP_API_KEY;
-    res.json({ configured: hasKey, provider: "parcelsapp" });
+
+    const maerskConfigured = isMaerskConfigured();
+    const parcelsAppConfigured = !!process.env.PARCELSAPP_API_KEY;
+
+    const directProviders: string[] = [];
+    if (maerskConfigured) directProviders.push("maersk");
+
+    res.json({
+      configured: maerskConfigured || parcelsAppConfigured,
+      maerskConfigured,
+      parcelsAppConfigured,
+      directProviders,
+      fallbackProvider: "parcelsapp",
+    });
   });
 
-  // POST /api/container-tracking/test-connection — verify API key works
+  // POST /api/container-tracking/test-connection — verify ParcelsApp key works
   app.post("/api/container-tracking/test-connection", requireAuth, async (req: Request, res: Response) => {
     if (!requireAllowedRole(req, res)) return;
     try {
@@ -64,8 +73,7 @@ export function registerContainerTrackingRoutes(app: Express) {
     }
   });
 
-  // POST /api/container-tracking/:id/track-now — immediately start tracking (fire-and-forget)
-  // Returns 202 right away; polling takes up to 60 s so we never make the browser wait.
+  // POST /api/container-tracking/:id/track-now — immediately track a single container
   app.post("/api/container-tracking/:id/track-now", requireAuth, async (req: Request, res: Response) => {
     if (!requireAllowedRole(req, res)) return;
 
@@ -75,12 +83,15 @@ export function registerContainerTrackingRoutes(app: Express) {
       return;
     }
 
-    if (!process.env.PARCELSAPP_API_KEY) {
-      res.status(400).json({ message: "ParcelsApp API key is not configured on this server. Please add PARCELSAPP_API_KEY to your environment variables." });
+    const maerskOk = isMaerskConfigured();
+    const parcelsOk = !!process.env.PARCELSAPP_API_KEY;
+    if (!maerskOk && !parcelsOk) {
+      res.status(400).json({
+        message: "No tracking provider is configured. Add MAERSK_CONSUMER_KEY / MAERSK_CONSUMER_SECRET (free) or PARCELSAPP_API_KEY to your environment variables.",
+      });
       return;
     }
 
-    // Quick validation — check the container exists and is not inactive
     try {
       const [row] = await db
         .select({ id: containers.id, containerNumber: containers.containerNumber, status: containers.status })
@@ -101,14 +112,12 @@ export function registerContainerTrackingRoutes(app: Express) {
         return;
       }
 
-      // Respond immediately — tracking runs in the background (up to 60 s)
       res.status(202).json({
         started: true,
         containerNumber: row.containerNumber,
         message: "Tracking started. Results will appear in about a minute — refresh the page to see updates.",
       });
 
-      // Fire-and-forget
       trackOneContainerById(containerId).catch((err: any) =>
         console.error(`[TrackNow] ${row.containerNumber}:`, err?.message),
       );
@@ -136,14 +145,13 @@ export function registerContainerTrackingRoutes(app: Express) {
         .where(eq(containerTrackingEvents.containerId, containerId))
         .orderBy(desc(containerTrackingEvents.eventTime))
         .limit(100);
-
       res.json(events);
     } catch (err: any) {
       res.status(500).json({ message: err?.message ?? "Failed to load events" });
     }
   });
 
-  // POST /api/container-tracking/bulk-settings — enable or disable tracking for all active containers
+  // POST /api/container-tracking/bulk-settings
   app.post("/api/container-tracking/bulk-settings", requireAuth, async (req: Request, res: Response) => {
     if (!requireAllowedRole(req, res)) return;
 
@@ -161,12 +169,14 @@ export function registerContainerTrackingRoutes(app: Express) {
     }
   });
 
-  // POST /api/container-tracking/bulk-track-now — immediately trigger tracking for all enabled containers
+  // POST /api/container-tracking/bulk-track-now
   app.post("/api/container-tracking/bulk-track-now", requireAuth, async (req: Request, res: Response) => {
     if (!requireAllowedRole(req, res)) return;
 
-    if (!process.env.PARCELSAPP_API_KEY) {
-      res.status(400).json({ message: "PARCELSAPP_API_KEY is not configured" });
+    const maerskOk = isMaerskConfigured();
+    const parcelsOk = !!process.env.PARCELSAPP_API_KEY;
+    if (!maerskOk && !parcelsOk) {
+      res.status(400).json({ message: "No tracking provider configured (MAERSK or PARCELSAPP)" });
       return;
     }
 
@@ -183,7 +193,7 @@ export function registerContainerTrackingRoutes(app: Express) {
     }
   });
 
-  // PATCH /api/container-tracking/:id/settings — update tracking settings on a container
+  // PATCH /api/container-tracking/:id/settings
   app.patch("/api/container-tracking/:id/settings", requireAuth, async (req: Request, res: Response) => {
     if (!requireAllowedRole(req, res)) return;
 
@@ -201,7 +211,6 @@ export function registerContainerTrackingRoutes(app: Express) {
 
     const updates: Record<string, unknown> = {};
     const data = parsed.data;
-
     if (data.trackingEnabled !== undefined) updates.trackingEnabled = data.trackingEnabled;
     if (data.trackingAutoUpdate !== undefined) updates.trackingAutoUpdate = data.trackingAutoUpdate;
     if ("trackingCarrierHint" in data) updates.trackingCarrierHint = data.trackingCarrierHint ?? null;
@@ -229,7 +238,6 @@ export function registerContainerTrackingRoutes(app: Express) {
         res.status(404).json({ message: "Container not found" });
         return;
       }
-
       res.json(updated);
     } catch (err: any) {
       res.status(500).json({ message: err?.message ?? "Update failed" });

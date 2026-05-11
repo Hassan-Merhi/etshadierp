@@ -2925,6 +2925,10 @@ let migrationsDone = false;
     )`,
     `ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS grade_id integer`,
     `ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS category_id integer`,
+    // Carrier-first provider columns (May 2026)
+    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_detected_carrier text`,
+    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_fallback_used boolean NOT NULL DEFAULT false`,
+    `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_fallback_reason text`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

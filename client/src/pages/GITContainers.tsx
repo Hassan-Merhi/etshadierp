@@ -638,7 +638,7 @@ function ContainerDrawer({
 
           <Separator />
 
-          {/* ── Auto Tracking (ParcelsApp) ── */}
+          {/* ── Auto Tracking ── */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Satellite className="h-3.5 w-3.5 text-muted-foreground" />
@@ -676,7 +676,7 @@ function ContainerDrawer({
 
             {trackEnabled && (
               <div className="space-y-1">
-                <Label className="text-xs">Destination Country (hint)</Label>
+                <Label className="text-xs">Destination country hint</Label>
                 <Input
                   placeholder="e.g. Democratic Republic of the Congo"
                   value={trackCarrierHint}
@@ -684,7 +684,7 @@ function ContainerDrawer({
                   data-testid="input-tracking-carrier-hint"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Helps ParcelsApp resolve the correct carrier. Leave blank to use default.
+                  Used when direct carrier tracking is unavailable. Leave blank to use default.
                 </p>
               </div>
             )}
@@ -692,7 +692,47 @@ function ContainerDrawer({
             {/* Last tracking result */}
             {container && (container.trackingLastStatus || container.trackingError) && (
               <div className="rounded-md border bg-muted/30 p-3 space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Last Result</p>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Last Result</p>
+                  {/* Provider badge */}
+                  {container.trackingProvider && (
+                    <span
+                      data-testid="badge-tracking-provider"
+                      className={
+                        container.trackingProvider === "maersk"
+                          ? "text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
+                          : "text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
+                      }
+                    >
+                      {container.trackingProvider === "maersk" ? "Maersk direct" : "ParcelsApp"}
+                    </span>
+                  )}
+                </div>
+
+                {/* Detected carrier */}
+                {(container as any).trackingDetectedCarrier && (
+                  <p className="text-xs text-muted-foreground" data-testid="text-detected-carrier">
+                    Carrier detected: <span className="font-medium">{(container as any).trackingDetectedCarrier}</span>
+                  </p>
+                )}
+
+                {/* Fallback note */}
+                {(container as any).trackingFallbackUsed && (
+                  <div
+                    className="flex items-start gap-1.5 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-2 py-1.5"
+                    data-testid="banner-tracking-fallback"
+                  >
+                    <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0 mt-px" />
+                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                      {(container as any).trackingFallbackReason === "maersk_not_configured"
+                        ? "Maersk direct not configured — used ParcelsApp"
+                        : (container as any).trackingFallbackReason === "maersk_api_error"
+                          ? "Maersk direct failed — used ParcelsApp fallback"
+                          : "Fallback provider used"}
+                    </p>
+                  </div>
+                )}
+
                 {container.trackingLastCheckedAt && (
                   <p className="text-xs text-muted-foreground">
                     Checked: {new Date(container.trackingLastCheckedAt).toLocaleString()}
