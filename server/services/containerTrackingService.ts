@@ -522,6 +522,78 @@ export async function trackOneContainerById(containerId: number): Promise<{
   return { ...result, quotaWarning };
 }
 
+// ─── ETA resolution helpers ───────────────────────────────────────────────────
+
+/**
+ * Resolve the best ETA from a direct carrier provider result.
+ * Priority: provider explicit ETA → most recent event date → preserve existing DB value.
+ * NEVER blanks an existing ETA.
+ */
+function resolveEtaFromProvider(
+  providerEta: string | null,
+  events: TrackingEvent[] | undefined,
+  currentEta: string | null,
+): { eta: string | null; source: "api" | "event" | "manual" | null } {
+  if (providerEta) return { eta: providerEta, source: "api" };
+  if (events?.length) {
+    const best = events
+      .filter((e) => e.date)
+      .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0))[0];
+    if (best?.date) return { eta: best.date.toISOString().slice(0, 10), source: "event" };
+  }
+  if (currentEta) return { eta: currentEta, source: "manual" };
+  return { eta: null, source: null };
+}
+
+/**
+ * Resolve the best ETA from a ParcelsApp/scraper shipment result.
+ * Uses deriveEstimatedDeliveryDate (which already falls back to state dates),
+ * then falls back to the existing DB value. NEVER blanks an existing ETA.
+ */
+function resolveEtaFromShipment(
+  shipment: ParcelsAppShipment,
+  currentEta: string | null,
+): { eta: string | null; source: "api" | "event" | "manual" | null } {
+  const derived = deriveEstimatedDeliveryDate(shipment);
+  if (derived) return { eta: derived, source: "api" };
+  if (currentEta) return { eta: currentEta, source: "manual" };
+  return { eta: null, source: null };
+}
+
+/**
+ * Log the ETA decision and confirm the persisted value from the DB.
+ * Called after every db.update() that may change the ETA column.
+ */
+async function logAndConfirmEta(
+  containerId: number,
+  containerNumber: string,
+  oldEta: string | null,
+  newEta: string | null,
+  source: string | null,
+  provider: string,
+  noUpdateReason?: string,
+): Promise<void> {
+  if (noUpdateReason) {
+    console.log(
+      `[ContainerTracking ETA] container=${containerNumber} NO UPDATE — ${noUpdateReason} ` +
+        `(existing=${oldEta ?? "null"}) provider=${provider}`,
+    );
+    return;
+  }
+  console.log(
+    `[ContainerTracking ETA] container=${containerNumber} oldEta=${oldEta ?? "null"} ` +
+      `→ newEta=${newEta ?? "null"} source=${source ?? "none"} provider=${provider}`,
+  );
+  const [saved] = await db
+    .select({ eta: containers.eta })
+    .from(containers)
+    .where(eq(containers.id, containerId))
+    .limit(1);
+  console.log(
+    `[ContainerTracking ETA] DB-confirmed: container=${containerNumber} eta=${saved?.eta ?? "null"}`,
+  );
+}
+
 // ─── Internal tracking implementation ─────────────────────────────────────────
 
 async function trackOneContainer(
@@ -537,6 +609,15 @@ async function trackOneContainer(
   error: string | null;
 }> {
   const now = new Date();
+
+  // Fetch the current ETA from the DB so we can preserve it if the provider
+  // returns nothing — we never want to blank an existing ETA.
+  const [currentRow] = await db
+    .select({ eta: containers.eta })
+    .from(containers)
+    .where(eq(containers.id, containerId))
+    .limit(1);
+  const currentEta: string | null = currentRow?.eta ?? null;
 
   // Guard: reject invalid container numbers before any API call
   if (!isValidContainerNumber(containerNumber)) {
@@ -571,6 +652,12 @@ async function trackOneContainer(
       await saveDirectEvents(containerId, result);
       await saveTrackingCheck(containerId, result.provider, "success", null, result.raw);
 
+      const { eta: finalEta, source: etaSrc } = resolveEtaFromProvider(
+        result.eta ?? null,
+        result.events,
+        currentEta,
+      );
+
       const updateSet: Record<string, unknown> = {
         trackingLastCheckedAt: now,
         trackingLastStatus: result.latestStatus,
@@ -583,27 +670,14 @@ async function trackOneContainer(
         trackingFallbackUsed: false,
         trackingFallbackReason: null,
       };
-
-      if (result.eta) {
-        updateSet.eta = result.eta;
-        updateSet.etaSource = "api";
-      } else if (result.events?.length) {
-        // Fallback: use the most recent event date so the column is never blank
-        const best = result.events
-          .filter((e) => e.date)
-          .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0))[0];
-        if (best?.date) {
-          updateSet.eta = best.date.toISOString().slice(0, 10);
-          updateSet.etaSource = "event";
-        }
-      }
+      if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
 
       await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
-
-      console.log(
-        `[ContainerTracking] ${containerNumber} → ${result.provider}: ` +
-          `status=${result.latestStatus ?? "?"} eta=${result.eta ?? "none"}`,
+      await logAndConfirmEta(
+        containerId, containerNumber, currentEta, finalEta, etaSrc, result.provider,
+        !finalEta ? "provider returned no ETA and no events with dates" : undefined,
       );
+      console.log(`[ContainerTracking] ${containerNumber} → ${result.provider}: status=${result.latestStatus ?? "?"}`);
 
       return {
         success: true,
@@ -640,6 +714,7 @@ async function trackOneContainer(
     detectedCarrier,
     lastDirectFallbackReason,
     now,
+    currentEta,
   );
 }
 
@@ -651,6 +726,7 @@ async function trackViaParcelsApp(
   detectedCarrier: string | null,
   fallbackReason: string | null,
   now: Date,
+  currentEta: string | null,
 ): Promise<{
   success: boolean;
   lastStatus: string | null;
@@ -675,11 +751,11 @@ async function trackViaParcelsApp(
 
     if (httpResult.success && httpResult.shipment) {
       const shipment = httpResult.shipment;
-      const lastStatus            = deriveLastStatus(shipment);
-      const lastLocation          = deriveLastLocation(shipment);
-      const lastEventDate         = deriveLastEventDate(shipment);
-      const lastDescription       = shipment.states?.[0]?.description ?? null;
-      const estimatedDeliveryDate = deriveEstimatedDeliveryDate(shipment);
+      const lastStatus      = deriveLastStatus(shipment);
+      const lastLocation    = deriveLastLocation(shipment);
+      const lastEventDate   = deriveLastEventDate(shipment);
+      const lastDescription = shipment.states?.[0]?.description ?? null;
+      const { eta: finalEta, source: etaSrc } = resolveEtaFromShipment(shipment, currentEta);
 
       await saveParcelsAppEvents(containerId, shipment);
 
@@ -695,8 +771,12 @@ async function trackViaParcelsApp(
         trackingFallbackUsed: !!fallbackReason,
         trackingFallbackReason: fallbackReason,
       };
-      if (estimatedDeliveryDate) { updateSet.eta = estimatedDeliveryDate; updateSet.etaSource = "api"; }
+      if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
       await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+      await logAndConfirmEta(
+        containerId, containerNumber, currentEta, finalEta, etaSrc, "http_scraper",
+        !finalEta ? "no ETA derived from shipment states" : undefined,
+      );
 
       console.log(`[ContainerTracking] ${containerNumber} → http_scraper: status=${lastStatus ?? "?"}`);
       return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
@@ -720,11 +800,11 @@ async function trackViaParcelsApp(
 
     if (scraped.success && scraped.shipment) {
       const shipment = scraped.shipment;
-      const lastStatus            = deriveLastStatus(shipment);
-      const lastLocation          = deriveLastLocation(shipment);
-      const lastEventDate         = deriveLastEventDate(shipment);
-      const lastDescription       = shipment.states?.[0]?.description ?? null;
-      const estimatedDeliveryDate = deriveEstimatedDeliveryDate(shipment);
+      const lastStatus      = deriveLastStatus(shipment);
+      const lastLocation    = deriveLastLocation(shipment);
+      const lastEventDate   = deriveLastEventDate(shipment);
+      const lastDescription = shipment.states?.[0]?.description ?? null;
+      const { eta: finalEta, source: etaSrc } = resolveEtaFromShipment(shipment, currentEta);
 
       await saveParcelsAppEvents(containerId, shipment);
 
@@ -740,8 +820,12 @@ async function trackViaParcelsApp(
         trackingFallbackUsed: !!fallbackReason,
         trackingFallbackReason: fallbackReason,
       };
-      if (estimatedDeliveryDate) { updateSet.eta = estimatedDeliveryDate; updateSet.etaSource = "api"; }
+      if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
       await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+      await logAndConfirmEta(
+        containerId, containerNumber, currentEta, finalEta, etaSrc, "parcelsapp_scraper",
+        !finalEta ? "no ETA derived from shipment states" : undefined,
+      );
 
       console.log(`[ContainerTracking] ${containerNumber} → parcelsapp_scraper: status=${lastStatus ?? "?"}`);
       return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
@@ -774,6 +858,12 @@ async function trackViaParcelsApp(
       if (result17.success) {
         await saveDirectEvents(containerId, result17);
 
+        const { eta: finalEta, source: etaSrc } = resolveEtaFromProvider(
+          result17.eta ?? null,
+          result17.events,
+          currentEta,
+        );
+
         const updateSet: Record<string, unknown> = {
           trackingLastCheckedAt: now,
           trackingLastStatus: result17.latestStatus,
@@ -786,8 +876,12 @@ async function trackViaParcelsApp(
           trackingFallbackUsed: !!fallbackReason,
           trackingFallbackReason: fallbackReason,
         };
-        if (result17.eta) { updateSet.eta = result17.eta; updateSet.etaSource = "api"; }
+        if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
         await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+        await logAndConfirmEta(
+          containerId, containerNumber, currentEta, finalEta, etaSrc, "17track",
+          !finalEta ? "17track returned no ETA and no events with dates" : undefined,
+        );
 
         console.log(`[ContainerTracking] ${containerNumber} → 17track: status=${result17.latestStatus ?? "?"}`);
         return {
@@ -871,11 +965,11 @@ async function trackViaParcelsApp(
   }
 
   const shipment = result.shipment;
-  const lastStatus            = deriveLastStatus(shipment);
-  const lastLocation          = deriveLastLocation(shipment);
-  const lastEventDate         = deriveLastEventDate(shipment);
-  const lastDescription       = shipment.states?.[0]?.description ?? null;
-  const estimatedDeliveryDate = deriveEstimatedDeliveryDate(shipment);
+  const lastStatus      = deriveLastStatus(shipment);
+  const lastLocation    = deriveLastLocation(shipment);
+  const lastEventDate   = deriveLastEventDate(shipment);
+  const lastDescription = shipment.states?.[0]?.description ?? null;
+  const { eta: finalEta, source: etaSrc } = resolveEtaFromShipment(shipment, currentEta);
 
   console.log(`[ContainerTracking] ${containerNumber} raw attributes:`, JSON.stringify(shipment.attributes ?? {}));
   await saveParcelsAppEvents(containerId, shipment);
@@ -892,10 +986,14 @@ async function trackViaParcelsApp(
     trackingFallbackUsed: !!fallbackReason,
     trackingFallbackReason: fallbackReason,
   };
-  if (estimatedDeliveryDate) { updateSet.eta = estimatedDeliveryDate; updateSet.etaSource = "api"; }
+  if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
   await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+  await logAndConfirmEta(
+    containerId, containerNumber, currentEta, finalEta, etaSrc, "parcelsapp",
+    !finalEta ? "no ETA derived from shipment states" : undefined,
+  );
 
-  console.log(`[ContainerTracking] ${containerNumber} → parcelsapp: status=${lastStatus ?? "?"} eta=${estimatedDeliveryDate ?? "none"}`);
+  console.log(`[ContainerTracking] ${containerNumber} → parcelsapp: status=${lastStatus ?? "?"}`);
   return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
 }
 
