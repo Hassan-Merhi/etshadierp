@@ -77,6 +77,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
   const [errors, setErrors]                     = useState<Record<string, string>>({});
   const [showZeroItems, setShowZeroItems]       = useState(false);
   const [hideNonPositive, setHideNonPositive]   = useState(false);
+  const [showNegativeOnly, setShowNegativeOnly] = useState(false);
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const qtyRefs    = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -313,7 +314,10 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
     return s + qty * price;
   }, 0);
 
+  const negativeCount = articleRows.filter(r => r.freeToPromise < 0).length;
+
   const visibleRows = (() => {
+    if (showNegativeOnly) return articleRows.filter(r => r.freeToPromise < 0);
     let base = showZeroItems ? articleRows : articleRows.filter(r => r.stockAvailable > 0 || r.expectedToLoad > 0);
     if (hideNonPositive) base = base.filter(r => r.freeToPromise > 0);
     return base;
@@ -421,10 +425,25 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
               <Button
                 size="default"
                 variant={hideNonPositive ? "default" : "outline"}
-                onClick={() => setHideNonPositive(v => !v)}
+                onClick={() => { setHideNonPositive(v => !v); setShowNegativeOnly(false); }}
                 data-testid="button-v5-hide-non-positive"
               >
                 {hideNonPositive ? `Show all (${nonPositiveCount} hidden)` : `Hide 0 & negative (${nonPositiveCount})`}
+              </Button>
+            </div>
+          )}
+
+          {negativeCount > 0 && (
+            <div className="border-l pl-4">
+              <Button
+                size="default"
+                variant={showNegativeOnly ? "destructive" : "outline"}
+                onClick={() => { setShowNegativeOnly(v => !v); setHideNonPositive(false); }}
+                data-testid="button-v5-show-negative-only"
+              >
+                {showNegativeOnly
+                  ? `Negative Only (${negativeCount})`
+                  : `Show Negative Only (${negativeCount})`}
               </Button>
             </div>
           )}

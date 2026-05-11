@@ -83,6 +83,7 @@ export default function FactoryStockAllocationV5() {
   const [editDrawerProformaId, setEditDrawerProformaId] = useState<number | null>(null);
   const [expandedRows, setExpandedRows]         = useState<Set<string>>(new Set());
   const [hideZero, setHideZero]                 = useState(true);
+  const [showNegativeOnly, setShowNegativeOnly] = useState(false);
   const [refreshFlash, setRefreshFlash]         = useState(false);
 
   /* ── Export dialog state ─────────────────────────────────────────────────── */
@@ -324,8 +325,9 @@ export default function FactoryStockAllocationV5() {
     retry: 1,
   });
 
-  const rows   = (query.data?.rows ?? []).slice().sort((a, b) => a.productName.localeCompare(b.productName));
-  const totals = query.data?.totals;
+  const allRows = (query.data?.rows ?? []).slice().sort((a, b) => a.productName.localeCompare(b.productName));
+  const rows    = showNegativeOnly ? allRows.filter(r => r.freeToPromise < 0) : allRows;
+  const totals  = query.data?.totals;
 
   // Auto-expand rows that contain the focused proforma, then scroll to first match
   useEffect(() => {
@@ -499,6 +501,16 @@ export default function FactoryStockAllocationV5() {
             data-testid="button-v5-toggle-zero"
           >
             {hideZero ? "Show Zero Rows" : "Hide Zero Rows"}
+          </Button>
+          <Button
+            variant={showNegativeOnly ? "destructive" : "outline"}
+            size="default"
+            onClick={() => setShowNegativeOnly(v => !v)}
+            data-testid="button-v5-toggle-negative-only"
+          >
+            {showNegativeOnly
+              ? `Negative Only (${rows.length})`
+              : `Show Negative Only`}
           </Button>
           <Button
             variant="outline"
