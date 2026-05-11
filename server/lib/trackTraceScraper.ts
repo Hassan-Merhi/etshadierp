@@ -134,16 +134,26 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
       "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     );
 
-    // Capture any JSON responses that might carry tracking data
+    // Capture JSON from ANY domain — track-trace proxies carrier data or embeds
+    // cross-origin iframes, so we need to catch responses from all sources.
     let capturedJson: unknown = null;
+    const capturedResponses: Array<{ url: string; data: unknown }> = [];
     page.on("response", async (response: any) => {
       try {
         const url: string = response.url();
-        if (!url.includes("track-trace.com")) return;
+        // Skip noise: images, fonts, analytics, ads
+        if (/\.(png|jpg|gif|svg|woff|woff2|ttf|ico|css)(\?|$)/i.test(url)) return;
+        if (/google|doubleclick|googletag|facebook|analytics|adnxs|adsystem/i.test(url)) return;
         const ct: string = response.headers()["content-type"] ?? "";
-        if (!ct.includes("json")) return;
+        if (!ct.includes("json") && !ct.includes("javascript")) return;
         const json = await response.json().catch(() => null);
-        if (json && typeof json === "object" && !capturedJson) capturedJson = json;
+        if (!json || typeof json !== "object") return;
+        capturedResponses.push({ url, data: json });
+        // Prefer responses that look like tracking data
+        const hasTrackingData = JSON.stringify(json).match(
+          /eta|vessel|port|transit|arrived|departed|discharged|loaded|container|movement|event|milestone/i,
+        );
+        if (hasTrackingData && !capturedJson) capturedJson = json;
       } catch { /* ignore */ }
     });
 
@@ -165,61 +175,72 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
     console.log(`[TrackTrace] Waiting 4 s for hash pre-fill…`);
     await new Promise((r) => setTimeout(r, 4_000));
 
-    const submitResult: string = await page.evaluate((cn: string): string => {
-      // Find the text input (track-trace uses a plain <input type=text>)
-      const inputSels = [
-        'input[name="query"]', 'input[name="number"]', 'input[name="container"]',
-        'input[name="q"]', 'input[name="trackingNumber"]',
-        '#number', '#query', '#container',
-        'input[type="text"]',
-      ];
-      let input: HTMLInputElement | null = null;
-      for (const sel of inputSels) {
-        const el = document.querySelector(sel) as HTMLInputElement | null;
-        if (el) { input = el; break; }
+    // Inspect the page to find the "Track direct" link href and form action
+    const pageInfo: { directHref: string | null; formAction: string | null; inputValue: string | null } =
+      await page.evaluate((cn: string) => {
+        const inputSels = [
+          'input[name="query"]', 'input[name="number"]', 'input[name="container"]',
+          'input[name="q"]', 'input[name="trackingNumber"]', '#number', '#query',
+          'input[type="text"]',
+        ];
+        let input: HTMLInputElement | null = null;
+        for (const sel of inputSels) {
+          const el = document.querySelector(sel) as HTMLInputElement | null;
+          if (el) { input = el; break; }
+        }
+
+        // Ensure value is set
+        if (input && !input.value) {
+          input.value = cn;
+          input.dispatchEvent(new Event("input",  { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+
+        // Find "Track direct" link href
+        const allEls = Array.from(document.querySelectorAll("a, button, input[type=submit]")) as HTMLElement[];
+        const directEl = allEls.find((el) => {
+          const t = (el.textContent ?? "").trim().toLowerCase();
+          return t === "track direct" || t === "track" || t === "go";
+        });
+        const directHref = directEl instanceof HTMLAnchorElement ? (directEl.href || null) : null;
+
+        const form = input?.closest("form");
+        const formAction = form ? (form.action || null) : null;
+        const inputValue = input?.value ?? null;
+
+        return { directHref, formAction, inputValue };
+      }, containerNumber).catch(() => ({ directHref: null, formAction: null, inputValue: null }));
+
+    console.log(`[TrackTrace] pageInfo:`, JSON.stringify(pageInfo));
+
+    // Navigate directly to the results URL if we have one; otherwise form-submit
+    if (pageInfo.directHref && pageInfo.directHref !== page.url()) {
+      console.log(`[TrackTrace] Navigating directly to: ${pageInfo.directHref}`);
+      try {
+        await page.goto(pageInfo.directHref, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT_MS });
+      } catch {
+        console.log(`[TrackTrace] Direct nav networkidle2 timed out — continuing`);
       }
-      if (!input) return "no_input_found";
+    } else {
+      // Fall back: click/submit via evaluate()
+      const submitResult: string = await page.evaluate((cn: string): string => {
+        const allLinks = Array.from(document.querySelectorAll("a, button, input[type=submit], input[type=button]")) as HTMLElement[];
+        const directBtn = allLinks.find((el) => {
+          const t = (el.textContent ?? "").trim().toLowerCase();
+          return t === "track direct" || t === "track" || t === "go" || t === "search";
+        });
+        if (directBtn) { directBtn.click(); return `clicked:${directBtn.textContent?.trim()}`; }
 
-      // Ensure the number is in the field
-      if (!input.value) {
-        input.value = cn;
-        input.dispatchEvent(new Event("input",  { bubbles: true }));
-        input.dispatchEvent(new Event("change", { bubbles: true }));
-      }
+        const form = (document.querySelector('input[type="text"]') as HTMLElement | null)?.closest("form");
+        if (form) { (form as HTMLFormElement).submit(); return "form_submitted"; }
+        return "no_submit_found";
+      }, containerNumber).catch(() => "evaluate_error");
+      console.log(`[TrackTrace] Submit fallback: ${submitResult}`);
+    }
 
-      // track-trace.com shows "Track direct" link after hash pre-fill.
-      // Find it by text content first, then fall back to generic selectors.
-      const allLinks = Array.from(document.querySelectorAll("a, button, input[type=submit], input[type=button]")) as HTMLElement[];
-
-      // Priority 1: any element whose visible text matches "Track direct" or "Track"
-      const directBtn = allLinks.find((el) => {
-        const t = (el.textContent ?? "").trim().toLowerCase();
-        return t === "track direct" || t === "track" || t === "go" || t === "search";
-      });
-      if (directBtn) { directBtn.click(); return `clicked_text:${directBtn.textContent?.trim()}`; }
-
-      // Priority 2: submit inputs and buttons
-      const submitSels = [
-        'input[type="submit"]', 'button[type="submit"]',
-        'button.btn', 'a.btn',
-      ];
-      for (const sel of submitSels) {
-        const btn = document.querySelector(sel) as HTMLElement | null;
-        if (btn) { btn.click(); return `clicked:${sel}`; }
-      }
-
-      // Last resort: submit the form directly
-      const form = input.closest("form");
-      if (form) { form.submit(); return "form_submitted"; }
-
-      return "no_submit_found";
-    }, containerNumber).catch(() => "evaluate_error");
-
-    console.log(`[TrackTrace] Submit result: ${submitResult}`);
-
-    // Wait for the tracking results to load after submission
-    console.log(`[TrackTrace] Waiting 10 s for results to load…`);
-    await new Promise((r) => setTimeout(r, 10_000));
+    // Wait for AJAX / page rendering after submit/navigate
+    console.log(`[TrackTrace] Waiting 12 s for results to render…`);
+    await new Promise((r) => setTimeout(r, 12_000));
 
     // ── Step 3: read everything via page.evaluate() ────────────────────────────
     // evaluate() runs JS inside the page context and returns plain JS values.
