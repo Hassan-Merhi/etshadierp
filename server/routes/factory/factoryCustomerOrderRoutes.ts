@@ -3306,13 +3306,15 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         entry.productName = resolveName(code, entry.productName);
       }
 
-      // Fetch IN_STOCK bale counts per article code for the relevant codes.
-      // IMPORTANT: passing a JS array directly to ANY(${array}) in a Drizzle sql
-      // template generates tuple syntax ANY(($1,$2,...)) which PostgreSQL rejects.
-      // Use sql.join to produce a valid IN ($1,$2,...) list instead.
+      // Fetch IN_STOCK bale counts per article code for the relevant codes,
+      // filtered by the order's locationId so the number matches what the
+      // Location Inventory page shows for that location.
       const stockQtyMap: Record<string, number> = {};
       if (allCodes.length > 0) {
         const codesList = sql.join(allCodes.map((c: string) => sql`${c}`), sql`,`);
+        const locationFilter = order.locationId
+          ? sql`AND erp_location_id = ${order.locationId}`
+          : sql``;
         const inStockRaw = await db.execute(
           sql`SELECT article_code AS "articleCode", COUNT(*)::int AS count
               FROM factory_bales
@@ -3320,6 +3322,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
                 AND status = 'IN_STOCK'
                 AND deleted_at IS NULL
                 AND article_code IN (${codesList})
+                ${locationFilter}
               GROUP BY article_code`,
         );
         const inStockRows = (inStockRaw as any).rows ?? (inStockRaw as unknown as any[]);

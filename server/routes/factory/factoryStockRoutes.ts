@@ -1658,8 +1658,9 @@ export function registerFactoryStockRoutes(app: Express) {
     }
   });
 
-  // GET /api/factory/bale-stock-count?articleCodes=HMD123,HMD456
+  // GET /api/factory/bale-stock-count?articleCodes=HMD123,HMD456&locationId=3
   // Returns { HMD123: 4, HMD456: 0, ... } — IN_STOCK bale counts per article code
+  // Optional locationId filters to only bales at that ERP location (mirrors location-inventory page).
   app.get("/api/factory/bale-stock-count", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -1669,15 +1670,23 @@ export function registerFactoryStockRoutes(app: Express) {
       const articleCodes = rawCodes.split(",").map((s) => s.trim()).filter(Boolean);
       if (articleCodes.length === 0) return res.json({});
 
+      const rawLocationId = req.query.locationId;
+      const locationId = rawLocationId ? parseInt(rawLocationId as string) : null;
+
+      const conditions: any[] = [
+        eq(factoryBales.companyId, companyId),
+        eq(factoryBales.status, "IN_STOCK"),
+        isNull(factoryBales.deletedAt),
+        inArray(factoryBales.articleCode, articleCodes),
+      ];
+      if (locationId && !isNaN(locationId)) {
+        conditions.push(eq(factoryBales.erpLocationId, locationId));
+      }
+
       const rows = await db
         .select({ articleCode: factoryBales.articleCode, count: sql<number>`COUNT(*)::int` })
         .from(factoryBales)
-        .where(and(
-          eq(factoryBales.companyId, companyId),
-          eq(factoryBales.status, "IN_STOCK"),
-          isNull(factoryBales.deletedAt),
-          inArray(factoryBales.articleCode, articleCodes),
-        ))
+        .where(and(...conditions))
         .groupBy(factoryBales.articleCode);
 
       const result: Record<string, number> = {};

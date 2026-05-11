@@ -726,14 +726,14 @@ export default function FactoryContainerLoadingScan() {
     },
     [orderDetail?.proformaIdUsed, proformas],
   );
+  const stockLocationId = orderDetail?.locationId || (selectedLocationId ? parseInt(selectedLocationId) : null);
   const { data: stockCounts = {} } = useQuery<Record<string, number>>({
-    queryKey: ["/api/factory/bale-stock-count", proformaArticleCodesForStock.join(",")],
+    queryKey: ["/api/factory/bale-stock-count", proformaArticleCodesForStock.join(","), stockLocationId],
     queryFn: async () => {
       if (proformaArticleCodesForStock.length === 0) return {};
-      const res = await fetch(
-        `/api/factory/bale-stock-count?articleCodes=${proformaArticleCodesForStock.join(",")}`,
-        { credentials: "include" },
-      );
+      const params = new URLSearchParams({ articleCodes: proformaArticleCodesForStock.join(",") });
+      if (stockLocationId) params.set("locationId", String(stockLocationId));
+      const res = await fetch(`/api/factory/bale-stock-count?${params}`, { credentials: "include" });
       if (!res.ok) return {};
       return res.json();
     },
