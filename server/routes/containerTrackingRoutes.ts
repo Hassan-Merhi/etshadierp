@@ -262,8 +262,7 @@ export function registerContainerTrackingRoutes(app: Express) {
 
     if (!anyProviderAvailable()) {
       res.status(400).json({
-        message:
-          "No tracking provider configured. Add MAERSK credentials, enable public tracking, or add PARCELSAPP_API_KEY.",
+        message: "No tracking provider configured. Add PARCELSAPP_API_KEY or ensure Chrome is available for Maersk direct tracking.",
       });
       return;
     }

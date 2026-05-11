@@ -804,9 +804,9 @@ export function startScheduler() {
     timezone: "America/New_York",
   });
 
-  // Container auto-tracking — runs every Tuesday at 8:00 AM EST
-  cron.schedule("0 8 * * 2", async () => {
-    console.log("[ContainerTracking] Weekly Tuesday auto-tracking cron fired.");
+  // Container auto-tracking — runs every 6 hours (00:00, 06:00, 12:00, 18:00 EST)
+  cron.schedule("0 */6 * * *", async () => {
+    console.log("[ContainerTracking] 6-hour auto-tracking cron fired.");
     try {
       const { trackDueContainers } = await import("./containerTrackingService");
       await trackDueContainers();
@@ -817,7 +817,7 @@ export function startScheduler() {
     timezone: "America/New_York",
   });
 
-  console.log("[ContainerTracking] Auto-tracking scheduler started — runs every Tuesday at 8:00 AM EST.");
+  console.log("[ContainerTracking] Auto-tracking scheduler started — runs every 6 hours (00:00, 06:00, 12:00, 18:00 EST).");
   console.log("[DailyExport] Scheduler started — time-configurable via export settings (checked every hour).");
   console.log("[WhatsApp] Monthly net-position scheduler started — runs on the 1st of each month at 7:00 AM EST.");
   console.log("[StockReport] Independent scheduler started — checks every hour.");

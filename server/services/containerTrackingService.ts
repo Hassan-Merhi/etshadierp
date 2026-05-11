@@ -43,13 +43,9 @@ import {
 } from "../lib/parcelsAppClient";
 import { scrapeTracking, isScraperAvailable } from "../lib/parcelsAppScraper";
 import { httpScrapeTracking, isHttpScraperAvailable } from "../lib/httpTrackingScraper";
-import { scrapeTrackTrace, isTrackTraceScraper } from "../lib/trackTraceScraper";
 import { scrapeMaerskDirect, isMaerskDirectScraperAvailable } from "../lib/maerskDirectScraper";
 import * as seventeenTrack from "../lib/trackingProviders/seventeenTrackProvider";
 import { resolveProvider } from "../lib/trackingProviders/providerResolver";
-import { isConfigured as isMaerskConfigured } from "../lib/trackingProviders/maerskProvider";
-import { isEnabled as isMaerskPublicEnabled } from "../lib/trackingProviders/maerskPublicProvider";
-import { isEnabled as isCmaPublicEnabled } from "../lib/trackingProviders/cmaPublicProvider";
 import type { CarrierTrackResult } from "../lib/trackingProviders/types";
 import {
   getTrackingPriority,
@@ -122,12 +118,11 @@ async function checkParcelsAppQuota(): Promise<boolean> {
 
 function anyProviderConfigured(): boolean {
   return (
-    isMaerskConfigured() ||
-    isMaerskPublicEnabled() ||
-    isCmaPublicEnabled() ||
     !!process.env.PARCELSAPP_API_KEY ||
     seventeenTrack.isConfigured() ||
-    isScraperAvailable()
+    isScraperAvailable() ||
+    isHttpScraperAvailable() ||
+    isMaerskDirectScraperAvailable()
   );
 }
 
@@ -519,7 +514,7 @@ export async function trackOneContainerById(containerId: number): Promise<TrackN
   const remaining = Math.max(0, limit - used);
   let quotaWarning: string | undefined;
 
-  if (remaining === 0 && !isMaerskConfigured() && !isMaerskPublicEnabled() && !isCmaPublicEnabled()) {
+  if (remaining === 0 && !isMaerskDirectScraperAvailable()) {
     throw new Error(`ParcelsApp monthly quota exhausted (${used}/${limit}). Track Now is blocked until next month.`);
   }
 
@@ -1043,7 +1038,27 @@ async function trackViaParcelsApp(
     }
   }
 
-  // ── Attempt 3: ParcelsApp API (quota-limited) ─────────────────────────────────
+  // ── Final: ParcelsApp API ─────────────────────────────────────────────────────
+  return await trackViaParcelsAppApi(containerId, containerNumber, detectedCarrier, fallbackReason, now, currentEta);
+}
+
+// ─── ParcelsApp API — shared final step for all carriers ──────────────────────
+
+async function trackViaParcelsAppApi(
+  containerId: number,
+  containerNumber: string,
+  detectedCarrier: string | null,
+  fallbackReason: string | null,
+  now: Date,
+  currentEta: string | null,
+): Promise<{
+  success: boolean;
+  lastStatus: string | null;
+  lastLocation: string | null;
+  lastDescription: string | null;
+  lastCheckedAt: Date;
+  error: string | null;
+}> {
   if (!process.env.PARCELSAPP_API_KEY) {
     const noProviderError = "No tracking provider configured (scraper unavailable, 17track not set, ParcelsApp key missing)";
     await db
@@ -1062,7 +1077,7 @@ async function trackViaParcelsApp(
   const quotaOk = await checkParcelsAppQuota();
   if (!quotaOk) {
     const { used, limit } = await getParcelsAppUsageStats();
-    const quotaError = `All providers exhausted — ParcelsApp API quota used (${used}/${limit})`;
+    const quotaError = `ParcelsApp API quota used (${used}/${limit}) — all providers exhausted`;
     console.warn(`[ContainerTracking] ${containerNumber}: ${quotaError}`);
     await saveTrackingCheck(containerId, "skipped", "skipped_quota", quotaError, null);
     await db
@@ -1103,8 +1118,6 @@ async function trackViaParcelsApp(
         trackingFallbackReason: fallbackReason,
       } as any)
       .where(eq(containers.id, containerId));
-    // All providers failed — still try to backfill ETA from any previously
-    // stored events so the column is never permanently blank.
     await backfillEtaFromEvents(containerId);
     return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: result.error ?? "Tracking failed" };
   }
