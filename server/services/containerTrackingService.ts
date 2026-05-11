@@ -43,6 +43,7 @@ import {
 import { scrapeTracking, isScraperAvailable } from "../lib/parcelsAppScraper";
 import { httpScrapeTracking, isHttpScraperAvailable } from "../lib/httpTrackingScraper";
 import { scrapeTrackTrace, isTrackTraceScraper } from "../lib/trackTraceScraper";
+import { scrapeMaerskDirect, isMaerskDirectScraperAvailable } from "../lib/maerskDirectScraper";
 import * as seventeenTrack from "../lib/trackingProviders/seventeenTrackProvider";
 import { resolveProvider } from "../lib/trackingProviders/providerResolver";
 import { isConfigured as isMaerskConfigured } from "../lib/trackingProviders/maerskProvider";
@@ -836,10 +837,90 @@ async function trackViaParcelsApp(
       return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
     }
 
-    console.log(`[ContainerTracking] ${containerNumber}: HTTP scraper got no data (${httpResult.error}) — trying track-trace...`);
+    console.log(`[ContainerTracking] ${containerNumber}: HTTP scraper got no data (${httpResult.error}) — trying next provider...`);
   }
 
-  // ── Attempt 1: track-trace.com Puppeteer scraper (no quota, no bot blocks) ───
+  // ── Attempt 1: Maersk direct Puppeteer scraper (intercepts Maersk's own API) ──
+  // Only for Maersk-family containers (MAERSK, Hamburg Süd, etc.)
+  const MAERSK_PREFIXES = /^(MAEU|MSKU|MRKU|MRSU|HASU|HJSC|HJCU|SUDU|SAFM)/i;
+  if (isMaerskDirectScraperAvailable() && MAERSK_PREFIXES.test(containerNumber)) {
+    console.log(`[ContainerTracking] ${containerNumber}: trying Maersk direct scraper...`);
+    const mdResult = await scrapeMaerskDirect(containerNumber);
+
+    await saveTrackingCheck(
+      containerId,
+      "maersk_direct",
+      mdResult.success ? "success" : mdResult.blocked ? "blocked" : "error",
+      mdResult.error ?? null,
+      mdResult.raw ?? null,
+    );
+
+    if (mdResult.success && (mdResult.latestStatus || mdResult.eta)) {
+      const updateSet: Record<string, unknown> = {
+        trackingLastCheckedAt: now,
+        trackingLastStatus: mdResult.latestStatus,
+        trackingLastEventDate: mdResult.latestEventDate,
+        trackingLastDescription: mdResult.latestDescription,
+        trackingError: null,
+        trackingChangedAt: now,
+        trackingProvider: "maersk_direct",
+        trackingDetectedCarrier: detectedCarrier,
+        trackingFallbackUsed: !!fallbackReason,
+        trackingFallbackReason: fallbackReason,
+      };
+
+      // Save events
+      if (mdResult.events?.length) {
+        const { eta: finalEta, source: etaSrc } = resolveEtaFromProvider(
+          mdResult.eta ?? null,
+          mdResult.events,
+          currentEta,
+        );
+        if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
+
+        await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+        await logAndConfirmEta(
+          containerId, containerNumber, currentEta, finalEta ?? null, etaSrc ?? null, "maersk_direct",
+          !finalEta ? "no ETA from maersk_direct" : undefined,
+        );
+
+        // Persist tracking events
+        const fakeShipment: ParcelsAppShipment = {
+          trackingId: containerNumber,
+          done: true,
+          attributes: {
+            ...(mdResult.latestStatus ? { status: mdResult.latestStatus } : {}),
+            ...(mdResult.latestLocation ? { location: mdResult.latestLocation } : {}),
+            ...(finalEta ? { estimatedArrival: finalEta } : {}),
+          },
+          states: mdResult.events.map((e) => ({
+            date: e.date?.toISOString().slice(0, 10) ?? "",
+            status: e.status ?? "",
+            location: e.location ?? "",
+            description: e.description ?? "",
+          })),
+        };
+        await saveParcelsAppEvents(containerId, fakeShipment);
+      } else {
+        if (mdResult.eta && !currentEta) { updateSet.eta = mdResult.eta; updateSet.etaSource = "api"; }
+        await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+      }
+
+      console.log(`[ContainerTracking] ${containerNumber} → maersk_direct: status=${mdResult.latestStatus ?? "?"}`);
+      return {
+        success: true,
+        lastStatus: mdResult.latestStatus,
+        lastLocation: mdResult.latestLocation,
+        lastDescription: mdResult.latestDescription,
+        lastCheckedAt: now,
+        error: null,
+      };
+    }
+
+    console.log(`[ContainerTracking] ${containerNumber}: maersk_direct got no data (${mdResult.error}) — trying track-trace...`);
+  }
+
+  // ── Attempt 2: track-trace.com Puppeteer scraper (no quota, no bot blocks) ───
   if (isTrackTraceScraper()) {
     console.log(`[ContainerTracking] ${containerNumber}: trying track-trace.com scraper...`);
     const ttResult = await scrapeTrackTrace(containerNumber);
