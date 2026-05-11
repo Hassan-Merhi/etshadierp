@@ -128,7 +128,7 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
 
     const chromePath = getChromiumPath();
     browser = await puppeteerExtra.launch({
-      headless: "new" as any,
+      headless: true,
       ...(chromePath ? { executablePath: chromePath } : {}),
       args: [
         "--no-sandbox",
@@ -138,7 +138,6 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
         "--disable-accelerated-2d-canvas",
         "--no-first-run",
         "--no-zygote",
-        "--single-process",
         "--disable-blink-features=AutomationControlled",
         "--window-size=1280,800",
         "--disable-extensions",
@@ -415,8 +414,15 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
     };
 
   } catch (err: any) {
-    console.error(`[TrackTrace] ${containerNumber}: unexpected error —`, err?.message ?? err);
-    return { success: false, shipment: null, blocked: false, error: `track-trace: ${err?.message ?? "unknown error"}` };
+    const msg = err?.message ?? String(err) ?? "unknown error";
+    console.error(`[TrackTrace] ${containerNumber}: unexpected error —`, msg);
+    return {
+      success: false,
+      shipment: null,
+      blocked: false,
+      error: `track-trace: ${msg}`,
+      rawResponse: { crashError: msg, stage: "launch_or_early_navigation" },
+    };
   } finally {
     clearTimeout(hardStop);
     try { await browser?.close(); } catch { /* ignore */ }
