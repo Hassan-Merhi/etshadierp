@@ -2272,7 +2272,7 @@ export const ROUTE_TO_FEATURE: Record<string, FeatureKey> = Object.fromEntries(
 export const updateContainerTrackingSchema = z.object({
   shopName: z.string().nullable().optional(),
   eta: z.string().nullable().optional(),
-  etaSource: z.enum(["manual", "api"]).optional(),
+  etaSource: z.enum(["manual", "api", "event"]).optional(),
   transporter: z.string().nullable().optional(),
   transportFee: z.string().nullable().optional(),
   numberPlate: z.string().nullable().optional(),

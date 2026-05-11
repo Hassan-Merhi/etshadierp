@@ -138,6 +138,57 @@ interface AuthUser {
   companyId?: number;
 }
 
+// ─── Inline ETA cell ──────────────────────────────────────────────────────────
+
+function EtaCell({ container, fmtDate }: { container: Container; fmtDate: (d: string | null | undefined) => string }) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(container.eta ?? "");
+
+  const mutation = useMutation({
+    mutationFn: (eta: string | null) =>
+      apiRequest("PATCH", `/api/containers/${container.id}/tracking`, { eta, etaSource: eta ? "manual" : undefined }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/git/containers"] });
+      setEditing(false);
+    },
+  });
+
+  function save() {
+    mutation.mutate(value || null);
+  }
+
+  if (editing) {
+    return (
+      <input
+        type="date"
+        value={value}
+        autoFocus
+        data-testid={`input-eta-inline-${container.id}`}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") save();
+          if (e.key === "Escape") { setValue(container.eta ?? ""); setEditing(false); }
+        }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-[128px] h-8 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+      />
+    );
+  }
+
+  return (
+    <span
+      onClick={(e) => { e.stopPropagation(); setValue(container.eta ?? ""); setEditing(true); }}
+      title="Click to set or edit ETA"
+      data-testid={`text-eta-${container.id}`}
+      className="cursor-text underline decoration-dashed underline-offset-2 decoration-muted-foreground/40"
+    >
+      {container.eta ? fmtDate(container.eta) : <span className="text-muted-foreground/50 text-xs no-underline">set ETA</span>}
+    </span>
+  );
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ACTIVE_STATUSES = [
@@ -1873,7 +1924,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                       <TableCell>{c.supplierName ?? <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell>{c.companyName}</TableCell>
                       <TableCell>{c.shopName ?? <span className="text-muted-foreground">—</span>}</TableCell>
-                      <TableCell>{fmtDate(c.eta)}</TableCell>
+                      <TableCell><EtaCell container={c} fmtDate={fmtDate} /></TableCell>
                       <TableCell className="text-right font-medium">
                         {c.grandTotal ? `$${fmt(parseNum(c.grandTotal))}` : "—"}
                       </TableCell>

@@ -30,7 +30,7 @@ import {
   containerTrackingEvents,
   containerTrackingChecks,
 } from "../../shared/schema";
-import { and, eq, inArray, gte, sql } from "drizzle-orm";
+import { and, eq, inArray, gte, sql, desc, isNotNull, isNull } from "drizzle-orm";
 import {
   trackContainer,
   normaliseEvents,
@@ -864,6 +864,9 @@ async function trackViaParcelsApp(
         trackingFallbackReason: fallbackReason,
       } as any)
       .where(eq(containers.id, containerId));
+    // All providers failed — still try to backfill ETA from any previously
+    // stored events so the column is never permanently blank.
+    await backfillEtaFromEvents(containerId);
     return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: result.error ?? "Tracking failed" };
   }
 
@@ -894,6 +897,44 @@ async function trackViaParcelsApp(
 
   console.log(`[ContainerTracking] ${containerNumber} → parcelsapp: status=${lastStatus ?? "?"} eta=${estimatedDeliveryDate ?? "none"}`);
   return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
+}
+
+// ─── ETA backfill from stored events ──────────────────────────────────────────
+
+/**
+ * If the container's ETA column is still NULL after a tracking run (e.g. all
+ * providers failed or returned no explicit ETA), fill it in from the most
+ * recent event we have stored in containerTrackingEvents.  Never overwrites
+ * an ETA that already exists.
+ */
+async function backfillEtaFromEvents(containerId: number): Promise<void> {
+  const [row] = await db
+    .select({ eta: containers.eta })
+    .from(containers)
+    .where(and(eq(containers.id, containerId), isNull(containers.eta)));
+
+  if (!row) return; // eta is already set — don't touch it
+
+  const [latest] = await db
+    .select({ eventTime: containerTrackingEvents.eventTime })
+    .from(containerTrackingEvents)
+    .where(
+      and(
+        eq(containerTrackingEvents.containerId, containerId),
+        isNotNull(containerTrackingEvents.eventTime),
+      ),
+    )
+    .orderBy(desc(containerTrackingEvents.eventTime))
+    .limit(1);
+
+  if (latest?.eventTime) {
+    const eta = new Date(latest.eventTime).toISOString().slice(0, 10);
+    await db
+      .update(containers)
+      .set({ eta, etaSource: "event" } as any)
+      .where(eq(containers.id, containerId));
+    console.log(`[ContainerTracking] Backfilled ETA from stored events → ${eta} (container ${containerId})`);
+  }
 }
 
 // ─── Event persistence ─────────────────────────────────────────────────────────
