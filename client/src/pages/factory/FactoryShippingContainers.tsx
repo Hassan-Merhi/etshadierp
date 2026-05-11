@@ -490,23 +490,35 @@ function DocumentsModal({
         const err = await resp.json().catch(() => ({ message: "Upload failed" }));
         throw new Error(err.message || "Upload failed");
       }
-      return resp.json();
+      return resp.json() as Promise<ShippingDocument>;
     },
     onSuccess: (doc: ShippingDocument) => {
-      queryClient.invalidateQueries({ queryKey: docsKey });
+      queryClient.setQueryData<ShippingDocument[]>(docsKey, (old = []) => [...old, doc]);
       queryClient.invalidateQueries({ queryKey: [LIST_KEY] });
+      queryClient.refetchQueries({ queryKey: docsKey });
       setPendingFile(null);
       setNewDocName("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
       toast({ title: "Document uploaded", description: doc.displayName });
     },
     onError: (e: any) => toast({ title: "Upload failed", description: e.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (docId: number) => apiRequest("DELETE", `${LIST_KEY}/${rowId}/documents/${docId}`, undefined),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: docsKey });
+    mutationFn: async (docId: number) => {
+      const resp = await apiRequest("DELETE", `${LIST_KEY}/${rowId}/documents/${docId}`, undefined);
+      if (!resp.ok && resp.status !== 404) {
+        const err = await resp.json().catch(() => ({ message: "Delete failed" }));
+        throw new Error(err.message || "Delete failed");
+      }
+      return { deletedId: docId };
+    },
+    onSuccess: ({ deletedId }) => {
+      queryClient.setQueryData<ShippingDocument[]>(docsKey, (old = []) =>
+        old.filter((d) => d.id !== deletedId),
+      );
       queryClient.invalidateQueries({ queryKey: [LIST_KEY] });
+      queryClient.refetchQueries({ queryKey: docsKey });
       toast({ title: "Document removed" });
     },
     onError: (e: any) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
@@ -592,41 +604,54 @@ function DocumentsModal({
                 </TableHeader>
                 <TableBody>
                   {docs.map((doc) => (
-                    <TableRow key={doc.id} data-testid={`row-doc-${doc.id}`} className={doc.isGhost ? "opacity-60" : ""}>
-                      <TableCell className="text-sm font-medium max-w-[130px] truncate" title={doc.displayName || doc.originalName}>
-                        {doc.isGhost
-                          ? <span className="text-muted-foreground italic text-xs">Broken record</span>
-                          : (doc.displayName || doc.originalName || "—")}
-                      </TableCell>
-                      <TableCell>
-                        {doc.isGhost
-                          ? <span className="text-xs text-muted-foreground">—</span>
-                          : (
-                            <Badge variant="outline" className="text-xs">
-                              {(doc.fileType || "FILE").split("/").pop()?.toUpperCase() || "FILE"}
-                            </Badge>
-                          )}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{fmtSize(doc.fileSize)}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{doc.uploadedBy || "—"}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          {!doc.isGhost && (
-                            <Button size="icon" variant="ghost" onClick={() => handleViewDoc(doc)} data-testid={`button-view-doc-${doc.id}`}>
-                              <Eye className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
+                    doc.isGhost ? (
+                      <TableRow key={doc.id} data-testid={`row-doc-${doc.id}`} className="bg-destructive/5">
+                        <TableCell colSpan={4} className="py-2">
+                          <p className="text-xs font-medium text-destructive">Broken record</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            No file is attached to this record. Delete it and re-upload.
+                          </p>
+                        </TableCell>
+                        <TableCell className="py-2">
                           <Button
                             size="icon" variant="ghost"
                             disabled={deleteMutation.isPending}
                             onClick={() => deleteMutation.mutate(doc.id)}
                             data-testid={`button-remove-doc-${doc.id}`}
                           >
-                            <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
                           </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      <TableRow key={doc.id} data-testid={`row-doc-${doc.id}`}>
+                        <TableCell className="text-sm font-medium max-w-[130px] truncate" title={doc.displayName || doc.originalName}>
+                          {doc.displayName || doc.originalName || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">
+                            {(doc.fileType || "FILE").split("/").pop()?.toUpperCase() || "FILE"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{fmtSize(doc.fileSize)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{doc.uploadedBy || "—"}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button size="icon" variant="ghost" onClick={() => handleViewDoc(doc)} data-testid={`button-view-doc-${doc.id}`}>
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              size="icon" variant="ghost"
+                              disabled={deleteMutation.isPending}
+                              onClick={() => deleteMutation.mutate(doc.id)}
+                              data-testid={`button-remove-doc-${doc.id}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
                   ))}
                 </TableBody>
               </Table>

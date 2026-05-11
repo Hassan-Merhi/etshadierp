@@ -126,6 +126,11 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
           documentCount: sql<number>`(
             SELECT COUNT(*)::int FROM factory_shipping_container_documents fscd
             WHERE fscd.scr_id = ${factoryShippingContainerRows.id}
+              AND fscd.file_name IS NOT NULL
+              AND fscd.file_name <> ''
+              AND fscd.file_name <> '-'
+              AND (fscd.original_name IS NOT NULL AND fscd.original_name <> '')
+              AND (fscd.file_data IS NOT NULL OR (fscd.file_url IS NOT NULL AND fscd.file_url <> '' AND fscd.file_url <> '-'))
           )`,
           shippingInvoiceFileName: factoryShippingContainerRows.shippingInvoiceFileName,
           shippingInvoiceOriginalName: factoryShippingContainerRows.shippingInvoiceOriginalName,
@@ -419,12 +424,33 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         ))
         .orderBy(factoryShippingContainerDocuments.uploadedAt);
 
-      // Mark each doc as a ghost (no retrievable file) so the client can
-      // show a safe "delete only" state instead of a broken view button.
-      const docs = allDocs.map(({ hasFileData, ...doc }) => ({
-        ...doc,
-        isGhost: !doc.fileName && !hasFileData,
-      }));
+      // Stronger ghost detection: missing/blank/dash fileName, missing both
+      // fileData and fileUrl, or missing both originalName and displayName.
+      function detectGhost(doc: typeof allDocs[0], hasFileData: string | null): boolean {
+        const fn = doc.fileName ?? "";
+        const badFileName = !fn || fn.trim() === "" || fn.trim() === "-";
+        const noData = !hasFileData;
+        const noUrl = !doc.fileUrl || doc.fileUrl.trim() === "" || doc.fileUrl.trim() === "-";
+        const noName =
+          (!doc.originalName || doc.originalName.trim() === "") &&
+          (!doc.displayName || doc.displayName.trim() === "");
+        return badFileName || (noData && noUrl) || noName;
+      }
+
+      const docs = allDocs.map(({ hasFileData, ...doc }) => {
+        const ghost = detectGhost({ ...doc, hasFileData } as typeof allDocs[0], hasFileData);
+        if (ghost) {
+          return {
+            ...doc,
+            isGhost: true,
+            displayName: "Broken record",
+            fileType: null,
+            fileSize: null,
+            uploadedBy: null,
+          };
+        }
+        return { ...doc, isGhost: false };
+      });
 
       res.json(docs);
     } catch (error: any) {
@@ -446,6 +472,12 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
         if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+        if (!req.file.buffer || req.file.buffer.length === 0) {
+          return res.status(400).json({ message: "Uploaded file is empty" });
+        }
+        if (!req.file.originalname || req.file.originalname.trim() === "") {
+          return res.status(400).json({ message: "File name is required" });
+        }
 
         const [row] = await db
           .select({ id: factoryShippingContainerRows.id })
@@ -460,8 +492,14 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
           req.file.originalname.replace(/\.[^.]+$/, "");
         const ext = path.extname(req.file.originalname);
         const generatedFilename = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+        if (!generatedFilename || generatedFilename.trim() === "") {
+          return res.status(400).json({ message: "Failed to generate file name" });
+        }
         const fileUrl = `/api/factory/shipping-container-docs/${generatedFilename}`;
         const fileData = req.file.buffer.toString("base64");
+        if (!fileData || fileData.trim() === "") {
+          return res.status(400).json({ message: "Failed to encode file data" });
+        }
 
         // Disk cache (non-fatal — DB is source of truth)
         try {
@@ -505,7 +543,11 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
             uploadedAt: factoryShippingContainerDocuments.uploadedAt,
           });
 
-        res.json(doc);
+        if (!doc || !doc.id || !doc.fileName || !doc.fileUrl) {
+          return res.status(500).json({ message: "Upload failed: database did not return a valid document record" });
+        }
+
+        res.json({ ...doc, isGhost: false });
       } catch (error: any) {
         console.error("Error uploading document:", error);
         res.status(400).json({ message: error.message });
@@ -548,13 +590,15 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
           .delete(factoryShippingContainerDocuments)
           .where(eq(factoryShippingContainerDocuments.id, docId));
 
-        // Remove disk cache (non-fatal)
-        try {
-          const diskPath = path.join(process.cwd(), "uploads", "shipping-container-docs", doc.fileName);
-          if (fs.existsSync(diskPath)) fs.unlinkSync(diskPath);
-        } catch {}
+        // Remove disk cache (non-fatal) — skip if fileName is blank/ghost
+        if (doc.fileName && doc.fileName.trim() !== "" && doc.fileName.trim() !== "-") {
+          try {
+            const diskPath = path.join(process.cwd(), "uploads", "shipping-container-docs", doc.fileName);
+            if (fs.existsSync(diskPath)) fs.unlinkSync(diskPath);
+          } catch {}
+        }
 
-        res.json({ success: true });
+        res.json({ success: true, deletedId: docId });
       } catch (error: any) {
         console.error("Error deleting document:", error);
         res.status(400).json({ message: error.message });
@@ -732,6 +776,29 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       res.send(buffer);
     } catch (error: any) {
       console.error("Error serving shipping invoice:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── POST cleanup ghost document records ──────────────────────────────────────
+  // Admin/dev utility: removes rows with no real file content.
+  app.post("/api/factory/shipping-container-docs/cleanup-ghosts", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const result = await db.execute(sql`
+        DELETE FROM factory_shipping_container_documents
+        WHERE company_id = ${companyId}
+          AND (file_name IS NULL OR file_name = '' OR file_name = '-')
+          AND file_data IS NULL
+          AND (file_url IS NULL OR file_url = '' OR file_url = '-')
+      `);
+
+      const removed = (result as any).rowCount ?? 0;
+      res.json({ success: true, removed });
+    } catch (error: any) {
+      console.error("Error cleaning up ghost documents:", error);
       res.status(500).json({ message: error.message });
     }
   });
