@@ -374,7 +374,7 @@ function AddRecordDialog({
                 {invoices.map((inv) => (
                   <SelectItem key={inv.id} value={String(inv.id)} disabled={inv.alreadyHasRow}>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs">{inv.invoiceNumber}</span>
+                      <span className="font-mono text-xs">{inv.invoiceNumber || `#${inv.id}`}</span>
                       <span className="text-muted-foreground text-xs">— {inv.customerName || "—"}</span>
                       <span className={cn("text-xs px-1 rounded", statusColor(inv.status))}>{statusLabel(inv.status)}</span>
                       {inv.alreadyHasRow && <span className="text-xs text-red-500">(already used)</span>}
