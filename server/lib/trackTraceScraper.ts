@@ -158,10 +158,56 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
       console.log(`[TrackTrace] networkidle2 timed out — continuing with what loaded`);
     }
 
-    // ── Step 2: passive wait for deferred JS / iframe rendering ───────────────
-    // No DOM interaction here — just let the page finish rendering.
-    // This is the key change: zero ElementHandles = zero "detached frame" risk.
-    console.log(`[TrackTrace] Waiting 10 s for page to fully render…`);
+    // ── Step 2: wait for hash-based pre-fill, then submit via evaluate() ────────
+    // track-trace.com reads the hash and pre-fills the input but does NOT
+    // auto-submit. We wait 4 s for the JS to settle, then click submit entirely
+    // inside page.evaluate() — returns a plain boolean, holds zero frame refs.
+    console.log(`[TrackTrace] Waiting 4 s for hash pre-fill…`);
+    await new Promise((r) => setTimeout(r, 4_000));
+
+    const submitResult: string = await page.evaluate((cn: string): string => {
+      // Find the text input (track-trace uses a plain <input type=text>)
+      const inputSels = [
+        'input[name="query"]', 'input[name="number"]', 'input[name="container"]',
+        'input[name="q"]', 'input[name="trackingNumber"]',
+        '#number', '#query', '#container',
+        'input[type="text"]',
+      ];
+      let input: HTMLInputElement | null = null;
+      for (const sel of inputSels) {
+        const el = document.querySelector(sel) as HTMLInputElement | null;
+        if (el) { input = el; break; }
+      }
+      if (!input) return "no_input_found";
+
+      // Ensure the number is in the field
+      if (!input.value) {
+        input.value = cn;
+        input.dispatchEvent(new Event("input",  { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+
+      // Click submit / Track button
+      const submitSels = [
+        'input[type="submit"]', 'button[type="submit"]',
+        'button.btn', 'a.btn', 'button', 'input[type="button"]',
+      ];
+      for (const sel of submitSels) {
+        const btn = document.querySelector(sel) as HTMLElement | null;
+        if (btn) { btn.click(); return `clicked:${sel}`; }
+      }
+
+      // Last resort: submit the form directly
+      const form = input.closest("form");
+      if (form) { form.submit(); return "form_submitted"; }
+
+      return "no_submit_found";
+    }, containerNumber).catch(() => "evaluate_error");
+
+    console.log(`[TrackTrace] Submit result: ${submitResult}`);
+
+    // Wait for the tracking results to load after submission
+    console.log(`[TrackTrace] Waiting 10 s for results to load…`);
     await new Promise((r) => setTimeout(r, 10_000));
 
     // ── Step 3: read everything via page.evaluate() ────────────────────────────
