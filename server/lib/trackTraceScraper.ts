@@ -238,9 +238,39 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
       console.log(`[TrackTrace] Submit fallback: ${submitResult}`);
     }
 
-    // Wait for AJAX / page rendering after submit/navigate
-    console.log(`[TrackTrace] Waiting 12 s for results to render…`);
-    await new Promise((r) => setTimeout(r, 12_000));
+    // Wait for AJAX / iframe injection after the click
+    console.log(`[TrackTrace] Waiting 8 s for iframes to inject…`);
+    await new Promise((r) => setTimeout(r, 8_000));
+
+    // Read iframe URLs — track-trace loads carrier tracking in cross-origin iframes.
+    // We can't read iframe content, but we CAN navigate Puppeteer to the iframe URL.
+    const iframeSrcs: string[] = await page.evaluate(() =>
+      Array.from(document.querySelectorAll("iframe"))
+        .map((f) => (f as HTMLIFrameElement).src ?? "")
+        .filter((s) => {
+          if (!s || s.length < 10) return false;
+          // Skip ads / analytics iframes
+          if (/google|doubleclick|facebook|analytics|adnxs|adsystem|youtube|twitter/i.test(s)) return false;
+          return true;
+        }),
+    ).catch(() => [] as string[]);
+
+    console.log(`[TrackTrace] Iframes found: ${JSON.stringify(iframeSrcs)}`);
+
+    // If we got a meaningful carrier iframe URL, navigate to it and read that page
+    if (iframeSrcs.length > 0) {
+      const carrierUrl = iframeSrcs[0];
+      console.log(`[TrackTrace] Navigating to carrier iframe: ${carrierUrl}`);
+      try {
+        await page.goto(carrierUrl, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT_MS });
+      } catch {
+        console.log(`[TrackTrace] Carrier iframe nav timed out — continuing`);
+      }
+      await new Promise((r) => setTimeout(r, 6_000));
+    } else {
+      // No iframe found — wait a bit more for possible same-page AJAX render
+      await new Promise((r) => setTimeout(r, 4_000));
+    }
 
     // ── Step 3: read everything via page.evaluate() ────────────────────────────
     // evaluate() runs JS inside the page context and returns plain JS values.

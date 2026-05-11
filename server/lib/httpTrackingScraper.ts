@@ -46,7 +46,8 @@ export function isHttpScraperAvailable(): boolean {
 
 function detectCarrier(containerNumber: string): string | null {
   const prefix = containerNumber.slice(0, 4).toUpperCase();
-  if (/^(MAEU|MSKU|MRKU|MRSU)/.test(prefix)) return "MAERSK";
+  // HASU = Hamburg Süd (Maersk-owned since 2017, tracked via Maersk)
+  if (/^(MAEU|MSKU|MRKU|MRSU|HASU|HJSC|HJCU|SUDU|SAFM)/.test(prefix)) return "MAERSK";
   if (/^(MSCU|MSDU|MEDU|MSMU|MSWU)/.test(prefix)) return "MSC";
   if (/^(HLCU|HLXU)/.test(prefix)) return "HAPAG";
   if (/^(COSU|CBHU|CCLU|COSJ)/.test(prefix)) return "COSCO";
