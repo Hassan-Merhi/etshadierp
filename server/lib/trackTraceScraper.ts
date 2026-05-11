@@ -187,10 +187,21 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
         input.dispatchEvent(new Event("change", { bubbles: true }));
       }
 
-      // Click submit / Track button
+      // track-trace.com shows "Track direct" link after hash pre-fill.
+      // Find it by text content first, then fall back to generic selectors.
+      const allLinks = Array.from(document.querySelectorAll("a, button, input[type=submit], input[type=button]")) as HTMLElement[];
+
+      // Priority 1: any element whose visible text matches "Track direct" or "Track"
+      const directBtn = allLinks.find((el) => {
+        const t = (el.textContent ?? "").trim().toLowerCase();
+        return t === "track direct" || t === "track" || t === "go" || t === "search";
+      });
+      if (directBtn) { directBtn.click(); return `clicked_text:${directBtn.textContent?.trim()}`; }
+
+      // Priority 2: submit inputs and buttons
       const submitSels = [
         'input[type="submit"]', 'button[type="submit"]',
-        'button.btn', 'a.btn', 'button', 'input[type="button"]',
+        'button.btn', 'a.btn',
       ];
       for (const sel of submitSels) {
         const btn = document.querySelector(sel) as HTMLElement | null;
