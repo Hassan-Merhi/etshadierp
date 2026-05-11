@@ -115,6 +115,8 @@ export default function StockItems() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [assignCategoryDialogOpen, setAssignCategoryDialogOpen] = useState(false);
+  const [pendingCategoryId, setPendingCategoryId] = useState<string>("");
 
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [adjustStockItemId, setAdjustStockItemId] = useState<string>("");
@@ -262,6 +264,28 @@ export default function StockItems() {
     }
   };
 
+  const assignCategoryMutation = useMutation({
+    mutationFn: async ({ ids, categoryId }: { ids: number[]; categoryId: number | null }) => {
+      return await apiRequest("POST", "/api/stock-items/bulk-assign-category", { ids, categoryId });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      setSelectedIds([]);
+      setAssignCategoryDialogOpen(false);
+      setPendingCategoryId("");
+      toast({ title: "Success", description: data.message || "Category assigned successfully" });
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error", description: error.message || "Failed to assign category", variant: "destructive" });
+    },
+  });
+
+  const handleConfirmAssignCategory = () => {
+    const categoryId = pendingCategoryId === "" ? null : parseInt(pendingCategoryId);
+    assignCategoryMutation.mutate({ ids: selectedIds, categoryId });
+  };
+
   const handleDeleteClick = () => { setDeleteDialogOpen(true); };
   const handleConfirmDelete = () => { deleteMutation.mutate(selectedIds); setDeleteDialogOpen(false); };
 
@@ -384,15 +408,28 @@ export default function StockItems() {
       >
         <div className="flex flex-wrap gap-2">
           {selectedIds.length > 0 && (
-            <Button
-              variant="destructive"
-              className="gap-2"
-              onClick={handleDeleteClick}
-              data-testid="button-delete-selected"
-            >
-              <Trash2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Delete</span> {selectedIds.length} {selectedIds.length === 1 ? 'Item' : 'Items'}
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => { setPendingCategoryId(""); setAssignCategoryDialogOpen(true); }}
+                data-testid="button-assign-category"
+              >
+                <Package className="h-4 w-4" />
+                <span className="hidden sm:inline">Assign Category</span>
+                <span className="sm:hidden">Category</span>
+                <span className="ml-1 text-muted-foreground">({selectedIds.length})</span>
+              </Button>
+              <Button
+                variant="destructive"
+                className="gap-2"
+                onClick={handleDeleteClick}
+                data-testid="button-delete-selected"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Delete</span> {selectedIds.length} {selectedIds.length === 1 ? 'Item' : 'Items'}
+              </Button>
+            </>
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -718,6 +755,44 @@ export default function StockItems() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={assignCategoryDialogOpen} onOpenChange={setAssignCategoryDialogOpen}>
+        <DialogContent data-testid="dialog-assign-category">
+          <DialogHeader>
+            <DialogTitle>Assign Category</DialogTitle>
+            <DialogDescription>
+              Choose a category to assign to the {selectedIds.length} selected {selectedIds.length === 1 ? 'item' : 'items'}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label className="mb-2 block">Category</Label>
+            <Select value={pendingCategoryId} onValueChange={setPendingCategoryId}>
+              <SelectTrigger data-testid="select-assign-category">
+                <SelectValue placeholder="Select a category..." />
+              </SelectTrigger>
+              <SelectContent>
+                {stockCategories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id.toString()}>
+                    {cat.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignCategoryDialogOpen(false)} data-testid="button-cancel-assign-category">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmAssignCategory}
+              disabled={pendingCategoryId === "" || assignCategoryMutation.isPending}
+              data-testid="button-confirm-assign-category"
+            >
+              {assignCategoryMutation.isPending ? "Saving..." : "Assign"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={adjustDialogOpen} onOpenChange={setAdjustDialogOpen}>
         <DialogContent data-testid="dialog-adjust-stock">

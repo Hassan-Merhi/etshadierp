@@ -421,6 +421,45 @@ export function registerStockRoutes(app: Express) {
     }
   });
 
+  // Bulk assign category to stock items
+  app.post("/api/stock-items/bulk-assign-category", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const companyId = req.session.currentCompanyId;
+      const { ids: rawIds, categoryId: rawCategoryId } = req.body;
+      if (!Array.isArray(rawIds) || rawIds.length === 0) {
+        return res.status(400).json({ message: "Invalid or empty ids array" });
+      }
+      const ids = rawIds.map((id: any) => parseInt(id, 10)).filter((n: number) => !isNaN(n) && n > 0);
+      if (ids.length === 0) {
+        return res.status(400).json({ message: "No valid numeric IDs provided" });
+      }
+      // categoryId null means remove category
+      const categoryId = rawCategoryId === null || rawCategoryId === undefined ? null : parseInt(rawCategoryId, 10);
+
+      // Verify items belong to this company
+      const validItems = await storage.bulkGetStockItemsByIds(ids, companyId);
+      const validIds = validItems.map(item => item.id);
+      if (validIds.length === 0) {
+        return res.status(404).json({ message: "No valid stock items found" });
+      }
+
+      await db
+        .update(stockItems)
+        .set({ categoryId: isNaN(categoryId as number) ? null : categoryId })
+        .where(and(
+          inArray(stockItems.id, validIds),
+          eq(stockItems.companyId, companyId)
+        ));
+
+      res.json({ message: `Category updated for ${validIds.length} item(s)`, updated: validIds.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Bulk update selling prices by barcode (global or location-specific)
   app.post("/api/stock-items/bulk-update-prices", requireAuth, requireNonPOS, async (req, res) => {
     try {
