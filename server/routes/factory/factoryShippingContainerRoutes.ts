@@ -575,9 +575,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         .from(factoryShippingContainerDocuments)
         .where(eq(factoryShippingContainerDocuments.fileName, filename));
 
-      if (!docRow) return res.status(404).json({ message: "File not found" });
+      if (!docRow) return res.status(404).json({ message: "File not found. This file may have been uploaded on a different server instance and is no longer available. Please delete and re-upload the document." });
       if (docRow.companyId !== companyId) return res.status(403).json({ message: "Forbidden" });
-      if (!docRow.fileData) return res.status(404).json({ message: "File data unavailable" });
+      if (!docRow.fileData) return res.status(404).json({ message: "File content is not stored in the database. This document was uploaded before cloud storage was enabled. Please delete and re-upload the file." });
 
       const buffer = Buffer.from(docRow.fileData, "base64");
       const ct = docRow.fileType || "application/octet-stream";

@@ -260,6 +260,30 @@ export default function ContainerDetail() {
     onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Delete failed", description: e.message, variant: "destructive" }); },
   });
 
+  async function handleViewDoc(storageKey: string) {
+    try {
+      const resp = await fetch(`/api/factory/uploads/${storageKey}`, { credentials: "include" });
+      if (!resp.ok) {
+        const isJson = resp.headers.get("content-type")?.includes("application/json");
+        const msg = isJson ? (await resp.json()).message : await resp.text();
+        toast({
+          title: resp.status === 404 ? "File no longer available" : "File unavailable",
+          description: resp.status === 404
+            ? "This file was uploaded before database storage was enabled and cannot be retrieved. Please delete it and re-upload."
+            : (msg || `Server returned ${resp.status}`),
+          variant: "destructive",
+        });
+        return;
+      }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      toast({ title: "Could not open file", description: "Network error", variant: "destructive" });
+    }
+  }
+
   const freightForm = useForm({
     defaultValues: { vendorName: "", freightAmount: "", currency: "USD", dueDate: "", notes: "" },
   });
@@ -965,7 +989,7 @@ export default function ContainerDetail() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => window.open(`/api/factory/uploads/${uploaded.storageKey}`, "_blank")}
+                            onClick={() => handleViewDoc(uploaded.storageKey)}
                             data-testid={`button-view-doc-${dt.code}`}
                           >
                             <Download className="h-4 w-4" />
@@ -999,7 +1023,7 @@ export default function ContainerDetail() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <Button size="icon" variant="ghost" onClick={() => window.open(`/api/factory/uploads/${d.storageKey}`, "_blank")} data-testid={`button-view-doc-opt-${d.id}`}>
+                      <Button size="icon" variant="ghost" onClick={() => handleViewDoc(d.storageKey)} data-testid={`button-view-doc-opt-${d.id}`}>
                         <Download className="h-4 w-4" />
                       </Button>
                       <Button size="icon" variant="ghost" onClick={() => { setPendingDelete(() => () => deleteDocMutation.mutate(d.id)); }} data-testid={`button-delete-doc-opt-${d.id}`}>

@@ -199,18 +199,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
   app.post("/api/factory/containers/:containerId/documents", requireAuth, async (req: any, res: any) => {
     try {
       const multer = (await import("multer")).default;
-      const path = await import("path");
-      const fs = await import("fs");
-      const uploadDir = path.default.join(process.cwd(), "uploads", "container-docs");
-      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-      const storage = multer.diskStorage({
-        destination: (_req: any, _file: any, cb: any) => cb(null, uploadDir),
-        filename: (_req: any, file: any, cb: any) => {
-          const ext = path.default.extname(file.originalname);
-          cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
-        },
-      });
-      const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } });
+      const pathLib = await import("path");
+      const fsLib = await import("fs");
+      // Use memory storage so file bytes are available for DB storage (avoids ephemeral-disk loss in production)
+      const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
       upload.single("file")(req, res, async (err: any) => {
         try {
@@ -223,12 +215,23 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
           if (!companyId || !docTypeId) return res.status(400).json({ message: "Missing companyId or docTypeId" });
 
           if (!(await verifyContainerOwnership(containerId, companyId))) {
-            // Remove the uploaded temp file before rejecting
-            if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
             return res.status(403).json({ message: "Access denied" });
           }
 
-          const storageKey = `container-docs/${req.file.filename}`;
+          const ext = pathLib.default.extname(req.file.originalname);
+          const generatedFilename = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+          const storageKey = `container-docs/${generatedFilename}`;
+          const fileData = req.file.buffer.toString("base64");
+
+          // Also write to disk cache (non-fatal — DB is source of truth)
+          try {
+            const uploadDir = pathLib.default.join(process.cwd(), "uploads", "container-docs");
+            if (!fsLib.existsSync(uploadDir)) fsLib.mkdirSync(uploadDir, { recursive: true });
+            fsLib.writeFileSync(pathLib.default.join(uploadDir, generatedFilename), req.file.buffer);
+          } catch (diskErr) {
+            console.warn("Container doc disk cache write failed (non-fatal):", diskErr);
+          }
+
           const [doc] = await db.insert(containerDocuments).values({
             companyId,
             containerId,
@@ -237,6 +240,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             storageKey,
             mimeType: req.file.mimetype,
             uploadedBy: (req.session as any).userId || null,
+            fileData,
           }).returning();
 
           const docType = await db.select().from(containerDocumentTypes).where(eq(containerDocumentTypes.id, docTypeId));
@@ -337,12 +341,27 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const storageKey = `${folder}/${filename}`;
       if (folder === "container-docs") {
         const [doc] = await db
-          .select({ companyId: containerDocuments.companyId })
+          .select({ companyId: containerDocuments.companyId, fileData: containerDocuments.fileData, mimeType: containerDocuments.mimeType, fileName: containerDocuments.fileName })
           .from(containerDocuments)
           .where(eq(containerDocuments.storageKey, storageKey));
         if (!doc || doc.companyId !== companyId) {
           return res.status(403).json({ message: "Access denied" });
         }
+
+        // Try disk cache first
+        const diskPath = path.join(process.cwd(), "uploads", folder, filename);
+        if (fs.existsSync(diskPath)) return res.sendFile(diskPath);
+
+        // Fall back to DB-stored file data
+        if (!doc.fileData) {
+          return res.status(404).json({ message: "File content is not stored in the database. This document was uploaded before cloud storage was enabled. Please delete and re-upload the file." });
+        }
+        const buffer = Buffer.from(doc.fileData, "base64");
+        const ct = doc.mimeType || "application/octet-stream";
+        res.setHeader("Content-Type", ct);
+        const isInline = ct.startsWith("image/") || ct === "application/pdf";
+        res.setHeader("Content-Disposition", `${isInline ? "inline" : "attachment"}; filename="${doc.fileName}"`);
+        return res.send(buffer);
       }
 
       safeSendFile(res, folder, filename);

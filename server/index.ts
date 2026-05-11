@@ -2941,6 +2941,13 @@ let migrationsDone = false;
     `ALTER TABLE factory_shipping_container_rows ADD COLUMN IF NOT EXISTS shipping_invoice_file_url text`,
     `ALTER TABLE factory_shipping_container_rows ADD COLUMN IF NOT EXISTS shipping_invoice_file_data text`,
     `ALTER TABLE factory_shipping_container_rows ADD COLUMN IF NOT EXISTS shipping_invoice_file_type text`,
+    // Ensure file_data column exists on shipping container documents (if table was created before this column was added)
+    `ALTER TABLE factory_shipping_container_documents ADD COLUMN IF NOT EXISTS file_data text`,
+    `ALTER TABLE factory_shipping_container_documents ADD COLUMN IF NOT EXISTS file_type text`,
+    `ALTER TABLE factory_shipping_container_documents ADD COLUMN IF NOT EXISTS file_size integer`,
+    `ALTER TABLE factory_shipping_container_documents ADD COLUMN IF NOT EXISTS uploaded_by text`,
+    // Add file_data to container_documents for DB-backed file serving (no more ephemeral disk dependency)
+    `ALTER TABLE container_documents ADD COLUMN IF NOT EXISTS file_data text`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

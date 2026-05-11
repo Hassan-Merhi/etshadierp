@@ -3480,6 +3480,7 @@ export const containerDocuments = pgTable("container_documents", {
   mimeType: varchar("mime_type", { length: 100 }),
   uploadedBy: varchar("uploaded_by"),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  fileData: text("file_data"),
 }, (t) => ({
   companyIdx: index("container_documents_company_idx").on(t.companyId),
   containerIdx: index("container_docs_container_idx").on(t.containerId),
@@ -3496,6 +3497,7 @@ export const insertContainerDocumentSchema = createInsertSchema(containerDocumen
   storageKey: z.string().min(1),
   mimeType: z.string().optional().nullable(),
   uploadedBy: z.string().optional().nullable(),
+  fileData: z.string().optional().nullable(),
 });
 
 export type InsertContainerDocument = z.infer<typeof insertContainerDocumentSchema>;

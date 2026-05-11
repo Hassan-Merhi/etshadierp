@@ -529,9 +529,12 @@ function DocumentsModal({
       if (!resp.ok) {
         const isJson = resp.headers.get("content-type")?.includes("application/json");
         const msg = isJson ? (await resp.json()).message : await resp.text();
+        const isLegacyFile = resp.status === 404;
         toast({
-          title: "File unavailable",
-          description: msg || `Server returned ${resp.status}`,
+          title: isLegacyFile ? "File no longer available" : "File unavailable",
+          description: isLegacyFile
+            ? "This file was uploaded before database storage was enabled and cannot be retrieved. Please delete it and re-upload."
+            : (msg || `Server returned ${resp.status}`),
           variant: "destructive",
         });
         return;
