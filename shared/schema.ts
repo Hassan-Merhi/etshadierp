@@ -5217,6 +5217,7 @@ export const factoryShippingContainerRows = pgTable("factory_shipping_container_
   companyId: integer("company_id").notNull(),
   customerOrderId: integer("customer_order_id").notNull().references(() => customerOrders.id, { onDelete: "restrict" }),
   orderDate: date("order_date").notNull(),
+  eta: date("eta"),
   containerArrivedDate: date("container_arrived_date"),
   note: text("note"),
   isDone: boolean("is_done").notNull().default(false),

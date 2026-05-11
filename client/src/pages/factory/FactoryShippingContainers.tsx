@@ -38,6 +38,7 @@ interface ShippingRow {
   companyId: number;
   customerOrderId: number;
   orderDate: string;
+  eta: string | null;
   containerArrivedDate: string | null;
   note: string | null;
   isDone: boolean;
@@ -1087,7 +1088,7 @@ export default function FactoryShippingContainers() {
         <div className="flex items-center gap-4 flex-wrap text-xs text-muted-foreground">
           <span className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> Has documents</span>
           <span className="flex items-center gap-1"><XCircle className="h-3.5 w-3.5 text-red-500" /> No documents</span>
-          <span>Click editable cells (Container #, Destination, Shipping Co., Note, Arrived) to edit inline.</span>
+          <span>Click editable cells (Container #, Destination, ETA, Shipping Co., Note, Arrived) to edit inline.</span>
         </div>
 
         {/* ── Main Table ── */}
@@ -1101,6 +1102,7 @@ export default function FactoryShippingContainers() {
                 <TableHead className="text-xs w-24 min-w-[96px]">Status</TableHead>
                 <TableHead className={stickyHeadBase} style={{ left: CTR_LEFT, minWidth: "120px", width: "120px" }}>Container #</TableHead>
                 <TableHead className="text-xs min-w-[120px]">Destination</TableHead>
+                <TableHead className="text-xs min-w-[100px]">ETA</TableHead>
                 <TableHead className="text-xs min-w-[90px]">Arrived</TableHead>
                 <TableHead className="text-xs min-w-[90px]">Loading</TableHead>
                 <TableHead className="text-xs min-w-[90px]">Finalized</TableHead>
@@ -1115,13 +1117,13 @@ export default function FactoryShippingContainers() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={15} className="text-center py-10 text-muted-foreground">
+                  <TableCell colSpan={16} className="text-center py-10 text-muted-foreground">
                     <Loader2 className="h-5 w-5 animate-spin mx-auto" />
                   </TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={15} className="text-center py-10 text-muted-foreground">
+                  <TableCell colSpan={16} className="text-center py-10 text-muted-foreground">
                     {active.length === 0 ? "No active records. Add one above." : "No records match the current filters."}
                   </TableCell>
                 </TableRow>
@@ -1166,6 +1168,16 @@ export default function FactoryShippingContainers() {
                         placeholder="Enter destination"
                         onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { destination: v || null } })}
                         testId={`cell-destination-${r.id}`}
+                      />
+                    </TableCell>
+
+                    {/* ETA (editable → stays on row) */}
+                    <TableCell>
+                      <DateCellInput
+                        value={r.eta || ""}
+                        placeholder="Set ETA"
+                        onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { eta: v || null } })}
+                        testId={`cell-eta-${r.id}`}
                       />
                     </TableCell>
 

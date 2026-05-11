@@ -2948,6 +2948,8 @@ let migrationsDone = false;
     `ALTER TABLE factory_shipping_container_documents ADD COLUMN IF NOT EXISTS uploaded_by text`,
     // Add file_data to container_documents for DB-backed file serving (no more ephemeral disk dependency)
     `ALTER TABLE container_documents ADD COLUMN IF NOT EXISTS file_data text`,
+    // ETA column on shipping container rows (manual date entry)
+    `ALTER TABLE factory_shipping_container_rows ADD COLUMN IF NOT EXISTS eta date`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

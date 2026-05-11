@@ -104,6 +104,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
           companyId: factoryShippingContainerRows.companyId,
           customerOrderId: factoryShippingContainerRows.customerOrderId,
           orderDate: factoryShippingContainerRows.orderDate,
+          eta: factoryShippingContainerRows.eta,
           containerArrivedDate: factoryShippingContainerRows.containerArrivedDate,
           note: factoryShippingContainerRows.note,
           isDone: factoryShippingContainerRows.isDone,
@@ -216,6 +217,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       if (!existing) return res.status(404).json({ message: "Row not found" });
 
       const patch: any = { updatedAt: new Date() };
+      if (req.body.eta !== undefined) patch.eta = req.body.eta || null;
       if (req.body.containerArrivedDate !== undefined) patch.containerArrivedDate = req.body.containerArrivedDate || null;
       if (req.body.note !== undefined) patch.note = req.body.note || null;
 
