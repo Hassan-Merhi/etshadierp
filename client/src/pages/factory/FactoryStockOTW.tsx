@@ -1,13 +1,49 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Ship, Package, Boxes, Building2, ChevronDown } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Ship, Package, Boxes, Building2, ChevronDown, StickyNote } from "lucide-react";
 import { useLocation } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
+
+const NOTES_KEY = "factory-otw-notes";
+
+function OTWNotes() {
+  const [value, setValue] = useState(() => localStorage.getItem(NOTES_KEY) ?? "");
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setValue(e.target.value);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      localStorage.setItem(NOTES_KEY, e.target.value);
+    }, 600);
+  }
+
+  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
+
+  return (
+    <Card>
+      <CardContent className="pt-3 pb-3">
+        <div className="flex items-center gap-2 mb-2">
+          <StickyNote className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Notes</span>
+        </div>
+        <Textarea
+          value={value}
+          onChange={handleChange}
+          placeholder="Write anything here…"
+          className="min-h-[80px] resize-y text-sm border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 p-0"
+          data-testid="textarea-otw-notes"
+        />
+      </CardContent>
+    </Card>
+  );
+}
 
 interface FactoryContainer {
   id: number;
@@ -191,6 +227,8 @@ export default function FactoryStockOTW() {
           {otwContainers.length} container{otwContainers.length !== 1 ? "s" : ""} OTW
         </Badge>
       </div>
+
+      <OTWNotes />
 
       {otwContainers.length === 0 ? (
         <Card>
