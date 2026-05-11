@@ -596,6 +596,10 @@ export const containers = pgTable("containers", {
   trackingLastDescription: text("tracking_last_description"),
   trackingError: text("tracking_error"),
   trackingChangedAt: timestamp("tracking_changed_at", { withTimezone: true }),
+  // Carrier-first tracking fields (carrier direct → ParcelsApp fallback)
+  trackingDetectedCarrier: text("tracking_detected_carrier"),
+  trackingFallbackUsed: boolean("tracking_fallback_used").default(false),
+  trackingFallbackReason: text("tracking_fallback_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   companyIdx: index("containers_company_idx").on(t.companyId),
