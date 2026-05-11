@@ -471,7 +471,7 @@ function ContainerDrawer({
 
   const trackNowMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/container-tracking/${container!.id}/track-now`, {});
+      const res = await apiRequest("POST", `/api/container-tracking/${container!.id}/track-now`, {}, false, 120000);
       return res.json() as Promise<TrackNowResult>;
     },
     onSuccess: (data) => {
@@ -1389,7 +1389,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
   const bulkTrackMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/container-tracking/bulk-track-now", {});
+      const res = await apiRequest("POST", "/api/container-tracking/bulk-track-now", {}, false, 120000);
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: "Failed" }));
         throw new Error(err.message || "Failed");

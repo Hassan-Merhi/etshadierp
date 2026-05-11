@@ -191,13 +191,14 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
   _isRetry = false,
+  timeoutMs = 30000,
 ): Promise<Response> {
   const controller = new AbortController();
   let intentionalAbort = false;
   const timeoutId = setTimeout(() => {
     intentionalAbort = true;
     controller.abort();
-  }, 30000);
+  }, timeoutMs);
   
   try {
     let body: string | undefined;
@@ -242,7 +243,7 @@ export async function apiRequest(
   } catch (error: any) {
     clearTimeout(timeoutId);
     if (error.name === "AbortError" && intentionalAbort) {
-      throw new Error(`Request timeout after 30 seconds for ${method} ${url}`);
+      throw new Error(`Request timeout after ${Math.round(timeoutMs / 1000)} seconds for ${method} ${url}`);
     }
     const networkFail = error.name === "AbortError"
       ? true
