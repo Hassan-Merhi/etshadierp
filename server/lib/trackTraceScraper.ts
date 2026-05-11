@@ -160,45 +160,34 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
     const url = `https://www.track-trace.com/container#${encodeURIComponent(containerNumber)}`;
     console.log(`[TrackTrace] Loading ${url}`);
 
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT_MS });
-
-    // Wait for results — track-trace renders a table with class "tracing" or
-    // individual carrier result rows. We wait for any content row to appear.
-    const resultSelector = [
-      "table.tracing",
-      ".tracking-result",
-      ".container-result",
-      "#tracing-result",
-      ".ttr-result",
-      "div[id^='result']",
-      "div.result-row",
-      "td.carrier-name",
-    ].join(", ");
-
+    // Use networkidle2 so we wait for the AJAX tracking queries to fire and settle
     try {
-      await page.waitForSelector(resultSelector, { timeout: RESULT_WAIT_MS });
+      await page.goto(url, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT_MS });
     } catch {
-      // Selector not found — still try to read whatever the page rendered
-      console.log(`[TrackTrace] No result selector matched — reading page anyway`);
+      // networkidle2 may time out on slow pages — continue with what loaded
+      console.log(`[TrackTrace] networkidle2 timed out — reading page as-is`);
     }
 
-    // Give JS a moment to populate the result data
-    await new Promise((r) => setTimeout(r, 3000));
+    // Additional wait for JS-rendered results (track-trace fires async carrier queries)
+    await new Promise((r) => setTimeout(r, 6000));
+
+    // Dump page body text for debugging (stored in raw_response)
+    const debugBodyText: string = await page.evaluate(
+      () => document.body?.innerText?.slice(0, 3000) ?? "",
+    );
+    const debugHtml: string = await page.evaluate(
+      () => document.documentElement?.innerHTML?.slice(0, 5000) ?? "",
+    );
+    console.log(`[TrackTrace] ${containerNumber} page text snippet: ${debugBodyText.slice(0, 300)}`);
 
     // Extract tracking data from the DOM
     const extracted = await page.evaluate((cn: string) => {
-      // Helper: get trimmed text of first element matching selector
-      function getText(root: Element | Document, sel: string): string {
-        const el = root.querySelector(sel);
-        return el?.textContent?.trim() ?? "";
-      }
+      const bodyText = document.body?.innerText ?? "";
 
-      // ── Attempt 1: standard track-trace results table ─────────────────────
-      // track-trace shows one row per carrier with columns:
-      //   Carrier | Container | BL | Status | Vessel | POL | ETA | POD | ...
+      // ── Attempt 1: all <tr> rows that mention the container number or status words ──
       const rows = Array.from(document.querySelectorAll("tr")).filter((tr) => {
         const text = tr.textContent ?? "";
-        return text.includes(cn) || text.match(/transit|departed|arrived|discharged|loaded/i);
+        return text.includes(cn) || /transit|departed|arrived|discharged|loaded|delivered|customs|gate/i.test(text);
       });
 
       let bestEta: string | null = null;
@@ -206,55 +195,61 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
       let bestLocation: string | null = null;
       const events: Array<{ date: string; status: string; location: string }> = [];
 
-      for (const row of rows.slice(0, 10)) {
+      for (const row of rows.slice(0, 20)) {
         const cells = Array.from(row.querySelectorAll("td, th")).map((td) =>
           td.textContent?.trim() ?? "",
         );
-        if (cells.length < 3) continue;
+        if (cells.length < 2) continue;
 
-        // Look for date-like cells (ETA / POD date)
         for (const cell of cells) {
-          if (/\d{1,2}[-\/\s][A-Za-z]{3}[-\/\s]\d{4}/.test(cell) ||
-              /\d{4}-\d{2}-\d{2}/.test(cell) ||
-              /[A-Za-z]{3}\s+\d{1,2}\s+\d{4}/.test(cell)) {
-            if (!bestEta) bestEta = cell;
+          // Date patterns: 20-Jun-2025, Jun 20 2025, 2025-06-20, 20/06/2025
+          if (!bestEta && (
+            /\d{1,2}[-\/\s][A-Za-z]{3}[-\/\s]\d{4}/.test(cell) ||
+            /\d{4}-\d{2}-\d{2}/.test(cell) ||
+            /[A-Za-z]{3}\s+\d{1,2}[,\s]+\d{4}/.test(cell) ||
+            /\d{2}\/\d{2}\/\d{4}/.test(cell)
+          )) {
+            bestEta = cell;
           }
-          if (/transit|departed|arrived|discharged|loaded|customs|port/i.test(cell) && !bestStatus) {
+          if (!bestStatus && /transit|departed|arrived|discharged|loaded|delivered|customs|gate out|on board/i.test(cell)) {
             bestStatus = cell;
           }
         }
 
-        // Heuristic: last meaningful cell may be a port/location
-        const meaningfulCells = cells.filter((c) => c.length > 1 && c !== cn);
-        if (meaningfulCells.length > 0 && !bestLocation) {
-          bestLocation = meaningfulCells[meaningfulCells.length - 1];
+        // Last meaningful non-container-number cell as location heuristic
+        const meaningful = cells.filter((c) => c.length > 2 && c !== cn && !/^\d+$/.test(c));
+        if (meaningful.length > 0 && !bestLocation) {
+          bestLocation = meaningful[meaningful.length - 1];
         }
       }
 
-      // ── Attempt 2: look for labelled fields ───────────────────────────────
+      // ── Attempt 2: labelled ETA fields ────────────────────────────────────
       if (!bestEta) {
-        const etaLabels = Array.from(document.querySelectorAll("*")).filter((el) =>
-          /^eta$/i.test(el.textContent?.trim() ?? ""),
+        // Look for any element whose text is exactly "ETA" and read the sibling/next
+        document.querySelectorAll("td, th, span, div, label, b, strong").forEach((el) => {
+          if (!bestEta && /^eta[:\s]*$/i.test(el.textContent?.trim() ?? "")) {
+            const next = el.nextElementSibling?.textContent?.trim()
+              ?? el.parentElement?.nextElementSibling?.textContent?.trim()
+              ?? "";
+            if (next && next !== "-" && next !== "—") bestEta = next;
+          }
+        });
+      }
+
+      // ── Attempt 3: full-body text scan ────────────────────────────────────
+      if (!bestEta) {
+        const etaMatch = bodyText.match(
+          /ETA[:\s]*([A-Za-z]{3}[\s\-\/]\d{1,2}[\s\-\/,\s]*\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}[\s\-\/][A-Za-z]{3}[\s\-\/]\d{4}|\d{2}\/\d{2}\/\d{4})/i,
         );
-        for (const label of etaLabels.slice(0, 3)) {
-          const sibling =
-            label.nextElementSibling?.textContent?.trim() ??
-            (label.parentElement?.nextElementSibling?.textContent?.trim());
-          if (sibling && sibling !== "-") { bestEta = sibling; break; }
-        }
-      }
-
-      // ── Attempt 3: scan all text for date patterns near "ETA" ─────────────
-      if (!bestEta) {
-        const bodyText = document.body?.innerText ?? "";
-        const etaMatch = bodyText.match(/ETA[:\s]+([A-Za-z]{3}[\s\-\/]\d{1,2}[\s\-\/]\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}[\s\-\/][A-Za-z]{3}[\s\-\/]\d{4})/i);
         if (etaMatch) bestEta = etaMatch[1];
       }
-
       if (!bestStatus) {
-        const bodyText = document.body?.innerText ?? "";
-        const statusMatch = bodyText.match(/(In Transit|Departed|Arrived|Discharged|Loaded|Customs|Gate Out|On Board)/i);
-        if (statusMatch) bestStatus = statusMatch[1];
+        const sm = bodyText.match(/(In Transit|Departed|Arrived|Discharged|Loaded|Delivered|Customs|Gate Out|On Board|At Sea)/i);
+        if (sm) bestStatus = sm[1];
+      }
+      if (!bestLocation) {
+        const lm = bodyText.match(/(?:POD|Port of Discharge|Location)[:\s]+([A-Z][A-Za-z\s,]+?)(?:\n|$)/i);
+        if (lm) bestLocation = lm[1].trim();
       }
 
       return { bestEta, bestStatus, bestLocation, events, pageTitle: document.title };
@@ -265,15 +260,14 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
       `eta="${extracted.bestEta ?? "none"}" location="${extracted.bestLocation ?? "none"}"`,
     );
 
-    // If we got absolutely nothing, check if we were redirected to an error page
+    // If we got absolutely nothing, check if we were blocked
     const finalUrl: string = page.url();
     if (!extracted.bestStatus && !extracted.bestEta && !capturedJson) {
-      const pageText: string = await page.evaluate(() => document.body?.innerText?.slice(0, 500) ?? "");
-      const isBlocked = /captcha|robot|blocked|403|access denied/i.test(pageText);
+      const isBlocked = /captcha|robot|blocked|403|access denied|verify you are human/i.test(debugBodyText);
       if (isBlocked) {
-        return { success: false, shipment: null, blocked: true, error: "track-trace: bot detection triggered" };
+        return { success: false, shipment: null, blocked: true, error: "track-trace: bot detection triggered", rawResponse: { debugBodyText: debugBodyText.slice(0, 1000), finalUrl } };
       }
-      return { success: false, shipment: null, blocked: false, error: "track-trace: no tracking data found on page" };
+      return { success: false, shipment: null, blocked: false, error: "track-trace: no tracking data found on page", rawResponse: { debugBodyText: debugBodyText.slice(0, 1000), debugHtml: debugHtml.slice(0, 2000), finalUrl } };
     }
 
     const eta = parseDate(extracted.bestEta);
@@ -297,7 +291,7 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
       success: true,
       shipment,
       blocked: false,
-      rawResponse: { extracted, capturedJson, finalUrl },
+      rawResponse: { extracted, capturedJson, finalUrl, debugBodyText: debugBodyText.slice(0, 1000) },
     };
 
   } catch (err: any) {
