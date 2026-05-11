@@ -11,7 +11,12 @@
  */
 
 import { existsSync } from "fs";
+import { execSync } from "child_process";
+import { createRequire } from "module";
 import type { ParcelsAppShipment } from "./parcelsAppClient";
+
+// createRequire lets us use require() from an ESM / "type":"module" context.
+const _require = createRequire(import.meta.url);
 
 export interface ScraperResult {
   success: boolean;
@@ -28,10 +33,10 @@ const DATA_WAIT_MS       = 45_000;
 
 export function isScraperAvailable(): boolean {
   try {
-    require.resolve("puppeteer-extra");
-    require.resolve("puppeteer-extra-plugin-stealth");
-    require.resolve("puppeteer");
-    const puppeteer = require("puppeteer");
+    _require.resolve("puppeteer-extra");
+    _require.resolve("puppeteer-extra-plugin-stealth");
+    _require.resolve("puppeteer");
+    const puppeteer = _require("puppeteer");
     const chromePath: string =
       typeof puppeteer.executablePath === "function"
         ? puppeteer.executablePath()
@@ -48,9 +53,23 @@ export function isScraperAvailable(): boolean {
  * is already present.  Logs progress so deployment issues are visible.
  */
 export async function ensureChromiumAvailable(): Promise<void> {
+  // isScraperAvailable() also verifies the binary — if it returns true,
+  // Chrome is already present and we can skip the download entirely.
+  if (isScraperAvailable()) {
+    console.log("[Puppeteer] Chrome binary found — scraper ready.");
+    return;
+  }
+
+  // Packages missing → nothing we can do at runtime.
   try {
-    require.resolve("puppeteer");
-    const puppeteer = require("puppeteer");
+    _require.resolve("puppeteer");
+  } catch {
+    console.log("[Puppeteer] puppeteer package not found — skipping Chrome download.");
+    return;
+  }
+
+  try {
+    const puppeteer = _require("puppeteer");
     const chromePath: string =
       typeof puppeteer.executablePath === "function"
         ? puppeteer.executablePath()
@@ -59,12 +78,7 @@ export async function ensureChromiumAvailable(): Promise<void> {
       console.log("[Puppeteer] Could not determine Chrome path — skipping download.");
       return;
     }
-    if (existsSync(chromePath)) {
-      console.log("[Puppeteer] Chrome binary found — scraper ready.");
-      return;
-    }
     console.log("[Puppeteer] Chrome binary not found at", chromePath, "— downloading now (this may take a minute)...");
-    const { execSync } = require("child_process");
     execSync("npx puppeteer browsers install chrome", {
       stdio: "inherit",
       timeout: 180_000,
@@ -75,7 +89,7 @@ export async function ensureChromiumAvailable(): Promise<void> {
       console.warn("[Puppeteer] Chrome still not found after download — scraper will be unavailable.");
     }
   } catch (err: any) {
-    console.warn("[Puppeteer] Chrome setup skipped:", err?.message ?? err);
+    console.warn("[Puppeteer] Chrome setup error:", err?.message ?? err);
   }
 }
 
@@ -89,11 +103,8 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
   const hard = setTimeout(() => timer.abort(), SCRAPER_TIMEOUT_MS);
 
   try {
-    // Lazy require so the server won't crash if the package is missing
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const puppeteerExtra = require("puppeteer-extra") as any;
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const StealthPlugin  = require("puppeteer-extra-plugin-stealth") as any;
+    const puppeteerExtra = _require("puppeteer-extra") as any;
+    const StealthPlugin  = _require("puppeteer-extra-plugin-stealth") as any;
     puppeteerExtra.use(StealthPlugin());
 
     browser = await puppeteerExtra.launch({

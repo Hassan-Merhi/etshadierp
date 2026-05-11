@@ -79,6 +79,7 @@ interface AvailableInvoice {
 }
 
 interface ShippingDocument {
+  isGhost?: boolean;
   id: number;
   scrId: number;
   displayName: string;
@@ -591,22 +592,30 @@ function DocumentsModal({
                 </TableHeader>
                 <TableBody>
                   {docs.map((doc) => (
-                    <TableRow key={doc.id} data-testid={`row-doc-${doc.id}`}>
+                    <TableRow key={doc.id} data-testid={`row-doc-${doc.id}`} className={doc.isGhost ? "opacity-60" : ""}>
                       <TableCell className="text-sm font-medium max-w-[130px] truncate" title={doc.displayName || doc.originalName}>
-                        {doc.displayName || doc.originalName || "—"}
+                        {doc.isGhost
+                          ? <span className="text-muted-foreground italic text-xs">Broken record</span>
+                          : (doc.displayName || doc.originalName || "—")}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {(doc.fileType || "FILE").split("/").pop()?.toUpperCase() || "FILE"}
-                        </Badge>
+                        {doc.isGhost
+                          ? <span className="text-xs text-muted-foreground">—</span>
+                          : (
+                            <Badge variant="outline" className="text-xs">
+                              {(doc.fileType || "FILE").split("/").pop()?.toUpperCase() || "FILE"}
+                            </Badge>
+                          )}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{fmtSize(doc.fileSize)}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{doc.uploadedBy || "—"}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => handleViewDoc(doc)} data-testid={`button-view-doc-${doc.id}`}>
-                            <Eye className="h-3.5 w-3.5" />
-                          </Button>
+                          {!doc.isGhost && (
+                            <Button size="icon" variant="ghost" onClick={() => handleViewDoc(doc)} data-testid={`button-view-doc-${doc.id}`}>
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                           <Button
                             size="icon" variant="ghost"
                             disabled={deleteMutation.isPending}

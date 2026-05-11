@@ -986,14 +986,16 @@ export default function ContainerDetail() {
                     <div className="flex items-center gap-1 shrink-0">
                       {uploaded && (
                         <>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => handleViewDoc(uploaded.storageKey)}
-                            data-testid={`button-view-doc-${dt.code}`}
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
+                          {!uploaded.isGhost && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleViewDoc(uploaded.storageKey)}
+                              data-testid={`button-view-doc-${dt.code}`}
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button
                             size="icon"
                             variant="ghost"
@@ -1023,9 +1025,11 @@ export default function ContainerDetail() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <Button size="icon" variant="ghost" onClick={() => handleViewDoc(d.storageKey)} data-testid={`button-view-doc-opt-${d.id}`}>
-                        <Download className="h-4 w-4" />
-                      </Button>
+                      {!d.isGhost && (
+                        <Button size="icon" variant="ghost" onClick={() => handleViewDoc(d.storageKey)} data-testid={`button-view-doc-opt-${d.id}`}>
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button size="icon" variant="ghost" onClick={() => { setPendingDelete(() => () => deleteDocMutation.mutate(d.id)); }} data-testid={`button-delete-doc-opt-${d.id}`}>
                         <Trash2 className="h-4 w-4" />
                       </Button>

@@ -397,7 +397,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         ));
       if (!row) return res.status(404).json({ message: "Row not found" });
 
-      const docs = await db
+      const allDocs = await db
         .select({
           id: factoryShippingContainerDocuments.id,
           scrId: factoryShippingContainerDocuments.scrId,
@@ -409,7 +409,8 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
           fileSize: factoryShippingContainerDocuments.fileSize,
           uploadedBy: factoryShippingContainerDocuments.uploadedBy,
           uploadedAt: factoryShippingContainerDocuments.uploadedAt,
-          // fileData intentionally excluded — large blob not needed for listing
+          hasFileData: factoryShippingContainerDocuments.fileData,
+          // fileData full content intentionally excluded — large blob not needed for listing
         })
         .from(factoryShippingContainerDocuments)
         .where(and(
@@ -417,6 +418,13 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
           eq(factoryShippingContainerDocuments.companyId, companyId),
         ))
         .orderBy(factoryShippingContainerDocuments.uploadedAt);
+
+      // Mark each doc as a ghost (no retrievable file) so the client can
+      // show a safe "delete only" state instead of a broken view button.
+      const docs = allDocs.map(({ hasFileData, ...doc }) => ({
+        ...doc,
+        isGhost: !doc.fileName && !hasFileData,
+      }));
 
       res.json(docs);
     } catch (error: any) {

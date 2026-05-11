@@ -181,15 +181,22 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       if (!companyId || !(await verifyContainerOwnership(containerId, companyId))) {
         return res.status(403).json({ message: "Access denied" });
       }
-      const docs = await db.select().from(containerDocuments).where(eq(containerDocuments.containerId, containerId));
+      const rawDocs = await db.select().from(containerDocuments).where(eq(containerDocuments.containerId, containerId));
       const docTypes = await db.select().from(containerDocumentTypes).orderBy(containerDocumentTypes.label);
       const requiredTypes = docTypes.filter((dt: any) => dt.isRequired);
-      const uploadedTypeIds = new Set(docs.map((d: any) => d.docTypeId));
+      const uploadedTypeIds = new Set(rawDocs.map((d: any) => d.docTypeId));
       const completeness = {
         total: requiredTypes.length,
         uploaded: requiredTypes.filter((rt: any) => uploadedTypeIds.has(rt.id)).length,
         complete: requiredTypes.every((rt: any) => uploadedTypeIds.has(rt.id)),
       };
+      // Mark ghost docs (no storage key AND no file data) so the client
+      // can show a delete-only state instead of a broken download button.
+      const docs = rawDocs.map((d: any) => ({
+        ...d,
+        fileData: undefined, // strip large blob from listing response
+        isGhost: !d.storageKey && !d.fileData,
+      }));
       res.json({ documents: docs, docTypes, completeness });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
