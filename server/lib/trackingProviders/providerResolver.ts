@@ -1,17 +1,18 @@
 /**
- * providerResolver.ts — Detect carrier from container number prefix and return
- * the ordered list of direct providers to try before falling back to ParcelsApp.
+ * providerResolver.ts — Detect carrier from container number prefix.
  *
- * Provider order per carrier:
- *   MAERSK: 1. Maersk official API (if credentials set)
- *           2. Maersk public page  (if MAERSK_PUBLIC_TRACKING_ENABLED=true)
- *   CMA:    1. CMA public page     (if CMA_PUBLIC_TRACKING_ENABLED=true)
- *   Other:  → ParcelsApp only
+ * The resolver identifies which carrier operates the container so the
+ * tracking service can route it to the right provider:
+ *   MAERSK → maersk_direct (Puppeteer intercept of Maersk's own API)
+ *   CMA    → parcelsapp API directly
+ *   MSC    → http_scraper (direct MSC API)
+ *   HAPAG  → http_scraper (direct Hapag-Lloyd API)
+ *   Others → http_scraper → parcelsapp_scraper → 17track → parcelsapp API
+ *
+ * tryDirect is always empty — carrier routing is handled in
+ * containerTrackingService.ts via the http_scraper and maersk_direct steps.
  */
 
-import * as maerskProvider from "./maerskProvider";
-import * as maerskPublicProvider from "./maerskPublicProvider";
-import * as cmaPublicProvider from "./cmaPublicProvider";
 import type { CarrierTrackResult } from "./types";
 
 export type DetectedCarrier = "MAERSK" | "CMA" | "MSC" | "HAPAG" | "OTHER" | null;
@@ -23,20 +24,26 @@ const PREFIX_MAP: Record<string, DetectedCarrier> = {
   MAEU: "MAERSK", MRKU: "MAERSK", MSKU: "MAERSK", MRSU: "MAERSK",
   MCIU: "MAERSK", SUDU: "MAERSK", HASU: "MAERSK", TRHU: "MAERSK",
   TEMU: "MAERSK", SEAU: "MAERSK", PONU: "MAERSK", SEGU: "MAERSK",
+  HJSC: "MAERSK", HJCU: "MAERSK", SAFM: "MAERSK",
 
   // ── CMA CGM (incl. ANL, APL, CNC) ─────────────────────────────────────────
-  CMAU: "CMA", CGMU: "CMA", APMU: "CMA", APHU: "CMA",
-  CXDU: "CMA", CAAU: "CMA", CAJU: "CMA", CAIU: "CMA",
+  CMAU: "CMA", CMDU: "CMA", APZU: "CMA", CGMU: "CMA",
+  APMU: "CMA", APHU: "CMA", CXDU: "CMA", CAAU: "CMA",
+  CAJU: "CMA", CAIU: "CMA",
 
   // ── MSC ───────────────────────────────────────────────────────────────────
-  MSCU: "MSC", MEDU: "MSC", MSDU: "MSC",
+  MSCU: "MSC", MEDU: "MSC", MSDU: "MSC", MSMU: "MSC", MSWU: "MSC",
 
   // ── Hapag-Lloyd ───────────────────────────────────────────────────────────
   HLCU: "HAPAG", HLXU: "HAPAG",
 
-  // ── Leasing (Triton, Textainer, Gold Fields, etc.)
-  //    Prefix only tells us the box owner, not the actual shipping line.
-  //    ParcelsApp handles detection for these automatically.
+  // ── COSCO ─────────────────────────────────────────────────────────────────
+  COSU: "OTHER", CBHU: "OTHER", CCLU: "OTHER", COSJ: "OTHER",
+
+  // ── Evergreen ─────────────────────────────────────────────────────────────
+  EVRU: "OTHER", EVRG: "OTHER", EMCU: "OTHER", EGHU: "OTHER",
+
+  // ── Leasing (box owner ≠ shipping line — let ParcelsApp auto-detect) ──────
   TCNU: "OTHER", TGBU: "OTHER", TCKU: "OTHER", TLLU: "OTHER",
   TCLU: "OTHER", TGHU: "OTHER", TIIU: "OTHER", UETU: "OTHER",
   ECMU: "OTHER", TXGI: "OTHER",
@@ -57,69 +64,22 @@ export function detectCarrier(containerNumber: string): DetectedCarrier {
 export interface ProviderResolution {
   detectedCarrier: DetectedCarrier;
   /**
-   * Ordered list of direct-carrier providers to try before falling back to
-   * ParcelsApp. Each entry is a zero-argument function that returns a result.
-   * Empty array means go straight to ParcelsApp.
+   * Always empty — carrier-specific routing is handled inside
+   * containerTrackingService.trackViaParcelsApp() via http_scraper and
+   * maersk_direct steps. This field is kept for API compatibility.
    */
   tryDirect: Array<() => Promise<CarrierTrackResult>>;
 }
 
-/**
- * Returns true if at least one non-ParcelsApp direct provider is available
- * (configured or enabled via env flag). Used to decide whether any direct
- * attempt is worth making.
- */
 export function anyDirectProviderPossible(): boolean {
-  return (
-    maerskProvider.isConfigured() ||
-    maerskPublicProvider.isEnabled() ||
-    cmaPublicProvider.isEnabled()
-  );
+  return false;
 }
 
-/**
- * Given a container number, return the detected carrier and the ordered list
- * of direct providers to attempt before falling back to ParcelsApp.
- */
 export function resolveProvider(containerNumber: string): ProviderResolution {
   const detectedCarrier = detectCarrier(containerNumber);
-  const tryDirect: Array<() => Promise<CarrierTrackResult>> = [];
-  const directNames: string[] = [];
-
-  // ── Maersk ────────────────────────────────────────────────────────────────
-  if (detectedCarrier === "MAERSK") {
-    if (maerskProvider.isConfigured()) {
-      tryDirect.push(() => maerskProvider.track(containerNumber));
-      directNames.push("maersk");
-    }
-    if (maerskPublicProvider.isEnabled()) {
-      tryDirect.push(() => maerskPublicProvider.track(containerNumber));
-      directNames.push("maersk_public");
-    }
-    console.log(
-      `[ProviderResolver] container=${containerNumber} prefix=${containerNumber.slice(0, 4).toUpperCase()} ` +
-        `detectedCarrier=MAERSK directProviders=[${directNames.join(", ") || "none"}]`,
-    );
-    return { detectedCarrier, tryDirect };
-  }
-
-  // ── CMA CGM ───────────────────────────────────────────────────────────────
-  if (detectedCarrier === "CMA") {
-    if (cmaPublicProvider.isEnabled()) {
-      tryDirect.push(() => cmaPublicProvider.track(containerNumber));
-      directNames.push("cma_public");
-    }
-    console.log(
-      `[ProviderResolver] container=${containerNumber} prefix=${containerNumber.slice(0, 4).toUpperCase()} ` +
-        `detectedCarrier=CMA directProviders=[${directNames.join(", ") || "none"}]`,
-    );
-    return { detectedCarrier, tryDirect };
-  }
-
-  // All other carriers (MSC, HAPAG, leasing, unknown) → ParcelsApp fallback
   console.log(
     `[ProviderResolver] container=${containerNumber} prefix=${containerNumber.slice(0, 4).toUpperCase()} ` +
-      `detectedCarrier=${detectedCarrier ?? "unknown"} directProviders=[] → http/scraper/parcelsapp fallback`,
+    `detectedCarrier=${detectedCarrier ?? "unknown"} directProviders=[none]`,
   );
   return { detectedCarrier, tryDirect: [] };
 }

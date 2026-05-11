@@ -1122,8 +1122,8 @@ function ContainerDrawer({
                   </p>
                 )}
 
-                {/* Fallback note */}
-                {container.trackingFallbackUsed && (
+                {/* Fallback note — only show when a fallback was actually used and it wasn't maersk_direct (which is the primary method now) */}
+                {container.trackingFallbackUsed && container.trackingProvider !== "maersk_direct" && (
                   <div
                     className="flex items-start gap-1.5 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-2 py-1.5"
                     data-testid="banner-tracking-fallback"
@@ -1133,26 +1133,12 @@ function ContainerDrawer({
                       {(() => {
                         const r = container.trackingFallbackReason;
                         if (!r) return "Fallback provider used";
-                        if (r === "maersk_not_configured" || r === "maersk_official_not_configured")
-                          return "Maersk API not configured — used ParcelsApp fallback";
-                        if (r === "maersk_api_error" || r === "maersk_official_api_error")
-                          return "Maersk API failed — used ParcelsApp fallback";
-                        if (r === "maersk_public_blocked")
-                          return "Maersk public page blocked — used ParcelsApp fallback";
-                        if (r === "maersk_public_no_data")
-                          return "Maersk public returned no data — used ParcelsApp fallback";
-                        if (r === "maersk_public_error" || r.startsWith("maersk_public_"))
-                          return "Maersk public tracking failed — used ParcelsApp fallback";
-                        if (r === "cma_public_blocked")
-                          return "CMA public page blocked — used ParcelsApp fallback";
-                        if (r === "cma_public_no_data")
-                          return "CMA public returned no data — used ParcelsApp fallback";
-                        if (r === "cma_public_error" || r.startsWith("cma_public_"))
-                          return "CMA public tracking failed — used ParcelsApp fallback";
+                        if (r.startsWith("maersk_")) return "Maersk direct tracking failed — used ParcelsApp fallback";
+                        if (r.startsWith("cma_")) return "CMA tracking failed — used ParcelsApp fallback";
                         if (r === "parcelsapp_quota_exhausted")
                           return "ParcelsApp monthly quota exhausted — web scraper or 17track used";
                         if (r === "scraper_blocked")
-                          return "Web scraper blocked by reCaptcha — fell back to 17track or ParcelsApp API";
+                          return "Web scraper blocked — fell back to 17track or ParcelsApp API";
                         if (r === "17track_quota_exhausted")
                           return "17track monthly quota exhausted — fell back to ParcelsApp API";
                         if (r === "17track_error")
