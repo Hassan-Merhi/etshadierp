@@ -608,7 +608,7 @@ export default function FactoryLocationInventory() {
         const matchesSearch = !q || p.productName.toLowerCase().includes(q) || p.articleCode.toLowerCase().includes(q);
         const matchesCat = categoryFilter === "__all__" || p.category === categoryFilter;
         const hideZero = proformaMode ? hideZeroAvailable : !showZeroStock;
-        if (hideZero && p.baleCount === 0) return false;
+        if (hideZero && (p.baleCount - (p.loadingCount ?? 0)) <= 0) return false;
         if (proformaMode && showSelectedOnly) return matchesSearch && matchesCat && selections.has(p.productId);
         return matchesSearch && matchesCat;
       }),
