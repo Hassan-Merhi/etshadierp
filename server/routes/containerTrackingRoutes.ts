@@ -20,11 +20,14 @@ import {
   trackAllEnabledNow,
   setBulkTrackingEnabled,
   getParcelsAppUsageStats,
+  get17trackUsageStats,
 } from "../services/containerTrackingService";
 import { testConnection } from "../lib/parcelsAppClient";
 import { isConfigured as isMaerskConfigured } from "../lib/trackingProviders/maerskProvider";
 import { isEnabled as isMaerskPublicEnabled } from "../lib/trackingProviders/maerskPublicProvider";
 import { isEnabled as isCmaPublicEnabled } from "../lib/trackingProviders/cmaPublicProvider";
+import { isConfigured as is17trackConfigured, getMonthlyLimit as get17trackLimit } from "../lib/trackingProviders/seventeenTrackProvider";
+import { isScraperAvailable } from "../lib/parcelsAppScraper";
 
 const ALLOWED_ROLES = ["Admin", "Developer", "Owner"] as const;
 
@@ -47,7 +50,9 @@ function anyProviderAvailable(): boolean {
     isMaerskConfigured() ||
     isMaerskPublicEnabled() ||
     isCmaPublicEnabled() ||
-    !!process.env.PARCELSAPP_API_KEY
+    !!process.env.PARCELSAPP_API_KEY ||
+    is17trackConfigured() ||
+    isScraperAvailable()
   );
 }
 
@@ -76,8 +81,13 @@ export function registerContainerTrackingRoutes(app: Express) {
     if (cmaPublicEnabled)    directProviders.push("cma_public");
 
     // Quota from DB — accurate even after server restarts
-    const { used: parcelsAppUsageThisMonth, limit: parcelsAppMonthlyLimit } =
-      await getParcelsAppUsageStats();
+    const [
+      { used: parcelsAppUsageThisMonth, limit: parcelsAppMonthlyLimit },
+      { used: seventeenTrackUsage, limit: seventeenTrackLimit },
+    ] = await Promise.all([getParcelsAppUsageStats(), get17trackUsageStats()]);
+
+    const scraperAvailable  = isScraperAvailable();
+    const seventeenConfigured = is17trackConfigured();
 
     const now = new Date();
     const nextReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
@@ -92,14 +102,24 @@ export function registerContainerTrackingRoutes(app: Express) {
     const perRunBudget = Math.max(1, Math.floor(dailyBudget / 4));
 
     res.json({
-      configured: maerskConfigured || maerskPublicEnabled || cmaPublicEnabled || parcelsAppConfigured,
+      configured: maerskConfigured || maerskPublicEnabled || cmaPublicEnabled || parcelsAppConfigured || scraperAvailable || seventeenConfigured,
       maerskConfigured,
       parcelsAppConfigured,
       publicProvidersEnabled,
       maerskPublicEnabled,
       cmaPublicEnabled,
       directProviders,
-      fallbackProvider: "parcelsapp",
+      fallbackProvider: "parcelsapp_scraper",
+      // ── Puppeteer stealth scraper ──────────────────────────────────────────
+      scraperAvailable,
+      scraperStatus: scraperAvailable ? "ready" : "not_installed",
+      // ── 17track ────────────────────────────────────────────────────────────
+      seventeenTrackConfigured: seventeenConfigured,
+      seventeenTrackUsageThisMonth: seventeenTrackUsage,
+      seventeenTrackMonthlyLimit: seventeenTrackLimit,
+      seventeenTrackRemaining: Math.max(0, seventeenTrackLimit - seventeenTrackUsage),
+      seventeenTrackQuotaExhausted: seventeenTrackUsage >= seventeenTrackLimit,
+      // ── ParcelsApp API ─────────────────────────────────────────────────────
       parcelsAppUsageThisMonth,
       parcelsAppMonthlyLimit,
       parcelsAppRemaining,
@@ -161,15 +181,15 @@ export function registerContainerTrackingRoutes(app: Express) {
         return;
       }
 
-      // Quota check upfront so we can respond before firing background job
+      // Quota check — only hard-block if ALL fallback providers are also unavailable
       const { used, limit } = await getParcelsAppUsageStats();
       const remaining = Math.max(0, limit - used);
-      const hasDirectProvider =
-        isMaerskConfigured() || isMaerskPublicEnabled() || isCmaPublicEnabled();
+      const hasDirectProvider = isMaerskConfigured() || isMaerskPublicEnabled() || isCmaPublicEnabled();
+      const hasFallbackProvider = is17trackConfigured() || isScraperAvailable();
 
-      if (remaining === 0 && !hasDirectProvider) {
+      if (remaining === 0 && !hasDirectProvider && !hasFallbackProvider) {
         res.status(402).json({
-          message: `ParcelsApp monthly quota exhausted (${used}/${limit}). Track Now is not available until next month.`,
+          message: `ParcelsApp monthly quota exhausted (${used}/${limit}) and no alternative providers are configured. Track Now is not available.`,
         });
         return;
       }
@@ -177,7 +197,9 @@ export function registerContainerTrackingRoutes(app: Express) {
       const quotaWarning =
         remaining > 0 && remaining <= Math.ceil(limit * 0.1)
           ? `ParcelsApp quota is low — ${remaining} of ${limit} credits remaining this month.`
-          : undefined;
+          : remaining === 0 && hasFallbackProvider
+            ? `ParcelsApp quota exhausted — using ${isScraperAvailable() ? "web scraper" : "17track"} as fallback.`
+            : undefined;
 
       res.status(202).json({
         started: true,

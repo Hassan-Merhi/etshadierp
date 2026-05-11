@@ -245,8 +245,9 @@ function fmtSkipReason(raw: string | null): string | null {
   if (raw === "skipped_recent") return "Checked recently — waiting for next interval";
   if (raw === "skipped_priority_budget") return "Lower priority — skipped this run to save quota";
   if (raw === "skipped_disabled") return "Auto-update is turned off";
-  if (raw === "skipped_quota") return "ParcelsApp monthly quota exhausted";
+  if (raw === "skipped_quota") return "All quota exhausted — scraper, 17track, and ParcelsApp API all unavailable";
   if (raw === "invalid_container_number") return "Container number is not a valid format";
+  if (raw === "scraper_blocked") return "Web scraper blocked by reCaptcha — fell back to 17track or ParcelsApp API";
   return raw;
 }
 
@@ -446,6 +447,15 @@ function ContainerDrawer({
     schedulerRemainingDays: number;
     schedulerDailyBudget: number;
     schedulerPerRunBudget: number;
+    // Puppeteer stealth scraper
+    scraperAvailable: boolean;
+    scraperStatus: string;
+    // 17track
+    seventeenTrackConfigured: boolean;
+    seventeenTrackUsageThisMonth: number;
+    seventeenTrackMonthlyLimit: number;
+    seventeenTrackRemaining: number;
+    seventeenTrackQuotaExhausted: boolean;
   }>({
     queryKey: ["/api/container-tracking/status"],
     staleTime: 5 * 60_000,
@@ -741,40 +751,121 @@ function ContainerDrawer({
               </div>
             )}
 
-            {/* ParcelsApp quota gauge */}
-            {trackingStatus?.parcelsAppConfigured && (
-              <div className="rounded-md border bg-muted/20 px-3 py-2 space-y-1.5" data-testid="panel-quota">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <p className="text-xs font-medium text-muted-foreground">ParcelsApp quota this month</p>
-                  {trackingStatus.parcelsAppQuotaExhausted && (
-                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" data-testid="badge-quota-exhausted">
-                      Paused
+            {/* Tracking provider chain */}
+            {trackingStatus && (
+              <div className="rounded-md border bg-muted/20 px-3 py-2 space-y-2.5" data-testid="panel-provider-chain">
+                <p className="text-xs font-medium text-muted-foreground">Tracking providers (tried in order)</p>
+
+                {/* Row helper */}
+                {(() => {
+                  const Row = ({
+                    label, badge, badgeColor, detail, testId,
+                  }: {
+                    label: string;
+                    badge: string;
+                    badgeColor: string;
+                    detail?: string;
+                    testId?: string;
+                  }) => (
+                    <div className="flex items-start gap-2 flex-wrap" data-testid={testId}>
+                      <span className="text-xs text-muted-foreground flex-1 min-w-0">{label}</span>
+                      <div className="flex flex-col items-end gap-0.5 shrink-0">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badgeColor}`}>{badge}</span>
+                        {detail && <span className="text-xs text-muted-foreground/70">{detail}</span>}
+                      </div>
+                    </div>
+                  );
+
+                  const scraperOk = trackingStatus.scraperAvailable;
+                  const stOk = trackingStatus.seventeenTrackConfigured && !trackingStatus.seventeenTrackQuotaExhausted;
+                  const paOk = trackingStatus.parcelsAppConfigured && !trackingStatus.parcelsAppQuotaExhausted;
+
+                  return (
+                    <div className="space-y-1.5">
+                      {/* 1. Web scraper */}
+                      <Row
+                        testId="row-scraper"
+                        label="1. ParcelsApp web scraper (no quota)"
+                        badge={scraperOk ? "Ready" : "Not installed"}
+                        badgeColor={scraperOk
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                          : "bg-muted text-muted-foreground"}
+                        detail={scraperOk ? "Puppeteer stealth — bypasses reCaptcha" : undefined}
+                      />
+
+                      {/* 2. 17track */}
+                      <Row
+                        testId="row-17track"
+                        label="2. 17track API"
+                        badge={
+                          !trackingStatus.seventeenTrackConfigured
+                            ? "Not configured"
+                            : trackingStatus.seventeenTrackQuotaExhausted
+                              ? "Quota exhausted"
+                              : "Ready"
+                        }
+                        badgeColor={
+                          !trackingStatus.seventeenTrackConfigured
+                            ? "bg-muted text-muted-foreground"
+                            : trackingStatus.seventeenTrackQuotaExhausted
+                              ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                        }
+                        detail={
+                          trackingStatus.seventeenTrackConfigured
+                            ? `${trackingStatus.seventeenTrackUsageThisMonth} / ${trackingStatus.seventeenTrackMonthlyLimit} used this month`
+                            : "Set SEVENTEENTRACK_API_KEY to enable"
+                        }
+                      />
+
+                      {/* 3. ParcelsApp API */}
+                      <Row
+                        testId="row-parcelsapp-api"
+                        label="3. ParcelsApp API (fallback)"
+                        badge={
+                          !trackingStatus.parcelsAppConfigured
+                            ? "Not configured"
+                            : trackingStatus.parcelsAppQuotaExhausted
+                              ? "Paused"
+                              : "Ready"
+                        }
+                        badgeColor={
+                          !trackingStatus.parcelsAppConfigured
+                            ? "bg-muted text-muted-foreground"
+                            : trackingStatus.parcelsAppQuotaExhausted
+                              ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                        }
+                        detail={
+                          trackingStatus.parcelsAppConfigured
+                            ? trackingStatus.parcelsAppQuotaExhausted
+                              ? `${trackingStatus.parcelsAppUsageThisMonth} / ${trackingStatus.parcelsAppMonthlyLimit} — resets ${trackingStatus.parcelsAppNextResetDate}`
+                              : `${trackingStatus.parcelsAppRemaining} of ${trackingStatus.parcelsAppMonthlyLimit} remaining`
+                            : undefined
+                        }
+                      />
+
+                      {/* Alert if scraper detected as blocked (shown only when scraper last check was blocked) */}
+                      {!scraperOk && !stOk && !paOk && (
+                        <div className="flex items-start gap-1.5 pt-1">
+                          <span className="text-xs text-red-600 dark:text-red-400">
+                            No active tracking provider — containers will not update automatically.
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Scraper blocked warning — surface when last check used scraper but was blocked */}
+                {trackingStatus.scraperAvailable && container?.trackingProvider === "parcelsapp_scraper" &&
+                  container?.trackingError?.toLowerCase().includes("recaptcha") && (
+                  <div className="flex items-start gap-1.5 pt-0.5" data-testid="banner-scraper-blocked">
+                    <span className="text-xs text-amber-600 dark:text-amber-400">
+                      reCaptcha detected automation on last scrape — 17track or ParcelsApp API used as fallback.
                     </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 rounded-full bg-muted h-1.5 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${
-                        trackingStatus.parcelsAppQuotaExhausted
-                          ? "bg-red-500"
-                          : trackingStatus.parcelsAppUsageThisMonth / trackingStatus.parcelsAppMonthlyLimit > 0.8
-                            ? "bg-amber-500"
-                            : "bg-emerald-500"
-                      }`}
-                      style={{
-                        width: `${Math.min(100, Math.round((trackingStatus.parcelsAppUsageThisMonth / trackingStatus.parcelsAppMonthlyLimit) * 100))}%`,
-                      }}
-                      data-testid="bar-quota-used"
-                    />
                   </div>
-                  <span className="text-xs text-muted-foreground tabular-nums shrink-0" data-testid="text-quota-used">
-                    {trackingStatus.parcelsAppUsageThisMonth} / {trackingStatus.parcelsAppMonthlyLimit}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground" data-testid="text-quota-remaining">
-                  {trackingStatus.parcelsAppRemaining} remaining — resets {trackingStatus.parcelsAppNextResetDate}
-                </p>
+                )}
               </div>
             )}
 
@@ -945,7 +1036,13 @@ function ContainerDrawer({
                         if (r === "cma_public_error" || r.startsWith("cma_public_"))
                           return "CMA public tracking failed — used ParcelsApp fallback";
                         if (r === "parcelsapp_quota_exhausted")
-                          return "ParcelsApp monthly quota exhausted — tracking skipped";
+                          return "ParcelsApp monthly quota exhausted — web scraper or 17track used";
+                        if (r === "scraper_blocked")
+                          return "Web scraper blocked by reCaptcha — fell back to 17track or ParcelsApp API";
+                        if (r === "17track_quota_exhausted")
+                          return "17track monthly quota exhausted — fell back to ParcelsApp API";
+                        if (r === "17track_error")
+                          return "17track failed — fell back to ParcelsApp API";
                         return `Fallback used: ${r}`;
                       })()}
                     </p>

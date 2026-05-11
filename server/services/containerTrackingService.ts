@@ -40,6 +40,8 @@ import {
   deriveEstimatedDeliveryDate,
   type ParcelsAppShipment,
 } from "../lib/parcelsAppClient";
+import { scrapeTracking, isScraperAvailable } from "../lib/parcelsAppScraper";
+import * as seventeenTrack from "../lib/trackingProviders/seventeenTrackProvider";
 import { resolveProvider } from "../lib/trackingProviders/providerResolver";
 import { isConfigured as isMaerskConfigured } from "../lib/trackingProviders/maerskProvider";
 import { isEnabled as isMaerskPublicEnabled } from "../lib/trackingProviders/maerskPublicProvider";
@@ -119,8 +121,40 @@ function anyProviderConfigured(): boolean {
     isMaerskConfigured() ||
     isMaerskPublicEnabled() ||
     isCmaPublicEnabled() ||
-    !!process.env.PARCELSAPP_API_KEY
+    !!process.env.PARCELSAPP_API_KEY ||
+    seventeenTrack.isConfigured() ||
+    isScraperAvailable()
   );
+}
+
+/**
+ * Count 17track credits used this calendar month.
+ * Only 'success' and 'error' rows count (same pattern as ParcelsApp).
+ */
+export async function get17trackUsageStats(): Promise<{ used: number; limit: number }> {
+  const limit = seventeenTrack.getMonthlyLimit();
+  try {
+    const now = new Date();
+    const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const result = await db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(containerTrackingChecks)
+      .where(
+        and(
+          eq(containerTrackingChecks.provider, "17track"),
+          inArray(containerTrackingChecks.status, ["success", "error"]),
+          gte(containerTrackingChecks.checkedAt, startOfMonth),
+        ),
+      );
+    return { used: result[0]?.count ?? 0, limit };
+  } catch {
+    return { used: 0, limit };
+  }
+}
+
+async function check17trackQuota(): Promise<boolean> {
+  const { used, limit } = await get17trackUsageStats();
+  return used < limit;
 }
 
 // ── Fallback reason derivation ────────────────────────────────────────────────
@@ -599,7 +633,7 @@ async function trackOneContainer(
   );
 }
 
-// ─── ParcelsApp fallback — single attempt per container check ─────────────────
+// ─── Universal fallback — scraper → 17track → ParcelsApp API ──────────────────
 
 async function trackViaParcelsApp(
   containerId: number,
@@ -615,37 +649,128 @@ async function trackViaParcelsApp(
   lastCheckedAt: Date;
   error: string | null;
 }> {
+
+  // ── Attempt 1: Puppeteer stealth scraper (no API key, no quota cost) ─────────
+  if (isScraperAvailable()) {
+    console.log(`[ContainerTracking] ${containerNumber}: trying ParcelsApp web scraper...`);
+    const scraped = await scrapeTracking(containerNumber);
+
+    await saveTrackingCheck(
+      containerId,
+      "parcelsapp_scraper",
+      scraped.success ? "success" : scraped.blocked ? "blocked" : "error",
+      scraped.error ?? null,
+      scraped.rawResponse ?? null,
+    );
+
+    if (scraped.success && scraped.shipment) {
+      const shipment = scraped.shipment;
+      const lastStatus            = deriveLastStatus(shipment);
+      const lastLocation          = deriveLastLocation(shipment);
+      const lastEventDate         = deriveLastEventDate(shipment);
+      const lastDescription       = shipment.states?.[0]?.description ?? null;
+      const estimatedDeliveryDate = deriveEstimatedDeliveryDate(shipment);
+
+      await saveParcelsAppEvents(containerId, shipment);
+
+      const updateSet: Record<string, unknown> = {
+        trackingLastCheckedAt: now,
+        trackingLastStatus: lastStatus,
+        trackingLastEventDate: lastEventDate,
+        trackingLastDescription: lastDescription,
+        trackingError: null,
+        trackingChangedAt: now,
+        trackingProvider: "parcelsapp_scraper",
+        trackingDetectedCarrier: detectedCarrier,
+        trackingFallbackUsed: !!fallbackReason,
+        trackingFallbackReason: fallbackReason,
+      };
+      if (estimatedDeliveryDate) { updateSet.eta = estimatedDeliveryDate; updateSet.etaSource = "api"; }
+      await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+
+      console.log(`[ContainerTracking] ${containerNumber} → parcelsapp_scraper: status=${lastStatus ?? "?"}`);
+      return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
+    }
+
+    if (scraped.blocked) {
+      console.warn(`[ContainerTracking] ${containerNumber}: scraper blocked by reCaptcha — trying 17track...`);
+    } else {
+      console.warn(`[ContainerTracking] ${containerNumber}: scraper failed (${scraped.error}) — trying 17track...`);
+    }
+  }
+
+  // ── Attempt 2: 17track API ────────────────────────────────────────────────────
+  if (seventeenTrack.isConfigured()) {
+    const quotaOk17 = await check17trackQuota();
+    if (!quotaOk17) {
+      console.warn(`[ContainerTracking] ${containerNumber}: 17track quota exhausted — skipping`);
+    } else {
+      console.log(`[ContainerTracking] ${containerNumber}: trying 17track...`);
+      const result17 = await seventeenTrack.track(containerNumber);
+
+      await saveTrackingCheck(
+        containerId,
+        "17track",
+        result17.success ? "success" : result17.noData ? "no_data" : "error",
+        result17.error ?? null,
+        result17.raw,
+      );
+
+      if (result17.success) {
+        await saveDirectEvents(containerId, result17);
+
+        const updateSet: Record<string, unknown> = {
+          trackingLastCheckedAt: now,
+          trackingLastStatus: result17.latestStatus,
+          trackingLastEventDate: result17.latestEventDate,
+          trackingLastDescription: result17.latestDescription,
+          trackingError: null,
+          trackingChangedAt: now,
+          trackingProvider: "17track",
+          trackingDetectedCarrier: detectedCarrier,
+          trackingFallbackUsed: !!fallbackReason,
+          trackingFallbackReason: fallbackReason,
+        };
+        if (result17.eta) { updateSet.eta = result17.eta; updateSet.etaSource = "api"; }
+        await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+
+        console.log(`[ContainerTracking] ${containerNumber} → 17track: status=${result17.latestStatus ?? "?"}`);
+        return {
+          success: true,
+          lastStatus: result17.latestStatus,
+          lastLocation: result17.latestLocation,
+          lastDescription: result17.latestDescription,
+          lastCheckedAt: now,
+          error: null,
+        };
+      }
+
+      console.warn(`[ContainerTracking] ${containerNumber}: 17track failed (${result17.error}) — trying ParcelsApp API...`);
+    }
+  }
+
+  // ── Attempt 3: ParcelsApp API (quota-limited) ─────────────────────────────────
   if (!process.env.PARCELSAPP_API_KEY) {
+    const noProviderError = "No tracking provider configured (scraper unavailable, 17track not set, ParcelsApp key missing)";
     await db
       .update(containers)
       .set({
         trackingLastCheckedAt: now,
-        trackingError: "No tracking provider configured",
+        trackingError: noProviderError,
         trackingDetectedCarrier: detectedCarrier,
         trackingFallbackUsed: !!fallbackReason,
         trackingFallbackReason: fallbackReason,
       } as any)
       .where(eq(containers.id, containerId));
-
-    return {
-      success: false,
-      lastStatus: null,
-      lastLocation: null,
-      lastDescription: null,
-      lastCheckedAt: now,
-      error: "No tracking provider configured",
-    };
+    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: noProviderError };
   }
 
-  // Check monthly quota before calling ParcelsApp (DB-sourced — survives restarts)
   const quotaOk = await checkParcelsAppQuota();
   if (!quotaOk) {
     const { used, limit } = await getParcelsAppUsageStats();
-    const quotaError = `ParcelsApp monthly quota exhausted (${used}/${limit})`;
+    const quotaError = `All providers exhausted — ParcelsApp API quota used (${used}/${limit})`;
     console.warn(`[ContainerTracking] ${containerNumber}: ${quotaError}`);
-
     await saveTrackingCheck(containerId, "skipped", "skipped_quota", quotaError, null);
-
     await db
       .update(containers)
       .set({
@@ -656,24 +781,11 @@ async function trackViaParcelsApp(
         trackingFallbackReason: fallbackReason ?? "parcelsapp_quota_exhausted",
       } as any)
       .where(eq(containers.id, containerId));
-
-    return {
-      success: false,
-      lastStatus: null,
-      lastLocation: null,
-      lastDescription: null,
-      lastCheckedAt: now,
-      error: quotaError,
-    };
+    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: quotaError };
   }
 
-  // ── Single ParcelsApp attempt — carrier hint OR auto-detect ───────────────
-  const hintCarrier =
-    detectedCarrier && detectedCarrier !== "OTHER" ? detectedCarrier : undefined;
-
-  console.log(
-    `[ContainerTracking] ${containerNumber}: ParcelsApp attempt carrier=${hintCarrier ?? "auto"}`,
-  );
+  const hintCarrier = detectedCarrier && detectedCarrier !== "OTHER" ? detectedCarrier : undefined;
+  console.log(`[ContainerTracking] ${containerNumber}: ParcelsApp API attempt carrier=${hintCarrier ?? "auto"}`);
 
   const result = await trackContainer(containerNumber, "United States", hintCarrier);
 
@@ -697,29 +809,17 @@ async function trackViaParcelsApp(
         trackingFallbackReason: fallbackReason,
       } as any)
       .where(eq(containers.id, containerId));
-
-    return {
-      success: false,
-      lastStatus: null,
-      lastLocation: null,
-      lastDescription: null,
-      lastCheckedAt: now,
-      error: result.error ?? "Tracking failed",
-    };
+    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: result.error ?? "Tracking failed" };
   }
 
   const shipment = result.shipment;
-  const lastStatus = deriveLastStatus(shipment);
-  const lastLocation = deriveLastLocation(shipment);
-  const lastEventDate = deriveLastEventDate(shipment);
-  const lastDescription = shipment.states?.[0]?.description ?? null;
+  const lastStatus            = deriveLastStatus(shipment);
+  const lastLocation          = deriveLastLocation(shipment);
+  const lastEventDate         = deriveLastEventDate(shipment);
+  const lastDescription       = shipment.states?.[0]?.description ?? null;
   const estimatedDeliveryDate = deriveEstimatedDeliveryDate(shipment);
 
-  console.log(
-    `[ContainerTracking] ${containerNumber} raw attributes:`,
-    JSON.stringify(shipment.attributes ?? {}),
-  );
-
+  console.log(`[ContainerTracking] ${containerNumber} raw attributes:`, JSON.stringify(shipment.attributes ?? {}));
   await saveParcelsAppEvents(containerId, shipment);
 
   const updateSet: Record<string, unknown> = {
@@ -734,27 +834,11 @@ async function trackViaParcelsApp(
     trackingFallbackUsed: !!fallbackReason,
     trackingFallbackReason: fallbackReason,
   };
-
-  if (estimatedDeliveryDate) {
-    updateSet.eta = estimatedDeliveryDate;
-    updateSet.etaSource = "api";
-  }
-
+  if (estimatedDeliveryDate) { updateSet.eta = estimatedDeliveryDate; updateSet.etaSource = "api"; }
   await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
 
-  console.log(
-    `[ContainerTracking] ${containerNumber} → parcelsapp: ` +
-      `status=${lastStatus ?? "?"} location=${lastLocation ?? "?"} eta=${estimatedDeliveryDate ?? "none"}`,
-  );
-
-  return {
-    success: true,
-    lastStatus,
-    lastLocation,
-    lastDescription,
-    lastCheckedAt: now,
-    error: null,
-  };
+  console.log(`[ContainerTracking] ${containerNumber} → parcelsapp: status=${lastStatus ?? "?"} eta=${estimatedDeliveryDate ?? "none"}`);
+  return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
 }
 
 // ─── Event persistence ─────────────────────────────────────────────────────────
