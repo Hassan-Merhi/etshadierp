@@ -28,6 +28,7 @@ import { isEnabled as isMaerskPublicEnabled } from "../lib/trackingProviders/mae
 import { isEnabled as isCmaPublicEnabled } from "../lib/trackingProviders/cmaPublicProvider";
 import { isConfigured as is17trackConfigured, getMonthlyLimit as get17trackLimit } from "../lib/trackingProviders/seventeenTrackProvider";
 import { isScraperAvailable } from "../lib/parcelsAppScraper";
+import { isHttpScraperAvailable } from "../lib/httpTrackingScraper";
 
 const ALLOWED_ROLES = ["Admin", "Developer", "Owner"] as const;
 
@@ -86,7 +87,8 @@ export function registerContainerTrackingRoutes(app: Express) {
       { used: seventeenTrackUsage, limit: seventeenTrackLimit },
     ] = await Promise.all([getParcelsAppUsageStats(), get17trackUsageStats()]);
 
-    const scraperAvailable  = isScraperAvailable();
+    const scraperAvailable    = isScraperAvailable();
+    const httpScraperAvailable = isHttpScraperAvailable();
     const seventeenConfigured = is17trackConfigured();
 
     const now = new Date();
@@ -102,17 +104,19 @@ export function registerContainerTrackingRoutes(app: Express) {
     const perRunBudget = Math.max(1, Math.floor(dailyBudget / 4));
 
     res.json({
-      configured: maerskConfigured || maerskPublicEnabled || cmaPublicEnabled || parcelsAppConfigured || scraperAvailable || seventeenConfigured,
+      configured: maerskConfigured || maerskPublicEnabled || cmaPublicEnabled || parcelsAppConfigured || scraperAvailable || seventeenConfigured || httpScraperAvailable,
       maerskConfigured,
       parcelsAppConfigured,
       publicProvidersEnabled,
       maerskPublicEnabled,
       cmaPublicEnabled,
       directProviders,
-      fallbackProvider: "parcelsapp_scraper",
+      fallbackProvider: "http_scraper",
+      // ── HTTP scraper (no browser) ──────────────────────────────────────────
+      httpScraperAvailable,
       // ── Puppeteer stealth scraper ──────────────────────────────────────────
       scraperAvailable,
-      scraperStatus: scraperAvailable ? "ready" : "not_installed",
+      scraperStatus: scraperAvailable ? "ready" : "unavailable",
       // ── 17track ────────────────────────────────────────────────────────────
       seventeenTrackConfigured: seventeenConfigured,
       seventeenTrackUsageThisMonth: seventeenTrackUsage,

@@ -18,6 +18,35 @@ import type { ParcelsAppShipment } from "./parcelsAppClient";
 // createRequire lets us use require() from an ESM / "type":"module" context.
 const _require = createRequire(import.meta.url);
 
+/**
+ * Returns the path to a usable Chromium binary, checking in order:
+ *   1. PUPPETEER_EXECUTABLE_PATH env override
+ *   2. System-installed chromium / chromium-browser / google-chrome (from Nix)
+ *   3. Puppeteer's own downloaded Chrome binary
+ */
+function getChromiumPath(): string | null {
+  // 1. Explicit env override
+  const envPath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  if (envPath && existsSync(envPath)) return envPath;
+
+  // 2. System Nix / PATH binaries
+  for (const cmd of ["chromium", "chromium-browser", "google-chrome", "google-chrome-stable"]) {
+    try {
+      const p = execSync(`which ${cmd} 2>/dev/null`, { encoding: "utf8", timeout: 3000 }).trim();
+      if (p && existsSync(p)) return p;
+    } catch { /* not found, try next */ }
+  }
+
+  // 3. Puppeteer bundled Chrome
+  try {
+    const puppeteer = _require("puppeteer");
+    const p: string = typeof puppeteer.executablePath === "function" ? puppeteer.executablePath() : "";
+    if (p && existsSync(p)) return p;
+  } catch { /* puppeteer not installed */ }
+
+  return null;
+}
+
 export interface ScraperResult {
   success: boolean;
   shipment: ParcelsAppShipment | null;
@@ -36,12 +65,7 @@ export function isScraperAvailable(): boolean {
     _require.resolve("puppeteer-extra");
     _require.resolve("puppeteer-extra-plugin-stealth");
     _require.resolve("puppeteer");
-    const puppeteer = _require("puppeteer");
-    const chromePath: string =
-      typeof puppeteer.executablePath === "function"
-        ? puppeteer.executablePath()
-        : "";
-    return !!chromePath && existsSync(chromePath);
+    return !!getChromiumPath();
   } catch {
     return false;
   }
@@ -53,10 +77,9 @@ export function isScraperAvailable(): boolean {
  * is already present.  Logs progress so deployment issues are visible.
  */
 export async function ensureChromiumAvailable(): Promise<void> {
-  // isScraperAvailable() also verifies the binary — if it returns true,
-  // Chrome is already present and we can skip the download entirely.
   if (isScraperAvailable()) {
-    console.log("[Puppeteer] Chrome binary found — scraper ready.");
+    const chromePath = getChromiumPath();
+    console.log("[Puppeteer] Chrome binary found — scraper ready.", chromePath);
     return;
   }
 
@@ -68,6 +91,7 @@ export async function ensureChromiumAvailable(): Promise<void> {
     return;
   }
 
+  // Try downloading Puppeteer's bundled Chrome as a last resort
   try {
     const puppeteer = _require("puppeteer");
     const chromePath: string =
@@ -75,10 +99,10 @@ export async function ensureChromiumAvailable(): Promise<void> {
         ? puppeteer.executablePath()
         : "";
     if (!chromePath) {
-      console.log("[Puppeteer] Could not determine Chrome path — skipping download.");
+      console.log("[Puppeteer] Could not determine Chrome path — scraper unavailable.");
       return;
     }
-    console.log("[Puppeteer] Chrome binary not found at", chromePath, "— downloading now (this may take a minute)...");
+    console.log("[Puppeteer] No Chrome found — attempting download (may take a minute)...");
     execSync("npx puppeteer browsers install chrome", {
       stdio: "inherit",
       timeout: 180_000,
@@ -86,7 +110,7 @@ export async function ensureChromiumAvailable(): Promise<void> {
     if (existsSync(chromePath)) {
       console.log("[Puppeteer] Chrome download complete — scraper ready.");
     } else {
-      console.warn("[Puppeteer] Chrome still not found after download — scraper will be unavailable.");
+      console.warn("[Puppeteer] Chrome still not found after download — scraper unavailable.");
     }
   } catch (err: any) {
     console.warn("[Puppeteer] Chrome setup error:", err?.message ?? err);
@@ -107,8 +131,10 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
     const StealthPlugin  = _require("puppeteer-extra-plugin-stealth") as any;
     puppeteerExtra.use(StealthPlugin());
 
+    const chromePath = getChromiumPath();
     browser = await puppeteerExtra.launch({
       headless: true,
+      ...(chromePath ? { executablePath: chromePath } : {}),
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",

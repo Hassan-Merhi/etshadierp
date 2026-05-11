@@ -448,6 +448,7 @@ function ContainerDrawer({
     schedulerDailyBudget: number;
     schedulerPerRunBudget: number;
     // Puppeteer stealth scraper
+    httpScraperAvailable: boolean;
     scraperAvailable: boolean;
     scraperStatus: string;
     // 17track
@@ -781,29 +782,39 @@ function ContainerDrawer({
                     </div>
                   );
 
+                  const httpOk    = trackingStatus.httpScraperAvailable;
                   const scraperOk = trackingStatus.scraperAvailable;
-                  const stOk = trackingStatus.seventeenTrackConfigured && !trackingStatus.seventeenTrackQuotaExhausted;
-                  const paOk = trackingStatus.parcelsAppConfigured && !trackingStatus.parcelsAppQuotaExhausted;
+                  const stOk      = trackingStatus.seventeenTrackConfigured && !trackingStatus.seventeenTrackQuotaExhausted;
+                  const paOk      = trackingStatus.parcelsAppConfigured && !trackingStatus.parcelsAppQuotaExhausted;
 
                   return (
                     <div className="space-y-1.5">
-                      {/* 1. Web scraper */}
+                      {/* 1. HTTP scraper (no browser) */}
                       <Row
-                        testId="row-scraper"
-                        label="1. ParcelsApp web scraper (no quota)"
-                        badge={scraperOk ? "Ready" : "Installing…"}
-                        badgeColor={scraperOk
-                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                          : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"}
-                        detail={scraperOk
-                          ? "Puppeteer stealth — bypasses reCaptcha"
-                          : "Chrome is downloading in the background — restart app to re-check"}
+                        testId="row-http-scraper"
+                        label="1. HTTP scraper (no browser)"
+                        badge="Ready"
+                        badgeColor="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                        detail="Tries ParcelsApp API & page directly — fastest, no quota"
                       />
 
-                      {/* 2. 17track */}
+                      {/* 2. Puppeteer web scraper */}
+                      <Row
+                        testId="row-scraper"
+                        label="2. Puppeteer web scraper (no quota)"
+                        badge={scraperOk ? "Ready" : "Unavailable"}
+                        badgeColor={scraperOk
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                          : "bg-muted text-muted-foreground"}
+                        detail={scraperOk
+                          ? "Stealth Chrome — handles reCaptcha via real browser"
+                          : "Chrome not available in this environment"}
+                      />
+
+                      {/* 3. 17track */}
                       <Row
                         testId="row-17track"
-                        label="2. 17track API"
+                        label="3. 17track API"
                         badge={
                           !trackingStatus.seventeenTrackConfigured
                             ? "Not configured"
@@ -839,10 +850,10 @@ function ContainerDrawer({
                         }
                       />
 
-                      {/* 3. ParcelsApp API */}
+                      {/* 4. ParcelsApp API */}
                       <Row
                         testId="row-parcelsapp-api"
-                        label="3. ParcelsApp API (fallback)"
+                        label="4. ParcelsApp API (fallback)"
                         badge={
                           !trackingStatus.parcelsAppConfigured
                             ? "Not configured"
@@ -866,8 +877,8 @@ function ContainerDrawer({
                         }
                       />
 
-                      {/* Alert if no provider is active */}
-                      {!scraperOk && !stOk && !paOk && (
+                      {/* Alert if no useful provider is active */}
+                      {!httpOk && !scraperOk && !stOk && !paOk && (
                         <div className="flex items-start gap-1.5 pt-1">
                           <span className="text-xs text-red-600 dark:text-red-400">
                             No active tracking provider — containers will not update automatically.

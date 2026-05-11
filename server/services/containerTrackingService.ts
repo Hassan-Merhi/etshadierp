@@ -41,6 +41,7 @@ import {
   type ParcelsAppShipment,
 } from "../lib/parcelsAppClient";
 import { scrapeTracking, isScraperAvailable } from "../lib/parcelsAppScraper";
+import { httpScrapeTracking, isHttpScraperAvailable } from "../lib/httpTrackingScraper";
 import * as seventeenTrack from "../lib/trackingProviders/seventeenTrackProvider";
 import { resolveProvider } from "../lib/trackingProviders/providerResolver";
 import { isConfigured as isMaerskConfigured } from "../lib/trackingProviders/maerskProvider";
@@ -649,6 +650,51 @@ async function trackViaParcelsApp(
   lastCheckedAt: Date;
   error: string | null;
 }> {
+
+  // ── Attempt 0: Lightweight HTTP scraper (no browser, no quota) ──────────────
+  if (isHttpScraperAvailable()) {
+    console.log(`[ContainerTracking] ${containerNumber}: trying HTTP scraper (no browser)...`);
+    const httpResult = await httpScrapeTracking(containerNumber);
+
+    await saveTrackingCheck(
+      containerId,
+      "http_scraper",
+      httpResult.success ? "success" : "error",
+      httpResult.error ?? null,
+      httpResult.rawResponse ?? null,
+    );
+
+    if (httpResult.success && httpResult.shipment) {
+      const shipment = httpResult.shipment;
+      const lastStatus            = deriveLastStatus(shipment);
+      const lastLocation          = deriveLastLocation(shipment);
+      const lastEventDate         = deriveLastEventDate(shipment);
+      const lastDescription       = shipment.states?.[0]?.description ?? null;
+      const estimatedDeliveryDate = deriveEstimatedDeliveryDate(shipment);
+
+      await saveParcelsAppEvents(containerId, shipment);
+
+      const updateSet: Record<string, unknown> = {
+        trackingLastCheckedAt: now,
+        trackingLastStatus: lastStatus,
+        trackingLastEventDate: lastEventDate,
+        trackingLastDescription: lastDescription,
+        trackingError: null,
+        trackingChangedAt: now,
+        trackingProvider: "http_scraper",
+        trackingDetectedCarrier: detectedCarrier,
+        trackingFallbackUsed: !!fallbackReason,
+        trackingFallbackReason: fallbackReason,
+      };
+      if (estimatedDeliveryDate) { updateSet.eta = estimatedDeliveryDate; updateSet.etaSource = "api"; }
+      await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+
+      console.log(`[ContainerTracking] ${containerNumber} → http_scraper: status=${lastStatus ?? "?"}`);
+      return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
+    }
+
+    console.log(`[ContainerTracking] ${containerNumber}: HTTP scraper got no data (${httpResult.error}) — trying Puppeteer...`);
+  }
 
   // ── Attempt 1: Puppeteer stealth scraper (no API key, no quota cost) ─────────
   if (isScraperAvailable()) {
