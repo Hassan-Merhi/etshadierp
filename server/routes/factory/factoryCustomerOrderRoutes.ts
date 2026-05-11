@@ -3318,6 +3318,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
               FROM factory_bales
               WHERE company_id = ${companyId}
                 AND status = 'IN_STOCK'
+                AND deleted_at IS NULL
                 AND article_code IN (${codesList})
               GROUP BY article_code`,
         );
