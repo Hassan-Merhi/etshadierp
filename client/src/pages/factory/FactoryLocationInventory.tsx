@@ -1239,11 +1239,11 @@ export default function FactoryLocationInventory() {
   const statsCostValue = activeInventoryData.reduce((s, p) => s + p.baleCount * p.productionPrice, 0);
   const statsSellValue = activeInventoryData.reduce((s, p) => s + p.baleCount * parseFloat(p.sellingPrice || "0"), 0);
 
-  const totalBales = regularProducts.reduce((s, p) => s + p.baleCount, 0);
+  const totalBales = regularProducts.reduce((s, p) => s + p.baleCount - (p.loadingCount ?? 0), 0);
   const totalKg = regularProducts.reduce((s, p) => s + p.totalWeight, 0);
   const totalSellValue = regularProducts.reduce((s, p) => s + p.baleCount * parseFloat(p.sellingPrice || "0"), 0);
   const totalProdValue = regularProducts.reduce((s, p) => s + p.baleCount * p.productionPrice, 0);
-  const spTotalBales = specialProducts.reduce((s, p) => s + p.baleCount, 0);
+  const spTotalBales = specialProducts.reduce((s, p) => s + p.baleCount - (p.loadingCount ?? 0), 0);
   const spTotalKg = specialProducts.reduce((s, p) => s + p.totalWeight, 0);
   const spTotalSellValue = specialProducts.reduce((s, p) => s + p.baleCount * parseFloat(p.sellingPrice || "0"), 0);
   const spTotalProdValue = specialProducts.reduce((s, p) => s + p.baleCount * p.productionPrice, 0);

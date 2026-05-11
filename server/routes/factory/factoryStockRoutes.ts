@@ -1683,15 +1683,41 @@ export function registerFactoryStockRoutes(app: Express) {
         conditions.push(eq(factoryBales.erpLocationId, locationId));
       }
 
-      const rows = await db
-        .select({ articleCode: factoryBales.articleCode, count: sql<number>`SUM(COALESCE(quantity, 1))::int` })
+      const inStockBales = await db
+        .select({ id: factoryBales.id, articleCode: factoryBales.articleCode, quantity: factoryBales.quantity })
         .from(factoryBales)
-        .where(and(...conditions))
-        .groupBy(factoryBales.articleCode);
+        .where(and(...conditions));
 
+      // Build initial totals from IN_STOCK bales
       const result: Record<string, number> = {};
       articleCodes.forEach((c) => { result[c] = 0; });
-      rows.forEach((r) => { if (r.articleCode) result[r.articleCode] = r.count; });
+      for (const b of inStockBales) {
+        if (b.articleCode) {
+          result[b.articleCode] = (result[b.articleCode] || 0) + parseFloat(String(b.quantity || "1"));
+        }
+      }
+
+      // Subtract bales currently scanned into an active LOADING order
+      const baleIds = inStockBales.map((b) => b.id).filter((id): id is number => id != null);
+      if (baleIds.length > 0) {
+        const loadingRows = await db
+          .select({ baleId: customerOrderBales.baleId })
+          .from(customerOrderBales)
+          .innerJoin(customerOrders, eq(customerOrderBales.orderId, customerOrders.id))
+          .where(
+            and(
+              eq(customerOrders.status, "LOADING"),
+              inArray(customerOrderBales.baleId, baleIds),
+            )
+          );
+        const loadingBaleIds = new Set(loadingRows.map((r) => r.baleId));
+        for (const b of inStockBales) {
+          if (b.id && b.articleCode && loadingBaleIds.has(b.id)) {
+            const qty = parseFloat(String(b.quantity || "1"));
+            result[b.articleCode] = Math.max(0, (result[b.articleCode] || 0) - qty);
+          }
+        }
+      }
 
       res.json(result);
     } catch (error: any) {
