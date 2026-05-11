@@ -1,12 +1,17 @@
 /**
  * providerResolver.ts — Detect carrier from container number prefix and return
- * the correct direct provider to try before falling back to ParcelsApp.
+ * the ordered list of direct providers to try before falling back to ParcelsApp.
  *
- * ISO container numbers: 4-letter owner code + 6 digits + 1 check digit.
- * The first 4 letters identify the equipment owner/operator.
+ * Provider order per carrier:
+ *   MAERSK: 1. Maersk official API (if credentials set)
+ *           2. Maersk public page  (if MAERSK_PUBLIC_TRACKING_ENABLED=true)
+ *   CMA:    1. CMA public page     (if CMA_PUBLIC_TRACKING_ENABLED=true)
+ *   Other:  → ParcelsApp only
  */
 
 import * as maerskProvider from "./maerskProvider";
+import * as maerskPublicProvider from "./maerskPublicProvider";
+import * as cmaPublicProvider from "./cmaPublicProvider";
 import type { CarrierTrackResult } from "./types";
 
 export type DetectedCarrier = "MAERSK" | "CMA" | "MSC" | "HAPAG" | "OTHER" | null;
@@ -19,7 +24,7 @@ const PREFIX_MAP: Record<string, DetectedCarrier> = {
   MCIU: "MAERSK", SUDU: "MAERSK", HASU: "MAERSK", TRHU: "MAERSK",
   TEMU: "MAERSK", SEAU: "MAERSK", PONU: "MAERSK", SEGU: "MAERSK",
 
-  // ── CMA CGM (incl. ANL, APL, CNC) — no provider yet, placeholder ──────────
+  // ── CMA CGM (incl. ANL, APL, CNC) ─────────────────────────────────────────
   CMAU: "CMA", CGMU: "CMA", APMU: "CMA", APHU: "CMA",
   CXDU: "CMA", CAAU: "CMA", CAJU: "CMA", CAIU: "CMA",
 
@@ -52,38 +57,55 @@ export function detectCarrier(containerNumber: string): DetectedCarrier {
 export interface ProviderResolution {
   detectedCarrier: DetectedCarrier;
   /**
-   * Call this to attempt direct-carrier tracking.
-   * Null when no direct provider is available for this carrier
-   * (not configured, or carrier has no provider wired yet).
+   * Ordered list of direct-carrier providers to try before falling back to
+   * ParcelsApp. Each entry is a zero-argument function that returns a result.
+   * Empty array means go straight to ParcelsApp.
    */
-  tryDirect: (() => Promise<CarrierTrackResult>) | null;
+  tryDirect: Array<() => Promise<CarrierTrackResult>>;
 }
 
 /**
- * Given a container number, return the detected carrier and a function to
- * attempt direct tracking before falling back to ParcelsApp.
+ * Returns true if at least one non-ParcelsApp direct provider is available
+ * (configured or enabled via env flag). Used to decide whether any direct
+ * attempt is worth making.
+ */
+export function anyDirectProviderPossible(): boolean {
+  return (
+    maerskProvider.isConfigured() ||
+    maerskPublicProvider.isEnabled() ||
+    cmaPublicProvider.isEnabled()
+  );
+}
+
+/**
+ * Given a container number, return the detected carrier and the ordered list
+ * of direct providers to attempt before falling back to ParcelsApp.
  */
 export function resolveProvider(containerNumber: string): ProviderResolution {
   const detectedCarrier = detectCarrier(containerNumber);
+  const tryDirect: Array<() => Promise<CarrierTrackResult>> = [];
 
   // ── Maersk ────────────────────────────────────────────────────────────────
   if (detectedCarrier === "MAERSK") {
+    // 1. Official API — only if credentials are configured
     if (maerskProvider.isConfigured()) {
-      return {
-        detectedCarrier,
-        tryDirect: () => maerskProvider.track(containerNumber),
-      };
+      tryDirect.push(() => maerskProvider.track(containerNumber));
     }
-    // Credentials not set — fall through to ParcelsApp
-    return { detectedCarrier, tryDirect: null };
+    // 2. Public page — only if flag enabled (and official API didn't cover it)
+    if (maerskPublicProvider.isEnabled()) {
+      tryDirect.push(() => maerskPublicProvider.track(containerNumber));
+    }
+    return { detectedCarrier, tryDirect };
   }
 
-  // ── CMA CGM — provider stub ready for when CMACGM_API_KEY is obtained ─────
+  // ── CMA CGM ───────────────────────────────────────────────────────────────
   if (detectedCarrier === "CMA") {
-    // TODO: wire cmaCgmProvider here when CMACGM_API_KEY is configured
-    return { detectedCarrier, tryDirect: null };
+    if (cmaPublicProvider.isEnabled()) {
+      tryDirect.push(() => cmaPublicProvider.track(containerNumber));
+    }
+    return { detectedCarrier, tryDirect };
   }
 
   // All other carriers (MSC, HAPAG, leasing, unknown) → ParcelsApp only
-  return { detectedCarrier, tryDirect: null };
+  return { detectedCarrier, tryDirect: [] };
 }

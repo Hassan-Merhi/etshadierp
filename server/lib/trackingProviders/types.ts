@@ -3,6 +3,12 @@
  *
  * Every provider normalises its response into this shape so the tracking
  * service can treat them interchangeably and fall back cleanly.
+ *
+ * Provider ids in use:
+ *   "maersk"        — Maersk official OAuth2 API
+ *   "maersk_public" — Maersk public webpage (no credentials)
+ *   "cma_public"    — CMA CGM public webpage (no credentials)
+ *   "parcelsapp"    — ParcelsApp multi-carrier fallback
  */
 
 export interface TrackingEvent {
@@ -14,9 +20,9 @@ export interface TrackingEvent {
 
 export interface CarrierTrackResult {
   success: boolean;
-  /** Canonical provider id: "maersk" | "cmacgm" | "parcelsapp" */
+  /** Canonical provider id */
   provider: string;
-  /** Detected/confirmed carrier name: "MAERSK" | "CMA" | null */
+  /** Detected/confirmed carrier name */
   carrier: string | null;
   containerNumber: string;
   latestStatus: string | null;
@@ -28,6 +34,10 @@ export interface CarrierTrackResult {
   events: TrackingEvent[];
   raw: unknown;
   error?: string;
-  /** True when provider has no credentials configured — safe fallback, not a hard error */
+  /** Provider not configured — safe fallback, not a hard error */
   notConfigured?: boolean;
+  /** Provider was blocked by bot protection (Akamai, DataDome, Cloudflare) */
+  blocked?: boolean;
+  /** Provider responded but returned no useful tracking data */
+  noData?: boolean;
 }

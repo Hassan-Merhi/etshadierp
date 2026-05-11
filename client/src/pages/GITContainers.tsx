@@ -701,10 +701,20 @@ function ContainerDrawer({
                       className={
                         container.trackingProvider === "maersk"
                           ? "text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
-                          : "text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
+                          : container.trackingProvider === "maersk_public"
+                            ? "text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+                            : container.trackingProvider === "cma_public"
+                              ? "text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+                              : "text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
                       }
                     >
-                      {container.trackingProvider === "maersk" ? "Maersk direct" : "ParcelsApp"}
+                      {container.trackingProvider === "maersk"
+                        ? "Maersk official"
+                        : container.trackingProvider === "maersk_public"
+                          ? "Maersk public"
+                          : container.trackingProvider === "cma_public"
+                            ? "CMA public"
+                            : "ParcelsApp"}
                     </span>
                   )}
                 </div>
@@ -724,11 +734,29 @@ function ContainerDrawer({
                   >
                     <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0 mt-px" />
                     <p className="text-xs text-amber-700 dark:text-amber-300">
-                      {(container as any).trackingFallbackReason === "maersk_not_configured"
-                        ? "Maersk direct not configured — used ParcelsApp"
-                        : (container as any).trackingFallbackReason === "maersk_api_error"
-                          ? "Maersk direct failed — used ParcelsApp fallback"
-                          : "Fallback provider used"}
+                      {(() => {
+                        const r = (container as any).trackingFallbackReason as string | null;
+                        if (!r) return "Fallback provider used";
+                        if (r === "maersk_not_configured" || r === "maersk_official_not_configured")
+                          return "Maersk API not configured — used ParcelsApp fallback";
+                        if (r === "maersk_api_error" || r === "maersk_official_api_error")
+                          return "Maersk API failed — used ParcelsApp fallback";
+                        if (r === "maersk_public_blocked")
+                          return "Maersk public page blocked — used ParcelsApp fallback";
+                        if (r === "maersk_public_no_data")
+                          return "Maersk public returned no data — used ParcelsApp fallback";
+                        if (r === "maersk_public_error" || r.startsWith("maersk_public_"))
+                          return "Maersk public tracking failed — used ParcelsApp fallback";
+                        if (r === "cma_public_blocked")
+                          return "CMA public page blocked — used ParcelsApp fallback";
+                        if (r === "cma_public_no_data")
+                          return "CMA public returned no data — used ParcelsApp fallback";
+                        if (r === "cma_public_error" || r.startsWith("cma_public_"))
+                          return "CMA public tracking failed — used ParcelsApp fallback";
+                        if (r === "parcelsapp_quota_exhausted")
+                          return "ParcelsApp monthly quota exhausted — tracking skipped";
+                        return `Fallback used: ${r}`;
+                      })()}
                     </p>
                   </div>
                 )}

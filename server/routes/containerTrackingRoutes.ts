@@ -1,7 +1,7 @@
 /**
  * containerTrackingRoutes.ts — API endpoints for container tracking.
  *
- * Provider order: Maersk direct API → ParcelsApp fallback.
+ * Provider order: Maersk official → Maersk public → CMA public → ParcelsApp.
  * API keys are NEVER exposed to the client.
  * All routes require Admin, Developer, or Owner role.
  */
@@ -19,9 +19,12 @@ import {
   trackOneContainerById,
   trackAllEnabledNow,
   setBulkTrackingEnabled,
+  getParcelsAppUsageStats,
 } from "../services/containerTrackingService";
 import { testConnection } from "../lib/parcelsAppClient";
 import { isConfigured as isMaerskConfigured } from "../lib/trackingProviders/maerskProvider";
+import { isEnabled as isMaerskPublicEnabled } from "../lib/trackingProviders/maerskPublicProvider";
+import { isEnabled as isCmaPublicEnabled } from "../lib/trackingProviders/cmaPublicProvider";
 
 const ALLOWED_ROLES = ["Admin", "Developer", "Owner"] as const;
 
@@ -32,6 +35,15 @@ function requireAllowedRole(req: Request, res: Response): boolean {
     return false;
   }
   return true;
+}
+
+function anyProviderAvailable(): boolean {
+  return (
+    isMaerskConfigured() ||
+    isMaerskPublicEnabled() ||
+    isCmaPublicEnabled() ||
+    !!process.env.PARCELSAPP_API_KEY
+  );
 }
 
 const updateTrackingSettingsSchema = z.object({
@@ -47,18 +59,31 @@ export function registerContainerTrackingRoutes(app: Express) {
   app.get("/api/container-tracking/status", requireAuth, (req: Request, res: Response) => {
     if (!requireAllowedRole(req, res)) return;
 
-    const maerskConfigured = isMaerskConfigured();
+    const maerskConfigured   = isMaerskConfigured();
+    const maerskPublicEnabled = isMaerskPublicEnabled();
+    const cmaPublicEnabled    = isCmaPublicEnabled();
     const parcelsAppConfigured = !!process.env.PARCELSAPP_API_KEY;
+    const publicProvidersEnabled = maerskPublicEnabled || cmaPublicEnabled;
 
     const directProviders: string[] = [];
-    if (maerskConfigured) directProviders.push("maersk");
+    if (maerskConfigured)    directProviders.push("maersk");
+    if (maerskPublicEnabled) directProviders.push("maersk_public");
+    if (cmaPublicEnabled)    directProviders.push("cma_public");
+
+    const { used: parcelsAppUsageThisMonth, limit: parcelsAppMonthlyLimit } =
+      getParcelsAppUsageStats();
 
     res.json({
-      configured: maerskConfigured || parcelsAppConfigured,
+      configured: maerskConfigured || maerskPublicEnabled || cmaPublicEnabled || parcelsAppConfigured,
       maerskConfigured,
       parcelsAppConfigured,
+      publicProvidersEnabled,
+      maerskPublicEnabled,
+      cmaPublicEnabled,
       directProviders,
       fallbackProvider: "parcelsapp",
+      parcelsAppUsageThisMonth,
+      parcelsAppMonthlyLimit,
     });
   });
 
@@ -83,11 +108,11 @@ export function registerContainerTrackingRoutes(app: Express) {
       return;
     }
 
-    const maerskOk = isMaerskConfigured();
-    const parcelsOk = !!process.env.PARCELSAPP_API_KEY;
-    if (!maerskOk && !parcelsOk) {
+    if (!anyProviderAvailable()) {
       res.status(400).json({
-        message: "No tracking provider is configured. Add MAERSK_CONSUMER_KEY / MAERSK_CONSUMER_SECRET (free) or PARCELSAPP_API_KEY to your environment variables.",
+        message:
+          "No tracking provider is configured. Add MAERSK_CONSUMER_KEY / MAERSK_CONSUMER_SECRET, " +
+          "enable PUBLIC_CARRIER_TRACKING_ENABLED=true, or add PARCELSAPP_API_KEY.",
       });
       return;
     }
@@ -173,10 +198,11 @@ export function registerContainerTrackingRoutes(app: Express) {
   app.post("/api/container-tracking/bulk-track-now", requireAuth, async (req: Request, res: Response) => {
     if (!requireAllowedRole(req, res)) return;
 
-    const maerskOk = isMaerskConfigured();
-    const parcelsOk = !!process.env.PARCELSAPP_API_KEY;
-    if (!maerskOk && !parcelsOk) {
-      res.status(400).json({ message: "No tracking provider configured (MAERSK or PARCELSAPP)" });
+    if (!anyProviderAvailable()) {
+      res.status(400).json({
+        message:
+          "No tracking provider configured. Add MAERSK credentials, enable public tracking, or add PARCELSAPP_API_KEY.",
+      });
       return;
     }
 

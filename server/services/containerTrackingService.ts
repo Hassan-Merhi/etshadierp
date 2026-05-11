@@ -1,17 +1,21 @@
 /**
  * containerTrackingService.ts — Container tracking with carrier-first provider chain.
  *
- * Provider order:
- *   1. Maersk direct API (if MAERSK_CONSUMER_KEY + MAERSK_CONSUMER_SECRET set)
- *   2. CMA CGM direct API (stub — ready for CMACGM_API_KEY when obtained)
- *   3. ParcelsApp fallback (always available when PARCELSAPP_API_KEY set)
+ * Provider order per carrier:
+ *   MAERSK: 1. Maersk official API (if credentials set)
+ *           2. Maersk public page  (if MAERSK_PUBLIC_TRACKING_ENABLED=true)
+ *           3. ParcelsApp fallback
+ *   CMA:    1. CMA public page     (if CMA_PUBLIC_TRACKING_ENABLED=true)
+ *           2. ParcelsApp fallback
+ *   Other:  → ParcelsApp fallback only
  *
  * Rules:
  *   - NEVER overwrite status when current status is Offloaded, Closed, or Completed.
  *   - Manual status always wins over API status.
  *   - tracking_enabled must be true for auto-tracking.
  *   - Minimum 4-hour cooldown between automatic checks per container.
- *   - Credentials are never logged or sent to the frontend.
+ *   - Credentials and API keys are never logged or sent to the frontend.
+ *   - ParcelsApp monthly quota (PARCELSAPP_MONTHLY_LIMIT, default 500) is enforced.
  */
 
 import { db } from "../db";
@@ -30,27 +34,77 @@ import {
   deriveEstimatedDeliveryDate,
   type ParcelsAppShipment,
 } from "../lib/parcelsAppClient";
-import { resolveProvider } from "../lib/trackingProviders/providerResolver";
+import { resolveProvider, anyDirectProviderPossible } from "../lib/trackingProviders/providerResolver";
 import { isConfigured as isMaerskConfigured } from "../lib/trackingProviders/maerskProvider";
+import { isEnabled as isMaerskPublicEnabled } from "../lib/trackingProviders/maerskPublicProvider";
+import { isEnabled as isCmaPublicEnabled } from "../lib/trackingProviders/cmaPublicProvider";
 import type { CarrierTrackResult } from "../lib/trackingProviders/types";
 
 const INACTIVE_STATUSES = ["Offloaded", "Closed", "Completed"] as const;
 const INACTIVE_SET = new Set<string>(INACTIVE_STATUSES);
 
 const COOLDOWN_HOURS = 4;
-
-// Minimum length a real ISO container number must have.
-// Anything shorter is a placeholder like "NB NUMBER".
 const MIN_CONTAINER_NUMBER_LENGTH = 9;
 
-/** Returns true if at least one tracking provider is configured. */
+// ── ParcelsApp monthly quota tracking ────────────────────────────────────────
+
+let _parcelsAppUsageThisMonth = 0;
+let _parcelsAppMonthKey = "";
+
+function getParcelsMonthKey(): string {
+  const d = new Date();
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Increments usage counter and returns true if still within quota. */
+function consumeParcelsAppQuota(): boolean {
+  const key = getParcelsMonthKey();
+  if (key !== _parcelsAppMonthKey) {
+    _parcelsAppMonthKey = key;
+    _parcelsAppUsageThisMonth = 0;
+  }
+  const limit = Math.max(1, parseInt(process.env.PARCELSAPP_MONTHLY_LIMIT ?? "500") || 500);
+  if (_parcelsAppUsageThisMonth >= limit) return false;
+  _parcelsAppUsageThisMonth++;
+  return true;
+}
+
+/** Expose current usage stats for the status endpoint (no keys, counts only). */
+export function getParcelsAppUsageStats(): { used: number; limit: number } {
+  const key = getParcelsMonthKey();
+  if (key !== _parcelsAppMonthKey) {
+    _parcelsAppMonthKey = key;
+    _parcelsAppUsageThisMonth = 0;
+  }
+  const limit = Math.max(1, parseInt(process.env.PARCELSAPP_MONTHLY_LIMIT ?? "500") || 500);
+  return { used: _parcelsAppUsageThisMonth, limit };
+}
+
+// ── Provider availability ─────────────────────────────────────────────────────
+
+/** Returns true if at least one tracking provider is configured or enabled. */
 function anyProviderConfigured(): boolean {
-  return isMaerskConfigured() || !!process.env.PARCELSAPP_API_KEY;
+  return (
+    isMaerskConfigured() ||
+    isMaerskPublicEnabled() ||
+    isCmaPublicEnabled() ||
+    !!process.env.PARCELSAPP_API_KEY
+  );
 }
 
 /** Returns true if this container number looks like a real ISO number worth tracking. */
 function isTrackableNumber(containerNumber: string): boolean {
   return containerNumber.trim().length >= MIN_CONTAINER_NUMBER_LENGTH;
+}
+
+// ── Fallback reason derivation ────────────────────────────────────────────────
+
+function deriveFallbackReason(result: CarrierTrackResult): string {
+  const p = result.provider;
+  if (result.notConfigured) return `${p}_not_configured`;
+  if (result.blocked)       return `${p}_blocked`;
+  if (result.noData)        return `${p}_no_data`;
+  return `${p}_error`;
 }
 
 // ─── Public entry points ───────────────────────────────────────────────────────
@@ -220,78 +274,78 @@ async function trackOneContainer(
   const now = new Date();
   const { detectedCarrier, tryDirect } = resolveProvider(containerNumber);
 
-  // ── Step 1: attempt direct carrier API ──────────────────────────────────────
-  if (tryDirect) {
-    const directResult = await tryDirect();
+  // ── Step 1: attempt each direct provider in order ──────────────────────────
+  let lastDirectFallbackReason: string | null = null;
 
-    if (directResult.success) {
-      await saveDirectEvents(containerId, directResult);
-      await saveTrackingCheck(containerId, directResult.provider, "success", null, directResult.raw);
+  for (const attempt of tryDirect) {
+    const result = await attempt();
+
+    if (result.success) {
+      await saveDirectEvents(containerId, result);
+      await saveTrackingCheck(containerId, result.provider, "success", null, result.raw);
 
       const updateSet: Record<string, unknown> = {
         trackingLastCheckedAt: now,
-        trackingLastStatus: directResult.latestStatus,
-        trackingLastEventDate: directResult.latestEventDate,
-        trackingLastDescription: directResult.latestDescription,
+        trackingLastStatus: result.latestStatus,
+        trackingLastEventDate: result.latestEventDate,
+        trackingLastDescription: result.latestDescription,
         trackingError: null,
         trackingChangedAt: now,
-        trackingProvider: directResult.provider,
+        trackingProvider: result.provider,
         trackingDetectedCarrier: detectedCarrier,
         trackingFallbackUsed: false,
         trackingFallbackReason: null,
       };
 
-      if (directResult.eta) {
-        updateSet.eta = directResult.eta;
+      if (result.eta) {
+        updateSet.eta = result.eta;
         updateSet.etaSource = "api";
       }
 
       await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
 
       console.log(
-        `[ContainerTracking] ${containerNumber} → ${directResult.provider}: ` +
-          `status=${directResult.latestStatus ?? "?"} eta=${directResult.eta ?? "none"}`,
+        `[ContainerTracking] ${containerNumber} → ${result.provider}: ` +
+          `status=${result.latestStatus ?? "?"} eta=${result.eta ?? "none"}`,
       );
 
       return {
         success: true,
-        lastStatus: directResult.latestStatus,
-        lastLocation: directResult.latestLocation,
-        lastDescription: directResult.latestDescription,
+        lastStatus: result.latestStatus,
+        lastLocation: result.latestLocation,
+        lastDescription: result.latestDescription,
         lastCheckedAt: now,
         error: null,
       };
     }
 
-    // Direct provider failed — note why and fall through to ParcelsApp
-    const directError = directResult.notConfigured
-      ? `${directResult.provider}_not_configured`
-      : `${directResult.provider}_api_error`;
+    // This direct provider failed — record why and try the next one
+    const reason = deriveFallbackReason(result);
+    const checkStatus = result.blocked ? "blocked" : result.noData ? "no_data" : "error";
 
     await saveTrackingCheck(
       containerId,
-      directResult.provider,
-      "error",
-      directResult.error ?? directError,
+      result.provider,
+      checkStatus,
+      result.error ?? reason,
       null,
     );
 
     console.log(
-      `[ContainerTracking] ${containerNumber}: ${directResult.provider} failed (${directResult.error}) — falling back to ParcelsApp`,
+      `[ContainerTracking] ${containerNumber}: ${result.provider} failed (${reason}) — trying next provider`,
     );
 
-    // Fall through to ParcelsApp below, tagging the fallback reason
-    return await trackViaParcelsApp(
-      containerId,
-      containerNumber,
-      detectedCarrier,
-      directError,
-      now,
-    );
+    lastDirectFallbackReason = reason;
   }
 
-  // ── Step 2: no direct provider — use ParcelsApp directly ──────────────────
-  return await trackViaParcelsApp(containerId, containerNumber, detectedCarrier, null, now);
+  // ── Step 2: all direct providers exhausted — use ParcelsApp fallback ───────
+  return await trackViaParcelsApp(
+    containerId,
+    containerNumber,
+    detectedCarrier,
+    lastDirectFallbackReason,
+    now,
+  );
 }
 
 // ─── ParcelsApp fallback ───────────────────────────────────────────────────────
@@ -335,9 +389,34 @@ async function trackViaParcelsApp(
     };
   }
 
+  // Check monthly quota before calling ParcelsApp
+  if (!consumeParcelsAppQuota()) {
+    const { used, limit } = getParcelsAppUsageStats();
+    const quotaError = `ParcelsApp monthly quota exhausted (${used}/${limit})`;
+    console.warn(`[ContainerTracking] ${containerNumber}: ${quotaError}`);
+
+    await db
+      .update(containers)
+      .set({
+        trackingLastCheckedAt: now,
+        trackingError: quotaError,
+        trackingDetectedCarrier: detectedCarrier,
+        trackingFallbackUsed: !!fallbackReason,
+        trackingFallbackReason: fallbackReason ?? "parcelsapp_quota_exhausted",
+      } as any)
+      .where(eq(containers.id, containerId));
+
+    return {
+      success: false,
+      lastStatus: null,
+      lastLocation: null,
+      lastDescription: null,
+      lastCheckedAt: now,
+      error: quotaError,
+    };
+  }
+
   // Determine carrier hint for ParcelsApp.
-  // Maersk/CMA detected → pass carrier name so ParcelsApp knows where to look.
-  // Leasing / unknown → let ParcelsApp auto-detect.
   const hintCarrier =
     detectedCarrier && detectedCarrier !== "OTHER" ? detectedCarrier : undefined;
 
