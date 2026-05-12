@@ -801,9 +801,25 @@ function AuthenticatedApp() {
   const isFactoryCompany = selectedCompany?.companyType === "factory" || selectedCompany?.companyType === "factory_v2";
   const isFactoryRoute = currentLocation.startsWith("/factory/");
 
-  const factoryDefaultPage = "/factory/production-report";
+  // Compute the right landing page for this user.
+  // For restricted users (fullAccess:false) we walk the sidebar nav in order and
+  // return the first page that's in their pageKeys, so they never land on a page
+  // they can't access. Falls back to production-report for admins / while loading.
+  const factoryDefaultPage = (() => {
+    if (!myAccess || myAccess.fullAccess) return "/factory/production-report";
+    for (const section of FACTORY_NAV_SECTIONS) {
+      for (const item of section.items) {
+        const key = item.url.replace(/^\//, "");
+        if (myAccess.pageKeys.includes(key)) return item.url;
+      }
+    }
+    if (myAccess.pageKeys.includes("factory/daybook")) return "/factory/daybook";
+    return "/factory/production-report";
+  })();
 
   if (isFactoryCompany && !isFactoryRoute && currentLocation !== "/my-settings") {
+    // Wait for myAccess before redirecting so restricted users land on their real first page
+    if (myAccess === undefined) return null;
     return <Redirect to={factoryDefaultPage} />;
   }
 
@@ -896,7 +912,7 @@ function AuthenticatedApp() {
     // 3. hiddenCostFields — per-user tab restrictions that aren't in pageKeys
     if (currentLocation === "/factory/production-report" &&
         myAccess.hiddenCostFields?.includes("hide_tab_production_analytics")) {
-      return <Redirect to="/factory/raw-stock" />;
+      return <Redirect to={factoryDefaultPage} />;
     }
   }
   // ── End route-level access guard ───────────────────────────────────────────
@@ -1057,7 +1073,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/net-profit-analytics" component={FactoryNetProfitAnalytics} />
                     <Route path="/factory/net-position" component={FactoryNetPosition} />
                     <Route path="/factory/financial-snapshot" component={FactoryFinancialSnapshot} />
-                    <Route path="/factory/production-report">{() => myAccess?.hiddenCostFields?.includes("hide_tab_production_analytics") ? <Redirect to="/factory/raw-stock" /> : <DailyProductionReport />}</Route>
+                    <Route path="/factory/production-report">{() => myAccess?.hiddenCostFields?.includes("hide_tab_production_analytics") ? <Redirect to={factoryDefaultPage} /> : <DailyProductionReport />}</Route>
                     <Route path="/factory/rental/warehouses" component={FactoryRentalWarehouses} />
                     <Route path="/factory/rental/shops" component={FactoryRentalShops} />
                     <Route path="/factory/rental/payments" component={FactoryRentalPayments} />
