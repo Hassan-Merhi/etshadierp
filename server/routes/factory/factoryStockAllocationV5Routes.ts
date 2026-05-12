@@ -411,7 +411,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
               const remainingQty = Math.max(containerExpectedQty - loadedBales, 0);
               return {
                 orderId: o.id,
-                containerName: o.containerNumber ?? `Container #${o.id}`,
+                containerName: o.containerNumber || `Order #${o.id}`,
                 status: o.status,
                 expectedQty: containerExpectedQty,
                 loadedQty: loadedBales,
