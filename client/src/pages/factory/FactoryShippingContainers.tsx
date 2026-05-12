@@ -470,10 +470,13 @@ function DocumentsModal({
     setNewDocName("");
   }, [rowId]);
 
-  const docsKey = [LIST_KEY, rowId, "documents"];
+  // IMPORTANT: queryKey[0] must be the full fetch URL — the default fetcher uses only queryKey[0].
+  // Using [LIST_KEY, rowId, "documents"] would cause every refetch to hit LIST_KEY (the row list)
+  // instead of the documents endpoint, wiping the docs list after each optimistic update.
+  const docsKey = rowId !== null ? [`${LIST_KEY}/${rowId}/documents`] : [`${LIST_KEY}/null/documents`];
   const { data: docs = [], isLoading } = useQuery<ShippingDocument[]>({
     queryKey: docsKey,
-    enabled: open && !!rowId,
+    enabled: open && rowId !== null,
   });
 
   const uploadMutation = useMutation({
@@ -494,8 +497,9 @@ function DocumentsModal({
     },
     onSuccess: (doc: ShippingDocument) => {
       queryClient.setQueryData<ShippingDocument[]>(docsKey, (old = []) => [...old, doc]);
-      queryClient.invalidateQueries({ queryKey: [LIST_KEY] });
-      queryClient.refetchQueries({ queryKey: docsKey });
+      // Invalidate the main row list to refresh document counts, but NOT docsKey
+      // (docsKey already has the correct optimistic data from setQueryData above)
+      queryClient.invalidateQueries({ queryKey: [LIST_KEY], exact: true });
       setPendingFile(null);
       setNewDocName("");
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -517,8 +521,8 @@ function DocumentsModal({
       queryClient.setQueryData<ShippingDocument[]>(docsKey, (old = []) =>
         old.filter((d) => d.id !== deletedId),
       );
-      queryClient.invalidateQueries({ queryKey: [LIST_KEY] });
-      queryClient.refetchQueries({ queryKey: docsKey });
+      // Invalidate the main row list to refresh document counts, but NOT docsKey
+      queryClient.invalidateQueries({ queryKey: [LIST_KEY], exact: true });
       toast({ title: "Document removed" });
     },
     onError: (e: any) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
