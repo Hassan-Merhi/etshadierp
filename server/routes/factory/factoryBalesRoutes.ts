@@ -1971,7 +1971,7 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const barcode = req.params.barcode;
+      const barcode = req.params.barcode.toUpperCase();
       const batchId = req.query.batchId ? parseOptionalId(req.query.batchId) : null;
       const excludeIdsStr = req.query.excludeIds as string;
       const excludeIds = excludeIdsStr ? excludeIdsStr.split(",").map(Number).filter(n => !isNaN(n)) : [];

@@ -898,7 +898,7 @@ export function registerBaleRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const referenceNumber = decodeURIComponent(req.params.referenceNumber);
+      const referenceNumber = decodeURIComponent(req.params.referenceNumber).toUpperCase();
       const labelPrint = await storage.getBaleLabelPrintByReference(referenceNumber, companyId);
 
       // If no label print exists, try to find the bale directly in factory_bales
@@ -1167,7 +1167,7 @@ export function registerBaleRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const referenceNumber = decodeURIComponent(req.params.referenceNumber);
+      const referenceNumber = decodeURIComponent(req.params.referenceNumber).toUpperCase();
 
       const [updated] = await db
         .update(baleLabelPrints)
@@ -1201,7 +1201,7 @@ export function registerBaleRoutes(app: Express) {
       const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const referenceNumber = decodeURIComponent(req.params.referenceNumber);
+      const referenceNumber = decodeURIComponent(req.params.referenceNumber).toUpperCase();
 
       const [bale] = await db
         .select()
@@ -1247,7 +1247,7 @@ export function registerBaleRoutes(app: Express) {
       const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const referenceNumber = decodeURIComponent(req.params.referenceNumber);
+      const referenceNumber = decodeURIComponent(req.params.referenceNumber).toUpperCase();
       const { newProductId } = req.body;
 
       if (!newProductId || typeof newProductId !== "number") {
