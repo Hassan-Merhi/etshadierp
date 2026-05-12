@@ -18,6 +18,7 @@ import { z } from "zod";
 import {
   trackOneContainerById,
   trackAllEnabledNow,
+  isBulkTrackingRunning,
   setBulkTrackingEnabled,
   getParcelsAppUsageStats,
   get17trackUsageStats,
@@ -270,6 +271,12 @@ export function registerContainerTrackingRoutes(app: Express) {
       res.status(400).json({
         message: "No tracking provider configured. Add PARCELSAPP_API_KEY or ensure Chrome is available for Maersk direct tracking.",
       });
+      return;
+    }
+
+    // Reject duplicate bulk runs immediately so the client gets a clear message
+    if (isBulkTrackingRunning()) {
+      res.status(409).json({ message: "A bulk tracking run is already in progress. Please wait for it to finish." });
       return;
     }
 

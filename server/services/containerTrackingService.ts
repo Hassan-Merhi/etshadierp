@@ -442,13 +442,26 @@ export async function setBulkTrackingEnabled(enabled: boolean): Promise<number> 
   return result.length;
 }
 
+// ── Bulk-run dedup guard ──────────────────────────────────────────────────────
+// Prevents two "Track All Now" runs from overlapping.  The flag is cleared as
+// soon as the background loop finishes (or errors out).
+let _bulkRunning = false;
+
+/** True while a bulk "Track All Now" run is in progress. */
+export function isBulkTrackingRunning(): boolean { return _bulkRunning; }
+
 /**
  * Immediately trigger tracking for every non-inactive container.
  * Bypasses cooldown and trackingEnabled flag — explicit manual override.
  * Starts tracking in the background and returns the count immediately.
+ * Returns 0 if a bulk run is already in progress.
  */
 export async function trackAllEnabledNow(): Promise<number> {
   if (!anyProviderConfigured()) return 0;
+  if (_bulkRunning) {
+    console.log("[BulkTracking] A bulk run is already in progress — ignoring duplicate request.");
+    return 0;
+  }
 
   const rows = await db
     .select({
@@ -462,6 +475,7 @@ export async function trackAllEnabledNow(): Promise<number> {
   const eligible = rows.filter((r) => isValidContainerNumber(r.containerNumber));
   if (eligible.length === 0) return 0;
 
+  _bulkRunning = true;
   (async () => {
     console.log(
       `[BulkTracking] Starting manual run for ${eligible.length} container(s): ` +
@@ -477,7 +491,9 @@ export async function trackAllEnabledNow(): Promise<number> {
       }
     }
     console.log(`[BulkTracking] Manual run complete for ${eligible.length} containers.`);
-  })().catch((err: any) => console.error("[BulkTracking] Unexpected error:", err?.message));
+  })()
+    .catch((err: any) => console.error("[BulkTracking] Unexpected error:", err?.message))
+    .finally(() => { _bulkRunning = false; });
 
   return eligible.length;
 }

@@ -25,6 +25,7 @@ import { existsSync } from "fs";
 import { execSync } from "child_process";
 import { createRequire } from "module";
 import type { CarrierTrackResult, TrackingEvent } from "./trackingProviders/types";
+import { acquirePuppeteerSlot } from "./puppeteerSemaphore";
 
 const _require = createRequire(import.meta.url);
 
@@ -122,21 +123,6 @@ async function getSharedBrowser(): Promise<any> {
 
   console.log("[MaerskDirect] Shared Chrome instance ready");
   return _sharedBrowser;
-}
-
-// ── Async mutex ───────────────────────────────────────────────────────────────
-// Ensures only one Maersk scrape runs at a time, regardless of how many
-// concurrent "Track Now" clicks or scheduler runs are in flight.
-
-let _lockChain: Promise<void> = Promise.resolve();
-
-function acquireLock(): Promise<() => void> {
-  let releaseFn!: () => void;
-  const waitFor = _lockChain;
-  // Next caller will wait until this slot is released
-  _lockChain = new Promise<void>((resolve) => { releaseFn = resolve; });
-  // This caller waits until the previous lock is done, then gets the release fn
-  return waitFor.then(() => releaseFn);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -308,10 +294,10 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     return emptyResult(containerNumber, "Puppeteer not available");
   }
 
-  // ── Acquire exclusive lock (Option B: mutex) ──────────────────────────────
-  console.log(`[MaerskDirect] ${containerNumber}: waiting for lock…`);
-  const release = await acquireLock();
-  console.log(`[MaerskDirect] ${containerNumber}: lock acquired`);
+  // ── Acquire global Puppeteer slot (shared with ParcelsApp scraper) ───────
+  console.log(`[MaerskDirect] ${containerNumber}: waiting for Puppeteer slot…`);
+  const release = await acquirePuppeteerSlot();
+  console.log(`[MaerskDirect] ${containerNumber}: Puppeteer slot acquired`);
 
   let page: any = null;
   const hardStop = setTimeout(() => {
@@ -476,6 +462,6 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     // Close just the tab, not the whole browser
     try { await page?.close(); } catch { /* ignore */ }
     release();
-    console.log(`[MaerskDirect] ${containerNumber}: lock released`);
+    console.log(`[MaerskDirect] ${containerNumber}: Puppeteer slot released`);
   }
 }

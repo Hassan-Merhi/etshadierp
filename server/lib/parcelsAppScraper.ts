@@ -6,6 +6,14 @@
  * the stealth plugin active, then intercept the page's own XHR/fetch response.
  * The page generates its own valid reCaptcha v3 token — we just capture the result.
  *
+ * Memory management:
+ *   - One Chrome process is shared across all calls (like maerskDirectScraper).
+ *   - All calls are serialised through the global puppeteerSemaphore so only
+ *     one browser operation runs at a time server-wide.
+ *   - Each call opens a new tab, uses it, then closes just the tab.
+ *   - The shared browser is kept warm between calls; it restarts automatically
+ *     if it crashes.
+ *
  * If reCaptcha detects the automation the API returns NO_TRACKER; we surface
  * blocked=true so the caller knows to fall back to the next provider.
  */
@@ -14,6 +22,7 @@ import { existsSync } from "fs";
 import { execSync } from "child_process";
 import { createRequire } from "module";
 import type { ParcelsAppShipment } from "./parcelsAppClient";
+import { acquirePuppeteerSlot } from "./puppeteerSemaphore";
 
 // createRequire lets us use require() from an ESM / "type":"module" context.
 const _require = createRequire(import.meta.url);
@@ -58,32 +67,25 @@ export interface ScraperResult {
 
 const SCRAPER_TIMEOUT_MS = 90_000;
 const NAV_TIMEOUT_MS     = 60_000;
-const DATA_WAIT_MS       = 45_000;
+const DATA_WAIT_MS       = 25_000;
+
+// ── Availability check ────────────────────────────────────────────────────────
 
 export function isScraperAvailable(): boolean {
   try {
     _require.resolve("puppeteer-extra");
     _require.resolve("puppeteer-extra-plugin-stealth");
     _require.resolve("puppeteer");
-    return !!getChromiumPath();
+    const chromePath = getChromiumPath();
+    return !!chromePath;
   } catch {
     return false;
   }
 }
 
-/**
- * Download the Puppeteer-managed Chrome binary if it is missing.
- * Safe to call on every server startup — exits immediately if Chrome
- * is already present.  Logs progress so deployment issues are visible.
- */
-export async function ensureChromiumAvailable(): Promise<void> {
-  if (isScraperAvailable()) {
-    const chromePath = getChromiumPath();
-    console.log("[Puppeteer] Chrome binary found — scraper ready.", chromePath);
-    return;
-  }
+export async function ensureChromiumInstalled(): Promise<void> {
+  if (isScraperAvailable()) return;
 
-  // Packages missing → nothing we can do at runtime.
   try {
     _require.resolve("puppeteer");
   } catch {
@@ -91,23 +93,21 @@ export async function ensureChromiumAvailable(): Promise<void> {
     return;
   }
 
-  // Try downloading Puppeteer's bundled Chrome as a last resort
   try {
     const puppeteer = _require("puppeteer");
-    const chromePath: string =
+    const p: string =
       typeof puppeteer.executablePath === "function"
         ? puppeteer.executablePath()
         : "";
-    if (!chromePath) {
-      console.log("[Puppeteer] Could not determine Chrome path — scraper unavailable.");
-      return;
-    }
-    console.log("[Puppeteer] No Chrome found — attempting download (may take a minute)...");
+    if (p && existsSync(p)) return;
+
+    console.log("[Puppeteer] Chrome not found — downloading…");
     execSync("npx puppeteer browsers install chrome", {
       stdio: "inherit",
-      timeout: 180_000,
+      timeout: 300_000,
     });
-    if (existsSync(chromePath)) {
+    const chromePath = getChromiumPath();
+    if (chromePath && existsSync(chromePath)) {
       console.log("[Puppeteer] Chrome download complete — scraper ready.");
     } else {
       console.warn("[Puppeteer] Chrome still not found after download — scraper unavailable.");
@@ -117,60 +117,104 @@ export async function ensureChromiumAvailable(): Promise<void> {
   }
 }
 
+// ── Shared browser instance ───────────────────────────────────────────────────
+// One Chrome process is kept alive and reused across all scrape calls.
+// Replaced automatically if it crashes.
+
+let _sharedBrowser: any = null;
+let _stealthRegistered = false;
+
+async function getSharedBrowser(): Promise<any> {
+  if (_sharedBrowser) {
+    try {
+      await _sharedBrowser.pages(); // lightweight liveness check
+      return _sharedBrowser;
+    } catch {
+      console.warn("[ParcelsAppScraper] Shared browser disconnected — relaunching");
+      _sharedBrowser = null;
+    }
+  }
+
+  const puppeteerExtra = _require("puppeteer-extra") as any;
+  if (!_stealthRegistered) {
+    const StealthPlugin = _require("puppeteer-extra-plugin-stealth") as any;
+    puppeteerExtra.use(StealthPlugin());
+    _stealthRegistered = true;
+  }
+
+  const chromePath = getChromiumPath();
+  console.log("[ParcelsAppScraper] Launching shared Chrome instance…");
+  _sharedBrowser = await puppeteerExtra.launch({
+    headless: "new" as any,
+    ...(chromePath ? { executablePath: chromePath } : {}),
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--disable-accelerated-2d-canvas",
+      "--no-first-run",
+      "--no-zygote",
+      "--renderer-process-limit=1",       // cap renderer processes
+      "--js-flags=--max-old-space-size=256",
+      // Anti-detection
+      "--disable-blink-features=AutomationControlled",
+      "--window-size=1280,800",
+      // Memory reduction
+      "--disable-extensions",
+      "--disable-background-networking",
+      "--disable-background-timer-throttling",
+      "--disable-backgrounding-occluded-windows",
+      "--disable-breakpad",
+      "--disable-client-side-phishing-detection",
+      "--disable-component-update",
+      "--disable-default-apps",
+      "--disable-domain-reliability",
+      "--disable-hang-monitor",
+      "--disable-infobars",
+      "--disable-notifications",
+      "--disable-popup-blocking",
+      "--disable-print-preview",
+      "--disable-renderer-backgrounding",
+      "--disable-sync",
+      "--disable-features=TranslateUI,BlinkGenPropertyTrees",
+      "--metrics-recording-only",
+      "--safebrowsing-disable-auto-update",
+      "--password-store=basic",
+    ],
+  });
+
+  _sharedBrowser.on("disconnected", () => {
+    console.warn("[ParcelsAppScraper] Shared browser disconnected (crash or killed)");
+    _sharedBrowser = null;
+  });
+
+  console.log("[ParcelsAppScraper] Shared Chrome instance ready");
+  return _sharedBrowser;
+}
+
+// ── Main scrape function ──────────────────────────────────────────────────────
+
 export async function scrapeTracking(containerNumber: string): Promise<ScraperResult> {
   if (!isScraperAvailable()) {
     return { success: false, shipment: null, blocked: false, error: "Puppeteer not installed" };
   }
 
-  let browser: any = null;
-  const timer = new AbortController();
-  const hard = setTimeout(() => timer.abort(), SCRAPER_TIMEOUT_MS);
+  // Acquire global slot — ensures at most 1 Puppeteer operation server-wide
+  console.log(`[ParcelsAppScraper] ${containerNumber}: waiting for Puppeteer slot…`);
+  const release = await acquirePuppeteerSlot();
+  console.log(`[ParcelsAppScraper] ${containerNumber}: Puppeteer slot acquired`);
+
+  let page: any = null;
+  const hardStop = setTimeout(() => {
+    console.warn(`[ParcelsAppScraper] ${containerNumber}: hard timeout — closing page`);
+    try { page?.close(); } catch { /* ignore */ }
+  }, SCRAPER_TIMEOUT_MS);
 
   try {
-    const puppeteerExtra = _require("puppeteer-extra") as any;
-    const StealthPlugin  = _require("puppeteer-extra-plugin-stealth") as any;
-    puppeteerExtra.use(StealthPlugin());
+    const browser = await getSharedBrowser();
+    page = await browser.newPage();
 
-    const chromePath = getChromiumPath();
-    browser = await puppeteerExtra.launch({
-      headless: "new" as any,   // new headless mode — more stable, better fingerprint
-      ...(chromePath ? { executablePath: chromePath } : {}),
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--disable-accelerated-2d-canvas",
-        "--no-first-run",
-        "--no-zygote",
-        "--single-process",    // KEEP: prevents multiple Chrome processes; critical for memory on 2GB hosts
-        // Anti-detection
-        "--disable-blink-features=AutomationControlled",
-        "--window-size=1280,800",
-        // Memory reduction
-        "--disable-extensions",
-        "--disable-background-networking",
-        "--disable-background-timer-throttling",
-        "--disable-backgrounding-occluded-windows",
-        "--disable-breakpad",
-        "--disable-client-side-phishing-detection",
-        "--disable-component-update",
-        "--disable-default-apps",
-        "--disable-domain-reliability",
-        "--disable-hang-monitor",
-        "--disable-infobars",
-        "--disable-notifications",
-        "--disable-popup-blocking",
-        "--disable-print-preview",
-        "--disable-renderer-backgrounding",
-        "--disable-sync",
-        "--metrics-recording-only",
-        "--safebrowsing-disable-auto-update",
-        "--password-store=basic",
-      ],
-    });
-
-    const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 800 });
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
@@ -230,9 +274,10 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
       await new Promise((r) => setTimeout(r, 1_000));
     }
 
-    await browser.close();
-    browser = null;
-    clearTimeout(hard);
+    clearTimeout(hardStop);
+    try { await page.close(); } catch { /* ignore */ }
+    page = null;
+    release();
 
     if (isBlocked) {
       return {
@@ -267,10 +312,11 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
       error: shipment ? undefined : "No matching shipment in page response",
     };
   } catch (err: any) {
-    if (browser) {
-      await browser.close().catch(() => {});
+    clearTimeout(hardStop);
+    if (page) {
+      try { await page.close(); } catch { /* ignore */ }
     }
-    clearTimeout(hard);
+    release();
     return {
       success: false,
       shipment: null,
