@@ -2959,6 +2959,10 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           }
           await db.delete(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
 
+          // Reset order totals to zero now that all bale links are gone.
+          // Without this call total_qty_bales would stay stale if the order is later restored.
+          await recalculateOrderTotals(db, orderId);
+
           const [updated] = await db.update(customerOrders)
             .set({ status: "CANCELLED", updatedAt: new Date() })
             .where(eq(customerOrders.id, orderId))

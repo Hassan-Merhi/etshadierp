@@ -1036,6 +1036,19 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
               AND reference_id = ${orderId}`,
       );
 
+      // Synchronise total_qty_bales with the actual customer_order_bales count.
+      // Bale links were deleted during cancellation (bales went back to stock),
+      // so this will reset total_qty_bales to 0 — the correct state for a freshly
+      // restored order that needs its bales re-scanned.
+      await db.execute(
+        sql`UPDATE customer_orders
+            SET total_qty_bales = (
+              SELECT COUNT(*)::int FROM customer_order_bales WHERE order_id = ${orderId}
+            ),
+            updated_at = NOW()
+            WHERE id = ${orderId}`,
+      );
+
       res.json({ id: orderId, restoredTo: restoreStatus });
     } catch (err: any) {
       console.error("[V5] restore-container error:", err);
