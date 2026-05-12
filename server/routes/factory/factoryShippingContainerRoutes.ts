@@ -1016,9 +1016,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         return ext ? `${joined}.${ext}` : joined;
       }
 
-      const safeName = (row.invoiceNumber || `row_${id}`).replace(/[^\w\-]/g, "_");
+      const zipFilename = buildZipFilename([row.containerNumber, row.clientName, row.destination], "zip");
       res.setHeader("Content-Type", "application/zip");
-      res.setHeader("Content-Disposition", `attachment; filename="shipping_package_${safeName}.zip"`);
+      res.setHeader("Content-Disposition", `attachment; filename="${zipFilename}"`);
 
       const archive = archiver("zip", { zlib: { level: 6 } });
       archive.on("error", (err) => {
