@@ -80,6 +80,7 @@ interface VerificationSummary {
   comparison: ComparisonItem[];
   totalLoadedBales: number;
   totalLoadedWeight: number;
+  dataSource?: "bale_rows" | "order_lines";
 }
 
 interface OrderCharge {
@@ -495,8 +496,36 @@ export default function FactoryPendingInvoiceVerify() {
         </div>
       </div>
 
-      {/* Recovery banner — shown when the order has 0 linked bales and the user is admin */}
-      {!verificationLoading && (verification?.totalLoadedBales ?? 0) === 0 && isAdminOrOwner && (
+      {/* Fallback notice — shown when bale records are missing but order lines cover the data */}
+      {!verificationLoading && verification?.dataSource === "order_lines" && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 p-4" data-testid="panel-order-lines-fallback">
+          <div className="flex items-start gap-3">
+            <Package className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Bale counts sourced from order summary</p>
+              <p className="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
+                Individual bale scan records are unavailable, but per-article totals are intact. All counts and weights shown are accurate.
+                If you need individual bale-level detail, use <strong>Recover Bales</strong>.
+              </p>
+            </div>
+          </div>
+          {isAdminOrOwner && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowRecoverDialog(true)}
+              className="border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200"
+              data-testid="button-recover-bales-from-notice"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Recover Bales
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Recovery banner — shown when the order has 0 linked bales, no fallback, and the user is admin */}
+      {!verificationLoading && (verification?.totalLoadedBales ?? 0) === 0 && verification?.dataSource !== "order_lines" && isAdminOrOwner && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950 p-4" data-testid="panel-zero-bales-warning">
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />

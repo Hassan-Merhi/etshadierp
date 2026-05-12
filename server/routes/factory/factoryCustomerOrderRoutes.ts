@@ -3235,12 +3235,59 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       console.log(
         `[verify-summary] orderId=${orderId} companyId=${companyId}` +
         ` status=${order.status} proformaIdUsed=${order.proformaIdUsed ?? 'null'}` +
-        ` customer_order_bales.count=${orderBales.length}`,
+        ` customer_order_bales.count=${orderBales.length} total_qty_bales=${order.totalQtyBales}`,
       );
+
+      // ── Fallback: when customer_order_bales is empty but the order has a recorded
+      // total (total_qty_bales > 0), reconstruct loadedByArticle from customer_order_lines.
+      // customer_order_lines is rebuilt by recalculateOrderTotals every time a bale is
+      // scanned, so it is the most reliable per-article aggregate when individual bale
+      // rows are unavailable (e.g. after a partial bale-row migration or cleanup).
+      let dataSource: "bale_rows" | "order_lines" = "bale_rows";
+      let syntheticBalesFromLines: typeof orderBales = [];
+
+      if (orderBales.length === 0 && order.totalQtyBales > 0) {
+        const rawLinesResult = await db.execute(
+          sql`SELECT * FROM customer_order_lines WHERE order_id = ${orderId}`,
+        );
+        const linesRows: any[] = (rawLinesResult as any).rows ?? (rawLinesResult as unknown as any[]);
+        const hasLines = linesRows.some((r: any) => (r.qty ?? 0) > 0);
+
+        if (hasLines) {
+          dataSource = "order_lines";
+          console.log(
+            `[verify-summary] orderId=${orderId} falling back to order_lines (${linesRows.length} lines, totalQtyBales=${order.totalQtyBales})`,
+          );
+          // Synthesise bale-like records from lines so the rest of the pipeline works unchanged
+          for (const row of linesRows) {
+            const qty = Number(row.qty ?? 0);
+            if (qty <= 0) continue;
+            const articleCode = String(row.article_code ?? row.articleCode ?? 'UNKNOWN');
+            const totalWeight = Number(row.total_weight ?? row.totalWeight ?? 0);
+            const totalPrice = Number(row.total_price ?? row.totalPrice ?? 0);
+            const weightPerBale = qty > 0 ? totalWeight / qty : 0;
+            const pricePerBale = qty > 0 ? totalPrice / qty : 0;
+            for (let i = 0; i < qty; i++) {
+              syntheticBalesFromLines.push({
+                id: 0,
+                order_id: orderId,
+                bale_id: 0,
+                weight: String(weightPerBale),
+                article_code: articleCode,
+                bale_name: String(row.bale_name ?? row.baleName ?? articleCode),
+                price_used: String(pricePerBale),
+                bale_reference: '',
+              });
+            }
+          }
+        }
+      }
+
+      const effectiveBales = dataSource === "order_lines" ? syntheticBalesFromLines : orderBales;
 
       // Build preliminary article code set from loaded bales.
       const loadedByArticle: Record<string, { articleCode: string; productName: string; qty: number; totalWeight: number; totalPrice: number }> = {};
-      for (const b of orderBales) {
+      for (const b of effectiveBales) {
         const articleCode = b.article_code;
         const baleName    = b.bale_name;
         const priceUsed   = b.price_used;
@@ -3404,9 +3451,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         loadedItems: Object.values(loadedByArticle),
         proformaLines: proformaLinesWithStock,
         comparison,
-        totalLoadedBales: orderBales.length,
-        // Use the already-normalised accumulator from loadedByArticle instead of re-iterating
+        totalLoadedBales: effectiveBales.length,
         totalLoadedWeight: Object.values(loadedByArticle).reduce((s, g) => s + g.totalWeight, 0),
+        dataSource,
       });
     } catch (error: any) {
       console.error("Error fetching verification summary:", error);
