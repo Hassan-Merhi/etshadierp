@@ -668,7 +668,7 @@ async function logAndConfirmEta(
 async function trackOneContainer(
   containerId: number,
   containerNumber: string,
-  _carrierHintUnused?: string,
+  destinationCountry?: string,
 ): Promise<{
   success: boolean;
   lastStatus: string | null;
@@ -1032,7 +1032,7 @@ async function trackViaParcelsApp(
 
     // ParcelsApp website (scraped via Puppeteer) has no CMA CGM data — skip it.
     // Go straight to the ParcelsApp v3 API which may have broader carrier coverage.
-    return await trackViaParcelsAppApi(containerId, containerNumber, null /* no hint — let ParcelsApp auto-detect CMA from container prefix */, fallbackReason, now, currentEta);
+    return await trackViaParcelsAppApi(containerId, containerNumber, null, fallbackReason, now, currentEta, destinationCountry);
   }
 
   // ── Attempt 2: Puppeteer stealth scraper (ParcelsApp, no API key, no quota cost) ──
@@ -1149,7 +1149,7 @@ async function trackViaParcelsApp(
   }
 
   // ── Final: ParcelsApp API ─────────────────────────────────────────────────────
-  return await trackViaParcelsAppApi(containerId, containerNumber, detectedCarrier, fallbackReason, now, currentEta);
+  return await trackViaParcelsAppApi(containerId, containerNumber, detectedCarrier, fallbackReason, now, currentEta, destinationCountry);
 }
 
 // ─── ParcelsApp API — shared final step for all carriers ──────────────────────
@@ -1161,6 +1161,7 @@ async function trackViaParcelsAppApi(
   fallbackReason: string | null,
   now: Date,
   currentEta: string | null,
+  destinationCountry?: string | null,
 ): Promise<{
   success: boolean;
   lastStatus: string | null;
@@ -1204,9 +1205,10 @@ async function trackViaParcelsAppApi(
   }
 
   const hintCarrier = detectedCarrier && detectedCarrier !== "OTHER" ? detectedCarrier : undefined;
-  console.log(`[ContainerTracking] ${containerNumber}: ParcelsApp API attempt carrier=${hintCarrier ?? "auto"}`);
+  const effectiveDestination = destinationCountry || "United States";
+  console.log(`[ContainerTracking] ${containerNumber}: ParcelsApp API attempt carrier=${hintCarrier ?? "auto"} destination="${effectiveDestination}"`);
 
-  const result = await trackContainer(containerNumber, "United States", hintCarrier);
+  const result = await trackContainer(containerNumber, effectiveDestination, hintCarrier);
 
   await saveTrackingCheck(
     containerId,
