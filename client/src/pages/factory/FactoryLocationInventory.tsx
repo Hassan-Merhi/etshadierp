@@ -1315,9 +1315,11 @@ export default function FactoryLocationInventory() {
               <Button size="icon" variant="ghost" className="h-7 w-7" title="View details" onClick={() => navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation.id}`)} data-testid={`button-view-details${testIdSuffix}-${prod.productId}`}>
                 <Package className="h-3.5 w-3.5" />
               </Button>
-              <Button size="icon" variant="ghost" className="h-7 w-7" title="Print barcodes" onClick={() => handleReprintProduct(prod)} data-testid={`button-print-barcodes${testIdSuffix}-${prod.productId}`}>
-                <Tag className="h-3.5 w-3.5" />
-              </Button>
+              {myAccess?.fullAccess && (
+                <Button size="icon" variant="ghost" className="h-7 w-7" title="Print barcodes" onClick={() => handleReprintProduct(prod)} data-testid={`button-print-barcodes${testIdSuffix}-${prod.productId}`}>
+                  <Tag className="h-3.5 w-3.5" />
+                </Button>
+              )}
               <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" title="Remove bales" onClick={() => { setDeleteProduct(prod); setDeleteQty(1); setDeleteDialogOpen(true); }} data-testid={`button-delete-product${testIdSuffix}-${prod.productId}`}>
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
