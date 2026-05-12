@@ -806,16 +806,57 @@ function AuthenticatedApp() {
   const isFactoryCompany = selectedCompany?.companyType === "factory" || selectedCompany?.companyType === "factory_v2";
   const isFactoryRoute = currentLocation.startsWith("/factory/");
 
+  // Sub-page → parent pageKey for detail/action routes that aren't direct nav items.
+  // Also used by factoryDefaultPage to accept old pre-merge page keys for hub pages.
+  const SUBPAGE_PARENT: [prefix: string, parentKey: string][] = [
+    ["/factory/sales/invoices",          "factory/invoicing"],
+    ["/factory/sales/new",               "factory/invoicing"],
+    ["/factory/sales/pending-invoices",  "factory/invoicing"],
+    ["/factory/invoices",                "factory/invoicing"],
+    ["/factory/sales/loading/",          "factory/sales/loadings"],
+    ["/factory/bale-product-history",    "factory/bales-hub"],
+    ["/factory/reprint-labels",          "factory/bales-hub"],
+    ["/factory/bales-history",           "factory/bales-hub"],
+    ["/factory/barcode-lookup",          "factory/bales-hub"],
+    ["/factory/payroll",                 "factory/payroll-hub"],
+    ["/factory/worker-payroll",          "factory/payroll-hub"],
+    ["/factory/workers",                 "factory/payroll-hub"],
+    ["/factory/employees",               "factory/payroll-hub"],
+    ["/factory/containers/new",          "factory/containers-hub"],
+    ["/factory/containers",              "factory/containers-hub"],
+    ["/factory/stock-otw",              "factory/containers-hub"],
+    ["/factory/customers",               "factory/parties"],
+    ["/factory/suppliers",               "factory/parties"],
+    ["/factory/net-position-details",    "factory/intelligence/financial-hub"],
+    ["/factory/net-position",            "factory/intelligence/financial-hub"],
+    ["/factory/net-profit-analytics",    "factory/intelligence/financial-hub"],
+    ["/factory/supplier-report",         "factory/intelligence/supplier-hub"],
+    ["/factory/supplier-statement",      "factory/intelligence/supplier-hub"],
+    ["/factory/production-summary",      "factory/intelligence/production-hub"],
+    ["/factory/ledger-monthly",          "factory/accounts"],
+    ["/factory/ledger-vouchers",         "factory/accounts"],
+    ["/factory/voucher-detail",          "factory/vouchers"],
+    ["/factory/create",                  "factory/accounts"],
+    ["/factory/financial-snapshot",      "factory/analytics"],
+  ];
+
   // Compute the right landing page for this user.
   // For restricted users (fullAccess:false) we walk the sidebar nav in order and
   // return the first page that's in their pageKeys, so they never land on a page
-  // they can't access. Falls back to production-report for admins / while loading.
+  // they can't access. Also accepts old pre-merge pageKeys (e.g. "factory/workers")
+  // for hub pages (e.g. "factory/payroll-hub") via SUBPAGE_PARENT.
+  // Falls back to production-report for admins / while loading.
   const factoryDefaultPage = (() => {
     if (!myAccess || myAccess.fullAccess) return "/factory/production-report";
     for (const section of FACTORY_NAV_SECTIONS) {
       for (const item of section.items) {
         const key = item.url.replace(/^\//, "");
         if (myAccess.pageKeys.includes(key)) return item.url;
+        // Accept old pre-hub-merge keys that now redirect to this hub
+        const legacyKeys = SUBPAGE_PARENT
+          .filter(([, parentKey]) => parentKey === key)
+          .map(([prefix]) => prefix.replace(/^\//, ""));
+        if (legacyKeys.some(lk => myAccess.pageKeys.includes(lk))) return item.url;
       }
     }
     if (myAccess.pageKeys.includes("factory/daybook")) return "/factory/daybook";
@@ -847,38 +888,6 @@ function AuthenticatedApp() {
 
     // Sub-page → parent pageKey for detail/action routes that are not direct
     // nav items but should inherit their parent's access requirement.
-    const SUBPAGE_PARENT: [prefix: string, parentKey: string][] = [
-      ["/factory/sales/invoices",          "factory/invoicing"],
-      ["/factory/sales/new",               "factory/invoicing"],
-      ["/factory/sales/pending-invoices",  "factory/invoicing"],
-      ["/factory/invoices",                "factory/invoicing"],
-      ["/factory/sales/loading/",          "factory/sales/loadings"],
-      ["/factory/bale-product-history",    "factory/bales-hub"],
-      ["/factory/reprint-labels",          "factory/bales-hub"],
-      ["/factory/bales-history",           "factory/bales-hub"],
-      ["/factory/barcode-lookup",          "factory/bales-hub"],
-      ["/factory/payroll",                 "factory/payroll-hub"],
-      ["/factory/worker-payroll",          "factory/payroll-hub"],
-      ["/factory/workers",                 "factory/payroll-hub"],
-      ["/factory/employees",               "factory/payroll-hub"],
-      ["/factory/containers/new",          "factory/containers-hub"],
-      ["/factory/containers",              "factory/containers-hub"],
-      ["/factory/stock-otw",              "factory/containers-hub"],
-      ["/factory/customers",               "factory/parties"],
-      ["/factory/suppliers",               "factory/parties"],
-      ["/factory/net-position-details",    "factory/intelligence/financial-hub"],
-      ["/factory/net-position",            "factory/intelligence/financial-hub"],
-      ["/factory/net-profit-analytics",    "factory/intelligence/financial-hub"],
-      ["/factory/supplier-report",         "factory/intelligence/supplier-hub"],
-      ["/factory/supplier-statement",      "factory/intelligence/supplier-hub"],
-      ["/factory/production-summary",      "factory/intelligence/production-hub"],
-      ["/factory/ledger-monthly",          "factory/accounts"],
-      ["/factory/ledger-vouchers",         "factory/accounts"],
-      ["/factory/voucher-detail",          "factory/vouchers"],
-      ["/factory/create",                  "factory/accounts"],
-      ["/factory/financial-snapshot",      "factory/analytics"],
-    ];
-
     // Resolve the pageKey for the current path.
     // Uses FACTORY_NAV_PAGES as the canonical list so that pages only in the
     // manual section (Dashboard, Daybook, Chat) are covered too.
