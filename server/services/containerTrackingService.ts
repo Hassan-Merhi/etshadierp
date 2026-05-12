@@ -348,7 +348,16 @@ export async function trackDueContainers(): Promise<void> {
     return;
   }
 
+  // ── Shuffle first so equal-priority ties rotate across runs ─────────────
+  // Without this, containers that happen to be earlier in the DB always win
+  // the budget, starving later-added containers (e.g. CMA) permanently.
+  for (let i = eligible.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+  }
+
   // ── Sort: highest priority first, then oldest checked, then ETA nearest ───
+  // Stable sort preserves the random shuffle order among fully-tied containers.
   eligible.sort((a, b) => {
     if (b.priority.priorityScore !== a.priority.priorityScore) {
       return b.priority.priorityScore - a.priority.priorityScore;
@@ -1021,51 +1030,9 @@ async function trackViaParcelsApp(
       }
     }
 
-    // ── Puppeteer scraper (ParcelsApp website, no API key needed) ──
-    if (isScraperAvailable()) {
-      console.log(`[ContainerTracking] ${containerNumber}: CMA — trying ParcelsApp web scraper...`);
-      const scraped = await scrapeTracking(containerNumber);
-      await saveTrackingCheck(
-        containerId,
-        "parcelsapp_scraper",
-        scraped.success ? "success" : scraped.blocked ? "blocked" : "error",
-        scraped.error ?? null,
-        scraped.rawResponse ?? null,
-      );
-      if (scraped.success && scraped.shipment) {
-        const shipment = scraped.shipment;
-        const lastStatus      = deriveLastStatus(shipment);
-        const lastLocation    = deriveLastLocation(shipment);
-        const lastEventDate   = deriveLastEventDate(shipment);
-        const lastDescription = shipment.states?.[0]?.description ?? null;
-        const { eta: finalEta, source: etaSrc } = resolveEtaFromShipment(shipment, currentEta);
-        await saveParcelsAppEvents(containerId, shipment);
-        const updateSet: Record<string, unknown> = {
-          trackingLastCheckedAt: now,
-          trackingLastStatus: lastStatus,
-          trackingLastEventDate: lastEventDate,
-          trackingLastDescription: lastDescription,
-          trackingError: null,
-          trackingChangedAt: now,
-          trackingProvider: "parcelsapp_scraper",
-          trackingDetectedCarrier: detectedCarrier,
-          trackingFallbackUsed: !!fallbackReason,
-          trackingFallbackReason: fallbackReason,
-        };
-        if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
-        await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
-        await logAndConfirmEta(
-          containerId, containerNumber, currentEta, finalEta, etaSrc, "parcelsapp_scraper",
-          !finalEta ? "no ETA derived from shipment states" : undefined,
-        );
-        console.log(`[ContainerTracking] ${containerNumber} → parcelsapp_scraper (CMA): status=${lastStatus ?? "?"}`);
-        return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
-      }
-      console.log(`[ContainerTracking] ${containerNumber}: CMA scraper failed (${scraped.error}) — trying ParcelsApp API...`);
-    }
-
-    // Last resort: ParcelsApp API
-    return await trackViaParcelsAppApi(containerId, containerNumber, detectedCarrier, fallbackReason, now, currentEta);
+    // ParcelsApp website (scraped via Puppeteer) has no CMA CGM data — skip it.
+    // Go straight to the ParcelsApp v3 API which may have broader carrier coverage.
+    return await trackViaParcelsAppApi(containerId, containerNumber, null /* no hint — let ParcelsApp auto-detect CMA from container prefix */, fallbackReason, now, currentEta);
   }
 
   // ── Attempt 2: Puppeteer stealth scraper (ParcelsApp, no API key, no quota cost) ──
