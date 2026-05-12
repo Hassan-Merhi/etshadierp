@@ -136,8 +136,9 @@ export default function FactoryPendingLoadings() {
     mutationFn: async (id: number) => {
       await apiRequest("POST", `/api/factory/customer-orders/${id}/cancel`);
     },
-    onSuccess: (_, id) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/v5/stock-allocation") });
     },
     onError: (err: any) => {
       toast({ title: "Delete failed", description: err.message, variant: "destructive" });
@@ -150,6 +151,7 @@ export default function FactoryPendingLoadings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/v5/stock-allocation") });
     },
     onError: (err: any) => {
       toast({ title: "Restore failed", description: err.message, variant: "destructive" });
@@ -193,6 +195,7 @@ export default function FactoryPendingLoadings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/v5/stock-allocation") });
       toast({ title: "Proforma linked", description: "The loading has been linked to the selected proforma." });
       closeLinkDialog();
     },
