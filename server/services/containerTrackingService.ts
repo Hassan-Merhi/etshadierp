@@ -45,6 +45,7 @@ import { scrapeTracking, isScraperAvailable } from "../lib/parcelsAppScraper";
 import { httpScrapeTracking, isHttpScraperAvailable } from "../lib/httpTrackingScraper";
 import { scrapeMaerskDirect, isMaerskDirectScraperAvailable } from "../lib/maerskDirectScraper";
 import * as seventeenTrack from "../lib/trackingProviders/seventeenTrackProvider";
+import * as cmaPublicProvider from "../lib/trackingProviders/cmaPublicProvider";
 import { resolveProvider } from "../lib/trackingProviders/providerResolver";
 import type { CarrierTrackResult } from "../lib/trackingProviders/types";
 import {
@@ -916,12 +917,103 @@ async function trackViaParcelsApp(
     console.log(`[ContainerTracking] ${containerNumber}: maersk_direct got no data (${mdResult.error}) — trying ParcelsApp scraper...`);
   }
 
-  // ── CMA fast-path: skip browser scrapers, go directly to ParcelsApp API ──────
-  // CMA CGM is protected by DataDome — no browser scraper can bypass it.
-  // ParcelsApp API supports CMA directly, so we skip the useless scraper steps.
+  // ── CMA provider chain ────────────────────────────────────────────────────────
+  // CMA CGM's own website is DataDome-protected so the HTTP scraper fast-fails.
+  // Try their undocumented public JSON endpoint first (free, no API key), then
+  // 17track, then ParcelsApp API.  Skip the Puppeteer browser scraper — it only
+  // scrapes parcelsapp.com which is tried explicitly further down.
   const CMA_PREFIXES = /^(CMAU|CMDU|APZU)/i;
   if (CMA_PREFIXES.test(containerNumber)) {
-    console.log(`[ContainerTracking] ${containerNumber}: CMA detected — skipping browser scrapers, going direct to ParcelsApp API...`);
+    console.log(`[ContainerTracking] ${containerNumber}: CMA detected — trying CMA public endpoint...`);
+
+    if (cmaPublicProvider.isEnabled()) {
+      const cmaResult = await cmaPublicProvider.track(containerNumber);
+      await saveTrackingCheck(
+        containerId,
+        "cma_public",
+        cmaResult.success ? "success" : cmaResult.blocked ? "blocked" : "error",
+        cmaResult.error ?? null,
+        cmaResult.raw ?? null,
+      );
+
+      if (cmaResult.success && (cmaResult.latestStatus || cmaResult.events.length > 0)) {
+        await saveDirectEvents(containerId, cmaResult);
+        const { eta: finalEta, source: etaSrc } = resolveEtaFromProvider(
+          cmaResult.eta ?? null,
+          cmaResult.events,
+          currentEta,
+        );
+        const updateSet: Record<string, unknown> = {
+          trackingLastCheckedAt: now,
+          trackingLastStatus: cmaResult.latestStatus,
+          trackingLastEventDate: cmaResult.latestEventDate,
+          trackingLastDescription: cmaResult.latestDescription,
+          trackingError: null,
+          trackingChangedAt: now,
+          trackingProvider: "cma_public",
+          trackingDetectedCarrier: detectedCarrier,
+          trackingFallbackUsed: !!fallbackReason,
+          trackingFallbackReason: fallbackReason,
+        };
+        if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
+        await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+        await logAndConfirmEta(
+          containerId, containerNumber, currentEta, finalEta, etaSrc, "cma_public",
+          !finalEta ? "no ETA from CMA public endpoint" : undefined,
+        );
+        console.log(`[ContainerTracking] ${containerNumber} → cma_public: status=${cmaResult.latestStatus ?? "?"}`);
+        return { success: true, lastStatus: cmaResult.latestStatus, lastLocation: cmaResult.latestLocation, lastDescription: cmaResult.latestDescription, lastCheckedAt: now, error: null };
+      }
+
+      console.log(`[ContainerTracking] ${containerNumber}: CMA public endpoint failed (${cmaResult.error}) — trying 17track...`);
+    }
+
+    // 17track handles CMA well — try it before burning ParcelsApp quota
+    if (seventeenTrack.isConfigured()) {
+      const quotaOk17 = await check17trackQuota();
+      if (quotaOk17) {
+        console.log(`[ContainerTracking] ${containerNumber}: trying 17track for CMA...`);
+        const result17 = await seventeenTrack.track(containerNumber);
+        await saveTrackingCheck(
+          containerId,
+          "17track",
+          result17.success ? "success" : result17.noData ? "no_data" : "error",
+          result17.error ?? null,
+          result17.raw,
+        );
+        if (result17.success) {
+          await saveDirectEvents(containerId, result17);
+          const { eta: finalEta, source: etaSrc } = resolveEtaFromProvider(
+            result17.eta ?? null,
+            result17.events,
+            currentEta,
+          );
+          const updateSet: Record<string, unknown> = {
+            trackingLastCheckedAt: now,
+            trackingLastStatus: result17.latestStatus,
+            trackingLastEventDate: result17.latestEventDate,
+            trackingLastDescription: result17.latestDescription,
+            trackingError: null,
+            trackingChangedAt: now,
+            trackingProvider: "17track",
+            trackingDetectedCarrier: detectedCarrier,
+            trackingFallbackUsed: !!fallbackReason,
+            trackingFallbackReason: fallbackReason,
+          };
+          if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
+          await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+          await logAndConfirmEta(
+            containerId, containerNumber, currentEta, finalEta, etaSrc, "17track",
+            !finalEta ? "17track returned no ETA" : undefined,
+          );
+          console.log(`[ContainerTracking] ${containerNumber} → 17track (CMA): status=${result17.latestStatus ?? "?"}`);
+          return { success: true, lastStatus: result17.latestStatus, lastLocation: result17.latestLocation, lastDescription: result17.latestDescription, lastCheckedAt: now, error: null };
+        }
+        console.log(`[ContainerTracking] ${containerNumber}: 17track failed for CMA (${result17.error}) — trying ParcelsApp API...`);
+      }
+    }
+
+    // Last resort: ParcelsApp API
     return await trackViaParcelsAppApi(containerId, containerNumber, detectedCarrier, fallbackReason, now, currentEta);
   }
 
