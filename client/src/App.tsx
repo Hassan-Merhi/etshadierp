@@ -892,6 +892,12 @@ function AuthenticatedApp() {
         }
       }
     }
+
+    // 3. hiddenCostFields — per-user tab restrictions that aren't in pageKeys
+    if (currentLocation === "/factory/production-report" &&
+        myAccess.hiddenCostFields?.includes("hide_tab_production_analytics")) {
+      return <Redirect to="/factory/raw-stock" />;
+    }
   }
   // ── End route-level access guard ───────────────────────────────────────────
 

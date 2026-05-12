@@ -101,9 +101,26 @@ export function registerFactoryDaybookRoutes(app: Express) {
 
       const validVoucherIds = new Set<number>();
       const voucherOptionalMap = new Map<number, boolean>();
+      // Also store live description/amount so stale daybook entries always show
+      // current voucher data after an edit.
+      const voucherLiveDataMap = new Map<number, {
+        description: string;
+        amountCurrency: string;
+        amountUsd: string;
+        fxRateToUsd: string;
+      }>();
       if (voucherRefIds.length > 0) {
         const liveVouchers = await db
-          .select({ id: vouchers.id, optional: vouchers.optional })
+          .select({
+            id: vouchers.id,
+            optional: vouchers.optional,
+            description: vouchers.description,
+            totalAmount: vouchers.totalAmount,
+            currency: vouchers.currency,
+            exchangeRate: vouchers.exchangeRate,
+            voucherType: vouchers.voucherType,
+            voucherNumber: vouchers.voucherNumber,
+          })
           .from(vouchers)
           .where(and(
             inArray(vouchers.id, voucherRefIds),
@@ -112,6 +129,16 @@ export function registerFactoryDaybookRoutes(app: Express) {
         liveVouchers.forEach((v: any) => {
           validVoucherIds.add(v.id);
           voucherOptionalMap.set(v.id, !!v.optional);
+          const currency = v.currency || "USD";
+          const fxRate = parseFloat(v.exchangeRate || "1") || 1;
+          const amtCurrency = parseFloat(v.totalAmount || "0");
+          const amtUsd = currency === "USD" ? amtCurrency : amtCurrency * fxRate;
+          voucherLiveDataMap.set(v.id, {
+            description: v.description || `${v.voucherType} voucher #${v.voucherNumber}`,
+            amountCurrency: String(amtCurrency),
+            amountUsd: String(amtUsd),
+            fxRateToUsd: String(fxRate),
+          });
         });
       }
 
@@ -142,12 +169,23 @@ export function registerFactoryDaybookRoutes(app: Express) {
           }
           return true;
         })
-        .map((r: any) => ({
-          ...r,
-          optional: r.referenceTable === "vouchers" && r.referenceId != null
-            ? voucherOptionalMap.get(r.referenceId) ?? false
-            : false,
-        }));
+        .map((r: any) => {
+          if (r.referenceTable === "vouchers" && r.referenceId != null) {
+            const live = voucherLiveDataMap.get(r.referenceId);
+            return {
+              ...r,
+              optional: voucherOptionalMap.get(r.referenceId) ?? false,
+              // Always use live voucher description and amount so edits reflect immediately
+              ...(live ? {
+                description: live.description,
+                amountCurrency: live.amountCurrency,
+                amountUsd: live.amountUsd,
+                fxRateToUsd: live.fxRateToUsd,
+              } : {}),
+            };
+          }
+          return { ...r, optional: false };
+        });
 
       // ── 2. Query vouchers directly (to catch pre-fix historical entries) ───
       // Only include Payment / Receipt / Journal vouchers in the daybook view
