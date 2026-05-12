@@ -910,9 +910,15 @@ function AuthenticatedApp() {
 
     const requiredKey = resolvePageKey(currentLocation);
 
-    // 1. Per-user page restriction — redirect if this page isn't in their allow-list
+    // 1. Per-user page restriction — redirect if this page isn't in their allow-list.
+    // Also accepts legacy pre-hub-merge keys (e.g. "factory/workers" grants access
+    // to "factory/payroll-hub") so restricted users aren't locked out of merged hubs.
     if (isRestrictedUser && requiredKey) {
-      if (!myAccess.pageKeys.includes(requiredKey)) {
+      const hasDirectAccess = myAccess.pageKeys.includes(requiredKey);
+      const hasLegacyAccess = SUBPAGE_PARENT
+        .filter(([, parentKey]) => parentKey === requiredKey)
+        .some(([prefix]) => myAccess.pageKeys.includes(prefix.replace(/^\//, "")));
+      if (!hasDirectAccess && !hasLegacyAccess) {
         return <Redirect to={factoryDefaultPage} />;
       }
     }
