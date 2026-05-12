@@ -696,8 +696,6 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
         items: [
           { key: "users-permissions", label: "Users & Permissions", icon: Users },
           { key: "users", label: "Users (legacy)", icon: Users, devOnly: true },
-          { key: "active-users", label: "Active Users", icon: Eye, devOnly: true },
-          { key: "login-history", label: "Login History", icon: Clock, devOnly: true },
         ],
       },
       {

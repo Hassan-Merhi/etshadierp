@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
@@ -133,6 +133,7 @@ export function UserManagementDrawer({
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [openTabGroups, setOpenTabGroups] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (user) {
@@ -277,6 +278,68 @@ export function UserManagementDrawer({
 
   const handleSaveErpRestrictions = () => saveErpRestrictionsMutation.mutate();
 
+  const toggleTabGroup = (group: string) => {
+    setOpenTabGroups((prev) => {
+      const next = new Set(prev);
+      next.has(group) ? next.delete(group) : next.add(group);
+      return next;
+    });
+  };
+
+  const isDirty = useMemo(() => {
+    if (!user) return false;
+    const origPageAccess = new Set(user.pageAccess ?? []);
+    const pageSetChanged =
+      pageAccess.size !== origPageAccess.size ||
+      Array.from(pageAccess).some((k) => !origPageAccess.has(k));
+    const sortedCost = JSON.stringify([...hiddenCostFields].sort());
+    const origSortedCost = JSON.stringify([...(user.hiddenCostFields ?? [])].sort());
+    const sortedErp = JSON.stringify([...hiddenErpCostFields].sort());
+    const origSortedErp = JSON.stringify([...(erpHiddenCostData?.hiddenCostFields ?? [])].sort());
+    return (
+      username !== (user.username ?? "") ||
+      displayName !== (user.displayName ?? "") ||
+      !!newPassword ||
+      (!isPrivileged && hasErpAccess !== (user.hasErpAccess ?? true)) ||
+      (!isPrivileged && hasFactoryAccess !== (user.hasFactoryAccess ?? true)) ||
+      (!isPrivileged && pageSetChanged) ||
+      (!isPrivileged && sortedCost !== origSortedCost) ||
+      (!isPrivileged && sortedErp !== origSortedErp)
+    );
+  }, [user, username, displayName, newPassword, hasErpAccess, hasFactoryAccess, pageAccess, hiddenCostFields, hiddenErpCostFields, erpHiddenCostData, isPrivileged]);
+
+  const handleSaveAll = () => {
+    const payload: any = {
+      displayName,
+    };
+    if (username !== user.username) payload.username = username;
+    if (newPassword) payload.password = newPassword;
+    if (!isPrivileged) {
+      payload.hasErpAccess = hasErpAccess;
+      payload.hasFactoryAccess = hasFactoryAccess;
+      payload.pageAccess = Array.from(pageAccess);
+      payload.hiddenCostFields = hiddenCostFields;
+    }
+    updateMutation.mutate(payload, {
+      onSuccess: () => {
+        if (!isPrivileged) saveErpRestrictionsMutation.mutate();
+      },
+    });
+  };
+
+  const handleDiscard = () => {
+    if (!user) return;
+    setUsername(user.username ?? "");
+    setDisplayName(user.displayName ?? "");
+    setHasErpAccess(isPrivileged ? true : (user.hasErpAccess ?? true));
+    setHasFactoryAccess(isPrivileged ? true : (user.hasFactoryAccess ?? true));
+    setPageAccess(new Set(user.pageAccess ?? []));
+    setHiddenCostFields(user.hiddenCostFields ?? []);
+    setHiddenErpCostFields(erpHiddenCostData?.hiddenCostFields ?? []);
+    setNewPassword("");
+    setShowPasswordReset(false);
+  };
+
   if (!user) return null;
 
   const accessLabel =
@@ -298,9 +361,9 @@ export function UserManagementDrawer({
       <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
         <SheetContent
           side="right"
-          className="w-full sm:max-w-[520px] overflow-y-auto p-0"
+          className="w-full sm:max-w-[520px] p-0 flex flex-col"
         >
-          <SheetHeader className="px-6 py-4 border-b">
+          <SheetHeader className="px-6 py-4 border-b shrink-0">
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted font-bold text-base uppercase text-muted-foreground">
                 {(user.displayName || user.username).charAt(0)}
@@ -324,7 +387,8 @@ export function UserManagementDrawer({
             </div>
           </SheetHeader>
 
-          <div className="px-6 py-4 space-y-4">
+          <div className="flex-1 overflow-y-auto">
+          <div className="px-6 py-4 space-y-4 pb-6">
             {/* Card 1: Account */}
             <Card>
               <CardHeader className="pb-3">
@@ -391,8 +455,8 @@ export function UserManagementDrawer({
                   </Button>
                 )}
 
-                <div className="flex items-center justify-between gap-3 pt-1 flex-wrap">
-                  {!isPrivileged && (
+                {!isPrivileged && (
+                  <div className="pt-1">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -403,18 +467,8 @@ export function UserManagementDrawer({
                       <Trash2 className="h-3.5 w-3.5" />
                       Remove User
                     </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    className="ml-auto gap-2"
-                    onClick={handleSaveAccount}
-                    disabled={updateMutation.isPending}
-                    data-testid="button-save-account"
-                  >
-                    <Save className="h-3.5 w-3.5" />
-                    {updateMutation.isPending ? "Saving..." : "Save"}
-                  </Button>
-                </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -459,18 +513,6 @@ export function UserManagementDrawer({
                           data-testid="switch-drawer-factory-access"
                         />
                       </div>
-                    </div>
-                    <div className="flex justify-end">
-                      <Button
-                        size="sm"
-                        className="gap-2"
-                        onClick={handleSaveAccess}
-                        disabled={updateMutation.isPending}
-                        data-testid="button-save-access"
-                      >
-                        <Save className="h-3.5 w-3.5" />
-                        {updateMutation.isPending ? "Saving..." : "Save"}
-                      </Button>
                     </div>
                   </>
                 )}
@@ -632,24 +674,53 @@ export function UserManagementDrawer({
                               </div>
                             </div>
                             <p className="text-xs text-muted-foreground">Checked tabs will be hidden from this user.</p>
-                            <div className="space-y-3 border rounded-md p-3 max-h-80 overflow-y-auto">
-                              {FACTORY_TAB_GROUPS.map((group) => (
-                                <div key={group} className="space-y-1.5">
-                                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</span>
-                                  <div className="grid grid-cols-2 gap-1 mt-1">
-                                    {FACTORY_TABS.filter((t) => t.group === group).map((tab) => (
-                                      <div key={tab.key} className="flex items-center gap-2">
-                                        <Checkbox
-                                          checked={hiddenCostFields.includes(tab.key)}
-                                          onCheckedChange={() => toggleCostField(tab.key)}
-                                          data-testid={`checkbox-tab-${tab.key}`}
-                                        />
-                                        <span className="text-sm">{tab.label}</span>
+                            <div className="space-y-1">
+                              {FACTORY_TAB_GROUPS.map((group) => {
+                                const groupTabs = FACTORY_TABS.filter((t) => t.group === group);
+                                const hiddenCount = groupTabs.filter((t) => hiddenCostFields.includes(t.key)).length;
+                                const isOpen = openTabGroups.has(group);
+                                return (
+                                  <Collapsible key={group} open={isOpen} onOpenChange={() => toggleTabGroup(group)}>
+                                    <CollapsibleTrigger asChild>
+                                      <div className="flex items-center justify-between cursor-pointer select-none rounded-md px-2.5 py-1.5 bg-muted/30 hover-elevate" data-testid={`group-tabs-${group.toLowerCase().replace(/\s+/g, "-")}`}>
+                                        <div className="flex items-center gap-2">
+                                          {isOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                                          <span className="text-xs font-semibold">{group}</span>
+                                          {hiddenCount > 0 && (
+                                            <Badge variant="secondary" className="text-xs">{hiddenCount} hidden</Badge>
+                                          )}
+                                        </div>
+                                        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                          <Button variant="ghost" size="sm" className="h-6 text-xs px-2"
+                                            onClick={() => setHiddenCostFields((prev) => Array.from(new Set([...prev, ...groupTabs.map((t) => t.key)])))}
+                                            data-testid={`button-tabs-hide-all-${group}`}>
+                                            Hide all
+                                          </Button>
+                                          <Button variant="ghost" size="sm" className="h-6 text-xs px-2"
+                                            onClick={() => { const keys = new Set(groupTabs.map((t) => t.key)); setHiddenCostFields((prev) => prev.filter((k) => !keys.has(k))); }}
+                                            data-testid={`button-tabs-show-all-${group}`}>
+                                            Show all
+                                          </Button>
+                                        </div>
                                       </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              ))}
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                      <div className="grid grid-cols-2 gap-1 px-2 py-1.5 pl-8">
+                                        {groupTabs.map((tab) => (
+                                          <div key={tab.key} className="flex items-center gap-2">
+                                            <Checkbox
+                                              checked={hiddenCostFields.includes(tab.key)}
+                                              onCheckedChange={() => toggleCostField(tab.key)}
+                                              data-testid={`checkbox-tab-${tab.key}`}
+                                            />
+                                            <span className="text-sm">{tab.label}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </CollapsibleContent>
+                                  </Collapsible>
+                                );
+                              })}
                             </div>
                           </div>
                         )}
@@ -700,13 +771,6 @@ export function UserManagementDrawer({
                           </div>
                         </div>
 
-                        <div className="flex justify-end">
-                          <Button size="sm" className="gap-2" onClick={handleSaveRestrictions} disabled={updateMutation.isPending} data-testid="button-save-restrictions">
-                            <Save className="h-3.5 w-3.5" />
-                            {updateMutation.isPending ? "Saving..." : "Save Restrictions"}
-                          </Button>
-                        </div>
-
                         <div className="space-y-2 pt-2 border-t">
                           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">ERP Cost &amp; Profit Fields</p>
                           <p className="text-xs text-muted-foreground">Checked items will be hidden from this user in the ERP system (sales detail, exports, prints).</p>
@@ -722,12 +786,6 @@ export function UserManagementDrawer({
                               </div>
                             ))}
                           </div>
-                          <div className="flex justify-end">
-                            <Button size="sm" className="gap-2" onClick={handleSaveErpRestrictions} disabled={saveErpRestrictionsMutation.isPending} data-testid="button-save-erp-restrictions">
-                              <Save className="h-3.5 w-3.5" />
-                              {saveErpRestrictionsMutation.isPending ? "Saving..." : "Save ERP Restrictions"}
-                            </Button>
-                          </div>
                         </div>
                       </>
                     )}
@@ -736,6 +794,37 @@ export function UserManagementDrawer({
               </Collapsible>
             </Card>
           </div>
+          </div>
+
+          {/* Sticky save bar — appears only when something has changed */}
+          {isDirty && (
+            <div className="shrink-0 border-t px-6 py-3 bg-background flex items-center justify-between gap-3 flex-wrap z-50">
+              <p className="text-xs text-muted-foreground">
+                {newPassword ? "Unsaved changes · includes new password" : "Unsaved changes"}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDiscard}
+                  disabled={updateMutation.isPending || saveErpRestrictionsMutation.isPending}
+                  data-testid="button-discard-changes"
+                >
+                  Discard
+                </Button>
+                <Button
+                  size="sm"
+                  className="gap-2"
+                  onClick={handleSaveAll}
+                  disabled={updateMutation.isPending || saveErpRestrictionsMutation.isPending}
+                  data-testid="button-save-all-changes"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  {updateMutation.isPending || saveErpRestrictionsMutation.isPending ? "Saving…" : "Save changes"}
+                </Button>
+              </div>
+            </div>
+          )}
         </SheetContent>
       </Sheet>
 
