@@ -11,7 +11,7 @@
  *
  * Provider order per carrier:
  *   MAERSK   → http_scraper (fast-fail, no network) → maersk_direct (Puppeteer intercepts Maersk API)
- *   CMA      → http_scraper (fast-fail, no network) → parcelsapp API directly (skips browser scrapers)
+ *   CMA      → http_scraper (fast-fail, no network) → cma_public (if enabled) → 17track (if configured) → parcelsapp_scraper (Puppeteer, free) → parcelsapp API
  *   MSC      → http_scraper (direct MSC API)        → parcelsapp_scraper → 17track → parcelsapp API
  *   HAPAG    → http_scraper (direct Hapag API)      → parcelsapp_scraper → 17track → parcelsapp API
  *   COSCO    → http_scraper (direct COSCO API)      → parcelsapp_scraper → 17track → parcelsapp API
@@ -1017,8 +1017,51 @@ async function trackViaParcelsApp(
           console.log(`[ContainerTracking] ${containerNumber} → 17track (CMA): status=${result17.latestStatus ?? "?"}`);
           return { success: true, lastStatus: result17.latestStatus, lastLocation: result17.latestLocation, lastDescription: result17.latestDescription, lastCheckedAt: now, error: null };
         }
-        console.log(`[ContainerTracking] ${containerNumber}: 17track failed for CMA (${result17.error}) — trying ParcelsApp API...`);
+        console.log(`[ContainerTracking] ${containerNumber}: 17track failed for CMA (${result17.error}) — trying ParcelsApp scraper...`);
       }
+    }
+
+    // ── Puppeteer scraper (ParcelsApp website, no API key needed) ──
+    if (isScraperAvailable()) {
+      console.log(`[ContainerTracking] ${containerNumber}: CMA — trying ParcelsApp web scraper...`);
+      const scraped = await scrapeTracking(containerNumber);
+      await saveTrackingCheck(
+        containerId,
+        "parcelsapp_scraper",
+        scraped.success ? "success" : scraped.blocked ? "blocked" : "error",
+        scraped.error ?? null,
+        scraped.rawResponse ?? null,
+      );
+      if (scraped.success && scraped.shipment) {
+        const shipment = scraped.shipment;
+        const lastStatus      = deriveLastStatus(shipment);
+        const lastLocation    = deriveLastLocation(shipment);
+        const lastEventDate   = deriveLastEventDate(shipment);
+        const lastDescription = shipment.states?.[0]?.description ?? null;
+        const { eta: finalEta, source: etaSrc } = resolveEtaFromShipment(shipment, currentEta);
+        await saveParcelsAppEvents(containerId, shipment);
+        const updateSet: Record<string, unknown> = {
+          trackingLastCheckedAt: now,
+          trackingLastStatus: lastStatus,
+          trackingLastEventDate: lastEventDate,
+          trackingLastDescription: lastDescription,
+          trackingError: null,
+          trackingChangedAt: now,
+          trackingProvider: "parcelsapp_scraper",
+          trackingDetectedCarrier: detectedCarrier,
+          trackingFallbackUsed: !!fallbackReason,
+          trackingFallbackReason: fallbackReason,
+        };
+        if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
+        await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+        await logAndConfirmEta(
+          containerId, containerNumber, currentEta, finalEta, etaSrc, "parcelsapp_scraper",
+          !finalEta ? "no ETA derived from shipment states" : undefined,
+        );
+        console.log(`[ContainerTracking] ${containerNumber} → parcelsapp_scraper (CMA): status=${lastStatus ?? "?"}`);
+        return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
+      }
+      console.log(`[ContainerTracking] ${containerNumber}: CMA scraper failed (${scraped.error}) — trying ParcelsApp API...`);
     }
 
     // Last resort: ParcelsApp API
