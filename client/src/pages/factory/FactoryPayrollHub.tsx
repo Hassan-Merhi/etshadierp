@@ -8,12 +8,19 @@ type Section = "workers" | "employees";
 
 function getInitialSection(): Section {
   if (typeof window !== "undefined") {
-    const hash = window.location.hash.replace("#", "");
-    if (hash === "employees" || hash === "workers") return hash;
-    const tab = new URLSearchParams(window.location.search).get("tab");
-    if (tab === "employees" || tab === "workers") return tab;
+    const params = new URLSearchParams(window.location.search);
+    const s = params.get("section");
+    if (s === "employees") return "employees";
+    if (s === "workers") return "workers";
   }
   return "workers";
+}
+
+function setSectionInUrl(section: Section) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("section", section);
+  url.searchParams.delete("tab");
+  window.history.replaceState(null, "", url.toString());
 }
 
 export default function FactoryPayrollHub() {
@@ -22,7 +29,7 @@ export default function FactoryPayrollHub() {
   function handleSectionChange(value: string) {
     const s = value as Section;
     setSection(s);
-    window.history.replaceState(null, "", `#${s}`);
+    setSectionInUrl(s);
   }
 
   return (

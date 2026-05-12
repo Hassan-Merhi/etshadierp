@@ -124,8 +124,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     label: "Finance",
     color: NAV_COLOR.finance,
     items: [
-      { title: "Workers",          url: "/factory/workers",                 icon: HardHat        },
-      { title: "Employees",        url: "/factory/employees",               icon: Users          },
+      { title: "Payroll",          url: "/factory/payroll-hub",             icon: HardHat        },
       { title: "Suppliers",        url: "/factory/suppliers",               icon: UserRound      },
       { title: "Transporters",     url: "/factory/transporters",            icon: Truck,         developerOnly: true },
       { title: "Vouchers",         url: "/factory/vouchers",                icon: FileText       },

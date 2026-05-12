@@ -852,8 +852,10 @@ function AuthenticatedApp() {
       ["/factory/reprint-labels",          "factory/bales-hub"],
       ["/factory/bales-history",           "factory/bales-hub"],
       ["/factory/barcode-lookup",          "factory/bales-hub"],
-      ["/factory/payroll",                 "factory/workers"],
-      ["/factory/worker-payroll",          "factory/workers"],
+      ["/factory/payroll",                 "factory/payroll-hub"],
+      ["/factory/worker-payroll",          "factory/payroll-hub"],
+      ["/factory/workers",                 "factory/payroll-hub"],
+      ["/factory/employees",               "factory/payroll-hub"],
       ["/factory/containers/new",          "factory/containers"],
       ["/factory/net-position-details",    "factory/net-position"],
       ["/factory/ledger-monthly",          "factory/accounts"],
@@ -1027,11 +1029,11 @@ function AuthenticatedApp() {
                     <Route path="/factory/stock-allocation-v5" component={FactoryStockAllocationV5} />
                     <Route path="/factory/customers/:id" component={FactoryCustomerStatement} />
                     <Route path="/factory/customers" component={FactoryCustomers} />
-                    <Route path="/factory/payroll-hub"><Redirect to="/factory/workers" /></Route>
+                    <Route path="/factory/payroll-hub" component={FactoryPayrollHub} />
                     <Route path="/factory/employees/:id" component={FactoryEmployeeDetail} />
-                    <Route path="/factory/employees" component={FactoryEmployeesHub} />
+                    <Route path="/factory/employees"><Redirect to="/factory/payroll-hub?section=employees" /></Route>
                     <Route path="/factory/workers/:id" component={FactoryWorkerDetail} />
-                    <Route path="/factory/workers" component={FactoryWorkersHub} />
+                    <Route path="/factory/workers"><Redirect to="/factory/payroll-hub?section=workers" /></Route>
                     <Route path="/factory/worker-payroll"><Redirect to="/factory/workers?tab=payroll" /></Route>
                     <Route path="/factory/supplier-report" component={FactorySupplierReport} />
                     <Route path="/factory/supplier-statement" component={FactorySupplierStatement} />
