@@ -190,6 +190,9 @@ const FactorySupplierScoreboard = lazy(() => import("@/pages/factory/FactorySupp
 const FactoryMixOptimizer = lazy(() => import("@/pages/factory/FactoryMixOptimizer"));
 const FactoryCashflow = lazy(() => import("@/pages/factory/FactoryCashflow"));
 const FactoryWaste = lazy(() => import("@/pages/factory/FactoryWaste"));
+const FactorySupplierHub = lazy(() => import("@/pages/factory/FactorySupplierHub"));
+const FactoryFinancialHub = lazy(() => import("@/pages/factory/FactoryFinancialHub"));
+const FactoryProductionIntelHub = lazy(() => import("@/pages/factory/FactoryProductionIntelHub"));
 const WasteDispatchPage = lazy(() => import("@/pages/factory/WasteDispatch"));
 const FactoryPOS = lazy(() => import("@/pages/factory/FactoryPOS"));
 const FactoryIntelSettings = lazy(() => import("@/pages/factory/FactorySettings"));
@@ -863,7 +866,12 @@ function AuthenticatedApp() {
       ["/factory/stock-otw",              "factory/containers-hub"],
       ["/factory/customers",               "factory/parties"],
       ["/factory/suppliers",               "factory/parties"],
-      ["/factory/net-position-details",    "factory/net-position"],
+      ["/factory/net-position-details",    "factory/intelligence/financial-hub"],
+      ["/factory/net-position",            "factory/intelligence/financial-hub"],
+      ["/factory/net-profit-analytics",    "factory/intelligence/financial-hub"],
+      ["/factory/supplier-report",         "factory/intelligence/supplier-hub"],
+      ["/factory/supplier-statement",      "factory/intelligence/supplier-hub"],
+      ["/factory/production-summary",      "factory/intelligence/production-hub"],
       ["/factory/ledger-monthly",          "factory/accounts"],
       ["/factory/ledger-vouchers",         "factory/accounts"],
       ["/factory/voucher-detail",          "factory/vouchers"],
@@ -1020,7 +1028,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/create" component={AccountingCreate} />
                     <Route path="/factory/payroll" component={Payroll} />
                     <Route path="/factory/analytics" component={Analytics} />
-                    <Route path="/factory/production-summary" component={ProductionSummary} />
+                    <Route path="/factory/production-summary"><Redirect to="/factory/intelligence/production-hub?section=production-summary" /></Route>
                     <Route path="/factory/sales/new" component={FactoryInvoiceCreate} />
                     <Route path="/factory/sales/loading/pending" component={FactoryPendingLoadings} />
                     <Route path="/factory/sales/loading/new" component={FactoryContainerLoadingScan} />
@@ -1043,8 +1051,8 @@ function AuthenticatedApp() {
                     <Route path="/factory/workers/:id" component={FactoryWorkerDetail} />
                     <Route path="/factory/workers"><Redirect to="/factory/payroll-hub?section=workers" /></Route>
                     <Route path="/factory/worker-payroll"><Redirect to="/factory/workers?tab=payroll" /></Route>
-                    <Route path="/factory/supplier-report" component={FactorySupplierReport} />
-                    <Route path="/factory/supplier-statement" component={FactorySupplierStatement} />
+                    <Route path="/factory/supplier-report"><Redirect to="/factory/intelligence/supplier-hub?section=report" /></Route>
+                    <Route path="/factory/supplier-statement"><Redirect to="/factory/intelligence/supplier-hub?section=statement" /></Route>
                     <Route path="/factory/broker-visual-statement" component={FactoryBrokerVisualStatement} />
                     <Route path="/factory/barcode-lookup" component={BarcodeLookup} />
                     <Route path="/factory/import" component={FactoryImport} />
@@ -1058,12 +1066,15 @@ function AuthenticatedApp() {
                     <Route path="/factory/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />
                     <Route path="/factory/intelligence/dashboard" component={FactoryDashboardIntel} />
                     <Route path="/factory/intelligence/kpis" component={FactoryKpis} />
-                    <Route path="/factory/intelligence/profitability" component={FactoryProfitability} />
+                    <Route path="/factory/intelligence/profitability"><Redirect to="/factory/intelligence/financial-hub?section=profitability" /></Route>
                     <Route path="/factory/intelligence/alerts" component={FactoryAlerts} />
-                    <Route path="/factory/intelligence/supplier-scores" component={FactorySupplierScoreboard} />
-                    <Route path="/factory/intelligence/mix-optimizer" component={FactoryMixOptimizer} />
-                    <Route path="/factory/intelligence/cashflow" component={FactoryCashflow} />
-                    <Route path="/factory/intelligence/waste" component={FactoryWaste} />
+                    <Route path="/factory/intelligence/supplier-hub" component={FactorySupplierHub} />
+                    <Route path="/factory/intelligence/financial-hub" component={FactoryFinancialHub} />
+                    <Route path="/factory/intelligence/production-hub" component={FactoryProductionIntelHub} />
+                    <Route path="/factory/intelligence/supplier-scores"><Redirect to="/factory/intelligence/supplier-hub?section=scores" /></Route>
+                    <Route path="/factory/intelligence/mix-optimizer"><Redirect to="/factory/intelligence/production-hub?section=mix-optimizer" /></Route>
+                    <Route path="/factory/intelligence/cashflow"><Redirect to="/factory/intelligence/financial-hub?section=cashflow" /></Route>
+                    <Route path="/factory/intelligence/waste"><Redirect to="/factory/intelligence/production-hub?section=waste" /></Route>
                     <Route path="/factory/waste-dispatch" component={WasteDispatchPage} />
                     <Route path="/factory/pos" component={FactoryPOS} />
                     <Route path="/factory/bale-ledger">{() => <Redirect to="/factory/production-report" />}</Route>
@@ -1080,8 +1091,8 @@ function AuthenticatedApp() {
                     {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/inventory-repair" component={InventoryRepair} />}
                     {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/company-data-reset" component={CompanyDataReset} />}
                     <Route path="/factory/net-position-details" component={FactoryNetPositionDetails} />
-                    <Route path="/factory/net-profit-analytics" component={FactoryNetProfitAnalytics} />
-                    <Route path="/factory/net-position" component={FactoryNetPosition} />
+                    <Route path="/factory/net-profit-analytics"><Redirect to="/factory/intelligence/financial-hub?section=net-profit" /></Route>
+                    <Route path="/factory/net-position"><Redirect to="/factory/intelligence/financial-hub?section=net-position" /></Route>
                     <Route path="/factory/financial-snapshot" component={FactoryFinancialSnapshot} />
                     <Route path="/factory/production-report">{() => myAccess?.hiddenCostFields?.includes("hide_tab_production_analytics") ? <Redirect to={factoryDefaultPage} /> : <DailyProductionReport />}</Route>
                     <Route path="/factory/rental/warehouses" component={FactoryRentalWarehouses} />
