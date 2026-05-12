@@ -10,6 +10,7 @@ import {
   customers,
 } from "@shared/schema";
 import { eq, inArray, sql, and, gte, lte, isNull } from "drizzle-orm";
+import { recalculateOrderTotals } from "./_helpers";
 import { sqlArray } from "../../lib/sqlArray";
 
 // ─── V5 Guard Convention ─────────────────────────────────────────────────────
@@ -1036,20 +1037,35 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
               AND reference_id = ${orderId}`,
       );
 
-      // Synchronise total_qty_bales with the actual customer_order_bales count.
-      // Bale links were deleted during cancellation (bales went back to stock),
-      // so this will reset total_qty_bales to 0 — the correct state for a freshly
-      // restored order that needs its bales re-scanned.
-      await db.execute(
-        sql`UPDATE customer_orders
-            SET total_qty_bales = (
-              SELECT COUNT(*)::int FROM customer_order_bales WHERE order_id = ${orderId}
-            ),
-            updated_at = NOW()
-            WHERE id = ${orderId}`,
+      // Restore the exact bale links that were archived when the order was cancelled.
+      // If history rows exist (i.e. the order was cancelled after this feature landed),
+      // copy them back into customer_order_bales so the scanner sees the original references.
+      // For older orders cancelled before this feature, history is empty and the totals
+      // are simply reset to 0 — those orders need Auto-Recover or manual recovery.
+      const historyResult = await db.execute(
+        sql`SELECT COUNT(*)::int AS cnt FROM customer_order_bales_history WHERE order_id = ${orderId}`,
       );
+      const historyCount = Number(((historyResult as any).rows ?? [])[0]?.cnt ?? 0);
 
-      res.json({ id: orderId, restoredTo: restoreStatus });
+      if (historyCount > 0) {
+        await db.execute(
+          sql`INSERT INTO customer_order_bales
+                (order_id, bale_id, bale_reference, location_id, weight,
+                 article_code, bale_name, price_used, scanned_by)
+              SELECT order_id, bale_id, bale_reference, location_id, weight,
+                     article_code, bale_name, price_used, scanned_by
+              FROM customer_order_bales_history
+              WHERE order_id = ${orderId}`,
+        );
+        await db.execute(
+          sql`DELETE FROM customer_order_bales_history WHERE order_id = ${orderId}`,
+        );
+      }
+
+      // Rebuild order_lines and sync total_qty_bales from the live bale count.
+      await recalculateOrderTotals(db, orderId);
+
+      res.json({ id: orderId, restoredTo: restoreStatus, balasRestored: historyCount });
     } catch (err: any) {
       console.error("[V5] restore-container error:", err);
       res.status(500).json({ message: err.message });

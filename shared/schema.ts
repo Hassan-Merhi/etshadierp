@@ -3323,6 +3323,24 @@ export const customerOrderBales = pgTable("customer_order_bales", {
 
 export type CustomerOrderBale = typeof customerOrderBales.$inferSelect;
 
+// ─── Bale history: archive of bale links at the moment an order is cancelled ──
+// Populated by the LOADING → CANCELLED path. On restore the rows are moved back
+// to customer_order_bales so the exact original references come back unchanged.
+export const customerOrderBalesHistory = pgTable("customer_order_bales_history", {
+  id: serial("id").primaryKey(),
+  originalId: integer("original_id").notNull(),
+  orderId: integer("order_id").notNull(),
+  baleId: integer("bale_id").notNull(),
+  baleReference: varchar("bale_reference", { length: 100 }).notNull(),
+  locationId: integer("location_id").notNull(),
+  weight: decimal("weight", { precision: 15, scale: 3 }).notNull(),
+  articleCode: varchar("article_code", { length: 50 }),
+  baleName: text("bale_name"),
+  priceUsed: decimal("price_used", { precision: 20, scale: 2 }).notNull(),
+  scannedBy: text("scanned_by"),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ─── V5: Per-container expected quantities ────────────────────────────────────
 // Created when a V5 proforma + containers are submitted via POST /api/factory/v5/proforma-with-loading.
 // One row per (order_id × article_code). Stores the expected quantity for that container at creation time

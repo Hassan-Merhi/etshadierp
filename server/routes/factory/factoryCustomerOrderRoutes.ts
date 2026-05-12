@@ -2952,6 +2952,21 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         // LOADING — any authenticated user can cancel; bale links are cleaned up
         if (order.status === "LOADING") {
           const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+
+          // Archive bale links before deleting so the exact references survive and
+          // can be restored verbatim when the order is un-cancelled.
+          if (orderBales.length > 0) {
+            await db.execute(
+              sql`INSERT INTO customer_order_bales_history
+                    (original_id, order_id, bale_id, bale_reference, location_id,
+                     weight, article_code, bale_name, price_used, scanned_by)
+                  SELECT id, order_id, bale_id, bale_reference, location_id,
+                         weight, article_code, bale_name, price_used, scanned_by
+                  FROM customer_order_bales
+                  WHERE order_id = ${orderId}`,
+            );
+          }
+
           for (const ob of orderBales) {
             await db.update(factoryBales)
               .set({ status: "IN_STOCK", updatedAt: new Date() })

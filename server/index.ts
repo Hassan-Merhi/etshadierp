@@ -2975,6 +2975,22 @@ let migrationsDone = false;
     // Broader ghost sweep: delete any row where file_data IS NULL regardless of metadata,
     // because without stored file_data the file cannot be served (disk is ephemeral).
     `DELETE FROM factory_shipping_container_documents WHERE file_data IS NULL`,
+    // Archive table: bale links saved at cancellation time so restore can bring back exact references
+    `CREATE TABLE IF NOT EXISTS customer_order_bales_history (
+      id serial PRIMARY KEY,
+      original_id integer NOT NULL,
+      order_id integer NOT NULL,
+      bale_id integer NOT NULL,
+      bale_reference varchar(100) NOT NULL,
+      location_id integer NOT NULL,
+      weight decimal(15,3) NOT NULL,
+      article_code varchar(50),
+      bale_name text,
+      price_used decimal(20,2) NOT NULL,
+      scanned_by text,
+      cancelled_at timestamptz NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS cobh_order_id_idx ON customer_order_bales_history (order_id)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
