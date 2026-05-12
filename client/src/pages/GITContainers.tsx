@@ -598,7 +598,10 @@ function ContainerDrawer({
 
   const transUpper = form.transporter.toUpperCase();
   const transLabel = transUpper.includes("FARHAT") || transUpper.includes("CONTINENTAL")
-    ? "(+11d)" : form.transporter ? "(+14d)" : "";
+    ? "(+11d)"
+    : transUpper.includes("KDOUH")
+    ? "(+12d)"
+    : form.transporter ? "(+14d)" : "";
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -698,6 +701,7 @@ function ContainerDrawer({
                   <SelectItem value="__none">—</SelectItem>
                   <SelectItem value="FARHAT">FARHAT (+11d)</SelectItem>
                   <SelectItem value="CONTINENTAL">CONTINENTAL (+11d)</SelectItem>
+                  <SelectItem value="KDOUH">KDOUH (+12d)</SelectItem>
                   <SelectItem value="TRH">TRH (+14d)</SelectItem>
                 </SelectContent>
               </Select>
