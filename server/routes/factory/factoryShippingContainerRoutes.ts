@@ -4,6 +4,7 @@ import { requireAuth } from "../../auth";
 import {
   customerOrders, customers,
   factoryShippingContainerRows, factoryShippingContainerDocuments,
+  factoryShippingAvailability, insertFactoryShippingAvailabilitySchema,
 } from "@shared/schema";
 import { eq, and, desc, inArray, isNull, sql } from "drizzle-orm";
 import multer from "multer";
@@ -812,6 +813,68 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
   });
 
   // ── GET WhatsApp preview ──────────────────────────────────────────────────────
+  // ── Shipping Availability CRUD ────────────────────────────────────────────────
+  const AVAIL_KEY = "/api/factory/shipping-availability";
+
+  app.get(AVAIL_KEY, requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const rows = await db
+        .select()
+        .from(factoryShippingAvailability)
+        .where(eq(factoryShippingAvailability.companyId, companyId))
+        .orderBy(desc(factoryShippingAvailability.date));
+      res.json(rows);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post(AVAIL_KEY, requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const parsed = insertFactoryShippingAvailabilitySchema.safeParse({ ...req.body, companyId });
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0]?.message || "Invalid data" });
+      const [row] = await db.insert(factoryShippingAvailability).values(parsed.data).returning();
+      res.json(row);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.patch(`${AVAIL_KEY}/:id`, requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+      const { date, shippingCompany, availableContainers } = req.body;
+      const updates: Record<string, any> = {};
+      if (date !== undefined) updates.date = date;
+      if (shippingCompany !== undefined) updates.shippingCompany = shippingCompany;
+      if (availableContainers !== undefined) updates.availableContainers = Number(availableContainers);
+      if (Object.keys(updates).length === 0) return res.status(400).json({ message: "No fields to update" });
+      const [row] = await db
+        .update(factoryShippingAvailability)
+        .set(updates)
+        .where(and(eq(factoryShippingAvailability.id, id), eq(factoryShippingAvailability.companyId, companyId)))
+        .returning();
+      if (!row) return res.status(404).json({ message: "Not found" });
+      res.json(row);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.delete(`${AVAIL_KEY}/:id`, requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+      await db
+        .delete(factoryShippingAvailability)
+        .where(and(eq(factoryShippingAvailability.id, id), eq(factoryShippingAvailability.companyId, companyId)));
+      res.json({ ok: true });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
   app.get("/api/factory/shipping-container-rows/:id/whatsapp-preview", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = getCompanyId(req);

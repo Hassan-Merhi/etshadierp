@@ -923,6 +923,239 @@ function WhatsAppModal({
   );
 }
 
+// ─── Shipping Availability Table ───────────────────────────────────────────────
+
+const AVAIL_KEY = "/api/factory/shipping-availability";
+
+interface AvailRow {
+  id: number;
+  date: string;
+  shippingCompany: string;
+  availableContainers: number;
+}
+
+interface EditingAvail {
+  id: number;
+  date: string;
+  shippingCompany: string;
+  availableContainers: string;
+}
+
+function ShippingAvailabilityTable() {
+  const { toast } = useToast();
+  const [editing, setEditing] = useState<EditingAvail | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [newRow, setNewRow] = useState({ date: "", shippingCompany: "", availableContainers: "" });
+
+  const { data: rows = [], isLoading } = useQuery<AvailRow[]>({
+    queryKey: [AVAIL_KEY],
+  });
+
+  const addMutation = useMutation({
+    mutationFn: () => apiRequest("POST", AVAIL_KEY, {
+      date: newRow.date,
+      shippingCompany: newRow.shippingCompany.trim(),
+      availableContainers: parseInt(newRow.availableContainers) || 0,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [AVAIL_KEY] });
+      setNewRow({ date: "", shippingCompany: "", availableContainers: "" });
+      setAdding(false);
+      toast({ title: "Row added" });
+    },
+    onError: (e: any) => toast({ title: "Failed to add", description: e.message, variant: "destructive" }),
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: (row: EditingAvail) => apiRequest("PATCH", `${AVAIL_KEY}/${row.id}`, {
+      date: row.date,
+      shippingCompany: row.shippingCompany.trim(),
+      availableContainers: parseInt(row.availableContainers) || 0,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [AVAIL_KEY] });
+      setEditing(null);
+      toast({ title: "Row saved" });
+    },
+    onError: (e: any) => toast({ title: "Failed to save", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `${AVAIL_KEY}/${id}`, undefined),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [AVAIL_KEY] });
+      toast({ title: "Row deleted" });
+    },
+    onError: (e: any) => toast({ title: "Failed to delete", description: e.message, variant: "destructive" }),
+  });
+
+  function startEdit(row: AvailRow) {
+    setEditing({ id: row.id, date: row.date, shippingCompany: row.shippingCompany, availableContainers: String(row.availableContainers) });
+  }
+
+  function handleAddKey(e: React.KeyboardEvent) {
+    if (e.key === "Enter") addMutation.mutate();
+    if (e.key === "Escape") { setAdding(false); setNewRow({ date: "", shippingCompany: "", availableContainers: "" }); }
+  }
+
+  function handleEditKey(e: React.KeyboardEvent) {
+    if (e.key === "Enter" && editing) saveMutation.mutate(editing);
+    if (e.key === "Escape") setEditing(null);
+  }
+
+  return (
+    <div className="rounded-md border overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 bg-muted/20 border-b">
+        <span className="text-sm font-medium">Container Availability</span>
+        <Button size="sm" onClick={() => setAdding(true)} disabled={adding} data-testid="button-add-availability">
+          <Plus className="h-3.5 w-3.5 mr-1" /> Add Row
+        </Button>
+      </div>
+
+      <div className="overflow-x-auto">
+        <Table className="text-xs">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-xs w-36">Date</TableHead>
+              <TableHead className="text-xs">Shipping Company</TableHead>
+              <TableHead className="text-xs w-40">Available Containers</TableHead>
+              <TableHead className="text-xs w-20" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin inline mr-2" />Loading…
+                </TableCell>
+              </TableRow>
+            ) : rows.length === 0 && !adding ? (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                  No rows yet. Click "Add Row" to start.
+                </TableCell>
+              </TableRow>
+            ) : (
+              <>
+                {rows.map((row) =>
+                  editing?.id === row.id ? (
+                    <TableRow key={row.id} className="bg-muted/30">
+                      <TableCell>
+                        <Input
+                          type="date"
+                          value={editing.date}
+                          onChange={(e) => setEditing({ ...editing, date: e.target.value })}
+                          onKeyDown={handleEditKey}
+                          className="h-7 text-xs"
+                          data-testid={`input-avail-date-${row.id}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          value={editing.shippingCompany}
+                          onChange={(e) => setEditing({ ...editing, shippingCompany: e.target.value })}
+                          onKeyDown={handleEditKey}
+                          className="h-7 text-xs"
+                          placeholder="e.g. Maersk"
+                          data-testid={`input-avail-company-${row.id}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={editing.availableContainers}
+                          onChange={(e) => setEditing({ ...editing, availableContainers: e.target.value })}
+                          onKeyDown={handleEditKey}
+                          className="h-7 text-xs"
+                          data-testid={`input-avail-count-${row.id}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => saveMutation.mutate(editing)} disabled={saveMutation.isPending} data-testid={`button-avail-save-${row.id}`}>
+                            <Check className="h-3.5 w-3.5 text-green-600" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => setEditing(null)} data-testid={`button-avail-cancel-${row.id}`}>
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    <TableRow key={row.id} className="hover-elevate cursor-pointer" onClick={() => startEdit(row)} data-testid={`row-avail-${row.id}`}>
+                      <TableCell>{row.date}</TableCell>
+                      <TableCell>{row.shippingCompany}</TableCell>
+                      <TableCell>{row.availableContainers}</TableCell>
+                      <TableCell>
+                        <Button
+                          size="icon" variant="ghost"
+                          onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(row.id); }}
+                          disabled={deleteMutation.isPending}
+                          data-testid={`button-avail-delete-${row.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                )}
+                {adding && (
+                  <TableRow className="bg-muted/30">
+                    <TableCell>
+                      <Input
+                        type="date"
+                        value={newRow.date}
+                        onChange={(e) => setNewRow({ ...newRow, date: e.target.value })}
+                        onKeyDown={handleAddKey}
+                        className="h-7 text-xs"
+                        autoFocus
+                        data-testid="input-new-avail-date"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        value={newRow.shippingCompany}
+                        onChange={(e) => setNewRow({ ...newRow, shippingCompany: e.target.value })}
+                        onKeyDown={handleAddKey}
+                        className="h-7 text-xs"
+                        placeholder="e.g. Maersk"
+                        data-testid="input-new-avail-company"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={newRow.availableContainers}
+                        onChange={(e) => setNewRow({ ...newRow, availableContainers: e.target.value })}
+                        onKeyDown={handleAddKey}
+                        className="h-7 text-xs"
+                        placeholder="0"
+                        data-testid="input-new-avail-count"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => addMutation.mutate()} disabled={addMutation.isPending || !newRow.date || !newRow.shippingCompany.trim()} data-testid="button-new-avail-save">
+                          <Check className="h-3.5 w-3.5 text-green-600" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => { setAdding(false); setNewRow({ date: "", shippingCompany: "", availableContainers: "" }); }} data-testid="button-new-avail-cancel">
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function FactoryShippingContainers() {
@@ -1349,6 +1582,9 @@ export default function FactoryShippingContainers() {
             </TableBody>
           </Table>
         </div>
+
+        {/* ── Container Availability ── */}
+        <ShippingAvailabilityTable />
 
         {/* ── Done / Hidden Containers ── */}
         <div className="rounded-md border overflow-hidden">

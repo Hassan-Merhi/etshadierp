@@ -5286,3 +5286,27 @@ export const insertFactoryShippingContainerDocumentSchema = createInsertSchema(f
 });
 export type InsertFactoryShippingContainerDocument = z.infer<typeof insertFactoryShippingContainerDocumentSchema>;
 export type FactoryShippingContainerDocument = typeof factoryShippingContainerDocuments.$inferSelect;
+
+// ── Factory Shipping Availability (May 2026) ──────────────────────────────────
+// Manual table tracking available containers by shipping company on a given date.
+export const factoryShippingAvailability = pgTable("factory_shipping_availability", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  date: date("date").notNull(),
+  shippingCompany: text("shipping_company").notNull(),
+  availableContainers: integer("available_containers").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  companyIdx: index("fsa_company_idx").on(t.companyId),
+}));
+
+export const insertFactoryShippingAvailabilitySchema = createInsertSchema(factoryShippingAvailability).omit({
+  id: true, createdAt: true,
+}).extend({
+  companyId: z.number().min(1),
+  date: z.string().min(1),
+  shippingCompany: z.string().min(1),
+  availableContainers: z.number().int().min(0),
+});
+export type InsertFactoryShippingAvailability = z.infer<typeof insertFactoryShippingAvailabilitySchema>;
+export type FactoryShippingAvailability = typeof factoryShippingAvailability.$inferSelect;

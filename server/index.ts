@@ -2950,6 +2950,14 @@ let migrationsDone = false;
     `ALTER TABLE container_documents ADD COLUMN IF NOT EXISTS file_data text`,
     // ETA column on shipping container rows (manual date entry)
     `ALTER TABLE factory_shipping_container_rows ADD COLUMN IF NOT EXISTS eta date`,
+    `CREATE TABLE IF NOT EXISTS factory_shipping_availability (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      date date NOT NULL,
+      shipping_company text NOT NULL,
+      available_containers integer NOT NULL DEFAULT 0,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
     // One-time cleanup: remove ghost rows from factory_shipping_container_documents.
     // These are rows created before the file_data column was added (so file_data IS NULL)
     // and that have no recoverable content (disk is ephemeral). They show up as broken
