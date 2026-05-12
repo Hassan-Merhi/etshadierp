@@ -103,7 +103,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     color: NAV_COLOR.sales,
     items: [
       { title: "Factory POS",           url: "/factory/pos",                    icon: ShoppingCart },
-      { title: "Customers",             url: "/factory/customers",              icon: Users        },
+      { title: "Parties",               url: "/factory/parties",                icon: Users        },
       { title: "Invoicing",             url: "/factory/invoicing",              icon: FileText     },
       { title: "Stock Allocation",      url: "/factory/stock-allocation-v5",    icon: LayoutGrid   },
       { title: "Loadings",              url: "/factory/sales/loadings",         icon: Container    },
@@ -124,7 +124,6 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     color: NAV_COLOR.finance,
     items: [
       { title: "Payroll",          url: "/factory/payroll-hub",             icon: HardHat        },
-      { title: "Suppliers",        url: "/factory/suppliers",               icon: UserRound      },
       { title: "Transporters",     url: "/factory/transporters",            icon: Truck,         developerOnly: true },
       { title: "Vouchers",         url: "/factory/vouchers",                icon: FileText       },
       { title: "Accounts",         url: "/factory/accounts",               icon: Landmark       },
