@@ -9,6 +9,15 @@
  * Works for all Maersk-group prefixes: MAEU, MSKU, MRKU, MRSU,
  *   HASU, HJSC, HJCU, SUDU, SAFM (Hamburg Süd) etc.
  *
+ * Memory strategy:
+ *   - ONE shared Chrome process is kept alive across all scrape calls.
+ *     Each scrape opens a new tab, uses it, then closes just the tab.
+ *     This keeps memory at a flat ~300 MB instead of spiking per container.
+ *   - A simple async mutex ensures only ONE scrape runs at a time, preventing
+ *     concurrent Chrome tabs from stacking up.
+ *   - If the shared browser crashes/disconnects it is automatically replaced
+ *     on the next scrape call.
+ *
  * Never throws — always returns a typed result.
  */
 
@@ -46,6 +55,91 @@ export function isMaerskDirectScraperAvailable(): boolean {
     return false;
   }
 }
+
+// ── Shared browser instance ───────────────────────────────────────────────────
+// One Chrome process is kept alive and reused across all scrape calls.
+// Replaced automatically if it crashes.
+
+let _sharedBrowser: any = null;
+let _stealthRegistered = false;
+
+async function getSharedBrowser(): Promise<any> {
+  // If we already have a live browser, verify it's still responsive
+  if (_sharedBrowser) {
+    try {
+      await _sharedBrowser.pages(); // lightweight liveness check
+      return _sharedBrowser;
+    } catch {
+      console.warn("[MaerskDirect] Shared browser disconnected — relaunching");
+      _sharedBrowser = null;
+    }
+  }
+
+  const puppeteerExtra = _require("puppeteer-extra") as any;
+  if (!_stealthRegistered) {
+    const StealthPlugin = _require("puppeteer-extra-plugin-stealth") as any;
+    puppeteerExtra.use(StealthPlugin());
+    _stealthRegistered = true;
+  }
+
+  const chromePath = getChromiumPath();
+  console.log("[MaerskDirect] Launching shared Chrome instance…");
+  _sharedBrowser = await puppeteerExtra.launch({
+    headless: true,
+    ...(chromePath ? { executablePath: chromePath } : {}),
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--disable-accelerated-2d-canvas",
+      "--no-first-run",
+      "--no-zygote",
+      "--disable-blink-features=AutomationControlled",
+      "--window-size=1280,800",
+      "--disable-extensions",
+      "--disable-background-networking",
+      "--disable-breakpad",
+      "--disable-client-side-phishing-detection",
+      "--disable-default-apps",
+      "--disable-hang-monitor",
+      "--disable-notifications",
+      "--disable-sync",
+      "--metrics-recording-only",
+      "--password-store=basic",
+      // Extra memory-saving flags
+      "--js-flags=--max-old-space-size=256",
+      "--disable-features=TranslateUI,BlinkGenPropertyTrees",
+      "--renderer-process-limit=1",
+    ],
+  });
+
+  // Auto-clear on crash so the next call relaunches cleanly
+  _sharedBrowser.on("disconnected", () => {
+    console.warn("[MaerskDirect] Shared browser disconnected (crash or killed)");
+    _sharedBrowser = null;
+  });
+
+  console.log("[MaerskDirect] Shared Chrome instance ready");
+  return _sharedBrowser;
+}
+
+// ── Async mutex ───────────────────────────────────────────────────────────────
+// Ensures only one Maersk scrape runs at a time, regardless of how many
+// concurrent "Track Now" clicks or scheduler runs are in flight.
+
+let _lockChain: Promise<void> = Promise.resolve();
+
+function acquireLock(): Promise<() => void> {
+  let releaseFn!: () => void;
+  const waitFor = _lockChain;
+  // Next caller will wait until this slot is released
+  _lockChain = new Promise<void>((resolve) => { releaseFn = resolve; });
+  // This caller waits until the previous lock is done, then gets the release fn
+  return waitFor.then(() => releaseFn);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function parseDate(raw: unknown): Date | null {
   if (!raw || typeof raw !== "string") return null;
@@ -94,15 +188,12 @@ function extractFromJson(data: unknown): {
   const d = data as Record<string, any>;
 
   // ── Maersk "synergy" tracking API format ─────────────────────────────────
-  // Shape: { containers: [{ container_num, eta_final_delivery, status,
-  //           locations: [{ city, terminal, events: [{ activity, event_time, event_time_type }] }] }] }
   const synergyContainers: any[] = d.containers ?? [];
   if (synergyContainers.length > 0) {
     const c = synergyContainers[0];
     const locations: any[] = c.locations ?? [];
 
     if (locations.length > 0) {
-      // Flatten all location events into a single sorted list
       const allEvents: TrackingEvent[] = [];
       for (const loc of locations) {
         const locLabel = [loc.terminal, loc.city, loc.country]
@@ -120,7 +211,6 @@ function extractFromJson(data: unknown): {
         }
       }
 
-      // Sort: actual events first (newest first), then expected (nearest first)
       allEvents.sort((a, b) => {
         if (!a.date && !b.date) return 0;
         if (!a.date) return 1;
@@ -128,21 +218,12 @@ function extractFromJson(data: unknown): {
         return b.date.getTime() - a.date.getTime();
       });
 
-      // ETA: prefer explicit eta_final_delivery, else last EXPECTED event time
       let etaRaw: string | null =
         c.eta_final_delivery ??
         c.eta ??
         d.eta_final_delivery ??
         null;
       if (!etaRaw) {
-        // Find the last EXPECTED event (furthest in the future)
-        const expectedEvents = allEvents
-          .filter((e) => e.date)
-          .filter((_, i, arr) => {
-            // We need access to original event_time_type — re-extract
-            return true;
-          });
-        // Walk locations in reverse to find last expected event
         for (let i = locations.length - 1; i >= 0; i--) {
           for (const ev of (locations[i].events ?? []).slice().reverse()) {
             if (ev.event_time_type === "EXPECTED" && ev.event_time) {
@@ -157,7 +238,6 @@ function extractFromJson(data: unknown): {
       const etaDate = parseDate(etaRaw);
       const eta = etaDate ? etaDate.toISOString().slice(0, 10) : null;
 
-      // Latest status: most recent ACTUAL event
       let latestActualStatus: string | null = null;
       for (let i = locations.length - 1; i >= 0; i--) {
         for (const ev of (locations[i].events ?? []).slice().reverse()) {
@@ -175,7 +255,7 @@ function extractFromJson(data: unknown): {
     }
   }
 
-  // ── Generic Maersk API format (containerEvents, events, milestones) ───────
+  // ── Generic Maersk API format ─────────────────────────────────────────────
   const containers: any[] =
     d.shipment?.containers ??
     d.data?.containers ??
@@ -206,7 +286,7 @@ function extractFromJson(data: unknown): {
 
 const SCRAPER_TIMEOUT_MS = 90_000;
 const NAV_TIMEOUT_MS     = 30_000;
-const API_WAIT_MS        = 20_000; // how long to wait for Maersk's API responses
+const API_WAIT_MS        = 20_000;
 
 const emptyResult = (containerNumber: string, error: string): CarrierTrackResult => ({
   success: false,
@@ -228,45 +308,22 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     return emptyResult(containerNumber, "Puppeteer not available");
   }
 
-  let browser: any = null;
-  const hardStop = setTimeout(
-    () => { try { browser?.close(); } catch { /* ignore */ } },
-    SCRAPER_TIMEOUT_MS,
-  );
+  // ── Acquire exclusive lock (Option B: mutex) ──────────────────────────────
+  console.log(`[MaerskDirect] ${containerNumber}: waiting for lock…`);
+  const release = await acquireLock();
+  console.log(`[MaerskDirect] ${containerNumber}: lock acquired`);
+
+  let page: any = null;
+  const hardStop = setTimeout(() => {
+    console.warn(`[MaerskDirect] ${containerNumber}: hard timeout — closing page`);
+    try { page?.close(); } catch { /* ignore */ }
+  }, SCRAPER_TIMEOUT_MS);
 
   try {
-    const puppeteerExtra = _require("puppeteer-extra") as any;
-    const StealthPlugin  = _require("puppeteer-extra-plugin-stealth") as any;
-    puppeteerExtra.use(StealthPlugin());
+    // ── Get/reuse shared browser (Option A: shared instance) ─────────────────
+    const browser = await getSharedBrowser();
+    page = await browser.newPage();
 
-    const chromePath = getChromiumPath();
-    browser = await puppeteerExtra.launch({
-      headless: true,
-      ...(chromePath ? { executablePath: chromePath } : {}),
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--disable-accelerated-2d-canvas",
-        "--no-first-run",
-        "--no-zygote",
-        "--disable-blink-features=AutomationControlled",
-        "--window-size=1280,800",
-        "--disable-extensions",
-        "--disable-background-networking",
-        "--disable-breakpad",
-        "--disable-client-side-phishing-detection",
-        "--disable-default-apps",
-        "--disable-hang-monitor",
-        "--disable-notifications",
-        "--disable-sync",
-        "--metrics-recording-only",
-        "--password-store=basic",
-      ],
-    });
-
-    const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 800 });
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
@@ -274,14 +331,11 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     );
 
     // ── Intercept all JSON responses from maersk.com domains ─────────────────
-    // Maersk's React app calls its own API (www.maersk.com/api/tracking/... or
-    // api.maersk.com/...) to load tracking data. We capture those responses.
     const capturedPayloads: Array<{ url: string; data: unknown }> = [];
 
     page.on("response", async (response: any) => {
       try {
         const url: string = response.url();
-        // Only intercept maersk-related endpoints
         if (
           !/maersk\.com/i.test(url) ||
           /\.(png|jpg|gif|svg|woff|woff2|ttf|ico|css|js)(\?|$)/i.test(url)
@@ -294,7 +348,6 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
         if (!json || typeof json !== "object") return;
 
         const str = JSON.stringify(json);
-        // Only keep responses that look like tracking data
         const isTracking = /event|milestone|container|movement|transit|arrival|vessel/i.test(str);
         if (isTracking) {
           console.log(`[MaerskDirect] Captured API response from: ${url.slice(0, 100)}`);
@@ -332,10 +385,7 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     for (const payload of capturedPayloads) {
       const { events, eta, latestStatus: parsedStatus } = extractFromJson(payload.data);
       if (events.length > 0 || eta) {
-        // Most-recent event = first after sort (newest first)
         const latest = events[0] ?? null;
-        // Prefer the explicit "last actual event" status over events[0] which
-        // may be a future EXPECTED event after sorting newest→oldest
         const latestActual = events.find((e) => e.date && e.date <= new Date()) ?? latest;
         const status = parsedStatus ?? latestActual?.status ?? latest?.status ?? null;
         console.log(
@@ -365,14 +415,12 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
 
     console.log(`[MaerskDirect] ${containerNumber} DOM[0:300]: ${bodyText.slice(0, 300)}`);
 
-    // Check if blocked
     const isBlocked = /access denied|captcha|bot|403|forbidden|challenge/i.test(bodyText.slice(0, 1000));
     if (isBlocked) {
       console.log(`[MaerskDirect] ${containerNumber}: bot challenge detected`);
       return { ...emptyResult(containerNumber, "bot_challenge"), blocked: true };
     }
 
-    // Try to extract status/ETA from rendered text
     const etaMatch = bodyText.match(
       /(?:ETA|Estimated\s+Arrival|Expected\s+Arrival)[:\s]+([A-Za-z]{3}\s+\d{1,2},?\s+\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+[A-Za-z]{3}\s+\d{4})/i,
     );
@@ -415,9 +463,19 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
   } catch (err: any) {
     const msg = err?.message ?? String(err) ?? "unknown error";
     console.error(`[MaerskDirect] ${containerNumber}: unexpected error —`, msg);
+
+    // If the browser crashed mid-scrape, clear the shared instance so next
+    // call gets a fresh one
+    if (/Protocol error|Target closed|Session closed|disconnected/i.test(msg)) {
+      _sharedBrowser = null;
+    }
+
     return emptyResult(containerNumber, `unexpected: ${msg}`);
   } finally {
     clearTimeout(hardStop);
-    try { await browser?.close(); } catch { /* ignore */ }
+    // Close just the tab, not the whole browser
+    try { await page?.close(); } catch { /* ignore */ }
+    release();
+    console.log(`[MaerskDirect] ${containerNumber}: lock released`);
   }
 }
