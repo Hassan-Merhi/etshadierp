@@ -2936,6 +2936,7 @@ let migrationsDone = false;
     `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_next_check_at timestamptz`,
     `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_last_skip_reason text`,
     // Shipping company invoice columns on shipping container rows (May 2026)
+    `ALTER TABLE customer_order_bales ADD COLUMN IF NOT EXISTS scanned_by text`,
     `ALTER TABLE factory_shipping_container_rows ADD COLUMN IF NOT EXISTS ci_number text`,
     `ALTER TABLE factory_shipping_container_rows ADD COLUMN IF NOT EXISTS shipping_invoice_file_name text`,
     `ALTER TABLE factory_shipping_container_rows ADD COLUMN IF NOT EXISTS shipping_invoice_original_name text`,

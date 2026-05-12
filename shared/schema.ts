@@ -3315,6 +3315,7 @@ export const customerOrderBales = pgTable("customer_order_bales", {
   articleCode: varchar("article_code", { length: 50 }),
   baleName: text("bale_name"),
   priceUsed: decimal("price_used", { precision: 20, scale: 2 }).notNull(),
+  scannedBy: text("scanned_by"),
 }, (t) => ({
   orderIdx: index("customer_order_bales_order_idx").on(t.orderId),
   baleIdx: index("customer_order_bales_bale_idx").on(t.baleId),

@@ -1139,6 +1139,7 @@ export function registerBaleRoutes(app: Express) {
             customerName: order.customers?.legalName || null,
             priceUsed: orderBaleRow.priceUsed,
             baleWeight: orderBaleRow.weight,
+            scannedBy: orderBaleRow.scannedBy || null,
           };
         }
       }

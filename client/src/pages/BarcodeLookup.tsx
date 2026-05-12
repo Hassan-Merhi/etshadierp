@@ -638,6 +638,9 @@ export default function BarcodeLookup() {
                         {o.loadingFinalizedAt && (
                           <InfoRow label="Loading Finalized" value={formatDate(o.loadingFinalizedAt)} />
                         )}
+                        {o.scannedBy && (
+                          <InfoRow label="Scanned by" value={<span className="flex items-center gap-1"><User2 className="h-3.5 w-3.5 text-muted-foreground" />{o.scannedBy}</span>} />
+                        )}
                         {o.containerNotes && (
                           <div className="col-span-2 md:col-span-3">
                             <InfoRow label="Notes" value={o.containerNotes} />

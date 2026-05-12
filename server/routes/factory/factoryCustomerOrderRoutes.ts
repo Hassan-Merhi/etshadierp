@@ -565,6 +565,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { scanCode, locationId } = req.body;
       if (!scanCode || !locationId) return res.status(400).json({ message: "scanCode and locationId are required" });
+      const scannerName: string | null = (req.session as any)?.username || (req.session as any)?.name || (req.session as any)?.email || null;
 
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
@@ -741,6 +742,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           articleCode: bale.articleCode,
           baleName: resolvedBaleName,
           priceUsed,
+          scannedBy: scannerName,
         });
 
         // V5 guard: proformaIdUsed IS NOT NULL
@@ -781,6 +783,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (!locationId || (!hasItems && !hasRefNumbers)) {
         return res.status(400).json({ message: "locationId and either items or refNumbers are required" });
       }
+      const scannerName: string | null = (req.session as any)?.username || (req.session as any)?.name || (req.session as any)?.email || null;
 
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
@@ -887,6 +890,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
               articleCode: bale.articleCode,
               baleName: baleProductForName1?.name || bale.productName || bale.articleCode || bale.baleCode,
               priceUsed,
+              scannedBy: scannerName,
             });
 
             // V5 guard: proformaIdUsed IS NOT NULL
@@ -1029,6 +1033,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
               articleCode: bale.articleCode,
               baleName: baleProductForName2?.name || bale.productName || bale.articleCode || bale.baleCode,
               priceUsed,
+              scannedBy: scannerName,
             });
 
             // V5 guard: proformaIdUsed IS NOT NULL
