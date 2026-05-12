@@ -941,6 +941,108 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
     }
   });
 
+  // ── GET /api/factory/v5/recently-cancelled-containers ────────────────────
+  // Returns V5 containers (proforma_id_used IS NOT NULL) that were cancelled
+  // within the last 30 days. Used by the "Restore Cancelled Container" UI.
+  // Read-only — does not modify any data.
+  app.get("/api/factory/v5/recently-cancelled-containers", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const raw = await db.execute(
+        sql`SELECT
+              co.id,
+              co.container_number      AS "containerNumber",
+              co.status,
+              co.customer_id           AS "customerId",
+              co.updated_at            AS "cancelledAt",
+              co.loading_started_at    AS "loadingStartedAt",
+              co.proforma_id_used      AS "proformaId",
+              c.legal_name             AS "customerName",
+              cp.name                  AS "proformaName"
+            FROM customer_orders co
+            LEFT JOIN customers c    ON c.id  = co.customer_id
+            LEFT JOIN customer_proformas cp ON cp.id = co.proforma_id_used
+            WHERE co.company_id          = ${companyId}
+              AND co.status              = 'CANCELLED'
+              AND co.proforma_id_used    IS NOT NULL
+              AND co.updated_at          >= NOW() - INTERVAL '30 days'
+            ORDER BY co.updated_at DESC
+            LIMIT 50`,
+      );
+
+      const orders = ((raw as any).rows ?? (raw as unknown as any[])).map((r: any) => ({
+        id:               Number(r.id),
+        containerNumber:  r.containerNumber ?? `Order #${r.id}`,
+        status:           r.status,
+        customerId:       r.customerId ? Number(r.customerId) : null,
+        customerName:     r.customerName ?? "Unknown",
+        cancelledAt:      r.cancelledAt,
+        wasLoading:       !!r.loadingStartedAt,
+        proformaId:       r.proformaId ? Number(r.proformaId) : null,
+        proformaName:     r.proformaName ?? null,
+      }));
+
+      res.json({ orders });
+    } catch (err: any) {
+      console.error("[V5] recently-cancelled-containers error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── POST /api/factory/v5/containers/:id/restore ──────────────────────────
+  // Restores a cancelled V5 container back to its previous status.
+  // If it had loadingStartedAt set → restore to LOADING.
+  // If it had no loadingStartedAt → restore to DRAFT.
+  // Note: bale links that were deleted during cancellation are NOT restored
+  // (bales are back in stock and can be re-scanned).
+  app.post("/api/factory/v5/containers/:id/restore", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseInt(req.params.id);
+      if (!orderId || isNaN(orderId)) return res.status(400).json({ message: "Invalid id" });
+
+      const [order] = await db.execute(
+        sql`SELECT id, status, proforma_id_used, loading_started_at
+            FROM customer_orders
+            WHERE id = ${orderId} AND company_id = ${companyId}`,
+      ).then((r: any) => (r.rows ?? (r as any[])).map((row: any) => ({
+        id: Number(row.id),
+        status: row.status,
+        proformaIdUsed: row.proforma_id_used,
+        loadingStartedAt: row.loading_started_at,
+      })));
+
+      if (!order) return res.status(404).json({ message: "Container not found" });
+      if (order.status !== "CANCELLED") return res.status(400).json({ message: "Only CANCELLED containers can be restored" });
+      if (!order.proformaIdUsed) return res.status(400).json({ message: "Only V5 containers (linked to a proforma) can be restored here" });
+
+      const restoreStatus = order.loadingStartedAt ? "LOADING" : "DRAFT";
+
+      await db.execute(
+        sql`UPDATE customer_orders
+            SET status = ${restoreStatus}, updated_at = NOW()
+            WHERE id = ${orderId} AND company_id = ${companyId}`,
+      );
+
+      // Remove the ORDER_CANCELLED daybook entry so financials are clean
+      await db.execute(
+        sql`DELETE FROM factory_daybook_entries
+            WHERE company_id = ${companyId}
+              AND tx_type = 'ORDER_CANCELLED'
+              AND reference_id = ${orderId}`,
+      );
+
+      res.json({ id: orderId, restoredTo: restoreStatus });
+    } catch (err: any) {
+      console.error("[V5] restore-container error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── GET /api/factory/v5/unlinked-loading-orders ───────────────────────────
   // Returns LOADING customer_orders that have proforma_id_used IS NULL.
   // Used by the "Link Existing Container" UI in Stock Allocation V5.

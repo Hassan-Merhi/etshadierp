@@ -2,7 +2,7 @@ import { useState, useMemo, Fragment, useCallback, useEffect, useRef } from "rea
 import { useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock, Pencil, X, Link2, FileDown } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock, Pencil, X, Link2, FileDown, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -282,6 +282,42 @@ export default function FactoryStockAllocationV5() {
     },
   });
 
+  /* ── Restore-Cancelled-Container dialog state ────────────────────────────── */
+  interface CancelledContainerRow {
+    id: number;
+    containerNumber: string;
+    customerName: string;
+    cancelledAt: string;
+    wasLoading: boolean;
+    proformaId: number | null;
+    proformaName: string | null;
+  }
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
+
+  const cancelledContainersQuery = useQuery<{ orders: CancelledContainerRow[] }>({
+    queryKey: ["/api/factory/v5/recently-cancelled-containers"],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/v5/recently-cancelled-containers", { credentials: "include" });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Failed"); }
+      return res.json();
+    },
+    enabled: restoreDialogOpen,
+    staleTime: 0,
+  });
+
+  const restoreContainerMut = useMutation({
+    mutationFn: (orderId: number) =>
+      apiRequest("POST", `/api/factory/v5/containers/${orderId}/restore`, {}),
+    onSuccess: (data: any) => {
+      toast({ title: `Container restored to ${data?.restoredTo === "LOADING" ? "Loading" : "Draft"}.` });
+      cancelledContainersQuery.refetch();
+      query.refetch();
+    },
+    onError: (err: any) => {
+      toast({ title: "Restore failed", description: err.message ?? "Unknown error", variant: "destructive" });
+    },
+  });
+
   /* ── Cancel-Container dialog state ──────────────────────────────────────── */
   const [cancelDialog, setCancelDialog] = useState<{
     orderId: number;
@@ -520,6 +556,14 @@ export default function FactoryStockAllocationV5() {
             data-testid="button-v5-export-excel"
           >
             <FileDown className="h-4 w-4 mr-2" />Export Excel
+          </Button>
+          <Button
+            variant="outline"
+            size="default"
+            onClick={() => setRestoreDialogOpen(true)}
+            data-testid="button-v5-restore-cancelled"
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />Restore Cancelled
           </Button>
           <Button size="default" onClick={() => setCreateDrawerOpen(true)} data-testid="button-v5-open-create-proforma">
             <Plus className="h-4 w-4 mr-2" />Create Proforma
@@ -1161,6 +1205,73 @@ export default function FactoryStockAllocationV5() {
         </DialogContent>
       </Dialog>
 
+      {/* Restore Cancelled Container dialog */}
+      <Dialog open={restoreDialogOpen} onOpenChange={open => { if (!open) setRestoreDialogOpen(false); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-4 w-4 text-muted-foreground" />
+              Restore Cancelled Container
+            </DialogTitle>
+            <DialogDescription>
+              Cancelled V5 containers from the last 30 days. Restoring puts the container back to its previous status. Any bales that were scanned in will need to be re-scanned.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto py-1">
+            {cancelledContainersQuery.isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : cancelledContainersQuery.isError ? (
+              <p className="text-sm text-destructive text-center py-4">Failed to load cancelled containers.</p>
+            ) : (cancelledContainersQuery.data?.orders ?? []).length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">No recently cancelled containers found (last 30 days).</p>
+            ) : (
+              (cancelledContainersQuery.data?.orders ?? []).map(order => (
+                <div
+                  key={order.id}
+                  className="flex items-center justify-between gap-3 rounded-md border px-3 py-2.5"
+                  data-testid={`row-cancelled-container-${order.id}`}
+                >
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm">{order.containerNumber}</span>
+                      <Badge variant="outline" className="text-[10px] h-4 px-1">
+                        {order.wasLoading ? "Was Loading" : "Was Draft"}
+                      </Badge>
+                    </div>
+                    <span className="text-xs text-muted-foreground truncate">
+                      {order.customerName}{order.proformaName ? ` · ${order.proformaName}` : ""}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      Cancelled {new Date(order.cancelledAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => restoreContainerMut.mutate(order.id)}
+                    disabled={restoreContainerMut.isPending}
+                    data-testid={`button-restore-container-${order.id}`}
+                  >
+                    {restoreContainerMut.isPending
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <><RotateCcw className="h-3.5 w-3.5 mr-1.5" />Restore</>}
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRestoreDialogOpen(false)} data-testid="button-restore-dialog-close">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Cancel Container — DRAFT (simple confirmation, no supervisor required) */}
       {cancelDialog?.status === "DRAFT" && (
         <Dialog open onOpenChange={open => { if (!open) setCancelDialog(null); }}>
@@ -1176,7 +1287,7 @@ export default function FactoryStockAllocationV5() {
                 Cancel <span className="font-semibold text-foreground">{cancelDialog.containerName}</span>?
               </p>
               <p className="text-sm text-muted-foreground">
-                This draft container will be marked as cancelled and removed from the expected load count. This cannot be undone.
+                This draft container will be marked as cancelled and removed from the expected load count. You can restore it later using the "Restore Cancelled" button.
               </p>
             </div>
             <DialogFooter className="gap-2">
@@ -1216,7 +1327,7 @@ export default function FactoryStockAllocationV5() {
                 This container is actively loading.
               </p>
               <p className="text-xs text-muted-foreground bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2">
-                All scanned bale links will be removed. Bales will remain in stock. This action cannot be undone.
+                All scanned bale links will be removed. Bales will remain in stock. You can restore the container later using the "Restore Cancelled" button.
               </p>
             </div>
             <DialogFooter className="gap-2">
