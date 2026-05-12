@@ -702,7 +702,7 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
       {
         label: "Tools",
         items: [
-          { key: "data-tools", label: "Data Tools", icon: Database, devOnly: true, factoryAdminAllowed: true },
+          { key: "data-tools", label: "Data Tools", icon: Database, devOnly: true },
           { key: "bulk-rename", label: "Bulk Rename", icon: Package, devOnly: true },
           { key: "edit-log", label: "Edit Log", icon: History },
           { key: "files-export", label: "Files & Export", icon: Upload },
@@ -1227,7 +1227,7 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
             </div>
           )}
 
-          {activeSection === "data-tools" && (currentUser?.role === "Developer" || (appMode === "factory" && ["Admin", "Owner"].includes(currentUser?.role || ""))) && (
+          {activeSection === "data-tools" && currentUser?.role === "Developer" && (
             <DataToolsTab />
           )}
           {activeSection === "exchange-rates" && (

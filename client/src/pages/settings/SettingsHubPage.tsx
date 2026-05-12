@@ -106,6 +106,7 @@ const HUB_CATEGORIES: HubCategory[] = [
     keywords: ["data", "files", "storage", "bulk", "rename", "offline", "sync", "backup"],
     firstSection: "files",
     group: "controls",
+    devOnly: true,
   },
   {
     key: "security",
