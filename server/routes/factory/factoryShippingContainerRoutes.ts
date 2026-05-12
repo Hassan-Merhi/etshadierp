@@ -108,6 +108,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
           eta: factoryShippingContainerRows.eta,
           containerArrivedDate: factoryShippingContainerRows.containerArrivedDate,
           note: factoryShippingContainerRows.note,
+          ciNumber: factoryShippingContainerRows.ciNumber,
           isDone: factoryShippingContainerRows.isDone,
           doneAt: factoryShippingContainerRows.doneAt,
           doneBy: factoryShippingContainerRows.doneBy,
@@ -230,6 +231,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       if (req.body.eta !== undefined) patch.eta = req.body.eta || null;
       if (req.body.containerArrivedDate !== undefined) patch.containerArrivedDate = req.body.containerArrivedDate || null;
       if (req.body.note !== undefined) patch.note = req.body.note || null;
+      if (req.body.ciNumber !== undefined) patch.ciNumber = req.body.ciNumber || null;
 
       const [updated] = await db
         .update(factoryShippingContainerRows)

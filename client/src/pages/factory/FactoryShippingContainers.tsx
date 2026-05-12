@@ -41,6 +41,7 @@ interface ShippingRow {
   eta: string | null;
   containerArrivedDate: string | null;
   note: string | null;
+  ciNumber: string | null;
   isDone: boolean;
   doneAt: string | null;
   doneBy: string | null;
@@ -1380,6 +1381,7 @@ export default function FactoryShippingContainers() {
                 <TableHead className="text-xs min-w-[110px]">Shipping Co.</TableHead>
                 <TableHead className="text-xs min-w-[90px]">Documents</TableHead>
                 <TableHead className="text-xs min-w-[110px]">Shipping Invoice</TableHead>
+                <TableHead className="text-xs min-w-[100px]">CI No.</TableHead>
                 <TableHead className="text-xs min-w-[110px]">Note</TableHead>
                 <TableHead className="text-xs min-w-[90px]">WhatsApp</TableHead>
                 <TableHead className="text-xs min-w-[80px]">Done</TableHead>
@@ -1388,13 +1390,13 @@ export default function FactoryShippingContainers() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={16} className="text-center py-10 text-muted-foreground">
+                  <TableCell colSpan={17} className="text-center py-10 text-muted-foreground">
                     <Loader2 className="h-5 w-5 animate-spin mx-auto" />
                   </TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={16} className="text-center py-10 text-muted-foreground">
+                  <TableCell colSpan={17} className="text-center py-10 text-muted-foreground">
                     {active.length === 0 ? "No active records. Add one above." : "No records match the current filters."}
                   </TableCell>
                 </TableRow>
@@ -1530,6 +1532,16 @@ export default function FactoryShippingContainers() {
                             : <Upload className="h-3.5 w-3.5 text-muted-foreground" />}
                         </Button>
                       )}
+                    </TableCell>
+
+                    {/* CI No. (editable → stays on row) */}
+                    <TableCell>
+                      <EditableCellInput
+                        value={r.ciNumber || ""}
+                        placeholder="Enter CI #"
+                        onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { ciNumber: v || null } })}
+                        testId={`cell-ci-${r.id}`}
+                      />
                     </TableCell>
 
                     {/* Note (editable → stays on row) */}

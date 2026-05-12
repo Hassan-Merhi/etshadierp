@@ -5220,6 +5220,7 @@ export const factoryShippingContainerRows = pgTable("factory_shipping_container_
   eta: date("eta"),
   containerArrivedDate: date("container_arrived_date"),
   note: text("note"),
+  ciNumber: text("ci_number"),
   isDone: boolean("is_done").notNull().default(false),
   doneAt: timestamp("done_at"),
   doneBy: text("done_by"),
