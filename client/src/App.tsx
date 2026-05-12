@@ -50,6 +50,7 @@ const Accounts = lazy(() => import("@/pages/Accounts"));
 const Agents = lazy(() => import("@/pages/Agents"));
 const FactoryAccounts = lazy(() => import("@/pages/factory/FactoryAccounts"));
 const FactoryVouchers = lazy(() => import("@/pages/factory/FactoryVouchers"));
+const FactoryAccountingHub = lazy(() => import("@/pages/factory/FactoryAccountingHub"));
 const Suppliers = lazy(() => import("@/pages/Suppliers"));
 const Vouchers = lazy(() => import("@/pages/Vouchers"));
 const Daybook = lazy(() => import("@/pages/Daybook"));
@@ -514,10 +515,11 @@ function AuthenticatedApp() {
     setAppTimezone(posCompanySettings?.timezone);
   }, [posCompanySettings?.timezone]);
 
-  const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hasErpAccess: boolean; hasFactoryAccess: boolean; companyId?: number; companyName?: string; hiddenCostFields?: string[] }>({
+  const { data: myAccess, isLoading: myAccessLoading, isError: myAccessError } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hasErpAccess: boolean; hasFactoryAccess: boolean; companyId?: number; companyName?: string; hiddenCostFields?: string[] }>({
     queryKey: ["/api/factory/my-access"],
     enabled: !!user && !isPOS,
     staleTime: 30000,
+    retry: 2,
   });
 
   const { data: factorySettings } = useQuery<Record<string, any>>({
@@ -833,10 +835,12 @@ function AuthenticatedApp() {
     ["/factory/supplier-report",         "factory/intelligence/supplier-hub"],
     ["/factory/supplier-statement",      "factory/intelligence/supplier-hub"],
     ["/factory/production-summary",      "factory/intelligence/production-hub"],
-    ["/factory/ledger-monthly",          "factory/accounts"],
-    ["/factory/ledger-vouchers",         "factory/accounts"],
-    ["/factory/voucher-detail",          "factory/vouchers"],
-    ["/factory/create",                  "factory/accounts"],
+    ["/factory/vouchers",                "factory/accounting-hub"],
+    ["/factory/accounts",               "factory/accounting-hub"],
+    ["/factory/ledger-monthly",          "factory/accounting-hub"],
+    ["/factory/ledger-vouchers",         "factory/accounting-hub"],
+    ["/factory/voucher-detail",          "factory/accounting-hub"],
+    ["/factory/create",                  "factory/accounting-hub"],
     ["/factory/financial-snapshot",      "factory/analytics"],
   ];
 
@@ -864,8 +868,17 @@ function AuthenticatedApp() {
   })();
 
   if (isFactoryCompany && !isFactoryRoute && currentLocation !== "/my-settings") {
-    // Wait for myAccess before redirecting so restricted users land on their real first page
-    if (myAccess === undefined) return null;
+    // Wait for myAccess before redirecting so restricted users land on their real first page.
+    // If the query is still in-flight show a spinner; if it hard-failed after retries fall
+    // through so the user gets the factory shell rather than a permanent blank screen.
+    if (myAccessLoading) {
+      return (
+        <div className="flex items-center justify-center h-screen">
+          <p className="text-muted-foreground text-sm">Loading...</p>
+        </div>
+      );
+    }
+    if (myAccess === undefined && !myAccessError) return null;
     return <Redirect to={factoryDefaultPage} />;
   }
 
@@ -1035,9 +1048,10 @@ function AuthenticatedApp() {
                     <Route path="/factory/stock-bale-list" component={FactoryStockBaleList} />
                     <Route path="/factory/stock-query/:id" component={FactoryStockItemDetail} />
                     <Route path="/factory/stock-query" component={StockQuery} />
-                    <Route path="/factory/accounts" component={FactoryAccounts} />
+                    <Route path="/factory/accounting-hub" component={FactoryAccountingHub} />
+                    <Route path="/factory/accounts"><Redirect to="/factory/accounting-hub?section=accounts" /></Route>
                     <Route path="/factory/agents" component={Agents} />
-                    <Route path="/factory/vouchers">{() => <FactoryVouchers />}</Route>
+                    <Route path="/factory/vouchers">{() => <Redirect to="/factory/accounting-hub?section=vouchers" />}</Route>
                     <Route path="/factory/vouchers/:id/edit" component={VoucherEdit} />
                     <Route path="/factory/voucher-detail/:voucherId" component={VoucherDetail} />
                     <Route path="/factory/create" component={AccountingCreate} />
