@@ -109,6 +109,9 @@ interface OrderDetail {
   destination?: string;
 }
 
+/** Strip unnecessary trailing zeros — e.g. 5563.00 → "5563", 15836.28 → "15836.28" */
+const fmtNum = (n: number, max = 2) => parseFloat(n.toFixed(max)).toString();
+
 export default function FactoryPendingInvoiceVerify() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
@@ -568,7 +571,7 @@ export default function FactoryPendingInvoiceVerify() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-weight">
-              {(verification?.totalLoadedWeight ?? 0).toFixed(2)} kg
+              {fmtNum(verification?.totalLoadedWeight ?? 0)} kg
             </div>
           </CardContent>
         </Card>
@@ -590,7 +593,7 @@ export default function FactoryPendingInvoiceVerify() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-amber-600 dark:text-amber-400" data-testid="text-total-not-loaded-weight">
-              {totalNotLoadedWeight.toFixed(2)} kg
+              {fmtNum(totalNotLoadedWeight)} kg
             </div>
           </CardContent>
         </Card>
@@ -707,13 +710,13 @@ export default function FactoryPendingInvoiceVerify() {
                                 {line.articleCode}
                               </TableCell>
                               <TableCell className="text-sm">{line.productName}</TableCell>
-                              <TableCell className="text-right font-mono">{line.expectedQty}</TableCell>
+                              <TableCell className="text-right font-mono">{fmtNum(Number(line.expectedQty))}</TableCell>
                               <TableCell className="text-right font-mono">{loaded}</TableCell>
                               <TableCell className="text-right font-mono">
                                 {remaining > 0 ? (
-                                  <span className="text-red-600 dark:text-red-400 font-medium">{remaining}</span>
+                                  <span className="text-red-600 dark:text-red-400 font-medium">{fmtNum(remaining)}</span>
                                 ) : remaining < 0 ? (
-                                  <span className="text-green-600 dark:text-green-400 font-medium">+{Math.abs(remaining)}</span>
+                                  <span className="text-green-600 dark:text-green-400 font-medium">+{fmtNum(Math.abs(remaining))}</span>
                                 ) : (
                                   <span className="text-muted-foreground">0</span>
                                 )}
@@ -770,8 +773,8 @@ export default function FactoryPendingInvoiceVerify() {
                             </TableCell>
                             <TableCell className="text-sm">{group.productName}</TableCell>
                             <TableCell className="text-right font-mono">{group.qty}</TableCell>
-                            <TableCell className="text-right font-mono">{(group.totalWeight || 0).toFixed(2)}</TableCell>
-                            {isAdminOrOwner && <TableCell className="text-right font-mono">{(group.totalPrice || 0).toFixed(2)}</TableCell>}
+                            <TableCell className="text-right font-mono">{fmtNum(group.totalWeight || 0)}</TableCell>
+                            {isAdminOrOwner && <TableCell className="text-right font-mono">{fmtNum(group.totalPrice || 0)}</TableCell>}
                           </TableRow>
                         ))}
                       </TableBody>
@@ -862,7 +865,7 @@ export default function FactoryPendingInvoiceVerify() {
                         {acct && <span className="text-xs text-muted-foreground">{acct.name}</span>}
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        <span className="font-mono text-sm" data-testid={`text-charge-amount-${charge.id}`}>{parseFloat(charge.amount).toFixed(2)}</span>
+                        <span className="font-mono text-sm" data-testid={`text-charge-amount-${charge.id}`}>{fmtNum(parseFloat(charge.amount))}</span>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -1098,7 +1101,7 @@ export default function FactoryPendingInvoiceVerify() {
                         <TableRow key={b.id} data-testid={`row-preview-bale-${b.id}`}>
                           <TableCell className="font-mono text-sm">{b.baleReference}</TableCell>
                           <TableCell className="text-sm">{b.productName}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{b.weightKg.toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{fmtNum(b.weightKg)}</TableCell>
                           <TableCell className="text-sm">{b.locationName}</TableCell>
                         </TableRow>
                       ))}
@@ -1186,7 +1189,7 @@ export default function FactoryPendingInvoiceVerify() {
                   {pf.lines.map((l, i) => (
                     <div key={i} className="flex justify-between text-sm">
                       <span className="text-muted-foreground">{l.articleCode}</span>
-                      <span className="font-medium">${parseFloat(l.pricePerBale).toFixed(2)}</span>
+                      <span className="font-medium">${fmtNum(parseFloat(l.pricePerBale))}</span>
                     </div>
                   ))}
                 </div>
