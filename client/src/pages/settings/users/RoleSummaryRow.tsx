@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2, MapPin, Monitor, Calendar, PackageMinus, ShieldCheck, ChevronDown, ChevronRight } from "lucide-react";
+import { Edit, Trash2, MapPin, Monitor, Calendar, PackageMinus, ShieldCheck, Users } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AdvancedRestrictionsPanel } from "@/components/AdvancedRestrictionsPanel";
 
@@ -15,6 +16,14 @@ interface RoleSummaryRowProps {
 }
 
 const NON_RESTRICTABLE_ROLES = ["Developer", "Admin"];
+
+function countActivePermissions(role: string, permissions: any[]): number {
+  const isNormal = role === "Normal User";
+  return permissions.filter((p: any) => {
+    if (p.role !== role) return false;
+    return isNormal ? p.enabled === true : p.enabled === false;
+  }).length;
+}
 
 function getRoleBadgeClass(role: string): string {
   switch (role?.toLowerCase()) {
@@ -40,6 +49,24 @@ export function RoleSummaryRow({
   const isPrivileged = ["Admin", "Owner", "Developer"].includes(role.role);
   const canShowRestrictions = !NON_RESTRICTABLE_ROLES.includes(role.role) && role.companyId;
 
+  const { data: allPermissions = [] } = useQuery<any[]>({
+    queryKey: ["/api/settings/role-permissions", role.companyId],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/settings/role-permissions?companyId=${role.companyId}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) throw new Error("Failed to load permissions");
+      return res.json();
+    },
+    enabled: canShowRestrictions,
+  });
+
+  const customCount = useMemo(
+    () => (canShowRestrictions ? countActivePermissions(role.role, allPermissions) : 0),
+    [role.role, allPermissions, canShowRestrictions]
+  );
+
   return (
     <div
       className={`rounded-md border bg-card transition-colors ${isEditing ? "border-primary/50 bg-accent/30" : ""}`}
@@ -56,6 +83,11 @@ export function RoleSummaryRow({
             >
               {role.role}
             </Badge>
+            {customCount > 0 && (
+              <Badge variant="secondary" className="text-xs font-normal">
+                Custom · {customCount} {role.role === "Normal User" ? "granted" : "restricted"}
+              </Badge>
+            )}
           </div>
 
           {(isPOS || role.daybookEditDays > 0 || role.canSellNegativeStock) && (
@@ -142,6 +174,12 @@ export function RoleSummaryRow({
             >
               Close
             </Button>
+          </div>
+          <div className="flex items-start gap-2 rounded-md border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/30 px-3 py-2 text-xs text-violet-700 dark:text-violet-300 mb-3">
+            <Users className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            <span>
+              These restrictions apply to <strong>all {role.role} users</strong> at {companyName} — not just this user.
+            </span>
           </div>
           <AdvancedRestrictionsPanel
             role={role.role}

@@ -14,11 +14,36 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, MapPin } from "lucide-react";
+import { Check, X, MapPin, Zap } from "lucide-react";
 
 const ROLE_OPTIONS = [
   "Admin", "Owner", "Manager", "POS", "Normal User",
 ];
+
+interface RolePreset {
+  label: string;
+  values: { daybookEditDays?: number; canSellNegativeStock?: boolean; canDeleteRecords?: boolean };
+}
+
+const ROLE_PRESETS: Record<string, RolePreset[]> = {
+  Manager: [
+    { label: "Read-only",  values: { daybookEditDays: 0, canSellNegativeStock: false, canDeleteRecords: false } },
+    { label: "Standard",   values: { daybookEditDays: 3, canSellNegativeStock: false, canDeleteRecords: true  } },
+    { label: "Power",      values: { daybookEditDays: 30, canSellNegativeStock: true,  canDeleteRecords: true  } },
+  ],
+  Owner: [
+    { label: "Standard",     values: { daybookEditDays: 7   } },
+    { label: "Unrestricted", values: { daybookEditDays: 365 } },
+  ],
+  "Normal User": [
+    { label: "View only", values: { daybookEditDays: 0 } },
+    { label: "Standard",  values: { daybookEditDays: 3 } },
+  ],
+  POS: [
+    { label: "Standard Cashier", values: { daybookEditDays: 0, canSellNegativeStock: false } },
+    { label: "Senior Cashier",   values: { daybookEditDays: 1, canSellNegativeStock: true  } },
+  ],
+};
 
 interface InlineRoleEditorProps {
   userId: string;
@@ -49,6 +74,14 @@ export function InlineRoleEditor({
   const [canDeleteRecords, setCanDeleteRecords] = useState(false);
 
   const isPOS = role === "POS";
+
+  const applyPreset = (values: RolePreset["values"]) => {
+    if (values.daybookEditDays !== undefined) setDaybookEditDays(values.daybookEditDays);
+    if (values.canSellNegativeStock !== undefined) setCanSellNegativeStock(values.canSellNegativeStock);
+    if (values.canDeleteRecords !== undefined) setCanDeleteRecords(values.canDeleteRecords);
+  };
+
+  const activePresets = ROLE_PRESETS[role] ?? [];
 
   useEffect(() => {
     if (editingRole) {
@@ -399,6 +432,31 @@ export function InlineRoleEditor({
             <p className="text-xs text-muted-foreground">
               When enabled, this Manager can delete, void, and archive records.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Presets */}
+      {activePresets.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Zap className="h-3 w-3" />
+            <span className="font-semibold uppercase tracking-wide">Quick presets</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {activePresets.map((preset) => (
+              <Button
+                key={preset.label}
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs px-2.5"
+                onClick={() => applyPreset(preset.values)}
+                data-testid={`button-preset-${preset.label.toLowerCase().replace(/\s+/g, "-")}`}
+              >
+                {preset.label}
+              </Button>
+            ))}
           </div>
         </div>
       )}

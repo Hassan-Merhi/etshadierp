@@ -568,6 +568,12 @@ export function UserManagementDrawer({
                       </p>
                     ) : (
                       <>
+                        <div className="flex items-start gap-2 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
+                          <User className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span>
+                            These restrictions apply to <strong>{user.username}</strong> personally — they override any role-level defaults for this user only.
+                          </span>
+                        </div>
                         {hasFactoryAccess && (
                           <div className="space-y-2">
                             <div className="flex items-center justify-between flex-wrap gap-2">
