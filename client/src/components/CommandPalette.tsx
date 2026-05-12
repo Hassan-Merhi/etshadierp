@@ -90,7 +90,7 @@ const DESCRIPTIONS: Record<string, string> = {
   "/factory/accounts": "Chart of accounts",
   "/factory/daybook": "Daily transaction log",
   "/factory/location-inventory": "Stock levels by location",
-  "/factory/stock-otw": "Factory containers on the way",
+  "/factory/containers-hub": "Factory containers and stock on the way",
   "/factory/intelligence/dashboard": "KPIs and insights",
   "/factory/intelligence/kpis": "Key performance indicators",
   "/factory/intelligence/profitability": "Profitability analysis",

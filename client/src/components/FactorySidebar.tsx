@@ -115,8 +115,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     color: NAV_COLOR.inventory,
     items: [
       { title: "Location Inventory", url: "/factory/location-inventory", icon: MapPin    },
-      { title: "Factory Stock OTW",  url: "/factory/stock-otw",          icon: Ship      },
-      { title: "Containers",         url: "/factory/containers",         icon: Container },
+      { title: "Containers",         url: "/factory/containers-hub",     icon: Container },
       { title: "Stock Query",        url: "/factory/stock-query",        icon: Search,   developerOnly: true },
     ],
   },
