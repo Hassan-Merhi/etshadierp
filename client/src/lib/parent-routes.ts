@@ -16,14 +16,14 @@ export function getParentRoute(pathname: string): string | null {
       const m = pathname.match(/^\/factory\/ledger-vouchers\/([^/]+)\//);
       if (m) return `/factory/ledger-monthly/${m[1]}`;
     }
-    if (/^\/factory\/ledger-monthly\//.test(pathname)) return "/factory/accounting-hub?section=accounts";
+    if (/^\/factory\/ledger-monthly\//.test(pathname)) return "/factory/accounts";
     {
       const m = pathname.match(/^\/factory\/bale-product-history\/(\d+)\/(\d+)\/\d+(?:\/(?:all|\d+))?/);
       if (m) return `/factory/bale-product-history/${m[1]}/${m[2]}`;
     }
     if (/^\/factory\/bale-product-history\/\d+\/\d+/.test(pathname)) return "/factory/location-inventory";
-    if (/^\/factory\/voucher-detail\//.test(pathname)) return "/factory/accounting-hub?section=vouchers";
-    if (/^\/factory\/vouchers\/\d+\/edit/.test(pathname)) return "/factory/accounting-hub?section=vouchers";
+    if (/^\/factory\/voucher-detail\//.test(pathname)) return "/factory/vouchers";
+    if (/^\/factory\/vouchers\/\d+\/edit/.test(pathname)) return "/factory/vouchers";
     return null;
   }
 

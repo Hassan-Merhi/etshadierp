@@ -292,7 +292,7 @@ export default function AccountingCreate() {
   const [, navigate] = useLocation();
   const [selectedEntity, setSelectedEntity] = useState<EntityType>("location");
   const isFactory = appMode === "factory";
-  const handleCreated = () => navigate(isFactory ? "/factory/accounting-hub?section=accounts" : "/accounting");
+  const handleCreated = () => navigate(isFactory ? "/factory/accounts" : "/accounting");
   const config = entityConfig[selectedEntity];
 
   const sidebarGroups: SidebarGroup[] = [

@@ -50,7 +50,6 @@ const Accounts = lazy(() => import("@/pages/Accounts"));
 const Agents = lazy(() => import("@/pages/Agents"));
 const FactoryAccounts = lazy(() => import("@/pages/factory/FactoryAccounts"));
 const FactoryVouchers = lazy(() => import("@/pages/factory/FactoryVouchers"));
-const FactoryAccountingHub = lazy(() => import("@/pages/factory/FactoryAccountingHub"));
 const Suppliers = lazy(() => import("@/pages/Suppliers"));
 const Vouchers = lazy(() => import("@/pages/Vouchers"));
 const Daybook = lazy(() => import("@/pages/Daybook"));
@@ -835,12 +834,10 @@ function AuthenticatedApp() {
     ["/factory/supplier-report",         "factory/intelligence/supplier-hub"],
     ["/factory/supplier-statement",      "factory/intelligence/supplier-hub"],
     ["/factory/production-summary",      "factory/intelligence/production-hub"],
-    ["/factory/vouchers",                "factory/accounting-hub"],
-    ["/factory/accounts",               "factory/accounting-hub"],
-    ["/factory/ledger-monthly",          "factory/accounting-hub"],
-    ["/factory/ledger-vouchers",         "factory/accounting-hub"],
-    ["/factory/voucher-detail",          "factory/accounting-hub"],
-    ["/factory/create",                  "factory/accounting-hub"],
+    ["/factory/ledger-monthly",          "factory/accounts"],
+    ["/factory/ledger-vouchers",         "factory/accounts"],
+    ["/factory/voucher-detail",          "factory/vouchers"],
+    ["/factory/create",                  "factory/accounts"],
     ["/factory/financial-snapshot",      "factory/analytics"],
   ];
 
@@ -1048,10 +1045,9 @@ function AuthenticatedApp() {
                     <Route path="/factory/stock-bale-list" component={FactoryStockBaleList} />
                     <Route path="/factory/stock-query/:id" component={FactoryStockItemDetail} />
                     <Route path="/factory/stock-query" component={StockQuery} />
-                    <Route path="/factory/accounting-hub" component={FactoryAccountingHub} />
-                    <Route path="/factory/accounts"><Redirect to="/factory/accounting-hub?section=accounts" /></Route>
+                    <Route path="/factory/accounts" component={FactoryAccounts} />
                     <Route path="/factory/agents" component={Agents} />
-                    <Route path="/factory/vouchers">{() => <Redirect to="/factory/accounting-hub?section=vouchers" />}</Route>
+                    <Route path="/factory/vouchers">{() => <FactoryVouchers />}</Route>
                     <Route path="/factory/vouchers/:id/edit" component={VoucherEdit} />
                     <Route path="/factory/voucher-detail/:voucherId" component={VoucherDetail} />
                     <Route path="/factory/create" component={AccountingCreate} />

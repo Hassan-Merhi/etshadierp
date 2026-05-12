@@ -708,7 +708,7 @@ export default function FactoryDaybook() {
   useEffect(() => {
     return () => {
       const path = window.location.pathname;
-      const isDaybookFlow = path.includes("/factory/daybook") || path.includes("/factory/vouchers") || path.includes("/factory/accounting-hub") || path.includes("/properties/daybook") || path.includes("/properties/vouchers");
+      const isDaybookFlow = path.includes("/factory/daybook") || path.includes("/factory/vouchers") || path.includes("/properties/daybook") || path.includes("/properties/vouchers");
       if (!isDaybookFlow) sessionStorage.removeItem(FACTORY_DAYBOOK_STATE_KEY);
     };
   }, []);
