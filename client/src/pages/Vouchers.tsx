@@ -1079,6 +1079,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       // Balances are updated via voucher-sidebar, full account lists don't change
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/voucher-sidebar"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts", paymentAccountType, paymentAccountId, "balance"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
@@ -1782,6 +1783,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       // Invalidate only essential queries for faster saves
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/voucher-sidebar"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts", paymentAccountType, paymentAccountId, "balance"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
@@ -2146,6 +2148,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers/list"] });
       // Reset import state
@@ -2544,6 +2547,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers/list"] });

@@ -250,6 +250,8 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       onOpenChange(false);
     },
     onError: (error: Error) => {
