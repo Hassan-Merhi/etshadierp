@@ -21,6 +21,7 @@ import {
   Link as LinkIcon,
   Wrench,
   PieChart,
+  BarChart3,
   AlertTriangle,
   Package,
   Box,
