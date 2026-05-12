@@ -325,8 +325,7 @@ export default function FactoryPendingInvoiceVerify() {
           ? `Not found: ${data.notFound.slice(0, 5).join(", ")}${data.notFound.length > 5 ? ` (+${data.notFound.length - 5} more)` : ""}`
           : data.message,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId, "verification"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       setShowRecoverDialog(false);
       setRecoverInput("");
     },
@@ -346,8 +345,7 @@ export default function FactoryPendingInvoiceVerify() {
         title: `${data.linked} bale(s) auto-linked`,
         description: data.summary.map(s => `${s.articleCode}: ${s.linked}/${s.needed}`).join(", "),
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId, "verification"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       setShowRecoverDialog(false);
     },
     onError: (error: Error) => {
