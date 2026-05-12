@@ -800,6 +800,7 @@ async function trackOneContainer(
     lastDirectFallbackReason,
     now,
     currentEta,
+    destinationCountry,
   );
 }
 
@@ -812,6 +813,7 @@ async function trackViaParcelsApp(
   fallbackReason: string | null,
   now: Date,
   currentEta: string | null,
+  destinationCountry?: string,
 ): Promise<{
   success: boolean;
   lastStatus: string | null;
