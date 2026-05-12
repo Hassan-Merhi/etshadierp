@@ -1562,7 +1562,7 @@ export const insertCompanySettingsSchema = createInsertSchema(companySettings).o
   logoUrl: z.string().optional(),
   logoFileName: z.string().optional(),
   invoiceFooter: z.string().optional(),
-  parentCreditAccountId: z.number().optional(),
+  parentCreditAccountId: z.number().nullable().optional(),
   netPositionAdjustment: z.string().optional(),
   posExcelImportEnabled: z.boolean().optional(),
   timezone: z.string().optional(),
