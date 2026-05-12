@@ -921,9 +921,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
 
       const files: any[] = [
         {
-          id: "invoice_pdf",
+          id: "invoice_excel",
           name: `Commercial Invoice — ${row.invoiceNumber || ""}`,
-          fileType: "PDF",
+          fileType: "XLSX",
           source: "Commercial Invoice",
           available: true,
         },
@@ -996,6 +996,8 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
           invoiceNumber: customerOrders.invoiceNumber,
           customerId: customerOrders.customerId,
           clientName: customers.legalName,
+          containerNumber: customerOrders.containerNumber,
+          destination: customerOrders.destination,
         })
         .from(factoryShippingContainerRows)
         .innerJoin(customerOrders, eq(factoryShippingContainerRows.customerOrderId, customerOrders.id))
@@ -1005,6 +1007,14 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
           eq(factoryShippingContainerRows.companyId, companyId),
         ));
       if (!row) return res.status(404).json({ message: "Row not found" });
+
+      function safeFilePart(s: string | null | undefined): string {
+        return (s || "").replace(/[\\/*?:[\]<>|]/g, "").replace(/\s+/g, "_").trim();
+      }
+      function buildZipFilename(parts: (string | null | undefined)[], ext: string): string {
+        const joined = parts.map(safeFilePart).filter(Boolean).join("_") || "export";
+        return ext ? `${joined}.${ext}` : joined;
+      }
 
       const safeName = (row.invoiceNumber || `row_${id}`).replace(/[^\w\-]/g, "_");
       res.setHeader("Content-Type", "application/zip");
@@ -1017,13 +1027,16 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       });
       archive.pipe(res);
 
-      // 1. Commercial invoice PDF
-      if (fileIds.includes("invoice_pdf")) {
+      // 1. Commercial invoice Excel
+      if (fileIds.includes("invoice_excel")) {
         const buf = await fetchInternalBuffer(
           req,
-          `/api/factory/customer-orders/${row.customerOrderId}/export-pdf`,
+          `/api/factory/customer-orders/${row.customerOrderId}/export-excel`,
         );
-        if (buf) archive.append(buf, { name: `Commercial_Invoice_${safeName}.pdf` });
+        if (buf) {
+          const excelName = buildZipFilename([row.containerNumber, row.clientName, row.destination], "xlsx");
+          archive.append(buf, { name: excelName });
+        }
       }
 
       // 2. Customer statement PDF

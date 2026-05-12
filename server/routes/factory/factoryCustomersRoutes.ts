@@ -712,7 +712,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const doc = new PDFDocument({ margin: 40, size: "A4", autoFirstPage: true });
       if (custHasArabicFont) doc.registerFont("Arabic", custArabicFontPath);
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename=statement_${(customer.legalName || customer.code || customerId).toString().replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, "_")}.pdf`);
+      res.setHeader("Content-Disposition", `attachment; filename=${(customer.legalName || customer.code || customerId).toString().replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, "_")}_Statement.pdf`);
       doc.pipe(res);
 
       // ── Arabic reshaper ──
@@ -1142,7 +1142,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
       }
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename=statement_${(customer.legalName || "customer").replace(/\s+/g, "_")}.xlsx`);
+      res.setHeader("Content-Disposition", `attachment; filename=${(customer.legalName || "customer").replace(/\s+/g, "_")}_Statement.xlsx`);
       await workbook.xlsx.write(res);
       res.end();
     } catch (error: any) {
