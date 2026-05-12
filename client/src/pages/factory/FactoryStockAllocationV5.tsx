@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -1272,86 +1273,82 @@ export default function FactoryStockAllocationV5() {
         </DialogContent>
       </Dialog>
 
-      {/* Cancel Container — DRAFT (simple confirmation, no supervisor required) */}
-      {cancelDialog?.status === "DRAFT" && (
-        <Dialog open onOpenChange={open => { if (!open) setCancelDialog(null); }}>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-destructive">
-                <X className="h-4 w-4" />
-                Cancel Container
-              </DialogTitle>
-            </DialogHeader>
-            <div className="flex flex-col gap-3 py-1">
-              <p className="text-sm text-muted-foreground">
-                Cancel <span className="font-semibold text-foreground">{cancelDialog.containerName}</span>?
-              </p>
-              <p className="text-sm text-muted-foreground">
-                This draft container will be marked as cancelled and removed from the expected load count. You can restore it later using the "Restore Cancelled" button.
-              </p>
-            </div>
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setCancelDialog(null)} data-testid="button-v5-cancel-ct-dismiss">
-                Back
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => cancelContainerMut.mutate({ orderId: cancelDialog.orderId })}
-                disabled={cancelContainerMut.isPending}
-                data-testid="button-v5-cancel-ct-confirm"
-              >
-                {cancelContainerMut.isPending
-                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Cancelling…</>
-                  : "Cancel Container"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+      {/* Cancel Container — DRAFT */}
+      <AlertDialog open={cancelDialog?.status === "DRAFT"} onOpenChange={open => { if (!open) setCancelDialog(null); }}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <X className="h-4 w-4" />
+              Cancel Container?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="flex flex-col gap-2 pt-1">
+                <p>
+                  You are about to cancel{" "}
+                  <span className="font-semibold text-foreground">{cancelDialog?.containerName}</span>.
+                </p>
+                <p>
+                  It will be removed from the expected load count. You can restore it within 30 days using the "Restore Cancelled" button.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel data-testid="button-v5-cancel-ct-dismiss">
+              Keep Container
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => cancelDialog && cancelContainerMut.mutate({ orderId: cancelDialog.orderId })}
+              disabled={cancelContainerMut.isPending}
+              data-testid="button-v5-cancel-ct-confirm"
+            >
+              {cancelContainerMut.isPending
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Cancelling…</>
+                : "Yes, Cancel It"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Cancel Container — LOADING */}
-      {cancelDialog?.status === "LOADING" && (
-        <Dialog open onOpenChange={open => {
-          if (!open) { setCancelDialog(null); }
-        }}>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-destructive">
-                <X className="h-4 w-4" />
-                Cancel Loading Container
-              </DialogTitle>
-            </DialogHeader>
-            <div className="flex flex-col gap-4 py-1">
-              <p className="text-sm text-muted-foreground">
-                Cancel <span className="font-semibold text-foreground">{cancelDialog.containerName}</span>?
-                This container is actively loading.
-              </p>
-              <p className="text-xs text-muted-foreground bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2">
-                All scanned bale links will be removed. Bales will remain in stock. You can restore the container later using the "Restore Cancelled" button.
-              </p>
-            </div>
-            <DialogFooter className="gap-2">
-              <Button
-                variant="outline"
-                onClick={() => { setCancelDialog(null); }}
-                data-testid="button-v5-cancel-ct-dismiss"
-              >
-                Back
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => cancelContainerMut.mutate({ orderId: cancelDialog.orderId })}
-                disabled={cancelContainerMut.isPending}
-                data-testid="button-v5-cancel-ct-confirm"
-              >
-                {cancelContainerMut.isPending
-                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Cancelling…</>
-                  : "Cancel Container"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+      <AlertDialog open={cancelDialog?.status === "LOADING"} onOpenChange={open => { if (!open) setCancelDialog(null); }}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <X className="h-4 w-4" />
+              Cancel Loading Container?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="flex flex-col gap-3 pt-1">
+                <p>
+                  You are about to cancel{" "}
+                  <span className="font-semibold text-foreground">{cancelDialog?.containerName}</span>,
+                  which is actively loading.
+                </p>
+                <p className="text-xs bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2">
+                  All scanned bale links will be removed and bales returned to stock. You can restore this container within 30 days using the "Restore Cancelled" button.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel data-testid="button-v5-cancel-ct-dismiss">
+              Keep Container
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => cancelDialog && cancelContainerMut.mutate({ orderId: cancelDialog.orderId })}
+              disabled={cancelContainerMut.isPending}
+              data-testid="button-v5-cancel-ct-confirm"
+            >
+              {cancelContainerMut.isPending
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Cancelling…</>
+                : "Yes, Cancel It"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Export Excel dialog */}
       <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
