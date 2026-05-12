@@ -956,7 +956,7 @@ export function registerFactoryStockRoutes(app: Express) {
       const includeSellPrice = req.query.includeSellPrice !== "0" && !fCfg?.hideSellingPrice && !userVis.hideSelling;
 
       // Only IN_STOCK — exclude FINALIZED and RESERVED
-      const bales = await db
+      const allLocationBales = await db
         .select()
         .from(factoryBales)
         .where(
@@ -966,6 +966,24 @@ export function registerFactoryStockRoutes(app: Express) {
             eq(factoryBales.status, "IN_STOCK"),
           )
         );
+
+      // Exclude bales already scanned into a LOADING order (V5 orders keep bales IN_STOCK during loading)
+      const allLocationBaleIds = allLocationBales.map(b => b.id);
+      const loadingBaleIdsExport = new Set<number>();
+      if (allLocationBaleIds.length > 0) {
+        const loadingRows = await db
+          .select({ baleId: customerOrderBales.baleId })
+          .from(customerOrderBales)
+          .innerJoin(customerOrders, eq(customerOrderBales.orderId, customerOrders.id))
+          .where(
+            and(
+              eq(customerOrders.status, "LOADING"),
+              inArray(customerOrderBales.baleId, allLocationBaleIds),
+            )
+          );
+        for (const r of loadingRows) loadingBaleIdsExport.add(r.baleId);
+      }
+      const bales = allLocationBales.filter(b => !loadingBaleIdsExport.has(b.id));
 
       const productIds = [...new Set(bales.map(b => b.productId).filter((id): id is number => id != null && id > 0))];
       const products = productIds.length > 0
@@ -1289,7 +1307,7 @@ export function registerFactoryStockRoutes(app: Express) {
       const includeCost = req.query.includeCost !== "0" && !fCfgAll?.hideAvgCost && !userVisAll.hideCost;
 
       // Only IN_STOCK — exclude FINALIZED and RESERVED
-      const bales = await db
+      const allBalesRaw = await db
         .select()
         .from(factoryBales)
         .where(
@@ -1299,6 +1317,24 @@ export function registerFactoryStockRoutes(app: Express) {
           )
         )
         .orderBy(factoryBales.erpLocationId, factoryBales.productName);
+
+      // Exclude bales already scanned into a LOADING order (V5 orders keep bales IN_STOCK during loading)
+      const allBaleIdsRaw = allBalesRaw.map(b => b.id);
+      const loadingBaleIdsAll = new Set<number>();
+      if (allBaleIdsRaw.length > 0) {
+        const loadingRowsAll = await db
+          .select({ baleId: customerOrderBales.baleId })
+          .from(customerOrderBales)
+          .innerJoin(customerOrders, eq(customerOrderBales.orderId, customerOrders.id))
+          .where(
+            and(
+              eq(customerOrders.status, "LOADING"),
+              inArray(customerOrderBales.baleId, allBaleIdsRaw),
+            )
+          );
+        for (const r of loadingRowsAll) loadingBaleIdsAll.add(r.baleId);
+      }
+      const bales = allBalesRaw.filter(b => !loadingBaleIdsAll.has(b.id));
 
       // Build lookup maps
       const locationIds = [...new Set(bales.map(b => b.erpLocationId).filter((id): id is number => id != null))];
