@@ -989,8 +989,8 @@ async function trackViaParcelsApp(
     if (seventeenTrack.isConfigured()) {
       const quotaOk17 = await check17trackQuota();
       if (quotaOk17) {
-        console.log(`[ContainerTracking] ${containerNumber}: trying 17track for CMA...`);
-        const result17 = await seventeenTrack.track(containerNumber);
+        console.log(`[ContainerTracking] ${containerNumber}: trying 17track for CMA (carrier=100755)...`);
+        const result17 = await seventeenTrack.track(containerNumber, seventeenTrack.CARRIER_CODES.CMA);
         await saveTrackingCheck(
           containerId,
           "17track",
