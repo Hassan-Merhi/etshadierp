@@ -430,50 +430,49 @@ export function UserManagementDrawer({
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex items-center justify-between rounded-md border p-3">
-                    <div>
-                      <p className="text-sm font-medium">ERP</p>
-                      <p className="text-xs text-muted-foreground">Accounting &amp; sales</p>
-                    </div>
-                    <Switch
-                      checked={isPrivileged ? true : hasErpAccess}
-                      disabled={isPrivileged}
-                      onCheckedChange={setHasErpAccess}
-                      data-testid="switch-drawer-erp-access"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between rounded-md border p-3">
-                    <div>
-                      <p className="text-sm font-medium">Factory</p>
-                      <p className="text-xs text-muted-foreground">Production &amp; bales</p>
-                    </div>
-                    <Switch
-                      checked={isPrivileged ? true : hasFactoryAccess}
-                      disabled={isPrivileged}
-                      onCheckedChange={setHasFactoryAccess}
-                      data-testid="switch-drawer-factory-access"
-                    />
-                  </div>
-                </div>
-                {isPrivileged && (
-                  <p className="text-xs text-muted-foreground">
-                    Admin / Owner accounts always have full access.
+                {isPrivileged ? (
+                  <p className="text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2.5">
+                    <strong>{user.role}</strong> accounts always have full access to both ERP and Factory — this cannot be restricted.
                   </p>
-                )}
-                {!isPrivileged && (
-                  <div className="flex justify-end">
-                    <Button
-                      size="sm"
-                      className="gap-2"
-                      onClick={handleSaveAccess}
-                      disabled={updateMutation.isPending}
-                      data-testid="button-save-access"
-                    >
-                      <Save className="h-3.5 w-3.5" />
-                      {updateMutation.isPending ? "Saving..." : "Save"}
-                    </Button>
-                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex items-center justify-between rounded-md border p-3">
+                        <div>
+                          <p className="text-sm font-medium">ERP</p>
+                          <p className="text-xs text-muted-foreground">Accounting &amp; sales</p>
+                        </div>
+                        <Switch
+                          checked={hasErpAccess}
+                          onCheckedChange={setHasErpAccess}
+                          data-testid="switch-drawer-erp-access"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between rounded-md border p-3">
+                        <div>
+                          <p className="text-sm font-medium">Factory</p>
+                          <p className="text-xs text-muted-foreground">Production &amp; bales</p>
+                        </div>
+                        <Switch
+                          checked={hasFactoryAccess}
+                          onCheckedChange={setHasFactoryAccess}
+                          data-testid="switch-drawer-factory-access"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        className="gap-2"
+                        onClick={handleSaveAccess}
+                        disabled={updateMutation.isPending}
+                        data-testid="button-save-access"
+                      >
+                        <Save className="h-3.5 w-3.5" />
+                        {updateMutation.isPending ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -503,11 +502,20 @@ export function UserManagementDrawer({
                         {advancedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                       </div>
                     </div>
-                    {!advancedOpen && (
-                      <p className="text-xs text-muted-foreground font-normal mt-1">
-                        Page access, hidden cost fields, daybook restrictions
-                      </p>
-                    )}
+                    {!advancedOpen && (() => {
+                      const pageCount = isPrivileged ? 0 : pageAccess.size;
+                      const costCount = isPrivileged ? 0 : hiddenCostFields.length;
+                      const erpCount = isPrivileged ? 0 : hiddenErpCostFields.length;
+                      const parts: string[] = [];
+                      if (pageCount > 0) parts.push(`${pageCount} page${pageCount !== 1 ? "s" : ""} hidden`);
+                      if (costCount > 0) parts.push(`${costCount} field${costCount !== 1 ? "s" : ""} hidden`);
+                      if (erpCount > 0) parts.push(`${erpCount} ERP field${erpCount !== 1 ? "s" : ""} hidden`);
+                      return (
+                        <p className="text-xs text-muted-foreground font-normal mt-1">
+                          {parts.length > 0 ? parts.join(" · ") : "No restrictions active — full access"}
+                        </p>
+                      );
+                    })()}
                   </CardHeader>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
@@ -533,7 +541,7 @@ export function UserManagementDrawer({
                                 </Button>
                               </div>
                             </div>
-                            <p className="text-xs text-muted-foreground">Leave all unchecked for full factory access.</p>
+                            <p className="text-xs text-muted-foreground">Checked pages will be <strong>hidden</strong> from this user. Leave all unchecked for full factory access.</p>
                             <div className="space-y-3 border rounded-md p-3 max-h-48 overflow-y-auto">
                               {FACTORY_PAGE_GROUPS.map((group) => {
                                 const groupPages = ALL_FACTORY_PAGES.filter((p) => p.group === group);
@@ -574,7 +582,7 @@ export function UserManagementDrawer({
                                 </Button>
                               </div>
                             </div>
-                            <p className="text-xs text-muted-foreground">Leave all unchecked for full ERP access.</p>
+                            <p className="text-xs text-muted-foreground">Checked pages will be <strong>hidden</strong> from this user. Leave all unchecked for full ERP access.</p>
                             <div className="space-y-3 border rounded-md p-3 max-h-48 overflow-y-auto">
                               {ERP_PAGE_GROUPS.map((group) => {
                                 const groupPages = ALL_ERP_PAGES.filter((p) => p.group === group);

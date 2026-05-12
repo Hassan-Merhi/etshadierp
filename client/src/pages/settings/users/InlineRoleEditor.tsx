@@ -403,28 +403,6 @@ export function InlineRoleEditor({
         </div>
       )}
 
-      {/* Non-POS cash account (non-privileged roles) */}
-      {!isPOS && !["Admin", "Owner", "Developer"].includes(role) && (
-        <div className="space-y-1.5">
-          <Label className="text-xs">Cash Account (Optional)</Label>
-          <Select
-            value={""}
-            onValueChange={() => {}}
-          >
-            <SelectTrigger className="h-8 text-xs" data-testid="select-cash-account">
-              <SelectValue placeholder="Not applicable for this role" />
-            </SelectTrigger>
-            <SelectContent>
-              {cashAccounts.map((a: any) => (
-                <SelectItem key={a.id} value={a.id.toString()}>
-                  {a.name} ({a.code})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
       {/* Footer */}
       <div className="flex items-center justify-end gap-2 border-t pt-3">
         <Button
