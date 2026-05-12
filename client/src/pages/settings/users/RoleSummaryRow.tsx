@@ -47,7 +47,7 @@ export function RoleSummaryRow({
   const [restrictionsOpen, setRestrictionsOpen] = useState(false);
   const isPOS = role.role === "POS";
   const isPrivileged = ["Admin", "Owner", "Developer"].includes(role.role);
-  const canShowRestrictions = !NON_RESTRICTABLE_ROLES.includes(role.role) && role.companyId;
+  const canShowRestrictions = !NON_RESTRICTABLE_ROLES.includes(role.role) && !!role.companyId;
 
   const { data: allPermissions = [] } = useQuery<any[]>({
     queryKey: ["/api/settings/role-permissions", role.companyId],
