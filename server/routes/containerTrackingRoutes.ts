@@ -199,15 +199,21 @@ export function registerContainerTrackingRoutes(app: Express) {
         return;
       }
 
-      // Run tracking synchronously so the response carries real results
-      console.log(`[TrackNow] ${row.containerNumber}: starting synchronous track...`);
-      const trackResult = await trackOneContainerById(containerId);
-      console.log(
-        `[TrackNow] ${row.containerNumber}: done — success=${trackResult.success} ` +
-          `provider=${trackResult.provider ?? "none"} oldEta=${trackResult.oldEta ?? "null"} newEta=${trackResult.newEta ?? "null"}`,
-      );
+      // Fire tracking in the background — providers (especially Puppeteer/scraper) can
+      // take well over 2 minutes, so we return 202 immediately and let the client poll.
+      console.log(`[TrackNow] ${row.containerNumber}: starting background track...`);
+      res.status(202).json({ started: true, containerNumber: row.containerNumber });
 
-      res.json(trackResult);
+      trackOneContainerById(containerId)
+        .then((r) => {
+          console.log(
+            `[TrackNow] ${row.containerNumber}: done — success=${r.success} ` +
+              `provider=${r.provider ?? "none"} oldEta=${r.oldEta ?? "null"} newEta=${r.newEta ?? "null"}`,
+          );
+        })
+        .catch((err) => {
+          console.error(`[TrackNow] ${row.containerNumber}: background error —`, err?.message ?? err);
+        });
     } catch (err: any) {
       if (!res.headersSent) {
         res.status(500).json({ message: err?.message ?? "Tracking failed" });

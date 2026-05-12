@@ -471,26 +471,44 @@ function ContainerDrawer({
 
   const trackNowMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/container-tracking/${container!.id}/track-now`, {}, false, 120000);
-      return res.json() as Promise<TrackNowResult>;
+      const res = await apiRequest("POST", `/api/container-tracking/${container!.id}/track-now`, {}, false, 15000);
+      return res.json() as Promise<{ started: true; containerNumber: string } | TrackNowResult>;
     },
     onSuccess: (data) => {
       const ALL_KEYS = ["/api/git/containers", "/api/containers", "/api/containers/active"];
-      ALL_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
 
-      if (data.success) {
-        const etaLine = data.etaChanged
-          ? `ETA: ${data.newEta ?? "—"} (was ${data.oldEta ?? "none"})`
-          : data.newEta
-            ? `ETA unchanged: ${data.newEta}`
+      // 202 fire-and-forget: tracking is running in the background
+      if ("started" in data && data.started) {
+        toast({
+          title: `Tracking ${data.containerNumber}…`,
+          description: "Running in the background — results will appear shortly.",
+        });
+        // Poll every 8 s for up to 80 s so the UI refreshes once tracking finishes
+        let polls = 0;
+        const interval = setInterval(() => {
+          polls++;
+          ALL_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
+          if (polls >= 10) clearInterval(interval);
+        }, 8000);
+        return;
+      }
+
+      // Legacy synchronous result (kept for safety)
+      ALL_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
+      const result = data as TrackNowResult;
+      if (result.success) {
+        const etaLine = result.etaChanged
+          ? `ETA: ${result.newEta ?? "—"} (was ${result.oldEta ?? "none"})`
+          : result.newEta
+            ? `ETA unchanged: ${result.newEta}`
             : "No ETA returned — previous ETA kept";
         toast({
-          title: `Tracked: ${data.containerNumber}`,
-          description: `${data.provider ?? "unknown"} — ${etaLine}`,
+          title: `Tracked: ${result.containerNumber}`,
+          description: `${result.provider ?? "unknown"} — ${etaLine}`,
         });
       } else {
-        const tried = data.attempts.length > 0
-          ? data.attempts.map((a) => `${a.provider}: ${a.status}`).join(" → ")
+        const tried = result.attempts?.length > 0
+          ? result.attempts.map((a) => `${a.provider}: ${a.status}`).join(" → ")
           : "No providers available";
         toast({
           title: "All providers failed",
@@ -498,8 +516,8 @@ function ContainerDrawer({
           variant: "destructive",
         });
       }
-      if (data.quotaWarning) {
-        setTimeout(() => toast({ title: "Quota low", description: data.quotaWarning, variant: "destructive" }), 400);
+      if (result.quotaWarning) {
+        setTimeout(() => toast({ title: "Quota low", description: result.quotaWarning, variant: "destructive" }), 400);
       }
     },
     onError: (err: any) => {
