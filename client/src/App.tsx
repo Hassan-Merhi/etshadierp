@@ -509,7 +509,7 @@ function AuthenticatedApp() {
     setAppTimezone(posCompanySettings?.timezone);
   }, [posCompanySettings?.timezone]);
 
-  const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hasErpAccess: boolean; hasFactoryAccess: boolean; companyId?: number; companyName?: string }>({
+  const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hasErpAccess: boolean; hasFactoryAccess: boolean; companyId?: number; companyName?: string; hiddenCostFields?: string[] }>({
     queryKey: ["/api/factory/my-access"],
     enabled: !!user && !isPOS,
     staleTime: 30000,
@@ -1051,7 +1051,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/net-profit-analytics" component={FactoryNetProfitAnalytics} />
                     <Route path="/factory/net-position" component={FactoryNetPosition} />
                     <Route path="/factory/financial-snapshot" component={FactoryFinancialSnapshot} />
-                    <Route path="/factory/production-report" component={DailyProductionReport} />
+                    <Route path="/factory/production-report">{() => myAccess?.hiddenCostFields?.includes("hide_tab_production_analytics") ? <Redirect to="/factory/raw-stock" /> : <DailyProductionReport />}</Route>
                     <Route path="/factory/rental/warehouses" component={FactoryRentalWarehouses} />
                     <Route path="/factory/rental/shops" component={FactoryRentalShops} />
                     <Route path="/factory/rental/payments" component={FactoryRentalPayments} />
