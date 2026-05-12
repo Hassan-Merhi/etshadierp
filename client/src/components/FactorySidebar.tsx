@@ -127,14 +127,8 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
       { title: "Transporters",     url: "/factory/transporters",            icon: Truck,         developerOnly: true },
       { title: "Vouchers",         url: "/factory/vouchers",                icon: FileText       },
       { title: "Accounts",         url: "/factory/accounts",               icon: Landmark       },
+      { title: "Analytics",        url: "/factory/analytics",               icon: TrendingUp,    adminOnly: true },
       { title: "Broker Statement", url: "/factory/broker-visual-statement", icon: ClipboardCheck, developerOnly: true },
-    ],
-  },
-  {
-    label: "Reports",
-    color: NAV_COLOR.reports,
-    items: [
-      { title: "Analytics", url: "/factory/analytics", icon: TrendingUp, adminOnly: true },
     ],
   },
   {
