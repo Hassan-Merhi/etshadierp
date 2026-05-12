@@ -53,7 +53,7 @@ async function buildNetPositionZip(
   });
 }
 
-// ── Helpers: check today's scheduled export state (UTC-agnostic: last 10 h) ───
+// ── Helpers: check today's scheduled export state (UTC-agnostic: last 23 h) ───
 
 async function hasTodayExportSucceeded(): Promise<boolean> {
   try {
@@ -61,7 +61,7 @@ async function hasTodayExportSucceeded(): Promise<boolean> {
       SELECT id FROM daily_export_runs
        WHERE run_type = 'scheduled'
          AND status   IN ('success', 'partial_failed')
-         AND started_at >= NOW() - INTERVAL '10 hours'
+         AND started_at >= NOW() - INTERVAL '23 hours'
        LIMIT 1
     `);
     return (r.rowCount ?? 0) > 0;
@@ -74,7 +74,7 @@ async function isTodayExportRunning(): Promise<boolean> {
       SELECT id FROM daily_export_runs
        WHERE run_type = 'scheduled'
          AND status   = 'running'
-         AND started_at >= NOW() - INTERVAL '10 hours'
+         AND started_at >= NOW() - INTERVAL '23 hours'
        LIMIT 1
     `);
     return (r.rowCount ?? 0) > 0;
@@ -83,10 +83,36 @@ async function isTodayExportRunning(): Promise<boolean> {
 
 /**
  * Re-runs the daily export if today's scheduled run hasn't succeeded yet.
- * Called at startup (after server restart) and from recovery crons.
+ * Called at startup (after server restart).
+ * Will NOT fire before the configured schedule hour to avoid early-restart surprises.
  */
 export async function checkAndRecoverDailyExport(): Promise<void> {
   try {
+    // Read schedule config first — only recover if the scheduled hour has already passed today.
+    const r = await pool.query(
+      `SELECT schedule_enabled, schedule_hour, schedule_timezone FROM export_settings WHERE id = 1`
+    );
+    if (!r.rows.length) return;
+    const row = r.rows[0];
+
+    if (!row.schedule_enabled) {
+      console.log("[DailyExport] Recovery check: schedule is disabled — skipping.");
+      return;
+    }
+
+    const configuredHour: number = row.schedule_hour ?? 18;
+    const tz: string = row.schedule_timezone || "America/New_York";
+    const nowInTz = new Date(new Date().toLocaleString("en-US", { timeZone: tz }));
+    const currentHour = nowInTz.getHours();
+
+    // Don't trigger recovery before the scheduled time has even arrived today.
+    if (currentHour < configuredHour) {
+      console.log(
+        `[DailyExport] Recovery check: current hour (${currentHour}:xx ${tz}) is before scheduled hour (${configuredHour}:00) — skipping.`
+      );
+      return;
+    }
+
     if (await hasTodayExportSucceeded()) {
       console.log("[DailyExport] Recovery check: today's export already succeeded — nothing to do.");
       return;
