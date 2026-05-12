@@ -862,7 +862,28 @@ export function registerBaleRoutes(app: Express) {
       const product = await storage.getBaleProductByArticleCode(articleCode, companyId);
       const labelPrints = await storage.getBaleLabelPrintsByArticle(articleCode, companyId);
 
-      res.json({ product: product || null, labelPrints });
+      // Enrich each label print with bale status so non-admin users can see deleted bales
+      const refNumbers = labelPrints.map((lp) => lp.referenceNumber).filter(Boolean);
+      let baleStatusMap: Record<string, string> = {};
+      if (refNumbers.length > 0) {
+        const baleRows = await db
+          .select({ referenceNumber: factoryBales.referenceNumber, status: factoryBales.status })
+          .from(factoryBales)
+          .where(and(
+            eq(factoryBales.companyId, companyId),
+            inArray(factoryBales.referenceNumber, refNumbers),
+          ));
+        for (const b of baleRows) {
+          if (b.referenceNumber) baleStatusMap[b.referenceNumber] = b.status;
+        }
+      }
+
+      const enrichedLabelPrints = labelPrints.map((lp) => ({
+        ...lp,
+        baleStatus: baleStatusMap[lp.referenceNumber] ?? null,
+      }));
+
+      res.json({ product: product || null, labelPrints: enrichedLabelPrints });
     } catch (error: any) {
       console.error("Error looking up article:", error);
       res.status(500).json({ message: error.message });

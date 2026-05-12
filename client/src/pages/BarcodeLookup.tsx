@@ -408,11 +408,15 @@ export default function BarcodeLookup() {
                           <TableHead>Reference No.</TableHead>
                           <TableHead>Approx. Weight (KG)</TableHead>
                           <TableHead>Printed At</TableHead>
+                          <TableHead>Status</TableHead>
                           <TableHead>Scanned</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {articleResult.labelPrints.map((lp) => (
+                        {articleResult.labelPrints.map((lp) => {
+                          const baleStatus = (lp as any).baleStatus as string | null;
+                          const isDeleted = baleStatus === "DELETED" || baleStatus === "REMOVED";
+                          return (
                           <TableRow
                             key={lp.id}
                             className="cursor-pointer hover-elevate"
@@ -423,10 +427,17 @@ export default function BarcodeLookup() {
                               referenceLookup.mutate(lp.referenceNumber);
                             }}
                           >
-                            <TableCell className="font-mono font-medium">{lp.referenceNumber}</TableCell>
+                            <TableCell className={`font-mono font-medium ${isDeleted ? "text-muted-foreground line-through" : ""}`}>{lp.referenceNumber}</TableCell>
                             <TableCell>{smartNum(lp.approxWeightKg)}</TableCell>
                             <TableCell className="text-sm text-muted-foreground">
                               {lp.printedAt ? new Date(lp.printedAt).toLocaleDateString() : "—"}
+                            </TableCell>
+                            <TableCell>
+                              {baleStatus ? (
+                                <BaleStatusBadge status={baleStatus} />
+                              ) : (
+                                <span className="text-muted-foreground text-xs">—</span>
+                              )}
                             </TableCell>
                             <TableCell>
                               {lp.scannedAt ? (
@@ -438,7 +449,7 @@ export default function BarcodeLookup() {
                               )}
                             </TableCell>
                           </TableRow>
-                        ))}
+                        );})}
                       </TableBody>
                     </Table>
                   </div>
