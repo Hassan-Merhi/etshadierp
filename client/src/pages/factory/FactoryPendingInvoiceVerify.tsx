@@ -670,7 +670,20 @@ export default function FactoryPendingInvoiceVerify() {
                               </TableCell>
                               <TableCell className="text-right font-mono" data-testid={`text-stock-${line.articleCode}`}>
                                 {(line.stockQty ?? 0) > 0 ? (
-                                  <span className="text-foreground font-medium">{line.stockQty}</span>
+                                  <button
+                                    className="underline underline-offset-2 cursor-pointer hover-elevate rounded px-0.5 text-foreground font-medium"
+                                    onClick={() => {
+                                      const p = new URLSearchParams({
+                                        articleCode: line.articleCode,
+                                        productName: line.productName,
+                                        back: window.location.pathname + window.location.search,
+                                      });
+                                      navigate(`/factory/stock-bale-list?${p}`);
+                                    }}
+                                    data-testid={`button-stock-detail-${line.articleCode}`}
+                                  >
+                                    {line.stockQty}
+                                  </button>
                                 ) : (
                                   <span className="text-muted-foreground">0</span>
                                 )}
