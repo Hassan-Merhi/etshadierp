@@ -364,8 +364,16 @@ export async function trackDueContainers(): Promise<void> {
   });
 
   // ── Apply per-run budget ───────────────────────────────────────────────────
-  const toTrack = eligible.slice(0, perRunBudget);
-  const budgetSkipped = eligible.slice(perRunBudget);
+  // Maersk containers use maersk_direct (no ParcelsApp quota cost) so they are
+  // always tracked regardless of the per-run budget.  All other carriers may
+  // eventually call the ParcelsApp API and therefore count against the quota.
+  const SCHED_MAERSK_PREFIXES = /^(MAEU|MSKU|MRKU|MRSU|HASU|HJSC|HJCU|SUDU|SAFM|MCIU|TRHU|TEMU|SEAU|PONU|SEGU|MWMU)/i;
+  const maerskEligible = eligible.filter(({ row }) => SCHED_MAERSK_PREFIXES.test(row.containerNumber));
+  const quotaEligible  = eligible.filter(({ row }) => !SCHED_MAERSK_PREFIXES.test(row.containerNumber));
+
+  const toTrackQuota   = quotaEligible.slice(0, perRunBudget);
+  const budgetSkipped  = quotaEligible.slice(perRunBudget);
+  const toTrack        = [...maerskEligible, ...toTrackQuota];
 
   // Save skip records for containers that didn't make the budget cut
   for (const { row } of budgetSkipped) {
@@ -380,7 +388,7 @@ export async function trackDueContainers(): Promise<void> {
   }
 
   console.log(
-    `[ContainerTracking] Eligible: ${eligible.length}, ` +
+    `[ContainerTracking] Eligible: ${eligible.length} (maersk=${maerskEligible.length} unlimited + quota=${quotaEligible.length} capped at ${perRunBudget}/run), ` +
     `tracking: ${toTrack.length}, ` +
     `budget-skipped: ${budgetSkipped.length}, ` +
     `recent: ${countRecent}, invalid: ${countInvalid}, disabled: ${countDisabled}.`,
@@ -922,7 +930,7 @@ async function trackViaParcelsApp(
   // Try their undocumented public JSON endpoint first (free, no API key), then
   // 17track, then ParcelsApp API.  Skip the Puppeteer browser scraper — it only
   // scrapes parcelsapp.com which is tried explicitly further down.
-  const CMA_PREFIXES = /^(CMAU|CMDU|APZU)/i;
+  const CMA_PREFIXES = /^(CMAU|CMDU|APZU|CGMU|APMU|APHU|CXDU|CAAU|CAJU|CAIU)/i;
   if (CMA_PREFIXES.test(containerNumber)) {
     console.log(`[ContainerTracking] ${containerNumber}: CMA detected — trying CMA public endpoint...`);
 

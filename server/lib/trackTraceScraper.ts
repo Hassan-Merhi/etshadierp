@@ -143,17 +143,20 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
         const url: string = response.url();
         // Skip noise: images, fonts, analytics, ads
         if (/\.(png|jpg|gif|svg|woff|woff2|ttf|ico|css)(\?|$)/i.test(url)) return;
-        if (/google|doubleclick|googletag|facebook|analytics|adnxs|adsystem/i.test(url)) return;
+        if (/google|doubleclick|googletag|facebook|analytics|adnxs|adsystem|flashtalking|ad-score|advertising|adserver|adtech|amazon-adsystem/i.test(url)) return;
         const ct: string = response.headers()["content-type"] ?? "";
         if (!ct.includes("json") && !ct.includes("javascript")) return;
         const json = await response.json().catch(() => null);
         if (!json || typeof json !== "object") return;
         capturedResponses.push({ url, data: json });
-        // Prefer responses that look like tracking data
-        const hasTrackingData = JSON.stringify(json).match(
-          /eta|vessel|port|transit|arrived|departed|discharged|loaded|container|movement|event|milestone/i,
-        );
-        if (hasTrackingData && !capturedJson) capturedJson = json;
+        // Only capture responses that look like real shipping/tracking data.
+        // Require at least TWO of the maritime keywords to avoid ad payloads that
+        // incidentally contain a single common word (e.g. "container" in an ad URL).
+        const body = JSON.stringify(json);
+        const maritimeMatches = (body.match(/\b(eta|vessel|port|transit|arrived|departed|discharged|loaded|movement|milestone|shipment|tracking|voyage|bill.of.lading|bl.number|booking)\b/gi) ?? []).length;
+        // Also reject if it looks like an ad creative payload
+        const isAdPayload = /\b(zIndex|jsVPaid|campaign|adChoice|creative|adserver|flashtalking|surveys)\b/i.test(body);
+        if (maritimeMatches >= 2 && !isAdPayload && !capturedJson) capturedJson = json;
       } catch { /* ignore */ }
     });
 
@@ -380,7 +383,7 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
       `eta="${extracted.bestEta ?? "none"}" location="${extracted.bestLocation ?? "none"}"`,
     );
 
-    if (!extracted.bestStatus && !extracted.bestEta && !capturedJson) {
+    if (!extracted.bestStatus && !extracted.bestEta && !extracted.bestLocation) {
       const isBlocked = /captcha|robot|blocked|403|access denied|verify you are human|datadome/i.test(debugBodyText);
       return {
         success: false,
