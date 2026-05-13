@@ -9,7 +9,7 @@ import { db } from "../db";
 import { stockItems, locations, companies } from "@shared/schema";
 import { eq, inArray } from "drizzle-orm";
 import { generateTransferImageBuffer } from "./generateTransferImage";
-import { sendWhatsAppFileToChatId } from "../services/whatsappService";
+import { sendWhatsAppFileToChatIdPos, sendWhatsAppTextToChatIdPos } from "../services/whatsappService";
 import { format } from "date-fns";
 
 export interface TransferWAItem {
@@ -116,37 +116,56 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
     displayDate = format(new Date(voucherDate), "dd MMM yyyy");
   } catch { /* keep raw string */ }
 
-  console.log(`[TransferWA] Generating PNG for ${voucherNumber}...`);
-
-  // Generate the PNG image once
-  const pngBuffer = await generateTransferImageBuffer({
-    voucherNumber,
-    date: displayDate,
-    sourceLocationName,
-    destLocationName,
-    items: imageItems,
-  });
-
-  console.log(`[TransferWA] PNG generated (${pngBuffer.length} bytes). Sending...`);
-
-  const safeVoucher = voucherNumber.replace(/[^a-zA-Z0-9_-]/g, "_");
-  const fileName = `Transfer_${safeVoucher}.png`;
-
   const caption = [
     `*Stock Transfer* — ${voucherNumber}`,
     `Date: ${displayDate}`,
     `From: ${sourceLocationName}`,
     `To: ${destLocationName}`,
     `Items: ${items.length}`,
+    ...imageItems.map((i) => `• ${i.name}: ${i.quantity} ${i.uom}`),
   ].join("\n");
+
+  // Try to generate PNG; fall back to text if Puppeteer/Chromium is unavailable
+  let pngBuffer: Buffer | null = null;
+  try {
+    console.log(`[TransferWA] Generating PNG for ${voucherNumber}...`);
+    pngBuffer = await generateTransferImageBuffer({
+      voucherNumber,
+      date: displayDate,
+      sourceLocationName,
+      destLocationName,
+      items: imageItems,
+    });
+    console.log(`[TransferWA] PNG generated (${pngBuffer.length} bytes).`);
+  } catch (imgErr: any) {
+    console.warn(`[TransferWA] Image generation failed for ${voucherNumber} — falling back to text. Error: ${imgErr?.message}`);
+  }
+
+  const safeVoucher = voucherNumber.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const fileName = `Transfer_${safeVoucher}.png`;
 
   // Send to all target groups
   for (const chatId of chatIds) {
-    const result = await sendWhatsAppFileToChatId(chatId, pngBuffer, fileName, caption, "image/png");
-    if (result.success) {
-      console.log(`[TransferWA] Sent ${voucherNumber} image to group ${chatId}`);
+    if (pngBuffer) {
+      const result = await sendWhatsAppFileToChatIdPos(chatId, pngBuffer, fileName, caption, "image/png");
+      if (result.success) {
+        console.log(`[TransferWA] Sent ${voucherNumber} image to group ${chatId}`);
+      } else {
+        console.warn(`[TransferWA] Image send failed for ${voucherNumber} → ${chatId}: ${result.error} — trying text fallback`);
+        const textResult = await sendWhatsAppTextToChatIdPos(chatId, caption);
+        if (textResult.success) {
+          console.log(`[TransferWA] Text fallback sent for ${voucherNumber} → ${chatId}`);
+        } else {
+          console.warn(`[TransferWA] Text fallback also failed for ${voucherNumber} → ${chatId}: ${textResult.error}`);
+        }
+      }
     } else {
-      console.warn(`[TransferWA] Send failed for ${voucherNumber} → ${chatId}: ${result.error}`);
+      const textResult = await sendWhatsAppTextToChatIdPos(chatId, caption);
+      if (textResult.success) {
+        console.log(`[TransferWA] Text message sent for ${voucherNumber} → ${chatId}`);
+      } else {
+        console.warn(`[TransferWA] Text send failed for ${voucherNumber} → ${chatId}: ${textResult.error}`);
+      }
     }
   }
 }
