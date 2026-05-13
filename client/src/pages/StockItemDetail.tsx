@@ -76,8 +76,16 @@ export default function StockItemDetail() {
 
   const selectedItem = stockItems.find(item => item.id === itemId);
 
-  const { data: itemDetails, isLoading: detailsLoading, error: detailsError } = useQuery<StockItemDetails>({
-    queryKey: [`/api/stock-items/${itemId}/details`],
+  const { data: itemDetails, isLoading: detailsLoading, error: detailsError, refetch: refetchDetails } = useQuery<StockItemDetails>({
+    queryKey: ["/api/stock-items", itemId, "details"],
+    queryFn: async () => {
+      const res = await fetch(`/api/stock-items/${itemId}/details`, { credentials: "include" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error(body.message || res.statusText);
+      }
+      return res.json();
+    },
     enabled: !!itemId,
   });
 
@@ -149,11 +157,16 @@ export default function StockItemDetail() {
           <Skeleton className="h-48 w-full" />
         </div>
       ) : detailsError ? (
-        <Card>
-          <CardContent className="p-6 text-center text-muted-foreground">
-            Failed to load stock item details. Please try again.
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+          <Package className="h-10 w-10 opacity-25" />
+          <p className="text-sm font-medium text-foreground">Failed to load stock item details</p>
+          {(detailsError as any)?.message && (
+            <p className="text-xs text-destructive max-w-md text-center">{(detailsError as any).message}</p>
+          )}
+          <Button variant="outline" size="sm" onClick={() => refetchDetails()} className="mt-1">
+            Try again
+          </Button>
+        </div>
       ) : !itemDetails ? (
         <Card>
           <CardContent className="p-6 text-center text-muted-foreground">
