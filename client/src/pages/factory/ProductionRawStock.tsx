@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown, AlertTriangle, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, FlaskConical, FileSpreadsheet, FileText, SlidersHorizontal, PlusCircle, MinusCircle, History, ArrowUpCircle, ArrowDownCircle, FlaskRound, Tag, ChevronRight, ChevronDown, Folder, FolderOpen } from "lucide-react";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, FlaskConical, FileSpreadsheet, FileText, SlidersHorizontal, PlusCircle, MinusCircle, History, ArrowUpCircle, ArrowDownCircle, FlaskRound, Tag, ChevronRight, ChevronDown, Folder, FolderOpen, Eye, EyeOff } from "lucide-react";
 import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
 import { EditMixBatchDialog } from "@/components/EditMixBatchDialog";
 import type { FactoryMixBatch } from "@shared/schema";
@@ -623,6 +623,7 @@ export default function ProductionRawStock() {
   // OB delete
   const [deleteObDialogOpen, setDeleteObDialogOpen] = useState(false);
   const [deletingObRecord, setDeletingObRecord] = useState<{ rawStockId: number; supplierName: string; containerNumber: string } | null>(null);
+  const [showZeroStock, setShowZeroStock] = useState(false);
   // Raw stock adjustment dialog
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [adjustingRow, setAdjustingRow] = useState<{ supplierId: number | null; supplierName: string } | null>(null);
@@ -1469,6 +1470,16 @@ export default function ProductionRawStock() {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setShowZeroStock(v => !v)}
+              data-testid="button-toggle-zero-stock"
+              className={showZeroStock ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
+            >
+              {showZeroStock ? <EyeOff className="h-3.5 w-3.5 mr-1.5" /> : <Eye className="h-3.5 w-3.5 mr-1.5" />}
+              {showZeroStock ? "Hide Empty" : "Show Empty"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setCategoriesDialogOpen(true)}
               data-testid="button-manage-categories"
             >
@@ -1521,8 +1532,10 @@ export default function ProductionRawStock() {
               </TableHeader>
               <TableBody>
                 {(() => {
-                  // Hide rows with zero free kg before grouping
-                  const visibleRawStock = rawStock.filter(row => parseFloat(row.freeKg || "0") > 0.001);
+                  // Hide rows with zero free kg before grouping (unless showZeroStock is on)
+                  const visibleRawStock = showZeroStock
+                    ? rawStock
+                    : rawStock.filter(row => parseFloat(row.freeKg || "0") > 0.001);
 
                   // Group rows by category
                   const categoryGroups = new Map<string, { categoryId: number | null; categoryName: string | null; rows: typeof rawStock }>();
