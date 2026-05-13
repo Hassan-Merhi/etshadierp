@@ -20,7 +20,7 @@ export interface RevisedTransferWAItem {
 }
 
 export interface SendRevisedTransferWAOptions {
-  destinationLocationId: number;
+  sourceLocationId: number;
   sourceLocationName: string;
   destLocationName: string;
   items: RevisedTransferWAItem[];
@@ -30,34 +30,34 @@ export interface SendRevisedTransferWAOptions {
 
 /**
  * Generate and send the revised stock transfer image.
- * Sends to the same groups as the original transfer image.
+ * Sends to the SOURCE location's WA group (the POS user who submitted the revision).
  * Designed to be called fire-and-forget — never throws.
  */
 export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOptions): Promise<void> {
-  const { destinationLocationId, sourceLocationName, destLocationName, items, voucherNumber, voucherDate } = opts;
+  const { sourceLocationId, sourceLocationName, destLocationName, items, voucherNumber, voucherDate } = opts;
 
-  console.log(`[RevisedTransferWA] Starting for ${voucherNumber} → destLocId=${destinationLocationId}, items=${items.length}`);
+  console.log(`[RevisedTransferWA] Starting for ${voucherNumber} → srcLocId=${sourceLocationId}, items=${items.length}`);
 
   if (!items || items.length === 0) {
     console.warn(`[RevisedTransferWA] No items for ${voucherNumber} — skipping`);
     return;
   }
 
-  // Collect all target chat IDs (same logic as original transfer)
+  // Send to the SOURCE location's WA group (the person revising the transfer)
   const chatIds = new Set<string>();
 
-  const [destLoc] = await db
+  const [srcLoc] = await db
     .select({ companyId: locations.companyId, transferWaGroupChatId: locations.transferWaGroupChatId })
     .from(locations)
-    .where(eq(locations.id, destinationLocationId));
+    .where(eq(locations.id, sourceLocationId));
 
-  if (destLoc?.transferWaGroupChatId) {
-    chatIds.add(destLoc.transferWaGroupChatId);
-  } else if (destLoc?.companyId) {
+  if (srcLoc?.transferWaGroupChatId) {
+    chatIds.add(srcLoc.transferWaGroupChatId);
+  } else if (srcLoc?.companyId) {
     const [company] = await db
       .select({ transferWaGroupChatId: companies.transferWaGroupChatId })
       .from(companies)
-      .where(eq(companies.id, destLoc.companyId));
+      .where(eq(companies.id, srcLoc.companyId));
     if (company?.transferWaGroupChatId) chatIds.add(company.transferWaGroupChatId);
   }
 

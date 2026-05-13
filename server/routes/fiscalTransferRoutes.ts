@@ -1337,6 +1337,10 @@ export function registerFiscalTransferRoutes(app: Express) {
             const uniqueSrcNames = [...new Set(items.map((i: any) => i.sourceLocationName).filter(Boolean))];
             const sourceName = uniqueSrcNames.length === 1 ? uniqueSrcNames[0] : "Multiple Sources";
 
+            // Use the first item's sourceLocationId to route to the source WA group
+            const srcLocationId = items.find((i: any) => i.sourceLocationId)?.sourceLocationId ?? null;
+            if (!srcLocationId) return;
+
             const waItems = items.map((i: any) => ({
               stockItemId: Number(i.stockItemId),
               stockItemName: i.stockItemName ?? null,
@@ -1347,7 +1351,7 @@ export function registerFiscalTransferRoutes(app: Express) {
             if (waItems.length === 0) return;
 
             await sendRevisedTransferWhatsApp({
-              destinationLocationId: transfer.destinationLocationId,
+              sourceLocationId: Number(srcLocationId),
               sourceLocationName: sourceName,
               destLocationName: destLoc?.name ?? "Unknown",
               items: waItems,
