@@ -232,11 +232,13 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-4 md:space-y-6">
-      <PageHeader
-        title="POS Dashboard"
-        subtitle={`${location?.name || "Loading..."} — ${posUser.username}`}
-      >
+    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
+      {/* Header row */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <PageHeader
+          title="POS Dashboard"
+          subtitle={`${location?.name || "Loading..."} — ${posUser.username}`}
+        />
         {isOnline ? (
           <Badge variant="outline" className="gap-1">
             <Wifi className="h-3 w-3" />
@@ -248,245 +250,205 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             Offline
           </Badge>
         )}
-      </PageHeader>
+      </div>
 
-      {/* Shift Status Card */}
-      <Card className={currentShift ? "border-green-500/50 bg-green-50/30 dark:bg-green-950/20" : ""}>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Clock className="h-5 w-5" />
-            Shift Status
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {shiftLoading ? (
-            <Skeleton className="h-20 w-full" />
-          ) : currentShift ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Badge variant="default" className="mb-2">Active Shift</Badge>
-                  <p className="text-sm text-muted-foreground">
-                    Started: {formatDisplayDate(currentShift.openedAt)} at {format(new Date(currentShift.openedAt), "hh:mm a")}
-                  </p>
-                  <p className="text-sm">
-                    Opening Cash: <span className="font-medium">{formatAmount(parseFloat(currentShift.openingCash))}</span>
-                  </p>
-                </div>
-                <Button
-                  variant="destructive"
-                  onClick={() => setCloseShiftDialog(true)}
-                  className="gap-2"
-                  data-testid="button-close-shift"
-                >
-                  <Square className="h-4 w-4" />
-                  End Shift
-                </Button>
-              </div>
+      {/* Stats pill bar */}
+      <div className="flex flex-wrap gap-3">
+        <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3 min-w-[130px]">
+          <ShoppingCart className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">Today's Sales</p>
+            {salesLoading ? (
+              <Skeleton className="h-5 w-12 mt-0.5" />
+            ) : (
+              <p className="text-lg font-semibold leading-none" data-testid="text-today-sales-count">
+                {todaySales?.count || 0}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3 min-w-[160px]">
+          <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">Today's Revenue</p>
+            {salesLoading ? (
+              <Skeleton className="h-5 w-20 mt-0.5" />
+            ) : (
+              <p className="text-lg font-semibold leading-none font-mono" data-testid="text-today-revenue">
+                {formatAmount(todaySales?.total || 0)}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3 min-w-[160px]">
+          <TrendingUp className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">Avg per Transaction</p>
+            {salesLoading ? (
+              <Skeleton className="h-5 w-16 mt-0.5" />
+            ) : (
+              <p className="text-lg font-semibold leading-none font-mono" data-testid="text-average-sale">
+                {formatAmount(todaySales?.average || 0)}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Shift Status */}
+      <div className={`rounded-xl border px-5 py-4 ${currentShift ? "border-green-500/40 bg-green-50/20 dark:bg-green-950/10" : "bg-muted/30"}`}>
+        <div className="flex items-center gap-2 mb-3">
+          <Clock className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-semibold">Shift Status</span>
+        </div>
+        {shiftLoading ? (
+          <Skeleton className="h-14 w-full" />
+        ) : currentShift ? (
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="space-y-1">
+              <Badge variant="default">Active Shift</Badge>
+              <p className="text-sm text-muted-foreground">
+                Started {formatDisplayDate(currentShift.openedAt)} at {format(new Date(currentShift.openedAt), "hh:mm a")}
+              </p>
+              <p className="text-sm">
+                Opening Cash:{" "}
+                <span className="font-semibold font-mono">{formatAmount(parseFloat(currentShift.openingCash))}</span>
+              </p>
             </div>
-          ) : (
-            <div className="flex items-center justify-between">
-              <div>
-                <Badge variant="secondary" className="mb-2">No Active Shift</Badge>
-                <p className="text-sm text-muted-foreground">
-                  Start a shift to begin making sales
-                </p>
-              </div>
-              <Button
-                onClick={() => setOpenShiftDialog(true)}
-                className="gap-2"
-                data-testid="button-start-shift"
-              >
-                <Play className="h-4 w-4" />
-                Start Shift
-              </Button>
+            <Button
+              variant="destructive"
+              onClick={() => setCloseShiftDialog(true)}
+              className="gap-2"
+              data-testid="button-close-shift"
+            >
+              <Square className="h-4 w-4" />
+              End Shift
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="space-y-1">
+              <Badge variant="secondary">No Active Shift</Badge>
+              <p className="text-sm text-muted-foreground">Start a shift to begin making sales</p>
             </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today's Sales</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {salesLoading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <>
-                <div className="text-2xl font-semibold" data-testid="text-today-sales-count">
-                  {todaySales?.count || 0}
-                </div>
-                <p className="text-xs text-muted-foreground">transactions</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today's Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {salesLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <>
-                <div className="text-2xl font-semibold" data-testid="text-today-revenue">
-                  {formatAmount(todaySales?.total || 0)}
-                </div>
-                <p className="text-xs text-muted-foreground">total revenue</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Sale</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {salesLoading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <>
-                <div className="text-2xl font-semibold" data-testid="text-average-sale">
-                  {formatAmount(todaySales?.average || 0)}
-                </div>
-                <p className="text-xs text-muted-foreground">per transaction</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+            <Button
+              onClick={() => setOpenShiftDialog(true)}
+              className="gap-2"
+              data-testid="button-start-shift"
+            >
+              <Play className="h-4 w-4" />
+              Start Shift
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Button
-              variant="outline"
-              className="h-24 flex-col gap-2"
-              onClick={() => navigate("/pos")}
-              disabled={!currentShift}
-              data-testid="button-new-sale"
-            >
-              <ShoppingCart className="h-6 w-6" />
-              <span>New Sale</span>
-            </Button>
-            
-            <Button
-              variant="outline"
-              className="h-24 flex-col gap-2"
-              onClick={() => navigate("/pos-daybook")}
-              data-testid="button-view-daybook"
-            >
-              <FileText className="h-6 w-6" />
-              <span>View Daybook</span>
-            </Button>
-            
-            <Button
-              variant="outline"
-              className="h-24 flex-col gap-2"
-              onClick={() => setShowHistory(!showHistory)}
-              data-testid="button-shift-history"
-            >
-              <History className="h-6 w-6" />
-              <span>Shift History</span>
-            </Button>
-            
-            <Button
-              variant="outline"
-              className="h-24 flex-col gap-2"
-              disabled
-              data-testid="button-cash-drawer"
-            >
-              <Wallet className="h-6 w-6" />
-              <span>Cash Drawer</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div>
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Quick Actions</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Button
+            variant="outline"
+            className="h-20 flex-col gap-2"
+            onClick={() => navigate("/pos")}
+            disabled={!currentShift}
+            data-testid="button-new-sale"
+          >
+            <ShoppingCart className="h-5 w-5" />
+            <span className="text-sm">New Sale</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-20 flex-col gap-2"
+            onClick={() => navigate("/pos-daybook")}
+            data-testid="button-view-daybook"
+          >
+            <FileText className="h-5 w-5" />
+            <span className="text-sm">View Daybook</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-20 flex-col gap-2"
+            onClick={() => setShowHistory(!showHistory)}
+            data-testid="button-shift-history"
+          >
+            <History className="h-5 w-5" />
+            <span className="text-sm">Shift History</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-20 flex-col gap-2"
+            disabled
+            data-testid="button-cash-drawer"
+          >
+            <Wallet className="h-5 w-5" />
+            <span className="text-sm">Cash Drawer</span>
+          </Button>
+        </div>
+      </div>
 
       {/* Shift History */}
       {showHistory && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Recent Shifts</CardTitle>
-            <CardDescription>Your last 10 shifts at this location</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <div>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Recent Shifts</p>
+          <div className="border rounded-xl overflow-hidden">
             <div className="table-responsive">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="hidden sm:table-cell">Duration</TableHead>
-                  <TableHead className="text-right">Opening</TableHead>
-                  <TableHead className="text-right">Closing</TableHead>
-                  <TableHead className="text-right">Sales</TableHead>
-                  <TableHead className="hidden sm:table-cell text-right">Variance</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {shiftHistory.slice(0, 10).map((shift) => {
-                  const variance = parseFloat(shift.variance || "0");
-                  return (
-                    <TableRow key={shift.id} data-testid={`row-shift-${shift.id}`}>
-                      <TableCell>
-                        {formatDisplayDate(shift.openedAt)}
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        {shift.closedAt ? (
-                          <>
-                            {format(new Date(shift.openedAt), "hh:mm a")} - {format(new Date(shift.closedAt), "hh:mm a")}
-                          </>
-                        ) : (
-                          format(new Date(shift.openedAt), "hh:mm a") + " - Active"
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatAmount(parseFloat(shift.openingCash))}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {shift.closingCash ? formatAmount(parseFloat(shift.closingCash)) : "-"}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {shift.salesTotal ? formatAmount(parseFloat(shift.salesTotal)) : "-"}
-                        {shift.salesCount ? ` (${shift.salesCount})` : ""}
-                      </TableCell>
-                      <TableCell className={`hidden sm:table-cell text-right font-mono ${variance !== 0 ? "text-destructive" : "text-green-600"}`}>
-                        {shift.variance ? formatAmount(variance) : "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={shift.status === "open" ? "default" : "secondary"}>
-                          {shift.status}
-                        </Badge>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
+                    <TableHead className="text-xs">Date</TableHead>
+                    <TableHead className="text-xs hidden sm:table-cell">Duration</TableHead>
+                    <TableHead className="text-xs text-right">Opening</TableHead>
+                    <TableHead className="text-xs text-right">Closing</TableHead>
+                    <TableHead className="text-xs text-right">Sales</TableHead>
+                    <TableHead className="text-xs hidden sm:table-cell text-right">Variance</TableHead>
+                    <TableHead className="text-xs">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {shiftHistory.slice(0, 10).map((shift) => {
+                    const variance = parseFloat(shift.variance || "0");
+                    return (
+                      <TableRow key={shift.id} data-testid={`row-shift-${shift.id}`}>
+                        <TableCell className="text-sm">{formatDisplayDate(shift.openedAt)}</TableCell>
+                        <TableCell className="text-sm hidden sm:table-cell text-muted-foreground">
+                          {shift.closedAt ? (
+                            <>{format(new Date(shift.openedAt), "hh:mm a")} – {format(new Date(shift.closedAt), "hh:mm a")}</>
+                          ) : (
+                            format(new Date(shift.openedAt), "hh:mm a") + " – Active"
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm">{formatAmount(parseFloat(shift.openingCash))}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          {shift.closingCash ? formatAmount(parseFloat(shift.closingCash)) : "—"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          {shift.salesTotal ? formatAmount(parseFloat(shift.salesTotal)) : "—"}
+                          {shift.salesCount ? <span className="text-muted-foreground text-xs ml-1">({shift.salesCount})</span> : ""}
+                        </TableCell>
+                        <TableCell className={`hidden sm:table-cell text-right font-mono text-sm ${variance !== 0 ? "text-destructive" : "text-green-600 dark:text-green-400"}`}>
+                          {shift.variance ? formatAmount(variance) : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={shift.status === "open" ? "default" : "secondary"} className="capitalize">
+                            {shift.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {shiftHistory.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                        No shift history found
                       </TableCell>
                     </TableRow>
-                  );
-                })}
-                {shiftHistory.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                      No shift history found
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                  )}
+                </TableBody>
+              </Table>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Open Shift Dialog */}

@@ -1,6 +1,5 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
@@ -21,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Search, Users, Printer, FileDown } from "lucide-react";
+import { Plus, Search, Users, Printer, FileDown, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { drCrClass } from "@/lib/formatNumber";
@@ -126,53 +125,16 @@ export default function POSCustomers() {
   const openingBalance = closingBalance - totalDr + totalCr;
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
-      <PageHeader title="Customers" subtitle="Manage customer accounts" />
-
-      <div className="grid grid-cols-2 gap-2 md:gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 p-3 pb-1 md:p-6 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium">Total Customers</CardTitle>
-            <Users className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-            {isLoading ? (
-              <Skeleton className="h-6 w-16" />
-            ) : (
-              <div className="text-xl md:text-2xl font-semibold" data-testid="text-total-customers">
-                {totalCustomers}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 p-3 pb-1 md:p-6 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium">Total Receivables</CardTitle>
-            <Users className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-            {isLoading ? (
-              <Skeleton className="h-6 w-20" />
-            ) : (
-              <div className="text-lg md:text-2xl font-semibold" data-testid="text-total-receivables">
-                {formatCashAmount(totalReceivables)}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
-          <CardTitle className="text-base">Customer List</CardTitle>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" data-testid="button-create-customer">
-                <Plus className="mr-2 h-4 w-4" />
-                New Customer
-              </Button>
-            </DialogTrigger>
+    <div className="container mx-auto p-4 md:p-6 space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <PageHeader title="Customers" subtitle="Manage customer accounts" />
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" data-testid="button-create-customer">
+              <Plus className="mr-2 h-4 w-4" />
+              New Customer
+            </Button>
+          </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Create New Customer</DialogTitle>
@@ -253,36 +215,59 @@ export default function POSCustomers() {
               </Form>
             </DialogContent>
           </Dialog>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search customers..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-                data-testid="input-search-customers"
-              />
-            </div>
-          </div>
+      </div>
 
-          {isLoading ? (
-            <div className="space-y-2">
-              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
-            </div>
-          ) : filteredCustomers.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium">{searchQuery ? "No customers found" : "No customers yet"}</p>
-              <p className="text-sm mt-1">{searchQuery ? "Try a different search term" : "Create your first customer to get started"}</p>
-            </div>
-          ) : (
+      {/* Stats pill bar */}
+      <div className="flex flex-wrap gap-3">
+        <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
+          <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">Total Customers</p>
+            {isLoading ? <Skeleton className="h-5 w-10 mt-0.5" /> : (
+              <p className="text-lg font-semibold leading-none" data-testid="text-total-customers">{totalCustomers}</p>
+            )}
+          </div>
+        </div>
+        <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
+          <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">Total Receivables</p>
+            {isLoading ? <Skeleton className="h-5 w-20 mt-0.5" /> : (
+              <p className="text-lg font-semibold leading-none font-mono" data-testid="text-total-receivables">{formatCashAmount(totalReceivables)}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Search + customer table */}
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search customers..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+            data-testid="input-search-customers"
+          />
+        </div>
+
+        {isLoading ? (
+          <div className="space-y-2">
+            {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+          </div>
+        ) : filteredCustomers.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p className="text-lg font-medium">{searchQuery ? "No customers found" : "No customers yet"}</p>
+            <p className="text-sm mt-1">{searchQuery ? "Try a different search term" : "Create your first customer to get started"}</p>
+          </div>
+        ) : (
+          <div className="border rounded-xl overflow-hidden">
             <div className="table-responsive">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
                     <TableHead className="text-xs">Customer Name</TableHead>
                     <TableHead className="text-xs hidden sm:table-cell">Phone</TableHead>
                     <TableHead className="text-xs text-right">Balance</TableHead>
@@ -303,7 +288,7 @@ export default function POSCustomers() {
                         </span>
                       </TableCell>
                       <TableCell className="text-sm hidden sm:table-cell text-muted-foreground">
-                        {customer.phone || "-"}
+                        {customer.phone || "—"}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         {formatCashAmount(customer.balance || 0)}
@@ -322,9 +307,9 @@ export default function POSCustomers() {
                 </TableBody>
               </Table>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </div>
 
       {/* Customer Statement Dialog */}
       <Dialog open={!!statementCustomer} onOpenChange={(open) => !open && setStatementCustomer(null)}>

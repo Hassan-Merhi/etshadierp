@@ -5139,7 +5139,7 @@ export class DbStorage implements IStorage {
         quantity: schema.salesItems.quantity,
         sellingPrice: schema.salesItems.sellingPrice,
         totalSales: schema.salesItems.totalSales,
-        posStation: schema.vouchers.posStation,
+        posStation: schema.vouchers.shiftId,
       })
       .from(schema.salesItems)
       .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))

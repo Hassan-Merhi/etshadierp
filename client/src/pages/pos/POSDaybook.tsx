@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/PageHeader";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import {
@@ -517,90 +516,59 @@ export default function POSDaybook() {
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-2 md:gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 p-3 pb-1 md:p-6 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium">
-              Sales
-            </CardTitle>
-            <Package className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-            {isLoading ? (
-              <Skeleton className="h-6 w-16" />
-            ) : (
-              <div className="text-xl md:text-2xl font-semibold" data-testid="text-transaction-count">
-                {salesTransactionCount}
-              </div>
+      {/* Stats pill bar */}
+      <div className="flex flex-wrap gap-3">
+        <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
+          <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">Sales</p>
+            {isLoading ? <Skeleton className="h-5 w-10 mt-0.5" /> : (
+              <p className="text-lg font-semibold leading-none" data-testid="text-transaction-count">{salesTransactionCount}</p>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 p-3 pb-1 md:p-6 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium">
-              Total
-            </CardTitle>
-            <DollarSign className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-            {isLoading ? (
-              <Skeleton className="h-6 w-20" />
-            ) : (
-              <div className="text-lg md:text-2xl font-semibold" data-testid="text-total-sales">
-                {formatCashAmount(totalSales)}
-              </div>
+          </div>
+        </div>
+        <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
+          <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">Total Revenue</p>
+            {isLoading ? <Skeleton className="h-5 w-20 mt-0.5" /> : (
+              <p className="text-lg font-semibold leading-none font-mono" data-testid="text-total-sales">{formatCashAmount(totalSales)}</p>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 p-3 pb-1 md:p-6 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium">
-              Average
-            </CardTitle>
-            <Calendar className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-            {isLoading ? (
-              <Skeleton className="h-6 w-20" />
-            ) : (
-              <div className="text-lg md:text-2xl font-semibold" data-testid="text-avg-transaction">
+          </div>
+        </div>
+        <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
+          <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">Avg per Sale</p>
+            {isLoading ? <Skeleton className="h-5 w-16 mt-0.5" /> : (
+              <p className="text-lg font-semibold leading-none font-mono" data-testid="text-avg-transaction">
                 {formatCashAmount(salesTransactionCount > 0 ? totalSales / salesTransactionCount : 0)}
-              </div>
+              </p>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 p-3 pb-1 md:p-6 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium">
-              Transfers
-            </CardTitle>
-            <ArrowRight className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-            {isLoading ? (
-              <Skeleton className="h-6 w-16" />
-            ) : (
-              <div className="text-xl md:text-2xl font-semibold" data-testid="text-transfer-count">
-                {transferCount}
-              </div>
+          </div>
+        </div>
+        <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
+          <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">Transfers</p>
+            {isLoading ? <Skeleton className="h-5 w-10 mt-0.5" /> : (
+              <p className="text-lg font-semibold leading-none" data-testid="text-transfer-count">{transferCount}</p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
-          <CardTitle className="text-base">
+      {/* Transactions table */}
+      <div>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <p className="text-sm font-semibold">
             Transactions
             {hiddenRowIds.size > 0 && !showHidden && (
               <span className="text-sm font-normal text-muted-foreground ml-2">
                 ({visibleVouchers.length} of {salesVouchers.length})
               </span>
             )}
-          </CardTitle>
+          </p>
           <div className="flex items-center gap-2">
             <Button
               variant={showHidden ? "secondary" : "outline"}
@@ -629,25 +597,25 @@ export default function POSDaybook() {
               </Button>
             )}
           </div>
-        </CardHeader>
-        <CardContent>
-          {isLoadingUser || isLoading ? (
-            <div className="space-y-2">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : salesVouchers.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium">No transactions found</p>
-              <p className="text-sm mt-1">Sales and transfers will appear here for the selected period</p>
-            </div>
-          ) : (
+        </div>
+        {isLoadingUser || isLoading ? (
+          <div className="space-y-2 mt-1">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
+          </div>
+        ) : salesVouchers.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p className="text-lg font-medium">No transactions found</p>
+            <p className="text-sm mt-1">Sales and transfers will appear here for the selected period</p>
+          </div>
+        ) : (
+          <div className="border rounded-xl overflow-hidden">
             <div className="table-responsive">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
                     <TableHead className="text-xs">Time</TableHead>
                     <TableHead className="text-xs">Type</TableHead>
                     <TableHead className="text-xs hidden sm:table-cell">Location</TableHead>
@@ -739,9 +707,9 @@ export default function POSDaybook() {
                 </TableBody>
               </Table>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </div>
 
       {/* Hidden row-level reprint template (outside dialog, always in DOM) */}
       <div className="hidden">
