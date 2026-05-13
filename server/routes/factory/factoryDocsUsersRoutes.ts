@@ -723,6 +723,33 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
     }
   });
 
+  // DELETE /api/factory/daybook/entry/:id — Hard delete a non-voucher-backed entry (admin/developer only)
+  app.delete("/api/factory/daybook/entry/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const session = req.session as any;
+      const companyId = session.factoryCompanyId || session.currentCompanyId;
+      const role = (session.currentRole || session.role || "").toLowerCase();
+      if (role !== "admin" && role !== "developer") {
+        return res.status(403).json({ message: "Only Admin or Developer can permanently delete entries" });
+      }
+      const id = Number(req.params.id);
+      if (isNaN(id) || id <= 0) return res.status(400).json({ message: "Invalid entry ID — only real (non-synthetic) entries can be hard deleted" });
+
+      const [entry] = await db.select().from(factoryDaybookEntries)
+        .where(and(eq(factoryDaybookEntries.id, id), eq(factoryDaybookEntries.companyId, companyId)));
+      if (!entry) return res.status(404).json({ message: "Entry not found" });
+
+      if (entry.referenceTable === "vouchers" && entry.referenceId) {
+        return res.status(400).json({ message: "Voucher-backed entries must be voided, not deleted" });
+      }
+
+      await db.delete(factoryDaybookEntries).where(eq(factoryDaybookEntries.id, id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // DELETE /api/factory/daybook/entry/:id/void — Void a voucher-backed daybook entry
   app.delete("/api/factory/daybook/entry/:id/void", requireAuth, async (req: any, res: any) => {
     try {

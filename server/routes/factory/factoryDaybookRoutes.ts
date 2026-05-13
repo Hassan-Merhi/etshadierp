@@ -108,6 +108,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
         amountCurrency: string;
         amountUsd: string;
         fxRateToUsd: string;
+        voucherNumber: string;
       }>();
       if (voucherRefIds.length > 0) {
         const liveVouchers = await db
@@ -138,6 +139,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
             amountCurrency: String(amtCurrency),
             amountUsd: String(amtUsd),
             fxRateToUsd: String(fxRate),
+            voucherNumber: v.voucherNumber || "",
           });
         });
       }
@@ -181,6 +183,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
                 amountCurrency: live.amountCurrency,
                 amountUsd: live.amountUsd,
                 fxRateToUsd: live.fxRateToUsd,
+                voucherNumber: live.voucherNumber,
               } : {}),
             };
           }
@@ -260,6 +263,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
               optional: !!v.optional,
               createdAt: v.createdAt,
               createdBy: null,
+              voucherNumber: v.voucherNumber || "",
             };
           });
       }

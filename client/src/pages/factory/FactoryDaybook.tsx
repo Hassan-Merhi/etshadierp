@@ -67,6 +67,7 @@ interface DaybookEntry {
   optional?: boolean;
   createdAt: string;
   createdBy: number | null;
+  voucherNumber?: string;
 }
 
 interface BaleMeta {
@@ -454,7 +455,10 @@ export default function FactoryDaybook() {
   const [editReason, setEditReason] = useState("");
   const [viewEntry, setViewEntry] = useState<DaybookEntry | null>(null);
   const [voidEntry, setVoidEntry] = useState<DaybookEntry | null>(null);
+  const [deleteEntry, setDeleteEntry] = useState<DaybookEntry | null>(null);
   const [isExportingDetailed, setIsExportingDetailed] = useState(false);
+  const [expandedInlineVoucherId, setExpandedInlineVoucherId] = useState<number | null>(null);
+  const [urlEntryHandled, setUrlEntryHandled] = useState(false);
 
   // ── Derive API date params from periodFilter ──────────────────────────────
   const startDate = periodFilter.fromDate;
@@ -511,6 +515,43 @@ export default function FactoryDaybook() {
       return res.json();
     },
   });
+
+  const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
+  const hiddenErpCosts: string[] = myErpPages?.hiddenErpCostFields ?? [];
+  const showAmounts = isAdminOrOwner && !hiddenErpCosts.includes("daybook_amounts");
+
+  const { data: expandedInlineEntries = [], isLoading: expandedInlineLoading } = useQuery<any[]>({
+    queryKey: ["/api/vouchers", expandedInlineVoucherId, "view-entries"],
+    queryFn: () => fetch(`/api/vouchers/${expandedInlineVoucherId}/view-entries`, { credentials: "include" }).then((r) => r.json()),
+    enabled: !!expandedInlineVoucherId,
+  });
+
+  // ── URL deep link: ?entryId= or ?voucherId= on mount ─────────────────────
+  useEffect(() => {
+    if (urlEntryHandled || isLoading || entries.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const entryId = parseInt(params.get("entryId") ?? "");
+    const voucherId = parseInt(params.get("voucherId") ?? "");
+    if (!isNaN(entryId) && entryId !== 0) {
+      const found = entries.find((e) => e.id === entryId);
+      if (found) {
+        setViewEntry(found);
+        setUrlEntryHandled(true);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("entryId");
+        window.history.replaceState({}, "", url.toString());
+      }
+    } else if (!isNaN(voucherId) && voucherId !== 0) {
+      const found = entries.find((e) => e.referenceId === voucherId);
+      if (found) {
+        setViewEntry(found);
+        setUrlEntryHandled(true);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("voucherId");
+        window.history.replaceState({}, "", url.toString());
+      }
+    }
+  }, [entries, isLoading, urlEntryHandled]);
 
   // ── Client-side filters (search, amount range, status) ────────────────────
   const filteredEntries = useMemo(() => {
@@ -865,6 +906,22 @@ export default function FactoryDaybook() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (entryId: number) => {
+      const res = await factoryApiRequest("DELETE", `/api/factory/daybook/entry/${entryId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
+      setDeleteEntry(null);
+      toast({ title: "Entry deleted", description: "The daybook entry has been permanently removed." });
+    },
+    onError: (e: any) => {
+      if (e?._handledGlobally) return;
+      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+    },
+  });
+
   const openEditDialog = (entry: DaybookEntry) => {
     setEditEntry(entry);
     setEditDescription(entry.description);
@@ -913,6 +970,7 @@ export default function FactoryDaybook() {
     const canEditEntry = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId && entry.txType !== "BALE_STOCK_ENTRY";
     const rid = String(entry.id);
     const isHidden = hiddenRowIds.has(rid);
+    const canHardDelete = (currentUser?.role === "Admin" || currentUser?.role === "Developer") && !isVoucherBacked && entry.id > 0;
     return (
       <div className="flex gap-1">
         <Button size={size} variant="ghost" title="View details"
@@ -943,6 +1001,12 @@ export default function FactoryDaybook() {
             onClick={(e) => { e.stopPropagation(); setVoidEntry(entry); }}
             data-testid={`button-void-voucher-${entry.id}`}
           ><Trash2 className="h-3 w-3" /></Button>
+        )}
+        {canHardDelete && (
+          <Button size={size} variant="ghost" title="Permanently delete entry"
+            onClick={(e) => { e.stopPropagation(); setDeleteEntry(entry); }}
+            data-testid={`button-delete-${entry.id}`}
+          ><Trash2 className="h-3 w-3 text-destructive" /></Button>
         )}
       </div>
     );
@@ -1207,8 +1271,8 @@ export default function FactoryDaybook() {
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead className="w-full">Date</TableHead>
-                        {isAdminOrOwner && <TableHead className="text-right whitespace-nowrap">Amount</TableHead>}
-                        {isAdminOrOwner && hasNonUsdC && <TableHead className="text-right whitespace-nowrap">FX Rate</TableHead>}
+                        {showAmounts && <TableHead className="text-right whitespace-nowrap">Amount</TableHead>}
+                        {showAmounts && hasNonUsdC && <TableHead className="text-right whitespace-nowrap">FX Rate</TableHead>}
                         <TableHead className="w-0 p-0"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1236,7 +1300,7 @@ export default function FactoryDaybook() {
                                   </div>
                                 </div>
                               </TableCell>
-                              {isAdminOrOwner && (
+                              {showAmounts && (
                                 <TableCell className="py-4 text-right">
                                   <div className="font-mono font-semibold">{currencySymbol(row.currencyCode)}{formatNumber(row.totalAmountCurrency)}</div>
                                   {row.currencyCode !== "USD" && (
@@ -1244,7 +1308,7 @@ export default function FactoryDaybook() {
                                   )}
                                 </TableCell>
                               )}
-                              {isAdminOrOwner && hasNonUsdC && (
+                              {showAmounts && hasNonUsdC && (
                                 <TableCell className="py-4 text-right font-mono text-muted-foreground text-sm">
                                   {row.currencyCode === "USD" ? "—" : row.fxRateToUsd ? parseFloat(row.fxRateToUsd).toFixed(4) : "mixed"}
                                 </TableCell>
@@ -1275,9 +1339,9 @@ export default function FactoryDaybook() {
                                     </div>
                                   </TableCell>
                                   <TableCell className="py-2 text-right font-mono font-medium">
-                                    {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency))}
+                                    {showAmounts ? `${currencySymbol(entry.currencyCode)}${formatNumber(parseFloat(entry.amountCurrency))}` : "—"}
                                   </TableCell>
-                                  {hasNonUsdC && (
+                                  {showAmounts && hasNonUsdC && (
                                     <TableCell className="py-2 text-right font-mono text-muted-foreground">
                                       {entry.currencyCode === "USD" ? "-" : entry.fxRateToUsd ? parseFloat(entry.fxRateToUsd).toFixed(4) : "-"}
                                     </TableCell>
@@ -1347,7 +1411,7 @@ export default function FactoryDaybook() {
                             <Badge variant="outline" className="text-xs text-muted-foreground">Hidden</Badge>
                           )}
                         </div>
-                        {isAdminOrOwner && (
+                        {showAmounts && (
                           <span className="font-mono font-medium text-sm whitespace-nowrap">
                             {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency || "0"))}
                           </span>
@@ -1372,8 +1436,8 @@ export default function FactoryDaybook() {
                     <TableRow>
                       <TableHead className="whitespace-nowrap">Date</TableHead>
                       <TableHead className="w-full">Description</TableHead>
-                      {isAdminOrOwner && <TableHead className="text-right whitespace-nowrap">Amount</TableHead>}
-                      {isAdminOrOwner && hasNonUsd && <TableHead className="text-right whitespace-nowrap">FX Rate</TableHead>}
+                      {showAmounts && <TableHead className="text-right whitespace-nowrap">Amount</TableHead>}
+                      {showAmounts && hasNonUsd && <TableHead className="text-right whitespace-nowrap">FX Rate</TableHead>}
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1384,14 +1448,16 @@ export default function FactoryDaybook() {
                       const rid = String(entry.id);
                       const isHidden = hiddenRowIds.has(rid);
                       const isBaleTransfer = entry.txType === "BALE_TRANSFER";
+                      const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
+                      const isInlineExpanded = isVoucherBacked && expandedInlineVoucherId === entry.referenceId;
                       const { variant: bv, className: bc } = getFactoryTxTypeBadge(entry.txType);
                       const showDateSep = entry.txDate !== prevDate;
                       if (showDateSep) prevDate = entry.txDate;
-                      const colSpan = 2 + (isAdminOrOwner ? 1 : 0) + (isAdminOrOwner && hasNonUsd ? 1 : 0) + 1;
+                      const colSpan = 2 + (showAmounts ? 1 : 0) + (showAmounts && hasNonUsd ? 1 : 0) + 1;
                       const dayEntries = showDateSep
                         ? visibleEntries.filter((e) => e.txDate === entry.txDate)
                         : [];
-                      const dayTotal = isAdminOrOwner && showDateSep
+                      const dayTotal = showAmounts && showDateSep
                         ? dayEntries.reduce((s, e) => s + parseFloat(e.amountUsd || e.amountCurrency || "0"), 0)
                         : 0;
                       return (
@@ -1403,7 +1469,7 @@ export default function FactoryDaybook() {
                                   <span className="font-semibold text-sm">{formatDisplayDate(entry.txDate + "T00:00:00")}</span>
                                   <div className="flex items-center gap-3">
                                     <span className="text-xs text-muted-foreground">{dayEntries.length} {dayEntries.length === 1 ? "entry" : "entries"}</span>
-                                    {isAdminOrOwner && (
+                                    {showAmounts && (
                                       <span className="font-mono text-sm font-medium">${formatNumber(dayTotal)}</span>
                                     )}
                                   </div>
@@ -1416,14 +1482,24 @@ export default function FactoryDaybook() {
                           data-testid={`row-daybook-${entry.id}`}
                           data-row-id={rid}
                           className={cn(
-                            isBaleTransfer ? "cursor-pointer hover-elevate" : "",
+                            (isBaleTransfer || isVoucherBacked) ? "cursor-pointer hover-elevate" : "",
                             entry.optional && "opacity-60",
                             selectedRowId === rid && "bg-accent/20",
                             isHidden && showHidden && "opacity-40",
+                            isInlineExpanded && "bg-accent/10",
                           )}
                           onClick={(e) => {
+                            if ((e.target as HTMLElement).closest("button")) return;
                             setSelectedRowId(rid);
-                            if (isBaleTransfer) handleEntryClick(entry, e);
+                            if (isBaleTransfer) {
+                              handleEntryClick(entry, e);
+                            } else if (isVoucherBacked) {
+                              if (isInlineExpanded) {
+                                setExpandedInlineVoucherId(null);
+                              } else {
+                                setExpandedInlineVoucherId(entry.referenceId);
+                              }
+                            }
                           }}
                         >
                           <TableCell className="whitespace-nowrap py-4">
@@ -1431,10 +1507,22 @@ export default function FactoryDaybook() {
                             <div className="text-xs text-muted-foreground mt-0.5 font-mono">
                               {formatDisplayTime(entry.createdAt)}
                             </div>
+                            {entry.voucherNumber && (
+                              <div className="text-xs text-muted-foreground font-mono mt-0.5" data-testid={`text-voucher-num-${entry.id}`}>
+                                {entry.voucherNumber}
+                              </div>
+                            )}
                             <div className="flex items-center gap-1 flex-wrap mt-1">
                               <Badge variant={bv} className={cn(bc, "whitespace-nowrap")} data-testid={`badge-type-${entry.id}`}>
                                 {formatTxType(entry.txType)}
                               </Badge>
+                              {isVoucherBacked && (
+                                <span className="text-muted-foreground" title={isInlineExpanded ? "Collapse entries" : "Expand ledger entries"}>
+                                  {isInlineExpanded
+                                    ? <ChevronDown className="h-3 w-3 inline" />
+                                    : <ChevronRight className="h-3 w-3 inline" />}
+                                </span>
+                              )}
                               {entry.optional && (
                                 <Badge variant="outline" className="text-muted-foreground text-xs" data-testid={`badge-optional-${entry.id}`}>
                                   Optional
@@ -1448,7 +1536,7 @@ export default function FactoryDaybook() {
                           <TableCell className="py-4 max-w-xs truncate" title={formatDaybookDescription(entry)}>
                             {formatDaybookDescription(entry)}
                           </TableCell>
-                          {isAdminOrOwner && (
+                          {showAmounts && (
                             <TableCell className="py-4 text-right">
                               <div className="font-mono font-semibold">{currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency || "0"))}</div>
                               {entry.currencyCode !== "USD" && parseFloat(entry.amountUsd || "0") > 0 && (
@@ -1456,7 +1544,7 @@ export default function FactoryDaybook() {
                               )}
                             </TableCell>
                           )}
-                          {isAdminOrOwner && hasNonUsd && (
+                          {showAmounts && hasNonUsd && (
                             <TableCell className="py-4 text-right font-mono text-muted-foreground text-sm">
                               {entry.currencyCode === "USD" ? "—" : parseFloat(entry.fxRateToUsd).toFixed(4)}
                             </TableCell>
@@ -1465,6 +1553,40 @@ export default function FactoryDaybook() {
                             {renderEntryActions(entry)}
                           </TableCell>
                         </TableRow>
+                        {isInlineExpanded && (
+                          <TableRow key={`inline-expand-${entry.id}`} className="bg-muted/10">
+                            <TableCell colSpan={colSpan} className="p-0">
+                              <div className="px-8 py-3 border-t border-dashed border-muted">
+                                {expandedInlineLoading ? (
+                                  <div className="space-y-1.5">
+                                    {[1,2,3].map((i) => <Skeleton key={i} className="h-4 w-full" />)}
+                                  </div>
+                                ) : expandedInlineEntries.filter((e: any) => !e.isStockItem).length === 0 ? (
+                                  <p className="text-sm text-muted-foreground">No ledger entries found.</p>
+                                ) : (
+                                  <div className="space-y-0.5">
+                                    {expandedInlineEntries.filter((e: any) => !e.isStockItem).map((e: any, idx: number) => (
+                                      <div key={e.id ?? idx} className="flex items-center justify-between text-sm py-0.5 gap-4">
+                                        <span className="text-muted-foreground truncate max-w-sm">
+                                          {e.accountName || "—"}
+                                          {e.narration && <span className="ml-2 text-xs italic opacity-70">{e.narration}</span>}
+                                        </span>
+                                        <div className="flex items-center gap-6 font-mono text-xs shrink-0">
+                                          {parseFloat(e.debitAmount || "0") > 0 && (
+                                            <span className="text-foreground">Dr {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(e.debitAmount))}</span>
+                                          )}
+                                          {parseFloat(e.creditAmount || "0") > 0 && (
+                                            <span className="text-muted-foreground">Cr {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(e.creditAmount))}</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
                         </>
                       );
                     });
@@ -1559,6 +1681,30 @@ export default function FactoryDaybook() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Hard Delete Alert */}
+      <AlertDialog open={deleteEntry !== null} onOpenChange={(open) => { if (!open) setDeleteEntry(null); }}>
+        <AlertDialogContent data-testid="dialog-delete-entry">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently delete this entry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the daybook entry. This action cannot be undone.
+              {deleteEntry && <span className="block mt-2 font-medium text-foreground">{formatDaybookDescription(deleteEntry)}</span>}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteEntry && deleteMutation.mutate(deleteEntry.id)}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete Entry"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {AdminDialog}
     </div>
   );
