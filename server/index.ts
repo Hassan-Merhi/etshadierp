@@ -3178,131 +3178,138 @@ let migrationsDone = false;
       // For each overpaid row the excess is moved to the FIRST month that still has
       // remaining capacity (paid < rental_amount), searching forward month by month.
       // Safe to re-run — idempotent as long as data is already clean.
+      // Written as plain JS (not PL/pgSQL) so every step is logged and errors are visible.
       try {
-        await migrationClient.query(`
-          DO $$
-          DECLARE
-            overpaid     RECORD;
-            excess       NUMERIC;
-            rental_amt   NUMERIC;
-            check_year   INT;
-            check_month  INT;
-            check_paid   NUMERIC;
-            target_year  INT;
-            target_month INT;
-            i            INT;
-            now_year     INT;
-            now_month    INT;
-          BEGIN
-            now_year  := EXTRACT(YEAR  FROM CURRENT_DATE)::INT;
-            now_month := EXTRACT(MONTH FROM CURRENT_DATE)::INT;
+        const now = new Date();
+        const nowYear  = now.getFullYear();
+        const nowMonth = now.getMonth() + 1;
 
-            FOR overpaid IN
-              SELECT pml.*, pc.rental_amount
-              FROM property_monthly_ledger pml
-              JOIN property_contracts pc ON pc.id = pml.contract_id
-              WHERE (
-                -- Case A: current/past month paid beyond expected
-                (
-                  pml.expected_amount > 0
-                  AND pml.paid_amount > pml.expected_amount
-                  AND (
-                    pml.year < now_year
-                    OR (pml.year = now_year AND pml.month <= now_month)
-                  )
-                )
-                OR
-                -- Case B: future prepaid month paid beyond one full month's rent
-                (
-                  pml.expected_amount = 0
-                  AND pml.paid_amount > pc.rental_amount
-                  AND pc.rental_amount > 0
-                )
-              )
-              ORDER BY pml.contract_id, pml.year, pml.month
-            LOOP
-              rental_amt := overpaid.rental_amount;
+        const overpaidResult = await migrationClient.query(`
+          SELECT
+            pml.id,
+            pml.company_id,
+            pml.module,
+            pml.contract_id,
+            pml.unit_id,
+            pml.year,
+            pml.month,
+            pml.expected_amount::numeric AS expected_amount,
+            pml.paid_amount::numeric     AS paid_amount,
+            pc.rental_amount::numeric    AS rental_amount
+          FROM property_monthly_ledger pml
+          JOIN property_contracts pc ON pc.id = pml.contract_id
+          WHERE (
+            (
+              pml.expected_amount::numeric > 0
+              AND pml.paid_amount::numeric > pml.expected_amount::numeric
+              AND (pml.year < $1 OR (pml.year = $1 AND pml.month <= $2))
+            )
+            OR
+            (
+              pml.expected_amount::numeric = 0
+              AND pml.paid_amount::numeric > pc.rental_amount::numeric
+              AND pc.rental_amount::numeric > 0
+            )
+          )
+          ORDER BY pml.contract_id, pml.year, pml.month
+        `, [nowYear, nowMonth]);
 
-              -- Excess for Case A vs Case B
-              IF overpaid.expected_amount > 0 THEN
-                excess := overpaid.paid_amount - overpaid.expected_amount;
-              ELSE
-                excess := overpaid.paid_amount - rental_amt;
-              END IF;
+        console.log(`[RentalFix] Found ${overpaidResult.rows.length} overpaid ledger row(s) to fix`);
 
-              IF excess < 0.005 THEN CONTINUE; END IF;
+        for (const row of overpaidResult.rows) {
+          const paidAmt    = Number(row.paid_amount);
+          const expectedAmt = Number(row.expected_amount);
+          const rentalAmt  = Number(row.rental_amount);
 
-              -- Reduce the overpaid month by exactly the excess
-              UPDATE property_monthly_ledger
-              SET paid_amount = paid_amount - excess
-              WHERE id = overpaid.id;
+          const capacity = expectedAmt > 0 ? expectedAmt : rentalAmt;
+          const excess   = paidAmt - capacity;
 
-              -- Search forward from the next month for the first slot with remaining capacity
-              check_year  := overpaid.year;
-              check_month := overpaid.month;
-              -- Advance one month
-              check_month := check_month + 1;
-              IF check_month > 12 THEN check_month := 1; check_year := check_year + 1; END IF;
+          if (excess < 0.005) continue;
 
-              target_year  := NULL;
-              target_month := NULL;
+          console.log(`[RentalFix] contract=${row.contract_id} ledger=${row.id} ` +
+            `month=${row.year}/${row.month} paid=${paidAmt} capacity=${capacity} excess=${excess}`);
 
-              FOR i IN 1..200 LOOP
-                SELECT COALESCE(paid_amount, 0)
-                INTO check_paid
-                FROM property_monthly_ledger
-                WHERE contract_id = overpaid.contract_id
-                  AND year  = check_year
-                  AND month = check_month;
+          // 1. Reduce the overpaid row
+          await migrationClient.query(
+            `UPDATE property_monthly_ledger SET paid_amount = paid_amount - $1 WHERE id = $2`,
+            [excess.toFixed(2), row.id]
+          );
 
-                -- Slot is available if: row doesn't exist yet, OR paid < rental_amount
-                IF NOT FOUND OR check_paid < rental_amt THEN
-                  target_year  := check_year;
-                  target_month := check_month;
-                  EXIT;
-                END IF;
+          // 2. Search forward for the first month with remaining capacity
+          let checkYear  = row.year;
+          let checkMonth = row.month + 1;
+          if (checkMonth > 12) { checkMonth = 1; checkYear++; }
 
-                check_month := check_month + 1;
-                IF check_month > 12 THEN check_month := 1; check_year := check_year + 1; END IF;
-              END LOOP;
+          let targetYear: number | null  = null;
+          let targetMonth: number | null = null;
 
-              IF target_year IS NULL THEN CONTINUE; END IF;
+          for (let i = 0; i < 200; i++) {
+            const slotResult = await migrationClient.query(
+              `SELECT paid_amount::numeric AS paid_amount
+               FROM property_monthly_ledger
+               WHERE contract_id = $1 AND year = $2 AND month = $3`,
+              [row.contract_id, checkYear, checkMonth]
+            );
 
-              -- Create or top-up the target month (expected_amount = 0 → prepaid)
-              INSERT INTO property_monthly_ledger
-                (company_id, module, contract_id, unit_id, year, month, expected_amount, paid_amount, created_at)
-              SELECT
-                overpaid.company_id, overpaid.module, overpaid.contract_id, overpaid.unit_id,
-                target_year, target_month, 0, excess, NOW()
-              ON CONFLICT (contract_id, year, month)
-              DO UPDATE SET paid_amount = property_monthly_ledger.paid_amount + EXCLUDED.paid_amount;
+            const slotPaid = slotResult.rows.length > 0
+              ? Number(slotResult.rows[0].paid_amount)
+              : null;
 
-              -- Reassign the most-recently-created payment from the overpaid month
-              -- to the new target month (best-effort audit fix)
+            // Available if: row doesn't exist yet, OR paid < rental_amount
+            if (slotPaid === null || slotPaid < rentalAmt) {
+              targetYear  = checkYear;
+              targetMonth = checkMonth;
+              break;
+            }
+
+            checkMonth++;
+            if (checkMonth > 12) { checkMonth = 1; checkYear++; }
+          }
+
+          if (targetYear === null || targetMonth === null) {
+            console.warn(`[RentalFix] No target slot found for contract=${row.contract_id} ledger=${row.id} — skipping`);
+            continue;
+          }
+
+          console.log(`[RentalFix] → moving excess $${excess} to ${targetYear}/${targetMonth}`);
+
+          // 3. Create or top-up the target month
+          await migrationClient.query(`
+            INSERT INTO property_monthly_ledger
+              (company_id, module, contract_id, unit_id, year, month, expected_amount, paid_amount, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, 0, $7, NOW())
+            ON CONFLICT (contract_id, year, month)
+            DO UPDATE SET paid_amount = property_monthly_ledger.paid_amount + EXCLUDED.paid_amount
+          `, [row.company_id, row.module, row.contract_id, row.unit_id,
+              targetYear, targetMonth, excess.toFixed(2)]);
+
+          // 4. Reassign the most-recent payment from the overpaid month → target month
+          const newLedger = await migrationClient.query(
+            `SELECT id FROM property_monthly_ledger
+             WHERE contract_id = $1 AND year = $2 AND month = $3`,
+            [row.contract_id, targetYear, targetMonth]
+          );
+          if (newLedger.rows.length > 0) {
+            const newLedgerId = newLedger.rows[0].id;
+            await migrationClient.query(`
               UPDATE property_payments
-              SET
-                for_year      = target_year,
-                for_month     = target_month,
-                ledger_row_id = (
-                  SELECT id FROM property_monthly_ledger
-                  WHERE contract_id = overpaid.contract_id
-                    AND year  = target_year
-                    AND month = target_month
-                )
+              SET for_year = $1, for_month = $2, ledger_row_id = $3
               WHERE id = (
                 SELECT id FROM property_payments
-                WHERE contract_id = overpaid.contract_id
-                  AND for_year  = overpaid.year
-                  AND for_month = overpaid.month
+                WHERE contract_id = $4 AND for_year = $5 AND for_month = $6
                 ORDER BY created_at DESC
                 LIMIT 1
-              );
+              )
+            `, [targetYear, targetMonth, newLedgerId,
+                row.contract_id, row.year, row.month]);
+          }
 
-            END LOOP;
-          END $$;
-        `);
+          console.log(`[RentalFix] Done: contract=${row.contract_id} fixed ${row.year}/${row.month} → ${targetYear}/${targetMonth}`);
+        }
+
+        console.log("[RentalFix] Rental overpayment fix complete");
       } catch (e: any) {
-        console.warn("Rental cascade migration skipped:", e.message?.split('\n')[0]);
+        console.error("[RentalFix] Migration error:", e.message);
       }
 
       // Auto-fix sequence desyncs (can happen after data restores / bulk imports with explicit IDs)
