@@ -102,17 +102,8 @@ export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOpt
   const safeVoucher = voucherNumber.replace(/[^a-zA-Z0-9_-]/g, "_");
   const fileName = `Revised_Transfer_${safeVoucher}.png`;
 
-  const caption = [
-    `*Stock Transfer — Revised* ✏️`,
-    `Voucher: ${voucherNumber}`,
-    `Date: ${displayDate}`,
-    `From: ${sourceLocationName}`,
-    `To: ${destLocationName}`,
-    `Items revised: ${items.length}`,
-  ].join("\n");
-
   for (const chatId of chatIds) {
-    const result = await sendWhatsAppFileToChatId(chatId, pngBuffer, fileName, caption, "image/png");
+    const result = await sendWhatsAppFileToChatId(chatId, pngBuffer, fileName, "", "image/png");
     if (result.success) {
       console.log(`[RevisedTransferWA] Sent ${voucherNumber} revised image to group ${chatId}`);
     } else {

@@ -190,7 +190,7 @@ function buildRevisedHtml(data: RevisedTransferImageData): string {
       "<div class=\"header\">" +
         "<div class=\"title\">Stock Transfer</div>" +
         "<div class=\"subtitle\">&#9998; Revised</div>" +
-        "<div class=\"date\">" + escHtml(data.date) + " &nbsp;·&nbsp; " + escHtml(data.voucherNumber) + "</div>" +
+        "<div class=\"date\">" + escHtml(data.date) + "</div>" +
       "</div>" +
       "<div class=\"route\">" +
         "<div class=\"loc-block\">" +
