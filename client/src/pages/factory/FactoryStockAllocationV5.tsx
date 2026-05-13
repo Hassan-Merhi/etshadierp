@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -530,10 +531,10 @@ export default function FactoryStockAllocationV5() {
             </Badge>
           )}
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <Button
             variant={hideZero ? "default" : "outline"}
-            size="default"
+            size="sm"
             onClick={() => setHideZero(v => !v)}
             data-testid="button-v5-toggle-zero"
           >
@@ -541,46 +542,65 @@ export default function FactoryStockAllocationV5() {
           </Button>
           <Button
             variant={showNegativeOnly ? "destructive" : "outline"}
-            size="default"
+            size="sm"
             onClick={() => setShowNegativeOnly(v => !v)}
             data-testid="button-v5-toggle-negative-only"
           >
-            {showNegativeOnly
-              ? `Negative Only (${rows.length})`
-              : `Show Negative Only`}
+            {showNegativeOnly ? `Negative Only (${rows.length})` : "Negative Only"}
           </Button>
-          <Button
-            variant="outline"
-            size="default"
-            onClick={() => setExportDialogOpen(true)}
-            disabled={rows.length === 0}
-            data-testid="button-v5-export-excel"
-          >
-            <FileDown className="h-4 w-4 mr-2" />Export Excel
+
+          <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setExportDialogOpen(true)}
+                disabled={rows.length === 0}
+                data-testid="button-v5-export-excel"
+              >
+                <FileDown className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Export Excel</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setRestoreDialogOpen(true)}
+                data-testid="button-v5-restore-cancelled"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Restore Cancelled</TooltipContent>
+          </Tooltip>
+
+          <Button size="sm" onClick={() => setCreateDrawerOpen(true)} data-testid="button-v5-open-create-proforma">
+            <Plus className="h-4 w-4 mr-1.5" />Create Proforma
           </Button>
-          <Button
-            variant="outline"
-            size="default"
-            onClick={() => setRestoreDialogOpen(true)}
-            data-testid="button-v5-restore-cancelled"
-          >
-            <RotateCcw className="h-4 w-4 mr-2" />Restore Cancelled
-          </Button>
-          <Button size="default" onClick={() => setCreateDrawerOpen(true)} data-testid="button-v5-open-create-proforma">
-            <Plus className="h-4 w-4 mr-2" />Create Proforma
-          </Button>
-          <Button
-            variant={refreshFlash ? "secondary" : "outline"}
-            size="default"
-            onClick={handleRefresh}
-            disabled={query.isFetching}
-            data-testid="button-v5-refresh"
-            className={cn(refreshFlash && "ring-2 ring-primary/40")}
-          >
-            {refreshFlash
-              ? <><CheckCircle2 className="h-4 w-4 mr-2 text-primary" />Refreshed</>
-              : <><RefreshCw className="h-4 w-4 mr-2" />Refresh</>}
-          </Button>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={refreshFlash ? "secondary" : "outline"}
+                size="icon"
+                onClick={handleRefresh}
+                disabled={query.isFetching}
+                data-testid="button-v5-refresh"
+                className={cn(refreshFlash && "ring-2 ring-primary/40")}
+              >
+                {refreshFlash
+                  ? <CheckCircle2 className="h-4 w-4 text-primary" />
+                  : <RefreshCw className="h-4 w-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{refreshFlash ? "Refreshed" : "Refresh"}</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
