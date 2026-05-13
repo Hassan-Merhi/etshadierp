@@ -9,8 +9,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { NotebookPen, Save, Check } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const NOTES_KEY = "/api/user/notes";
 const DEBOUNCE_MS = 1200;
@@ -50,12 +54,15 @@ export function UserNotesPanel() {
     },
   });
 
-  const scheduleSave = useCallback((value: string) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      saveMutation.mutate(value);
-    }, DEBOUNCE_MS);
-  }, [saveMutation]);
+  const scheduleSave = useCallback(
+    (value: string) => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        saveMutation.mutate(value);
+      }, DEBOUNCE_MS);
+    },
+    [saveMutation],
+  );
 
   function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const value = e.target.value;
@@ -88,21 +95,19 @@ export function UserNotesPanel() {
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        data-testid="button-open-user-notes"
-        aria-label="Open my notes"
-        className={cn(
-          "fixed bottom-5 right-5 z-50",
-          "h-11 w-11 rounded-full",
-          "flex items-center justify-center",
-          "bg-primary text-primary-foreground shadow-md",
-          "transition-transform duration-150 hover:scale-105 active:scale-95",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        )}
-      >
-        <NotebookPen className="h-5 w-5" />
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={() => setOpen(true)}
+            data-testid="button-open-user-notes"
+            aria-label="My notes"
+            className="fixed bottom-5 left-5 z-50 h-11 w-11 rounded-full flex items-center justify-center bg-primary text-primary-foreground shadow-md transition-transform duration-150 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <NotebookPen className="h-5 w-5" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right">My notes</TooltipContent>
+      </Tooltip>
 
       <Sheet open={open} onOpenChange={handleOpenChange}>
         <SheetContent
