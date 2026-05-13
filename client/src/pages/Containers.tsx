@@ -864,7 +864,7 @@ export default function Containers() {
             <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-3 py-2">
               <span className="text-sm font-semibold font-mono text-primary" data-testid="text-total-amount">
                 {formatAmount(
-                  allContainers.reduce((sum, c) => {
+                  containers.reduce((sum, c) => {
                     const gTotal = parseFloat(c.grandTotal ?? "0");
                     return sum + (gTotal || parseFloat(c.itemsTotal ?? "0") || 0);
                   }, 0)
