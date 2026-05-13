@@ -7,6 +7,9 @@
 import { acquirePuppeteerSlot } from "../lib/puppeteerSemaphore";
 import { execSync } from "child_process";
 import { existsSync } from "fs";
+import { createRequire } from "module";
+
+const _require = createRequire(import.meta.url);
 
 export interface TransferImageItem {
   name: string;
@@ -33,7 +36,7 @@ function getChromiumPath(): string | null {
   }
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pup = require("puppeteer");
+    const pup = _require("puppeteer");
     const p: string = typeof pup.executablePath === "function" ? pup.executablePath() : "";
     if (p && existsSync(p)) return p;
   } catch { /* not installed */ }
@@ -229,7 +232,7 @@ export async function generateTransferImageBuffer(data: TransferImageData): Prom
   let browser: any = null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const puppeteer = require("puppeteer");
+    const puppeteer = _require("puppeteer");
     const chromePath = getChromiumPath();
     browser = await puppeteer.launch({
       headless: "new",
