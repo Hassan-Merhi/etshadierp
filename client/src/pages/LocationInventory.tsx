@@ -2426,11 +2426,19 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       {/* Stock Items Table View (Single Group) */}
       {selectedLocationLocal && selectedGroup && (
         <div>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-            <h1 className="text-xl md:text-3xl font-bold">
-              {selectedGroup.groupName} - Stock Items
-            </h1>
-            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Layers className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-xl md:text-2xl font-bold leading-tight">
+                  {selectedGroup.groupName}
+                </h1>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{selectedLocationLocal.name} · Stock Items</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
               <Button
                 onClick={() => setShowZeroStock(v => !v)}
                 data-testid="button-show-zero-stock-items"
@@ -2447,12 +2455,33 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   data-testid="button-archive-stock-group"
                   className="gap-2 flex-1 sm:flex-none"
                 >
-                  <Archive className="h-4 w-4 mr-2" />
+                  <Archive className="h-4 w-4" />
                   Archive Stock Group
                 </Button>
               )}
             </div>
           </div>
+
+          {/* Stats bar */}
+          {!inventoryLoading && filteredStockItems.length > 0 && (
+            <div className="flex flex-wrap gap-3 mb-4">
+              <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
+                <Package className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold">{filteredStockItems.length.toLocaleString()}</span>
+                <span className="text-xs text-muted-foreground">Items</span>
+              </div>
+              <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
+                <span className="text-sm font-semibold font-mono">{Math.floor(filteredStockItems.reduce((s, i) => s + parseFloat(i.quantity || "0"), 0)).toLocaleString()}</span>
+                <span className="text-xs text-muted-foreground">BL total</span>
+              </div>
+              {!posUser && (
+                <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-3 py-2">
+                  <span className="text-sm font-semibold font-mono text-primary">{formatAmount(filteredStockItems.reduce((s, i) => s + parseFloat(i.totalValue || "0"), 0))}</span>
+                  <span className="text-xs text-muted-foreground">total value</span>
+                </div>
+              )}
+            </div>
+          )}
 
           <Card className="p-3 md:p-4 w-full">
             <div className="relative mb-4">
@@ -2621,14 +2650,14 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                         <tr
                           key={item.inventoryId}
                           data-testid={`row-item-desktop-${item.stockItemId}`}
-                          className={`border-t h-12 ${
+                          className={`border-t h-13 ${
                             index === selectedRowIndex 
                               ? (isNegative ? "bg-red-200 dark:bg-red-800/50 ring-2 ring-primary" : "bg-accent") 
-                              : (isNegative ? "bg-red-100 dark:bg-red-900/30" : "hover-elevate")
+                              : (isNegative ? "bg-rose-50 dark:bg-rose-950/30" : "hover-elevate")
                           }`}
                           onClick={() => setSelectedRowIndex(index)}
                         >
-                          <td className="px-3 font-medium">
+                          <td className="px-3 py-2.5 font-medium">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -2645,27 +2674,30 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           </td>
                           {showMovement ? (
                             <>
-                              <td className="px-3 text-right font-mono text-muted-foreground">
-                                {Math.floor(openingQty).toLocaleString()} BL
+                              <td className="px-3 text-right font-mono text-sm text-muted-foreground">
+                                {Math.floor(openingQty).toLocaleString()} <span className="text-xs">BL</span>
                               </td>
-                              <td className={`px-3 text-right font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>
-                                {Math.floor(closingQty).toLocaleString()} BL
+                              <td className={`px-3 text-right font-mono font-semibold ${isNegative ? "text-red-600" : ""}`}>
+                                {Math.floor(closingQty).toLocaleString()} <span className="text-xs font-normal text-muted-foreground">BL</span>
                               </td>
-                              <td className={`px-3 text-right font-mono font-medium ${isMovementNeg ? "text-red-600" : movement > 0 ? "text-green-600" : "text-muted-foreground"}`}>
-                                {movement > 0 ? "+" : ""}{Math.floor(movement).toLocaleString()} BL
+                              <td className={`px-3 text-right font-mono font-semibold ${isMovementNeg ? "text-red-600" : movement > 0 ? "text-green-600" : "text-muted-foreground"}`}>
+                                <span className="inline-flex items-center justify-end gap-1">
+                                  {movement > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : movement < 0 ? <TrendingDown className="h-3.5 w-3.5" /> : null}
+                                  {movement > 0 ? "+" : ""}{Math.floor(movement).toLocaleString()} <span className="text-xs font-normal">BL</span>
+                                </span>
                               </td>
                             </>
                           ) : (
-                            <td className={`px-3 text-right font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>
-                              {Math.floor(closingQty).toLocaleString()}<span className="ml-3">BL</span>
+                            <td className={`px-3 text-right font-mono font-semibold ${isNegative ? "text-red-600" : ""}`}>
+                              {Math.floor(closingQty).toLocaleString()}<span className="ml-2 text-xs font-normal text-muted-foreground">BL</span>
                             </td>
                           )}
                           {!posUser && (
                             <>
-                              <td className="px-3 text-right font-mono">
+                              <td className="px-3 text-right font-mono text-sm text-muted-foreground">
                                 {formatAmount(parseFloat(item.averageRate))}
                               </td>
-                              <td className="px-3 text-right font-mono font-medium">
+                              <td className="px-3 text-right font-mono font-semibold">
                                 {formatAmount(parseFloat(item.totalValue))}
                               </td>
                             </>
@@ -2724,11 +2756,19 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       {/* All Stock Items View */}
       {selectedLocationLocal && viewAllItems && (
         <div>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-            <h1 className="text-xl md:text-3xl font-bold">
-              {selectedLocationLocal.name} - All Stock Items
-            </h1>
-            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Warehouse className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-xl md:text-2xl font-bold leading-tight">
+                  {selectedLocationLocal.name}
+                </h1>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">All Stock Items</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
               <Button
                 onClick={() => setShowZeroStock(v => !v)}
                 data-testid="button-show-zero-stock-all-items"
@@ -2758,6 +2798,32 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               </Button>
             </div>
           </div>
+
+          {/* Stats bar */}
+          {!inventoryLoading && inventory.length > 0 && (
+            <div className="flex flex-wrap gap-3 mb-4">
+              <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
+                <Layers className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold">{stockGroups.length}</span>
+                <span className="text-xs text-muted-foreground">Groups</span>
+              </div>
+              <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
+                <Package className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold">{inventory.length.toLocaleString()}</span>
+                <span className="text-xs text-muted-foreground">Items</span>
+              </div>
+              <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
+                <span className="text-sm font-semibold font-mono">{Math.floor(inventory.reduce((s, i) => s + parseFloat(i.quantity || "0"), 0)).toLocaleString()}</span>
+                <span className="text-xs text-muted-foreground">BL total</span>
+              </div>
+              {!posUser && (
+                <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-3 py-2">
+                  <span className="text-sm font-semibold font-mono text-primary">{formatAmount(inventory.reduce((s, i) => s + parseFloat(i.totalValue || "0"), 0))}</span>
+                  <span className="text-xs text-muted-foreground">total value</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Printable area */}
           <div ref={printRef}>
@@ -3026,17 +3092,36 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                               <tbody>
                                 {Object.entries(groupedInventory).map(([groupCode, { name, items }]) => (
                                   <>
-                                    <tr key={`header-${groupCode}`} className="bg-muted/30">
-                                      <td colSpan={posUser ? 2 : 4} className="px-3 py-2 font-bold">
-                                        {name}
+                                    <tr key={`header-${groupCode}`} className="bg-muted/40 border-t">
+                                      <td className="px-3 py-2">
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                            <Layers className="h-3 w-3 text-primary" />
+                                          </div>
+                                          <span className="font-semibold text-sm">{name}</span>
+                                          <Badge variant="secondary" className="font-mono text-xs ml-1">
+                                            {items.length}
+                                          </Badge>
+                                        </div>
                                       </td>
+                                      <td className="px-3 py-2 text-right font-mono text-sm text-muted-foreground font-medium">
+                                        {Math.floor(items.reduce((s, i) => s + parseFloat(i.quantity || "0"), 0)).toLocaleString()} <span className="text-xs">BL</span>
+                                      </td>
+                                      {!posUser && (
+                                        <>
+                                          <td />
+                                          <td className="px-3 py-2 text-right font-mono text-sm text-muted-foreground font-medium">
+                                            {formatAmount(items.reduce((s, i) => s + parseFloat(i.totalValue || "0"), 0))}
+                                          </td>
+                                        </>
+                                      )}
                                     </tr>
                                     {items.map((item) => {
                                       const itemQty = parseFloat(item.quantity || "0");
                                       const isNegative = itemQty < 0;
                                       return (
-                                        <tr key={item.inventoryId} className={`border-t ${isNegative ? "bg-red-100 dark:bg-red-900/30" : "hover-elevate"}`}>
-                                          <td className="px-3 py-2">
+                                        <tr key={item.inventoryId} className={`border-t ${isNegative ? "bg-rose-50 dark:bg-rose-950/30" : "hover-elevate"}`}>
+                                          <td className="px-3 py-2.5 pl-6">
                                             <button
                                               onClick={() => navigate(`/locations/${item.locationId}/stock-items/${item.stockItemId}/history`)}
                                               className="text-left text-primary hover:underline cursor-pointer"
@@ -3048,15 +3133,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                               </span>
                                             </button>
                                           </td>
-                                          <td className={`px-3 py-2 text-right font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>
-                                            {Math.floor(itemQty).toLocaleString()}<span className="ml-3">BL</span>
+                                          <td className={`px-3 text-right font-mono font-semibold ${isNegative ? "text-red-600" : ""}`}>
+                                            {Math.floor(itemQty).toLocaleString()}<span className="ml-2 text-xs font-normal text-muted-foreground">BL</span>
                                           </td>
                                           {!posUser && (
                                             <>
-                                              <td className="px-3 py-2 text-right font-mono">
+                                              <td className="px-3 text-right font-mono text-sm text-muted-foreground">
                                                 {formatAmount(parseFloat(item.averageRate))}
                                               </td>
-                                              <td className="px-3 py-2 text-right font-mono font-medium">
+                                              <td className="px-3 text-right font-mono font-semibold">
                                                 {formatAmount(parseFloat(item.totalValue))}
                                               </td>
                                             </>
