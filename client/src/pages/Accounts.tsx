@@ -1962,9 +1962,6 @@ export default function Accounts() {
                         {selectedAccount.name}
                       </span>
                     </div>
-                    <Badge variant="secondary" className="text-xs capitalize shrink-0">
-                      {selectedAccount.type}
-                    </Badge>
                   </div>
 
                   {/* Balance */}
