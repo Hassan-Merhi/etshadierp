@@ -50,6 +50,7 @@ import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositio
 import path from "path";
 import fs from "fs";
 import { sendTransferWhatsApp } from "../helpers/sendTransferWhatsApp";
+import { sendRevisedTransferWhatsApp } from "../helpers/sendRevisedTransferWhatsApp";
 
 export function registerFiscalTransferRoutes(app: Express) {
   app.post("/api/fiscal-period/close", requireAuth, async (req, res) => {
@@ -1313,7 +1314,7 @@ export function registerFiscalTransferRoutes(app: Express) {
 
       res.json({ ...revision, items: savedItems });
 
-      // Fire-and-forget: send transfer image for POS-submitted (optional) revisions only
+      // Fire-and-forget: send revised transfer image for POS-submitted (optional) revisions only
       if (isOptional) setImmediate(async () => {
           try {
             const [transfer] = await db
@@ -1336,15 +1337,16 @@ export function registerFiscalTransferRoutes(app: Express) {
             const uniqueSrcNames = [...new Set(items.map((i: any) => i.sourceLocationName).filter(Boolean))];
             const sourceName = uniqueSrcNames.length === 1 ? uniqueSrcNames[0] : "Multiple Sources";
 
-            const waItems = items
-              .filter((i: any) => parseFloat(i.newQuantity) > 0)
-              .map((i: any) => ({
-                stockItemId: Number(i.stockItemId),
-                quantity: parseFloat(i.newQuantity),
-              }));
+            const waItems = items.map((i: any) => ({
+              stockItemId: Number(i.stockItemId),
+              stockItemName: i.stockItemName ?? null,
+              originalQuantity: parseFloat(i.originalQuantity) || 0,
+              delta: parseFloat(i.delta) || 0,
+              newQuantity: parseFloat(i.newQuantity) || 0,
+            }));
             if (waItems.length === 0) return;
 
-            await sendTransferWhatsApp({
+            await sendRevisedTransferWhatsApp({
               destinationLocationId: transfer.destinationLocationId,
               sourceLocationName: sourceName,
               destLocationName: destLoc?.name ?? "Unknown",
@@ -1353,7 +1355,7 @@ export function registerFiscalTransferRoutes(app: Express) {
               voucherDate: voucherRow.voucherDate,
             });
           } catch (e: any) {
-            console.error("[TransferWA] Failed to send (revision):", e.message);
+            console.error("[RevisedTransferWA] Failed to send (revision):", e.message);
           }
         });
     } catch (error: any) {

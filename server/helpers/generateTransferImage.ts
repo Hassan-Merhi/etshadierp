@@ -119,6 +119,139 @@ function buildHtml(data: TransferImageData): string {
     "</body></html>";
 }
 
+// ── Revised Transfer Image ────────────────────────────────────────────────────
+
+export interface RevisedTransferItem {
+  name: string;
+  uom: string;
+  before: number;
+  delta: number;
+  after: number;
+}
+
+export interface RevisedTransferImageData {
+  voucherNumber: string;
+  date: string;
+  sourceLocationName: string;
+  destLocationName: string;
+  items: RevisedTransferItem[];
+}
+
+function buildRevisedHtml(data: RevisedTransferImageData): string {
+  const rows = data.items.map((item) => {
+    const deltaStr = item.delta > 0
+      ? `+${formatQty(item.delta)}`
+      : formatQty(item.delta);
+    const deltaColor = item.delta > 0 ? "#16a34a" : item.delta < 0 ? "#dc2626" : "#94a3b8";
+    return (
+      "<tr>" +
+      "<td class=\"item-name\">" + escHtml(item.name) + "</td>" +
+      "<td class=\"qty muted\">" + formatQty(item.before) + "</td>" +
+      "<td class=\"qty delta\" style=\"color:" + deltaColor + "\">" + deltaStr + "</td>" +
+      "<td class=\"qty after\">" + formatQty(item.after) + "</td>" +
+      "<td class=\"uom\">" + escHtml(item.uom) + "</td>" +
+      "</tr>"
+    );
+  }).join("");
+
+  return "<!DOCTYPE html>" +
+    "<html><head><meta charset=\"utf-8\"/><style>" +
+    "* { margin: 0; padding: 0; box-sizing: border-box; }" +
+    "body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; width: 640px; padding: 0; }" +
+    ".card { background: #ffffff; border-radius: 14px; overflow: hidden; margin: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.10); }" +
+    ".header { background: linear-gradient(135deg, #b45309 0%, #92400e 100%); padding: 20px 24px 16px; }" +
+    ".title { color: #ffffff; font-size: 20px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }" +
+    ".subtitle { color: #fde68a; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-top: 2px; }" +
+    ".date { color: #fef3c7; font-size: 13px; margin-top: 5px; font-weight: 500; }" +
+    ".route { background: #f8fafc; padding: 14px 24px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #e2e8f0; }" +
+    ".loc-block { flex: 1; }" +
+    ".loc-label { color: #94a3b8; font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; margin-bottom: 3px; }" +
+    ".loc-name { color: #1e293b; font-size: 16px; font-weight: 700; }" +
+    ".arrow { color: #b45309; font-size: 22px; flex-shrink: 0; }" +
+    ".items-section { padding: 0 24px 8px; background: #ffffff; }" +
+    ".items-header { display: flex; padding: 10px 0 6px; border-bottom: 2px solid #e2e8f0; }" +
+    ".col-name { flex: 1; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }" +
+    ".col-qty { width: 72px; text-align: right; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }" +
+    ".col-uom { width: 50px; text-align: right; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }" +
+    "table { width: 100%; border-collapse: collapse; }" +
+    "table tr:not(:last-child) td { border-bottom: 1px solid #f1f5f9; }" +
+    "table td { padding: 10px 0; vertical-align: middle; }" +
+    "td.item-name { color: #334155; font-size: 13px; padding-right: 8px; font-weight: 500; }" +
+    "td.qty { width: 72px; text-align: right; font-size: 14px; font-weight: 800; }" +
+    "td.muted { color: #94a3b8; }" +
+    "td.delta { font-size: 15px; }" +
+    "td.after { color: #1d4ed8; }" +
+    "td.uom { width: 50px; text-align: right; color: #94a3b8; font-size: 11px; padding-left: 4px; font-weight: 600; }" +
+    ".footer { background: #fffbeb; padding: 13px 24px; border-top: 2px solid #fde68a; display: flex; justify-content: space-between; align-items: center; }" +
+    ".badge { background: #b45309; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; padding: 3px 10px; border-radius: 20px; }" +
+    ".items-count { color: #92400e; font-size: 13px; font-weight: 700; }" +
+    "</style></head><body>" +
+    "<div class=\"card\">" +
+      "<div class=\"header\">" +
+        "<div class=\"title\">Stock Transfer</div>" +
+        "<div class=\"subtitle\">&#9998; Revised</div>" +
+        "<div class=\"date\">" + escHtml(data.date) + " &nbsp;·&nbsp; " + escHtml(data.voucherNumber) + "</div>" +
+      "</div>" +
+      "<div class=\"route\">" +
+        "<div class=\"loc-block\">" +
+          "<div class=\"loc-label\">From</div>" +
+          "<div class=\"loc-name\">" + escHtml(data.sourceLocationName) + "</div>" +
+        "</div>" +
+        "<div class=\"arrow\">&#8594;</div>" +
+        "<div class=\"loc-block\" style=\"text-align:right\">" +
+          "<div class=\"loc-label\">To</div>" +
+          "<div class=\"loc-name\">" + escHtml(data.destLocationName) + "</div>" +
+        "</div>" +
+      "</div>" +
+      "<div class=\"items-section\">" +
+        "<div class=\"items-header\">" +
+          "<div class=\"col-name\">Item</div>" +
+          "<div class=\"col-qty\">Before</div>" +
+          "<div class=\"col-qty\">Change</div>" +
+          "<div class=\"col-qty\">After</div>" +
+          "<div class=\"col-uom\">UOM</div>" +
+        "</div>" +
+        "<table>" + rows + "</table>" +
+      "</div>" +
+      "<div class=\"footer\">" +
+        "<span class=\"badge\">Revision</span>" +
+        "<span class=\"items-count\">" + data.items.length + " item" + (data.items.length !== 1 ? "s" : "") + " revised</span>" +
+      "</div>" +
+    "</div>" +
+    "</body></html>";
+}
+
+export async function generateRevisedTransferImageBuffer(data: RevisedTransferImageData): Promise<Buffer> {
+  const html = buildRevisedHtml(data);
+  const release = await acquirePuppeteerSlot();
+  let browser: any = null;
+  try {
+    const { default: puppeteer } = await import("puppeteer");
+    const chromePath = getChromiumPath();
+    browser = await puppeteer.launch({
+      headless: "new",
+      ...(chromePath ? { executablePath: chromePath } : {}),
+      args: [
+        "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
+        "--disable-gpu", "--disable-accelerated-2d-canvas", "--no-first-run",
+        "--no-zygote", "--disable-extensions", "--disable-background-networking",
+      ],
+    });
+    const page = await browser.newPage();
+    await page.setViewport({ width: 672, height: 900 });
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
+    await new Promise((r) => setTimeout(r, 300));
+    const cardEl = await page.$(".card");
+    const screenshot = cardEl
+      ? await cardEl.screenshot({ type: "png" })
+      : await page.screenshot({ type: "png", fullPage: true });
+    return Buffer.from(screenshot as Uint8Array);
+  } finally {
+    if (browser) { try { await browser.close(); } catch { /* ignore */ } }
+    release();
+  }
+}
+
 export async function generateTransferImageBuffer(data: TransferImageData): Promise<Buffer> {
   const html = buildHtml(data);
   const release = await acquirePuppeteerSlot();
