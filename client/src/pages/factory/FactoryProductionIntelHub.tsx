@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Trash2, Beaker } from "lucide-react";
+import { BarChart3, Trash2, Beaker, Ship } from "lucide-react";
 import ProductionSummary from "@/pages/factory/ProductionSummary";
 import FactoryWaste from "@/pages/factory/FactoryWaste";
 import FactoryMixOptimizer from "@/pages/factory/FactoryMixOptimizer";
+import FactoryContainerTracking from "@/pages/factory/FactoryContainerTracking";
 
-type Section = "production-summary" | "waste" | "mix-optimizer";
+type Section = "production-summary" | "waste" | "mix-optimizer" | "container-tracking";
 
 function getInitialSection(): Section {
   if (typeof window !== "undefined") {
     const s = new URLSearchParams(window.location.search).get("section");
     if (s === "waste") return "waste";
     if (s === "mix-optimizer") return "mix-optimizer";
+    if (s === "container-tracking") return "container-tracking";
   }
   return "production-summary";
 }
@@ -53,6 +55,10 @@ export default function FactoryProductionIntelHub() {
               <Beaker className="h-4 w-4 mr-2" />
               Mix Optimizer
             </TabsTrigger>
+            <TabsTrigger value="container-tracking" data-testid="tab-production-intel-container-tracking">
+              <Ship className="h-4 w-4 mr-2" />
+              Container Tracking
+            </TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="production-summary" className="flex-1 overflow-auto mt-0 p-4">
@@ -63,6 +69,9 @@ export default function FactoryProductionIntelHub() {
         </TabsContent>
         <TabsContent value="mix-optimizer" className="flex-1 overflow-auto mt-0 p-4">
           <FactoryMixOptimizer />
+        </TabsContent>
+        <TabsContent value="container-tracking" className="flex-1 overflow-auto mt-0 p-4">
+          <FactoryContainerTracking />
         </TabsContent>
       </Tabs>
     </div>

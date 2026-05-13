@@ -142,6 +142,8 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
           shippingInvoiceOriginalName: factoryShippingContainerRows.shippingInvoiceOriginalName,
           shippingInvoiceFileUrl: factoryShippingContainerRows.shippingInvoiceFileUrl,
           shippingInvoiceFileType: factoryShippingContainerRows.shippingInvoiceFileType,
+          trackingLink: factoryShippingContainerRows.trackingLink,
+          grandTotal: customerOrders.grandTotal,
         })
         .from(factoryShippingContainerRows)
         .innerJoin(customerOrders, eq(factoryShippingContainerRows.customerOrderId, customerOrders.id))
@@ -232,6 +234,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       if (req.body.containerArrivedDate !== undefined) patch.containerArrivedDate = req.body.containerArrivedDate || null;
       if (req.body.note !== undefined) patch.note = req.body.note || null;
       if (req.body.ciNumber !== undefined) patch.ciNumber = req.body.ciNumber || null;
+      if (req.body.trackingLink !== undefined) patch.trackingLink = req.body.trackingLink || null;
 
       const [updated] = await db
         .update(factoryShippingContainerRows)

@@ -5252,6 +5252,7 @@ export const factoryShippingContainerRows = pgTable("factory_shipping_container_
   shippingInvoiceFileUrl: text("shipping_invoice_file_url"),
   shippingInvoiceFileData: text("shipping_invoice_file_data"),
   shippingInvoiceFileType: text("shipping_invoice_file_type"),
+  trackingLink: text("tracking_link"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({

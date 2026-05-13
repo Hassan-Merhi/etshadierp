@@ -2955,6 +2955,8 @@ let migrationsDone = false;
     `ALTER TABLE container_documents ADD COLUMN IF NOT EXISTS file_data text`,
     // ETA column on shipping container rows (manual date entry)
     `ALTER TABLE factory_shipping_container_rows ADD COLUMN IF NOT EXISTS eta date`,
+    // Tracking link on shipping container rows (for container tracking tab)
+    `ALTER TABLE factory_shipping_container_rows ADD COLUMN IF NOT EXISTS tracking_link text`,
     `CREATE TABLE IF NOT EXISTS factory_shipping_availability (
       id serial PRIMARY KEY,
       company_id integer NOT NULL,
