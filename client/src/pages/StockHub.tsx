@@ -19,7 +19,6 @@ export default function StockHub() {
           <TabsTrigger value="items" data-testid="tab-stock-items">Items</TabsTrigger>
           <TabsTrigger value="query" data-testid="tab-stock-query">Query</TabsTrigger>
           <TabsTrigger value="offload" data-testid="tab-offload-search">Offload Search</TabsTrigger>
-          <TabsTrigger value="grades" data-testid="tab-grades-categories">Grades & Categories</TabsTrigger>
         </TabsList>
 
         <TabsContent value="items">
