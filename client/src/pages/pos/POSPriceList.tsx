@@ -362,12 +362,13 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                   data-testid={`button-location-${loc.id}`}
                   onClick={() => { setSelectedLocationId(loc.id); setSearch(""); setGroupFilter("all"); setEditingItem(null); setShowUnpriced(false); setHiddenUnpricedGroups(new Set()); }}
                   className={cn(
-                    "w-full text-left px-3 py-2 rounded-md text-sm transition-colors hover-elevate",
+                    "w-full text-left px-3 py-2 rounded-md text-sm transition-colors hover-elevate flex items-center gap-2",
                     selectedLocationId === loc.id
                       ? "bg-primary text-primary-foreground font-medium"
-                      : "text-sidebar-foreground"
+                      : "bg-sidebar-accent/30 text-sidebar-foreground hover:bg-sidebar-accent/50"
                   )}
                 >
+                  <MapPin className="w-3.5 h-3.5 shrink-0 opacity-60" />
                   {loc.name}
                 </button>
               ))}
@@ -380,7 +381,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0 flex-wrap">
           <Tag className="w-4 h-4 text-muted-foreground" />
-          <PageHeader title="Price List" />
+          <PageHeader title="Price List" showBackButton={false} />
           {isAllMode ? (
             <Badge variant="secondary" className="gap-1">
               <Layers className="w-3 h-3" />
