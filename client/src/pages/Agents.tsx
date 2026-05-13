@@ -6,7 +6,6 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -32,9 +31,11 @@ import {
   TrendingUp,
   TrendingDown,
   X,
-  ChevronLeft,
   FileDown,
   Printer,
+  Users,
+  ArrowRightLeft,
+  BookOpen,
 } from "lucide-react";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { useDateJump } from "@/hooks/use-date-jump";
@@ -94,6 +95,18 @@ function parseBalance(value: any): number {
   return isNaN(parsed) ? 0 : parsed;
 }
 
+const VOUCHER_TYPE_COLORS: Record<string, string> = {
+  "Payment":   "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+  "Receipt":   "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+  "Journal":   "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
+  "Invoice":   "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
+  "Purchase":  "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+};
+
+function voucherBadgeClass(type: string) {
+  return VOUCHER_TYPE_COLORS[type] ?? "bg-muted text-muted-foreground";
+}
+
 export default function Agents() {
   const { selectedCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
@@ -110,13 +123,11 @@ export default function Agents() {
 
   useEscapeBack(selectedAccount ? () => setSelectedAccount(null) : null);
 
-  // All accounts
   const { data: allAccounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
     queryKey: ["/api/accounts/all", selectedCompany?.id],
     enabled: !!selectedCompany,
   });
 
-  // Agent account list
   const { data: agentAccountRows = [], isLoading: agentsLoading } = useQuery<AgentAccount[]>({
     queryKey: ["/api/agent-accounts"],
     enabled: !!selectedCompany,
@@ -124,7 +135,6 @@ export default function Agents() {
 
   const agentIds = useMemo(() => new Set(agentAccountRows.map((a) => a.accountId)), [agentAccountRows]);
 
-  // Filtered agent accounts shown in left panel
   const agentAccounts = useMemo(() => {
     const searchLower = agentSearch.trim().toLowerCase();
     return allAccounts.filter((a) => {
@@ -134,7 +144,6 @@ export default function Agents() {
     });
   }, [allAccounts, agentIds, agentSearch]);
 
-  // Accounts not yet added (for the add dialog)
   const availableAccounts = useMemo(() => {
     const searchLower = addSearch.trim().toLowerCase();
     return allAccounts.filter((a) => {
@@ -144,7 +153,6 @@ export default function Agents() {
     });
   }, [allAccounts, agentIds, addSearch]);
 
-  // Transactions for selected account
   const accountTypeUrl = selectedAccount ? (selectedAccount.type || "").toLowerCase().replace(" ", "-") : null;
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
     queryKey: selectedAccount
@@ -163,7 +171,6 @@ export default function Agents() {
     enabled: !!selectedAccount,
   });
 
-  // Pre-period balance
   const { data: prePeriodData } = useQuery<{ balance: number }>({
     queryKey: selectedAccount && periodFilter.fromDate
       ? [`/api/accounts/${accountTypeUrl}/${selectedAccount.accountId}/pre-period-balance`, { endDate: periodFilter.fromDate }]
@@ -180,7 +187,6 @@ export default function Agents() {
     enabled: !!selectedAccount && !!periodFilter.fromDate,
   });
 
-  // Add agent mutation
   const addMutation = useMutation({
     mutationFn: async (account: Account) => {
       const res = await fetch("/api/agent-accounts", {
@@ -194,12 +200,11 @@ export default function Agents() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/agent-accounts"] });
-      toast({ title: "Account added to Agents" });
+      toast({ title: "Account added to Agent Ledger" });
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  // Remove agent mutation
   const removeMutation = useMutation({
     mutationFn: async (accountId: string) => {
       const res = await fetch(`/api/agent-accounts/${encodeURIComponent(accountId)}`, {
@@ -212,12 +217,11 @@ export default function Agents() {
     onSuccess: (_, accountId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/agent-accounts"] });
       if (selectedAccount?.id === accountId) setSelectedAccount(null);
-      toast({ title: "Account removed from Agents" });
+      toast({ title: "Account removed from Agent Ledger" });
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  // Group transactions by voucherId
   const groupTransactions = (): GroupedVoucher[] => {
     const map = new Map<number, GroupedVoucher>();
     transactions.forEach((txn) => {
@@ -273,6 +277,9 @@ export default function Agents() {
     ? (vouchersWithBalance[vouchersWithBalance.length - 1].runningBalance ?? openingBalance)
     : openingBalance;
 
+  const periodDebit  = vouchersWithBalance.reduce((s, v) => s + v.totalDebit,  0);
+  const periodCredit = vouchersWithBalance.reduce((s, v) => s + v.totalCredit, 0);
+
   const periodLabel = useMemo(() => {
     const hasStart = !!periodFilter.fromDate;
     const hasEnd = !!periodFilter.toDate;
@@ -311,253 +318,360 @@ export default function Agents() {
 
   return (
     <div className="flex h-full">
-      {/* Left panel — agent account list */}
-      <div className="w-72 shrink-0 border-r flex flex-col h-full overflow-hidden">
-        <div className="p-4 border-b space-y-3">
+      {/* Left panel — agent list */}
+      <div className="w-64 shrink-0 border-r flex flex-col h-full overflow-hidden">
+        {/* Panel header */}
+        <div className="px-4 py-3 border-b space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="font-semibold text-sm">Agents</h2>
-            <Button size="icon" variant="outline" onClick={() => { setAddSearch(""); setAddDialogOpen(true); }} data-testid="button-add-agent">
+            <span className="text-sm font-semibold">Agent Ledger</span>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => { setAddSearch(""); setAddDialogOpen(true); }}
+              data-testid="button-add-agent"
+            >
               <Plus className="h-4 w-4" />
             </Button>
           </div>
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Search agents..."
               value={agentSearch}
               onChange={(e) => setAgentSearch(e.target.value)}
-              className="pl-9"
+              className="pl-8 h-8 text-sm"
               data-testid="input-agent-search"
             />
           </div>
         </div>
+
+        {/* Agent list */}
         <div className="flex-1 overflow-y-auto">
           {agentsLoading || accountsLoading ? (
-            <div className="p-4 space-y-2">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+            <div className="p-3 space-y-1.5">
+              {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
             </div>
           ) : agentAccounts.length === 0 ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">
-              {agentIds.size === 0 ? "No agents yet. Click + to add accounts." : "No accounts match your search."}
+            <div className="flex flex-col items-center gap-2 py-12 px-4 text-center">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                <Users className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium">
+                {agentIds.size === 0 ? "No agents yet" : "No results"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {agentIds.size === 0 ? "Click + to pin an account as an agent" : "Try a different search"}
+              </p>
             </div>
           ) : (
-            agentAccounts.map((account) => (
-              <div
-                key={account.id}
-                className={`flex items-center border-b last:border-b-0 group ${selectedAccount?.id === account.id ? "bg-accent/40" : ""}`}
-                data-testid={`agent-row-${account.id}`}
-              >
-                <button
-                  className="flex-1 p-3 text-left hover-elevate"
-                  onClick={() => setSelectedAccount(account)}
-                  data-testid={`button-select-agent-${account.id}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm flex-1 truncate">{account.name}</span>
+            <div className="p-2 space-y-0.5">
+              {agentAccounts.map((account) => {
+                const isSelected = selectedAccount?.id === account.id;
+                return (
+                  <div
+                    key={account.id}
+                    className={`flex items-center rounded-lg group ${isSelected ? "bg-accent/50" : ""}`}
+                    data-testid={`agent-row-${account.id}`}
+                  >
+                    <button
+                      className={`flex-1 px-3 py-2.5 text-left rounded-lg hover-elevate min-w-0`}
+                      onClick={() => setSelectedAccount(account)}
+                      data-testid={`button-select-agent-${account.id}`}
+                    >
+                      <p className="text-sm font-medium truncate leading-tight">{account.name}</p>
+                      {account.balance !== 0 && (
+                        <p className="text-xs tabular-nums text-muted-foreground mt-0.5">
+                          {formatAmount(Math.abs(account.balance))}{" "}
+                          <span className={drCrClass(account.balanceSide)}>
+                            {account.balanceSide ?? ""}
+                          </span>
+                        </p>
+                      )}
+                    </button>
+                    <button
+                      className="p-2 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive shrink-0"
+                      onClick={() => removeMutation.mutate(account.id)}
+                      data-testid={`button-remove-agent-${account.id}`}
+                      title="Remove from Agent Ledger"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-                  {account.balance !== 0 && (
-                    <div className="mt-0.5 text-xs tabular-nums text-muted-foreground">
-                      {formatAmount(Math.abs(account.balance))}{" "}
-                      <span className={drCrClass(account.balanceSide)}>
-                        {account.balanceSide ?? ""}
-                      </span>
-                    </div>
-                  )}
-                </button>
-                <button
-                  className="p-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                  onClick={() => removeMutation.mutate(account.id)}
-                  data-testid={`button-remove-agent-${account.id}`}
-                  title="Remove from agents"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ))
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
 
       {/* Right panel — statement */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto">
         {!selectedAccount ? (
           <div className="h-full flex items-center justify-center">
-            <div className="text-center text-muted-foreground space-y-2">
-              <ChevronLeft className="h-10 w-10 mx-auto opacity-30" />
-              <p className="text-sm">Select an agent account to view its statement</p>
+            <div className="flex flex-col items-center gap-3 text-center">
+              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                <BookOpen className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium">No agent selected</p>
+              <p className="text-xs text-muted-foreground">Pick an agent from the list to view their ledger statement</p>
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
-            {/* Account summary card */}
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-4 flex-wrap">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Account</p>
-                    <p className="font-semibold" data-testid="text-agent-account-name">{selectedAccount.name}</p>
-                    <Badge variant="outline" className="text-xs mt-1">{selectedAccount.type}</Badge>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Current Balance</p>
-                    <div className="flex items-center gap-2">
-                      {selectedAccount.balanceSide?.toLowerCase() === "cr"
-                        ? <TrendingDown className="w-4 h-4 text-red-600" />
-                        : <TrendingUp className="w-4 h-4 text-green-600" />}
-                      <span className="font-mono font-semibold" data-testid="text-agent-balance">
-                        {formatAmount(Math.abs(selectedAccount.balance))}{" "}
-                        <span className={drCrClass(selectedAccount.balanceSide)}>{selectedAccount.balanceSide ?? ""}</span>
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 ml-auto">
-                    <Button variant="outline" size="sm" onClick={handleExportExcel} disabled={transactionsLoading || vouchersWithBalance.length === 0} data-testid="button-export-excel">
-                      <FileDown className="h-4 w-4 mr-1" />
-                      Excel
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handlePrint()} disabled={transactionsLoading} data-testid="button-print">
-                      <Printer className="h-4 w-4 mr-1" />
-                      Print
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedAccount(null)} data-testid="button-clear-account">
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="mt-3 pt-3 border-t">
-                  <PeriodFilter value={periodFilter} onChange={handlePeriodChange} />
-                </div>
-              </CardContent>
-            </Card>
+          <div className="p-6 space-y-5">
 
-            {/* Statement table */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Ledger: {selectedAccount.name}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {transactionsLoading ? (
-                  <div className="space-y-2">
-                    {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
-                  </div>
-                ) : (
-                  <div ref={printRef} className="print-container">
-                    {/* Print header */}
-                    <div className="hidden print:block" style={{ marginBottom: 16 }}>
-                      <div style={{ textAlign: "center" }}>
-                        <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{selectedCompany?.name}</h1>
-                        <h2 style={{ fontSize: 14, fontWeight: 600, margin: "4px 0 0" }}>Agent Statement: {selectedAccount.name}</h2>
-                      </div>
-                      <div style={{ borderTop: "1px solid #ccc", borderBottom: "1px solid #ccc", padding: "6px 0", fontSize: 11, marginTop: 8 }}>
-                        <div>Period: {periodLabel}</div>
-                        <div>Generated: {formatDisplayDate(new Date())}</div>
-                      </div>
-                    </div>
+            {/* Header row */}
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-lg font-semibold" data-testid="text-agent-account-name">
+                    {selectedAccount.name}
+                  </h2>
+                  <Badge
+                    variant="secondary"
+                    className="text-xs no-default-active-elevate bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 capitalize"
+                  >
+                    {selectedAccount.type}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-1.5 mt-1">
+                  {selectedAccount.balanceSide?.toLowerCase() === "cr"
+                    ? <TrendingDown className="w-3.5 h-3.5 text-red-500" />
+                    : <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />}
+                  <span className="text-sm font-mono font-semibold" data-testid="text-agent-balance">
+                    {formatAmount(Math.abs(selectedAccount.balance))}
+                  </span>
+                  <span className={`text-xs ${drCrClass(selectedAccount.balanceSide)}`}>
+                    {selectedAccount.balanceSide ?? ""}
+                  </span>
+                  <span className="text-xs text-muted-foreground">current balance</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportExcel}
+                  disabled={transactionsLoading || vouchersWithBalance.length === 0}
+                  data-testid="button-export-excel"
+                >
+                  <FileDown className="h-3.5 w-3.5 mr-1.5" />
+                  Excel
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePrint()}
+                  disabled={transactionsLoading}
+                  data-testid="button-print"
+                >
+                  <Printer className="h-3.5 w-3.5 mr-1.5" />
+                  Print
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSelectedAccount(null)}
+                  data-testid="button-clear-account"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
 
-                    <div className="rounded-md border table-responsive print:border-0">
-                      <Table>
-                        <TableHeader className="sticky top-0 z-30 bg-background">
-                          <TableRow className="bg-muted/30">
-                            <TableHead className="w-[110px] py-2">Date</TableHead>
-                            <TableHead className="w-[100px] py-2">Type</TableHead>
-                            <TableHead className="py-2">Particulars</TableHead>
-                            <TableHead className="text-right w-[120px] py-2">Debit</TableHead>
-                            <TableHead className="text-right w-[120px] py-2">Credit</TableHead>
-                            <TableHead className="text-right w-[130px] py-2">Balance</TableHead>
+            {/* Period filter */}
+            <div>
+              <PeriodFilter value={periodFilter} onChange={handlePeriodChange} />
+            </div>
+
+            {/* Stats pills */}
+            <div className="flex flex-wrap gap-3">
+              <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-2">
+                <ArrowRightLeft className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div>
+                  <p className="text-xs text-muted-foreground leading-none mb-1">Opening Balance</p>
+                  <p className="text-sm font-semibold font-mono leading-none">
+                    {formatAmount(Math.abs(openingBalance))}{" "}
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {openingBalance >= 0
+                        ? (selectedAccount.type === "supplier" ? "Cr" : "Dr")
+                        : (selectedAccount.type === "supplier" ? "Dr" : "Cr")}
+                    </span>
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-2">
+                <TrendingDown className="h-4 w-4 text-red-500 shrink-0" />
+                <div>
+                  <p className="text-xs text-muted-foreground leading-none mb-1">Period Debit</p>
+                  <p className="text-sm font-semibold font-mono leading-none">{formatAmount(periodDebit)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-2">
+                <TrendingUp className="h-4 w-4 text-emerald-600 shrink-0" />
+                <div>
+                  <p className="text-xs text-muted-foreground leading-none mb-1">Period Credit</p>
+                  <p className="text-sm font-semibold font-mono leading-none">{formatAmount(periodCredit)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-2">
+                <ArrowRightLeft className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div>
+                  <p className="text-xs text-muted-foreground leading-none mb-1">Closing Balance</p>
+                  <p className={`text-sm font-semibold font-mono leading-none ${closingBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                    {formatAmount(Math.abs(closingBalance))}{" "}
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {closingBalance >= 0
+                        ? (selectedAccount.type === "supplier" ? "Cr" : "Dr")
+                        : (selectedAccount.type === "supplier" ? "Dr" : "Cr")}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Ledger table */}
+            <div ref={printRef} className="print-container">
+              {/* Print-only header */}
+              <div className="hidden print:block mb-4">
+                <div className="text-center">
+                  <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{selectedCompany?.name}</h1>
+                  <h2 style={{ fontSize: 14, fontWeight: 600, margin: "4px 0 0" }}>Agent Ledger: {selectedAccount.name}</h2>
+                </div>
+                <div style={{ borderTop: "1px solid #ccc", borderBottom: "1px solid #ccc", padding: "6px 0", fontSize: 11, marginTop: 8 }}>
+                  <div>Period: {periodLabel}</div>
+                  <div>Generated: {formatDisplayDate(new Date())}</div>
+                </div>
+              </div>
+
+              <div className="border rounded-xl overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/40 hover:bg-muted/40">
+                      <TableHead className="text-xs h-9 font-semibold w-[120px]">Date</TableHead>
+                      <TableHead className="text-xs h-9 font-semibold w-[110px]">Type</TableHead>
+                      <TableHead className="text-xs h-9 font-semibold">Particulars</TableHead>
+                      <TableHead className="text-xs h-9 font-semibold text-right w-[130px]">Debit</TableHead>
+                      <TableHead className="text-xs h-9 font-semibold text-right w-[130px]">Credit</TableHead>
+                      <TableHead className="text-xs h-9 font-semibold text-right w-[140px]">Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {transactionsLoading ? (
+                      [...Array(5)].map((_, i) => (
+                        <TableRow key={i}>
+                          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <>
+                        {/* Opening Balance row */}
+                        <TableRow className="bg-muted/40 hover:bg-muted/40 font-semibold" data-testid="row-opening-balance">
+                          <TableCell className="py-2.5 text-xs text-muted-foreground uppercase tracking-wide" colSpan={3}>
+                            Opening Balance
+                          </TableCell>
+                          <TableCell className="py-2.5 text-right font-mono text-sm">
+                            {selectedAccount.type === "supplier"
+                              ? openingBalance < 0 ? formatAmount(Math.abs(openingBalance)) : "-"
+                              : openingBalance > 0 ? formatAmount(openingBalance) : "-"}
+                          </TableCell>
+                          <TableCell className="py-2.5 text-right font-mono text-sm">
+                            {selectedAccount.type === "supplier"
+                              ? openingBalance > 0 ? formatAmount(openingBalance) : "-"
+                              : openingBalance < 0 ? formatAmount(Math.abs(openingBalance)) : "-"}
+                          </TableCell>
+                          <TableCell className="py-2.5 text-right font-mono text-sm">
+                            {formatAmount(Math.abs(openingBalance))}{" "}
+                            <span className="text-xs text-muted-foreground font-normal">
+                              {openingBalance >= 0 ? (selectedAccount.type === "supplier" ? "Cr" : "Dr") : (selectedAccount.type === "supplier" ? "Dr" : "Cr")}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+
+                        {vouchersWithBalance.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6}>
+                              <div className="flex flex-col items-center gap-2 py-10 text-center">
+                                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                                  <ArrowRightLeft className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                                <p className="text-sm font-medium">No transactions</p>
+                                <p className="text-xs text-muted-foreground">No activity in this period</p>
+                              </div>
+                            </TableCell>
                           </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {/* Opening Balance */}
-                          <TableRow className="bg-accent/30 border-b-2" data-testid="row-opening-balance">
-                            <TableCell className="font-mono text-sm py-2" colSpan={3}>
-                              <span className="font-semibold">Opening Balance</span>
+                        ) : (
+                          vouchersWithBalance.map((v) => {
+                            const bal = v.runningBalance ?? 0;
+                            const dateKey = v.voucherDate.split("T")[0];
+                            const dateFmt = format(new Date(dateKey + "T00:00:00"), "dd MMM yyyy");
+                            const note = (v.narration?.trim()) || (v.voucherDescription?.trim()) || "";
+                            return (
+                              <TableRow key={v.voucherId} className="hover:bg-muted/30" data-testid={`row-voucher-${v.voucherId}`}>
+                                <TableCell className="py-2.5 font-mono text-sm whitespace-nowrap">{dateFmt}</TableCell>
+                                <TableCell className="py-2.5">
+                                  <Badge
+                                    variant="secondary"
+                                    className={`text-xs no-default-active-elevate ${voucherBadgeClass(v.voucherType)}`}
+                                  >
+                                    {v.voucherType}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="py-2.5">
+                                  <p className="text-xs text-muted-foreground font-mono">{v.voucherNumber}</p>
+                                  {note && <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-xs">{note}</p>}
+                                </TableCell>
+                                <TableCell className="py-2.5 text-right font-mono text-sm">
+                                  {v.totalDebit > 0 ? formatAmount(v.totalDebit) : <span className="text-muted-foreground">—</span>}
+                                </TableCell>
+                                <TableCell className="py-2.5 text-right font-mono text-sm">
+                                  {v.totalCredit > 0 ? formatAmount(v.totalCredit) : <span className="text-muted-foreground">—</span>}
+                                </TableCell>
+                                <TableCell className="py-2.5 text-right font-mono text-sm font-medium">
+                                  {formatAmount(Math.abs(bal))}{" "}
+                                  <span className={`text-xs font-normal ${bal >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                                    {bal >= 0
+                                      ? (selectedAccount.type === "supplier" ? "Cr" : "Dr")
+                                      : (selectedAccount.type === "supplier" ? "Dr" : "Cr")}
+                                  </span>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+
+                        {/* Closing Balance row */}
+                        {vouchersWithBalance.length > 0 && (
+                          <TableRow className="bg-muted/40 hover:bg-muted/40 font-semibold" data-testid="row-closing-balance">
+                            <TableCell colSpan={3} className="py-2.5 text-xs text-muted-foreground uppercase tracking-wide">
+                              Closing Balance
                             </TableCell>
-                            <TableCell className="text-right font-mono py-2">
-                              {selectedAccount.type === "supplier"
-                                ? openingBalance < 0 ? formatAmount(Math.abs(openingBalance)) : "-"
-                                : openingBalance > 0 ? formatAmount(openingBalance) : "-"}
+                            <TableCell className="py-2.5 text-right font-mono text-sm">
+                              {formatAmount(periodDebit)}
                             </TableCell>
-                            <TableCell className="text-right font-mono py-2">
-                              {selectedAccount.type === "supplier"
-                                ? openingBalance > 0 ? formatAmount(openingBalance) : "-"
-                                : openingBalance < 0 ? formatAmount(Math.abs(openingBalance)) : "-"}
+                            <TableCell className="py-2.5 text-right font-mono text-sm">
+                              {formatAmount(periodCredit)}
                             </TableCell>
-                            <TableCell className="text-right font-mono font-semibold py-2">
-                              {formatAmount(Math.abs(openingBalance))}{" "}
-                              <span className="text-xs text-muted-foreground">
-                                {openingBalance >= 0 ? (selectedAccount.type === "supplier" ? "Cr" : "Dr") : (selectedAccount.type === "supplier" ? "Dr" : "Cr")}
+                            <TableCell className="py-2.5 text-right font-mono text-sm">
+                              {formatAmount(Math.abs(closingBalance))}{" "}
+                              <span className="text-xs text-muted-foreground font-normal">
+                                {closingBalance >= 0
+                                  ? (selectedAccount.type === "supplier" ? "Cr" : "Dr")
+                                  : (selectedAccount.type === "supplier" ? "Dr" : "Cr")}
                               </span>
                             </TableCell>
                           </TableRow>
-
-                          {vouchersWithBalance.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
-                                No transactions found for this period
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            vouchersWithBalance.map((v) => {
-                              const bal = v.runningBalance ?? 0;
-                              const dateKey = v.voucherDate.split("T")[0];
-                              const dateFmt = format(new Date(dateKey + "T00:00:00"), "dd MMM yyyy");
-                              const note = (v.narration?.trim()) || (v.voucherDescription?.trim()) || "";
-                              return (
-                                <TableRow key={v.voucherId} className="hover:bg-muted/30" data-testid={`row-voucher-${v.voucherId}`}>
-                                  <TableCell className="font-mono text-sm py-2 whitespace-nowrap">{dateFmt}</TableCell>
-                                  <TableCell className="py-2">
-                                    <Badge variant="outline" className="text-xs">{v.voucherType}</Badge>
-                                  </TableCell>
-                                  <TableCell className="py-2 text-sm">
-                                    <div className="font-medium text-xs text-muted-foreground">{v.voucherNumber}</div>
-                                    {note && <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-xs">{note}</div>}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono text-sm py-2">
-                                    {v.totalDebit > 0 ? formatAmount(v.totalDebit) : "-"}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono text-sm py-2">
-                                    {v.totalCredit > 0 ? formatAmount(v.totalCredit) : "-"}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono text-sm py-2 font-medium">
-                                    {formatAmount(Math.abs(bal))}{" "}
-                                    <span className={`text-xs ${bal >= 0 ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}>
-                                      {bal >= 0
-                                        ? (selectedAccount.type === "supplier" ? "Cr" : "Dr")
-                                        : (selectedAccount.type === "supplier" ? "Dr" : "Cr")}
-                                    </span>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })
-                          )}
-
-                          {/* Closing Balance */}
-                          {vouchersWithBalance.length > 0 && (
-                            <TableRow className="bg-accent/30 border-t-2 font-semibold" data-testid="row-closing-balance">
-                              <TableCell colSpan={3} className="py-2 text-sm">Closing Balance</TableCell>
-                              <TableCell className="text-right font-mono py-2">
-                                {formatAmount(vouchersWithBalance.reduce((s, v) => s + v.totalDebit, 0))}
-                              </TableCell>
-                              <TableCell className="text-right font-mono py-2">
-                                {formatAmount(vouchersWithBalance.reduce((s, v) => s + v.totalCredit, 0))}
-                              </TableCell>
-                              <TableCell className="text-right font-mono py-2">
-                                {formatAmount(Math.abs(closingBalance))}{" "}
-                                <span className="text-xs text-muted-foreground">
-                                  {closingBalance >= 0
-                                    ? (selectedAccount.type === "supplier" ? "Cr" : "Dr")
-                                    : (selectedAccount.type === "supplier" ? "Dr" : "Cr")}
-                                </span>
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                        )}
+                      </>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -566,7 +680,7 @@ export default function Agents() {
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add Account to Agents</DialogTitle>
+            <DialogTitle>Add Account to Agent Ledger</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="relative">
@@ -580,7 +694,7 @@ export default function Agents() {
                 data-testid="input-add-agent-search"
               />
             </div>
-            <div className="max-h-80 overflow-y-auto border rounded-md divide-y">
+            <div className="max-h-80 overflow-y-auto border rounded-xl divide-y">
               {accountsLoading ? (
                 <div className="p-4 space-y-2">
                   {[1, 2, 3].map((i) => <Skeleton key={i} className="h-8 w-full" />)}
@@ -591,14 +705,17 @@ export default function Agents() {
                 availableAccounts.slice(0, 100).map((account) => (
                   <button
                     key={account.id}
-                    className="w-full p-3 text-left hover-elevate flex items-center gap-2"
+                    className="w-full px-4 py-3 text-left hover-elevate flex items-center gap-2"
                     onClick={() => {
                       addMutation.mutate(account);
                       setAddDialogOpen(false);
                     }}
                     data-testid={`button-add-account-${account.id}`}
                   >
-                    <span className="text-sm flex-1">{account.name}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{account.name}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{account.type}</p>
+                    </div>
                     {account.balance !== 0 && (
                       <span className="text-xs tabular-nums text-muted-foreground shrink-0">
                         {formatAmount(Math.abs(account.balance))}{" "}

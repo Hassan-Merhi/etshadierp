@@ -58,7 +58,7 @@ import {
 const defaultPinnedItems: NavItem[] = [
   { title: "Tracking",    url: "/tracking",             icon: Ship            },
   { title: "Dashboard",   url: "/financial-overview",  icon: LayoutDashboard },
-  { title: "Agents",      url: "/agents",              icon: UserRound       },
+  { title: "Agent Ledger", url: "/agents",              icon: UserRound       },
   { title: "Daybook",     url: "/daybook",             icon: Book            },
   { title: "All Daybook", url: "/transaction-journal", icon: ScrollText      },
   { title: "Vouchers",    url: "/vouchers",            icon: Receipt         },
