@@ -1820,8 +1820,8 @@ export default function FactorySuppliers() {
                         notes: p.notes,
                         onDelete: () => { wrapAdminAction(() => setPendingDelete(() => () => deletePaymentMutation.mutate(p.id)), "Delete Payment"); },
                         nativeImpact: -nativeAmt,
-                        rowCc: isCrossCurrency ? primaryCc : cc,
-                        rowNativeAmt: isCrossCurrency ? -nativeAmt : -amt,
+                        rowCc: primaryCc,
+                        rowNativeAmt: isCrossCurrency ? 0 : -amt,
                         conversionNote,
                       };
                     }),
@@ -1850,8 +1850,8 @@ export default function FactorySuppliers() {
                           optional: isOptional,
                           notes: vp.notes || null,
                           nativeImpact: isOptional ? 0 : -vpNativeAmt,
-                          rowCc: vpIsCross ? primaryCc : "USD",
-                          rowNativeAmt: isOptional ? 0 : (vpIsCross ? -vpNativeAmt : -usdAmt),
+                          rowCc: primaryCc,
+                          rowNativeAmt: isOptional ? 0 : (vpIsCross ? 0 : -usdAmt),
                           conversionNote: vpConversionNote,
                         };
                       }),
