@@ -53,19 +53,23 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
   // Collect all target chat IDs (deduped)
   const chatIds = new Set<string>();
 
-  // Look up destination location (gets companyId + location WA group in one query)
+  // Look up destination location
   const [destLoc] = await db
     .select({
-      companyId:           locations.companyId,
-      whatsappGroupChatId: locations.whatsappGroupChatId,
+      companyId:             locations.companyId,
+      transferWaGroupChatId: locations.transferWaGroupChatId,
     })
     .from(locations)
     .where(eq(locations.id, destinationLocationId));
 
   console.log(`[TransferWA] destLoc=${JSON.stringify(destLoc)}`);
 
-  // 1. Per-company transfer WA group from Settings
-  if (destLoc?.companyId) {
+  // 1. Per-location transfer WA group (takes priority — location-specific group)
+  if (destLoc?.transferWaGroupChatId) {
+    console.log(`[TransferWA] location.transferWaGroupChatId=${destLoc.transferWaGroupChatId}`);
+    chatIds.add(destLoc.transferWaGroupChatId);
+  } else if (destLoc?.companyId) {
+    // 2. Fall back to per-company transfer WA group from Settings
     const [company] = await db
       .select({ transferWaGroupChatId: companies.transferWaGroupChatId })
       .from(companies)
@@ -74,12 +78,6 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
     if (company?.transferWaGroupChatId) {
       chatIds.add(company.transferWaGroupChatId);
     }
-  }
-
-  // 2. Destination location's own WA group
-  if (destLoc?.whatsappGroupChatId) {
-    console.log(`[TransferWA] location.whatsappGroupChatId=${destLoc.whatsappGroupChatId}`);
-    chatIds.add(destLoc.whatsappGroupChatId);
   }
 
   if (chatIds.size === 0) {

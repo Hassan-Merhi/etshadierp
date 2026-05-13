@@ -176,6 +176,7 @@ export const locations = pgTable("locations", {
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   whatsappGroupChatId: text("whatsapp_group_chat_id"),
+  transferWaGroupChatId: text("transfer_wa_group_chat_id"),
 }, (t) => ({
   companyIdx: index("locations_company_idx").on(t.companyId),
 }));

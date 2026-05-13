@@ -165,7 +165,7 @@ export function registerLocationRoutes(app: Express) {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const { name, whatsappGroupChatId } = req.body;
+      const { name, whatsappGroupChatId, transferWaGroupChatId } = req.body;
       if (!name || typeof name !== "string" || !name.trim()) {
         return res.status(400).json({ message: "name is required" });
       }
@@ -173,6 +173,9 @@ export function registerLocationRoutes(app: Express) {
       const updatePayload: Record<string, any> = { name: name.trim() };
       if (whatsappGroupChatId !== undefined) {
         updatePayload.whatsappGroupChatId = whatsappGroupChatId || null;
+      }
+      if (transferWaGroupChatId !== undefined) {
+        updatePayload.transferWaGroupChatId = transferWaGroupChatId || null;
       }
 
       const [updated] = await db
