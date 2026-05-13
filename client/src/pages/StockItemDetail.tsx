@@ -39,6 +39,7 @@ interface Sale {
   sellingPrice: string;
   totalSales: string;
   voucherId?: number;
+  posStation?: number | null;
 }
 
 interface StockItemDetails {
@@ -91,10 +92,14 @@ export default function StockItemDetail() {
 
   useEscapeBack(handleBack);
 
-  const handleSaleClick = (saleDate: string, voucherId?: number) => {
-    if (!voucherId) return;
-    const normalizedDate = saleDate.split(' ')[0];
-    navigate(`/pos-daybook?date=${normalizedDate}&voucherId=${voucherId}`);
+  const handleSaleClick = (sale: Sale) => {
+    if (!sale.voucherId) return;
+    if (sale.posStation != null) {
+      const normalizedDate = sale.saleDate.split(' ')[0];
+      navigate(`/pos-daybook?date=${normalizedDate}&voucherId=${sale.voucherId}`);
+    } else {
+      navigate(`/daybook?voucherId=${sale.voucherId}`);
+    }
   };
 
   if (!itemId || (stockItems.length > 0 && !selectedItem)) {
@@ -243,7 +248,7 @@ export default function StockItemDetail() {
                           {itemDetails.sales.map((sale, idx) => (
                             <TableRow 
                               key={idx}
-                              onClick={() => handleSaleClick(sale.saleDate, sale.voucherId)}
+                              onClick={() => handleSaleClick(sale)}
                               className={sale.voucherId ? "cursor-pointer hover-elevate" : ""}
                               data-testid={`row-sale-${idx}`}
                             >
@@ -268,7 +273,7 @@ export default function StockItemDetail() {
                       {itemDetails.sales.map((sale, idx) => (
                         <div
                           key={idx}
-                          onClick={() => handleSaleClick(sale.saleDate, sale.voucherId)}
+                          onClick={() => handleSaleClick(sale)}
                           className={`p-2 rounded-md border text-sm ${sale.voucherId ? "cursor-pointer hover-elevate" : ""}`}
                           data-testid={`row-sale-${idx}`}
                         >
