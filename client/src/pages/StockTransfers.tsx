@@ -9,7 +9,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -31,11 +30,14 @@ import {
 import {
   ArrowRight,
   ExternalLink,
-  Eye,
+  Pencil,
   Save,
   X,
   ArrowLeftRight,
   Search,
+  Package,
+  DollarSign,
+  Clock,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -138,13 +140,47 @@ export default function StockTransfers() {
     try { return formatDate(parseISO(d)); } catch { return d; }
   };
 
+  const totalValue = transfers.reduce((s, t) => s + (t.totalAmount || 0), 0);
+  const pendingCount = transfers.filter(t => !t.inventoryApplied).length;
+
   return (
-    <div className="p-4 md:p-6 space-y-4 w-full">
+    <div className="p-4 md:p-6 space-y-5 w-full">
       <PageHeader
         title="Stock Transfers"
         subtitle="All stock movement vouchers between locations"
         icon={<ArrowLeftRight className="h-5 w-5" />}
       />
+
+      {/* Stats pill bar */}
+      <div className="flex flex-wrap gap-3">
+        <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
+          <ArrowLeftRight className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">Transfers</p>
+            {isLoading ? <Skeleton className="h-5 w-10 mt-0.5" /> : (
+              <p className="text-lg font-semibold leading-none">{transfers.length}</p>
+            )}
+          </div>
+        </div>
+        <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
+          <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">Total Value</p>
+            {isLoading ? <Skeleton className="h-5 w-20 mt-0.5" /> : (
+              <p className="text-lg font-semibold leading-none font-mono">{formatAmount(totalValue)}</p>
+            )}
+          </div>
+        </div>
+        <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
+          <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">Pending</p>
+            {isLoading ? <Skeleton className="h-5 w-10 mt-0.5" /> : (
+              <p className="text-lg font-semibold leading-none">{pendingCount}</p>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
@@ -167,150 +203,161 @@ export default function StockTransfers() {
       </div>
 
       {/* Table */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <CardTitle className="text-base">
-              {isLoading ? "Loading…" : `${filtered.length} transfer${filtered.length !== 1 ? "s" : ""}`}
-            </CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-4 space-y-2">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="py-16 text-center text-muted-foreground text-sm">
-              No stock transfers found for the selected period.
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <Table>
-                <TableHeader className="sticky top-0 z-30 bg-background">
-                  <TableRow>
-                    <TableHead className="whitespace-nowrap">Voucher</TableHead>
-                    <TableHead className="whitespace-nowrap">Date</TableHead>
-                    <TableHead className="whitespace-nowrap">From</TableHead>
-                    <TableHead className="whitespace-nowrap"></TableHead>
-                    <TableHead className="whitespace-nowrap">To</TableHead>
-                    <TableHead className="whitespace-nowrap">Stock Items</TableHead>
-                    <TableHead className="whitespace-nowrap text-right">Total</TableHead>
-                    <TableHead className="whitespace-nowrap">Status</TableHead>
-                    <TableHead className="whitespace-nowrap">Notes</TableHead>
-                    <TableHead className="whitespace-nowrap text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((t) => (
-                    <TableRow
-                      key={t.transferId}
-                      className="hover-elevate cursor-pointer"
-                      onClick={() => openVoucher(t.voucherId)}
-                      data-testid={`row-transfer-${t.transferId}`}
-                    >
-                      <TableCell className="font-mono text-sm font-medium whitespace-nowrap">
-                        {t.voucherNumber}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-sm">
-                        {formatVoucherDate(t.voucherDate)}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-sm">
-                        {t.sourceLocationName}
-                      </TableCell>
-                      <TableCell className="px-0">
-                        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-sm">
-                        {t.destinationLocationName}
-                      </TableCell>
-                      <TableCell className="text-sm max-w-56">
-                        <TooltipProvider>
-                          {(t.stockItemNames ?? []).length === 0 ? (
-                            <span className="text-muted-foreground/50 italic">—</span>
-                          ) : (t.stockItemNames ?? []).length <= 2 ? (
-                            <span className="text-sm">
-                              {(t.stockItemNames ?? []).join(", ")}
-                            </span>
-                          ) : (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="cursor-default underline decoration-dotted underline-offset-2 text-sm">
-                                  {(t.stockItemNames ?? [])[0]}{" "}
-                                  <span className="text-muted-foreground text-xs">+{(t.stockItemNames ?? []).length - 1} more</span>
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground">
+          <ArrowLeftRight className="h-12 w-12 mx-auto mb-4 opacity-40" />
+          <p className="text-base font-medium">No transfers found</p>
+          <p className="text-sm mt-1">
+            {search ? "Try adjusting your search or date range" : "No stock transfers in the selected period"}
+          </p>
+        </div>
+      ) : (
+        <div className="border rounded-xl overflow-hidden">
+          <div className="table-responsive">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="text-xs whitespace-nowrap">Voucher</TableHead>
+                  <TableHead className="text-xs whitespace-nowrap">Date</TableHead>
+                  <TableHead className="text-xs whitespace-nowrap">Route</TableHead>
+                  <TableHead className="text-xs whitespace-nowrap">Items</TableHead>
+                  <TableHead className="text-xs whitespace-nowrap text-right">Total</TableHead>
+                  <TableHead className="text-xs whitespace-nowrap">Status</TableHead>
+                  <TableHead className="text-xs whitespace-nowrap">Notes</TableHead>
+                  <TableHead className="text-xs whitespace-nowrap text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((t) => (
+                  <TableRow
+                    key={t.transferId}
+                    className="hover-elevate cursor-pointer"
+                    onClick={() => openVoucher(t.voucherId)}
+                    data-testid={`row-transfer-${t.transferId}`}
+                  >
+                    <TableCell className="font-mono text-sm font-medium whitespace-nowrap">
+                      {t.voucherNumber}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-sm">
+                      {formatVoucherDate(t.voucherDate)}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-sm">
+                      <span className="flex items-center gap-1.5">
+                        <span>{t.sourceLocationName}</span>
+                        <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span>{t.destinationLocationName}</span>
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm max-w-52">
+                      <TooltipProvider>
+                        {(t.stockItemNames ?? []).length === 0 ? (
+                          <span className="text-muted-foreground/50 italic">—</span>
+                        ) : (t.stockItemNames ?? []).length <= 2 ? (
+                          <span>{(t.stockItemNames ?? []).join(", ")}</span>
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-default underline decoration-dotted underline-offset-2">
+                                {(t.stockItemNames ?? [])[0]}{" "}
+                                <span className="text-muted-foreground text-xs">
+                                  +{(t.stockItemNames ?? []).length - 1} more
                                 </span>
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-xs">
-                                <ul className="text-xs space-y-0.5">
-                                  {(t.stockItemNames ?? []).map((n, i) => (
-                                    <li key={i}>{n}</li>
-                                  ))}
-                                </ul>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                        </TooltipProvider>
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm tabular-nums whitespace-nowrap">
-                        {formatAmount(t.totalAmount)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={t.inventoryApplied ? "default" : "outline"} className="text-xs whitespace-nowrap">
-                          {t.inventoryApplied ? "Applied" : "Pending"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-48 text-sm text-muted-foreground truncate">
-                        {t.notes || <span className="italic text-muted-foreground/50">—</span>}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div
-                          className="flex items-center justify-end gap-1"
-                          onClick={(e) => e.stopPropagation()}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs">
+                              <ul className="text-xs space-y-0.5">
+                                {(t.stockItemNames ?? []).map((n, i) => (
+                                  <li key={i}>{n}</li>
+                                ))}
+                              </ul>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </TooltipProvider>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm tabular-nums whitespace-nowrap">
+                      {formatAmount(t.totalAmount)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={t.inventoryApplied ? "default" : "secondary"}
+                        className="text-xs whitespace-nowrap"
+                      >
+                        {t.inventoryApplied ? "Applied" : "Pending"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="max-w-44 text-sm text-muted-foreground truncate">
+                      {t.notes || <span className="italic text-muted-foreground/40">—</span>}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div
+                        className="flex items-center justify-end gap-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="Edit notes"
+                          onClick={() => startEdit(t)}
+                          data-testid={`button-edit-${t.transferId}`}
                         >
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            title="View details"
-                            onClick={() => startEdit(t)}
-                            data-testid={`button-view-${t.transferId}`}
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            title="Open voucher"
-                            onClick={() => openVoucher(t.voucherId)}
-                            data-testid={`button-open-${t.transferId}`}
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="Open voucher"
+                          onClick={() => openVoucher(t.voucherId)}
+                          data-testid={`button-open-${t.transferId}`}
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
 
       {/* Edit Notes Dialog */}
       <Dialog open={!!editingTransfer} onOpenChange={(open) => { if (!open) setEditingTransfer(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Transfer Details — {editingTransfer?.voucherNumber}</DialogTitle>
+            <DialogTitle>Transfer Notes — {editingTransfer?.voucherNumber}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2 py-2">
-            <p className="text-sm text-muted-foreground">
-              {editingTransfer?.sourceLocationName} → {editingTransfer?.destinationLocationName}
-              {editingTransfer?.voucherDate && (
-                <> &middot; {formatVoucherDate(editingTransfer.voucherDate)}</>
-              )}
-            </p>
+          <div className="space-y-3 py-1">
+            {editingTransfer && (
+              <div className="rounded-lg border bg-muted/40 px-3 py-2.5 space-y-1">
+                <div className="flex items-center gap-1.5 text-sm font-medium">
+                  <span>{editingTransfer.sourceLocationName}</span>
+                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span>{editingTransfer.destinationLocationName}</span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span>{formatVoucherDate(editingTransfer.voucherDate)}</span>
+                  {editingTransfer.stockItemNames?.length > 0 && (
+                    <>
+                      <span>·</span>
+                      <span className="flex items-center gap-1">
+                        <Package className="h-3 w-3" />
+                        {editingTransfer.stockItemNames.length} item{editingTransfer.stockItemNames.length !== 1 ? "s" : ""}
+                      </span>
+                    </>
+                  )}
+                  <span>·</span>
+                  <span>{formatAmount(editingTransfer.totalAmount)}</span>
+                </div>
+              </div>
+            )}
             <Textarea
               value={editNotes}
               onChange={(e) => setEditNotes(e.target.value)}
