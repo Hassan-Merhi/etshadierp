@@ -54,6 +54,8 @@ import {
   Send,
   Loader2,
   CheckCircle2,
+  Scale,
+  FileText,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -1834,33 +1836,10 @@ export default function Accounts() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="view" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Select Account</CardTitle>
-                {selectedAccount && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedAccount(null);
-                      updateUrlParams({ accountId: null, accountType: null });
-                    }}
-                    data-testid="button-change-account"
-                  >
-                    <X className="w-4 h-4 mr-1" />
-                    Change
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
+        <TabsContent value="view" className="space-y-4">
+          <div className="space-y-3">
               {!selectedAccount ? (
                 <div className="space-y-2">
-                  <Label htmlFor="account-search">
-                    Search & Select Account
-                  </Label>
                   <div className="space-y-2">
                     <div className="relative">
                       <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -1883,7 +1862,7 @@ export default function Accounts() {
                     ) : (
                       <div
                         ref={accountListRef}
-                        className="max-h-64 overflow-y-auto border rounded-md"
+                        className="max-h-64 overflow-y-auto border rounded-xl overflow-hidden"
                         onKeyDown={(e) => handleListArrowScroll(e, accountListRef)}
                       >
                         {filteredAccounts.length === 0 ? (
@@ -1973,8 +1952,7 @@ export default function Accounts() {
                   </div>
                 </div>
               ) : (
-                <Card className="bg-muted/50">
-                  <CardContent className="p-4">
+                <div className="rounded-xl border bg-muted/40 p-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">
@@ -2164,29 +2142,12 @@ export default function Accounts() {
                         </DropdownMenu>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                </div>
               )}
-            </CardContent>
-          </Card>
+          </div>
 
           {selectedAccount && (
             <>
-              <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      Statement Period
-                    </CardTitle>
-                    <PeriodFilter
-                      value={periodFilter}
-                      onChange={handlePeriodFilterChange}
-                      data-testid="period-filter"
-                    />
-                  </div>
-                </CardHeader>
-              </Card>
 
               {isFactorySupplierAccount ? (
                 <Card>
@@ -2428,6 +2389,11 @@ export default function Accounts() {
                     Ledger: {selectedAccount?.name}
                   </CardTitle>
                   <div className="flex items-center gap-2 flex-wrap">
+                    <PeriodFilter
+                      value={periodFilter}
+                      onChange={handlePeriodFilterChange}
+                      data-testid="period-filter"
+                    />
                     {selectedVoucherIds.size > 0 && (
                       <Button
                         variant="destructive"
@@ -2459,6 +2425,47 @@ export default function Accounts() {
                     </div>
                   ) : (
                     <>
+                    {/* Stats pill bar */}
+                    {!hideBalances && vouchersWithBalance.length > 0 && (() => {
+                      const totalDr = vouchersWithBalance.reduce((s, v) => s + (v.totalDebit ?? 0), 0);
+                      const totalCr = vouchersWithBalance.reduce((s, v) => s + (v.totalCredit ?? 0), 0);
+                      const cb = closingBalance;
+                      const cbSide = selectedAccount?.type === "supplier"
+                        ? cb > 0 ? "Cr" : "Dr"
+                        : cb >= 0 ? "Dr" : "Cr";
+                      return (
+                        <div className="flex flex-wrap gap-3 mb-4">
+                          <div className="rounded-lg border bg-muted/40 px-4 py-2 flex items-center gap-3">
+                            <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                            <div>
+                              <p className="text-xs text-muted-foreground leading-none mb-0.5">Transactions</p>
+                              <p className="text-base font-semibold leading-none">{vouchersWithBalance.length}</p>
+                            </div>
+                          </div>
+                          <div className="rounded-lg border bg-muted/40 px-4 py-2 flex items-center gap-3">
+                            <TrendingUp className="w-4 h-4 text-muted-foreground shrink-0" />
+                            <div>
+                              <p className="text-xs text-muted-foreground leading-none mb-0.5">Total Debit</p>
+                              <p className="text-base font-semibold leading-none tabular-nums">{formatAmount(totalDr)}</p>
+                            </div>
+                          </div>
+                          <div className="rounded-lg border bg-muted/40 px-4 py-2 flex items-center gap-3">
+                            <TrendingDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                            <div>
+                              <p className="text-xs text-muted-foreground leading-none mb-0.5">Total Credit</p>
+                              <p className="text-base font-semibold leading-none tabular-nums">{formatAmount(totalCr)}</p>
+                            </div>
+                          </div>
+                          <div className="rounded-lg border bg-muted/40 px-4 py-2 flex items-center gap-3">
+                            <Scale className="w-4 h-4 text-muted-foreground shrink-0" />
+                            <div>
+                              <p className="text-xs text-muted-foreground leading-none mb-0.5">Closing Balance</p>
+                              <p className="text-base font-semibold leading-none tabular-nums">{formatAmount(Math.abs(cb))} {cbSide}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                     <div ref={printRef} className="print-container">
                       <div className="hidden print:block print-header">
                         <div style={{ textAlign: "center", marginBottom: "16px" }}>
@@ -2478,10 +2485,10 @@ export default function Accounts() {
                           <div>Generated: {formatDisplayDate(new Date())}</div>
                         </div>
                       </div>
-                      <div className="rounded-md border table-responsive print:border-0 hidden md:block print:!block">
+                      <div className="rounded-xl border overflow-hidden table-responsive print:border-0 hidden md:block print:!block">
                         <Table>
                           <TableHeader className="sticky top-0 z-30 bg-background">
-                            <TableRow className="bg-muted/30">
+                            <TableRow className="bg-muted/40 hover:bg-muted/40">
                               <TableHead className="w-[40px] py-2 print:hidden">
                                 <Checkbox
                                   checked={
@@ -2608,7 +2615,7 @@ export default function Accounts() {
                                   </TableCell>
                                   <TableCell className="py-2">
                                     <Badge
-                                      variant="outline"
+                                      variant="secondary"
                                       className="text-xs"
                                     >
                                       {voucher.voucherType}
@@ -2748,7 +2755,7 @@ export default function Accounts() {
                                       )}
                                     </div>
                                   </div>
-                                  <Badge variant="outline" className="text-xs flex-shrink-0">
+                                  <Badge variant="secondary" className="text-xs flex-shrink-0">
                                     {voucher.voucherType}
                                   </Badge>
                                 </div>
