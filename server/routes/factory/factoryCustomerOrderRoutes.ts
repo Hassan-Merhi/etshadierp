@@ -4914,6 +4914,50 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
     }
   });
 
+  // ─────── INVOICE CONTAINER TRACKING ─────────────────────────────────────
+  // GET /api/factory/invoice-container-tracking
+  // Returns all VERIFIED / FINALIZED factory invoices that have a container
+  // number, enriched with ETA + tracking status from the ERP containers table
+  // (the Maersk / CMA auto-tracking system).
+  app.get("/api/factory/invoice-container-tracking", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const rows = await db
+        .select({
+          id: customerOrders.id,
+          invoiceNumber: customerOrders.invoiceNumber,
+          containerNumber: customerOrders.containerNumber,
+          status: customerOrders.status,
+          grandTotal: customerOrders.grandTotal,
+          orderDate: customerOrders.orderDate,
+          customerName: customers.legalName,
+          // ERP container tracking fields
+          eta: containers.eta,
+          trackingLastStatus: containers.trackingLastStatus,
+          trackingLink: containers.trackingLink,
+          containerStatus: containers.status,
+        })
+        .from(customerOrders)
+        .leftJoin(customers, eq(customerOrders.customerId, customers.id))
+        .leftJoin(containers, eq(customerOrders.containerNumber, containers.containerNumber))
+        .where(
+          and(
+            eq(customerOrders.companyId, companyId),
+            isNull(customerOrders.deletedAt),
+            sql`${customerOrders.status} IN ('VERIFIED', 'FINALIZED')`,
+            sql`${customerOrders.containerNumber} IS NOT NULL AND TRIM(${customerOrders.containerNumber}) <> ''`,
+          )
+        )
+        .orderBy(desc(customerOrders.orderDate), desc(customerOrders.id));
+
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ─────── CONTAINER DOCUMENT TYPES ───────
 
 }
