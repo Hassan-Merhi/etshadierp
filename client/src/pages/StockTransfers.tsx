@@ -63,7 +63,11 @@ interface StockTransferRow {
   createdAt: string;
 }
 
-export default function StockTransfers() {
+interface StockTransfersProps {
+  hideVoucherNotes?: boolean;
+}
+
+export default function StockTransfers({ hideVoucherNotes = false }: StockTransfersProps) {
   const [, setLocation] = useLocation();
   const { formatAmount } = useCurrencyContext();
   const { formatDate } = useDateFormat();
@@ -223,13 +227,13 @@ export default function StockTransfers() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="text-xs whitespace-nowrap">Voucher</TableHead>
+                  {!hideVoucherNotes && <TableHead className="text-xs whitespace-nowrap">Voucher</TableHead>}
                   <TableHead className="text-xs whitespace-nowrap">Date</TableHead>
                   <TableHead className="text-xs whitespace-nowrap">Route</TableHead>
                   <TableHead className="text-xs whitespace-nowrap">Items</TableHead>
                   <TableHead className="text-xs whitespace-nowrap text-right">Total</TableHead>
                   <TableHead className="text-xs whitespace-nowrap">Status</TableHead>
-                  <TableHead className="text-xs whitespace-nowrap">Notes</TableHead>
+                  {!hideVoucherNotes && <TableHead className="text-xs whitespace-nowrap">Notes</TableHead>}
                   <TableHead className="text-xs whitespace-nowrap text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -241,9 +245,11 @@ export default function StockTransfers() {
                     onClick={() => openVoucher(t.voucherId)}
                     data-testid={`row-transfer-${t.transferId}`}
                   >
-                    <TableCell className="font-mono text-sm font-medium whitespace-nowrap">
-                      {t.voucherNumber}
-                    </TableCell>
+                    {!hideVoucherNotes && (
+                      <TableCell className="font-mono text-sm font-medium whitespace-nowrap">
+                        {t.voucherNumber}
+                      </TableCell>
+                    )}
                     <TableCell className="whitespace-nowrap text-sm">
                       {formatVoucherDate(t.voucherDate)}
                     </TableCell>
@@ -292,9 +298,11 @@ export default function StockTransfers() {
                         {t.inventoryApplied ? "Applied" : "Pending"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="max-w-44 text-sm text-muted-foreground truncate">
-                      {t.notes || <span className="italic text-muted-foreground/40">—</span>}
-                    </TableCell>
+                    {!hideVoucherNotes && (
+                      <TableCell className="max-w-44 text-sm text-muted-foreground truncate">
+                        {t.notes || <span className="italic text-muted-foreground/40">—</span>}
+                      </TableCell>
+                    )}
                     <TableCell className="text-right">
                       <div
                         className="flex items-center justify-end gap-1"

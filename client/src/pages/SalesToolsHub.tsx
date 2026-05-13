@@ -53,7 +53,7 @@ export default function SalesToolsHub() {
           <TabsContent key={t.key} value={t.key} className="flex-1 overflow-auto m-0 p-0">
             <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
               {t.key === "daybook"   && <POSDaybook />}
-              {t.key === "transfers" && <StockTransfers />}
+              {t.key === "transfers" && <StockTransfers hideVoucherNotes />}
               {t.key === "pricelist" && <POSPriceList />}
             </Suspense>
           </TabsContent>
