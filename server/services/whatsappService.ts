@@ -424,28 +424,33 @@ export async function markContainersWaSent(): Promise<void> {
   );
 }
 
-// ── Stock Transfer WhatsApp Settings ────────────────────────────────────────
+// ── Stock Transfer WhatsApp Settings (per-company) ──────────────────────────
 
-export async function getTransferWaGroupChatId(): Promise<{ groupChatId: string; instanceId: string; apiToken: string; enabled: boolean } | null> {
+export async function getCompanyTransferWaGroupChatId(companyId: number): Promise<string> {
   const res = await pool.query(
-    `SELECT transfer_wa_group_chat_id, instance_id, api_token, enabled
-     FROM whatsapp_settings WHERE id = 1`,
+    `SELECT transfer_wa_group_chat_id FROM companies WHERE id = $1`,
+    [companyId],
   );
-  if (!res.rows?.length) return null;
-  const r = res.rows[0];
-  return {
-    groupChatId: r.transfer_wa_group_chat_id ?? "",
-    instanceId:  r.instance_id  ?? "",
-    apiToken:    r.api_token    ?? "",
-    enabled:     r.enabled      ?? false,
-  };
+  return res.rows[0]?.transfer_wa_group_chat_id ?? "";
 }
 
-export async function setTransferWaGroupChatId(groupChatId: string): Promise<void> {
+export async function setCompanyTransferWaGroupChatId(companyId: number, groupChatId: string): Promise<void> {
   await pool.query(
-    `UPDATE whatsapp_settings SET transfer_wa_group_chat_id = $1 WHERE id = 1`,
-    [groupChatId],
+    `UPDATE companies SET transfer_wa_group_chat_id = $1 WHERE id = $2`,
+    [groupChatId || null, companyId],
   );
+}
+
+export async function getAllCompanyTransferWaSettings(): Promise<Array<{ companyId: number; companyName: string; groupChatId: string }>> {
+  const res = await pool.query(
+    `SELECT id, name, COALESCE(transfer_wa_group_chat_id, '') AS group_chat_id
+     FROM companies WHERE active = true ORDER BY name`,
+  );
+  return res.rows.map((r: any) => ({
+    companyId:   r.id,
+    companyName: r.name,
+    groupChatId: r.group_chat_id ?? "",
+  }));
 }
 
 /**

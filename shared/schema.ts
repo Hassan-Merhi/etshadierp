@@ -13,6 +13,7 @@ export const companies = pgTable("companies", {
   baseCurrency: varchar("base_currency", { length: 10 }).default("USD"),
   displayCurrency: varchar("display_currency", { length: 10 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  transferWaGroupChatId: text("transfer_wa_group_chat_id"),
 });
 
 export const insertCompanySchema = createInsertSchema(companies).omit({

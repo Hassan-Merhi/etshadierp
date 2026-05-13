@@ -1234,23 +1234,25 @@ export function registerGitRoutes(app: Express) {
 
   app.get("/api/git/transfer-wa-settings", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { getTransferWaGroupChatId, getWaSettings } = await import("../services/whatsappService");
-      const [settings, main] = await Promise.all([getTransferWaGroupChatId(), getWaSettings()]);
+      const { getAllCompanyTransferWaSettings, getWaSettings } = await import("../services/whatsappService");
+      const [companies, main] = await Promise.all([getAllCompanyTransferWaSettings(), getWaSettings()]);
       res.json({
-        groupChatId:    settings?.groupChatId    ?? "",
+        companies,
         hasCredentials: !!(main?.instanceId && main?.apiToken),
-        waEnabled:      main?.enabled            ?? false,
+        waEnabled:      main?.enabled ?? false,
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
   });
 
-  app.patch("/api/git/transfer-wa-settings", requireAuth, requireRole("Admin", "Developer", "Owner"), async (req: Request, res: Response) => {
+  app.patch("/api/git/transfer-wa-settings/:companyId", requireAuth, requireRole("Admin", "Developer", "Owner"), async (req: Request, res: Response) => {
     try {
+      const companyId = parseInt(req.params.companyId, 10);
+      if (isNaN(companyId)) return res.status(400).json({ message: "Invalid companyId" });
       const { groupChatId = "" } = req.body;
-      const { setTransferWaGroupChatId } = await import("../services/whatsappService");
-      await setTransferWaGroupChatId(String(groupChatId));
+      const { setCompanyTransferWaGroupChatId } = await import("../services/whatsappService");
+      await setCompanyTransferWaGroupChatId(companyId, String(groupChatId));
       res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message });

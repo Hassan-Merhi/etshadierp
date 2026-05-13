@@ -1,15 +1,15 @@
 /**
  * sendTransferWhatsApp.ts
  * Fire-and-forget helper: build the transfer image and send it to:
- *   1. The globally-configured transfer WA group (Settings → Stock Transfers WA)
+ *   1. The destination company's configured transfer WA group (Settings → Transfers WA)
  *   2. The destination location's own WA group (if configured)
  */
 
 import { db } from "../db";
-import { stockItems, locations } from "@shared/schema";
+import { stockItems, locations, companies } from "@shared/schema";
 import { eq, inArray } from "drizzle-orm";
 import { generateTransferImageBuffer } from "./generateTransferImage";
-import { sendWhatsAppFileToChatId, getTransferWaGroupChatId } from "../services/whatsappService";
+import { sendWhatsAppFileToChatId } from "../services/whatsappService";
 import { format } from "date-fns";
 
 export interface TransferWAItem {
@@ -29,8 +29,8 @@ export interface SendTransferWAOptions {
 /**
  * Generate and send the stock transfer image.
  * Sends to:
- *   - The global transfer WA group configured in Settings (if set)
- *   - The destination location's WA group (if set)
+ *   - The destination company's configured transfer WA group (if set)
+ *   - The destination location's own WA group (if set)
  * Designed to be called fire-and-forget inside setImmediate — never throws.
  */
 export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise<void> {
@@ -46,18 +46,27 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
   // Collect all target chat IDs (deduped)
   const chatIds = new Set<string>();
 
-  // 1. Global transfer WA group from settings
-  const globalSetting = await getTransferWaGroupChatId();
-  if (globalSetting?.groupChatId) {
-    chatIds.add(globalSetting.groupChatId);
-  }
-
-  // 2. Destination location's own WA group
+  // Look up destination location (gets companyId + location WA group in one query)
   const [destLoc] = await db
-    .select({ whatsappGroupChatId: locations.whatsappGroupChatId })
+    .select({
+      companyId:           locations.companyId,
+      whatsappGroupChatId: locations.whatsappGroupChatId,
+    })
     .from(locations)
     .where(eq(locations.id, destinationLocationId));
 
+  // 1. Per-company transfer WA group from Settings
+  if (destLoc?.companyId) {
+    const [company] = await db
+      .select({ transferWaGroupChatId: companies.transferWaGroupChatId })
+      .from(companies)
+      .where(eq(companies.id, destLoc.companyId));
+    if (company?.transferWaGroupChatId) {
+      chatIds.add(company.transferWaGroupChatId);
+    }
+  }
+
+  // 2. Destination location's own WA group
   if (destLoc?.whatsappGroupChatId) {
     chatIds.add(destLoc.whatsappGroupChatId);
   }
