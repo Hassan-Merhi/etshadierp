@@ -2,7 +2,7 @@ import { useState, useMemo, type Dispatch, type SetStateAction } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import {
-  Play, CheckCircle2, Clock, DollarSign, ChevronDown, ChevronRight, X, Users, Trash2, CalendarDays, Printer, RotateCcw, Wrench, FileDown, ShieldCheck,
+  Play, CheckCircle2, Clock, DollarSign, ChevronDown, ChevronRight, X, Users, Trash2, CalendarDays, Printer, RotateCcw, Wrench, FileDown, ShieldCheck, Layers,
 } from "lucide-react";
 import * as XLSX from "@/lib/excelHelper";
 import { Button } from "@/components/ui/button";
@@ -63,10 +63,10 @@ interface PreviewWorkerRow {
   halfDayDates: AttendanceEntry[];
 }
 
-const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "outline"; className: string }> = {
-  DRAFT: { label: "Draft", variant: "outline", className: "border-amber-400 text-amber-700 dark:text-amber-400" },
-  APPROVED: { label: "Approved", variant: "outline", className: "border-blue-400 text-blue-700 dark:text-blue-400" },
-  PAID: { label: "Paid", variant: "outline", className: "border-green-500 text-green-700 dark:text-green-400" },
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  DRAFT: { label: "Draft", className: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" },
+  APPROVED: { label: "Approved", className: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" },
+  PAID: { label: "Paid", className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" },
 };
 
 function fmt(val: string | number | null | undefined) {
@@ -162,18 +162,18 @@ function BatchRow({ group, expanded, toggleGroup, selectedIds, setSelectedIds, s
       </div>
 
       {isExpanded && (
-        <div className="overflow-x-auto bg-muted/30">
+        <div className="overflow-x-auto">
           <Table>
-            <TableHeader className="sticky top-0 z-30 bg-muted/30">
-              <TableRow>
-                <TableHead className="w-10 pl-8"></TableHead>
-                <TableHead>Worker</TableHead>
-                <TableHead className="text-center">Present</TableHead>
-                <TableHead className="text-center">Absent</TableHead>
-                <TableHead className="text-right">Net</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Paid On</TableHead>
-                <TableHead></TableHead>
+            <TableHeader>
+              <TableRow className="bg-muted/40 hover:bg-muted/40">
+                <TableHead className="w-10 pl-8 text-xs h-9 font-semibold"></TableHead>
+                <TableHead className="text-xs h-9 font-semibold">Worker</TableHead>
+                <TableHead className="text-center text-xs h-9 font-semibold">Present</TableHead>
+                <TableHead className="text-center text-xs h-9 font-semibold">Absent</TableHead>
+                <TableHead className="text-right text-xs h-9 font-semibold">Net</TableHead>
+                <TableHead className="text-xs h-9 font-semibold">Status</TableHead>
+                <TableHead className="text-xs h-9 font-semibold">Paid On</TableHead>
+                <TableHead className="text-xs h-9"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -205,7 +205,7 @@ function BatchRow({ group, expanded, toggleGroup, selectedIds, setSelectedIds, s
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm font-semibold">${fmt(p.netSalary)}</TableCell>
                     <TableCell>
-                      <Badge variant={cfg.variant} className={`text-xs ${cfg.className}`}>{cfg.label}</Badge>
+                      <Badge variant="secondary" className={`text-xs no-default-active-elevate ${cfg.className}`}>{cfg.label}</Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{p.paidAt ? fmtDate(p.paidAt, formatDisplayDate) : "—"}</TableCell>
                     <TableCell>
@@ -602,52 +602,63 @@ export default function FactoryPayrollTab() {
   const completedGroups = payrollGroups.filter((g) => g.records.every((p) => p.status === "PAID"));
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Workers on Payroll</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold" data-testid="stat-workers">{stats.uniqueWorkers}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Paid</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold" data-testid="stat-paid">${stats.paid.toFixed(2)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Pending Payment</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold" data-testid="stat-pending">${stats.pending.toFixed(2)}</p>
-          </CardContent>
-        </Card>
+    <div className="space-y-5">
+
+      {/* Stats pills */}
+      <div className="flex flex-wrap gap-3">
+        {isLoading ? (
+          <>
+            <Skeleton className="h-10 w-40 rounded-lg" />
+            <Skeleton className="h-10 w-36 rounded-lg" />
+            <Skeleton className="h-10 w-44 rounded-lg" />
+            <Skeleton className="h-10 w-40 rounded-lg" />
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Workers on Payroll</span>
+              <span className="font-semibold" data-testid="stat-workers">{stats.uniqueWorkers}</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+              <Layers className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Batches</span>
+              <span className="font-semibold">{payrollGroups.length}</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+              <Clock className="h-4 w-4 text-amber-500" />
+              <span className="text-muted-foreground">Pending</span>
+              <span className="font-semibold font-mono text-amber-600 dark:text-amber-400" data-testid="stat-pending">${stats.pending.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              <span className="text-muted-foreground">Total Paid</span>
+              <span className="font-semibold font-mono text-emerald-600 dark:text-emerald-400" data-testid="stat-paid">${stats.paid.toFixed(2)}</span>
+            </div>
+          </>
+        )}
       </div>
 
+      {/* Filter / actions row */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-sm font-semibold">Payroll Records</h2>
-          <p className="text-xs text-muted-foreground">{payrolls?.length || 0} total · {payrollGroups.length} batch{payrollGroups.length !== 1 ? "es" : ""}</p>
-        </div>
-        <div className="flex gap-2">
+        <p className="text-xs text-muted-foreground">
+          {payrolls?.length || 0} record{payrolls?.length !== 1 ? "s" : ""} · {payrollGroups.length} batch{payrollGroups.length !== 1 ? "es" : ""}
+        </p>
+        <div className="flex gap-2 flex-wrap">
           {selectedIds.size > 0 && (
             <Button variant="outline" onClick={() => setBulkPayOpen(true)} data-testid="button-bulk-pay">
               <DollarSign className="h-4 w-4 mr-2" />
               Pay {selectedIds.size} Selected
             </Button>
           )}
-          <Button variant="outline" onClick={() => { setRepairResult(null); setRepairOpen(true); }} data-testid="button-repair-ledger" title="Remove stale ledger entries from previously undone payrolls/advances">
-            <ShieldCheck className="h-4 w-4 mr-2" />
-            Repair Ledger
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => { setRepairResult(null); setRepairOpen(true); }}
+            data-testid="button-repair-ledger"
+            title="Repair Ledger — remove stale entries from undone payrolls"
+          >
+            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
           </Button>
           <Button onClick={() => setRunOpen(true)} data-testid="button-run-payroll">
             <Play className="h-4 w-4 mr-2" />
@@ -656,53 +667,54 @@ export default function FactoryPayrollTab() {
         </div>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-4 space-y-2">
-              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+      {/* Records list */}
+      <div className="border rounded-xl overflow-hidden">
+        {isLoading ? (
+          <div className="p-4 space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
+          </div>
+        ) : payrollGroups.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-14 text-center">
+            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+              <DollarSign className="h-5 w-5 text-muted-foreground" />
             </div>
-          ) : payrollGroups.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground">
-              <DollarSign className="mx-auto h-8 w-8 mb-3 opacity-30" />
-              <p className="font-medium">No payroll records yet</p>
-              <p className="text-sm mt-1">Click "Run Payroll" to generate records</p>
-            </div>
-          ) : (
-            <div>
-              {/* ── Active batches (any pending records) ── */}
-              {activeGroups.length === 0 && completedGroups.length > 0 && (
-                <div className="text-center py-10 text-muted-foreground text-sm">
-                  All batches are fully paid — see completed batches below.
-                </div>
-              )}
-              <div className="divide-y">
-                {activeGroups.map((group) => <BatchRow key={group.key} group={group} expanded={expandedGroups} toggleGroup={toggleGroup} selectedIds={selectedIds} setSelectedIds={setSelectedIds} setPayTargetId={setPayTargetId} setPayCashAccountId={setPayCashAccountId} setPayOpen={setPayOpen} setFixAcctTargetId={setFixAcctTargetId} setFixAcctCashId={setFixAcctCashId} setFixAcctOpen={setFixAcctOpen} setUndoTargetId={setUndoTargetId} setDeleteBatchGroup={setDeleteBatchGroup} formatDisplayDate={formatDisplayDate} />)}
+            <p className="text-sm font-medium">No payroll records yet</p>
+            <p className="text-xs text-muted-foreground">Click "Run Payroll" to generate records for your workers</p>
+          </div>
+        ) : (
+          <div>
+            {/* ── Active batches (any pending records) ── */}
+            {activeGroups.length === 0 && completedGroups.length > 0 && (
+              <div className="text-center py-10 text-muted-foreground text-sm">
+                All batches are fully paid — see completed batches below.
               </div>
-
-              {/* ── Completed batches (all paid) ── */}
-              {completedGroups.length > 0 && (
-                <div className={activeGroups.length > 0 ? "border-t" : ""}>
-                  <button
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-muted-foreground hover-elevate"
-                    onClick={() => setShowCompletedBatches((v) => !v)}
-                    data-testid="toggle-completed-batches"
-                  >
-                    {showCompletedBatches ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                    {completedGroups.length} completed batch{completedGroups.length !== 1 ? "es" : ""}
-                  </button>
-                  {showCompletedBatches && (
-                    <div className="divide-y bg-muted/20">
-                      {completedGroups.map((group) => <BatchRow key={group.key} group={group} expanded={expandedGroups} toggleGroup={toggleGroup} selectedIds={selectedIds} setSelectedIds={setSelectedIds} setPayTargetId={setPayTargetId} setPayCashAccountId={setPayCashAccountId} setPayOpen={setPayOpen} setFixAcctTargetId={setFixAcctTargetId} setFixAcctCashId={setFixAcctCashId} setFixAcctOpen={setFixAcctOpen} setUndoTargetId={setUndoTargetId} setDeleteBatchGroup={setDeleteBatchGroup} formatDisplayDate={formatDisplayDate} condensed />)}
-                    </div>
-                  )}
-                </div>
-              )}
+            )}
+            <div className="divide-y">
+              {activeGroups.map((group) => <BatchRow key={group.key} group={group} expanded={expandedGroups} toggleGroup={toggleGroup} selectedIds={selectedIds} setSelectedIds={setSelectedIds} setPayTargetId={setPayTargetId} setPayCashAccountId={setPayCashAccountId} setPayOpen={setPayOpen} setFixAcctTargetId={setFixAcctTargetId} setFixAcctCashId={setFixAcctCashId} setFixAcctOpen={setFixAcctOpen} setUndoTargetId={setUndoTargetId} setDeleteBatchGroup={setDeleteBatchGroup} formatDisplayDate={formatDisplayDate} />)}
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            {/* ── Completed batches (all paid) ── */}
+            {completedGroups.length > 0 && (
+              <div className={activeGroups.length > 0 ? "border-t" : ""}>
+                <button
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-muted-foreground hover-elevate"
+                  onClick={() => setShowCompletedBatches((v) => !v)}
+                  data-testid="toggle-completed-batches"
+                >
+                  {showCompletedBatches ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                  {completedGroups.length} completed batch{completedGroups.length !== 1 ? "es" : ""}
+                </button>
+                {showCompletedBatches && (
+                  <div className="divide-y bg-muted/20">
+                    {completedGroups.map((group) => <BatchRow key={group.key} group={group} expanded={expandedGroups} toggleGroup={toggleGroup} selectedIds={selectedIds} setSelectedIds={setSelectedIds} setPayTargetId={setPayTargetId} setPayCashAccountId={setPayCashAccountId} setPayOpen={setPayOpen} setFixAcctTargetId={setFixAcctTargetId} setFixAcctCashId={setFixAcctCashId} setFixAcctOpen={setFixAcctOpen} setUndoTargetId={setUndoTargetId} setDeleteBatchGroup={setDeleteBatchGroup} formatDisplayDate={formatDisplayDate} condensed />)}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Run Payroll Dialog */}
       <Dialog open={runOpen} onOpenChange={setRunOpen}>
