@@ -4,12 +4,6 @@ import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Table,
   TableBody,
   TableCell,
@@ -39,7 +33,20 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Users, Container, DollarSign, Download, Edit, EyeOff, Eye, ExternalLink, FileText, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Users,
+  Container,
+  DollarSign,
+  Download,
+  Edit,
+  EyeOff,
+  Eye,
+  ExternalLink,
+  FileText,
+  Truck,
+  Search,
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,7 +62,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
-import { utils, writeFile, readFile, ExcelJS } from "@/lib/excelHelper";
+import { utils, writeFile } from "@/lib/excelHelper";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 
 interface SupplierWithStats {
@@ -76,6 +83,7 @@ export default function Suppliers() {
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierWithStats | null>(null);
   const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [hideZeroBalance, setHideZeroBalance] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
   const [dialogTab, setDialogTab] = useState<"transactions" | "purchase-orders">("transactions");
   const [supplierToDelete, setSupplierToDelete] = useState<{ id: number; name: string } | null>(null);
 
@@ -101,20 +109,13 @@ export default function Suppliers() {
     },
   });
 
-  // Handle clicking on a transaction to navigate to it
   const handleTransactionClick = async (txn: any) => {
-    // First switch to the correct company if different
     const targetCompany = companies.find((c: any) => c.id === txn.companyId);
     if (targetCompany && (!selectedCompany || selectedCompany.id !== txn.companyId)) {
-      // Switch company via API first
       await apiRequest("POST", "/api/auth/set-company", { companyId: txn.companyId });
       selectCompany(targetCompany);
     }
-
-    // Close the dialog
     setSelectedSupplier(null);
-
-    // Navigate to the voucher page with the correct tab for editing
     const voucherTypeMap: Record<string, string> = {
       Payment: "payment",
       Receipt: "receipt",
@@ -134,32 +135,28 @@ export default function Suppliers() {
       navigate(`/voucher-detail/${txn.voucherId}`);
     }
   };
-  
-  // Fetch global supplier statistics (no company filter)
+
   const { data: suppliers = [], isLoading } = useQuery<SupplierWithStats[]>({
     queryKey: ["/api/suppliers/stats"],
   });
 
-  // Fetch all companies for the filter dropdown
   const { data: companies = [] } = useQuery<any[]>({
     queryKey: ["/api/companies"],
   });
 
-  // Fetch unified ledger for the selected supplier (with optional company filter)
-  const unifiedLedgerUrl = companyFilter !== "all" 
+  const unifiedLedgerUrl = companyFilter !== "all"
     ? `/api/suppliers/${selectedSupplier?.id}/unified-ledger?companyId=${companyFilter}`
     : `/api/suppliers/${selectedSupplier?.id}/unified-ledger`;
-  
+
   const { data: unifiedLedger = [], isLoading: ledgerLoading } = useQuery<any[]>({
     queryKey: [unifiedLedgerUrl],
     enabled: !!selectedSupplier,
   });
 
-  // Fetch purchase orders for the selected supplier (with optional company filter)
-  const purchaseOrdersUrl = companyFilter !== "all" 
+  const purchaseOrdersUrl = companyFilter !== "all"
     ? `/api/suppliers/${selectedSupplier?.id}/purchase-orders?companyId=${companyFilter}`
     : `/api/suppliers/${selectedSupplier?.id}/purchase-orders`;
-  
+
   const { data: purchaseOrders = [], isLoading: posLoading } = useQuery<any[]>({
     queryKey: [purchaseOrdersUrl],
     enabled: !!selectedSupplier,
@@ -168,43 +165,34 @@ export default function Suppliers() {
   const activeSuppliers = suppliers.filter((s) => s.active);
   const totalContainers = suppliers.reduce((sum, s) => sum + Number(s.containerCount || 0), 0);
   const totalBalance = suppliers.reduce((sum, s) => sum + Number(s.balance || 0), 0);
-  
-  // Sort suppliers alphabetically by name and filter by balance if needed
+
   const sortedSuppliers = [...suppliers]
     .filter(s => hideZeroBalance ? s.balance !== 0 : true)
-    .sort((a, b) => 
-      a.legalName.localeCompare(b.legalName)
-    );
-  
-  const handleSupplierClick = async (supplier: SupplierWithStats) => {
+    .filter(s => searchTerm.trim() === "" || s.legalName.toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => a.legalName.localeCompare(b.legalName));
+
+  const handleSupplierClick = (supplier: SupplierWithStats) => {
     setSelectedSupplier(supplier);
-    setCompanyFilter("all"); // Reset filter when opening
-    setDialogTab("transactions"); // Reset to transactions tab
+    setCompanyFilter("all");
+    setDialogTab("transactions");
   };
-  
-  const handleCloseDialog = async () => {
+
+  const handleCloseDialog = () => {
     setSelectedSupplier(null);
     setCompanyFilter("all");
     setDialogTab("transactions");
   };
 
-  // Handle clicking on a PO to navigate to its details
   const handlePOClick = async (po: any) => {
-    // First switch to the correct company if different
     const targetCompany = companies.find((c: any) => c.id === po.companyId);
     if (targetCompany && (!selectedCompany || selectedCompany.id !== po.companyId)) {
       await apiRequest("POST", "/api/auth/set-company", { companyId: po.companyId });
       selectCompany(targetCompany);
     }
-
-    // Close the dialog
     setSelectedSupplier(null);
-
-    // Navigate to PO edit page
     navigate(`/purchase-orders/${po.id}/edit`);
   };
 
-  // Handle clicking on a container number to navigate to it
   const handleContainerClick = async (po: any) => {
     if (!po.containerId) return;
     const targetCompany = companies.find((c: any) => c.id === po.companyId);
@@ -218,7 +206,6 @@ export default function Suppliers() {
 
   const handleExportToExcel = async () => {
     if (!selectedSupplier || unifiedLedger.length === 0) return;
-
     const exportData = unifiedLedger.map((txn: any) => ({
       Date: txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "",
       Company: txn.companyName,
@@ -227,11 +214,9 @@ export default function Suppliers() {
       Description: txn.description,
       Balance: txn.balance,
     }));
-
     const worksheet = utils.json_to_sheet(exportData);
     const workbook = utils.book_new();
     utils.book_append_sheet(workbook, worksheet, "Supplier Ledger");
-    
     const fileName = `${selectedSupplier.legalName}_Ledger_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
     await writeFile(workbook, fileName);
   };
@@ -240,565 +225,434 @@ export default function Suppliers() {
   const ledgerRows = unifiedLedger.filter((t: any) => t.type !== "opening");
   const txCount = ledgerRows.length;
 
+  const typeBadgeClass: Record<string, string> = {
+    Payment: "bg-green-500/10 text-green-600 dark:text-green-400",
+    Receipt: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+    Journal: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
+    "Credit Note": "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    "Debit Note": "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  };
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <PageHeader title="Suppliers" subtitle="Manage supplier accounts and track container shipments" />
+    <div className="p-6 space-y-5">
+      <PageHeader title="Suppliers" subtitle="Manage supplier accounts and track container shipments" showBackButton={false} />
+
+      {/* Stats pills */}
+      <div className="flex flex-wrap gap-3">
+        {isLoading ? (
+          [1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-40 rounded-lg" />)
+        ) : (
+          <>
+            <div className="flex items-center gap-2.5 rounded-lg border bg-muted/40 px-4 py-2">
+              <Users className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span className="text-xs text-muted-foreground">Active Suppliers</span>
+              <span className="font-semibold text-sm" data-testid="text-active-suppliers">{activeSuppliers.length}</span>
+            </div>
+            <div className="flex items-center gap-2.5 rounded-lg border bg-muted/40 px-4 py-2">
+              <Container className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span className="text-xs text-muted-foreground">Total Containers</span>
+              <span className="font-semibold text-sm" data-testid="text-total-containers">{totalContainers}</span>
+            </div>
+            <div className="flex items-center gap-2.5 rounded-lg border bg-muted/40 px-4 py-2">
+              <DollarSign className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span className="text-xs text-muted-foreground">Total Outstanding</span>
+              <span className="font-semibold text-sm font-mono" data-testid="text-total-balance">{formatAmount(totalBalance)}</span>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Filter bar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-48">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search suppliers..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+            data-testid="input-supplier-search"
+          />
         </div>
+        <Button
+          variant="outline"
+          size="default"
+          onClick={() => setHideZeroBalance(!hideZeroBalance)}
+          data-testid="button-toggle-zero-balance"
+        >
+          {hideZeroBalance ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+          {hideZeroBalance ? "Hide Zero" : "Show All"}
+        </Button>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Active Suppliers
-            </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <div className="text-2xl font-bold" data-testid="text-active-suppliers">
-                {activeSuppliers.length}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Containers
-            </CardTitle>
-            <Container className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <div className="text-2xl font-bold" data-testid="text-total-containers">
-                {totalContainers}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Outstanding
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div className="text-2xl font-bold" data-testid="text-total-balance">
-                {formatAmount(totalBalance)}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Supplier List</CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setHideZeroBalance(!hideZeroBalance)}
-            data-testid="button-toggle-zero-balance"
-            title={hideZeroBalance ? "Show all suppliers" : "Hide zero balance suppliers"}
-          >
-            {hideZeroBalance ? (
-              <><EyeOff className="h-4 w-4 mr-1" /> Hide Zero</>
-            ) : (
-              <><Eye className="h-4 w-4 mr-1" /> Show All</>
-            )}
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-2">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
+      {/* Supplier table */}
+      {isLoading ? (
+        <div className="border rounded-xl overflow-hidden">
+          <div className="bg-muted/40 px-4 py-2.5 border-b flex gap-6">
+            {[180, 80, 100, 80].map((w, i) => <Skeleton key={i} className="h-3.5 rounded" style={{ width: w }} />)}
+          </div>
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="px-4 py-3.5 border-b last:border-b-0 flex gap-6 items-center">
+              {[180, 80, 100, 80].map((w, j) => <Skeleton key={j} className="h-3 rounded" style={{ width: w }} />)}
             </div>
-          ) : suppliers.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No suppliers found. Create suppliers in the Master Data page.
-            </div>
-          ) : (
-            <>
-            <div className="hidden md:block overflow-x-auto">
-              <Table>
-                <TableHeader className="sticky top-0 z-30 bg-background">
-                  <TableRow>
-                    <TableHead className="sticky left-0 bg-muted z-10">Name</TableHead>
-                    <TableHead className="text-right">Containers</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedSuppliers.map((supplier) => (
-                    <TableRow
-                      key={supplier.id}
-                      data-testid={`row-supplier-${supplier.id}`}
-                    >
-                      <TableCell className="font-medium sticky left-0 bg-background z-10">
-                        <Button
-                          variant="ghost"
-                          className="p-0 h-auto font-medium hover:underline text-left"
-                          onClick={() => handleSupplierClick(supplier)}
-                          data-testid={`button-supplier-name-${supplier.id}`}
-                        >
-                          {supplier.legalName}
-                        </Button>
-                      </TableCell>
-                      <TableCell className="text-right" data-testid={`text-containers-${supplier.id}`}>
-                        <Badge variant="outline">
-                          {supplier.containerCount}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-mono" data-testid={`text-balance-${supplier.id}`}>
-                        <span className={supplier.balance > 0 ? "text-red-600" : supplier.balance < 0 ? "text-green-600" : ""}>
-                          {formatAmount(Math.abs(supplier.balance))}
-                          {supplier.balance !== 0 && (supplier.balance > 0 ? " Cr" : " Dr")}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={supplier.active ? "default" : "secondary"}>
-                          {supplier.active ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => navigate(`/suppliers/${supplier.id}/proformas`)}
-                            data-testid={`button-proformas-supplier-${supplier.id}`}
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => navigate(`/suppliers/${supplier.id}/edit`)}
-                            data-testid={`button-edit-supplier-${supplier.id}`}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setSupplierToDelete({ id: supplier.id, name: supplier.legalName })}
-                            data-testid={`button-delete-supplier-${supplier.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <div className="md:hidden space-y-3">
+          ))}
+        </div>
+      ) : suppliers.length === 0 ? (
+        <div className="border rounded-xl bg-muted/20 flex flex-col items-center justify-center py-16 gap-3 text-center">
+          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+            <Truck className="w-5 h-5 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="text-sm font-medium">No suppliers found</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Create suppliers in the Master Data page</p>
+          </div>
+        </div>
+      ) : sortedSuppliers.length === 0 ? (
+        <div className="border rounded-xl bg-muted/20 flex flex-col items-center justify-center py-12 gap-3 text-center">
+          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+            <Search className="w-5 h-5 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="text-sm font-medium">No results</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Try adjusting your search or filter</p>
+          </div>
+        </div>
+      ) : (
+        <div className="border rounded-xl overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/40 hover:bg-muted/40">
+                <TableHead className="h-9 font-semibold text-xs">Supplier</TableHead>
+                <TableHead className="h-9 font-semibold text-xs">Containers</TableHead>
+                <TableHead className="h-9 font-semibold text-xs text-right">Balance</TableHead>
+                <TableHead className="h-9 font-semibold text-xs text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {sortedSuppliers.map((supplier) => (
-                <Card key={supplier.id} data-testid={`row-supplier-${supplier.id}`}>
-                  <CardContent className="p-4 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <Button
-                        variant="ghost"
-                        className="p-0 h-auto font-medium hover:underline text-left"
-                        onClick={() => handleSupplierClick(supplier)}
-                        data-testid={`button-supplier-name-${supplier.id}`}
-                      >
+                <TableRow
+                  key={supplier.id}
+                  className="cursor-pointer hover:bg-muted/40 group"
+                  onClick={() => handleSupplierClick(supplier)}
+                  data-testid={`row-supplier-${supplier.id}`}
+                >
+                  <TableCell className="py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm" data-testid={`button-supplier-name-${supplier.id}`}>
                         {supplier.legalName}
-                      </Button>
-                      <Badge variant={supplier.active ? "default" : "secondary"}>
-                        {supplier.active ? "Active" : "Inactive"}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Container className="h-3 w-3" />
-                        <span>{supplier.containerCount} containers</span>
-                      </div>
-                      <span className={`font-mono font-semibold ${supplier.balance > 0 ? "text-red-600" : supplier.balance < 0 ? "text-green-600" : ""}`} data-testid={`text-balance-${supplier.id}`}>
-                        {formatAmount(Math.abs(supplier.balance))}
-                        {supplier.balance !== 0 && (supplier.balance > 0 ? " Cr" : " Dr")}
                       </span>
+                      {!supplier.active && (
+                        <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                      )}
                     </div>
-                    <div className="flex justify-end gap-1">
+                    {supplier.email && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{supplier.email}</p>
+                    )}
+                  </TableCell>
+                  <TableCell className="py-3">
+                    {supplier.containerCount > 0 ? (
+                      <Badge variant="secondary" className="text-xs" data-testid={`text-containers-${supplier.id}`}>
+                        {supplier.containerCount}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground" data-testid={`text-containers-${supplier.id}`}>—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="py-3 text-right">
+                    <span
+                      className={`font-mono text-sm font-medium ${
+                        supplier.balance > 0 ? "text-red-500" : supplier.balance < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                      }`}
+                      data-testid={`text-balance-${supplier.id}`}
+                    >
+                      {supplier.balance === 0 ? "—" : `${formatAmount(Math.abs(supplier.balance))} ${supplier.balance > 0 ? "Cr" : "Dr"}`}
+                    </span>
+                  </TableCell>
+                  <TableCell className="py-3 text-right">
+                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
                         variant="ghost"
-                        size="sm"
-                        onClick={() => navigate(`/suppliers/${supplier.id}/edit`)}
-                        data-testid={`button-edit-supplier-${supplier.id}`}
+                        size="icon"
+                        onClick={(e) => { e.stopPropagation(); navigate(`/suppliers/${supplier.id}/proformas`); }}
+                        data-testid={`button-proformas-supplier-${supplier.id}`}
+                        title="Proformas"
                       >
-                        <Edit className="h-4 w-4 mr-1" />
-                        Edit
+                        <FileText className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setSupplierToDelete({ id: supplier.id, name: supplier.legalName })}
-                        data-testid={`button-delete-supplier-mobile-${supplier.id}`}
+                        onClick={(e) => { e.stopPropagation(); navigate(`/suppliers/${supplier.id}/edit`); }}
+                        data-testid={`button-edit-supplier-${supplier.id}`}
+                        title="Edit"
                       >
-                        <Trash2 className="h-4 w-4 text-muted-foreground" />
+                        <Edit className="h-4 w-4" />
                       </Button>
                     </div>
-                  </CardContent>
-                </Card>
+                  </TableCell>
+                </TableRow>
               ))}
-            </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {/* Supplier Details Dialog */}
       <Dialog open={!!selectedSupplier} onOpenChange={handleCloseDialog}>
-        <DialogContent className="max-w-6xl w-[95vw] md:w-auto max-h-[85vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedSupplier?.legalName}
-            </DialogTitle>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pt-2">
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <label className="text-sm text-muted-foreground whitespace-nowrap">Filter by Company:</label>
-                <Select value={companyFilter} onValueChange={setCompanyFilter}>
-                  <SelectTrigger className="w-full sm:w-48" data-testid="select-company-filter">
-                    <SelectValue placeholder="All Companies" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Companies</SelectItem>
-                    {companies.map((company: any) => (
-                      <SelectItem key={company.id} value={company.id.toString()}>
-                        {company.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportToExcel}
-                disabled={unifiedLedger.length === 0}
-                data-testid="button-export-excel"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export to Excel
+        <DialogContent className="max-w-5xl w-[95vw] max-h-[85vh] overflow-hidden flex flex-col gap-0 p-0">
+          <DialogHeader className="px-5 pt-5 pb-4 border-b shrink-0">
+            <DialogTitle className="text-base">{selectedSupplier?.legalName}</DialogTitle>
+            {/* Compact filter bar */}
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+              <Select value={companyFilter} onValueChange={setCompanyFilter}>
+                <SelectTrigger className="w-44 h-8 text-xs" data-testid="select-company-filter">
+                  <SelectValue placeholder="All Companies" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Companies</SelectItem>
+                  {companies.map((company: any) => (
+                    <SelectItem key={company.id} value={company.id.toString()}>{company.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="sm" onClick={handleExportToExcel} disabled={unifiedLedger.length === 0} data-testid="button-export-excel">
+                <Download className="h-4 w-4 mr-1.5" />
+                Export
               </Button>
+              {/* Stats pills */}
+              {!ledgerLoading && txCount > 0 && (
+                <div className="ml-auto flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 rounded-md border bg-muted/40 px-2.5 py-1 text-xs">
+                    <span className="text-muted-foreground">Transactions</span>
+                    <span className="font-semibold">{txCount}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 rounded-md border bg-muted/40 px-2.5 py-1 text-xs">
+                    <span className="text-muted-foreground">Balance</span>
+                    <span className="font-semibold font-mono">
+                      {formatAmount(unifiedLedger[unifiedLedger.length - 1]?.balance ?? 0)}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </DialogHeader>
-          
-          <Tabs value={dialogTab} onValueChange={(v) => setDialogTab(v as "transactions" | "purchase-orders")} className="flex-1 flex flex-col overflow-hidden">
-            <TabsList className="w-fit">
-              <TabsTrigger value="transactions" data-testid="tab-transactions">
-                <DollarSign className="h-4 w-4 mr-2" />
-                Transactions
-              </TabsTrigger>
-              <TabsTrigger value="purchase-orders" data-testid="tab-purchase-orders">
-                <FileText className="h-4 w-4 mr-2" />
-                Purchase Orders ({purchaseOrders.length})
-              </TabsTrigger>
-            </TabsList>
 
-            <TabsContent value="transactions" className="flex-1 overflow-y-auto mt-4">
+          <Tabs value={dialogTab} onValueChange={(v) => setDialogTab(v as "transactions" | "purchase-orders")} className="flex-1 flex flex-col overflow-hidden">
+            <div className="px-5 pt-3 shrink-0">
+              <TabsList className="w-fit h-8">
+                <TabsTrigger value="transactions" className="text-xs h-7" data-testid="tab-transactions">
+                  <DollarSign className="h-3.5 w-3.5 mr-1.5" />
+                  Transactions
+                </TabsTrigger>
+                <TabsTrigger value="purchase-orders" className="text-xs h-7" data-testid="tab-purchase-orders">
+                  <FileText className="h-3.5 w-3.5 mr-1.5" />
+                  Purchase Orders {purchaseOrders.length > 0 && `(${purchaseOrders.length})`}
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            {/* Transactions tab */}
+            <TabsContent value="transactions" className="flex-1 overflow-y-auto mt-0 px-5 pb-5 pt-3">
               {ledgerLoading ? (
-                <div className="space-y-2">
-                  {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
+                <div className="border rounded-xl overflow-hidden">
+                  <div className="bg-muted/40 px-4 py-2.5 border-b flex gap-6">
+                    {[80, 100, 80, 100, 80, 80, 80].map((w, i) => <Skeleton key={i} className="h-3.5 rounded" style={{ width: w }} />)}
+                  </div>
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <div key={i} className="px-4 py-3 border-b last:border-b-0 flex gap-6 items-center">
+                      {[80, 100, 80, 100, 80, 80, 80].map((w, j) => <Skeleton key={j} className="h-3 rounded" style={{ width: w }} />)}
+                    </div>
                   ))}
                 </div>
               ) : unifiedLedger.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No transactions found for this supplier
-                  {companyFilter !== "all" && companies.find((c: any) => c.id === parseInt(companyFilter)) 
-                    ? ` in ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
-                    : ""}.
+                <div className="border rounded-xl bg-muted/20 flex flex-col items-center justify-center py-12 gap-3 text-center">
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                    <DollarSign className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">No transactions</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      No transactions found{companyFilter !== "all" ? " for this company" : ""}
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
-                      <div className="text-sm text-muted-foreground">
-                        Showing {txCount} transaction{txCount !== 1 ? "s" : ""}
-                        {companyFilter !== "all" && companies.find((c: any) => c.id === parseInt(companyFilter))
-                          ? ` from ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
-                          : " from all companies"}
-                      </div>
-
-                      {openingEntry && (
-                        <div className="flex items-center justify-between rounded-md bg-muted/50 border px-4 py-2 text-sm">
-                          <span className="text-muted-foreground font-medium">Opening Balance</span>
-                          <span className="font-mono font-semibold">{formatAmount(openingEntry.balance)}</span>
-                        </div>
-                      )}
-
-                      <div className="hidden md:block">
-                        <Table>
-                          <TableHeader className="sticky top-0 z-30 bg-background">
-                            <TableRow>
-                              <TableHead>Date</TableHead>
-                              <TableHead>Company</TableHead>
-                              <TableHead>Type</TableHead>
-                              <TableHead>Container</TableHead>
-                              <TableHead className="text-right">Debit</TableHead>
-                              <TableHead className="text-right">Credit</TableHead>
-                              <TableHead className="text-right">Balance</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {ledgerRows.map((txn: any, idx: number) => {
-                              const isPayment = txn.voucherType === "Payment" || txn.debit > 0;
-                              return (
-                                <TableRow key={`${txn.type}-${txn.docNumber}-${idx}`}>
-                                  <TableCell className="font-mono text-sm">
-                                    {txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}
-                                  </TableCell>
-                                  <TableCell className="text-sm">
-                                    <Badge variant="secondary">{txn.companyName}</Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant={isPayment ? "default" : "outline"}>
-                                      {isPayment ? "Payment" : txn.voucherType}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    {txn.containerNumber ? (
-                                      <button
-                                        onClick={() => handleContainerClick(txn)}
-                                        className="font-mono text-sm text-primary hover:underline cursor-pointer flex items-center gap-1"
-                                        data-testid={`link-container-${idx}`}
-                                      >
-                                        {txn.containerNumber}
-                                        <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                                      </button>
-                                    ) : (
-                                      <button
-                                        onClick={() => handleTransactionClick(txn)}
-                                        className="text-sm text-muted-foreground hover:text-primary hover:underline cursor-pointer flex items-center gap-1"
-                                        data-testid={`link-transaction-${idx}`}
-                                      >
-                                        {txn.docNumber || "-"}
-                                        <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                                      </button>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono text-sm">
-                                    {txn.debit > 0 ? formatAmount(txn.debit) : "—"}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono text-sm">
-                                    {txn.credit > 0 ? formatAmount(txn.credit) : "—"}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono font-semibold">
-                                    {formatAmount(txn.balance)}
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
-
-                      <div className="md:hidden space-y-3">
+                  {openingEntry && (
+                    <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-4 py-2.5">
+                      <span className="text-xs font-medium text-muted-foreground">Opening Balance</span>
+                      <span className="font-mono font-semibold text-sm">{formatAmount(openingEntry.balance)}</span>
+                    </div>
+                  )}
+                  <div className="border rounded-xl overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/40 hover:bg-muted/40">
+                          <TableHead className="h-9 text-xs font-semibold">Date</TableHead>
+                          <TableHead className="h-9 text-xs font-semibold">Company</TableHead>
+                          <TableHead className="h-9 text-xs font-semibold">Type</TableHead>
+                          <TableHead className="h-9 text-xs font-semibold">Ref</TableHead>
+                          <TableHead className="h-9 text-xs font-semibold text-right">Debit</TableHead>
+                          <TableHead className="h-9 text-xs font-semibold text-right">Credit</TableHead>
+                          <TableHead className="h-9 text-xs font-semibold text-right">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
                         {ledgerRows.map((txn: any, idx: number) => {
                           const isPayment = txn.voucherType === "Payment" || txn.debit > 0;
                           return (
-                            <Card key={`${txn.type}-${txn.docNumber}-${idx}`}>
-                              <CardContent className="p-3 space-y-2">
-                                <div className="flex items-center justify-between gap-2 flex-wrap">
-                                  <span className="font-mono text-xs text-muted-foreground">
-                                    {txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}
-                                  </span>
-                                  <Badge variant={isPayment ? "default" : "outline"}>
-                                    {isPayment ? "Payment" : txn.voucherType}
-                                  </Badge>
-                                </div>
+                            <TableRow key={`${txn.type}-${txn.docNumber}-${idx}`} className="text-xs">
+                              <TableCell className="py-2.5 font-mono text-muted-foreground whitespace-nowrap">
+                                {txn.date ? format(new Date(txn.date), "dd MMM yyyy") : "-"}
+                              </TableCell>
+                              <TableCell className="py-2.5">
+                                <Badge variant="secondary" className="text-xs">{txn.companyName}</Badge>
+                              </TableCell>
+                              <TableCell className="py-2.5">
+                                <Badge variant="secondary" className={`text-xs ${typeBadgeClass[isPayment ? "Payment" : txn.voucherType] || ""}`}>
+                                  {isPayment ? "Payment" : txn.voucherType}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="py-2.5">
                                 {txn.containerNumber ? (
                                   <button
                                     onClick={() => handleContainerClick(txn)}
-                                    className="font-mono text-sm text-primary hover:underline cursor-pointer flex items-center gap-1"
-                                    data-testid={`link-container-mobile-${idx}`}
+                                    className="font-mono text-xs text-primary hover:underline cursor-pointer flex items-center gap-1"
+                                    data-testid={`link-container-${idx}`}
                                   >
                                     {txn.containerNumber}
-                                    <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                    <ExternalLink className="h-3 w-3 shrink-0" />
                                   </button>
                                 ) : (
                                   <button
                                     onClick={() => handleTransactionClick(txn)}
-                                    className="text-sm text-muted-foreground hover:text-primary hover:underline cursor-pointer flex items-center gap-1"
-                                    data-testid={`link-transaction-mobile-${idx}`}
+                                    className="text-xs text-muted-foreground hover:text-primary hover:underline cursor-pointer flex items-center gap-1"
+                                    data-testid={`link-transaction-${idx}`}
                                   >
                                     {txn.docNumber || "-"}
-                                    <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                    <ExternalLink className="h-3 w-3 shrink-0" />
                                   </button>
                                 )}
-                                <div className="flex items-center justify-between gap-2 flex-wrap">
-                                  <Badge variant="secondary" className="text-xs">{txn.companyName}</Badge>
-                                  <div className="flex items-center gap-3 font-mono text-xs">
-                                    {txn.debit > 0 && <span className="text-muted-foreground">Dr: {formatAmount(txn.debit)}</span>}
-                                    {txn.credit > 0 && <span className="text-muted-foreground">Cr: {formatAmount(txn.credit)}</span>}
-                                    <span className="font-semibold">{formatAmount(txn.balance)}</span>
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
+                              </TableCell>
+                              <TableCell className="py-2.5 text-right font-mono">
+                                {txn.debit > 0 ? formatAmount(txn.debit) : "—"}
+                              </TableCell>
+                              <TableCell className="py-2.5 text-right font-mono">
+                                {txn.credit > 0 ? formatAmount(txn.credit) : "—"}
+                              </TableCell>
+                              <TableCell className="py-2.5 text-right font-mono font-semibold">
+                                {formatAmount(txn.balance)}
+                              </TableCell>
+                            </TableRow>
                           );
                         })}
-                      </div>
-
-                      <div className="border-t pt-4 flex justify-end">
-                        <div className="text-sm">
-                          <span className="text-muted-foreground">Total Balance: </span>
-                          <span className="font-mono font-semibold text-lg">
-                            {formatAmount(unifiedLedger[unifiedLedger.length - 1]?.balance ?? 0)}
-                          </span>
-                        </div>
-                      </div>
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               )}
             </TabsContent>
 
-            <TabsContent value="purchase-orders" className="flex-1 overflow-y-auto mt-4">
+            {/* Purchase Orders tab */}
+            <TabsContent value="purchase-orders" className="flex-1 overflow-y-auto mt-0 px-5 pb-5 pt-3">
               {posLoading ? (
-                <div className="space-y-2">
-                  {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
+                <div className="border rounded-xl overflow-hidden">
+                  <div className="bg-muted/40 px-4 py-2.5 border-b flex gap-6">
+                    {[120, 100, 100, 100].map((w, i) => <Skeleton key={i} className="h-3.5 rounded" style={{ width: w }} />)}
+                  </div>
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="px-4 py-3.5 border-b last:border-b-0 flex gap-6 items-center">
+                      {[120, 100, 100, 100].map((w, j) => <Skeleton key={j} className="h-3 rounded" style={{ width: w }} />)}
+                    </div>
                   ))}
                 </div>
               ) : purchaseOrders.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No purchase orders found for this supplier
-                  {companyFilter !== "all" && companies.find((c: any) => c.id === parseInt(companyFilter)) 
-                    ? ` in ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
-                    : ""}.
+                <div className="border rounded-xl bg-muted/20 flex flex-col items-center justify-center py-12 gap-3 text-center">
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">No purchase orders</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      No purchase orders found{companyFilter !== "all" ? " for this company" : ""}
+                    </p>
+                  </div>
                 </div>
               ) : (() => {
-                  const sortedPOs = [...purchaseOrders]
-                    .sort((a: any, b: any) => new Date(b.importDate || b.createdAt).getTime() - new Date(a.importDate || a.createdAt).getTime())
-                    .map((po: any) => {
-                      const itemsTotal = parseFloat(po.itemsTotal || "0");
-                      const freight = parseFloat(po.freight || "0");
-                      const surcharge = parseFloat(po.surcharge || "0");
-                      const fumigation = parseFloat(po.fumigation || "0");
-                      const documentCharges = parseFloat(po.documentCharges || "0");
-                      const discount = parseFloat(po.discount || "0");
-                      const otherCharges = parseFloat(po.otherCharges || "0");
-                      const totalAmount = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
-                      return { ...po, totalAmount };
-                    });
-                  const grandTotal = sortedPOs.reduce((sum: number, po: any) => sum + po.totalAmount, 0);
+                const sortedPOs = [...purchaseOrders]
+                  .sort((a: any, b: any) => new Date(b.importDate || b.createdAt).getTime() - new Date(a.importDate || a.createdAt).getTime())
+                  .map((po: any) => {
+                    const itemsTotal = parseFloat(po.itemsTotal || "0");
+                    const freight = parseFloat(po.freight || "0");
+                    const surcharge = parseFloat(po.surcharge || "0");
+                    const fumigation = parseFloat(po.fumigation || "0");
+                    const documentCharges = parseFloat(po.documentCharges || "0");
+                    const discount = parseFloat(po.discount || "0");
+                    const otherCharges = parseFloat(po.otherCharges || "0");
+                    const totalAmount = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
+                    return { ...po, totalAmount };
+                  });
+                const grandTotal = sortedPOs.reduce((sum: number, po: any) => sum + po.totalAmount, 0);
 
-                  return (
-                    <div className="space-y-3">
-                      <div className="text-sm text-muted-foreground">
-                        Showing {sortedPOs.length} purchase order{sortedPOs.length !== 1 ? "s" : ""}
-                        {companyFilter !== "all" && companies.find((c: any) => c.id === parseInt(companyFilter))
-                          ? ` from ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
-                          : " from all companies"}
-                      </div>
-
-                      <div className="hidden md:block">
-                        <Table>
-                          <TableHeader className="sticky top-0 z-30 bg-background">
-                            <TableRow>
-                              <TableHead className="text-base">Container</TableHead>
-                              <TableHead className="text-base">Import Date</TableHead>
-                              <TableHead className="text-base">Company</TableHead>
-                              <TableHead className="text-right text-base">Total Amount</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {sortedPOs.map((po: any, idx: number) => (
-                              <TableRow key={po.id} className="h-14">
-                                <TableCell>
-                                  {po.containerId ? (
-                                    <button
-                                      onClick={() => handleContainerClick(po)}
-                                      className="flex items-center gap-2 text-primary hover:underline cursor-pointer font-mono font-bold text-base"
-                                      data-testid={`link-po-container-${idx}`}
-                                    >
-                                      {po.containerNumber || "-"}
-                                      <ExternalLink className="h-4 w-4 flex-shrink-0" />
-                                    </button>
-                                  ) : (
-                                    <span className="font-mono font-bold text-base">{po.containerNumber || "-"}</span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="font-mono text-base">
-                                  {po.importDate ? format(new Date(po.importDate), "dd MMM yyyy") : "-"}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="secondary">{po.companyName}</Badge>
-                                </TableCell>
-                                <TableCell className="text-right font-mono font-bold text-base">
-                                  {formatAmount(po.totalAmount)}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-
-                      <div className="md:hidden space-y-2">
-                        {sortedPOs.map((po: any, idx: number) => (
-                          <Card key={po.id}>
-                            <CardContent className="p-3 space-y-1">
-                              <div className="flex items-center justify-between gap-2">
+                return (
+                  <div className="space-y-3">
+                    <div className="border rounded-xl overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/40 hover:bg-muted/40">
+                            <TableHead className="h-9 text-xs font-semibold">Container</TableHead>
+                            <TableHead className="h-9 text-xs font-semibold">Import Date</TableHead>
+                            <TableHead className="h-9 text-xs font-semibold">Company</TableHead>
+                            <TableHead className="h-9 text-xs font-semibold text-right">Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {sortedPOs.map((po: any, idx: number) => (
+                            <TableRow key={po.id} className="text-sm cursor-pointer hover:bg-muted/40" onClick={() => handlePOClick(po)}>
+                              <TableCell className="py-3">
                                 {po.containerId ? (
                                   <button
-                                    onClick={() => handleContainerClick(po)}
-                                    className="flex items-center gap-1 text-primary hover:underline cursor-pointer font-mono font-bold"
-                                    data-testid={`link-po-container-mobile-${idx}`}
+                                    onClick={(e) => { e.stopPropagation(); handleContainerClick(po); }}
+                                    className="flex items-center gap-1.5 font-mono font-semibold text-primary hover:underline"
+                                    data-testid={`link-po-container-${idx}`}
                                   >
                                     {po.containerNumber || "-"}
-                                    <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                                   </button>
                                 ) : (
-                                  <span className="font-mono font-bold">{po.containerNumber || "-"}</span>
+                                  <span className="font-mono font-semibold">{po.containerNumber || "-"}</span>
                                 )}
-                                <span className="font-mono text-sm text-muted-foreground">
-                                  {po.importDate ? format(new Date(po.importDate), "dd MMM yyyy") : "-"}
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between gap-2">
+                              </TableCell>
+                              <TableCell className="py-3 font-mono text-sm text-muted-foreground">
+                                {po.importDate ? format(new Date(po.importDate), "dd MMM yyyy") : "-"}
+                              </TableCell>
+                              <TableCell className="py-3">
                                 <Badge variant="secondary" className="text-xs">{po.companyName}</Badge>
-                                <span className="font-mono font-bold">{formatAmount(po.totalAmount)}</span>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-
-                      <div className="border-t pt-3 flex items-center justify-between bg-muted/50 rounded-md px-4 py-3">
-                        <span className="text-sm font-medium text-muted-foreground">
-                          {sortedPOs.length} container{sortedPOs.length !== 1 ? "s" : ""}
-                        </span>
-                        <div className="text-right">
-                          <span className="text-xs text-muted-foreground block">Total</span>
-                          <span className="font-mono font-bold text-lg">{formatAmount(grandTotal)}</span>
-                        </div>
+                              </TableCell>
+                              <TableCell className="py-3 text-right font-mono font-semibold">
+                                {formatAmount(po.totalAmount)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <div className="flex justify-end">
+                      <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+                        <span className="text-muted-foreground">Grand Total</span>
+                        <span className="font-mono font-semibold">{formatAmount(grandTotal)}</span>
                       </div>
                     </div>
-                  );
-                })()
-              }
+                  </div>
+                );
+              })()}
             </TabsContent>
           </Tabs>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!supplierToDelete} onOpenChange={(o) => !o && setSupplierToDelete(null)}>
+      {/* Delete confirmation */}
+      <AlertDialog open={!!supplierToDelete} onOpenChange={(open) => !open && setSupplierToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Supplier</AlertDialogTitle>
@@ -807,14 +661,13 @@ export default function Suppliers() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => supplierToDelete && deleteMutation.mutate(supplierToDelete.id)}
-              disabled={deleteMutation.isPending}
-              data-testid="button-confirm-delete"
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-supplier"
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
