@@ -49,6 +49,7 @@ import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelpe
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
 import path from "path";
 import fs from "fs";
+import { sendTransferWhatsApp } from "../helpers/sendTransferWhatsApp";
 
 export function registerFiscalTransferRoutes(app: Express) {
   app.post("/api/fiscal-period/close", requireAuth, async (req, res) => {
@@ -747,11 +748,40 @@ export function registerFiscalTransferRoutes(app: Express) {
             return { transfer, transferItems, newVoucher };
           });
 
-          return res.status(201).json({
+          res.status(201).json({
             transfer: txResult.transfer,
             items: txResult.transferItems,
             voucher: txResult.newVoucher,
           });
+
+          // Fire-and-forget: send transfer image to destination WA group
+          setImmediate(async () => {
+            try {
+              const waSourceId = txResult.transfer.sourceLocationId;
+              let sourceName = "Multiple Sources";
+              if (waSourceId) {
+                const [srcLoc] = await db
+                  .select({ name: locations.name })
+                  .from(locations)
+                  .where(eq(locations.id, waSourceId));
+                if (srcLoc?.name) sourceName = srcLoc.name;
+              }
+              await sendTransferWhatsApp({
+                destinationLocationId,
+                sourceLocationName: sourceName,
+                destLocationName: destLocation.name,
+                items: txResult.transferItems.map((i) => ({
+                  stockItemId: i.stockItemId,
+                  quantity: parseFloat(i.quantity),
+                })),
+                voucherNumber: txResult.newVoucher.voucherNumber,
+                voucherDate: txResult.newVoucher.voucherDate,
+              });
+            } catch (e: any) {
+              console.error("[TransferWA] Failed to send:", e.message);
+            }
+          });
+          return;
         }
 
         // Original flow: Use existing voucher (voucherId required)

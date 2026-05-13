@@ -1,5 +1,6 @@
 import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
+import { sendTransferWhatsApp } from "../helpers/sendTransferWhatsApp";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
@@ -1856,9 +1857,9 @@ export function registerImportRoutes(app: Express) {
         });
       }
 
+      const voucherNumber = `ST-${Date.now()}`;
       await db.transaction(async (tx) => {
         // Create stock transfer voucher
-        const voucherNumber = `ST-${Date.now()}`;
 
         const [voucher] = await tx
           .insert(vouchers)
@@ -1906,6 +1907,31 @@ export function registerImportRoutes(app: Express) {
         success: true,
         itemsCount: items.length,
         totalValue: totalValue.toFixed(2),
+      });
+
+      // Fire-and-forget: send transfer image to destination WA group
+      const waItems = transferItems.map((i) => ({
+        stockItemId: i.stockItemId,
+        quantity: parseFloat(i.quantity),
+      }));
+      const waVoucher = voucherNumber;
+      const waSrcName = sourceLocation.name;
+      const waDstName = destLocation.name;
+      const waDstId   = destinationLocationId;
+      const waDate    = transferDate;
+      setImmediate(async () => {
+        try {
+          await sendTransferWhatsApp({
+            destinationLocationId: waDstId,
+            sourceLocationName: waSrcName,
+            destLocationName: waDstName,
+            items: waItems,
+            voucherNumber: waVoucher,
+            voucherDate: waDate,
+          });
+        } catch (e: any) {
+          console.error("[TransferWA] Failed to send:", e.message);
+        }
       });
     } catch (error: any) {
       console.error("Stock Transfer Import error:", error);
@@ -2290,6 +2316,7 @@ export function registerImportRoutes(app: Express) {
       }
 
       // Create voucher and update inventory in a transaction
+      let multiSourceVoucherNumber = "";
       await db.transaction(async (tx) => {
         // Get next voucher number
         const existingVouchers = await tx
@@ -2312,7 +2339,8 @@ export function registerImportRoutes(app: Express) {
             nextNumber = parseInt(numMatch[1]) + 1;
           }
         }
-        const voucherNumber = `STI-${String(nextNumber).padStart(4, "0")}`;
+        multiSourceVoucherNumber = `STI-${String(nextNumber).padStart(4, "0")}`;
+        const voucherNumber = multiSourceVoucherNumber;
 
         // Create the voucher
         const [voucher] = await tx
@@ -2367,6 +2395,32 @@ export function registerImportRoutes(app: Express) {
         itemsCount: processedItems.length,
         totalValue: totalValue.toFixed(2),
       });
+
+      // Fire-and-forget: send transfer image to destination WA group
+      if (multiSourceVoucherNumber) {
+        const waItemsMs = processedItems.map((i) => ({
+          stockItemId: i.stockItemId,
+          quantity: i.quantity,
+        }));
+        const waVoucherMs = multiSourceVoucherNumber;
+        const waDstNameMs = destLocation.name;
+        const waDstIdMs   = destinationLocationId;
+        const waDateMs    = transferDate || getClientDate(req);
+        setImmediate(async () => {
+          try {
+            await sendTransferWhatsApp({
+              destinationLocationId: waDstIdMs,
+              sourceLocationName: "Multiple Sources",
+              destLocationName: waDstNameMs,
+              items: waItemsMs,
+              voucherNumber: waVoucherMs,
+              voucherDate: waDateMs,
+            });
+          } catch (e: any) {
+            console.error("[TransferWA] Failed to send:", e.message);
+          }
+        });
+      }
     } catch (error: any) {
       console.error("Stock Transfer Import error:", error);
       res.status(500).json({ message: error.message });
