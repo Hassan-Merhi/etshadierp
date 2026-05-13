@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Search, Pencil, Users, UserX, UserCheck, AlertTriangle, CheckCircle2, RefreshCw, Loader2 } from "lucide-react";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+  Plus, Search, Pencil, Users, UserX, UserCheck,
+  AlertTriangle, CheckCircle2, RefreshCw, Loader2,
+  DollarSign, UserCheck2, UserMinus,
+} from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,9 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
@@ -36,9 +40,12 @@ interface Employee {
 }
 
 const AVATAR_COLORS = [
-  "bg-blue-100 text-blue-700", "bg-purple-100 text-purple-700",
-  "bg-emerald-100 text-emerald-700", "bg-amber-100 text-amber-700",
-  "bg-rose-100 text-rose-700", "bg-cyan-100 text-cyan-700",
+  "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
+  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
+  "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300",
 ];
 
 function getAvatarColor(name: string) {
@@ -53,8 +60,14 @@ function getInitials(name: string) {
 
 const emptyForm = {
   firstName: "", lastName: "", code: "", department: "", phone: "",
-  monthlySalary: "", joinDate: new Date().toLocaleDateString('en-CA'),
+  monthlySalary: "", joinDate: new Date().toLocaleDateString("en-CA"),
 };
+
+function fmt(val: string | number | null | undefined) {
+  const n = parseFloat(String(val || 0));
+  if (isNaN(n)) return "$0";
+  return n % 1 === 0 ? `$${n.toLocaleString()}` : `$${n.toFixed(2)}`;
+}
 
 export default function FactoryEmployees() {
   const [, navigate] = useLocation();
@@ -68,7 +81,10 @@ export default function FactoryEmployees() {
   const [formData, setFormData] = useState({ ...emptyForm });
   const [recalcConfirmOpen, setRecalcConfirmOpen] = useState(false);
   const [recalcResultOpen, setRecalcResultOpen] = useState(false);
-  const [recalcResult, setRecalcResult] = useState<{ updated: number; employees: Array<{ id: number; name: string; oldBalance: number; newBalance: number }> } | null>(null);
+  const [recalcResult, setRecalcResult] = useState<{
+    updated: number;
+    employees: Array<{ id: number; name: string; oldBalance: number; newBalance: number }>;
+  } | null>(null);
 
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
     queryKey: ["/api/factory/employees"],
@@ -82,10 +98,7 @@ export default function FactoryEmployees() {
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const res = await factoryApiRequest("POST", "/api/factory/employees", data);
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Failed to create employee");
-      }
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed to create employee"); }
       return res.json();
     },
     onSuccess: () => {
@@ -100,10 +113,7 @@ export default function FactoryEmployees() {
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<typeof formData> }) => {
       const res = await factoryApiRequest("PATCH", `/api/factory/employees/${id}`, data);
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Failed to update employee");
-      }
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed to update employee"); }
       return res.json();
     },
     onSuccess: (emp: Employee) => {
@@ -118,10 +128,7 @@ export default function FactoryEmployees() {
   const deactivateMutation = useMutation({
     mutationFn: async (id: number) => {
       const res = await factoryApiRequest("PATCH", `/api/factory/employees/${id}`, { active: false });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "Failed to end contract");
-      }
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || "Failed to end contract"); }
       return res.json();
     },
     onSuccess: () => {
@@ -135,10 +142,7 @@ export default function FactoryEmployees() {
   const reactivateMutation = useMutation({
     mutationFn: async (id: number) => {
       const res = await factoryApiRequest("PATCH", `/api/factory/employees/${id}`, { active: true });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "Failed to reactivate employee");
-      }
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || "Failed to reactivate employee"); }
       return res.json();
     },
     onSuccess: () => {
@@ -151,10 +155,7 @@ export default function FactoryEmployees() {
   const recalcMutation = useMutation({
     mutationFn: async () => {
       const res = await factoryApiRequest("POST", "/api/factory/employees/recalculate-balances", {});
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "Failed to recalculate balances");
-      }
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || "Failed to recalculate balances"); }
       return res.json();
     },
     onSuccess: (data) => {
@@ -169,7 +170,7 @@ export default function FactoryEmployees() {
     },
   });
 
-  function parseCodeNum(code: string | null | undefined): number {
+  function parseCodeNum(code: string | null | undefined) {
     if (!code) return Infinity;
     const m = code.match(/(\d+)$/);
     return m ? parseInt(m[1], 10) : Infinity;
@@ -180,8 +181,7 @@ export default function FactoryEmployees() {
       const matchesSearch =
         !search ||
         `${e.firstName} ${e.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
-        (e.code || "").toLowerCase().includes(search.toLowerCase()) ||
-        (e.department || "").toLowerCase().includes(search.toLowerCase());
+        (e.code || "").toLowerCase().includes(search.toLowerCase());
       const matchesStatus =
         statusFilter === "All" ||
         (statusFilter === "Active" && e.active) ||
@@ -190,11 +190,12 @@ export default function FactoryEmployees() {
     })
     .sort((a, b) => parseCodeNum(a.code) - parseCodeNum(b.code));
 
-  const fmt = (val: string | number | null | undefined) => {
-    const n = parseFloat(String(val || 0));
-    if (isNaN(n)) return "$0";
-    return n % 1 === 0 ? `$${n.toLocaleString()}` : `$${n.toFixed(2)}`;
-  };
+  // Stats
+  const totalActive = employees.filter((e) => e.active).length;
+  const totalInactive = employees.filter((e) => !e.active).length;
+  const totalMonthlySalary = employees
+    .filter((e) => e.active)
+    .reduce((s, e) => s + parseFloat(e.monthlySalary || "0"), 0);
 
   function openCreate() {
     setFormData({ ...emptyForm });
@@ -219,10 +220,46 @@ export default function FactoryEmployees() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[180px]">
+    <div className="space-y-5">
+
+      {/* Stats pills */}
+      <div className="flex flex-wrap gap-3">
+        {isLoading ? (
+          <>
+            <Skeleton className="h-10 w-36 rounded-lg" />
+            <Skeleton className="h-10 w-32 rounded-lg" />
+            <Skeleton className="h-10 w-32 rounded-lg" />
+            <Skeleton className="h-10 w-44 rounded-lg" />
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Total</span>
+              <span className="font-semibold">{employees.length}</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+              <UserCheck2 className="h-4 w-4 text-emerald-500" />
+              <span className="text-muted-foreground">Active</span>
+              <span className="font-semibold">{totalActive}</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+              <UserMinus className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Inactive</span>
+              <span className="font-semibold">{totalInactive}</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Monthly Payroll</span>
+              <span className="font-semibold font-mono">{fmt(totalMonthlySalary)}</span>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Filter row */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search employees..."
@@ -242,102 +279,144 @@ export default function FactoryEmployees() {
             <SelectItem value="All">All</SelectItem>
           </SelectContent>
         </Select>
-        <Button size="icon" onClick={openCreate} data-testid="button-create-employee" title="New Employee">
-          <Plus className="h-4 w-4" />
+        <Button onClick={openCreate} data-testid="button-create-employee">
+          <Plus className="mr-2 h-4 w-4" />
+          New Employee
         </Button>
       </div>
 
-      {/* List */}
-      {isLoading ? (
-        <div className="flex flex-col gap-2">
-          {[...Array(6)].map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full rounded-md" />
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <Users className="h-10 w-10 text-muted-foreground mb-3" />
-            <p className="text-muted-foreground">No employees found</p>
-            <Button size="sm" className="mt-4" onClick={openCreate} data-testid="button-create-employee-empty">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Employee
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {filtered.map((emp) => {
-            const fullName = `${emp.firstName} ${emp.lastName}`;
-            const balance = parseFloat(emp.currentBalance || "0");
-            return (
-              <Card
-                key={emp.id}
-                className="cursor-pointer hover-elevate group"
-                onClick={() => navigate(`/factory/employees/${emp.id}`)}
-                data-testid={`card-employee-${emp.id}`}
-              >
-                <CardContent className="px-4 py-3">
-                  <div className="flex items-center gap-4 flex-wrap">
-
-                    {/* Avatar */}
-                    <Avatar className={`h-10 w-10 shrink-0 ${getAvatarColor(fullName)}`}>
-                      <AvatarFallback className={`text-sm font-semibold ${getAvatarColor(fullName)}`}>
-                        {getInitials(fullName)}
-                      </AvatarFallback>
-                    </Avatar>
-
-                    {/* Name + department */}
-                    <div className="flex-1 min-w-36">
-                      <div className="font-semibold text-sm leading-tight">{fullName}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {emp.department || <span className="opacity-40">—</span>}
+      {/* Table */}
+      <div className="border rounded-xl overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40 hover:bg-muted/40">
+              <TableHead className="text-xs h-9 font-semibold">Employee</TableHead>
+              <TableHead className="text-xs h-9 font-semibold text-right">Monthly Salary</TableHead>
+              <TableHead className="text-xs h-9 font-semibold text-right">Balance</TableHead>
+              <TableHead className="text-xs h-9 font-semibold">Status</TableHead>
+              <TableHead className="text-xs h-9 font-semibold w-[80px]"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              [...Array(6)].map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-8 w-8 rounded-full" />
+                      <Skeleton className="h-4 w-36" />
+                    </div>
+                  </TableCell>
+                  <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              ))
+            ) : filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5}>
+                  <div className="flex flex-col items-center gap-2 py-10 text-center">
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                      <Users className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium">No employees found</p>
+                    <p className="text-xs text-muted-foreground">
+                      {search ? "Try a different search term" : "Add your first employee to get started"}
+                    </p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              filtered.map((emp) => {
+                const fullName = `${emp.firstName} ${emp.lastName}`;
+                const balance = parseFloat(emp.currentBalance || "0");
+                const avatarColor = getAvatarColor(fullName);
+                return (
+                  <TableRow
+                    key={emp.id}
+                    className="group cursor-pointer hover:bg-muted/40"
+                    onClick={() => navigate(`/factory/employees/${emp.id}`)}
+                    data-testid={`row-employee-${emp.id}`}
+                  >
+                    <TableCell className="py-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar className={`h-8 w-8 shrink-0 ${avatarColor}`}>
+                          <AvatarFallback className={`text-xs font-semibold ${avatarColor}`}>
+                            {getInitials(fullName)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="font-medium text-sm">{fullName}</span>
                       </div>
-                    </div>
-
-                    {/* Balance */}
-                    <div className="shrink-0 min-w-24">
-                      <p className="text-xs text-muted-foreground">Balance</p>
-                      <p className={`text-sm font-semibold ${balance < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                    </TableCell>
+                    <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground">
+                      {fmt(emp.monthlySalary)}
+                    </TableCell>
+                    <TableCell className="py-3 text-right">
+                      <span className={`font-mono font-semibold text-sm ${
+                        balance < 0
+                          ? "text-red-600 dark:text-red-400"
+                          : "text-emerald-600 dark:text-emerald-400"
+                      }`}>
                         {fmt(emp.currentBalance)}
-                      </p>
-                    </div>
-
-                    {/* Status */}
-                    <div className="shrink-0">
+                      </span>
+                    </TableCell>
+                    <TableCell className="py-3">
                       <Badge
-                        variant="outline"
-                        className={`text-xs no-default-active-elevate ${emp.active
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "border-red-400 text-red-600 dark:text-red-400"}`}
+                        variant="secondary"
+                        className={`text-xs no-default-active-elevate ${
+                          emp.active
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                            : "bg-muted text-muted-foreground"
+                        }`}
                       >
                         {emp.active ? "Active" : "Inactive"}
                       </Badge>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-1 shrink-0 md:invisible md:group-hover:visible" onClick={(e) => e.stopPropagation()}>
-                      <Button size="icon" variant="ghost" onClick={() => openEdit(emp)} data-testid={`button-edit-employee-${emp.id}`}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      {emp.active ? (
-                        <Button size="icon" variant="ghost" onClick={() => setEndingContractEmployee(emp)} data-testid={`button-end-contract-${emp.id}`} title="End Contract">
-                          <UserX className="h-3.5 w-3.5 text-destructive" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <div
+                        className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => openEdit(emp)}
+                          data-testid={`button-edit-employee-${emp.id}`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                      ) : (
-                        <Button size="icon" variant="ghost" onClick={() => reactivateMutation.mutate(emp.id)} disabled={reactivateMutation.isPending} data-testid={`button-reactivate-${emp.id}`} title="Reactivate">
-                          <UserCheck className="h-3.5 w-3.5 text-green-600" />
-                        </Button>
-                      )}
-                    </div>
-
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+                        {emp.active ? (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setEndingContractEmployee(emp)}
+                            data-testid={`button-end-contract-${emp.id}`}
+                            title="End Contract"
+                          >
+                            <UserX className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        ) : (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => reactivateMutation.mutate(emp.id)}
+                            disabled={reactivateMutation.isPending}
+                            data-testid={`button-reactivate-${emp.id}`}
+                            title="Reactivate"
+                          >
+                            <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       {/* Create / Edit Dialog */}
       <Dialog open={createOpen || !!editingEmployee} onOpenChange={(open) => {
@@ -351,84 +430,40 @@ export default function FactoryEmployees() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label>First Name *</Label>
-                <Input
-                  value={formData.firstName}
-                  onChange={(e) => handleField("firstName", e.target.value)}
-                  placeholder="First name"
-                  data-testid="input-first-name"
-                />
+                <Input value={formData.firstName} onChange={(e) => handleField("firstName", e.target.value)} placeholder="First name" data-testid="input-first-name" />
               </div>
               <div className="space-y-1">
                 <Label>Last Name *</Label>
-                <Input
-                  value={formData.lastName}
-                  onChange={(e) => handleField("lastName", e.target.value)}
-                  placeholder="Last name"
-                  data-testid="input-last-name"
-                />
+                <Input value={formData.lastName} onChange={(e) => handleField("lastName", e.target.value)} placeholder="Last name" data-testid="input-last-name" />
               </div>
             </div>
             {!editingEmployee && (
               <div className="space-y-1">
                 <Label>Code (optional)</Label>
-                <Input
-                  value={formData.code}
-                  onChange={(e) => handleField("code", e.target.value)}
-                  placeholder="Auto-generated if blank"
-                  data-testid="input-code"
-                />
+                <Input value={formData.code} onChange={(e) => handleField("code", e.target.value)} placeholder="Auto-generated if blank" data-testid="input-code" />
               </div>
             )}
             <div className="space-y-1">
               <Label>Department</Label>
-              <Input
-                value={formData.department}
-                onChange={(e) => handleField("department", e.target.value)}
-                placeholder="e.g. Operations"
-                data-testid="input-department"
-              />
+              <Input value={formData.department} onChange={(e) => handleField("department", e.target.value)} placeholder="e.g. Operations" data-testid="input-department" />
             </div>
             <div className="space-y-1">
               <Label>Phone</Label>
-              <Input
-                value={formData.phone}
-                onChange={(e) => handleField("phone", e.target.value)}
-                placeholder="+1 234 567 8900"
-                data-testid="input-phone"
-              />
+              <Input value={formData.phone} onChange={(e) => handleField("phone", e.target.value)} placeholder="+1 234 567 8900" data-testid="input-phone" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label>Monthly Salary</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.monthlySalary}
-                  onChange={(e) => handleField("monthlySalary", e.target.value)}
-                  placeholder="0.00"
-                  data-testid="input-monthly-salary"
-                />
+                <Input type="number" min="0" step="0.01" value={formData.monthlySalary} onChange={(e) => handleField("monthlySalary", e.target.value)} placeholder="0.00" data-testid="input-monthly-salary" />
               </div>
               <div className="space-y-1">
                 <Label>Join Date *</Label>
-                <Input
-                  type="date"
-                  value={formData.joinDate}
-                  onChange={(e) => handleField("joinDate", e.target.value)}
-                  data-testid="input-join-date"
-                />
+                <Input type="date" value={formData.joinDate} onChange={(e) => handleField("joinDate", e.target.value)} data-testid="input-join-date" />
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => { setCreateOpen(false); setEditingEmployee(null); }}
-              data-testid="button-cancel"
-            >
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => { setCreateOpen(false); setEditingEmployee(null); }} data-testid="button-cancel">Cancel</Button>
             <Button
               onClick={() => {
                 if (editingEmployee) {
@@ -453,18 +488,14 @@ export default function FactoryEmployees() {
             <DialogTitle>End Contract</DialogTitle>
           </DialogHeader>
           {endingContractEmployee && (() => {
-            // Use live data from query instead of stale state snapshot
-            const liveEmp = employees.find(e => e.id === endingContractEmployee.id) ?? endingContractEmployee;
+            const liveEmp = employees.find((e) => e.id === endingContractEmployee.id) ?? endingContractEmployee;
             const balance = parseFloat(liveEmp.currentBalance || "0");
             const fmtBal = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             return (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Ending contract for <span className="font-semibold text-foreground">{endingContractEmployee.firstName} {endingContractEmployee.lastName}</span>.
-                  They will be marked inactive but can be reactivated later.
+                  Ending contract for <span className="font-semibold text-foreground">{endingContractEmployee.firstName} {endingContractEmployee.lastName}</span>. They will be marked inactive but can be reactivated later.
                 </p>
-
-                {/* Balance status */}
                 {balance > 0 ? (
                   <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 p-3 space-y-1.5">
                     <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-medium text-sm">
@@ -472,8 +503,7 @@ export default function FactoryEmployees() {
                       Outstanding balance: ${fmtBal(balance)}
                     </div>
                     <p className="text-xs text-amber-700/80 dark:text-amber-400/80 leading-relaxed">
-                      Running payroll records salary as <em>earned</em> — it doesn't mean cash was handed out. 
-                      To clear this balance, go to <strong>Withdrawals</strong> and record a cash payment of ${fmtBal(balance)} before ending the contract.
+                      Running payroll records salary as <em>earned</em> — it doesn't mean cash was handed out. To clear this balance, go to <strong>Withdrawals</strong> and record a cash payment of ${fmtBal(balance)} before ending the contract.
                     </p>
                   </div>
                 ) : balance < 0 ? (
@@ -496,9 +526,7 @@ export default function FactoryEmployees() {
             );
           })()}
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setEndingContractEmployee(null)} disabled={deactivateMutation.isPending}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setEndingContractEmployee(null)} disabled={deactivateMutation.isPending}>Cancel</Button>
             <Button
               variant="destructive"
               onClick={() => endingContractEmployee && deactivateMutation.mutate(endingContractEmployee.id)}
@@ -517,31 +545,19 @@ export default function FactoryEmployees() {
           <DialogHeader>
             <DialogTitle>Recalculate All Employee Balances</DialogTitle>
             <DialogDescription>
-              This will rebuild every employee's current balance, total deposits, and total withdrawals
-              from their actual accounting records. Use this to fix balances that were corrupted by
-              deletions that didn't reverse properly.
+              This will rebuild every employee's current balance, total deposits, and total withdrawals from their actual accounting records. Use this to fix balances that were corrupted by deletions that didn't reverse properly.
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 p-3 flex items-start gap-2 text-sm text-amber-800 dark:text-amber-300">
             <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-            <span>
-              This will overwrite the stored balances for <strong>all employees</strong> based on
-              surviving voucher records. Balances for employees with deleted vouchers will be corrected.
-            </span>
+            <span>This will overwrite the stored balances for <strong>all employees</strong> based on surviving voucher records.</span>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setRecalcConfirmOpen(false)} disabled={recalcMutation.isPending}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => recalcMutation.mutate()}
-              disabled={recalcMutation.isPending}
-              data-testid="button-confirm-recalculate"
-            >
+            <Button variant="outline" onClick={() => setRecalcConfirmOpen(false)} disabled={recalcMutation.isPending}>Cancel</Button>
+            <Button onClick={() => recalcMutation.mutate()} disabled={recalcMutation.isPending} data-testid="button-confirm-recalculate">
               {recalcMutation.isPending
                 ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Recalculating...</>
-                : <><RefreshCw className="h-4 w-4 mr-2" />Recalculate Now</>
-              }
+                : <><RefreshCw className="h-4 w-4 mr-2" />Recalculate Now</>}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -552,35 +568,33 @@ export default function FactoryEmployees() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
               Balances Recalculated
             </DialogTitle>
             <DialogDescription>
               {recalcResult?.updated ?? 0} employee{recalcResult?.updated !== 1 ? "s" : ""} updated from voucher records.
             </DialogDescription>
           </DialogHeader>
-          {recalcResult && recalcResult.employees.filter(e => Math.abs(e.oldBalance - e.newBalance) > 0.005).length > 0 && (
-            <div className="max-h-64 overflow-y-auto border rounded-md divide-y text-sm">
-              <div className="grid grid-cols-3 px-3 py-2 bg-muted text-xs font-medium text-muted-foreground">
+          {recalcResult && recalcResult.employees.filter((e) => Math.abs(e.oldBalance - e.newBalance) > 0.005).length > 0 ? (
+            <div className="max-h-64 overflow-y-auto border rounded-xl overflow-hidden text-sm">
+              <div className="grid grid-cols-3 px-3 py-2 bg-muted/40 text-xs font-semibold text-muted-foreground">
                 <span>Employee</span>
                 <span className="text-right">Old Balance</span>
                 <span className="text-right">New Balance</span>
               </div>
               {recalcResult.employees
-                .filter(e => Math.abs(e.oldBalance - e.newBalance) > 0.005)
-                .map(e => (
-                  <div key={e.id} className="grid grid-cols-3 px-3 py-2">
+                .filter((e) => Math.abs(e.oldBalance - e.newBalance) > 0.005)
+                .map((e) => (
+                  <div key={e.id} className="grid grid-cols-3 px-3 py-2 border-t">
                     <span className="truncate">{e.name}</span>
                     <span className="text-right font-mono text-muted-foreground">${e.oldBalance.toFixed(2)}</span>
                     <span className={`text-right font-mono font-medium ${e.newBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                       ${e.newBalance.toFixed(2)}
                     </span>
                   </div>
-                ))
-              }
+                ))}
             </div>
-          )}
-          {recalcResult && recalcResult.employees.filter(e => Math.abs(e.oldBalance - e.newBalance) > 0.005).length === 0 && (
+          ) : (
             <p className="text-sm text-muted-foreground text-center py-4">All balances were already correct — no changes needed.</p>
           )}
           <DialogFooter>
