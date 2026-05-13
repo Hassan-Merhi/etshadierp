@@ -1,13 +1,12 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber, drCrClass } from "@/lib/formatNumber";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { Plus, Search, Building2, Pencil } from "lucide-react";
+import { Plus, Search, Building2, Pencil, Users, Wallet, TrendingUp, TrendingDown, EyeOff, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -41,6 +40,16 @@ const formSchema = insertCustomerSchema.extend({
   legalName: z.string().min(1, "Legal name is required"),
 });
 
+const typeBadgeClass: Record<string, string> = {
+  Payment: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
+  Receipt: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
+  Journal: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
+  "Credit Note": "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  "Debit Note": "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  Transfer: "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300",
+  Adjustment: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
+};
+
 export default function Customers() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
@@ -50,10 +59,9 @@ export default function Customers() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [hideZero, setHideZero] = useState(true);
   const [statementCustomer, setStatementCustomer] = useState<(Customer & { balance: number; balanceSide: string }) | null>(null);
 
-  // Fetch transactions when a customer is selected for statement
-  // Works whether entries are stored by ledger_account_id or customer_id (post-migration)
   const { data: ledgerTxns = [], isLoading: txnsLoading } = useQuery<any[]>({
     queryKey: ["/api/customers", statementCustomer?.id, "transactions"],
     queryFn: () =>
@@ -78,7 +86,6 @@ export default function Customers() {
     },
   });
 
-  // Reset form when company changes
   useEffect(() => {
     if (selectedCompany?.id) {
       form.reset({
@@ -96,30 +103,17 @@ export default function Customers() {
       return await apiRequest("POST", "/api/customers", data);
     },
     onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Customer created successfully with ledger account",
-      });
+      toast({ title: "Success", description: "Customer created successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/customers/stats", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/customers", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", selectedCompany?.id] });
       setIsCreateOpen(false);
-      form.reset({
-        companyId: selectedCompany?.id || 0,
-        legalName: "",
-        phone: "",
-        openingBalance: "0",
-        openingBalanceSide: "Dr",
-      });
+      form.reset({ companyId: selectedCompany?.id || 0, legalName: "", phone: "", openingBalance: "0", openingBalanceSide: "Dr" });
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -128,31 +122,18 @@ export default function Customers() {
       return await apiRequest("PUT", `/api/customers/${data.id}`, data);
     },
     onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Customer updated successfully",
-      });
+      toast({ title: "Success", description: "Customer updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/customers/stats", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/customers", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", selectedCompany?.id] });
       setIsEditOpen(false);
       setEditingCustomer(null);
-      form.reset({
-        companyId: selectedCompany?.id || 0,
-        legalName: "",
-        phone: "",
-        openingBalance: "0",
-        openingBalanceSide: "Dr",
-      });
+      form.reset({ companyId: selectedCompany?.id || 0, legalName: "", phone: "", openingBalance: "0", openingBalanceSide: "Dr" });
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -179,23 +160,115 @@ export default function Customers() {
   const filteredCustomers = customers.filter((customer) => {
     const matchesSearch = (customer.legalName || "").toLowerCase().includes((searchQuery || "").toLowerCase());
     const hasBalance = (customer.balance || 0) !== 0;
-    return matchesSearch && (hasBalance || !!searchQuery);
+    if (!matchesSearch) return false;
+    if (hideZero && !hasBalance && !searchQuery) return false;
+    return true;
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
-    );
-  }
+  // Stats
+  const totalCustomers = customers.length;
+  const withBalance = customers.filter((c) => (c.balance || 0) !== 0).length;
+  const totalReceivable = customers
+    .filter((c) => c.balanceSide === "Dr" && (c.balance || 0) > 0)
+    .reduce((s, c) => s + (c.balance || 0), 0);
+  const totalPayable = customers
+    .filter((c) => c.balanceSide === "Cr" && (c.balance || 0) > 0)
+    .reduce((s, c) => s + (c.balance || 0), 0);
+
+  const CustomerForm = ({ isEdit }: { isEdit: boolean }) => (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <FormField
+          control={form.control}
+          name="legalName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Legal Name *</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="ABC Company Ltd." data-testid={isEdit ? "input-edit-legal-name" : "input-legal-name"} />
+              </FormControl>
+              {!isEdit && <FormDescription>Customer code will be auto-generated</FormDescription>}
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="phone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Phone Number</FormLabel>
+              <FormControl>
+                <Input {...field} value={field.value || ""} placeholder="+1234567890" data-testid={isEdit ? "input-edit-phone" : "input-phone"} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="openingBalance"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Opening Balance</FormLabel>
+                <FormControl>
+                  <Input {...field} value={field.value || "0"} type="number" step="0.01" placeholder="0.00" data-testid={isEdit ? "input-edit-opening-balance" : "input-opening-balance"} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="openingBalanceSide"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Balance Side</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || "Dr"}>
+                  <FormControl>
+                    <SelectTrigger data-testid={isEdit ? "select-edit-balance-side" : "select-balance-side"}>
+                      <SelectValue placeholder="Select side" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="Dr">Dr (Debit)</SelectItem>
+                    <SelectItem value="Cr">Cr (Credit)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => isEdit ? setIsEditOpen(false) : setIsCreateOpen(false)}
+            data-testid={isEdit ? "button-edit-cancel" : "button-cancel"}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={isEdit ? updateMutation.isPending : createMutation.isPending}
+            data-testid={isEdit ? "button-submit-edit-customer" : "button-submit-customer"}
+          >
+            {isEdit
+              ? (updateMutation.isPending ? "Updating..." : "Update Customer")
+              : (createMutation.isPending ? "Creating..." : "Create Customer")}
+          </Button>
+        </div>
+      </form>
+    </Form>
+  );
 
   return (
-    <div className="flex flex-col h-full p-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-        <div>
-          <PageHeader title="Customers" subtitle="Manage customer accounts and receivables" />
-        </div>
+    <div className="flex flex-col h-full p-6 gap-5">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <PageHeader title="Customers" subtitle="Manage customer accounts and receivables" showBackButton={false} />
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
             <Button data-testid="button-create-customer">
@@ -207,325 +280,195 @@ export default function Customers() {
             <DialogHeader>
               <DialogTitle>Create New Customer</DialogTitle>
             </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
-                <FormField
-                  control={form.control}
-                  name="legalName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Legal Name *</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="ABC Company Ltd." data-testid="input-legal-name" />
-                      </FormControl>
-                      <FormDescription>
-                        Customer code will be auto-generated
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
-                      <FormControl>
-                        <Input {...field} value={field.value || ""} placeholder="+1234567890" data-testid="input-phone" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="openingBalance"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Opening Balance</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value || "0"} type="number" step="0.01" placeholder="0.00" data-testid="input-opening-balance" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="openingBalanceSide"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Balance Side</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value || "Dr"}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-balance-side">
-                              <SelectValue placeholder="Select side" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Dr">Dr (Debit)</SelectItem>
-                            <SelectItem value="Cr">Cr (Credit)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsCreateOpen(false)}
-                    data-testid="button-cancel"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={createMutation.isPending}
-                    data-testid="button-submit-customer"
-                  >
-                    {createMutation.isPending ? "Creating..." : "Create Customer"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
+            <CustomerForm isEdit={false} />
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="mb-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      {/* Stats pills */}
+      <div className="flex flex-wrap gap-3">
+        {isLoading ? (
+          <>
+            <Skeleton className="h-10 w-40 rounded-lg" />
+            <Skeleton className="h-10 w-40 rounded-lg" />
+            <Skeleton className="h-10 w-44 rounded-lg" />
+            <Skeleton className="h-10 w-44 rounded-lg" />
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Total Customers</span>
+              <span className="font-semibold">{totalCustomers}</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+              <Wallet className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">With Balance</span>
+              <span className="font-semibold">{withBalance}</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+              <TrendingUp className="h-4 w-4 text-blue-500" />
+              <span className="text-muted-foreground">Receivable</span>
+              <span className="font-semibold font-mono">{formatCashAmount(totalReceivable)}</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+              <TrendingDown className="h-4 w-4 text-red-500" />
+              <span className="text-muted-foreground">Payable</span>
+              <span className="font-semibold font-mono">{formatCashAmount(totalPayable)}</span>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Filter row */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search customers by name..."
+            placeholder="Search customers..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-9"
             data-testid="input-search-customers"
           />
         </div>
+        <Button
+          variant="outline"
+          onClick={() => setHideZero(!hideZero)}
+          data-testid="button-toggle-hide-zero"
+        >
+          {hideZero ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
+          {hideZero ? "Show Zero" : "Hide Zero"}
+        </Button>
       </div>
 
-      <Card className="hidden md:block overflow-x-auto">
+      {/* Table */}
+      <div className="border rounded-xl overflow-hidden">
         <Table>
-          <TableHeader className="sticky top-0 z-30 bg-background">
-            <TableRow>
-              <TableHead className="sticky left-0 bg-muted z-10">Legal Name</TableHead>
-              <TableHead className="text-right">Current Balance</TableHead>
-              <TableHead>Balance Side</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
+          <TableHeader>
+            <TableRow className="bg-muted/40 hover:bg-muted/40">
+              <TableHead className="text-xs h-9 font-semibold">Customer</TableHead>
+              <TableHead className="text-xs h-9 font-semibold">Phone</TableHead>
+              <TableHead className="text-xs h-9 font-semibold text-right">Balance</TableHead>
+              <TableHead className="text-xs h-9 font-semibold w-[60px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredCustomers.length === 0 ? (
+            {isLoading ? (
+              [...Array(6)].map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-28 ml-auto" /></TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              ))
+            ) : filteredCustomers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground">
-                  {searchQuery ? "No customers found matching your search" : "No customers yet"}
+                <TableCell colSpan={4}>
+                  <div className="flex flex-col items-center gap-2 py-10 text-center">
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                      <Building2 className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium">No customers found</p>
+                    <p className="text-xs text-muted-foreground">
+                      {searchQuery ? "Try a different search term" : "Add your first customer to get started"}
+                    </p>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
               filteredCustomers.map((customer) => (
-                <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
-                  <TableCell className="sticky left-0 bg-background z-10">
-                    <button
-                      onClick={() => setStatementCustomer(customer)}
-                      className="flex items-center gap-2 text-primary hover:underline cursor-pointer"
-                      data-testid={`link-customer-statement-${customer.id}`}
-                    >
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      {customer.legalName}
-                    </button>
+                <TableRow
+                  key={customer.id}
+                  className="group cursor-pointer hover:bg-muted/40"
+                  data-testid={`row-customer-${customer.id}`}
+                  onClick={() => setStatementCustomer(customer)}
+                >
+                  <TableCell className="py-3">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="font-medium text-sm" data-testid={`text-customer-name-${customer.id}`}>
+                        {customer.legalName}
+                      </span>
+                    </div>
                   </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatCashAmount(customer.balance || 0)}
+                  <TableCell className="py-3 text-sm text-muted-foreground">
+                    {customer.phone || <span className="text-muted-foreground/50">—</span>}
                   </TableCell>
-                  <TableCell className={`font-semibold text-sm ${drCrClass(customer.balanceSide || "Dr")}`}>{customer.balanceSide || "Dr"}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEditClick(customer)}
-                      data-testid={`button-edit-customer-${customer.id}`}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                  <TableCell className="py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <span className={`font-mono font-semibold text-sm ${drCrClass(customer.balanceSide || "Dr")}`}>
+                        {formatCashAmount(customer.balance || 0)}
+                      </span>
+                      <Badge variant="secondary" className={`text-xs ${drCrClass(customer.balanceSide || "Dr")}`}>
+                        {customer.balanceSide || "Dr"}
+                      </Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <div className="flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => { e.stopPropagation(); handleEditClick(customer); }}
+                        data-testid={`button-edit-customer-${customer.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
-      </Card>
-      <div className="md:hidden space-y-3">
-        {filteredCustomers.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            {searchQuery ? "No customers found matching your search" : "No customers yet"}
-          </div>
-        ) : (
-          filteredCustomers.map((customer) => (
-            <Card key={customer.id} data-testid={`row-customer-${customer.id}`}>
-              <div className="p-4 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <button
-                    onClick={() => setStatementCustomer(customer)}
-                    className="flex items-center gap-2 text-primary hover:underline cursor-pointer text-sm font-medium"
-                    data-testid={`link-customer-statement-${customer.id}`}
-                  >
-                    <Building2 className="h-4 w-4 text-muted-foreground" />
-                    {customer.legalName}
-                  </button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleEditClick(customer)}
-                    data-testid={`button-edit-customer-${customer.id}`}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <Badge variant="secondary" className={drCrClass(customer.balanceSide || "Dr")}>{customer.balanceSide || "Dr"}</Badge>
-                  <span className="font-mono font-semibold">{formatCashAmount(customer.balance || 0)}</span>
-                </div>
-              </div>
-            </Card>
-          ))
-        )}
       </div>
 
-      {/* Edit Customer Dialog */}
+      {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={(open) => {
         setIsEditOpen(open);
         if (!open) {
           setEditingCustomer(null);
-          form.reset({
-            companyId: selectedCompany?.id || 0,
-            legalName: "",
-            phone: "",
-            openingBalance: "0",
-            openingBalanceSide: "Dr",
-          });
+          form.reset({ companyId: selectedCompany?.id || 0, legalName: "", phone: "", openingBalance: "0", openingBalanceSide: "Dr" });
         }
       }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Customer</DialogTitle>
           </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
-              <FormField
-                control={form.control}
-                name="legalName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Legal Name *</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="ABC Company Ltd." data-testid="input-edit-legal-name" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} placeholder="+1234567890" data-testid="input-edit-phone" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="openingBalance"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Opening Balance</FormLabel>
-                      <FormControl>
-                        <Input {...field} value={field.value || "0"} type="number" step="0.01" placeholder="0.00" data-testid="input-edit-opening-balance" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="openingBalanceSide"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Balance Side</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || "Dr"}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-edit-balance-side">
-                            <SelectValue placeholder="Select side" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Dr">Dr (Debit)</SelectItem>
-                          <SelectItem value="Cr">Cr (Credit)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsEditOpen(false)}
-                  data-testid="button-edit-cancel"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={updateMutation.isPending}
-                  data-testid="button-submit-edit-customer"
-                >
-                  {updateMutation.isPending ? "Updating..." : "Update Customer"}
-                </Button>
-              </div>
-            </form>
-          </Form>
+          <CustomerForm isEdit={true} />
         </DialogContent>
       </Dialog>
 
-      {/* Customer Statement Dialog */}
+      {/* Statement Dialog */}
       <Dialog open={!!statementCustomer} onOpenChange={(open) => !open && setStatementCustomer(null)}>
-        <DialogContent className="max-w-3xl w-[95vw] max-h-[85vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
+        <DialogContent className="max-w-3xl w-[95vw] max-h-[85vh] overflow-hidden flex flex-col gap-4">
+          <DialogHeader className="pb-0">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Building2 className="h-4 w-4 text-muted-foreground" />
               {statementCustomer?.legalName}
             </DialogTitle>
-            <div className="flex items-center gap-3 pt-1 text-sm text-muted-foreground">
-              <span>Balance: <span className="font-mono font-semibold text-foreground">{formatCashAmount(statementCustomer?.balance || 0)}</span></span>
-              <Badge variant="secondary" className={drCrClass(statementCustomer?.balanceSide || "Dr")}>
-                {statementCustomer?.balanceSide || "Dr"}
-              </Badge>
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+              <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
+                <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-muted-foreground">Balance</span>
+                <span className={`font-mono font-semibold ${drCrClass(statementCustomer?.balanceSide || "Dr")}`}>
+                  {formatCashAmount(statementCustomer?.balance || 0)}
+                </span>
+                <Badge variant="secondary" className={`text-xs ${drCrClass(statementCustomer?.balanceSide || "Dr")}`}>
+                  {statementCustomer?.balanceSide || "Dr"}
+                </Badge>
+              </div>
+              {!txnsLoading && (
+                <span className="rounded-full border bg-muted/40 px-2.5 py-0.5 text-xs text-muted-foreground font-medium">
+                  {ledgerTxns.length} transaction{ledgerTxns.length !== 1 ? "s" : ""}
+                </span>
+              )}
             </div>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto mt-2">
+          <div className="flex-1 overflow-y-auto min-h-0">
             {txnsLoading ? (
               <div className="space-y-2">
                 {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
@@ -538,70 +481,92 @@ export default function Customers() {
               const totalCr = sorted.reduce((s, t) => s + parseFloat(t.creditAmount || "0"), 0);
               const closingBalance = statementCustomer?.balance || 0;
               const openingBalance = closingBalance - totalDr + totalCr;
-
               let running = openingBalance;
 
               return sorted.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">No transactions found</div>
+                <div className="flex flex-col items-center gap-2 py-10 text-center">
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                    <Building2 className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm font-medium">No transactions</p>
+                  <p className="text-xs text-muted-foreground">No ledger entries found for this customer</p>
+                </div>
               ) : (
-                <Table>
-                  <TableHeader className="sticky top-0 z-30 bg-background">
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="text-right">Debit</TableHead>
-                      <TableHead className="text-right">Credit</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {openingBalance !== 0 && (
-                      <TableRow className="text-muted-foreground text-sm">
-                        <TableCell>—</TableCell>
-                        <TableCell colSpan={1} className="italic">Opening Balance</TableCell>
-                        <TableCell></TableCell>
-                        <TableCell></TableCell>
-                        <TableCell className="text-right font-mono">{formatAmount(Math.abs(openingBalance))}</TableCell>
+                <div className="border rounded-xl overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/40 hover:bg-muted/40">
+                        <TableHead className="text-xs h-9 font-semibold">Date</TableHead>
+                        <TableHead className="text-xs h-9 font-semibold">Type</TableHead>
+                        <TableHead className="text-xs h-9 font-semibold">Description</TableHead>
+                        <TableHead className="text-xs h-9 font-semibold text-right">Debit</TableHead>
+                        <TableHead className="text-xs h-9 font-semibold text-right">Credit</TableHead>
+                        <TableHead className="text-xs h-9 font-semibold text-right">Balance</TableHead>
                       </TableRow>
-                    )}
-                    {sorted.map((t, i) => {
-                      const dr = parseFloat(t.debitAmount || "0");
-                      const cr = parseFloat(t.creditAmount || "0");
-                      running = running + dr - cr;
-                      return (
-                        <TableRow key={t.entryId ?? i}>
-                          <TableCell className="font-mono text-sm whitespace-nowrap">
-                            {t.voucherDate ? format(new Date(t.voucherDate), "yyyy-MM-dd") : "—"}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-                            {t.narration || t.voucherDescription || t.voucherType || "—"}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-sm">
-                            {dr > 0 ? formatAmount(dr) : ""}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-sm">
-                            {cr > 0 ? formatAmount(cr) : ""}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-sm font-medium">
-                            {formatAmount(Math.abs(running))}
-                            <span className={`text-xs font-semibold ml-1 ${drCrClass(running >= 0 ? "Dr" : "Cr")}`}>{running >= 0 ? "Dr" : "Cr"}</span>
+                    </TableHeader>
+                    <TableBody>
+                      {openingBalance !== 0 && (
+                        <TableRow className="text-muted-foreground text-xs italic">
+                          <TableCell className="py-2">—</TableCell>
+                          <TableCell className="py-2"></TableCell>
+                          <TableCell className="py-2">Opening Balance</TableCell>
+                          <TableCell className="py-2"></TableCell>
+                          <TableCell className="py-2"></TableCell>
+                          <TableCell className="py-2 text-right font-mono font-medium">
+                            {formatAmount(Math.abs(openingBalance))}
                           </TableCell>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                  <TableFooter className="sticky bottom-0 z-30 bg-background border-t-2">
-                    <TableRow className="font-semibold">
-                      <TableCell colSpan={2}>Total</TableCell>
-                      <TableCell className="text-right font-mono text-foreground">{formatAmount(totalDr)}</TableCell>
-                      <TableCell className="text-right font-mono text-foreground">{formatAmount(totalCr)}</TableCell>
-                      <TableCell className="text-right font-mono text-foreground">
-                        {formatAmount(Math.abs(closingBalance))}
-                        <span className={`text-xs font-semibold ml-1 ${drCrClass(statementCustomer?.balanceSide || "Dr")}`}>{(statementCustomer?.balanceSide || "Dr")}</span>
-                      </TableCell>
-                    </TableRow>
-                  </TableFooter>
-                </Table>
+                      )}
+                      {sorted.map((t, i) => {
+                        const dr = parseFloat(t.debitAmount || "0");
+                        const cr = parseFloat(t.creditAmount || "0");
+                        running = running + dr - cr;
+                        return (
+                          <TableRow key={t.entryId ?? i} className="text-xs hover:bg-muted/40">
+                            <TableCell className="py-2 font-mono whitespace-nowrap">
+                              {t.voucherDate ? format(new Date(t.voucherDate), "yyyy-MM-dd") : "—"}
+                            </TableCell>
+                            <TableCell className="py-2">
+                              {t.voucherType ? (
+                                <Badge variant="secondary" className={`text-xs ${typeBadgeClass[t.voucherType] || ""}`}>
+                                  {t.voucherType}
+                                </Badge>
+                              ) : <span className="text-muted-foreground">—</span>}
+                            </TableCell>
+                            <TableCell className="py-2 text-muted-foreground max-w-[160px] truncate">
+                              {t.narration || t.voucherDescription || "—"}
+                            </TableCell>
+                            <TableCell className="py-2 text-right font-mono">
+                              {dr > 0 ? formatAmount(dr) : ""}
+                            </TableCell>
+                            <TableCell className="py-2 text-right font-mono">
+                              {cr > 0 ? formatAmount(cr) : ""}
+                            </TableCell>
+                            <TableCell className="py-2 text-right font-mono font-medium">
+                              {formatAmount(Math.abs(running))}
+                              <span className={`text-xs font-semibold ml-1 ${drCrClass(running >= 0 ? "Dr" : "Cr")}`}>
+                                {running >= 0 ? "Dr" : "Cr"}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                    <TableFooter className="bg-muted/40">
+                      <TableRow className="font-semibold text-xs">
+                        <TableCell colSpan={3}>Total</TableCell>
+                        <TableCell className="text-right font-mono">{formatAmount(totalDr)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatAmount(totalCr)}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatAmount(Math.abs(closingBalance))}
+                          <span className={`text-xs font-semibold ml-1 ${drCrClass(statementCustomer?.balanceSide || "Dr")}`}>
+                            {statementCustomer?.balanceSide || "Dr"}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  </Table>
+                </div>
               );
             })()}
           </div>

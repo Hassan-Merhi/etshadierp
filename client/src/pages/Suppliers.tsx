@@ -345,9 +345,6 @@ export default function Suppliers() {
                         <Badge variant="secondary" className="text-xs">Inactive</Badge>
                       )}
                     </div>
-                    {supplier.email && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{supplier.email}</p>
-                    )}
                   </TableCell>
                   <TableCell className="py-3">
                     {supplier.containerCount > 0 ? (
