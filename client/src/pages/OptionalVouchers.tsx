@@ -1,18 +1,16 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { FileText, Search, Pencil, Check, Trash2, X, Filter } from "lucide-react";
+import { FileText, Search, Pencil, Check, Trash2, X } from "lucide-react";
 import { format } from "date-fns";
 
 export default function OptionalVouchers() {
@@ -92,9 +90,12 @@ export default function OptionalVouchers() {
 
   const hasFilters = typeFilter !== "all" || startDate || endDate || search;
 
-  const voucherTypes = ["Sales", "Payment", "Receipt", "Journal", "Stock Transfer", "Purchase", "Contra", "Credit Note", "Debit Note"];
+  const voucherTypes = [
+    "Sales", "Payment", "Receipt", "Journal", "Stock Transfer",
+    "Purchase", "Contra", "Credit Note", "Debit Note",
+  ];
 
-  const getTypeBadgeVariant = (type: string) => {
+  const getTypeBadgeVariant = (type: string): "default" | "secondary" | "outline" => {
     switch (type) {
       case "Sales": return "default";
       case "Payment": return "secondary";
@@ -103,178 +104,265 @@ export default function OptionalVouchers() {
     }
   };
 
+  const grandTotal = vouchers.reduce((sum, v: any) => sum + parseFloat(v.totalAmount || "0"), 0);
+
+  const handleEdit = (v: any) => {
+    const voucherTypeMap: Record<string, string> = {
+      Payment: "payment",
+      Receipt: "receipt",
+      Journal: "journal",
+      Consumption: "adjustment",
+      Production: "adjustment",
+      Mixed: "adjustment",
+      StockTransfer: "transfer",
+      "Stock Transfer": "transfer",
+      "Credit Note": "creditnote",
+      "Debit Note": "creditnote",
+    };
+    const tab = voucherTypeMap[v.voucherType];
+    if (tab) {
+      navigate(`/vouchers?edit=${v.id}&tab=${tab}`);
+    } else {
+      navigate(`/vouchers/${v.id}/edit`);
+    }
+  };
+
   return (
-    <div className="flex flex-col gap-4 p-3 sm:p-6 w-full min-w-0">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div>
-          <PageHeader title="Optional Vouchers" subtitle="Draft/unposted vouchers that can be edited or finalized" icon={<FileText className="h-5 w-5" />} />
+    <div className="flex flex-col gap-4 p-4 md:p-6">
+
+      {/* ── Header ── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <PageHeader
+          title="Optional Vouchers"
+          subtitle="Draft vouchers pending edit or finalization"
+          icon={<FileText className="h-5 w-5" />}
+        />
+        {!isLoading && !isError && vouchers.length > 0 && (
+          <Badge variant="secondary" className="text-sm px-3 py-1" data-testid="text-voucher-count">
+            {vouchers.length} draft{vouchers.length !== 1 ? "s" : ""}
+          </Badge>
+        )}
+      </div>
+
+      {/* ── Filter row ── */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-40" data-testid="select-voucher-type">
+            <SelectValue placeholder="All Types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            {voucherTypes.map(t => (
+              <SelectItem key={t} value={t}>{t}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="relative flex-1 min-w-44">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search voucher #, notes..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+            data-testid="input-search-vouchers"
+          />
         </div>
+
+        <Input
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          className="w-40"
+          data-testid="input-start-date"
+        />
+
+        <Input
+          type="date"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+          className="w-40"
+          data-testid="input-end-date"
+        />
+
         {hasFilters && (
-          <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters">
-            <X className="h-4 w-4 mr-1" />
-            Clear Filters
+          <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters" className="gap-1.5">
+            <X className="h-4 w-4" />
+            Clear
           </Button>
         )}
       </div>
 
-      <Card>
-        <CardContent className="pt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger data-testid="select-voucher-type">
-                <SelectValue placeholder="All Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                {voucherTypes.map(t => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      {/* ── Stats pill bar ── */}
+      {!isLoading && !isError && vouchers.length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">Drafts</span>
+            <span className="font-semibold">{vouchers.length}</span>
+          </div>
+          <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
+            <span className="text-muted-foreground">Grand Total</span>
+            <span className="font-semibold" data-testid="text-optional-grand-total">
+              {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+        </div>
+      )}
 
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search voucher #, notes..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
-                data-testid="input-search-vouchers"
-              />
+      {/* ── States ── */}
+      {isLoading ? (
+        <div className="border rounded-xl overflow-hidden">
+          <div className="h-11 bg-muted/40 border-b" />
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-4 py-3 border-b last:border-0">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-5 w-20 rounded-full" />
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-4 w-20 ml-auto" />
             </div>
-
-            <Input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              placeholder="Start Date"
-              data-testid="input-start-date"
-            />
-
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              placeholder="End Date"
-              data-testid="input-end-date"
-            />
+          ))}
+        </div>
+      ) : isError ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 text-destructive" data-testid="text-optional-vouchers-error">
+          <FileText className="h-10 w-10 opacity-30" />
+          <p className="text-sm font-medium">Failed to load optional vouchers</p>
+          <p className="text-xs text-muted-foreground">{(error as any)?.message}</p>
+        </div>
+      ) : vouchers.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground" data-testid="text-no-optional-vouchers">
+          <FileText className="h-10 w-10 opacity-25" />
+          <p className="text-sm font-medium">No optional vouchers found</p>
+          <p className="text-xs">
+            {hasFilters ? "Try adjusting your filters" : "All vouchers have been finalized"}
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Desktop table */}
+          <div className="hidden md:block border rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="h-11 bg-muted/40 border-b">
+                  <th className="text-left px-4 font-medium">Date</th>
+                  <th className="text-left px-4 font-medium">Voucher #</th>
+                  <th className="text-left px-4 font-medium">Type</th>
+                  <th className="text-left px-4 font-medium">Location</th>
+                  <th className="text-right px-4 font-medium">Total</th>
+                  <th className="text-right px-4 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vouchers.map((v: any) => (
+                  <tr key={v.id} className="border-t hover:bg-muted/30 transition-colors" data-testid={`row-voucher-${v.id}`}>
+                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                      {v.voucherDate ? format(new Date(v.voucherDate + "T00:00:00"), "dd MMM yyyy") : "—"}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      {v.voucherNumber || <span className="italic">Draft</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant={getTypeBadgeVariant(v.voucherType)} className="text-xs">
+                        {v.voucherType}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {v.locationName || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-medium">
+                      {parseFloat(v.totalAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleEdit(v)}
+                          data-testid={`button-edit-voucher-${v.id}`}
+                          className="gap-1.5 h-8"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setFinalizeVoucherId(v.id)}
+                          data-testid={`button-finalize-voucher-${v.id}`}
+                          className="gap-1.5 h-8 text-green-700 dark:text-green-400"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          Finalize
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setDeleteVoucherId(v.id)}
+                          data-testid={`button-delete-voucher-${v.id}`}
+                          className="h-8 w-8 text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t bg-muted/40">
+                  <td colSpan={4} className="px-4 py-2 text-sm font-medium">
+                    Total ({vouchers.length} voucher{vouchers.length !== 1 ? "s" : ""})
+                  </td>
+                  <td className="px-4 py-2 text-right tabular-nums font-semibold" data-testid="text-optional-grand-total-footer">
+                    {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                  </td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
           </div>
 
-          {isLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : isError ? (
-            <div className="text-center py-12 text-destructive" data-testid="text-optional-vouchers-error">
-              <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="text-lg font-medium">Failed to load optional vouchers</p>
-              <p className="text-sm mt-1">{(error as any)?.message}</p>
-            </div>
-          ) : vouchers.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground" data-testid="text-no-optional-vouchers">
-              <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="text-lg font-medium">No optional vouchers found</p>
-              <p className="text-sm mt-1">All vouchers are finalized, or try adjusting your filters.</p>
-            </div>
-          ) : (
-            <>
-              <div className="text-sm text-muted-foreground mb-2" data-testid="text-voucher-count">
-                {vouchers.length} optional voucher(s)
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-2">
+            {vouchers.map((v: any) => (
+              <div key={v.id} className="border rounded-xl p-4 space-y-2" data-testid={`card-voucher-${v.id}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-medium">
+                      {v.voucherDate ? format(new Date(v.voucherDate + "T00:00:00"), "dd MMM yyyy") : "—"}
+                    </div>
+                    {v.voucherNumber && (
+                      <div className="text-xs font-mono text-muted-foreground mt-0.5">{v.voucherNumber}</div>
+                    )}
+                  </div>
+                  <Badge variant={getTypeBadgeVariant(v.voucherType)} className="text-xs shrink-0">
+                    {v.voucherType}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{v.locationName || "—"}</span>
+                  <span className="font-semibold tabular-nums">
+                    {parseFloat(v.totalAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 pt-1 border-t">
+                  <Button size="sm" variant="ghost" onClick={() => handleEdit(v)} data-testid={`button-edit-mobile-${v.id}`} className="gap-1.5 flex-1 h-8">
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setFinalizeVoucherId(v.id)} data-testid={`button-finalize-mobile-${v.id}`} className="gap-1.5 flex-1 h-8 text-green-700 dark:text-green-400">
+                    <Check className="h-3.5 w-3.5" />
+                    Finalize
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={() => setDeleteVoucherId(v.id)} data-testid={`button-delete-mobile-${v.id}`} className="h-8 w-8 text-destructive">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
-              <div className="table-responsive rounded-md border">
-                <Table>
-                  <TableHeader className="sticky top-0 z-30 bg-background">
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead className="hidden sm:table-cell">Location</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {vouchers.map((v: any) => (
-                      <TableRow key={v.id} data-testid={`row-voucher-${v.id}`}>
-                        <TableCell className="whitespace-nowrap">
-                          {v.voucherDate ? format(new Date(v.voucherDate + "T00:00:00"), "dd MMM yyyy") : "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getTypeBadgeVariant(v.voucherType)}>{v.voucherType}</Badge>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell text-muted-foreground">
-                          {v.locationName || "—"}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {parseFloat(v.totalAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => {
-                                const voucherTypeMap: Record<string, string> = {
-                                  Payment: "payment",
-                                  Receipt: "receipt",
-                                  Journal: "journal",
-                                  Consumption: "adjustment",
-                                  Production: "adjustment",
-                                  Mixed: "adjustment",
-                                  StockTransfer: "transfer",
-                                  "Stock Transfer": "transfer",
-                                  "Credit Note": "creditnote",
-                                  "Debit Note": "creditnote",
-                                };
-                                const tab = voucherTypeMap[v.voucherType];
-                                if (tab) {
-                                  navigate(`/vouchers?edit=${v.id}&tab=${tab}`);
-                                } else {
-                                  navigate(`/vouchers/${v.id}/edit`);
-                                }
-                              }}
-                              data-testid={`button-edit-voucher-${v.id}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setFinalizeVoucherId(v.id)}
-                              data-testid={`button-finalize-voucher-${v.id}`}
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setDeleteVoucherId(v.id)}
-                              data-testid={`button-delete-voucher-${v.id}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                  <TableFooter className="sticky bottom-0 z-10 bg-background border-t">
-                    <TableRow className="font-semibold">
-                      <TableCell colSpan={3}>Total ({vouchers.length} voucher{vouchers.length !== 1 ? "s" : ""})</TableCell>
-                      <TableCell className="text-right font-mono" data-testid="text-optional-grand-total">
-                        {vouchers.reduce((sum, v: any) => sum + parseFloat(v.totalAmount || "0"), 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                      </TableCell>
-                      <TableCell></TableCell>
-                    </TableRow>
-                  </TableFooter>
-                </Table>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            ))}
+          </div>
+        </>
+      )}
 
       <ConfirmDialog
         open={finalizeVoucherId !== null}
