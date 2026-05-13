@@ -10,6 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -553,39 +556,78 @@ export default function FactoryWorkers() {
     </div>
   );
 
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-md" />)}
-      </div>
-    );
-  }
-
   const balance = endResult ? parseFloat(endResult.balance) : 0;
 
+  const totalSalary = (workers ?? [])
+    .filter((w) => w.active)
+    .reduce((s, w) => s + parseFloat(w.baseSalary || "0"), 0);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <Tabs defaultValue="workers">
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-4 flex-wrap">
-            <div>
-              <PageHeader title="Workers" />
-              <p className="text-sm text-muted-foreground mt-0.5">
-                <span className="font-medium text-foreground">{activeCount}</span> active
-                {inactiveCount > 0 && <span className="ml-2"><span className="font-medium text-foreground">{inactiveCount}</span> inactive</span>}
-              </p>
-            </div>
-            <TabsList>
-              <TabsTrigger value="workers" data-testid="tab-workers">Workers</TabsTrigger>
-              {showCategories && (
-                <TabsTrigger value="categories" data-testid="tab-categories">
-                  <Layers className="h-3.5 w-3.5 mr-1.5" />Categories
-                  {categories.length > 0 && <Badge variant="secondary" className="ml-1.5 text-xs no-default-active-elevate">{categories.length}</Badge>}
-                </TabsTrigger>
-              )}
-            </TabsList>
+          <TabsList>
+            <TabsTrigger value="workers" data-testid="tab-workers">Workers</TabsTrigger>
+            {showCategories && (
+              <TabsTrigger value="categories" data-testid="tab-categories">
+                <Layers className="h-3.5 w-3.5 mr-1.5" />Categories
+                {categories.length > 0 && <Badge variant="secondary" className="ml-1.5 text-xs no-default-active-elevate">{categories.length}</Badge>}
+              </TabsTrigger>
+            )}
+          </TabsList>
+        </div>
+
+        <TabsContent value="workers" className="mt-4 space-y-5">
+
+          {/* Stats pills */}
+          <div className="flex flex-wrap gap-3">
+            {isLoading ? (
+              <>
+                <Skeleton className="h-10 w-36 rounded-lg" />
+                <Skeleton className="h-10 w-32 rounded-lg" />
+                <Skeleton className="h-10 w-32 rounded-lg" />
+                <Skeleton className="h-10 w-44 rounded-lg" />
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Total</span>
+                  <span className="font-semibold">{workers?.length ?? 0}</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+                  <UserCheck className="h-4 w-4 text-emerald-500" />
+                  <span className="text-muted-foreground">Active</span>
+                  <span className="font-semibold">{activeCount}</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+                  <UserX className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Inactive</span>
+                  <span className="font-semibold">{inactiveCount}</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+                  <Download className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Total Salary</span>
+                  <span className="font-semibold font-mono">${totalSalary.toLocaleString()}</span>
+                </div>
+              </>
+            )}
           </div>
-          <div className="flex gap-2 flex-wrap">
+
+          {/* Filter + actions row */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Search by name, code, position..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" data-testid="input-search" />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-32" data-testid="select-status-filter"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All</SelectItem>
+                <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="Inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFile} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -609,131 +651,128 @@ export default function FactoryWorkers() {
               <Plus className="h-4 w-4 mr-2" />Add Worker
             </Button>
           </div>
-        </div>
 
-        <TabsContent value="workers" className="mt-4 space-y-4">
-          <div className="flex gap-3 flex-wrap items-center">
-            <div className="relative flex-1 min-w-48">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search by name, code, position..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" data-testid="input-search" />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-32" data-testid="select-status-filter"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All</SelectItem>
-                <SelectItem value="Active">Active</SelectItem>
-                <SelectItem value="Inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-      {filteredWorkers.length === 0 ? (
-        <div className="text-center py-20 text-muted-foreground">
-          <Users className="mx-auto h-10 w-10 mb-3 opacity-40" />
-          <p className="font-medium" data-testid="text-empty">No workers found</p>
-          <p className="text-sm mt-1">
-            {searchQuery || statusFilter !== "All" ? "Try adjusting your search or filters" : "Add your first worker to get started"}
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {filteredWorkers.map((worker) => (
-            <div
-              key={worker.id}
-              className="group cursor-pointer"
-              onClick={() => setLocation(`/factory/workers/${worker.id}`)}
-              data-testid={`card-worker-${worker.id}`}
-            >
-              <Card className="hover-elevate">
-                <CardContent className="px-4 py-3">
-                  <div className="flex items-center gap-4 flex-wrap">
-
-                    {/* Avatar + doc dot */}
-                    <div className="relative shrink-0">
-                      <Avatar className={`h-10 w-10 text-sm font-semibold ${getAvatarColor(worker.fullName)}`}>
-                        {worker.photoUrl ? <AvatarImage src={worker.photoUrl} /> : null}
-                        <AvatarFallback className={getAvatarColor(worker.fullName)}>
-                          {getInitials(worker.fullName)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span
-                        className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background ${(docCounts[worker.id] ?? 0) > 0 ? "bg-green-500" : "bg-red-400"}`}
-                        title={(docCounts[worker.id] ?? 0) > 0 ? `${docCounts[worker.id]} document(s) uploaded` : "No documents uploaded"}
-                        data-testid={`dot-docs-${worker.id}`}
-                      />
-                    </div>
-
-                    {/* Name + sub info */}
-                    <div className="flex-1 min-w-36">
-                      <p className="font-semibold text-sm leading-tight" data-testid={`text-name-${worker.id}`}>
-                        {worker.fullName}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {[worker.position, worker.department].filter(Boolean).join(" · ") || <span className="opacity-40">—</span>}
-                      </p>
-                    </div>
-
-                    {/* Code */}
-                    <div className="shrink-0 min-w-20">
-                      <p className="text-xs text-muted-foreground">Code</p>
-                      <p className="text-sm font-mono font-medium" data-testid={`text-code-${worker.id}`}>
-                        {worker.employeeCode || "—"}
-                      </p>
-                    </div>
-
-                    {/* Salary */}
-                    {worker.baseSalary && (
-                      <div className="shrink-0 min-w-20">
-                        <p className="text-xs text-muted-foreground">Salary</p>
-                        <p className="text-sm font-medium">
-                          ${parseFloat(worker.baseSalary).toLocaleString()}
+          {/* Table */}
+          <div className="border rounded-xl overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="text-xs h-9 font-semibold">Worker</TableHead>
+                  <TableHead className="text-xs h-9 font-semibold">Position</TableHead>
+                  <TableHead className="text-xs h-9 font-semibold text-right">Salary</TableHead>
+                  <TableHead className="text-xs h-9 font-semibold">Status</TableHead>
+                  <TableHead className="text-xs h-9 font-semibold w-[80px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  [...Array(6)].map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Skeleton className="h-8 w-8 rounded-full" />
+                          <Skeleton className="h-4 w-36" />
+                        </div>
+                      </TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredWorkers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5}>
+                      <div className="flex flex-col items-center gap-2 py-10 text-center">
+                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                          <Users className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <p className="text-sm font-medium" data-testid="text-empty">No workers found</p>
+                        <p className="text-xs text-muted-foreground">
+                          {searchQuery || statusFilter !== "All" ? "Try adjusting your search or filters" : "Add your first worker to get started"}
                         </p>
                       </div>
-                    )}
-
-                    {/* Status badge */}
-                    <div className="shrink-0">
-                      <Badge
-                        variant={worker.active ? "default" : "secondary"}
-                        className="text-xs no-default-active-elevate"
-                        data-testid={`badge-status-${worker.id}`}
-                      >
-                        {worker.active ? "Active" : "Inactive"}
-                      </Badge>
-                    </div>
-
-                    {/* Action buttons */}
-                    <div
-                      className="flex gap-1 shrink-0 visibility-hidden md:invisible md:group-hover:visible"
-                      onClick={(e) => e.stopPropagation()}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredWorkers.map((worker) => (
+                    <TableRow
+                      key={worker.id}
+                      className="group cursor-pointer hover:bg-muted/40"
+                      onClick={() => setLocation(`/factory/workers/${worker.id}`)}
+                      data-testid={`row-worker-${worker.id}`}
                     >
-                      <Button size="icon" variant="ghost" onClick={() => openEdit(worker)} data-testid={`button-edit-worker-${worker.id}`}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      {worker.active ? (
-                        <Button size="icon" variant="ghost" onClick={() => openEndContract(worker)} data-testid={`button-end-contract-${worker.id}`}>
-                          <UserX className="h-3.5 w-3.5" />
-                        </Button>
-                      ) : (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => reactivateMutation.mutate(worker.id)}
-                          disabled={reactivateMutation.isPending}
-                          data-testid={`button-reactivate-${worker.id}`}
+                      <TableCell className="py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="relative shrink-0">
+                            <Avatar className={`h-8 w-8 text-xs font-semibold ${getAvatarColor(worker.fullName)}`}>
+                              {worker.photoUrl ? <AvatarImage src={worker.photoUrl} /> : null}
+                              <AvatarFallback className={getAvatarColor(worker.fullName)}>
+                                {getInitials(worker.fullName)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span
+                              className={`absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-background ${(docCounts[worker.id] ?? 0) > 0 ? "bg-emerald-500" : "bg-red-400"}`}
+                              title={(docCounts[worker.id] ?? 0) > 0 ? `${docCounts[worker.id]} document(s) uploaded` : "No documents uploaded"}
+                              data-testid={`dot-docs-${worker.id}`}
+                            />
+                          </div>
+                          <span className="font-medium text-sm" data-testid={`text-name-${worker.id}`}>
+                            {worker.fullName}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3 text-sm text-muted-foreground">
+                        {worker.position || <span className="text-muted-foreground/40">—</span>}
+                      </TableCell>
+                      <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground">
+                        {worker.baseSalary ? `$${parseFloat(worker.baseSalary).toLocaleString()}` : <span className="text-muted-foreground/40">—</span>}
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <Badge
+                          variant="secondary"
+                          className={`text-xs no-default-active-elevate ${
+                            worker.active
+                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                          data-testid={`badge-status-${worker.id}`}
                         >
-                          <UserCheck className="h-3.5 w-3.5 text-green-600" />
-                        </Button>
-                      )}
-                    </div>
+                          {worker.active ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <div
+                          className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Button size="icon" variant="ghost" onClick={() => openEdit(worker)} data-testid={`button-edit-worker-${worker.id}`}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          {worker.active ? (
+                            <Button size="icon" variant="ghost" onClick={() => openEndContract(worker)} data-testid={`button-end-contract-${worker.id}`}>
+                              <UserX className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          ) : (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => reactivateMutation.mutate(worker.id)}
+                              disabled={reactivateMutation.isPending}
+                              data-testid={`button-reactivate-${worker.id}`}
+                            >
+                              <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          ))}
-        </div>
-        )}
         </TabsContent>
 
         {showCategories && <TabsContent value="categories" className="mt-4">
