@@ -3171,73 +3171,115 @@ let migrationsDone = false;
         `);
       } catch { /* skip if tables not ready */ }
 
-      // One-time fix: cascade overpaid rental months to the next unpaid month.
-      // When a month already had balance=$0 and a new payment was recorded against it,
-      // the excess ended up inflating that month's paid_amount beyond its expected_amount.
-      // This migration finds each such case and moves the excess forward to the first
-      // month that hasn't been fully prepaid yet.
+      // Fix: cascade overpaid rental months to the correct next available month.
+      // Handles two cases:
+      //   A) Current/past month with paid > expected (expected > 0)
+      //   B) Future prepaid month with paid > contract rental_amount (expected = 0)
+      // For each overpaid row the excess is moved to the FIRST month that still has
+      // remaining capacity (paid < rental_amount), searching forward month by month.
+      // Safe to re-run — idempotent as long as data is already clean.
       try {
         await migrationClient.query(`
           DO $$
           DECLARE
-            overpaid RECORD;
-            excess NUMERIC;
-            target_year INT;
+            overpaid     RECORD;
+            excess       NUMERIC;
+            rental_amt   NUMERIC;
+            check_year   INT;
+            check_month  INT;
+            check_paid   NUMERIC;
+            target_year  INT;
             target_month INT;
+            i            INT;
+            now_year     INT;
+            now_month    INT;
           BEGIN
-            -- Process each current/past ledger row that is overpaid (paid > expected, expected > 0)
+            now_year  := EXTRACT(YEAR  FROM CURRENT_DATE)::INT;
+            now_month := EXTRACT(MONTH FROM CURRENT_DATE)::INT;
+
             FOR overpaid IN
-              SELECT pml.*
+              SELECT pml.*, pc.rental_amount
               FROM property_monthly_ledger pml
-              WHERE pml.expected_amount > 0
-                AND pml.paid_amount > pml.expected_amount
-                AND (
-                  pml.year < EXTRACT(YEAR FROM CURRENT_DATE)::INT
-                  OR (
-                    pml.year  = EXTRACT(YEAR FROM CURRENT_DATE)::INT
-                    AND pml.month <= EXTRACT(MONTH FROM CURRENT_DATE)::INT
+              JOIN property_contracts pc ON pc.id = pml.contract_id
+              WHERE (
+                -- Case A: current/past month paid beyond expected
+                (
+                  pml.expected_amount > 0
+                  AND pml.paid_amount > pml.expected_amount
+                  AND (
+                    pml.year < now_year
+                    OR (pml.year = now_year AND pml.month <= now_month)
                   )
                 )
+                OR
+                -- Case B: future prepaid month paid beyond one full month's rent
+                (
+                  pml.expected_amount = 0
+                  AND pml.paid_amount > pc.rental_amount
+                  AND pc.rental_amount > 0
+                )
+              )
               ORDER BY pml.contract_id, pml.year, pml.month
             LOOP
-              excess := overpaid.paid_amount - overpaid.expected_amount;
+              rental_amt := overpaid.rental_amount;
 
-              -- Fix the overpaid month: clamp to its expected amount
+              -- Excess for Case A vs Case B
+              IF overpaid.expected_amount > 0 THEN
+                excess := overpaid.paid_amount - overpaid.expected_amount;
+              ELSE
+                excess := overpaid.paid_amount - rental_amt;
+              END IF;
+
+              IF excess < 0.005 THEN CONTINUE; END IF;
+
+              -- Reduce the overpaid month by exactly the excess
               UPDATE property_monthly_ledger
-              SET paid_amount = expected_amount
+              SET paid_amount = paid_amount - excess
               WHERE id = overpaid.id;
 
-              -- Find the target month: first month after all existing ledger rows for this contract
-              -- where paid < rental_amount (i.e. not yet fully prepaid).
-              -- We use the last existing row as the starting point and advance one month.
-              SELECT
-                CASE WHEN month = 12 THEN year + 1 ELSE year END,
-                CASE WHEN month = 12 THEN 1          ELSE month + 1 END
-              INTO target_year, target_month
-              FROM property_monthly_ledger
-              WHERE contract_id = overpaid.contract_id
-              ORDER BY year DESC, month DESC
-              LIMIT 1;
+              -- Search forward from the next month for the first slot with remaining capacity
+              check_year  := overpaid.year;
+              check_month := overpaid.month;
+              -- Advance one month
+              check_month := check_month + 1;
+              IF check_month > 12 THEN check_month := 1; check_year := check_year + 1; END IF;
 
-              -- Create or add to the target month's ledger row (expectedAmount=0 = prepaid)
+              target_year  := NULL;
+              target_month := NULL;
+
+              FOR i IN 1..200 LOOP
+                SELECT COALESCE(paid_amount, 0)
+                INTO check_paid
+                FROM property_monthly_ledger
+                WHERE contract_id = overpaid.contract_id
+                  AND year  = check_year
+                  AND month = check_month;
+
+                -- Slot is available if: row doesn't exist yet, OR paid < rental_amount
+                IF NOT FOUND OR check_paid < rental_amt THEN
+                  target_year  := check_year;
+                  target_month := check_month;
+                  EXIT;
+                END IF;
+
+                check_month := check_month + 1;
+                IF check_month > 12 THEN check_month := 1; check_year := check_year + 1; END IF;
+              END LOOP;
+
+              IF target_year IS NULL THEN CONTINUE; END IF;
+
+              -- Create or top-up the target month (expected_amount = 0 → prepaid)
               INSERT INTO property_monthly_ledger
                 (company_id, module, contract_id, unit_id, year, month, expected_amount, paid_amount, created_at)
               SELECT
-                overpaid.company_id,
-                overpaid.module,
-                overpaid.contract_id,
-                overpaid.unit_id,
-                target_year,
-                target_month,
-                0,
-                excess,
-                NOW()
+                overpaid.company_id, overpaid.module, overpaid.contract_id, overpaid.unit_id,
+                target_year, target_month, 0, excess, NOW()
               ON CONFLICT (contract_id, year, month)
               DO UPDATE SET paid_amount = property_monthly_ledger.paid_amount + EXCLUDED.paid_amount;
 
-              -- Reassign the most recently created payment that was booked to the overpaid month
-              -- to point to the new target month instead (best-effort — keeps audit trail accurate)
-              UPDATE property_payments pp
+              -- Reassign the most-recently-created payment from the overpaid month
+              -- to the new target month (best-effort audit fix)
+              UPDATE property_payments
               SET
                 for_year      = target_year,
                 for_month     = target_month,
@@ -3247,11 +3289,11 @@ let migrationsDone = false;
                     AND year  = target_year
                     AND month = target_month
                 )
-              WHERE pp.id = (
+              WHERE id = (
                 SELECT id FROM property_payments
                 WHERE contract_id = overpaid.contract_id
-                  AND for_year    = overpaid.year
-                  AND for_month   = overpaid.month
+                  AND for_year  = overpaid.year
+                  AND for_month = overpaid.month
                 ORDER BY created_at DESC
                 LIMIT 1
               );
