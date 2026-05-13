@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import FactoryFinancialSnapshot from "@/pages/factory/FactoryFinancialSnapshot";
 import FactoryShippingContainers from "@/pages/factory/FactoryShippingContainers";
 import FactoryStatusBuilder from "@/pages/factory/FactoryStatusBuilder";
+import FactoryContainerTracking from "@/pages/factory/FactoryContainerTracking";
 import { addDays, format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +25,7 @@ import {
 import {
   ChevronDown, ChevronRight, ChevronLeft, FlaskConical, PackageCheck, Scale,
   TrendingUp, TrendingDown, Minus, Tag, Trash2,
-  Package, ShoppingCart, AlertTriangle, Truck, RefreshCw, Layers,
+  Package, ShoppingCart, AlertTriangle, Truck, RefreshCw, Layers, Ship,
 } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -921,6 +922,10 @@ export default function DailyProductionReport() {
           <TabsTrigger value="ledger" data-testid="tab-ledger">Bale Ledger</TabsTrigger>
           <TabsTrigger value="shipping" data-testid="tab-shipping">Shipping Containers</TabsTrigger>
           <TabsTrigger value="sheets" data-testid="tab-sheets">Factory Sheets</TabsTrigger>
+          <TabsTrigger value="container-tracking" data-testid="tab-container-tracking" className="flex items-center gap-1.5">
+            <Ship className="h-3.5 w-3.5" />
+            Container Tracking
+          </TabsTrigger>
         </TabsList>
 
         {/* ── Production tab ── */}
@@ -1508,6 +1513,11 @@ export default function DailyProductionReport() {
         {/* ── Factory Sheets tab ── */}
         <TabsContent value="sheets" className="flex-1 overflow-hidden flex flex-col mt-0 data-[state=inactive]:hidden">
           <FactoryStatusBuilder />
+        </TabsContent>
+
+        {/* ── Container Tracking tab ── */}
+        <TabsContent value="container-tracking" className="flex-1 overflow-y-auto p-4 mt-0 data-[state=inactive]:hidden">
+          <FactoryContainerTracking />
         </TabsContent>
       </Tabs>
     </div>
