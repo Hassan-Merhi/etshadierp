@@ -7,8 +7,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { PageHeader } from "@/components/PageHeader";
 import {
   BookOpen, Eye, EyeOff, ExternalLink, List, AlignJustify, Package,
-  Trash2, ChevronDown, ChevronRight, Filter, X, FileDown, Plus,
-  LayoutList, Layers, ArrowUpDown,
+  Trash2, ChevronDown, ChevronRight, X, FileDown, Plus,
+  LayoutList, Layers,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -439,7 +439,7 @@ export default function FactoryDaybook() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // ── View/UX state ─────────────────────────────────────────────────────────
-  const [isDetailed, setIsDetailed] = useState(false);
+  const [isDetailed, setIsDetailed] = useState(false); // always defaults to condensed
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
   const [hiddenRowIds, setHiddenRowIds] = useState<Set<string>>(new Set());
   const [showHidden, setShowHidden] = useState(false);
@@ -708,7 +708,6 @@ export default function FactoryDaybook() {
     setSearchQuery(saved.searchQuery || "");
     setMinAmount(saved.minAmount || "");
     setMaxAmount(saved.maxAmount || "");
-    setSortOrder((saved.sortOrder as "asc" | "desc") || "desc");
     setHiddenRowIds(new Set(saved.hiddenRowIds || []));
     setShowHidden(saved.showHidden || false);
     if (saved.viewMode) setIsDetailed(saved.viewMode === "detailed");
@@ -1048,109 +1047,58 @@ export default function FactoryDaybook() {
 
       {/* Filters */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Filter className="w-5 h-5" />
-              <CardTitle>Filters</CardTitle>
-            </div>
+        <CardContent className="pt-4 pb-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <Input
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              data-testid="input-search"
+              className="w-44 h-8 text-sm"
+            />
+            <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
+            <Select value={txTypeFilter} onValueChange={setTxTypeFilter}>
+              <SelectTrigger className="w-36 h-8 text-sm" data-testid="select-tx-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Types</SelectItem>
+                <SelectItem value="PAYMENT">Payment</SelectItem>
+                <SelectItem value="RECEIPT">Receipt</SelectItem>
+                <SelectItem value="JOURNAL">Journal</SelectItem>
+                <SelectItem value="INVOICE">Invoice</SelectItem>
+                <SelectItem value="BALE_TRANSFER">Bale Transfer</SelectItem>
+                <SelectItem value="CONTAINER_IMPORT">Container Import</SelectItem>
+                <SelectItem value="OFFLOAD_RAW_STOCK">Offload Raw Stock</SelectItem>
+                <SelectItem value="COMMISSION">Commission</SelectItem>
+                <SelectItem value="BALE_PRESSING">Bale Pressing</SelectItem>
+                <SelectItem value="BALE_FINALIZE">Bale Finalize</SelectItem>
+                <SelectItem value="BALE_STOCK_ENTRY">Bale Stock Entry</SelectItem>
+                <SelectItem value="BALE_REMOVAL">Bale Removal</SelectItem>
+                <SelectItem value="FREIGHT_PAYMENT">Freight Payment</SelectItem>
+                <SelectItem value="SUPPLIER_PAYMENT">Supplier Payment</SelectItem>
+                <SelectItem value="PAYROLL_PAYMENT">Payroll Payment</SelectItem>
+                <SelectItem value="DOC_UPLOAD">Doc Upload</SelectItem>
+                <SelectItem value="DOC_DELETE">Doc Delete</SelectItem>
+                <SelectItem value="FREIGHT_ADD">Freight Add</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "exclude" | "only")}>
+              <SelectTrigger className="w-36 h-8 text-sm" data-testid="select-status-filter">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Entries</SelectItem>
+                <SelectItem value="exclude">Exclude Optional</SelectItem>
+                <SelectItem value="only">Only Optional</SelectItem>
+              </SelectContent>
+            </Select>
             {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters" className="gap-1">
-                <X className="w-4 h-4" />
-                Clear Filters
+              <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters" className="gap-1 h-8 text-sm">
+                <X className="w-3.5 h-3.5" />
+                Clear
               </Button>
             )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="space-y-2">
-              <Label>Period</Label>
-              <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
-            </div>
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <Select value={txTypeFilter} onValueChange={setTxTypeFilter}>
-                <SelectTrigger className="w-40" data-testid="select-tx-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Types</SelectItem>
-                  <SelectItem value="PAYMENT">Payment</SelectItem>
-                  <SelectItem value="RECEIPT">Receipt</SelectItem>
-                  <SelectItem value="JOURNAL">Journal</SelectItem>
-                  <SelectItem value="INVOICE">Invoice</SelectItem>
-                  <SelectItem value="BALE_TRANSFER">Bale Transfer</SelectItem>
-                  <SelectItem value="CONTAINER_IMPORT">Container Import</SelectItem>
-                  <SelectItem value="OFFLOAD_RAW_STOCK">Offload Raw Stock</SelectItem>
-                  <SelectItem value="COMMISSION">Commission</SelectItem>
-                  <SelectItem value="BALE_PRESSING">Bale Pressing</SelectItem>
-                  <SelectItem value="BALE_FINALIZE">Bale Finalize</SelectItem>
-                  <SelectItem value="BALE_STOCK_ENTRY">Bale Stock Entry</SelectItem>
-                  <SelectItem value="BALE_REMOVAL">Bale Removal</SelectItem>
-                  <SelectItem value="FREIGHT_PAYMENT">Freight Payment</SelectItem>
-                  <SelectItem value="SUPPLIER_PAYMENT">Supplier Payment</SelectItem>
-                  <SelectItem value="PAYROLL_PAYMENT">Payroll Payment</SelectItem>
-                  <SelectItem value="DOC_UPLOAD">Doc Upload</SelectItem>
-                  <SelectItem value="DOC_DELETE">Doc Delete</SelectItem>
-                  <SelectItem value="FREIGHT_ADD">Freight Add</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Currency</Label>
-              <Select value={currencyFilter} onValueChange={setCurrencyFilter}>
-                <SelectTrigger className="w-28" data-testid="select-currency-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="EUR">EUR</SelectItem>
-                  <SelectItem value="AUD">AUD</SelectItem>
-                  <SelectItem value="LBP">LBP</SelectItem>
-                  <SelectItem value="GBP">GBP</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "exclude" | "only")}>
-                <SelectTrigger className="w-36" data-testid="select-status-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Entries</SelectItem>
-                  <SelectItem value="exclude">Exclude Optional</SelectItem>
-                  <SelectItem value="only">Only Optional</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Min Amount</Label>
-              <Input
-                type="number" placeholder="0" value={minAmount}
-                onChange={(e) => setMinAmount(e.target.value)}
-                data-testid="input-min-amount" className="w-[110px]"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Max Amount</Label>
-              <Input
-                type="number" placeholder="∞" value={maxAmount}
-                onChange={(e) => setMaxAmount(e.target.value)}
-                data-testid="input-max-amount" className="w-[110px]"
-              />
-            </div>
-            <div className="space-y-2 flex-1 min-w-[180px]">
-              <Label>Search</Label>
-              <Input
-                placeholder="Description or type..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                data-testid="input-search"
-              />
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -1201,17 +1149,6 @@ export default function FactoryDaybook() {
                   )}
                 </>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSortOrder((v) => v === "desc" ? "asc" : "desc")}
-                data-testid="button-sort-order"
-                className="gap-1"
-                title={sortOrder === "desc" ? "Newest first — click for oldest first" : "Oldest first — click for newest first"}
-              >
-                <ArrowUpDown className="w-4 h-4" />
-                <span className="hidden sm:inline text-xs">{sortOrder === "desc" ? "Newest first" : "Oldest first"}</span>
-              </Button>
               <div className="flex items-center border rounded-md overflow-hidden">
                 <Button
                   variant="ghost" size="sm"
@@ -1507,11 +1444,6 @@ export default function FactoryDaybook() {
                             <div className="text-xs text-muted-foreground mt-0.5 font-mono">
                               {formatDisplayTime(entry.createdAt)}
                             </div>
-                            {entry.voucherNumber && (
-                              <div className="text-xs text-muted-foreground font-mono mt-0.5" data-testid={`text-voucher-num-${entry.id}`}>
-                                {entry.voucherNumber}
-                              </div>
-                            )}
                             <div className="flex items-center gap-1 flex-wrap mt-1">
                               <Badge variant={bv} className={cn(bc, "whitespace-nowrap")} data-testid={`badge-type-${entry.id}`}>
                                 {formatTxType(entry.txType)}
