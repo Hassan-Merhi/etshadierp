@@ -82,7 +82,7 @@ export default function Containers() {
   const [searchTerm, setSearchTerm] = useState("");
   const [soldSearchTerm, setSoldSearchTerm] = useState("");
   const [otwSearchTerm, setOtwSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("OTW");
   const [supplierFilter, setSupplierFilter] = useState("ALL");
   // OTW Tracking filters
   const [otwLocationFilter, setOtwLocationFilter] = useState("ALL");
