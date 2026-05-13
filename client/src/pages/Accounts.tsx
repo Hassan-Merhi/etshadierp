@@ -444,7 +444,9 @@ export default function Accounts() {
         })
     : [];
 
-  const accounts = baseAccounts;
+  const accounts = appMode === "factory"
+    ? [...baseAccounts, ...factorySupplierAccounts, ...factoryWorkerAccounts]
+    : baseAccounts;
 
   const { data: ledgerAccounts = [], isLoading: ledgerAccountsLoading } =
     useQuery<LedgerAccount[]>({
