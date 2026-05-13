@@ -1898,11 +1898,11 @@ export default function Accounts() {
                                   data-testid={`button-select-account-${account.id}`}
                                 >
                                   <div className="flex items-center gap-2 w-full">
-                                    <span className="text-sm flex-1">
+                                    <span className="text-sm flex-1 font-medium">
                                       {account.name}
                                     </span>
                                     {!hideBalances && account.balance !== 0 && (
-                                      <span className="ml-auto text-xs tabular-nums text-muted-foreground shrink-0">
+                                      <span className="ml-auto text-xs tabular-nums text-muted-foreground shrink-0 font-mono">
                                         {formatAmount(Math.abs(account.balance))}{" "}
                                         <span className={drCrClass(account.balanceSide)}>
                                           {account.balanceSide ?? ""}
@@ -1916,7 +1916,7 @@ export default function Accounts() {
                                 account.children.map((child) => (
                                   <div
                                     key={child.id}
-                                    className="border-b last:border-b-0"
+                                    className="border-b last:border-b-0 bg-muted/20"
                                   >
                                     <button
                                       onClick={() =>
@@ -1925,15 +1925,15 @@ export default function Accounts() {
                                       disabled={
                                         accountsLoading || !selectedCompany
                                       }
-                                      className="w-full p-3 pl-16 text-left hover-elevate"
+                                      className="w-full p-2.5 pl-14 text-left hover-elevate"
                                       data-testid={`button-select-account-${child.id}`}
                                     >
                                       <div className="flex items-center gap-2 w-full">
-                                        <span className="text-sm flex-1">
+                                        <span className="text-sm flex-1 text-muted-foreground">
                                           {child.name}
                                         </span>
                                         {!hideBalances && child.balance !== 0 && (
-                                          <span className="ml-auto text-xs tabular-nums text-muted-foreground shrink-0">
+                                          <span className="ml-auto text-xs tabular-nums text-muted-foreground shrink-0 font-mono">
                                             {formatAmount(Math.abs(child.balance))}{" "}
                                             <span className={drCrClass(child.balanceSide)}>
                                               {child.balanceSide ?? ""}
@@ -3007,16 +3007,9 @@ export default function Accounts() {
           )}
         </TabsContent>
 
-        <TabsContent value="alter" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Alter Account</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+        <TabsContent value="alter" className="space-y-4">
+          <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-account-search">
-                  Search & Select Account to Edit
-                </Label>
                 <div className="relative">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -3044,7 +3037,7 @@ export default function Accounts() {
                 ) : (
                   <div
                     ref={editAccountListRef}
-                    className="max-h-64 overflow-y-auto border rounded-md"
+                    className="max-h-64 overflow-y-auto border rounded-xl overflow-hidden"
                     onKeyDown={(e) => handleListArrowScroll(e, editAccountListRef)}
                   >
                     {filteredAccountsForEdit.length === 0 ? (
@@ -3162,12 +3155,20 @@ export default function Accounts() {
                               }
                             }}
                             className={`w-full p-3 text-left border-b last:border-b-0 ${
-                              isSelected ? "bg-accent" : "hover-elevate"
-                            } ${!isEditable ? "opacity-60" : ""}`}
+                              isSelected ? "bg-primary/10" : isEditable ? "hover-elevate" : "opacity-50"
+                            }`}
                             data-testid={`button-select-account-edit-${account.id}`}
                           >
                             <div className="flex items-center gap-2 w-full">
-                              <span className="text-sm flex-1 text-left">{account.name}</span>
+                              <div className="flex-1 min-w-0 text-left">
+                                <span className="text-sm font-medium">{account.name}</span>
+                                {!isEditable && (
+                                  <span className="block text-xs text-muted-foreground/60 mt-0.5">Read-only</span>
+                                )}
+                              </div>
+                              <Badge variant="secondary" className="text-xs shrink-0 capitalize">
+                                {account.type}
+                              </Badge>
                               {(isFactorySupplier || isFactoryWorker || isFixedAsset) && (
                                 <span
                                   role="button"
@@ -3197,13 +3198,10 @@ export default function Accounts() {
               </div>
 
               {(accountToEdit || supplierToEdit || customerToEdit || employeeToEdit) && (
-                <Card className="bg-muted/50">
-                  <CardHeader>
-                    <CardTitle className="text-sm">
-                      {supplierToEdit ? "Edit Supplier" : customerToEdit ? "Edit Customer" : employeeToEdit ? "Edit Employee" : "Edit Account Details"}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                <div className="rounded-xl border bg-muted/40 p-4 space-y-4">
+                  <p className="text-sm font-semibold">
+                    {supplierToEdit ? "Edit Supplier" : customerToEdit ? "Edit Customer" : employeeToEdit ? "Edit Employee" : "Edit Account Details"}
+                  </p>
                     <Form {...editForm}>
                       <form
                         onSubmit={editForm.handleSubmit(onEditSubmit)}
@@ -3390,18 +3388,12 @@ export default function Accounts() {
                         </div>
                       </form>
                     </Form>
-                  </CardContent>
-                </Card>
+                </div>
               )}
 
               {bankToEdit && (
-                <Card className="bg-muted/50">
-                  <CardHeader>
-                    <CardTitle className="text-sm">
-                      Edit Bank Account Details
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                <div className="rounded-xl border bg-muted/40 p-4 space-y-4">
+                  <p className="text-sm font-semibold">Edit Bank Account Details</p>
                     <Form {...bankForm}>
                       <form
                         onSubmit={bankForm.handleSubmit(onBankSubmit)}
@@ -3560,11 +3552,9 @@ export default function Accounts() {
                         </div>
                       </form>
                     </Form>
-                  </CardContent>
-                </Card>
+                </div>
               )}
-            </CardContent>
-          </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="find" className="space-y-4">
