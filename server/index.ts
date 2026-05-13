@@ -3171,6 +3171,98 @@ let migrationsDone = false;
         `);
       } catch { /* skip if tables not ready */ }
 
+      // One-time fix: cascade overpaid rental months to the next unpaid month.
+      // When a month already had balance=$0 and a new payment was recorded against it,
+      // the excess ended up inflating that month's paid_amount beyond its expected_amount.
+      // This migration finds each such case and moves the excess forward to the first
+      // month that hasn't been fully prepaid yet.
+      try {
+        await migrationClient.query(`
+          DO $$
+          DECLARE
+            overpaid RECORD;
+            excess NUMERIC;
+            target_year INT;
+            target_month INT;
+          BEGIN
+            -- Process each current/past ledger row that is overpaid (paid > expected, expected > 0)
+            FOR overpaid IN
+              SELECT pml.*
+              FROM property_monthly_ledger pml
+              WHERE pml.expected_amount > 0
+                AND pml.paid_amount > pml.expected_amount
+                AND (
+                  pml.year < EXTRACT(YEAR FROM CURRENT_DATE)::INT
+                  OR (
+                    pml.year  = EXTRACT(YEAR FROM CURRENT_DATE)::INT
+                    AND pml.month <= EXTRACT(MONTH FROM CURRENT_DATE)::INT
+                  )
+                )
+              ORDER BY pml.contract_id, pml.year, pml.month
+            LOOP
+              excess := overpaid.paid_amount - overpaid.expected_amount;
+
+              -- Fix the overpaid month: clamp to its expected amount
+              UPDATE property_monthly_ledger
+              SET paid_amount = expected_amount
+              WHERE id = overpaid.id;
+
+              -- Find the target month: first month after all existing ledger rows for this contract
+              -- where paid < rental_amount (i.e. not yet fully prepaid).
+              -- We use the last existing row as the starting point and advance one month.
+              SELECT
+                CASE WHEN month = 12 THEN year + 1 ELSE year END,
+                CASE WHEN month = 12 THEN 1          ELSE month + 1 END
+              INTO target_year, target_month
+              FROM property_monthly_ledger
+              WHERE contract_id = overpaid.contract_id
+              ORDER BY year DESC, month DESC
+              LIMIT 1;
+
+              -- Create or add to the target month's ledger row (expectedAmount=0 = prepaid)
+              INSERT INTO property_monthly_ledger
+                (company_id, module, contract_id, unit_id, year, month, expected_amount, paid_amount, created_at)
+              SELECT
+                overpaid.company_id,
+                overpaid.module,
+                overpaid.contract_id,
+                overpaid.unit_id,
+                target_year,
+                target_month,
+                0,
+                excess,
+                NOW()
+              ON CONFLICT (contract_id, year, month)
+              DO UPDATE SET paid_amount = property_monthly_ledger.paid_amount + EXCLUDED.paid_amount;
+
+              -- Reassign the most recently created payment that was booked to the overpaid month
+              -- to point to the new target month instead (best-effort — keeps audit trail accurate)
+              UPDATE property_payments pp
+              SET
+                for_year      = target_year,
+                for_month     = target_month,
+                ledger_row_id = (
+                  SELECT id FROM property_monthly_ledger
+                  WHERE contract_id = overpaid.contract_id
+                    AND year  = target_year
+                    AND month = target_month
+                )
+              WHERE pp.id = (
+                SELECT id FROM property_payments
+                WHERE contract_id = overpaid.contract_id
+                  AND for_year    = overpaid.year
+                  AND for_month   = overpaid.month
+                ORDER BY created_at DESC
+                LIMIT 1
+              );
+
+            END LOOP;
+          END $$;
+        `);
+      } catch (e: any) {
+        console.warn("Rental cascade migration skipped:", e.message?.split('\n')[0]);
+      }
+
       // Auto-fix sequence desyncs (can happen after data restores / bulk imports with explicit IDs)
       const seqFixes: Array<[string, string]> = [
         ["ledger_accounts", "ledger_accounts_id_seq"],

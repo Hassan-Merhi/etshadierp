@@ -230,6 +230,86 @@ async function ensureMonthlyLedgerRows(contractId: number) {
   });
 }
 
+// ── Smart allocation builder ───────────────────────────────────────────────
+// Builds the list of (year, month, chunk) allocations for a payment, starting
+// from (startYear, startMonth) but SKIPPING any month that is already fully
+// paid or fully prepaid, so the payment cascades to the next unpaid month.
+//
+// "Fully paid" rules:
+//   • Current / past month  → paidAmount >= expectedAmount (standard due month)
+//   • Future month          → paidAmount >= rentalAmount   (already prepaid in full)
+async function buildAllocations(
+  contractId: number,
+  startYear: number,
+  startMonth: number,
+  totalAmount: number,
+  rentalAmount: number,
+): Promise<Array<{ year: number; month: number; chunk: string }>> {
+  // Load all existing ledger rows for this contract so we can check balances
+  const existingRows = await db
+    .select({
+      year: propertyMonthlyLedger.year,
+      month: propertyMonthlyLedger.month,
+      paidAmount: propertyMonthlyLedger.paidAmount,
+      expectedAmount: propertyMonthlyLedger.expectedAmount,
+    })
+    .from(propertyMonthlyLedger)
+    .where(eq(propertyMonthlyLedger.contractId, contractId));
+
+  const ledgerMap = new Map<string, { paid: number; expected: number }>();
+  for (const row of existingRows) {
+    ledgerMap.set(`${row.year}-${row.month}`, {
+      paid: parseFloat(row.paidAmount as string),
+      expected: parseFloat(row.expectedAmount as string),
+    });
+  }
+
+  const now = new Date();
+  const nowYear = now.getUTCFullYear();
+  const nowMonth = now.getUTCMonth() + 1;
+
+  const allocations: Array<{ year: number; month: number; chunk: string }> = [];
+  let remaining = totalAmount;
+  let ay = startYear, am = startMonth;
+  let skipped = 0; // guard against infinite loops of already-paid months
+
+  while (remaining > 0.005) {
+    const isFuture = ay > nowYear || (ay === nowYear && am > nowMonth);
+    const existing = ledgerMap.get(`${ay}-${am}`);
+
+    let outstanding: number;
+    if (existing) {
+      if (isFuture) {
+        // Future prepaid month: compare against contract rental amount
+        outstanding = Math.max(0, rentalAmount - existing.paid);
+      } else {
+        // Current / past due month: compare against its expected amount
+        outstanding = Math.max(0, existing.expected - existing.paid);
+      }
+    } else {
+      // No ledger row yet — full capacity available
+      outstanding = rentalAmount > 0 ? rentalAmount : remaining;
+    }
+
+    if (outstanding <= 0.005) {
+      // Already fully paid — skip this month and try the next
+      am++; if (am > 12) { am = 1; ay++; }
+      skipped++;
+      if (skipped > 500) break; // absolute safety cap
+      continue;
+    }
+
+    skipped = 0; // reset skip counter once we found an allocatable month
+    const chunk = Math.min(remaining, outstanding);
+    allocations.push({ year: ay, month: am, chunk: chunk.toFixed(2) });
+    remaining = Math.round((remaining - chunk) * 100) / 100;
+    am++; if (am > 12) { am = 1; ay++; }
+    if (allocations.length >= 120) break; // safety cap ~10 years
+  }
+
+  return allocations;
+}
+
 async function ensureMonthlyForCompany(companyId: number, module: RentalModule) {
   const active = await db
     .select({ id: propertyContracts.id })
@@ -1003,22 +1083,11 @@ export function registerRentalRoutes(
       const [unit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, contract.unitId));
 
       // ── Build monthly allocations ──────────────────────────────────────────
-      // If the payment exceeds one month's rent, split it across consecutive months
-      // starting from the payment date's month. Each chunk = min(remaining, rentalAmount).
+      // Uses the smart allocator that skips months already fully paid/prepaid,
+      // cascading the payment to the next month that still has an outstanding balance.
       const totalAmountNum = parseFloat(data.amount);
       const rentalAmountNum = parseFloat(contract.rentalAmount as string);
-      const allocations: Array<{ year: number; month: number; chunk: string }> = [];
-      {
-        let remaining = totalAmountNum;
-        let ay = y, am = m;
-        while (remaining > 0.005) {
-          const chunk = rentalAmountNum > 0 ? Math.min(remaining, rentalAmountNum) : remaining;
-          allocations.push({ year: ay, month: am, chunk: chunk.toFixed(2) });
-          remaining = Math.round((remaining - chunk) * 100) / 100;
-          am++; if (am > 12) { am = 1; ay++; }
-          if (allocations.length >= 120) break; // safety cap ~10 years
-        }
-      }
+      const allocations = await buildAllocations(contract.id, y, m, totalAmountNum, rentalAmountNum);
 
       const payments = await db.transaction(async (tx) => {
         // Ensure a ledger row exists for every allocated month
@@ -1146,17 +1215,7 @@ export function registerRentalRoutes(
 
         const totalAmountNum = parseFloat(data.amount);
         const rentalAmountNum = parseFloat(contract.rentalAmount as string);
-        const allocations: Array<{ year: number; month: number; chunk: string }> = [];
-        {
-          let remaining = totalAmountNum, ay = y, am = m;
-          while (remaining > 0.005) {
-            const chunk = rentalAmountNum > 0 ? Math.min(remaining, rentalAmountNum) : remaining;
-            allocations.push({ year: ay, month: am, chunk: chunk.toFixed(2) });
-            remaining = Math.round((remaining - chunk) * 100) / 100;
-            am++; if (am > 12) { am = 1; ay++; }
-            if (allocations.length >= 120) break;
-          }
-        }
+        const allocations = await buildAllocations(contract.id, y, m, totalAmountNum, rentalAmountNum);
 
         const payments = await db.transaction(async (tx) => {
           for (const alloc of allocations) {
