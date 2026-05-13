@@ -1706,20 +1706,14 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         <div>
           {/* Page header */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold">All Stock — All Locations</h1>
-              {!allInventoryLoading && filteredCombinedRows.length > 0 && (
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  {filteredCombinedRows.length} item{filteredCombinedRows.length !== 1 ? "s" : ""}
-                  {" · "}
-                  {allInventoryLocations.length} location{allInventoryLocations.length !== 1 ? "s" : ""}
-                  {" · "}
-                  Total value:{" "}
-                  <span className="font-medium">
-                    {formatAmount(filteredCombinedRows.reduce((s, r) => s + r.totalValue, 0))}
-                  </span>
-                </p>
-              )}
+            <div className="flex items-center gap-2">
+              <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Globe className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-xl md:text-2xl font-bold leading-tight">All Stock</h1>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">All Locations</p>
+              </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <DropdownMenu>
@@ -1784,6 +1778,28 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               </Button>
             </div>
           </div>
+
+          {/* Stats bar */}
+          {!allInventoryLoading && filteredCombinedRows.length > 0 && (
+            <div className="flex flex-wrap gap-3 mb-4">
+              <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
+                <Package className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold">{filteredCombinedRows.length.toLocaleString()}</span>
+                <span className="text-xs text-muted-foreground">Items</span>
+              </div>
+              <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
+                <Warehouse className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold">{allInventoryLocations.length.toLocaleString()}</span>
+                <span className="text-xs text-muted-foreground">Locations</span>
+              </div>
+              {!posUser && (
+                <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-3 py-2">
+                  <span className="text-sm font-semibold font-mono text-primary">{formatAmount(filteredCombinedRows.reduce((s, r) => s + r.totalValue, 0))}</span>
+                  <span className="text-xs text-muted-foreground">total value</span>
+                </div>
+              )}
+            </div>
+          )}
 
           <Card className="w-full">
             {/* Filters row */}
@@ -2177,7 +2193,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             ) : (
               <>
                 {/* Mobile card view */}
-                <div className="md:hidden space-y-3">
+                <div className="md:hidden space-y-2">
                 {filteredStockGroups.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     No stock groups found matching your search
@@ -2190,74 +2206,56 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                       const movement = closingQty - openingQty;
                       const isNegative = closingQty < 0;
                       return (
-                        <Card
+                        <div
                           key={group.groupId || 0}
-                          className={`p-3 cursor-pointer ${isNegative ? "bg-red-100 dark:bg-red-900/30" : "hover-elevate"}`}
+                          className={`bg-card border rounded-xl p-4 cursor-pointer hover-elevate flex items-center gap-3 ${isNegative ? "border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/30" : ""}`}
                           onClick={() => setSelectedGroup(group)}
                           data-testid={`row-group-${group.groupId || 'uncategorized'}`}
                         >
-                          <div className="flex items-center gap-2 mb-2">
-                            <Layers className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium" data-testid={`name-${group.groupId}`}>{group.groupName}</span>
+                          <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Layers className="h-4 w-4 text-primary" />
                           </div>
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div>
-                              <span className="text-muted-foreground">Items: </span>
-                              <span data-testid={`items-${group.groupId}`}>{group.itemCount.toLocaleString()}</span>
-                            </div>
-                            {showMovement ? (
-                              <>
-                                <div className="text-right">
-                                  <span className="text-muted-foreground">Opening: </span>
-                                  <span className="font-mono text-muted-foreground">{Math.floor(openingQty).toLocaleString()} BL</span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">Closing: </span>
-                                  <span className={`font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>{Math.floor(closingQty).toLocaleString()} BL</span>
-                                </div>
-                                <div className="text-right">
-                                  <span className="text-muted-foreground">Change: </span>
-                                  <span className={`font-mono font-medium ${movement < 0 ? "text-red-600" : movement > 0 ? "text-green-600" : "text-muted-foreground"}`}>
-                                    {movement > 0 ? "+" : ""}{Math.floor(movement).toLocaleString()} BL
-                                  </span>
-                                </div>
-                              </>
-                            ) : (
-                              <div className="text-right">
-                                <span className="text-muted-foreground">Qty: </span>
-                                <span className={`font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`} data-testid={`qty-${group.groupId}`}>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm leading-snug truncate" data-testid={`name-${group.groupId}`}>{group.groupName}</p>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <Badge variant="secondary" className="text-xs font-mono" data-testid={`items-${group.groupId}`}>
+                                {group.itemCount.toLocaleString()} items
+                              </Badge>
+                              {showMovement ? (
+                                <span className={`text-xs font-mono font-semibold ${movement < 0 ? "text-red-600" : movement > 0 ? "text-green-600" : "text-muted-foreground"}`}>
+                                  {movement > 0 ? <TrendingUp className="inline h-3 w-3 mr-0.5" /> : movement < 0 ? <TrendingDown className="inline h-3 w-3 mr-0.5" /> : null}
+                                  {movement > 0 ? "+" : ""}{Math.floor(movement).toLocaleString()} BL
+                                </span>
+                              ) : (
+                                <span className={`text-xs font-mono font-semibold ${isNegative ? "text-red-600" : "text-muted-foreground"}`} data-testid={`qty-${group.groupId}`}>
                                   {Math.floor(closingQty).toLocaleString()} BL
                                 </span>
-                              </div>
-                            )}
-                            {!posUser && (
-                              <>
-                                <div>
-                                  <span className="text-muted-foreground">Avg Rate: </span>
-                                  <span className="font-mono" data-testid={`rate-${group.groupId}`}>{formatAmount(group.averageRate)}</span>
-                                </div>
-                                <div className="text-right">
-                                  <span className="text-muted-foreground">Value: </span>
-                                  <span className="font-mono font-medium" data-testid={`value-${group.groupId}`}>{formatAmount(group.totalValue)}</span>
-                                </div>
-                              </>
-                            )}
+                              )}
+                            </div>
                           </div>
-                        </Card>
+                          {!posUser && (
+                            <div className="text-right flex-shrink-0">
+                              <p className="text-sm font-semibold font-mono" data-testid={`value-${group.groupId}`}>{formatAmount(group.totalValue)}</p>
+                              <p className="text-xs text-muted-foreground font-mono" data-testid={`rate-${group.groupId}`}>{formatAmount(group.averageRate)} avg</p>
+                            </div>
+                          )}
+                          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        </div>
                       );
                     })}
                     {filteredStockGroups.length > 0 && !itemSearchTerm && (
-                      <Card className="p-3 bg-muted/50">
-                        <div className="flex items-center justify-between font-bold text-sm">
-                          <span>Total ({filteredStockGroups.reduce((sum, g) => sum + g.itemCount, 0).toLocaleString()} items)</span>
-                          <span className="font-mono">{Math.floor(filteredStockGroups.reduce((sum, g) => sum + g.totalQuantity, 0)).toLocaleString()} BL</span>
+                      <div className="bg-muted/50 border rounded-xl p-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Total</p>
+                          <p className="text-sm font-semibold">{filteredStockGroups.reduce((sum, g) => sum + g.itemCount, 0).toLocaleString()} items</p>
                         </div>
-                        {!posUser && (
-                          <div className="text-right text-sm font-mono font-bold mt-1">
-                            {formatAmount(filteredStockGroups.reduce((sum, g) => sum + g.totalValue, 0))}
-                          </div>
-                        )}
-                      </Card>
+                        <div className="text-right">
+                          <p className="text-sm font-mono font-bold">{Math.floor(filteredStockGroups.reduce((sum, g) => sum + g.totalQuantity, 0)).toLocaleString()} BL</p>
+                          {!posUser && (
+                            <p className="text-sm font-mono font-semibold text-primary">{formatAmount(filteredStockGroups.reduce((sum, g) => sum + g.totalValue, 0))}</p>
+                          )}
+                        </div>
+                      </div>
                     )}
                   </>
                 )}
@@ -2496,7 +2494,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             </div>
 
             {/* Mobile card view */}
-            <div className="md:hidden space-y-3">
+            <div className="md:hidden space-y-2">
               {filteredStockItems.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   {itemSearchTerm ? "No items found matching your search" : "No items in this group"}
@@ -2508,84 +2506,65 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                     const openingQty = showMovement ? (openingInventoryMap.get(item.stockItemId) || 0) : 0;
                     const movement = closingQty - openingQty;
                     const isNegative = closingQty < 0;
+                    const isSelected = index === selectedRowIndex;
                     return (
-                      <Card
+                      <div
                         key={item.inventoryId}
                         data-testid={`row-item-${item.stockItemId}`}
-                        className={`p-3 ${
-                          index === selectedRowIndex
-                            ? (isNegative ? "bg-red-200 dark:bg-red-800/50 ring-2 ring-primary" : "bg-accent")
-                            : (isNegative ? "bg-red-100 dark:bg-red-900/30" : "hover-elevate")
-                        }`}
+                        className={`bg-card border rounded-xl p-4 cursor-pointer hover-elevate ${
+                          isSelected ? "ring-2 ring-primary" : ""
+                        } ${isNegative ? "border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/30" : ""}`}
                         onClick={() => setSelectedRowIndex(index)}
                       >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/locations/${item.locationId}/stock-items/${item.stockItemId}/history`);
-                          }}
-                          className="text-left text-primary hover:underline cursor-pointer font-medium mb-2 block"
-                          data-testid={`link-item-${item.stockItemId}`}
-                        >
-                          <span className="flex items-center gap-2 flex-wrap">
-                            {item.stockItemName}
-                            {item.stockItemActive === false && <Badge variant="outline" className="text-xs">Inactive</Badge>}
-                          </span>
-                        </button>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          {showMovement ? (
-                            <>
-                              <div>
-                                <span className="text-muted-foreground">Opening: </span>
-                                <span className="font-mono text-muted-foreground">{Math.floor(openingQty).toLocaleString()} BL</span>
-                              </div>
-                              <div className="text-right">
-                                <span className="text-muted-foreground">Closing: </span>
-                                <span className={`font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>{Math.floor(closingQty).toLocaleString()} BL</span>
-                              </div>
-                              <div className="col-span-2 text-right">
-                                <span className="text-muted-foreground">Change: </span>
-                                <span className={`font-mono font-medium ${movement < 0 ? "text-red-600" : movement > 0 ? "text-green-600" : "text-muted-foreground"}`}>
-                                  {movement > 0 ? "+" : ""}{Math.floor(movement).toLocaleString()} BL
-                                </span>
-                              </div>
-                            </>
-                          ) : (
-                            <div>
-                              <span className="text-muted-foreground">Qty: </span>
-                              <span className={`font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>
-                                {Math.floor(closingQty).toLocaleString()} BL
-                              </span>
-                            </div>
-                          )}
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/locations/${item.locationId}/stock-items/${item.stockItemId}/history`);
+                            }}
+                            className="text-left text-primary hover:underline cursor-pointer font-semibold text-sm leading-snug flex-1"
+                            data-testid={`link-item-${item.stockItemId}`}
+                          >
+                            <span className="flex items-center gap-2 flex-wrap">
+                              {item.stockItemName}
+                              {item.stockItemActive === false && <Badge variant="outline" className="text-xs">Inactive</Badge>}
+                            </span>
+                          </button>
                           {!posUser && (
-                            <>
-                              <div className={showMovement ? "" : "text-right"}>
-                                <span className="text-muted-foreground">Rate: </span>
-                                <span className="font-mono">{formatAmount(parseFloat(item.averageRate))}</span>
-                              </div>
-                              <div className={`${showMovement ? "" : "col-span-2"} text-right`}>
-                                <span className="text-muted-foreground">Value: </span>
-                                <span className="font-mono font-medium">{formatAmount(parseFloat(item.totalValue))}</span>
-                              </div>
-                            </>
+                            <span className="font-mono font-bold text-sm flex-shrink-0">{formatAmount(parseFloat(item.totalValue))}</span>
                           )}
                         </div>
-                      </Card>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          {showMovement ? (
+                            <>
+                              <span className="text-xs text-muted-foreground font-mono">{Math.floor(openingQty).toLocaleString()} → <span className={`font-semibold ${isNegative ? "text-red-600" : "text-foreground"}`}>{Math.floor(closingQty).toLocaleString()}</span> BL</span>
+                              <span className={`text-xs font-mono font-semibold inline-flex items-center gap-0.5 ${movement < 0 ? "text-red-600" : movement > 0 ? "text-green-600" : "text-muted-foreground"}`}>
+                                {movement > 0 ? <TrendingUp className="h-3 w-3" /> : movement < 0 ? <TrendingDown className="h-3 w-3" /> : null}
+                                {movement > 0 ? "+" : ""}{Math.floor(movement).toLocaleString()} BL
+                              </span>
+                            </>
+                          ) : (
+                            <span className={`text-sm font-mono font-semibold ${isNegative ? "text-red-600" : ""}`}>
+                              {Math.floor(closingQty).toLocaleString()} <span className="text-xs font-normal text-muted-foreground">BL</span>
+                            </span>
+                          )}
+                          {!posUser && (
+                            <span className="text-xs text-muted-foreground font-mono ml-auto">{formatAmount(parseFloat(item.averageRate))} avg</span>
+                          )}
+                        </div>
+                      </div>
                     );
                   })}
                   {filteredStockItems.length > 0 && (
-                    <Card className="p-3 bg-muted/50">
-                      <div className="flex items-center justify-between font-bold text-sm">
-                        <span>Total</span>
-                        <span className="font-mono">{Math.floor(filteredStockItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()} BL</span>
+                    <div className="bg-muted/50 border rounded-xl p-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Total</p>
+                        <p className="text-sm font-mono font-bold">{Math.floor(filteredStockItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()} BL</p>
                       </div>
                       {!posUser && (
-                        <div className="text-right text-sm font-mono font-bold mt-1">
-                          {formatAmount(filteredStockItems.reduce((sum, item) => sum + parseFloat(item.totalValue || "0"), 0))}
-                        </div>
+                        <p className="text-sm font-mono font-semibold text-primary">{formatAmount(filteredStockItems.reduce((sum, item) => sum + parseFloat(item.totalValue || "0"), 0))}</p>
                       )}
-                    </Card>
+                    </div>
                   )}
                 </>
               )}
