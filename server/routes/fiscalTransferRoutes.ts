@@ -1313,9 +1313,8 @@ export function registerFiscalTransferRoutes(app: Express) {
 
       res.json({ ...revision, items: savedItems });
 
-      // Fire-and-forget: send transfer image when POS user saves a revision
-      if (isOptional) {
-        setImmediate(async () => {
+      // Fire-and-forget: send transfer image whenever a revision is saved (optional or non-optional)
+      setImmediate(async () => {
           try {
             const [transfer] = await db
               .select({ destinationLocationId: stockTransferVouchers.destinationLocationId, voucherId: stockTransferVouchers.voucherId })
@@ -1357,7 +1356,6 @@ export function registerFiscalTransferRoutes(app: Express) {
             console.error("[TransferWA] Failed to send (revision):", e.message);
           }
         });
-      }
     } catch (error: any) {
       console.error("[Revision POST] Error:", error.message);
       res.status(500).json({ message: error.message });
@@ -1574,6 +1572,43 @@ export function registerFiscalTransferRoutes(app: Express) {
           .where(eq(vouchers.id, updated.transfer.voucherId));
         
         res.json(updated);
+
+        // Fire-and-forget: send transfer image after transfer order is saved
+        setImmediate(async () => {
+          try {
+            const [voucherRow] = await db
+              .select({ voucherNumber: vouchers.voucherNumber, voucherDate: vouchers.voucherDate })
+              .from(vouchers)
+              .where(eq(vouchers.id, updated.transfer.voucherId));
+            if (!voucherRow) return;
+
+            const [destLoc] = await db
+              .select({ name: locations.name })
+              .from(locations)
+              .where(eq(locations.id, updated.transfer.destinationLocationId));
+
+            const uniqueSrcIds = [...new Set(items.map((i) => i.sourceLocationId))];
+            let sourceName = "Multiple Sources";
+            if (uniqueSrcIds.length === 1) {
+              const [srcLoc] = await db
+                .select({ name: locations.name })
+                .from(locations)
+                .where(eq(locations.id, uniqueSrcIds[0]));
+              if (srcLoc?.name) sourceName = srcLoc.name;
+            }
+
+            await sendTransferWhatsApp({
+              destinationLocationId: updated.transfer.destinationLocationId,
+              sourceLocationName: sourceName,
+              destLocationName: destLoc?.name ?? "Unknown",
+              items: items.map((i) => ({ stockItemId: i.stockItemId, quantity: i.quantity })),
+              voucherNumber: voucherRow.voucherNumber,
+              voucherDate: voucherRow.voucherDate,
+            });
+          } catch (e: any) {
+            console.error("[TransferWA] Failed to send (PUT):", e.message);
+          }
+        });
       } catch (error: any) {
         console.error("[Stock Transfer PUT] Error:", error.message);
         
