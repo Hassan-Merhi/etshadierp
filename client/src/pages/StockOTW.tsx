@@ -167,7 +167,9 @@ function StockOTWContent() {
     grouped.forEach((group) => {
       group.containerCount = group.containers.length;
     });
-    return Array.from(grouped.values());
+    return Array.from(grouped.values()).sort((a, b) =>
+      a.stockItemName.localeCompare(b.stockItemName)
+    );
   }, [stockItems]);
 
   const gradeOptions = useMemo(() => {

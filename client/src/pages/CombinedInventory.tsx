@@ -200,6 +200,7 @@ export default function CombinedInventory() {
     return Array.from(map.values()).sort((a, b) =>
       a.stockItemName.localeCompare(b.stockItemName)
     );
+
   }, [containerDetailsQueries, inventoryRows, allStockItems, includeZero]);
 
   const searchLower = search.trim().toLowerCase();
