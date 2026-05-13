@@ -3,13 +3,13 @@ import { useQuery, useQueries } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Layers, Search, ChevronRight, ArrowLeft, List, FolderOpen, Download } from "lucide-react";
+import { Layers, Search, ChevronRight, ArrowLeft, List, FolderOpen, Download, Loader2 } from "lucide-react";
 import { formatNumber } from "@/lib/formatNumber";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -46,7 +46,7 @@ interface CombinedRow {
   inHandQty: number;
   totalQty: number;
   inHandValue: number;
-  otwWeightedCostSum: number; // sum(qty * rate) for OTW items
+  otwWeightedCostSum: number;
   avgRate: number;
   combinedValue: number;
 }
@@ -98,7 +98,10 @@ export default function CombinedInventory() {
     enabled: includeZero,
   });
 
-  const isLoading = loadingContainers || loadingInventory || containerDetailsQueries.some((q) => q.isLoading) || (includeZero && loadingStockItems);
+  // Only block on containers list + inventory — OTW details load progressively
+  const isLoading = loadingContainers || loadingInventory || (includeZero && loadingStockItems);
+  const isLoadingOtw = containerDetailsQueries.some((q) => q.isLoading);
+  const loadedOtwCount = containerDetailsQueries.filter((q) => !q.isLoading && q.data).length;
 
   const combinedData = useMemo((): CombinedRow[] => {
     const map = new Map<number, CombinedRow>();
@@ -183,9 +186,6 @@ export default function CombinedInventory() {
       });
     }
 
-    // Compute avgRate and combinedValue:
-    // - Prefer in-hand avg rate (most accurate, reflects actual received cost)
-    // - Fall back to OTW purchase rate when there's no in-hand stock yet
     map.forEach((row) => {
       if (row.inHandQty > 0) {
         row.avgRate = row.inHandValue / row.inHandQty;
@@ -252,7 +252,6 @@ export default function CombinedInventory() {
     otwQty: filteredAll.reduce((s, r) => s + r.otwQty, 0),
     inHandQty: filteredAll.reduce((s, r) => s + r.inHandQty, 0),
     totalQty: filteredAll.reduce((s, r) => s + r.totalQty, 0),
-    inHandValue: filteredAll.reduce((s, r) => s + r.inHandValue, 0),
     combinedValue: filteredAll.reduce((s, r) => s + r.combinedValue, 0),
   }), [filteredAll]);
 
@@ -287,148 +286,161 @@ export default function CombinedInventory() {
     await XLSX.writeFile(wb, filename);
   };
 
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-3">
+          {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-10 w-32 rounded-lg" />)}
+        </div>
+        <Skeleton className="h-10 w-full rounded-md" />
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-4 p-3 sm:p-6 w-full min-w-0">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 flex-wrap">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header */}
+      {isDrillMode ? (
         <div className="flex items-center gap-3">
-          {isDrillMode && (
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => setSelectedGroupId(undefined)}
-              data-testid="button-back-to-groups"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setSelectedGroupId(undefined)}
+            data-testid="button-back-to-groups"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           <div>
-            {isDrillMode ? (
-              <>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-0.5">
-                  <button
-                    className="hover:text-foreground transition-colors"
-                    onClick={() => setSelectedGroupId(undefined)}
-                  >
-                    Combined Inventory
-                  </button>
-                  <ChevronRight className="h-3 w-3" />
-                  <span className="text-foreground font-medium">{drillGroup?.stockGroupName}</span>
-                </div>
-                <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-                  <FolderOpen className="h-5 w-5 sm:h-6 sm:w-6" />
-                  {drillGroup?.stockGroupName}
-                </h1>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  {drillGroup?.itemCount} item{drillGroup?.itemCount !== 1 ? "s" : ""}
-                </p>
-              </>
-            ) : (
-              <>
-                <PageHeader title="Combined Inventory" icon={<Layers className="h-5 w-5" />} />
-                <p className="text-sm text-muted-foreground mt-1">
-                  In-transit (OTW) + in-hand stock combined per item
-                </p>
-              </>
-            )}
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
+              <button
+                className="hover:text-foreground transition-colors"
+                onClick={() => setSelectedGroupId(undefined)}
+              >
+                Combined Inventory
+              </button>
+              <ChevronRight className="h-3 w-3" />
+              <span className="text-foreground font-medium">{drillGroup?.stockGroupName}</span>
+            </div>
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <FolderOpen className="h-5 w-5 text-muted-foreground" />
+              {drillGroup?.stockGroupName}
+            </h1>
           </div>
         </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {!isDrillMode && (
-            <div className="flex items-center gap-1 rounded-md border p-1">
-              <Button
-                size="sm"
-                variant={viewMode === "groups" ? "secondary" : "ghost"}
-                onClick={() => { setViewMode("groups"); setSelectedGroupId(undefined); }}
-                data-testid="button-view-groups"
-              >
-                <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
-                By Group
-              </Button>
-              <Button
-                size="sm"
-                variant={viewMode === "all" ? "secondary" : "ghost"}
-                onClick={() => setViewMode("all")}
-                data-testid="button-view-all"
-              >
-                <List className="h-3.5 w-3.5 mr-1.5" />
-                View All
-              </Button>
-            </div>
-          )}
-
-          <button
-            onClick={() => setIncludeZero((v) => !v)}
-            data-testid="toggle-include-zero"
-            className={`flex items-center gap-2 rounded-md border px-3 h-9 text-sm font-medium transition-colors ${
-              includeZero
-                ? "bg-secondary text-secondary-foreground border-border"
-                : "bg-background text-muted-foreground border-border hover:text-foreground"
-            }`}
-          >
-            <span
-              className={`inline-flex items-center justify-center w-4 h-4 rounded border flex-shrink-0 ${
-                includeZero ? "bg-primary border-primary" : "border-muted-foreground"
-              }`}
-            >
-              {includeZero && (
-                <svg viewBox="0 0 10 8" className="w-2.5 h-2.5 text-primary-foreground" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="1,4 4,7 9,1" />
-                </svg>
-              )}
-            </span>
-            Include zero stock
-          </button>
-
+      ) : (
+        <PageHeader
+          title="Combined Inventory"
+          subtitle="In-transit (OTW) + in-hand stock combined per item"
+          icon={<Layers className="h-5 w-5" />}
+        >
           <Button
             variant="outline"
             size="sm"
             onClick={handleExport}
-            disabled={isLoading}
             data-testid="button-export-excel"
           >
             <Download className="h-3.5 w-3.5 mr-1.5" />
             Export Excel
           </Button>
+        </PageHeader>
+      )}
+
+      {/* Stats bar */}
+      <div className="flex flex-wrap gap-3">
+        <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
+          <span className="text-sm font-semibold" data-testid="stat-items">{totals.items.toLocaleString()}</span>
+          <span className="text-xs text-muted-foreground">Items</span>
+        </div>
+        <div className="flex items-center gap-2 bg-blue-500/10 rounded-lg px-3 py-2">
+          {isLoadingOtw ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
+          ) : null}
+          <span className="text-sm font-semibold font-mono text-blue-700 dark:text-blue-300" data-testid="stat-otw">
+            {formatNumber(totals.otwQty, 0)}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            OTW Qty{isLoadingOtw ? ` (${loadedOtwCount}/${otwContainers.length})` : ""}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
+          <span className="text-sm font-semibold font-mono" data-testid="stat-inhand">{formatNumber(totals.inHandQty, 0)}</span>
+          <span className="text-xs text-muted-foreground">In-Hand Qty</span>
+        </div>
+        <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
+          <span className="text-sm font-semibold font-mono" data-testid="stat-total">{formatNumber(totals.totalQty, 0)}</span>
+          <span className="text-xs text-muted-foreground">Total Qty</span>
+        </div>
+        <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-3 py-2">
+          <span className="text-sm font-semibold font-mono text-primary">{formatAmount(totals.combinedValue)}</span>
+          <span className="text-xs text-muted-foreground">Total Value</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "Items", value: totals.items.toLocaleString(), testId: "stat-items" },
-          { label: "OTW Qty", value: formatNumber(totals.otwQty, 0), testId: "stat-otw" },
-          { label: "In-Hand Qty", value: formatNumber(totals.inHandQty, 0), testId: "stat-inhand" },
-          { label: "Total Qty", value: formatNumber(totals.totalQty, 0), testId: "stat-total" },
-        ].map(({ label, value, testId }) => (
-          <div key={label} className="rounded-md border bg-card p-4" data-testid={testId}>
-            <p className="text-xs text-muted-foreground mb-1">{label}</p>
-            <p className="text-2xl font-bold font-mono">{value}</p>
+      {/* Filter row */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder={isDrillMode ? "Search items in this group..." : "Search stock items..."}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10"
+            data-testid="input-search-combined"
+          />
+        </div>
+        {!isDrillMode && (
+          <div className="flex gap-1">
+            <Button
+              size="sm"
+              variant={viewMode === "groups" ? "default" : "outline"}
+              onClick={() => { setViewMode("groups"); setSelectedGroupId(undefined); }}
+              data-testid="button-view-groups"
+            >
+              <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
+              By Group
+            </Button>
+            <Button
+              size="sm"
+              variant={viewMode === "all" ? "default" : "outline"}
+              onClick={() => setViewMode("all")}
+              data-testid="button-view-all"
+            >
+              <List className="h-3.5 w-3.5 mr-1.5" />
+              View All
+            </Button>
           </div>
-        ))}
+        )}
+        <label className="flex items-center gap-2 cursor-pointer select-none" data-testid="toggle-include-zero">
+          <Checkbox
+            checked={includeZero}
+            onCheckedChange={(v) => setIncludeZero(!!v)}
+            id="include-zero"
+          />
+          <span className="text-sm text-muted-foreground">Include zero stock</span>
+        </label>
+        {isDrillMode && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            data-testid="button-export-excel"
+          >
+            <Download className="h-3.5 w-3.5 mr-1.5" />
+            Export
+          </Button>
+        )}
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder={isDrillMode ? "Search items in this group..." : "Search stock items..."}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-10"
-          data-testid="input-search-combined"
-        />
-      </div>
-
-      {isLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
-          ))}
-        </div>
-      ) : viewMode === "groups" && !isDrillMode ? (
+      {/* Content */}
+      {viewMode === "groups" && !isDrillMode ? (
         <GroupsView
           groups={stockGroups}
           onSelectGroup={setSelectedGroupId}
           formatAmount={formatAmount}
+          isLoadingOtw={isLoadingOtw}
         />
       ) : isDrillMode ? (
         <ItemsTable
@@ -451,101 +463,119 @@ function GroupsView({
   groups,
   onSelectGroup,
   formatAmount,
+  isLoadingOtw,
 }: {
   groups: StockGroupSummary[];
   onSelectGroup: (id: number | null) => void;
   formatAmount: (v: number) => string;
+  isLoadingOtw: boolean;
 }) {
   if (groups.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center text-muted-foreground">
-          <Layers className="h-12 w-12 mx-auto mb-3 opacity-30" />
-          <p className="text-lg font-medium">No stock groups found</p>
-          <p className="text-sm mt-1">Try adjusting your search.</p>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-14 h-14 rounded-xl bg-muted/60 flex items-center justify-center mb-4">
+          <Layers className="w-7 h-7 text-muted-foreground" />
+        </div>
+        <h2 className="text-lg font-semibold mb-1">No stock groups found</h2>
+        <p className="text-sm text-muted-foreground">Try adjusting your search.</p>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto rounded-md">
-          <Table>
-            <TableHeader className="sticky top-0 z-30 bg-background">
-              <TableRow>
-                <TableHead>Stock Group</TableHead>
-                <TableHead className="text-right hidden sm:table-cell">Items</TableHead>
-                <TableHead className="text-right">OTW Qty</TableHead>
-                <TableHead className="text-right">In-Hand Qty</TableHead>
-                <TableHead className="text-right">Total Qty</TableHead>
-                <TableHead className="text-right hidden md:table-cell">Total Value</TableHead>
-                <TableHead className="w-8"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {groups.map((g) => (
-                <TableRow
-                  key={g.stockGroupId ?? "__null__"}
-                  className="cursor-pointer hover-elevate"
-                  onClick={() => onSelectGroup(g.stockGroupId)}
-                  data-testid={`row-group-${g.stockGroupId ?? "null"}`}
-                >
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="font-medium">{g.stockGroupName}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right hidden sm:table-cell">
-                    <Badge variant="secondary">{g.itemCount}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {g.otwQty > 0 ? (
-                      <span className="text-blue-500 dark:text-blue-400">{formatNumber(g.otwQty, 0)}</span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatNumber(g.inHandQty, 0)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono font-semibold">
-                    {formatNumber(g.totalQty, 0)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono hidden md:table-cell text-muted-foreground">
-                    {g.combinedValue > 0 ? formatAmount(g.combinedValue) : "—"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-            <TableFooter className="sticky bottom-0 z-10 bg-background border-t">
-              <TableRow className="font-semibold">
-                <TableCell>Total ({groups.length} group{groups.length !== 1 ? "s" : ""})</TableCell>
-                <TableCell className="hidden sm:table-cell"></TableCell>
-                <TableCell className="text-right font-mono" data-testid="total-otw-qty">
-                  {formatNumber(groups.reduce((s, g) => s + g.otwQty, 0), 0)}
-                </TableCell>
-                <TableCell className="text-right font-mono" data-testid="total-inhand-qty">
-                  {formatNumber(groups.reduce((s, g) => s + g.inHandQty, 0), 0)}
-                </TableCell>
-                <TableCell className="text-right font-mono" data-testid="total-combined-qty">
-                  {formatNumber(groups.reduce((s, g) => s + g.totalQty, 0), 0)}
-                </TableCell>
-                <TableCell className="text-right font-mono hidden md:table-cell" data-testid="total-combined-value">
-                  {formatAmount(groups.reduce((s, g) => s + g.combinedValue, 0))}
-                </TableCell>
-                <TableCell></TableCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
+    <div className="space-y-2">
+      {groups.map((g) => (
+        <div
+          key={g.stockGroupId ?? "__null__"}
+          className="bg-card border rounded-xl p-4 flex items-center gap-4 cursor-pointer hover-elevate"
+          onClick={() => onSelectGroup(g.stockGroupId)}
+          data-testid={`row-group-${g.stockGroupId ?? "null"}`}
+        >
+          {/* Icon */}
+          <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <FolderOpen className="h-5 w-5 text-primary" />
+          </div>
+
+          {/* Name + item count */}
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm">{g.stockGroupName}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {g.itemCount} item{g.itemCount !== 1 ? "s" : ""}
+            </p>
+          </div>
+
+          {/* Stats */}
+          <div className="hidden sm:flex items-center gap-6 flex-shrink-0">
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">OTW</p>
+              {g.otwQty > 0 ? (
+                <p className="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400">
+                  {formatNumber(g.otwQty, 0)}
+                </p>
+              ) : (
+                <p className="text-sm font-mono text-muted-foreground">—</p>
+              )}
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">In-Hand</p>
+              <p className="text-sm font-mono">{formatNumber(g.inHandQty, 0)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Total</p>
+              <p className="text-sm font-mono font-semibold">{formatNumber(g.totalQty, 0)}</p>
+            </div>
+            <div className="text-right hidden md:block">
+              <p className="text-xs text-muted-foreground">Value</p>
+              <p className="text-sm font-mono">
+                {g.combinedValue > 0 ? formatAmount(g.combinedValue) : "—"}
+              </p>
+            </div>
+          </div>
+
+          {/* Mobile: show total qty only */}
+          <div className="sm:hidden text-right flex-shrink-0">
+            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="text-sm font-mono font-semibold">{formatNumber(g.totalQty, 0)}</p>
+          </div>
+
+          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
         </div>
-      </CardContent>
-    </Card>
+      ))}
+
+      {/* Totals footer */}
+      <div className="bg-muted/40 rounded-xl px-4 py-3 flex items-center gap-4">
+        <div className="flex-1">
+          <span className="text-sm font-semibold">Total ({groups.length} group{groups.length !== 1 ? "s" : ""})</span>
+        </div>
+        <div className="hidden sm:flex items-center gap-6 flex-shrink-0">
+          <div className="text-right w-16">
+            <p className="text-xs text-muted-foreground">OTW</p>
+            <p className="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400" data-testid="total-otw-qty">
+              {formatNumber(groups.reduce((s, g) => s + g.otwQty, 0), 0)}
+            </p>
+          </div>
+          <div className="text-right w-20">
+            <p className="text-xs text-muted-foreground">In-Hand</p>
+            <p className="text-sm font-mono font-semibold" data-testid="total-inhand-qty">
+              {formatNumber(groups.reduce((s, g) => s + g.inHandQty, 0), 0)}
+            </p>
+          </div>
+          <div className="text-right w-20">
+            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="text-sm font-mono font-semibold" data-testid="total-combined-qty">
+              {formatNumber(groups.reduce((s, g) => s + g.totalQty, 0), 0)}
+            </p>
+          </div>
+          <div className="text-right hidden md:block w-28">
+            <p className="text-xs text-muted-foreground">Value</p>
+            <p className="text-sm font-mono font-semibold" data-testid="total-combined-value">
+              {formatAmount(groups.reduce((s, g) => s + g.combinedValue, 0))}
+            </p>
+          </div>
+        </div>
+        <div className="w-4 flex-shrink-0" />
+      </div>
+    </div>
   );
 }
 
@@ -562,76 +592,130 @@ function ItemsTable({
     otwQty: rows.reduce((s, r) => s + r.otwQty, 0),
     inHandQty: rows.reduce((s, r) => s + r.inHandQty, 0),
     totalQty: rows.reduce((s, r) => s + r.totalQty, 0),
-    inHandValue: rows.reduce((s, r) => s + r.inHandValue, 0),
     combinedValue: rows.reduce((s, r) => s + r.combinedValue, 0),
   }), [rows]);
 
   if (rows.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center text-muted-foreground">
-          <Layers className="h-12 w-12 mx-auto mb-3 opacity-30" />
-          <p className="text-lg font-medium">No stock items found</p>
-          <p className="text-sm mt-1">{emptyMessage}</p>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-14 h-14 rounded-xl bg-muted/60 flex items-center justify-center mb-4">
+          <Layers className="w-7 h-7 text-muted-foreground" />
+        </div>
+        <h2 className="text-lg font-semibold mb-1">No stock items found</h2>
+        <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto rounded-md">
-          <Table>
-            <TableHeader className="sticky top-0 z-30 bg-background">
-              <TableRow>
-                <TableHead>Item Name</TableHead>
-                <TableHead className="text-right">OTW Qty</TableHead>
-                <TableHead className="text-right">In-Hand Qty</TableHead>
-                <TableHead className="text-right">Total Qty</TableHead>
-                <TableHead className="text-right hidden md:table-cell">Avg Rate</TableHead>
-                <TableHead className="text-right">Total Value</TableHead>
+    <>
+      {/* Desktop table */}
+      <div className="hidden md:block border rounded-xl overflow-hidden">
+        <Table>
+          <TableHeader className="bg-muted/40">
+            <TableRow>
+              <TableHead>Item Name</TableHead>
+              <TableHead className="text-right">OTW Qty</TableHead>
+              <TableHead className="text-right">In-Hand Qty</TableHead>
+              <TableHead className="text-right">Total Qty</TableHead>
+              <TableHead className="text-right">Avg Rate</TableHead>
+              <TableHead className="text-right">Total Value</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={row.stockItemId} data-testid={`row-combined-${row.stockItemId}`}>
+                <TableCell className="font-medium">
+                  {row.stockItemName}
+                  {row.stockGroupName && (
+                    <span className="ml-2">
+                      <Badge variant="outline" className="text-xs font-normal">{row.stockGroupName}</Badge>
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right font-mono">
+                  {row.otwQty > 0 ? (
+                    <span className="text-blue-600 dark:text-blue-400 font-semibold">{formatNumber(row.otwQty, 0)}</span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right font-mono">
+                  {row.inHandQty > 0 ? formatNumber(row.inHandQty, 0) : <span className="text-muted-foreground">—</span>}
+                </TableCell>
+                <TableCell className="text-right font-mono font-semibold">
+                  {formatNumber(row.totalQty, 0)}
+                </TableCell>
+                <TableCell className="text-right font-mono text-muted-foreground">
+                  {row.avgRate > 0 ? formatAmount(row.avgRate) : <span>—</span>}
+                </TableCell>
+                <TableCell className="text-right font-mono">
+                  {row.combinedValue > 0 ? formatAmount(row.combinedValue) : <span className="text-muted-foreground">—</span>}
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.stockItemId} data-testid={`row-combined-${row.stockItemId}`}>
-                  <TableCell className="font-medium">{row.stockItemName}</TableCell>
-                  <TableCell className="text-right font-mono">
-                    {row.otwQty > 0 ? (
-                      <span className="text-blue-500 dark:text-blue-400">{formatNumber(row.otwQty, 0)}</span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {row.inHandQty > 0 ? formatNumber(row.inHandQty, 0) : <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell className="text-right font-mono font-semibold">
-                    {formatNumber(row.totalQty, 0)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono hidden md:table-cell text-muted-foreground">
-                    {row.avgRate > 0 ? formatAmount(row.avgRate) : <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {row.combinedValue > 0 ? formatAmount(row.combinedValue) : <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-            <TableFooter className="sticky bottom-0 z-10 bg-background border-t">
-              <TableRow className="font-semibold">
-                <TableCell>Total ({rows.length} item{rows.length !== 1 ? "s" : ""})</TableCell>
-                <TableCell className="text-right font-mono">{formatNumber(totals.otwQty, 0)}</TableCell>
-                <TableCell className="text-right font-mono">{formatNumber(totals.inHandQty, 0)}</TableCell>
-                <TableCell className="text-right font-mono">{formatNumber(totals.totalQty, 0)}</TableCell>
-                <TableCell className="text-right font-mono hidden md:table-cell"></TableCell>
-                <TableCell className="text-right font-mono">{formatAmount(totals.combinedValue)}</TableCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
+            ))}
+          </TableBody>
+          <TableFooter className="bg-muted/40">
+            <TableRow className="font-semibold">
+              <TableCell>Total ({rows.length} item{rows.length !== 1 ? "s" : ""})</TableCell>
+              <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400">{formatNumber(totals.otwQty, 0)}</TableCell>
+              <TableCell className="text-right font-mono">{formatNumber(totals.inHandQty, 0)}</TableCell>
+              <TableCell className="text-right font-mono">{formatNumber(totals.totalQty, 0)}</TableCell>
+              <TableCell className="text-right font-mono"></TableCell>
+              <TableCell className="text-right font-mono">{formatAmount(totals.combinedValue)}</TableCell>
+            </TableRow>
+          </TableFooter>
+        </Table>
+      </div>
+
+      {/* Mobile cards */}
+      <div className="md:hidden space-y-2">
+        {rows.map((row) => (
+          <div
+            key={row.stockItemId}
+            className="bg-card border rounded-xl p-4"
+            data-testid={`row-combined-${row.stockItemId}`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-sm">{row.stockItemName}</p>
+                {row.stockGroupName && (
+                  <p className="text-xs text-muted-foreground mt-0.5">{row.stockGroupName}</p>
+                )}
+              </div>
+              <p className="text-sm font-mono font-semibold flex-shrink-0">
+                {row.combinedValue > 0 ? formatAmount(row.combinedValue) : "—"}
+              </p>
+            </div>
+            <div className="flex gap-4 mt-2 text-xs">
+              {row.otwQty > 0 && (
+                <div>
+                  <span className="text-muted-foreground">OTW </span>
+                  <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">{formatNumber(row.otwQty, 0)}</span>
+                </div>
+              )}
+              {row.inHandQty > 0 && (
+                <div>
+                  <span className="text-muted-foreground">In-Hand </span>
+                  <span className="font-mono">{formatNumber(row.inHandQty, 0)}</span>
+                </div>
+              )}
+              <div>
+                <span className="text-muted-foreground">Total </span>
+                <span className="font-mono font-semibold">{formatNumber(row.totalQty, 0)}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+        {/* Mobile total */}
+        <div className="bg-muted/40 rounded-xl px-4 py-3 flex justify-between items-center">
+          <span className="text-sm font-semibold">Total ({rows.length} items)</span>
+          <div className="text-right">
+            <p className="text-sm font-mono font-semibold">{formatAmount(totals.combinedValue)}</p>
+            <p className="text-xs text-muted-foreground font-mono">{formatNumber(totals.totalQty, 0)} units</p>
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </>
   );
 }
