@@ -927,7 +927,7 @@ export default function FactoryDaybook() {
           }}
           data-testid={isHidden ? `button-unhide-${entry.id}` : `button-hide-${entry.id}`}
         >{isHidden ? <Eye className="h-3 w-3 text-muted-foreground" /> : <EyeOff className="h-3 w-3 text-muted-foreground" />}</Button>
-        {isAdminOrOwner && isVoucherBacked && (
+        {isAdminOrOwner && isVoucherBacked && ["PAYMENT", "RECEIPT", "JOURNAL"].includes(entry.txType) && (
           <Button size={size} variant="ghost" title="Void voucher"
             onClick={(e) => { e.stopPropagation(); setVoidEntry(entry); }}
             data-testid={`button-void-voucher-${entry.id}`}

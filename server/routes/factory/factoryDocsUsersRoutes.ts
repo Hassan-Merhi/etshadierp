@@ -692,11 +692,16 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         reason: reason.trim(),
       });
 
-      // ── Sync description back to the source voucher so Accounts statements stay in sync ──
-      if (description !== undefined && updated.referenceTable === "vouchers" && updated.referenceId) {
-        await db.update(vouchers)
-          .set({ description })
-          .where(and(eq(vouchers.id, updated.referenceId), eq(vouchers.companyId, companyId)));
+      // ── Sync description and date back to the source voucher so Accounts statements stay in sync ──
+      if (updated.referenceTable === "vouchers" && updated.referenceId) {
+        const voucherUpdates: any = {};
+        if (description !== undefined) voucherUpdates.description = description;
+        if (txDate !== undefined) voucherUpdates.voucherDate = txDate;
+        if (Object.keys(voucherUpdates).length > 0) {
+          await db.update(vouchers)
+            .set(voucherUpdates)
+            .where(and(eq(vouchers.id, updated.referenceId), eq(vouchers.companyId, companyId)));
+        }
       }
 
       res.json(updated);

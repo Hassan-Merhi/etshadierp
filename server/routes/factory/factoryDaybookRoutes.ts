@@ -204,12 +204,21 @@ export function registerFactoryDaybookRoutes(app: Express) {
 
       let syntheticRows: any[] = [];
       if (shouldFetchVouchers) {
-        // Build the set of voucher IDs already captured in factory_daybook_entries
-        // Use filteredDaybookRows so deleted-voucher entries don't block synthetic rows
+        // Build the set of voucher IDs already captured in factory_daybook_entries.
+        // IMPORTANT: query ALL entries for the company (no date filter) so that when a
+        // voucher's date is changed, the real daybook entry (which keeps its original
+        // txDate) still suppresses the synthetic row — preventing duplicates when the
+        // real entry's txDate and the voucher's voucherDate are in different date windows.
+        const allCapturedRows = await db
+          .select({ referenceId: factoryDaybookEntries.referenceId })
+          .from(factoryDaybookEntries)
+          .where(and(
+            eq(factoryDaybookEntries.companyId, companyId),
+            eq(factoryDaybookEntries.referenceTable, "vouchers"),
+            sql`${factoryDaybookEntries.referenceId} IS NOT NULL`,
+          ));
         const capturedVoucherIds = new Set<number>(
-          filteredDaybookRows
-            .filter((r: any) => r.referenceTable === "vouchers" && r.referenceId != null)
-            .map((r: any) => r.referenceId as number)
+          allCapturedRows.map((r: any) => r.referenceId as number)
         );
 
         const voucherConds: any[] = [
