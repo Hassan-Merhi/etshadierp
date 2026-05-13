@@ -754,8 +754,8 @@ export function registerFiscalTransferRoutes(app: Express) {
             voucher: txResult.newVoucher,
           });
 
-          // Fire-and-forget: send transfer image to destination WA group
-          setImmediate(async () => {
+          // Fire-and-forget: send transfer image to destination WA group (POS users only)
+          if (req.user?.role === "POS") setImmediate(async () => {
             try {
               const waSourceId = txResult.transfer.sourceLocationId;
               let sourceName = "Multiple Sources";
@@ -900,8 +900,8 @@ export function registerFiscalTransferRoutes(app: Express) {
         });
         res.status(201).json(transfer);
 
-        // Fire-and-forget: send transfer image to destination WA group (original-flow / voucherId path)
-        setImmediate(async () => {
+        // Fire-and-forget: send transfer image to destination WA group (POS users only, original-flow / voucherId path)
+        if (req.user?.role === "POS") setImmediate(async () => {
           try {
             const uniqueSrcIds = [...new Set(itemsWithRate.map((i: any) => Number(i.sourceLocationId)).filter(Boolean))];
             let sourceName = "Multiple Sources";
@@ -1313,8 +1313,8 @@ export function registerFiscalTransferRoutes(app: Express) {
 
       res.json({ ...revision, items: savedItems });
 
-      // Fire-and-forget: send transfer image whenever a revision is saved (optional or non-optional)
-      setImmediate(async () => {
+      // Fire-and-forget: send transfer image for POS-submitted (optional) revisions only
+      if (isOptional) setImmediate(async () => {
           try {
             const [transfer] = await db
               .select({ destinationLocationId: stockTransferVouchers.destinationLocationId, voucherId: stockTransferVouchers.voucherId })
@@ -1572,43 +1572,6 @@ export function registerFiscalTransferRoutes(app: Express) {
           .where(eq(vouchers.id, updated.transfer.voucherId));
         
         res.json(updated);
-
-        // Fire-and-forget: send transfer image after transfer order is saved
-        setImmediate(async () => {
-          try {
-            const [voucherRow] = await db
-              .select({ voucherNumber: vouchers.voucherNumber, voucherDate: vouchers.voucherDate })
-              .from(vouchers)
-              .where(eq(vouchers.id, updated.transfer.voucherId));
-            if (!voucherRow) return;
-
-            const [destLoc] = await db
-              .select({ name: locations.name })
-              .from(locations)
-              .where(eq(locations.id, updated.transfer.destinationLocationId));
-
-            const uniqueSrcIds = [...new Set(items.map((i) => i.sourceLocationId))];
-            let sourceName = "Multiple Sources";
-            if (uniqueSrcIds.length === 1) {
-              const [srcLoc] = await db
-                .select({ name: locations.name })
-                .from(locations)
-                .where(eq(locations.id, uniqueSrcIds[0]));
-              if (srcLoc?.name) sourceName = srcLoc.name;
-            }
-
-            await sendTransferWhatsApp({
-              destinationLocationId: updated.transfer.destinationLocationId,
-              sourceLocationName: sourceName,
-              destLocationName: destLoc?.name ?? "Unknown",
-              items: items.map((i) => ({ stockItemId: i.stockItemId, quantity: i.quantity })),
-              voucherNumber: voucherRow.voucherNumber,
-              voucherDate: voucherRow.voucherDate,
-            });
-          } catch (e: any) {
-            console.error("[TransferWA] Failed to send (PUT):", e.message);
-          }
-        });
       } catch (error: any) {
         console.error("[Stock Transfer PUT] Error:", error.message);
         
