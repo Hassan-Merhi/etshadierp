@@ -34,6 +34,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, ChevronRight, RefreshCw, ChevronDown, Download, Building2, GitCompare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -591,6 +592,16 @@ export default function SalesReport() {
             Compare
           </Button>
 
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => recalculateMutation.mutate()}
+            disabled={recalculateMutation.isPending}
+            data-testid="button-recalculate-costs"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${recalculateMutation.isPending ? "animate-spin" : ""}`} />
+            {recalculateMutation.isPending ? "Recalculating..." : "Recalc Costs"}
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2" disabled={groupedData.length === 0} data-testid="button-export-dropdown">
@@ -613,359 +624,224 @@ export default function SalesReport() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total Sales</CardDescription>
-            <CardTitle className="text-2xl">
-              {formatAmount(totals.totalSales)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Cost Price Total</CardDescription>
-            <CardTitle className="text-2xl">
-              {formatAmount(totals.totalCost)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Cost Profit</CardDescription>
-            <CardTitle className={`text-2xl flex items-center gap-2 ${totals.costProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-              {totals.costProfit >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-              {totals.costProfit < 0 ? '-' : ''}{formatAmount(totals.costProfit)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Configured Price Total</CardDescription>
-            <CardTitle className="text-2xl">
-              {formatAmount(totals.totalConfiguredCost)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Configured Profit</CardDescription>
-            <CardTitle className={`text-2xl flex items-center gap-2 ${totals.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-              {totals.configuredProfit >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-              {totals.configuredProfit < 0 ? '-' : ''}{formatAmount(totals.configuredProfit)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
+      {/* Summary Pills */}
+      <div className="flex flex-wrap gap-3">
+        {isLoading ? (
+          <>
+            <Skeleton className="h-10 w-40 rounded-lg" />
+            <Skeleton className="h-10 w-40 rounded-lg" />
+            <Skeleton className="h-10 w-44 rounded-lg" />
+            <Skeleton className="h-10 w-44 rounded-lg" />
+            <Skeleton className="h-10 w-48 rounded-lg" />
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Total Sales</span>
+              <span className="font-semibold font-mono" data-testid="text-total-sales">{formatAmount(totals.totalSales)}</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+              <span className="text-muted-foreground">Cost Price</span>
+              <span className="font-semibold font-mono" data-testid="text-total-cost">{formatAmount(totals.totalCost)}</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+              {totals.costProfit >= 0
+                ? <TrendingUp className="h-4 w-4 text-emerald-500" />
+                : <TrendingDown className="h-4 w-4 text-red-500" />}
+              <span className="text-muted-foreground">Cost Profit</span>
+              <span className={`font-semibold font-mono ${totals.costProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-cost-profit">
+                {totals.costProfit < 0 ? "-" : ""}{formatAmount(Math.abs(totals.costProfit))}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+              <span className="text-muted-foreground">Configured Price</span>
+              <span className="font-semibold font-mono" data-testid="text-configured-cost">{formatAmount(totals.totalConfiguredCost)}</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+              {totals.configuredProfit >= 0
+                ? <TrendingUp className="h-4 w-4 text-emerald-500" />
+                : <TrendingDown className="h-4 w-4 text-red-500" />}
+              <span className="text-muted-foreground">Configured Profit</span>
+              <span className={`font-semibold font-mono ${totals.configuredProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-configured-profit">
+                {totals.configuredProfit < 0 ? "-" : ""}{formatAmount(Math.abs(totals.configuredProfit))}
+              </span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="grouping">View By</Label>
-              <Select
-                value={grouping}
-                onValueChange={(value) => setGrouping(value as GroupingType)}
-              >
-                <SelectTrigger id="grouping" data-testid="select-grouping">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="daily">Daily</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="yearly">Yearly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="profitFilter">Profit Filter</Label>
-              <Select
-                value={profitFilter}
-                onValueChange={(value) => setProfitFilter(value as ProfitFilter)}
-              >
-                <SelectTrigger id="profitFilter" data-testid="select-profit-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Profits</SelectItem>
-                  <SelectItem value="positive">Positive Only</SelectItem>
-                  <SelectItem value="negative">Negative Only</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="location">Location</Label>
-              <Select
-                value={selectedLocation}
-                onValueChange={setSelectedLocation}
-                disabled={isMultiCompanyMode}
-              >
-                <SelectTrigger id="location" data-testid="select-location">
-                  <SelectValue placeholder={isMultiCompanyMode ? "N/A (multi-co)" : "All Locations"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Locations</SelectItem>
-                  {locations.map((loc: any) => (
-                    <SelectItem key={loc.id} value={loc.id.toString()}>
-                      {loc.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="stockGroup">Stock Group</Label>
-              <Select
-                value={selectedStockGroup}
-                onValueChange={(val) => {
-                  setSelectedStockGroup(val);
-                  setSelectedStockItem("all"); // reset item when group changes
-                }}
-              >
-                <SelectTrigger id="stockGroup" data-testid="select-stock-group">
-                  <SelectValue placeholder="All Groups" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Groups</SelectItem>
-                  {stockGroups.map((g: any) => (
-                    <SelectItem key={g.id} value={g.id.toString()}>
-                      {g.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="stockItem">Stock Item</Label>
-              <Select
-                value={selectedStockItem}
-                onValueChange={setSelectedStockItem}
-                disabled={isMultiCompanyMode}
-              >
-                <SelectTrigger id="stockItem" data-testid="select-stock-item">
-                  <SelectValue placeholder={isMultiCompanyMode ? "N/A (multi-co)" : "All Items"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Items</SelectItem>
-                  {filteredStockItems.map((item: any) => (
-                    <SelectItem key={item.id} value={item.id.toString()}>
-                      {item.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="search">Search</Label>
-              <Input
-                id="search"
-                placeholder="Search..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                data-testid="input-search"
-              />
-            </div>
-          </div>
-          <div className="mt-4">
-            <Button
-              variant="outline"
-              onClick={handleClearFilters}
-              data-testid="button-clear-filters"
-            >
-              Clear Filters
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-wrap items-center gap-3">
+        <Select value={grouping} onValueChange={(value) => setGrouping(value as GroupingType)}>
+          <SelectTrigger className="w-32" data-testid="select-grouping">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="daily">Daily</SelectItem>
+            <SelectItem value="monthly">Monthly</SelectItem>
+            <SelectItem value="yearly">Yearly</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={profitFilter} onValueChange={(value) => setProfitFilter(value as ProfitFilter)}>
+          <SelectTrigger className="w-40" data-testid="select-profit-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Profits</SelectItem>
+            <SelectItem value="positive">Positive Only</SelectItem>
+            <SelectItem value="negative">Negative Only</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={selectedLocation} onValueChange={setSelectedLocation} disabled={isMultiCompanyMode}>
+          <SelectTrigger className="w-40" data-testid="select-location">
+            <SelectValue placeholder={isMultiCompanyMode ? "N/A (multi-co)" : "All Locations"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Locations</SelectItem>
+            {locations.map((loc: any) => (
+              <SelectItem key={loc.id} value={loc.id.toString()}>{loc.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={selectedStockGroup} onValueChange={(val) => { setSelectedStockGroup(val); setSelectedStockItem("all"); }}>
+          <SelectTrigger className="w-36" data-testid="select-stock-group">
+            <SelectValue placeholder="All Groups" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Groups</SelectItem>
+            {stockGroups.map((g: any) => (
+              <SelectItem key={g.id} value={g.id.toString()}>{g.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={selectedStockItem} onValueChange={setSelectedStockItem} disabled={isMultiCompanyMode}>
+          <SelectTrigger className="w-44" data-testid="select-stock-item">
+            <SelectValue placeholder={isMultiCompanyMode ? "N/A (multi-co)" : "All Items"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Items</SelectItem>
+            {filteredStockItems.map((item: any) => (
+              <SelectItem key={item.id} value={item.id.toString()}>{item.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input
+          placeholder="Search..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-44"
+          data-testid="input-search"
+        />
+        <Button variant="ghost" onClick={handleClearFilters} data-testid="button-clear-filters">
+          Clear
+        </Button>
+      </div>
 
       {/* Data Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Sales by {grouping.charAt(0).toUpperCase() + grouping.slice(1)} ({filteredGroupedData.length})</CardTitle>
-          <CardDescription>Click on any row to view detailed breakdown</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Loading sales data...
-            </div>
-          ) : filteredGroupedData.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No sales transactions found. Try adjusting your filters.
-            </div>
-          ) : (
-            <>
-            <div className="hidden md:block overflow-x-auto">
-              <Table>
-                <TableHeader className="sticky top-0 z-30 bg-background">
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Items</TableHead>
-                    <TableHead className="text-right">Total Qty</TableHead>
-                    <TableHead className="text-right">Total Sales</TableHead>
-                    <TableHead className="text-right">Cost Price Total</TableHead>
-                    <TableHead className="text-right">Cost Profit</TableHead>
-                    <TableHead className="text-right">Configured Price Total</TableHead>
-                    <TableHead className="text-right">Configured Profit</TableHead>
-                    <TableHead></TableHead>
+      <div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Sales by {grouping.charAt(0).toUpperCase() + grouping.slice(1)}
+          {filteredGroupedData.length > 0 && ` · ${filteredGroupedData.length} row${filteredGroupedData.length !== 1 ? "s" : ""}`}
+          {" · "}Click any row to drill in
+        </p>
+        <div className="border rounded-xl overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/40 hover:bg-muted/40">
+                <TableHead className="text-xs h-9 font-semibold">Date</TableHead>
+                <TableHead className="text-xs h-9 font-semibold text-right">Items</TableHead>
+                <TableHead className="text-xs h-9 font-semibold text-right">Qty</TableHead>
+                <TableHead className="text-xs h-9 font-semibold text-right">Total Sales</TableHead>
+                <TableHead className="text-xs h-9 font-semibold text-right">Cost Price</TableHead>
+                <TableHead className="text-xs h-9 font-semibold text-right">Cost Profit</TableHead>
+                <TableHead className="text-xs h-9 font-semibold text-right">Config. Price</TableHead>
+                <TableHead className="text-xs h-9 font-semibold text-right">Config. Profit</TableHead>
+                <TableHead className="text-xs h-9 w-8"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                [...Array(6)].map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-10 ml-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                    <TableCell></TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
+                ))
+              ) : filteredGroupedData.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9}>
+                    <div className="flex flex-col items-center gap-2 py-10 text-center">
+                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                        <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <p className="text-sm font-medium">No sales found</p>
+                      <p className="text-xs text-muted-foreground">Try adjusting your date range or filters</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                <>
                   {filteredGroupedData.map((group) => (
-                    <TableRow 
-                      key={group.date} 
+                    <TableRow
+                      key={group.date}
                       data-testid={`row-sale-${group.date}`}
-                      className={`cursor-pointer hover-elevate${selectedRowDate === group.date ? " bg-muted" : ""}`}
+                      className={`cursor-pointer hover:bg-muted/40${selectedRowDate === group.date ? " bg-muted/40" : ""}`}
                       onClick={() => handleRowClick(group)}
                     >
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium py-3">
                         <div className="flex items-center gap-2">
                           {group.displayDate}
                           {group.isCreditSale && (
-                            <Badge variant="outline" className="text-xs text-amber-600 border-amber-400 dark:text-amber-400 dark:border-amber-600">Credit</Badge>
+                            <Badge variant="secondary" className="text-xs no-default-active-elevate bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Credit</Badge>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatNumber(group.itemCount, 0)}
+                      <TableCell className="py-3 text-right font-mono text-sm">{formatNumber(group.itemCount, 0)}</TableCell>
+                      <TableCell className="py-3 text-right font-mono text-sm">{formatNumber(group.totalQty, 0)}</TableCell>
+                      <TableCell className="py-3 text-right font-mono text-sm">{formatAmount(group.totalSales)}</TableCell>
+                      <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground">{formatAmount(group.totalCost)}</TableCell>
+                      <TableCell className={`py-3 text-right font-mono text-sm font-semibold ${group.costProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                        {group.costProfit < 0 ? "-" : ""}{formatAmount(Math.abs(group.costProfit))}
                       </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatNumber(group.totalQty, 0)}
+                      <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground">{formatAmount(group.totalConfiguredCost)}</TableCell>
+                      <TableCell className={`py-3 text-right font-mono text-sm font-semibold ${group.configuredProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                        {group.configuredProfit < 0 ? "-" : ""}{formatAmount(Math.abs(group.configuredProfit))}
                       </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatAmount(group.totalSales)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatAmount(group.totalCost)}
-                      </TableCell>
-                      <TableCell className={`text-right font-mono font-semibold ${group.costProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                        {group.costProfit < 0 ? '-' : ''}{formatAmount(group.costProfit)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatAmount(group.totalConfiguredCost)}
-                      </TableCell>
-                      <TableCell className={`text-right font-mono font-semibold ${group.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                        {group.configuredProfit < 0 ? '-' : ''}{formatAmount(group.configuredProfit)}
-                      </TableCell>
-                      <TableCell>
+                      <TableCell className="py-3">
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </TableCell>
                     </TableRow>
                   ))}
                   {/* Totals Row */}
-                  <TableRow className="font-bold bg-muted/50">
-                    <TableCell>TOTAL</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatNumber(salesData.length, 0)}
+                  <TableRow className="bg-muted/40 hover:bg-muted/40 font-semibold">
+                    <TableCell className="py-3 text-xs uppercase tracking-wide text-muted-foreground">Total</TableCell>
+                    <TableCell className="py-3 text-right font-mono text-sm">{formatNumber(salesData.length, 0)}</TableCell>
+                    <TableCell className="py-3 text-right font-mono text-sm">{formatNumber(totals.totalQty, 0)}</TableCell>
+                    <TableCell className="py-3 text-right font-mono text-sm">{formatAmount(totals.totalSales)}</TableCell>
+                    <TableCell className="py-3 text-right font-mono text-sm">{formatAmount(totals.totalCost)}</TableCell>
+                    <TableCell className={`py-3 text-right font-mono text-sm ${totals.costProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                      {totals.costProfit < 0 ? "-" : ""}{formatAmount(Math.abs(totals.costProfit))}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatNumber(totals.totalQty, 0)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatAmount(totals.totalSales)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatAmount(totals.totalCost)}
-                    </TableCell>
-                    <TableCell className={`text-right font-mono ${totals.costProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {totals.costProfit < 0 ? '-' : ''}{formatAmount(totals.costProfit)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatAmount(totals.totalConfiguredCost)}
-                    </TableCell>
-                    <TableCell className={`text-right font-mono ${totals.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {totals.configuredProfit < 0 ? '-' : ''}{formatAmount(totals.configuredProfit)}
+                    <TableCell className="py-3 text-right font-mono text-sm">{formatAmount(totals.totalConfiguredCost)}</TableCell>
+                    <TableCell className={`py-3 text-right font-mono text-sm ${totals.configuredProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                      {totals.configuredProfit < 0 ? "-" : ""}{formatAmount(Math.abs(totals.configuredProfit))}
                     </TableCell>
                     <TableCell></TableCell>
                   </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-            <div className="md:hidden space-y-3">
-              {filteredGroupedData.map((group) => (
-                <Card 
-                  key={group.date}
-                  data-testid={`row-sale-${group.date}`}
-                  className={`cursor-pointer hover-elevate${selectedRowDate === group.date ? " bg-muted" : ""}`}
-                  onClick={() => handleRowClick(group)}
-                >
-                  <CardContent className="p-4 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium">{group.displayDate}</span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Items: </span>
-                        <span className="font-mono">{formatNumber(group.itemCount, 0)}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Qty: </span>
-                        <span className="font-mono">{formatNumber(group.totalQty, 0)}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Sales: </span>
-                        <span className="font-mono">{formatAmount(group.totalSales)}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Cost: </span>
-                        <span className="font-mono">{formatAmount(group.totalCost)}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 pt-1 border-t">
-                      <div className="text-sm">
-                        <span className="text-muted-foreground">Cost Profit: </span>
-                        <span className={`font-mono font-semibold ${group.costProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                          {group.costProfit < 0 ? '-' : ''}{formatAmount(group.costProfit)}
-                        </span>
-                      </div>
-                      <div className="text-sm">
-                        <span className="text-muted-foreground">Config Profit: </span>
-                        <span className={`font-mono font-semibold ${group.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                          {group.configuredProfit < 0 ? '-' : ''}{formatAmount(group.configuredProfit)}
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              <Card className="bg-muted/50">
-                <CardContent className="p-4">
-                  <div className="font-bold text-sm mb-2">TOTAL</div>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Sales: </span>
-                      <span className="font-mono font-semibold">{formatAmount(totals.totalSales)}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Cost: </span>
-                      <span className="font-mono font-semibold">{formatAmount(totals.totalCost)}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Cost Profit: </span>
-                      <span className={`font-mono font-semibold ${totals.costProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                        {totals.costProfit < 0 ? '-' : ''}{formatAmount(totals.costProfit)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Config Profit: </span>
-                      <span className={`font-mono font-semibold ${totals.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                        {totals.configuredProfit < 0 ? '-' : ''}{formatAmount(totals.configuredProfit)}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+                </>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
 
       {/* Print Styles */}
       <style>{`
