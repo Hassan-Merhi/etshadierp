@@ -1952,196 +1952,137 @@ export default function Accounts() {
                   </div>
                 </div>
               ) : (
-                <div className="rounded-xl border bg-muted/40 p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="rounded-xl border bg-muted/40 px-4 py-3 flex flex-wrap items-center gap-3">
+                  {/* Account name + type */}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground leading-none mb-0.5">Account</p>
+                      <span className="font-semibold text-sm leading-tight" data-testid="text-account-name">
+                        {selectedAccount.name}
+                      </span>
+                    </div>
+                    <Badge variant="secondary" className="text-xs capitalize shrink-0">
+                      {selectedAccount.type}
+                    </Badge>
+                  </div>
+
+                  {/* Balance */}
+                  {!hideBalances && (
+                    <div className="flex items-center gap-2">
                       <div>
-                        <p className="text-xs text-muted-foreground mb-1">
-                          Account Name
-                        </p>
-                        <span
-                          className="font-medium"
-                          data-testid="text-account-name"
-                        >
-                          {selectedAccount.name}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">
-                          Current Balance
-                        </p>
+                        <p className="text-xs text-muted-foreground leading-none mb-0.5">Balance</p>
                         {(() => {
-                          // Broker account: show per-currency breakdown from broker statement
                           if (isBrokerSupplier && brokerStatementData?.currencyLedgers?.length > 0) {
                             return (
-                              <div className="flex flex-col gap-0.5" data-testid="text-account-balance">
+                              <div className="flex flex-col gap-0" data-testid="text-account-balance">
                                 {brokerStatementData.currencyLedgers.map((section: any) => {
                                   const net = parseFloat(section.netBalance || "0");
                                   const side = net > 0 ? "CR" : net < 0 ? "DR" : "";
-                                  const isNeg = net > 0;
                                   const fmt2 = (n: number) => Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                                   return (
-                                    <div key={section.currencyCode} className="flex items-center gap-1.5">
-                                      {isNeg ? (
-                                        <TrendingDown className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                                      ) : (
-                                        <TrendingUp className="w-3.5 h-3.5 text-green-600 shrink-0" />
-                                      )}
-                                      <span className="font-mono font-semibold text-sm">
-                                        {section.currencyCode} {fmt2(net)} {side}
-                                      </span>
-                                    </div>
+                                    <span key={section.currencyCode} className="font-mono font-semibold text-sm">
+                                      {section.currencyCode} {fmt2(net)} {side}
+                                    </span>
                                   );
                                 })}
                               </div>
                             );
                           }
-
-                          // Ledger account with multi-currency data
                           if (isLedgerAccount && ledgerCurrencyBalances && ledgerCurrencyBalances.length > 0) {
-                            const openingBalance = parseFloat(String(selectedAccount?.openingBalance ?? "0")) || 0;
-                            const openingSide = selectedAccount?.openingBalanceSide ?? "Dr";
-                            const signedOb = openingSide === "Dr" ? openingBalance : -openingBalance;
+                            const ob = parseFloat(String(selectedAccount?.openingBalance ?? "0")) || 0;
+                            const obSide = selectedAccount?.openingBalanceSide ?? "Dr";
+                            const signedOb = obSide === "Dr" ? ob : -ob;
                             const baseCurr = "USD";
-
                             const rows = ledgerCurrencyBalances.map((row) => {
                               let net = row.totalDebit - row.totalCredit;
                               if (row.currency === baseCurr) net += signedOb;
                               return { currency: row.currency, net };
                             });
-
-                            // If opening balance is in USD but there's no USD transaction row, add it
-                            if (signedOb !== 0 && !rows.find((r) => r.currency === baseCurr)) {
-                              rows.push({ currency: baseCurr, net: signedOb });
-                            }
-
+                            if (signedOb !== 0 && !rows.find((r) => r.currency === baseCurr)) rows.push({ currency: baseCurr, net: signedOb });
                             const nonZeroRows = rows.filter((r) => Math.abs(r.net) >= 0.005);
-
-                            if (nonZeroRows.length <= 1) {
-                              // Single currency — fall through to default display
-                            } else {
+                            if (nonZeroRows.length > 1) {
                               return (
-                                <div className="flex flex-col gap-0.5" data-testid="text-account-balance">
+                                <div className="flex flex-col gap-0" data-testid="text-account-balance">
                                   {nonZeroRows.map((row) => {
-                                    const side = row.net >= 0 ? "Dr" : "Cr";
-                                    const isNeg = row.net < 0;
                                     const fmt2 = (n: number) => Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                                     return (
-                                      <div key={row.currency} className="flex items-center gap-1.5">
-                                        {isNeg ? (
-                                          <TrendingDown className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                                        ) : (
-                                          <TrendingUp className="w-3.5 h-3.5 text-green-600 shrink-0" />
-                                        )}
-                                        <span className="font-mono font-semibold text-sm">
-                                          {row.currency} {fmt2(row.net)} {side}
-                                        </span>
-                                      </div>
+                                      <span key={row.currency} className="font-mono font-semibold text-sm">
+                                        {row.currency} {fmt2(row.net)} {row.net >= 0 ? "Dr" : "Cr"}
+                                      </span>
                                     );
                                   })}
                                 </div>
                               );
                             }
                           }
-
-                          // Default: single balance display — always the real
-                          // account balance, independent of any period filter.
                           const bal = selectedAccount?.balance ?? 0;
                           const side = selectedAccount?.balanceSide ?? "Dr";
-                          const isNegative = side === "Cr";
+                          const isNeg = side === "Cr";
                           return (
-                            <div className="flex items-center gap-2">
-                              {isNegative ? (
-                                <TrendingDown className="w-4 h-4 text-red-600" />
-                              ) : (
-                                <TrendingUp className="w-4 h-4 text-green-600" />
-                              )}
-                              <span
-                                className="font-mono font-semibold"
-                                data-testid="text-account-balance"
-                              >
+                            <div className="flex items-center gap-1.5">
+                              {isNeg
+                                ? <TrendingDown className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                                : <TrendingUp className="w-3.5 h-3.5 text-green-500 shrink-0" />}
+                              <span className="font-mono font-semibold text-sm" data-testid="text-account-balance">
                                 {formatAmount(Math.abs(bal))} {side}
                               </span>
                             </div>
                           );
                         })()}
                       </div>
-                      <div className="md:col-span-2 flex justify-end gap-2 flex-wrap">
-                        {/* WhatsApp buttons — factory/ERP mode + ledger accounts only */}
-                        {(appMode === "factory" || appMode === "erp") && selectedAccount?.type === "ledger" && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => sendWaStatementMutation.mutate()}
-                              disabled={sendWaStatementMutation.isPending || !waRule?.enabled || !waRule?.whatsappChatId}
-                              title={!waRule?.enabled || !waRule?.whatsappChatId ? "Configure WhatsApp first" : "Send statement to WhatsApp now"}
-                              data-testid="button-send-whatsapp-statement"
-                            >
-                              {sendWaStatementMutation.isPending
-                                ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                : <Send className="w-4 h-4 mr-2" />}
-                              Send to WhatsApp
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={openWaRuleDialog}
-                              data-testid="button-whatsapp-settings"
-                            >
-                              <MessageCircle className="w-4 h-4 mr-2" />
-                              WhatsApp
-                              {waRule?.enabled && waRule?.whatsappChatId && (
-                                <CheckCircle2 className="w-3.5 h-3.5 ml-1.5 text-green-600" />
-                              )}
-                            </Button>
-                          </>
-                        )}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={transactionsLoading || vouchersWithBalance.length === 0}
-                              data-testid="button-export-dropdown"
-                            >
-                              <FileDown className="w-4 h-4 mr-2" />
-                              Export
-                              <ChevronDown className="w-3 h-3 ml-1" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-52">
-                            <DropdownMenuLabel className="text-xs text-muted-foreground">Language</DropdownMenuLabel>
-                            {(["en", "fr", "ar"] as const).map((lang) => (
-                              <DropdownMenuItem
-                                key={lang}
-                                onClick={() => setExportLang(lang)}
-                                className="flex items-center justify-between"
-                                data-testid={`button-lang-${lang}`}
-                              >
-                                <span>{exportLabels[lang].language}</span>
-                                {exportLang === lang && <span className="text-xs text-primary">✓</span>}
-                              </DropdownMenuItem>
-                            ))}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => handleExportStatementToExcel()}
-                              data-testid="button-export-excel"
-                            >
-                              <FileDown className="w-4 h-4 mr-2" />
-                              Excel
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleExportStatementToPDF()}
-                              disabled={isFactorySupplierAccount}
-                              data-testid="button-export-pdf"
-                            >
-                              <FileDown className="w-4 h-4 mr-2" />
-                              PDF
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
                     </div>
+                  )}
+
+                  {/* Action buttons */}
+                  <div className="ml-auto flex items-center gap-1.5 flex-wrap">
+                    {(appMode === "factory" || appMode === "erp") && selectedAccount?.type === "ledger" && (
+                      <>
+                        <Button variant="outline" size="sm" onClick={() => sendWaStatementMutation.mutate()}
+                          disabled={sendWaStatementMutation.isPending || !waRule?.enabled || !waRule?.whatsappChatId}
+                          title={!waRule?.enabled || !waRule?.whatsappChatId ? "Configure WhatsApp first" : "Send statement to WhatsApp now"}
+                          data-testid="button-send-whatsapp-statement">
+                          {sendWaStatementMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={openWaRuleDialog} data-testid="button-whatsapp-settings">
+                          <MessageCircle className="w-4 h-4" />
+                          {waRule?.enabled && waRule?.whatsappChatId && <CheckCircle2 className="w-3 h-3 ml-1 text-green-500" />}
+                        </Button>
+                      </>
+                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" disabled={transactionsLoading || vouchersWithBalance.length === 0} data-testid="button-export-dropdown">
+                          <FileDown className="w-4 h-4" />
+                          <ChevronDown className="w-3 h-3 ml-0.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuLabel className="text-xs text-muted-foreground">Language</DropdownMenuLabel>
+                        {(["en", "fr", "ar"] as const).map((lang) => (
+                          <DropdownMenuItem key={lang} onClick={() => setExportLang(lang)} className="flex items-center justify-between" data-testid={`button-lang-${lang}`}>
+                            <span>{exportLabels[lang].language}</span>
+                            {exportLang === lang && <span className="text-xs text-primary">✓</span>}
+                          </DropdownMenuItem>
+                        ))}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleExportStatementToExcel()} data-testid="button-export-excel">
+                          <FileDown className="w-4 h-4 mr-2" /> Excel
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExportStatementToPDF()} disabled={isFactorySupplierAccount} data-testid="button-export-pdf">
+                          <FileDown className="w-4 h-4 mr-2" /> PDF
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => { setSelectedAccount(null); updateUrlParams({ accountId: null, accountType: null }); }}
+                      title="Change account"
+                      data-testid="button-change-account"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               )}
           </div>
