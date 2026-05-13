@@ -2156,7 +2156,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             </AlertDialogContent>
           </AlertDialog>
 
-          <Card className="p-4 w-full">
+          <Card className="p-4 w-full overflow-hidden">
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
@@ -2262,7 +2262,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               </div>
 
               {/* Desktop table view */}
-              <div className="hidden md:block rounded-md border overflow-hidden w-full min-w-0">
+              <div className="hidden md:block border-t -mx-4 -mb-4 w-[calc(100%+2rem)]">
                 <table className="w-full table-fixed text-sm">
                   <colgroup>
                     <col />
@@ -2481,7 +2481,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             </div>
           )}
 
-          <Card className="p-3 md:p-4 w-full">
+          <Card className="p-3 md:p-4 w-full overflow-hidden">
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
@@ -2571,7 +2571,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             </div>
 
             {/* Desktop table view */}
-            <div className="hidden md:block rounded-md border overflow-hidden w-full min-w-0">
+            <div className="hidden md:block border-t -mx-3 md:-mx-4 -mb-3 md:-mb-4 w-[calc(100%+1.5rem)] md:w-[calc(100%+2rem)]">
               <table className="w-full table-fixed text-sm">
                 <colgroup>
                   <col />
