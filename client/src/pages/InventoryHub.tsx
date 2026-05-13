@@ -3,6 +3,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import LocationInventory from "@/pages/LocationInventory";
 import StockOTW from "@/pages/StockOTW";
 import Containers from "@/pages/Containers";
+import CombinedInventory from "@/pages/CombinedInventory";
 
 export default function InventoryHub() {
   const search = useSearch();
@@ -17,6 +18,7 @@ export default function InventoryHub() {
         <TabsList className="mb-5">
           <TabsTrigger value="by-location" data-testid="tab-by-location">By Location</TabsTrigger>
           <TabsTrigger value="on-the-way" data-testid="tab-on-the-way">On The Way</TabsTrigger>
+          <TabsTrigger value="combined" data-testid="tab-combined">Combined</TabsTrigger>
           <TabsTrigger value="containers" data-testid="tab-containers">Containers</TabsTrigger>
         </TabsList>
 
@@ -26,6 +28,10 @@ export default function InventoryHub() {
 
         <TabsContent value="on-the-way">
           <StockOTW />
+        </TabsContent>
+
+        <TabsContent value="combined">
+          <CombinedInventory />
         </TabsContent>
 
         <TabsContent value="containers">

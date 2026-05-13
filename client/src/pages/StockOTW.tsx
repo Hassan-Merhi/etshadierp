@@ -8,11 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Package, Search, Ship, AlertCircle, ChevronRight, ChevronDown, Layers, X } from "lucide-react";
+import { Package, Search, Ship, AlertCircle, ChevronRight, ChevronDown, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { useLocation, useSearch } from "wouter";
-import CombinedInventory from "@/pages/CombinedInventory";
 import type { Container, Supplier } from "@shared/schema";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -552,40 +550,5 @@ function StockOTWContent() {
 }
 
 export default function StockOTW() {
-  const [location, navigate] = useLocation();
-  const searchString = useSearch();
-  const params = new URLSearchParams(searchString);
-  const activeTab = params.get("tab") || "otw";
-
-  const switchTab = (tab: string) => {
-    navigate(tab === "otw" ? location : `${location}?tab=${tab}`);
-  };
-
-  return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 px-3 sm:px-6 pt-3 sm:pt-6 pb-0">
-        <Button
-          size="sm"
-          variant={activeTab === "otw" ? "default" : "outline"}
-          onClick={() => switchTab("otw")}
-          data-testid="tab-stock-otw"
-        >
-          <Ship className="h-3.5 w-3.5 mr-1.5" />
-          Stock OTW
-        </Button>
-        <Button
-          size="sm"
-          variant={activeTab === "combined" ? "default" : "outline"}
-          onClick={() => switchTab("combined")}
-          data-testid="tab-combined-inventory"
-        >
-          <Layers className="h-3.5 w-3.5 mr-1.5" />
-          Combined
-        </Button>
-      </div>
-      <div className="flex-1 min-h-0 overflow-auto px-3 sm:px-6 pt-4 sm:pt-6">
-        {activeTab === "combined" ? <CombinedInventory /> : <StockOTWContent />}
-      </div>
-    </div>
-  );
+  return <StockOTWContent />;
 }

@@ -332,7 +332,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/sales-report/comparison" component={SalesReportComparison} />
       {user?.role === "Developer" && <Route path="/company-transfer" component={CompanyTransfer} />}
       {user?.role === "Developer" && <Route path="/net-profit-report" component={NetProfitReport} />}
-      <Route path="/combined-inventory"><Redirect to="/stock-otw?tab=combined" /></Route>
+      <Route path="/combined-inventory"><Redirect to="/inventory?tab=combined" /></Route>
       <Route path="/bale-ledger" component={BaleLedger} />
       <Route path="/pos-daybook"><Redirect to="/sales-tools?tab=daybook" /></Route>
       <Route path="/pos-price-list"><Redirect to="/sales-tools?tab=pricelist" /></Route>
