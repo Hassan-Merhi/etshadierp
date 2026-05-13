@@ -43,6 +43,13 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
     voucherDate,
   } = opts;
 
+  console.log(`[TransferWA] Starting for ${voucherNumber} → destLocId=${destinationLocationId}, items=${items.length}`);
+
+  if (!items || items.length === 0) {
+    console.warn(`[TransferWA] No items provided for ${voucherNumber} — skipping`);
+    return;
+  }
+
   // Collect all target chat IDs (deduped)
   const chatIds = new Set<string>();
 
@@ -55,12 +62,15 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
     .from(locations)
     .where(eq(locations.id, destinationLocationId));
 
+  console.log(`[TransferWA] destLoc=${JSON.stringify(destLoc)}`);
+
   // 1. Per-company transfer WA group from Settings
   if (destLoc?.companyId) {
     const [company] = await db
       .select({ transferWaGroupChatId: companies.transferWaGroupChatId })
       .from(companies)
       .where(eq(companies.id, destLoc.companyId));
+    console.log(`[TransferWA] company.transferWaGroupChatId=${company?.transferWaGroupChatId}`);
     if (company?.transferWaGroupChatId) {
       chatIds.add(company.transferWaGroupChatId);
     }
@@ -68,6 +78,7 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
 
   // 2. Destination location's own WA group
   if (destLoc?.whatsappGroupChatId) {
+    console.log(`[TransferWA] location.whatsappGroupChatId=${destLoc.whatsappGroupChatId}`);
     chatIds.add(destLoc.whatsappGroupChatId);
   }
 
@@ -76,8 +87,15 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
     return;
   }
 
-  // Look up stock item names in a single query
-  const uniqueIds = [...new Set(items.map((i) => i.stockItemId))];
+  console.log(`[TransferWA] Sending to ${chatIds.size} group(s): ${[...chatIds].join(", ")}`);
+
+  // Look up stock item names in a single query (guard against empty array)
+  const uniqueIds = [...new Set(items.map((i) => i.stockItemId).filter((id) => id > 0))];
+  if (uniqueIds.length === 0) {
+    console.warn(`[TransferWA] No valid stockItemIds in items for ${voucherNumber} — skipping`);
+    return;
+  }
+
   const itemRows = await db
     .select({ id: stockItems.id, name: stockItems.name, uom: stockItems.uom })
     .from(stockItems)
@@ -100,6 +118,8 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
     displayDate = format(new Date(voucherDate), "dd MMM yyyy");
   } catch { /* keep raw string */ }
 
+  console.log(`[TransferWA] Generating PNG for ${voucherNumber}...`);
+
   // Generate the PNG image once
   const pngBuffer = await generateTransferImageBuffer({
     voucherNumber,
@@ -108,6 +128,8 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
     destLocationName,
     items: imageItems,
   });
+
+  console.log(`[TransferWA] PNG generated (${pngBuffer.length} bytes). Sending...`);
 
   const safeVoucher = voucherNumber.replace(/[^a-zA-Z0-9_-]/g, "_");
   const fileName = `Transfer_${safeVoucher}.png`;
