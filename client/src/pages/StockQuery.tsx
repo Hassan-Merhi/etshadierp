@@ -215,15 +215,6 @@ export default function StockQuery() {
             <Search className="h-3.5 w-3.5 mr-1.5" />
             Stock Query
           </Button>
-          <Button
-            size="sm"
-            variant={activeTab === "summary" ? "secondary" : "ghost"}
-            onClick={() => switchTab("summary")}
-            data-testid="tab-location-summary"
-          >
-            <Grid3X3 className="h-3.5 w-3.5 mr-1.5" />
-            Location Summary
-          </Button>
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-auto">
