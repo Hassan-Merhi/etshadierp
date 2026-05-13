@@ -101,7 +101,7 @@ export function UserNotesPanel() {
             onClick={() => setOpen(true)}
             data-testid="button-open-user-notes"
             aria-label="My notes"
-            className="fixed bottom-5 left-5 z-50 h-11 w-11 rounded-full flex items-center justify-center bg-primary text-primary-foreground shadow-md transition-transform duration-150 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="fixed bottom-20 left-5 z-50 h-11 w-11 rounded-full flex items-center justify-center bg-primary text-primary-foreground shadow-md transition-transform duration-150 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <NotebookPen className="h-5 w-5" />
           </button>
