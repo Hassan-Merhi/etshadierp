@@ -56,6 +56,7 @@ import {
   CheckCircle2,
   Scale,
   FileText,
+  Lock,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -2948,39 +2949,34 @@ export default function Accounts() {
           )}
         </TabsContent>
 
-        <TabsContent value="alter" className="space-y-4">
-          <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="edit-account-search"
-                    placeholder="Search by name or type..."
-                    value={editSearchTerm}
-                    onChange={(e) => setEditSearchTerm(e.target.value)}
-                    onKeyDown={(e) => handleListArrowScroll(e, editAccountListRef)}
-                    className="pl-9"
-                    disabled={
-                      accountsLoading ||
-                      ledgerAccountsLoading ||
-                      !selectedCompany
-                    }
-                    data-testid="input-edit-account-search"
-                  />
-                </div>
+        <TabsContent value="alter">
+          <div className="flex gap-4 items-start">
+            {/* ── Left column: search + account list ── */}
+            <div className="w-80 shrink-0 space-y-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  id="edit-account-search"
+                  placeholder="Search accounts..."
+                  value={editSearchTerm}
+                  onChange={(e) => setEditSearchTerm(e.target.value)}
+                  onKeyDown={(e) => handleListArrowScroll(e, editAccountListRef)}
+                  className="pl-9"
+                  disabled={accountsLoading || ledgerAccountsLoading || !selectedCompany}
+                  data-testid="input-edit-account-search"
+                />
+              </div>
 
-                {accountsLoading ||
-                ledgerAccountsLoading ||
-                !selectedCompany ? (
-                  <div className="p-4">
-                    <Skeleton className="h-8 w-full" />
-                  </div>
-                ) : (
-                  <div
-                    ref={editAccountListRef}
-                    className="max-h-64 overflow-y-auto border rounded-xl overflow-hidden"
-                    onKeyDown={(e) => handleListArrowScroll(e, editAccountListRef)}
-                  >
+              {accountsLoading || ledgerAccountsLoading || !selectedCompany ? (
+                <div className="space-y-1.5">
+                  {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
+                </div>
+              ) : (
+                <div
+                  ref={editAccountListRef}
+                  className="border rounded-xl overflow-hidden overflow-y-auto max-h-[calc(100vh-280px)]"
+                  onKeyDown={(e) => handleListArrowScroll(e, editAccountListRef)}
+                >
                     {filteredAccountsForEdit.length === 0 ? (
                       <div className="p-4 text-center text-sm text-muted-foreground">
                         No accounts found
@@ -3095,25 +3091,43 @@ export default function Accounts() {
                                 });
                               }
                             }}
-                            className={`w-full p-3 text-left border-b last:border-b-0 ${
-                              isSelected ? "bg-primary/10" : isEditable ? "hover-elevate" : "opacity-50"
+                            className={`w-full px-3 py-2.5 text-left border-b last:border-b-0 transition-colors ${
+                              isSelected
+                                ? "bg-primary/10"
+                                : isEditable
+                                ? "hover:bg-muted/60 cursor-pointer"
+                                : "cursor-default"
                             }`}
                             data-testid={`button-select-account-edit-${account.id}`}
                           >
                             <div className="flex items-center gap-2 w-full">
+                              {/* Selected indicator */}
+                              <div className={`w-1 h-6 rounded-full shrink-0 transition-colors ${isSelected ? "bg-primary" : "bg-transparent"}`} />
                               <div className="flex-1 min-w-0 text-left">
-                                <span className="text-sm font-medium">{account.name}</span>
+                                <span className={`text-sm font-medium ${!isEditable ? "text-muted-foreground" : ""}`}>{account.name}</span>
                                 {!isEditable && (
-                                  <span className="block text-xs text-muted-foreground/60 mt-0.5">Read-only</span>
+                                  <span className="flex items-center gap-1 text-xs text-muted-foreground/60 mt-0.5">
+                                    <Lock className="w-2.5 h-2.5" /> Read-only
+                                  </span>
                                 )}
                               </div>
-                              <Badge variant="secondary" className="text-xs shrink-0 capitalize">
+                              <Badge
+                                variant="secondary"
+                                className={`text-xs shrink-0 capitalize ${
+                                  isLedger ? "bg-blue-500/10 text-blue-600 dark:text-blue-400" :
+                                  isBank ? "bg-green-500/10 text-green-600 dark:text-green-400" :
+                                  isSupplier ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" :
+                                  isCustomer ? "bg-purple-500/10 text-purple-600 dark:text-purple-400" :
+                                  isEmployee ? "bg-teal-500/10 text-teal-600 dark:text-teal-400" :
+                                  ""
+                                }`}
+                              >
                                 {account.type}
                               </Badge>
                               {(isFactorySupplier || isFactoryWorker || isFixedAsset) && (
                                 <span
                                   role="button"
-                                  className="ml-auto p-1 rounded text-muted-foreground hover:text-destructive shrink-0"
+                                  className="p-1 rounded text-muted-foreground hover:text-destructive shrink-0"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (isFactorySupplier) {
@@ -3136,365 +3150,231 @@ export default function Accounts() {
                     )}
                   </div>
                 )}
-              </div>
+            </div>
 
-              {(accountToEdit || supplierToEdit || customerToEdit || employeeToEdit) && (
-                <div className="rounded-xl border bg-muted/40 p-4 space-y-4">
-                  <p className="text-sm font-semibold">
-                    {supplierToEdit ? "Edit Supplier" : customerToEdit ? "Edit Customer" : employeeToEdit ? "Edit Employee" : "Edit Account Details"}
-                  </p>
-                    <Form {...editForm}>
-                      <form
-                        onSubmit={editForm.handleSubmit(onEditSubmit)}
-                        className="space-y-4"
-                       noValidate>
-                        <FormField
-                          control={editForm.control}
-                          name="code"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Account Code</FormLabel>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  readOnly
-                                  className="bg-muted"
-                                  data-testid="input-edit-code"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={editForm.control}
-                          name="name"
-                          render={({ field }) => (
+            {/* ── Right column: edit panel ── */}
+            <div className="flex-1 min-w-0">
+              {!(accountToEdit || supplierToEdit || customerToEdit || employeeToEdit || bankToEdit) ? (
+                /* Empty state */
+                <div className="border rounded-xl bg-muted/20 flex flex-col items-center justify-center py-16 gap-3 text-center">
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                    <Edit className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Select an account</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Choose an account from the list to edit it</p>
+                  </div>
+                </div>
+              ) : bankToEdit ? (
+                /* ── Bank account edit form ── */
+                <div className="border rounded-xl overflow-hidden">
+                  {/* Header */}
+                  <div className="flex items-center gap-2 px-4 py-3 bg-muted/40 border-b">
+                    <Edit className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground leading-none">Editing bank account</p>
+                      <p className="text-sm font-semibold truncate mt-0.5">{bankToEdit.name}</p>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => { setBankToEdit(null); bankForm.reset(); }} data-testid="button-close-bank-edit">
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="p-4">
+                    <Form {...bankForm}>
+                      <form onSubmit={bankForm.handleSubmit(onBankSubmit)} className="space-y-4" noValidate>
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField control={bankForm.control} name="name" render={({ field }) => (
                             <FormItem>
                               <FormLabel>Account Name</FormLabel>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  data-testid="input-edit-name"
-                                />
-                              </FormControl>
+                              <FormControl><Input {...field} data-testid="input-edit-bank-name" /></FormControl>
                               <FormMessage />
                             </FormItem>
-                          )}
-                        />
-                        {!supplierToEdit && !customerToEdit && !employeeToEdit && (
-                          <>
-                            <FormField
-                              control={editForm.control}
-                              name="accountType"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Account Type</FormLabel>
-                                  <Select
-                                    onValueChange={field.onChange}
-                                    value={field.value}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger data-testid="select-edit-type">
-                                        <SelectValue placeholder="Select type" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      <SelectItem value="Asset">Asset</SelectItem>
-                                      <SelectItem value="Liability">Liability</SelectItem>
-                                      <SelectItem value="Equity">Equity</SelectItem>
-                                      <SelectItem value="Income">Income</SelectItem>
-                                      <SelectItem value="Expense">Expense</SelectItem>
-                                      <SelectItem value="Bank">Bank</SelectItem>
-                                      <SelectItem value="Cash">Cash</SelectItem>
-                                      <SelectItem value="Indirect Expense">Indirect Expense</SelectItem>
-                                      <SelectItem value="Direct Expense">Direct Expense</SelectItem>
-                                      <SelectItem value="Government Taxes">Government Taxes</SelectItem>
-                                      <SelectItem value="Loans">Loans</SelectItem>
-                                      <SelectItem value="Duty Agent">Duty Agent</SelectItem>
-                                      <SelectItem value="Transporter Agent">Transporter Agent</SelectItem>
-                                      <SelectItem value="Accounts Payable">Accounts Payable</SelectItem>
-                                      <SelectItem value="Profit">Profit</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={editForm.control}
-                              name="subType"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Sub Type (Optional)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      {...field}
-                                      value={field.value || ""}
-                                      placeholder="Leave blank or enter sub type"
-                                      data-testid="input-edit-subtype"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </>
-                        )}
-                        <div className={`grid gap-4 ${supplierToEdit ? "grid-cols-1" : "grid-cols-2"}`}>
-                          <FormField
-                            control={editForm.control}
-                            name="openingBalance"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Opening Balance</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    {...field}
-                                    data-testid="input-edit-balance"
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          {!supplierToEdit && (
-                            <FormField
-                              control={editForm.control}
-                              name="openingBalanceSide"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Balance Side</FormLabel>
-                                  <Select
-                                    onValueChange={field.onChange}
-                                    value={field.value}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger data-testid="select-edit-balance-side">
-                                        <SelectValue placeholder="Dr/Cr" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      <SelectItem value="Dr">Dr (Debit)</SelectItem>
-                                      <SelectItem value="Cr">Cr (Credit)</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          )}
+                          )} />
+                          <FormField control={bankForm.control} name="bankName" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Bank Name</FormLabel>
+                              <FormControl><Input {...field} data-testid="input-edit-bank-bankname" /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormField control={bankForm.control} name="accountNumber" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Account Number</FormLabel>
+                              <FormControl><Input {...field} data-testid="input-edit-bank-accountnumber" /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormField control={bankForm.control} name="routingCode" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Routing Code <span className="text-muted-foreground">(optional)</span></FormLabel>
+                              <FormControl><Input {...field} value={field.value || ""} data-testid="input-edit-bank-routingcode" /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormField control={bankForm.control} name="openingBalance" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Opening Balance</FormLabel>
+                              <FormControl><Input type="number" step="0.01" {...field} value={field.value || "0"} data-testid="input-edit-bank-balance" /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormField control={bankForm.control} name="openingBalanceSide" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Balance Side</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl><SelectTrigger data-testid="select-edit-bank-balance-side"><SelectValue placeholder="Dr/Cr" /></SelectTrigger></FormControl>
+                                <SelectContent>
+                                  <SelectItem value="Dr">Dr (Debit)</SelectItem>
+                                  <SelectItem value="Cr">Cr (Credit)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
                         </div>
-                        <div className="flex gap-2 justify-between">
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            onClick={handleDeleteAccount}
-                            disabled={deleteLedgerMutation.isPending || deleteSupplierMutation.isPending || deleteCustomerMutation.isPending || deleteEmployeeMutation.isPending}
-                            data-testid="button-delete-account"
-                          >
+                        {/* Actions */}
+                        <div className="pt-2 flex items-center justify-between gap-2 flex-wrap">
+                          <Button type="button" variant="destructive" onClick={handleDeleteBankAccount} disabled={deleteBankMutation.isPending} data-testid="button-delete-bank-account">
                             <Trash2 className="w-4 h-4 mr-2" />
-                            {(deleteLedgerMutation.isPending || deleteSupplierMutation.isPending || deleteCustomerMutation.isPending || deleteEmployeeMutation.isPending)
-                              ? "Deleting..."
-                              : "Delete"}
+                            {deleteBankMutation.isPending ? "Deleting..." : "Delete Account"}
                           </Button>
                           <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => {
-                                setAccountToEdit(null);
-                                setSupplierToEdit(null);
-                                setCustomerToEdit(null);
-                                setEmployeeToEdit(null);
-                                editForm.reset();
-                              }}
-                              data-testid="button-cancel-edit"
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              type="submit"
-                              disabled={updateLedgerMutation.isPending || updateSupplierMutation.isPending || updateCustomerMutation.isPending || updateEmployeeMutation.isPending}
-                              data-testid="button-save-edit"
-                            >
+                            <Button type="button" variant="outline" onClick={() => { setBankToEdit(null); bankForm.reset(); }} data-testid="button-cancel-bank-edit">Cancel</Button>
+                            <Button type="submit" disabled={updateBankMutation.isPending} data-testid="button-save-bank-edit">
                               <Edit className="w-4 h-4 mr-2" />
-                              {(updateLedgerMutation.isPending || updateEmployeeMutation.isPending)
-                                ? "Saving..."
-                                : "Save Changes"}
+                              {updateBankMutation.isPending ? "Saving..." : "Save Changes"}
                             </Button>
                           </div>
                         </div>
                       </form>
                     </Form>
+                  </div>
                 </div>
-              )}
-
-              {bankToEdit && (
-                <div className="rounded-xl border bg-muted/40 p-4 space-y-4">
-                  <p className="text-sm font-semibold">Edit Bank Account Details</p>
-                    <Form {...bankForm}>
-                      <form
-                        onSubmit={bankForm.handleSubmit(onBankSubmit)}
-                        className="space-y-4"
-                       noValidate>
-                        <FormField
-                          control={bankForm.control}
-                          name="name"
-                          render={({ field }) => (
+              ) : (
+                /* ── Ledger / supplier / customer / employee edit form ── */
+                <div className="border rounded-xl overflow-hidden">
+                  {/* Header */}
+                  <div className="flex items-center gap-2 px-4 py-3 bg-muted/40 border-b">
+                    <Edit className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground leading-none">
+                        {supplierToEdit ? "Editing supplier" : customerToEdit ? "Editing customer" : employeeToEdit ? "Editing employee" : "Editing ledger account"}
+                      </p>
+                      <p className="text-sm font-semibold truncate mt-0.5">
+                        {(accountToEdit || supplierToEdit || customerToEdit || employeeToEdit)?.name}
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => { setAccountToEdit(null); setSupplierToEdit(null); setCustomerToEdit(null); setEmployeeToEdit(null); editForm.reset(); }} data-testid="button-close-edit">
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="p-4">
+                    <Form {...editForm}>
+                      <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4" noValidate>
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField control={editForm.control} name="code" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Account Code</FormLabel>
+                              <FormControl><Input {...field} readOnly className="bg-muted font-mono text-sm" data-testid="input-edit-code" /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormField control={editForm.control} name="name" render={({ field }) => (
                             <FormItem>
                               <FormLabel>Account Name</FormLabel>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  data-testid="input-edit-bank-name"
-                                />
-                              </FormControl>
+                              <FormControl><Input {...field} data-testid="input-edit-name" /></FormControl>
                               <FormMessage />
                             </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={bankForm.control}
-                          name="bankName"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Bank Name</FormLabel>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  data-testid="input-edit-bank-bankname"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={bankForm.control}
-                          name="accountNumber"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Account Number</FormLabel>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  data-testid="input-edit-bank-accountnumber"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={bankForm.control}
-                          name="routingCode"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Routing Code (Optional)</FormLabel>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  value={field.value || ""}
-                                  data-testid="input-edit-bank-routingcode"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={bankForm.control}
-                            name="openingBalance"
-                            render={({ field }) => (
+                          )} />
+                        </div>
+
+                        {!supplierToEdit && !customerToEdit && !employeeToEdit && (
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField control={editForm.control} name="accountType" render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Opening Balance</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    {...field}
-                                    value={field.value || "0"}
-                                    data-testid="input-edit-bank-balance"
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={bankForm.control}
-                            name="openingBalanceSide"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Balance Side</FormLabel>
-                                <Select
-                                  onValueChange={field.onChange}
-                                  value={field.value}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger data-testid="select-edit-bank-balance-side">
-                                      <SelectValue placeholder="Dr/Cr" />
-                                    </SelectTrigger>
-                                  </FormControl>
+                                <FormLabel>Account Type</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl><SelectTrigger data-testid="select-edit-type"><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
                                   <SelectContent>
-                                    <SelectItem value="Dr">
-                                      Dr (Debit)
-                                    </SelectItem>
-                                    <SelectItem value="Cr">
-                                      Cr (Credit)
-                                    </SelectItem>
+                                    <SelectItem value="Asset">Asset</SelectItem>
+                                    <SelectItem value="Liability">Liability</SelectItem>
+                                    <SelectItem value="Equity">Equity</SelectItem>
+                                    <SelectItem value="Income">Income</SelectItem>
+                                    <SelectItem value="Expense">Expense</SelectItem>
+                                    <SelectItem value="Bank">Bank</SelectItem>
+                                    <SelectItem value="Cash">Cash</SelectItem>
+                                    <SelectItem value="Indirect Expense">Indirect Expense</SelectItem>
+                                    <SelectItem value="Direct Expense">Direct Expense</SelectItem>
+                                    <SelectItem value="Government Taxes">Government Taxes</SelectItem>
+                                    <SelectItem value="Loans">Loans</SelectItem>
+                                    <SelectItem value="Duty Agent">Duty Agent</SelectItem>
+                                    <SelectItem value="Transporter Agent">Transporter Agent</SelectItem>
+                                    <SelectItem value="Accounts Payable">Accounts Payable</SelectItem>
+                                    <SelectItem value="Profit">Profit</SelectItem>
                                   </SelectContent>
                                 </Select>
                                 <FormMessage />
                               </FormItem>
-                            )}
-                          />
+                            )} />
+                            <FormField control={editForm.control} name="subType" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Sub Type <span className="text-muted-foreground">(optional)</span></FormLabel>
+                                <FormControl><Input {...field} value={field.value || ""} placeholder="Leave blank or enter sub type" data-testid="input-edit-subtype" /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-4">
+                          {!employeeToEdit && (
+                            <FormField control={editForm.control} name="openingBalance" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Opening Balance</FormLabel>
+                                <FormControl><Input type="number" step="0.01" {...field} data-testid="input-edit-balance" /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                          )}
+                          {!supplierToEdit && !employeeToEdit && (
+                            <FormField control={editForm.control} name="openingBalanceSide" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Balance Side</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl><SelectTrigger data-testid="select-edit-balance-side"><SelectValue placeholder="Dr/Cr" /></SelectTrigger></FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="Dr">Dr (Debit)</SelectItem>
+                                    <SelectItem value="Cr">Cr (Credit)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                          )}
                         </div>
-                        <div className="flex gap-2 justify-between">
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            onClick={handleDeleteBankAccount}
-                            disabled={deleteBankMutation.isPending}
-                            data-testid="button-delete-bank-account"
-                          >
+
+                        {/* Danger zone */}
+                        <div className="pt-2 border-t flex items-center justify-between gap-2 flex-wrap">
+                          <Button type="button" variant="destructive" onClick={handleDeleteAccount}
+                            disabled={deleteLedgerMutation.isPending || deleteSupplierMutation.isPending || deleteCustomerMutation.isPending || deleteEmployeeMutation.isPending}
+                            data-testid="button-delete-account">
                             <Trash2 className="w-4 h-4 mr-2" />
-                            {deleteBankMutation.isPending
-                              ? "Deleting..."
-                              : "Delete"}
+                            {(deleteLedgerMutation.isPending || deleteSupplierMutation.isPending || deleteCustomerMutation.isPending || deleteEmployeeMutation.isPending) ? "Deleting..." : "Delete Account"}
                           </Button>
                           <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => {
-                                setBankToEdit(null);
-                                bankForm.reset();
-                              }}
-                              data-testid="button-cancel-bank-edit"
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              type="submit"
-                              disabled={updateBankMutation.isPending}
-                              data-testid="button-save-bank-edit"
-                            >
+                            <Button type="button" variant="outline" onClick={() => { setAccountToEdit(null); setSupplierToEdit(null); setCustomerToEdit(null); setEmployeeToEdit(null); editForm.reset(); }} data-testid="button-cancel-edit">Cancel</Button>
+                            <Button type="submit" disabled={updateLedgerMutation.isPending || updateSupplierMutation.isPending || updateCustomerMutation.isPending || updateEmployeeMutation.isPending} data-testid="button-save-edit">
                               <Edit className="w-4 h-4 mr-2" />
-                              {updateBankMutation.isPending
-                                ? "Saving..."
-                                : "Save Changes"}
+                              {(updateLedgerMutation.isPending || updateEmployeeMutation.isPending) ? "Saving..." : "Save Changes"}
                             </Button>
                           </div>
                         </div>
                       </form>
                     </Form>
+                  </div>
                 </div>
               )}
+            </div>
           </div>
         </TabsContent>
 
