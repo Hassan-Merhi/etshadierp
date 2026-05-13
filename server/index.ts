@@ -2996,6 +2996,14 @@ let migrationsDone = false;
       cancelled_at timestamptz NOT NULL DEFAULT now()
     )`,
     `CREATE INDEX IF NOT EXISTS cobh_order_id_idx ON customer_order_bales_history (order_id)`,
+    // Personal notes per user (private, cross-module)
+    `CREATE TABLE IF NOT EXISTS user_notes (
+      id serial PRIMARY KEY,
+      user_id varchar NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+      content text NOT NULL DEFAULT '',
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

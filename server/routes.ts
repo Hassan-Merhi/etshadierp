@@ -52,6 +52,7 @@ import { registerExportRoutes } from "./routes/exportRoutes";
 import { registerGlobalTransactionRoutes } from "./routes/globalTransactionRoutes";
 import { registerGitRoutes } from "./routes/gitRoutes";
 import { registerContainerTrackingRoutes } from "./routes/containerTrackingRoutes";
+import { registerUserNotesRoutes } from "./routes/userNotesRoutes";
 import { registerPropertiesRentalRoutes } from "./routes/propertiesRentalRoutes";
 import { registerErpRentalRoutes } from "./routes/erpRentalRoutes";
 import { registerFactoryRentalRoutes } from "./routes/factoryRentalRoutes";
@@ -1773,6 +1774,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerExportRoutes(app);
   registerGitRoutes(app);
   registerContainerTrackingRoutes(app);
+  registerUserNotesRoutes(app);
 
   const httpServer = createServer(app);
 

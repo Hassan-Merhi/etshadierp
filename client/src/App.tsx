@@ -222,6 +222,7 @@ const FactoryRentalPayments = lazy(() => import("@/pages/factory/FactoryRentalPa
 const PropertiesRentalPayments = lazy(() => import("@/pages/properties/PropertiesRentalPayments"));
 const MySettings = lazy(() => import("@/pages/MySettings"));
 import { CommandPalette } from "@/components/CommandPalette";
+import { UserNotesPanel } from "@/components/UserNotesPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowLeft } from "lucide-react";
 import {
@@ -1292,6 +1293,7 @@ export default function App() {
                       <UpdateBanner />
                       <ChatWidget />
                       <DateJumpDialog />
+                      <UserNotesPanel />
                     </CursorNavProvider>
                   </CurrencyProvider>
                 </DateFormatProvider>
