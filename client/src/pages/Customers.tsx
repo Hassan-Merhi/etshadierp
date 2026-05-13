@@ -348,7 +348,6 @@ export default function Customers() {
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
               <TableHead className="text-xs h-9 font-semibold">Customer</TableHead>
-              <TableHead className="text-xs h-9 font-semibold">Phone</TableHead>
               <TableHead className="text-xs h-9 font-semibold text-right">Balance</TableHead>
               <TableHead className="text-xs h-9 font-semibold w-[60px]"></TableHead>
             </TableRow>
@@ -392,9 +391,6 @@ export default function Customers() {
                         {customer.legalName}
                       </span>
                     </div>
-                  </TableCell>
-                  <TableCell className="py-3 text-sm text-muted-foreground">
-                    {customer.phone || <span className="text-muted-foreground/50">—</span>}
                   </TableCell>
                   <TableCell className="py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
