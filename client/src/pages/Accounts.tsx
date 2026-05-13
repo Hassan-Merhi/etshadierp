@@ -3376,42 +3376,75 @@ export default function Accounts() {
         </TabsContent>
 
         <TabsContent value="find" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Find Voucher</CardTitle>
-              <p className="text-sm text-muted-foreground">Search by voucher number, description, or amount to quickly open and edit any transaction</p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                <Input
-                  placeholder="Search by voucher number, description, or amount (e.g. REC-001, duties, 3967)"
-                  value={voucherSearchTerm}
-                  onChange={(e) => setVoucherSearchTerm(e.target.value)}
-                  className="pl-9"
-                  data-testid="input-voucher-search"
-                />
+          {/* Search bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              placeholder="Search by voucher number, description, or amount (e.g. REC-001, duties, 3967)"
+              value={voucherSearchTerm}
+              onChange={(e) => setVoucherSearchTerm(e.target.value)}
+              className="pl-9"
+              data-testid="input-voucher-search"
+            />
+          </div>
+
+          {/* Initial prompt */}
+          {!voucherSearchTerm.trim() && (
+            <div className="border rounded-xl bg-muted/20 flex flex-col items-center justify-center py-16 gap-3 text-center">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                <FileText className="w-5 h-5 text-muted-foreground" />
               </div>
+              <div>
+                <p className="text-sm font-medium">Find any voucher</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Type a voucher number, description, or amount above</p>
+              </div>
+            </div>
+          )}
 
-              {voucherSearchLoading && (
-                <p className="text-sm text-muted-foreground py-4 text-center">Searching…</p>
-              )}
+          {/* Loading skeletons */}
+          {voucherSearchLoading && (
+            <div className="border rounded-xl overflow-hidden">
+              <div className="bg-muted/40 px-4 py-2.5 border-b flex gap-6">
+                {[80, 60, 70, 140, 80, 80].map((w, i) => <Skeleton key={i} className="h-3.5 rounded" style={{ width: w }} />)}
+              </div>
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="px-4 py-3 border-b last:border-b-0 flex gap-6 items-center">
+                  {[80, 60, 70, 140, 80, 80].map((w, j) => <Skeleton key={j} className="h-3 rounded" style={{ width: w }} />)}
+                </div>
+              ))}
+            </div>
+          )}
 
-              {!voucherSearchLoading && voucherSearchTerm.trim().length > 0 && voucherSearchResults.length === 0 && (
-                <p className="text-sm text-muted-foreground py-8 text-center">No vouchers found matching &ldquo;{voucherSearchTerm}&rdquo;</p>
-              )}
+          {/* No results */}
+          {!voucherSearchLoading && voucherSearchTerm.trim().length > 0 && voucherSearchResults.length === 0 && (
+            <div className="border rounded-xl bg-muted/20 flex flex-col items-center justify-center py-16 gap-3 text-center">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                <Search className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">No vouchers found</p>
+                <p className="text-xs text-muted-foreground mt-0.5">No results for &ldquo;{voucherSearchTerm}&rdquo; — try a different term</p>
+              </div>
+            </div>
+          )}
 
-              {voucherSearchResults.length > 0 && (
+          {/* Results */}
+          {voucherSearchResults.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs text-muted-foreground">Results</span>
+                <Badge variant="secondary" className="text-xs">{voucherSearchResults.length}</Badge>
+              </div>
+              <div className="border rounded-xl overflow-hidden">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="text-xs h-8">Voucher #</TableHead>
-                      <TableHead className="text-xs h-8">Date</TableHead>
-                      <TableHead className="text-xs h-8">Type</TableHead>
-                      <TableHead className="text-xs h-8">Description</TableHead>
-                      <TableHead className="text-xs h-8">Location</TableHead>
-                      <TableHead className="text-xs h-8 text-right">Amount</TableHead>
-                      <TableHead className="text-xs h-8"></TableHead>
+                    <TableRow className="bg-muted/40 hover:bg-muted/40">
+                      <TableHead className="text-xs h-9 font-semibold">Voucher #</TableHead>
+                      <TableHead className="text-xs h-9 font-semibold">Date</TableHead>
+                      <TableHead className="text-xs h-9 font-semibold">Type</TableHead>
+                      <TableHead className="text-xs h-9 font-semibold">Description</TableHead>
+                      <TableHead className="text-xs h-9 font-semibold">Location</TableHead>
+                      <TableHead className="text-xs h-9 font-semibold text-right">Amount</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -3428,6 +3461,18 @@ export default function Accounts() {
                         "Credit Note": "credit-note",
                         "Debit Note": "credit-note",
                       };
+                      const typeBadgeClass: Record<string, string> = {
+                        Payment: "bg-green-500/10 text-green-600 dark:text-green-400",
+                        Receipt: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+                        Journal: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
+                        Consumption: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+                        Production: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+                        Mixed: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+                        StockTransfer: "bg-teal-500/10 text-teal-600 dark:text-teal-400",
+                        "Stock Transfer": "bg-teal-500/10 text-teal-600 dark:text-teal-400",
+                        "Credit Note": "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+                        "Debit Note": "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+                      };
                       const base = modePrefix;
                       const tabName = voucherTypeMap[v.voucherType];
                       const handleOpen = () => {
@@ -3440,37 +3485,33 @@ export default function Accounts() {
                       return (
                         <TableRow
                           key={v.id}
-                          className="text-xs cursor-pointer hover-elevate"
+                          className="text-xs cursor-pointer hover:bg-muted/40 group"
                           onClick={handleOpen}
                           data-testid={`row-voucher-${v.id}`}
                         >
-                          <TableCell className="py-2 font-mono font-medium">{v.voucherNumber}</TableCell>
-                          <TableCell className="py-2 text-muted-foreground whitespace-nowrap">{v.voucherDate}</TableCell>
-                          <TableCell className="py-2">{v.voucherType}</TableCell>
-                          <TableCell className="py-2 max-w-[200px] truncate text-muted-foreground">{v.description || "-"}</TableCell>
-                          <TableCell className="py-2 text-muted-foreground">{v.locationName || "-"}</TableCell>
-                          <TableCell className="py-2 text-right font-medium tabular-nums">
-                            {parseFloat(v.totalAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {v.currency}
+                          <TableCell className="py-2.5 font-mono font-semibold">{v.voucherNumber}</TableCell>
+                          <TableCell className="py-2.5 text-muted-foreground whitespace-nowrap">{v.voucherDate}</TableCell>
+                          <TableCell className="py-2.5">
+                            <Badge variant="secondary" className={`text-xs ${typeBadgeClass[v.voucherType] || ""}`}>
+                              {v.voucherType}
+                            </Badge>
                           </TableCell>
-                          <TableCell className="py-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => { e.stopPropagation(); handleOpen(); }}
-                              data-testid={`button-open-voucher-${v.id}`}
-                            >
-                              <ArrowUpRight className="h-3 w-3 mr-1" />
-                              Open
-                            </Button>
+                          <TableCell className="py-2.5 max-w-[200px] truncate text-muted-foreground">{v.description || "-"}</TableCell>
+                          <TableCell className="py-2.5 text-muted-foreground">{v.locationName || "-"}</TableCell>
+                          <TableCell className="py-2.5 text-right font-medium tabular-nums">
+                            <span className="flex items-center justify-end gap-1.5">
+                              {parseFloat(v.totalAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {v.currency}
+                              <ArrowUpRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                            </span>
                           </TableCell>
                         </TableRow>
                       );
                     })}
                   </TableBody>
                 </Table>
-              )}
-            </CardContent>
-          </Card>
+              </div>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
