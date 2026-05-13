@@ -3,8 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, Package, Container, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { PageHeader } from "@/components/PageHeader";
@@ -50,7 +48,6 @@ export default function OffloadItemSearch() {
   const totalQty = results.reduce((sum, r) => sum + parseFloat(r.quantity || "0"), 0);
   const totalValue = results.reduce((sum, r) => sum + parseFloat(r.lineTotal || "0"), 0);
   const uniqueContainers = new Set(results.map((r) => r.containerNumber)).size;
-
   const currency = results[0]?.currency ?? "USD";
 
   const fmtQty = (v: string | number) =>
@@ -60,129 +57,163 @@ export default function OffloadItemSearch() {
     Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <div>
-        <PageHeader title="Offload Item Search" subtitle="Search any item name to see every offloaded container it arrived in" />
-      </div>
+    <div className="flex flex-col gap-4 p-4 md:p-6">
 
-      <div className="flex gap-2">
-        <div className="relative flex-1 max-w-xl">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder="Type item name e.g. MJS MIX CH WINTER BOOTS"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            data-testid="input-item-search"
+      {/* ── Header + Search ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex-1">
+          <PageHeader
+            title="Offload Item Search"
+            subtitle="Search any item name to see every offloaded container it arrived in"
           />
         </div>
-        <Button onClick={handleSearch} disabled={!input.trim() || isLoading} data-testid="button-search">
-          {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
-          Search
-        </Button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-80">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="e.g. MJS MIX CH WINTER BOOTS"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              data-testid="input-item-search"
+            />
+          </div>
+          <Button
+            onClick={handleSearch}
+            disabled={!input.trim() || isLoading}
+            data-testid="button-search"
+          >
+            {isLoading
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <Search className="h-4 w-4" />}
+            <span className="ml-1.5">Search</span>
+          </Button>
+        </div>
       </div>
 
-      {searchTerm && !isLoading && results.length === 0 && (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            <Package className="h-10 w-10 mx-auto mb-3 opacity-30" />
-            <p>No offloaded containers found for <strong>"{searchTerm}"</strong></p>
-          </CardContent>
-        </Card>
+      {/* ── Stats pill bar ── */}
+      {results.length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
+            <Container className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">Containers</span>
+            <span className="font-semibold" data-testid="stat-containers">{uniqueContainers}</span>
+          </div>
+          <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
+            <Package className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">Total Qty</span>
+            <span className="font-semibold" data-testid="stat-qty">{fmtQty(totalQty)} KG</span>
+          </div>
+          <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
+            <span className="text-muted-foreground">Total Value</span>
+            <span className="font-semibold" data-testid="stat-value">{currency} {fmtMoney(totalValue)}</span>
+          </div>
+        </div>
       )}
 
+      {/* ── Result label ── */}
+      {results.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">{results.length}</span> line{results.length !== 1 ? "s" : ""} for &ldquo;{searchTerm}&rdquo;
+        </p>
+      )}
+
+      {/* ── Initial empty state ── */}
+      {!searchTerm && (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
+          <Search className="h-10 w-10 opacity-25" />
+          <p className="text-sm font-medium">Enter an item name above to search offloaded containers</p>
+          <p className="text-xs">Shows supplier price (Dubai price) — not the offloaded landed cost</p>
+        </div>
+      )}
+
+      {/* ── No results state ── */}
+      {searchTerm && !isLoading && results.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
+          <Package className="h-10 w-10 opacity-25" />
+          <p className="text-sm font-medium">No offloaded containers found for &ldquo;{searchTerm}&rdquo;</p>
+          <p className="text-xs">Try a different item name or partial name</p>
+        </div>
+      )}
+
+      {/* ── Results table ── */}
       {results.length > 0 && (
         <>
-          <div className="grid grid-cols-3 gap-4">
-            <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between gap-1 space-y-0">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Containers</CardTitle>
-                <Container className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold" data-testid="stat-containers">{uniqueContainers}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between gap-1 space-y-0">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Qty (KG)</CardTitle>
-                <Package className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold" data-testid="stat-qty">{fmtQty(totalQty)}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between gap-1 space-y-0">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Value ({currency})</CardTitle>
-                <Package className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold" data-testid="stat-value">{fmtMoney(totalValue)}</p>
-              </CardContent>
-            </Card>
+          {/* Desktop table */}
+          <div className="hidden md:block border rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="h-11 bg-muted/40 border-b">
+                  <th className="text-left px-4 font-medium">Item Name</th>
+                  <th className="text-left px-4 font-medium">Container</th>
+                  <th className="text-left px-4 font-medium">Offload Date</th>
+                  <th className="text-left px-4 font-medium">PO #</th>
+                  <th className="text-left px-4 font-medium">Supplier</th>
+                  <th className="text-right px-4 font-medium">Qty (KG)</th>
+                  <th className="text-right px-4 font-medium">Price / KG</th>
+                  <th className="text-right px-4 font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((row, i) => (
+                  <tr key={i} className="border-t hover:bg-muted/30 transition-colors" data-testid={`row-result-${i}`}>
+                    <td className="px-4 py-3 font-medium">{row.itemName}</td>
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{row.containerNumber}</span>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {row.offloadDate ? format(new Date(row.offloadDate), "dd MMM yyyy") : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{row.poNumber}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{row.supplierName ?? "—"}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{fmtQty(row.quantity)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                      {row.currency} {fmtMoney(row.rate)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-medium">
+                      {row.currency} {fmtMoney(row.lineTotal)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t bg-muted/40">
+                  <td colSpan={5} className="px-4 py-2 text-sm font-medium">Total</td>
+                  <td className="px-4 py-2 text-right tabular-nums font-semibold">{fmtQty(totalQty)}</td>
+                  <td />
+                  <td className="px-4 py-2 text-right tabular-nums font-semibold">{currency} {fmtMoney(totalValue)}</td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                Results for &ldquo;{searchTerm}&rdquo;
-                <Badge className="ml-2">{results.length} line{results.length !== 1 ? "s" : ""}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader className="sticky top-0 z-30 bg-background">
-                  <TableRow>
-                    <TableHead>Item Name</TableHead>
-                    <TableHead>Container</TableHead>
-                    <TableHead>Offload Date</TableHead>
-                    <TableHead>PO #</TableHead>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead className="text-right">Qty (KG)</TableHead>
-                    <TableHead className="text-right">Price / KG</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {results.map((row, i) => {
-                    return (
-                    <TableRow key={i} data-testid={`row-result-${i}`}>
-                      <TableCell className="font-medium">{row.itemName}</TableCell>
-                      <TableCell>
-                        <span className="font-mono text-sm">{row.containerNumber}</span>
-                      </TableCell>
-                      <TableCell>
-                        {row.offloadDate ? format(new Date(row.offloadDate), "dd MMM yyyy") : "—"}
-                      </TableCell>
-                      <TableCell>{row.poNumber}</TableCell>
-                      <TableCell className="text-muted-foreground">{row.supplierName ?? "—"}</TableCell>
-                      <TableCell className="text-right">{fmtQty(row.quantity)}</TableCell>
-                      <TableCell className="text-right">
-                        {row.currency} {fmtMoney(row.rate)}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {row.currency} {fmtMoney(row.lineTotal)}
-                      </TableCell>
-                    </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-2">
+            {results.map((row, i) => (
+              <div key={i} className="border rounded-xl p-4 space-y-2" data-testid={`card-result-${i}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-medium text-sm leading-tight">{row.itemName}</span>
+                  <Badge variant="outline" className="font-mono text-xs shrink-0">{row.containerNumber}</Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <div><span className="text-foreground font-medium">PO:</span> {row.poNumber}</div>
+                  <div><span className="text-foreground font-medium">Date:</span> {row.offloadDate ? format(new Date(row.offloadDate), "dd MMM yyyy") : "—"}</div>
+                  <div><span className="text-foreground font-medium">Supplier:</span> {row.supplierName ?? "—"}</div>
+                  <div><span className="text-foreground font-medium">Qty:</span> {fmtQty(row.quantity)} KG</div>
+                </div>
+                <div className="flex justify-between items-center pt-1 border-t text-sm">
+                  <span className="text-muted-foreground">{row.currency} {fmtMoney(row.rate)} / KG</span>
+                  <span className="font-semibold">{row.currency} {fmtMoney(row.lineTotal)}</span>
+                </div>
+              </div>
+            ))}
+            <div className="border rounded-xl px-4 py-3 bg-muted/40 flex justify-between text-sm font-semibold">
+              <span>Total ({uniqueContainers} container{uniqueContainers !== 1 ? "s" : ""})</span>
+              <span>{currency} {fmtMoney(totalValue)}</span>
+            </div>
+          </div>
         </>
-      )}
-
-      {!searchTerm && (
-        <Card>
-          <CardContent className="py-16 text-center text-muted-foreground">
-            <Search className="h-12 w-12 mx-auto mb-4 opacity-20" />
-            <p className="text-lg">Enter an item name above to search offloaded containers</p>
-            <p className="text-sm mt-1">Shows supplier price (Dubai price) — not the offloaded landed cost</p>
-          </CardContent>
-        </Card>
       )}
     </div>
   );
