@@ -185,148 +185,122 @@ export default function FactoryEmployeeAdvancesTab() {
   , [advances]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-3 items-end justify-between">
-        <div className="flex flex-wrap gap-3 items-end">
-          <div>
-            <Label className="text-xs text-muted-foreground mb-1 block">Employee</Label>
-            <Select value={empFilter} onValueChange={setEmpFilter}>
-              <SelectTrigger className="w-44" data-testid="select-emp-filter">
-                <SelectValue placeholder="All employees" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Employees</SelectItem>
-                {employees.map((e) => (
-                  <SelectItem key={e.id} value={String(e.id)}>{e.firstName} {e.lastName}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+    <div className="space-y-5">
+
+      {/* Filter + actions row */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Select value={empFilter} onValueChange={setEmpFilter}>
+          <SelectTrigger className="w-44" data-testid="select-emp-filter">
+            <SelectValue placeholder="All employees" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Employees</SelectItem>
+            {employees.map((e) => (
+              <SelectItem key={e.id} value={String(e.id)}>{e.firstName} {e.lastName}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+          <SelectTrigger className="w-36" data-testid="select-status-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="open">Open</SelectItem>
+            <SelectItem value="paid">Fully Paid</SelectItem>
+          </SelectContent>
+        </Select>
+        {!isLoading && advances.some((a) => !a.fullyPaid) && (
+          <div className="flex items-center gap-2 rounded-lg border bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 px-3 py-1.5 text-sm">
+            <Banknote className="h-4 w-4 text-amber-500 shrink-0" />
+            <span className="text-muted-foreground">Outstanding</span>
+            <span className="font-semibold font-mono text-amber-700 dark:text-amber-300">${fmt(totalOutstanding)}</span>
           </div>
-          <div>
-            <Label className="text-xs text-muted-foreground mb-1 block">Status</Label>
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-              <SelectTrigger className="w-36" data-testid="select-status-filter">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="paid">Fully Paid</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <Button onClick={() => setAddOpen(true)} data-testid="button-add-advance">
+        )}
+        <Button onClick={() => setAddOpen(true)} className="ml-auto" data-testid="button-add-advance">
           <Plus className="h-4 w-4 mr-2" /> Add Advance
         </Button>
       </div>
 
-      {!isLoading && advances.some((a) => !a.fullyPaid) && (
-        <div className="flex items-center gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-          <Banknote className="h-4 w-4 text-amber-600 shrink-0" />
-          <span className="text-sm text-amber-800 dark:text-amber-200">
-            Outstanding advances: <strong>{fmt(totalOutstanding)}</strong>
-          </span>
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
-      ) : advances.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            <Users className="h-10 w-10 mx-auto mb-3 opacity-40" />
-            <p>No advances found.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <div className="hidden sm:block rounded-md border">
-            <Table>
-              <TableHeader className="sticky top-0 z-30 bg-background">
-                <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-right">Remaining</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead />
+      {/* Table */}
+      <div className="border rounded-xl overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40 hover:bg-muted/40">
+              <TableHead className="text-xs h-9 font-semibold">Employee</TableHead>
+              <TableHead className="text-xs h-9 font-semibold">Date</TableHead>
+              <TableHead className="text-xs h-9 font-semibold text-right">Amount</TableHead>
+              <TableHead className="text-xs h-9 font-semibold text-right">Remaining</TableHead>
+              <TableHead className="text-xs h-9 font-semibold">Status</TableHead>
+              <TableHead className="text-xs h-9 font-semibold">Notes</TableHead>
+              <TableHead className="text-xs h-9 w-24"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              [...Array(4)].map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell></TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {advances.map((adv) => (
-                  <TableRow key={adv.id} data-testid={`row-advance-${adv.id}`}>
-                    <TableCell className="font-medium">{adv.firstName} {adv.lastName}</TableCell>
-                    <TableCell className="text-sm">{adv.advanceDate}</TableCell>
-                    <TableCell className="text-right font-mono">{fmt(adv.amount)}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {adv.fullyPaid ? <span className="text-muted-foreground">—</span> : fmt(adv.remainingBalance)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={adv.fullyPaid ? "outline" : "secondary"}>
-                        {adv.fullyPaid ? "Paid" : "Open"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-32 truncate">{adv.notes || "—"}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1 justify-end">
-                        {!adv.fullyPaid && (
-                          <Button size="sm" variant="outline" onClick={() => { setRepayOpen(adv); setRepayForm({ repaymentDate: today(), amount: adv.remainingBalance, cashAccountId: "", notes: "" }); }} data-testid={`button-repay-${adv.id}`}>
-                            <RotateCcw className="h-3 w-3 mr-1" /> Repay
-                          </Button>
-                        )}
-                        <Button size="icon" variant="ghost" onClick={() => setDeleteConfirm(adv)} data-testid={`button-delete-advance-${adv.id}`}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          <div className="sm:hidden space-y-2">
-            {advances.map((adv) => (
-              <Card key={adv.id} data-testid={`card-advance-${adv.id}`}>
-                <CardContent className="p-3 space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-medium text-sm">{adv.firstName} {adv.lastName}</p>
-                      <p className="text-xs text-muted-foreground">{adv.advanceDate}</p>
+              ))
+            ) : advances.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7}>
+                  <div className="flex flex-col items-center gap-2 py-10 text-center">
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                      <Banknote className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <Badge variant={adv.fullyPaid ? "outline" : "secondary"} className="shrink-0">
-                      {adv.fullyPaid ? "Paid" : "Open"}
-                    </Badge>
+                    <p className="text-sm font-medium">No advances found</p>
+                    <p className="text-xs text-muted-foreground">
+                      {statusFilter !== "all" || empFilter !== "all" ? "Try adjusting your filters" : "Add an advance to get started"}
+                    </p>
                   </div>
-                  <div className="grid grid-cols-2 gap-1 text-sm">
-                    <span className="text-muted-foreground">Amount</span>
-                    <span className="font-mono text-right">{fmt(adv.amount)}</span>
+                </TableCell>
+              </TableRow>
+            ) : advances.map((adv) => (
+              <TableRow key={adv.id} className="hover:bg-muted/40" data-testid={`row-advance-${adv.id}`}>
+                <TableCell className="font-medium py-3">{adv.firstName} {adv.lastName}</TableCell>
+                <TableCell className="py-3 text-sm text-muted-foreground">{adv.advanceDate}</TableCell>
+                <TableCell className="py-3 text-right font-mono text-sm">${fmt(adv.amount)}</TableCell>
+                <TableCell className="py-3 text-right font-mono text-sm">
+                  {adv.fullyPaid
+                    ? <span className="text-muted-foreground/40">—</span>
+                    : <span className="text-amber-600 dark:text-amber-400">${fmt(adv.remainingBalance)}</span>}
+                </TableCell>
+                <TableCell className="py-3">
+                  <Badge
+                    variant="secondary"
+                    className={`text-xs no-default-active-elevate ${adv.fullyPaid
+                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                      : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"}`}
+                  >
+                    {adv.fullyPaid ? "Paid" : "Open"}
+                  </Badge>
+                </TableCell>
+                <TableCell className="py-3 text-sm text-muted-foreground max-w-32 truncate">{adv.notes || "—"}</TableCell>
+                <TableCell className="py-3">
+                  <div className="flex gap-1 justify-end">
                     {!adv.fullyPaid && (
-                      <>
-                        <span className="text-muted-foreground">Remaining</span>
-                        <span className="font-mono text-right text-amber-600">{fmt(adv.remainingBalance)}</span>
-                      </>
-                    )}
-                  </div>
-                  {adv.notes && <p className="text-xs text-muted-foreground">{adv.notes}</p>}
-                  <div className="flex gap-2 pt-1">
-                    {!adv.fullyPaid && (
-                      <Button size="sm" variant="outline" className="flex-1" onClick={() => { setRepayOpen(adv); setRepayForm({ repaymentDate: today(), amount: adv.remainingBalance, cashAccountId: "", notes: "" }); }}>
+                      <Button size="sm" variant="outline" onClick={() => { setRepayOpen(adv); setRepayForm({ repaymentDate: today(), amount: adv.remainingBalance, cashAccountId: "", notes: "" }); }} data-testid={`button-repay-${adv.id}`}>
                         <RotateCcw className="h-3 w-3 mr-1" /> Repay
                       </Button>
                     )}
-                    <Button size="icon" variant="ghost" onClick={() => setDeleteConfirm(adv)}>
+                    <Button size="icon" variant="ghost" onClick={() => setDeleteConfirm(adv)} data-testid={`button-delete-advance-${adv.id}`}>
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
+                </TableCell>
+              </TableRow>
             ))}
-          </div>
-        </>
-      )}
+          </TableBody>
+        </Table>
+      </div>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
