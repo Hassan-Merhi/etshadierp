@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/PageHeader";
 import {
   BookOpen, Eye, EyeOff, ExternalLink, List, AlignJustify, Package,
   Trash2, ChevronDown, ChevronRight, Filter, X, FileDown, Plus,
-  LayoutList, Layers,
+  LayoutList, Layers, ArrowUpDown,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -234,6 +234,7 @@ interface FactoryDaybookUIState {
   hiddenRowIds: string[];
   showHidden: boolean;
   viewMode: "detailed" | "condensed";
+  sortOrder: "asc" | "desc";
   scrollY: number;
 }
 
@@ -434,6 +435,7 @@ export default function FactoryDaybook() {
   const [searchQuery, setSearchQuery] = useState("");
   const [minAmount, setMinAmount] = useState("");
   const [maxAmount, setMaxAmount] = useState("");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // ── View/UX state ─────────────────────────────────────────────────────────
   const [isDetailed, setIsDetailed] = useState(false);
@@ -448,6 +450,7 @@ export default function FactoryDaybook() {
   const [editDescription, setEditDescription] = useState("");
   const [editAmountCurrency, setEditAmountCurrency] = useState("");
   const [editAmountUsd, setEditAmountUsd] = useState("");
+  const [editTxDate, setEditTxDate] = useState("");
   const [editReason, setEditReason] = useState("");
   const [viewEntry, setViewEntry] = useState<DaybookEntry | null>(null);
   const [voidEntry, setVoidEntry] = useState<DaybookEntry | null>(null);
@@ -536,8 +539,12 @@ export default function FactoryDaybook() {
         return true;
       });
     }
+    result = [...result].sort((a, b) => {
+      const dateCmp = a.txDate.localeCompare(b.txDate) || a.id - b.id;
+      return sortOrder === "desc" ? -dateCmp : dateCmp;
+    });
     return result;
-  }, [entries, statusFilter, searchQuery, minAmount, maxAmount]);
+  }, [entries, statusFilter, searchQuery, minAmount, maxAmount, sortOrder]);
 
   // Visible entries in detailed view (hide/unhide logic)
   const visibleEntries = useMemo(() => {
@@ -660,6 +667,7 @@ export default function FactoryDaybook() {
     setSearchQuery(saved.searchQuery || "");
     setMinAmount(saved.minAmount || "");
     setMaxAmount(saved.maxAmount || "");
+    setSortOrder((saved.sortOrder as "asc" | "desc") || "desc");
     setHiddenRowIds(new Set(saved.hiddenRowIds || []));
     setShowHidden(saved.showHidden || false);
     if (saved.viewMode) setIsDetailed(saved.viewMode === "detailed");
@@ -680,12 +688,13 @@ export default function FactoryDaybook() {
       searchQuery,
       minAmount,
       maxAmount,
+      sortOrder,
       hiddenRowIds: Array.from(hiddenRowIds),
       showHidden,
       viewMode: isDetailed ? "detailed" : "condensed",
       scrollY: scrollYRef.current,
     });
-  }, [periodFilter, txTypeFilter, currencyFilter, statusFilter, searchQuery, minAmount, maxAmount, hiddenRowIds, showHidden, isDetailed]);
+  }, [periodFilter, txTypeFilter, currencyFilter, statusFilter, searchQuery, minAmount, maxAmount, sortOrder, hiddenRowIds, showHidden, isDetailed]);
 
   // ── Session persistence: track scroll ────────────────────────────────────
   useEffect(() => {
@@ -861,6 +870,7 @@ export default function FactoryDaybook() {
     setEditDescription(entry.description);
     setEditAmountCurrency(entry.amountCurrency);
     setEditAmountUsd(entry.amountUsd);
+    setEditTxDate(entry.txDate);
     setEditReason("");
   };
 
@@ -891,6 +901,7 @@ export default function FactoryDaybook() {
       data: {
         description: editDescription,
         ...(!isVoucherBacked && { amountCurrency: editAmountCurrency, amountUsd: editAmountUsd }),
+        ...(editTxDate !== editEntry.txDate && { txDate: editTxDate }),
         reason: editReason.trim(),
       },
     });
@@ -1126,6 +1137,17 @@ export default function FactoryDaybook() {
                   )}
                 </>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSortOrder((v) => v === "desc" ? "asc" : "desc")}
+                data-testid="button-sort-order"
+                className="gap-1"
+                title={sortOrder === "desc" ? "Newest first — click for oldest first" : "Oldest first — click for newest first"}
+              >
+                <ArrowUpDown className="w-4 h-4" />
+                <span className="hidden sm:inline text-xs">{sortOrder === "desc" ? "Newest first" : "Oldest first"}</span>
+              </Button>
               <div className="flex items-center border rounded-md overflow-hidden">
                 <Button
                   variant="ghost" size="sm"
@@ -1272,7 +1294,7 @@ export default function FactoryDaybook() {
                                           data-testid={`button-edit-source-${entry.id}`}
                                         ><ExternalLink className="h-3 w-3" /></Button>
                                       )}
-                                      {isAdminOrOwner && isVoucherBacked && (
+                                      {isAdminOrOwner && isVoucherBacked && ["PAYMENT", "RECEIPT", "JOURNAL"].includes(entry.txType) && (
                                         <Button size="icon" variant="ghost" title="Void"
                                           onClick={(e) => { e.stopPropagation(); setVoidEntry(entry); }}
                                           data-testid={`button-void-voucher-${entry.id}`}
@@ -1356,12 +1378,39 @@ export default function FactoryDaybook() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {visibleEntries.map((entry) => {
+                    {(() => {
+                      let prevDate = "";
+                      return visibleEntries.map((entry) => {
                       const rid = String(entry.id);
                       const isHidden = hiddenRowIds.has(rid);
                       const isBaleTransfer = entry.txType === "BALE_TRANSFER";
                       const { variant: bv, className: bc } = getFactoryTxTypeBadge(entry.txType);
+                      const showDateSep = entry.txDate !== prevDate;
+                      if (showDateSep) prevDate = entry.txDate;
+                      const colSpan = 2 + (isAdminOrOwner ? 1 : 0) + (isAdminOrOwner && hasNonUsd ? 1 : 0) + 1;
+                      const dayEntries = showDateSep
+                        ? visibleEntries.filter((e) => e.txDate === entry.txDate)
+                        : [];
+                      const dayTotal = isAdminOrOwner && showDateSep
+                        ? dayEntries.reduce((s, e) => s + parseFloat(e.amountUsd || e.amountCurrency || "0"), 0)
+                        : 0;
                       return (
+                        <>
+                          {showDateSep && (
+                            <TableRow key={`date-sep-${entry.txDate}`} className="bg-muted/40 pointer-events-none">
+                              <TableCell colSpan={colSpan} className="py-1.5 px-4">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-semibold text-sm">{formatDisplayDate(entry.txDate + "T00:00:00")}</span>
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-xs text-muted-foreground">{dayEntries.length} {dayEntries.length === 1 ? "entry" : "entries"}</span>
+                                    {isAdminOrOwner && (
+                                      <span className="font-mono text-sm font-medium">${formatNumber(dayTotal)}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
                         <TableRow
                           key={entry.id}
                           data-testid={`row-daybook-${entry.id}`}
@@ -1416,8 +1465,10 @@ export default function FactoryDaybook() {
                             {renderEntryActions(entry)}
                           </TableCell>
                         </TableRow>
+                        </>
                       );
-                    })}
+                    });
+                    })()}
                   </TableBody>
                 </Table>
               </div>
@@ -1445,6 +1496,10 @@ export default function FactoryDaybook() {
                 <div>
                   <Label className="text-sm font-medium">Description</Label>
                   <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} data-testid="input-edit-description" />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Date</Label>
+                  <Input type="date" value={editTxDate} onChange={(e) => setEditTxDate(e.target.value)} data-testid="input-edit-tx-date" />
                 </div>
                 {!isVoucherBacked && (
                   <div className="grid grid-cols-2 gap-2">
