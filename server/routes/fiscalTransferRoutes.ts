@@ -899,6 +899,31 @@ export function registerFiscalTransferRoutes(app: Express) {
           itemsCount: transfer.items.length,
         });
         res.status(201).json(transfer);
+
+        // Fire-and-forget: send transfer image to destination WA group (original-flow / voucherId path)
+        setImmediate(async () => {
+          try {
+            const uniqueSrcIds = [...new Set(itemsWithRate.map((i: any) => Number(i.sourceLocationId)).filter(Boolean))];
+            let sourceName = "Multiple Sources";
+            if (uniqueSrcIds.length === 1) {
+              const [srcLoc] = await db.select({ name: locations.name }).from(locations).where(eq(locations.id, uniqueSrcIds[0]));
+              if (srcLoc?.name) sourceName = srcLoc.name;
+            }
+            await sendTransferWhatsApp({
+              destinationLocationId,
+              sourceLocationName: sourceName,
+              destLocationName: destLocation.name,
+              items: transfer.items.map((i: any) => ({
+                stockItemId: i.stockItemId,
+                quantity: parseFloat(i.quantity),
+              })),
+              voucherNumber: voucher.voucherNumber,
+              voucherDate: voucher.voucherDate,
+            });
+          } catch (e: any) {
+            console.error("[TransferWA] Failed to send (original-flow):", e.message);
+          }
+        });
       } catch (error: any) {
         console.error(
           "[Stock Transfer] Error creating transfer:",
@@ -1287,6 +1312,52 @@ export function registerFiscalTransferRoutes(app: Express) {
         .where(eq(stockTransferRevisionItems.revisionId, revision.id));
 
       res.json({ ...revision, items: savedItems });
+
+      // Fire-and-forget: send transfer image when POS user saves a revision
+      if (isOptional) {
+        setImmediate(async () => {
+          try {
+            const [transfer] = await db
+              .select({ destinationLocationId: stockTransferVouchers.destinationLocationId, voucherId: stockTransferVouchers.voucherId })
+              .from(stockTransferVouchers)
+              .where(eq(stockTransferVouchers.id, transferId));
+            if (!transfer) return;
+
+            const [destLoc] = await db
+              .select({ name: locations.name })
+              .from(locations)
+              .where(eq(locations.id, transfer.destinationLocationId));
+
+            const [voucherRow] = await db
+              .select({ voucherNumber: vouchers.voucherNumber, voucherDate: vouchers.voucherDate })
+              .from(vouchers)
+              .where(eq(vouchers.id, transfer.voucherId));
+            if (!voucherRow) return;
+
+            const uniqueSrcNames = [...new Set(items.map((i: any) => i.sourceLocationName).filter(Boolean))];
+            const sourceName = uniqueSrcNames.length === 1 ? uniqueSrcNames[0] : "Multiple Sources";
+
+            const waItems = items
+              .filter((i: any) => parseFloat(i.newQuantity) > 0)
+              .map((i: any) => ({
+                stockItemId: Number(i.stockItemId),
+                quantity: parseFloat(i.newQuantity),
+              }));
+            if (waItems.length === 0) return;
+
+            await sendTransferWhatsApp({
+              destinationLocationId: transfer.destinationLocationId,
+              sourceLocationName: sourceName,
+              destLocationName: destLoc?.name ?? "Unknown",
+              items: waItems,
+              voucherNumber: voucherRow.voucherNumber,
+              voucherDate: voucherRow.voucherDate,
+            });
+          } catch (e: any) {
+            console.error("[TransferWA] Failed to send (revision):", e.message);
+          }
+        });
+      }
     } catch (error: any) {
       console.error("[Revision POST] Error:", error.message);
       res.status(500).json({ message: error.message });
