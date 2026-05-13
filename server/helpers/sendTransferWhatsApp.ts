@@ -1,14 +1,15 @@
 /**
  * sendTransferWhatsApp.ts
- * Fire-and-forget helper: build the transfer image and send it to the
- * destination location's WhatsApp group chat.
+ * Fire-and-forget helper: build the transfer image and send it to:
+ *   1. The globally-configured transfer WA group (Settings → Stock Transfers WA)
+ *   2. The destination location's own WA group (if configured)
  */
 
 import { db } from "../db";
 import { stockItems, locations } from "@shared/schema";
 import { eq, inArray } from "drizzle-orm";
 import { generateTransferImageBuffer } from "./generateTransferImage";
-import { sendWhatsAppFileToChatId } from "../services/whatsappService";
+import { sendWhatsAppFileToChatId, getTransferWaGroupChatId } from "../services/whatsappService";
 import { format } from "date-fns";
 
 export interface TransferWAItem {
@@ -26,9 +27,11 @@ export interface SendTransferWAOptions {
 }
 
 /**
- * Generate and send the stock transfer image to the destination
- * location's WhatsApp group. Designed to be called fire-and-forget
- * inside setImmediate — never throws to the caller.
+ * Generate and send the stock transfer image.
+ * Sends to:
+ *   - The global transfer WA group configured in Settings (if set)
+ *   - The destination location's WA group (if set)
+ * Designed to be called fire-and-forget inside setImmediate — never throws.
  */
 export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise<void> {
   const {
@@ -40,18 +43,29 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
     voucherDate,
   } = opts;
 
-  // Look up destination location's WA group chat ID
+  // Collect all target chat IDs (deduped)
+  const chatIds = new Set<string>();
+
+  // 1. Global transfer WA group from settings
+  const globalSetting = await getTransferWaGroupChatId();
+  if (globalSetting?.groupChatId) {
+    chatIds.add(globalSetting.groupChatId);
+  }
+
+  // 2. Destination location's own WA group
   const [destLoc] = await db
     .select({ whatsappGroupChatId: locations.whatsappGroupChatId })
     .from(locations)
     .where(eq(locations.id, destinationLocationId));
 
-  if (!destLoc?.whatsappGroupChatId) {
-    console.log(`[TransferWA] No WA group for destination location ${destinationLocationId} — skipping`);
-    return;
+  if (destLoc?.whatsappGroupChatId) {
+    chatIds.add(destLoc.whatsappGroupChatId);
   }
 
-  const chatId = destLoc.whatsappGroupChatId;
+  if (chatIds.size === 0) {
+    console.log(`[TransferWA] No WA groups configured for transfer ${voucherNumber} — skipping`);
+    return;
+  }
 
   // Look up stock item names in a single query
   const uniqueIds = [...new Set(items.map((i) => i.stockItemId))];
@@ -77,7 +91,7 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
     displayDate = format(new Date(voucherDate), "dd MMM yyyy");
   } catch { /* keep raw string */ }
 
-  // Generate the PNG image
+  // Generate the PNG image once
   const pngBuffer = await generateTransferImageBuffer({
     voucherNumber,
     date: displayDate,
@@ -86,7 +100,6 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
     items: imageItems,
   });
 
-  // Send to the destination location's WA group
   const safeVoucher = voucherNumber.replace(/[^a-zA-Z0-9_-]/g, "_");
   const fileName = `Transfer_${safeVoucher}.png`;
 
@@ -98,11 +111,13 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
     `Items: ${items.length}`,
   ].join("\n");
 
-  const result = await sendWhatsAppFileToChatId(chatId, pngBuffer, fileName, caption, "image/png");
-
-  if (result.success) {
-    console.log(`[TransferWA] Sent ${voucherNumber} image to group ${chatId} (${destLocationName})`);
-  } else {
-    console.warn(`[TransferWA] Send failed for ${voucherNumber}: ${result.error}`);
+  // Send to all target groups
+  for (const chatId of chatIds) {
+    const result = await sendWhatsAppFileToChatId(chatId, pngBuffer, fileName, caption, "image/png");
+    if (result.success) {
+      console.log(`[TransferWA] Sent ${voucherNumber} image to group ${chatId}`);
+    } else {
+      console.warn(`[TransferWA] Send failed for ${voucherNumber} → ${chatId}: ${result.error}`);
+    }
   }
 }

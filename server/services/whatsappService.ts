@@ -424,6 +424,30 @@ export async function markContainersWaSent(): Promise<void> {
   );
 }
 
+// ── Stock Transfer WhatsApp Settings ────────────────────────────────────────
+
+export async function getTransferWaGroupChatId(): Promise<{ groupChatId: string; instanceId: string; apiToken: string; enabled: boolean } | null> {
+  const res = await pool.query(
+    `SELECT transfer_wa_group_chat_id, instance_id, api_token, enabled
+     FROM whatsapp_settings WHERE id = 1`,
+  );
+  if (!res.rows?.length) return null;
+  const r = res.rows[0];
+  return {
+    groupChatId: r.transfer_wa_group_chat_id ?? "",
+    instanceId:  r.instance_id  ?? "",
+    apiToken:    r.api_token    ?? "",
+    enabled:     r.enabled      ?? false,
+  };
+}
+
+export async function setTransferWaGroupChatId(groupChatId: string): Promise<void> {
+  await pool.query(
+    `UPDATE whatsapp_settings SET transfer_wa_group_chat_id = $1 WHERE id = 1`,
+    [groupChatId],
+  );
+}
+
 /**
  * Send a file to ALL active recipients via the main WhatsApp instance (id=1).
  * Uses the shared sendGreenApiFileUpload helper (form-data package).

@@ -26,6 +26,7 @@ import { StockReportSection } from "./StockReportSection";
 import { WhatsAppExportSection } from "./WhatsAppExportSection";
 import { PosWhatsAppSection } from "./PosWhatsAppSection";
 import { ContainersWhatsAppSection } from "./ContainersWhatsAppSection";
+import { TransferWhatsAppSection } from "./TransferWhatsAppSection";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -717,6 +718,10 @@ export function ExportCenter() {
             <MessageCircle className="h-3.5 w-3.5 text-green-600" />
             Containers WA
           </TabsTrigger>
+          <TabsTrigger value="transfer-wa" data-testid="tab-transfer-wa" className="flex items-center gap-1.5">
+            <MessageCircle className="h-3.5 w-3.5 text-blue-500" />
+            Transfers WA
+          </TabsTrigger>
         </TabsList>
 
         {/* ══════════════════════════════════════════════════════════════
@@ -1302,6 +1307,20 @@ export function ExportCenter() {
             </p>
           </div>
           <ContainersWhatsAppSection />
+        </TabsContent>
+
+        {/* ══════════════════════════════════════════════════════════════
+            STOCK TRANSFERS WHATSAPP TAB
+        ══════════════════════════════════════════════════════════════ */}
+        <TabsContent value="transfer-wa" className="space-y-4 mt-4">
+          <div>
+            <h3 className="text-base font-semibold mb-1">Stock Transfers — WhatsApp</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Choose which WhatsApp group receives a summary image whenever a stock transfer is confirmed.
+              The image shows the voucher number, date, locations, and item quantities — no costs.
+            </p>
+          </div>
+          <TransferWhatsAppSection />
         </TabsContent>
 
       </Tabs>

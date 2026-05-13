@@ -1021,6 +1021,7 @@ let migrationsDone = false;
     `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS containers_wa_schedule_enabled boolean NOT NULL DEFAULT false`,
     `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS containers_wa_schedule_hour integer NOT NULL DEFAULT 8`,
     `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS containers_wa_last_sent_at timestamp`,
+    `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS transfer_wa_group_chat_id text NOT NULL DEFAULT ''`,
     // WhatsApp recipients (individual numbers or group chatIds) — per-tenant
     `CREATE TABLE IF NOT EXISTS whatsapp_recipients (
       id serial PRIMARY KEY,

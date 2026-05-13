@@ -1230,6 +1230,33 @@ export function registerGitRoutes(app: Express) {
     },
   );
 
+  // ── Stock Transfer WhatsApp Settings ────────────────────────────────────────
+
+  app.get("/api/git/transfer-wa-settings", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { getTransferWaGroupChatId, getWaSettings } = await import("../services/whatsappService");
+      const [settings, main] = await Promise.all([getTransferWaGroupChatId(), getWaSettings()]);
+      res.json({
+        groupChatId:    settings?.groupChatId    ?? "",
+        hasCredentials: !!(main?.instanceId && main?.apiToken),
+        waEnabled:      main?.enabled            ?? false,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/git/transfer-wa-settings", requireAuth, requireRole("Admin", "Developer", "Owner"), async (req: Request, res: Response) => {
+    try {
+      const { groupChatId = "" } = req.body;
+      const { setTransferWaGroupChatId } = await import("../services/whatsappService");
+      await setTransferWaGroupChatId(String(groupChatId));
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── Containers WhatsApp Settings ────────────────────────────────────────────
 
   app.get("/api/git/containers-wa-settings", requireAuth, async (req: Request, res: Response) => {
