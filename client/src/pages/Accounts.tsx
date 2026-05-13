@@ -3439,11 +3439,9 @@ export default function Accounts() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/40 hover:bg-muted/40">
-                      <TableHead className="text-xs h-9 font-semibold">Voucher #</TableHead>
                       <TableHead className="text-xs h-9 font-semibold">Date</TableHead>
                       <TableHead className="text-xs h-9 font-semibold">Type</TableHead>
                       <TableHead className="text-xs h-9 font-semibold">Description</TableHead>
-                      <TableHead className="text-xs h-9 font-semibold">Location</TableHead>
                       <TableHead className="text-xs h-9 font-semibold text-right">Amount</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -3489,7 +3487,6 @@ export default function Accounts() {
                           onClick={handleOpen}
                           data-testid={`row-voucher-${v.id}`}
                         >
-                          <TableCell className="py-2.5 font-mono font-semibold">{v.voucherNumber}</TableCell>
                           <TableCell className="py-2.5 text-muted-foreground whitespace-nowrap">{v.voucherDate}</TableCell>
                           <TableCell className="py-2.5">
                             <Badge variant="secondary" className={`text-xs ${typeBadgeClass[v.voucherType] || ""}`}>
@@ -3497,7 +3494,6 @@ export default function Accounts() {
                             </Badge>
                           </TableCell>
                           <TableCell className="py-2.5 max-w-[200px] truncate text-muted-foreground">{v.description || "-"}</TableCell>
-                          <TableCell className="py-2.5 text-muted-foreground">{v.locationName || "-"}</TableCell>
                           <TableCell className="py-2.5 text-right font-medium tabular-nums">
                             <span className="flex items-center justify-end gap-1.5">
                               {parseFloat(v.totalAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {v.currency}
