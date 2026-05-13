@@ -43,12 +43,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import type { LucideIcon } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -85,21 +79,11 @@ export default function Containers() {
   const { formatDisplayDate } = useDateFormat();
   const [activeTab, setActiveTab] = useState("active");
 
-  const sidebarGroups: { label: string; items: { key: string; label: string; icon: LucideIcon }[] }[] = [
-    {
-      label: "Containers",
-      items: [
-        { key: "active", label: "Active Containers", icon: Package },
-      ],
-    },
-  ];
-
   const [searchTerm, setSearchTerm] = useState("");
   const [soldSearchTerm, setSoldSearchTerm] = useState("");
   const [otwSearchTerm, setOtwSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("OTW");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [supplierFilter, setSupplierFilter] = useState("ALL");
-  const [showFilters, setShowFilters] = useState(false);
   // OTW Tracking filters
   const [otwLocationFilter, setOtwLocationFilter] = useState("ALL");
   const [otwSupplierFilter, setOtwSupplierFilter] = useState("ALL");
@@ -791,396 +775,269 @@ export default function Containers() {
         title="Container Tracking"
         subtitle="Track containers and manage offloading"
       >
-        {activeTab === "active" && (
-          <div className="flex gap-2 flex-wrap">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2" data-testid="button-export-dropdown">
-                  <Download className="h-4 w-4" />
-                  Export
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={exportToExcel} data-testid="button-export-excel">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={exportAllContainersFull} data-testid="button-export-all-full">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export All (Full)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+        <div className="flex gap-2 flex-wrap">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2" data-testid="button-export-dropdown">
+                <Download className="h-4 w-4" />
+                Export
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={exportToExcel} data-testid="button-export-excel">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={exportAllContainersFull} data-testid="button-export-all-full">
+                <Download className="h-4 w-4 mr-2" />
+                Export All (Full)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button className="gap-2" data-testid="button-add-dropdown">
-                  <Plus className="h-4 w-4" />
-                  Add
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setAddDialogOpen(true)} data-testid="button-add-container">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button className="gap-2" data-testid="button-add-dropdown">
+                <Plus className="h-4 w-4" />
+                Add
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setAddDialogOpen(true)} data-testid="button-add-container">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Container
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild data-testid="button-import-po">
+                <Link href="/po-import" className="flex items-center">
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Container
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild data-testid="button-import-po">
-                  <Link href="/po-import" className="flex items-center">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Import PO
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
+                  Import PO
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </PageHeader>
 
-      {/* Mobile section selector */}
-      <div className="md:hidden">
-        <Select value={activeTab} onValueChange={setActiveTab}>
-          <SelectTrigger className="w-full" data-testid="select-container-section">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {sidebarGroups.flatMap((g) => g.items).map((item) => {
-              const Icon = item.icon;
-              return (
-                <SelectItem key={item.key} value={item.key}>
-                  <span className="flex items-center gap-2">
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </span>
+      {/* Stats bar */}
+      {!isLoading && allContainers.length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
+            <Package className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-semibold" data-testid="text-total-containers">{allContainers.length.toLocaleString()}</span>
+            <span className="text-xs text-muted-foreground">Containers</span>
+          </div>
+          {(() => {
+            const otwCount = allContainers.filter((c) => c.status === "OTW").length;
+            const arrivedCount = allContainers.filter((c) => c.status === "ARRIVED").length;
+            const offloadedCount = allContainers.filter((c) => c.status === "OFFLOADED").length;
+            return (
+              <>
+                {otwCount > 0 && (
+                  <div className="flex items-center gap-2 bg-blue-500/10 rounded-lg px-3 py-2">
+                    <Truck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">{otwCount}</span>
+                    <span className="text-xs text-muted-foreground">OTW</span>
+                  </div>
+                )}
+                {arrivedCount > 0 && (
+                  <div className="flex items-center gap-2 bg-amber-500/10 rounded-lg px-3 py-2">
+                    <MapPin className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">{arrivedCount}</span>
+                    <span className="text-xs text-muted-foreground">Arrived</span>
+                  </div>
+                )}
+                {offloadedCount > 0 && (
+                  <div className="flex items-center gap-2 bg-green-500/10 rounded-lg px-3 py-2">
+                    <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    <span className="text-sm font-semibold text-green-700 dark:text-green-300">{offloadedCount}</span>
+                    <span className="text-xs text-muted-foreground">Offloaded</span>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+          {!hideContainerCosts && (
+            <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-3 py-2">
+              <span className="text-sm font-semibold font-mono text-primary" data-testid="text-total-amount">
+                {formatAmount(
+                  allContainers.reduce((sum, c) => {
+                    const gTotal = parseFloat(c.grandTotal ?? "0");
+                    return sum + (gTotal || parseFloat(c.itemsTotal ?? "0") || 0);
+                  }, 0)
+                )}
+              </span>
+              <span className="text-xs text-muted-foreground">total value</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Inline filter row */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by container number..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+            data-testid="input-search-container"
+          />
+        </div>
+        <div className="flex gap-1 flex-wrap">
+          {(["ALL", "OTW", "ARRIVED", "OFFLOADED"] as const).map((s) => (
+            <Button
+              key={s}
+              size="sm"
+              variant={statusFilter === s ? "default" : "outline"}
+              onClick={() => setStatusFilter(s)}
+              data-testid={`button-status-${s.toLowerCase()}`}
+            >
+              {s === "ALL" ? "All" : s === "OTW" ? "OTW" : s === "ARRIVED" ? "Arrived" : "Offloaded"}
+            </Button>
+          ))}
+        </div>
+        {suppliers.length > 0 && (
+          <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+            <SelectTrigger className="w-[160px]" data-testid="select-supplier-filter">
+              <SelectValue placeholder="All suppliers" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Suppliers</SelectItem>
+              {suppliers.map((supplier) => (
+                <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                  {supplier.legalName}
                 </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        {(statusFilter !== "ALL" || supplierFilter !== "ALL" || searchTerm) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { clearFilters(); setSearchTerm(""); }}
+            data-testid="button-clear-filters"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Clear
+          </Button>
+        )}
       </div>
 
-      <div className="flex gap-6">
-        <nav className="hidden md:block w-56 shrink-0 space-y-4">
-          {sidebarGroups.map((group) => (
-            <div key={group.label}>
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
-                {group.label}
-              </h3>
-              <div className="space-y-1">
-                {group.items.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.key;
-                  return (
-                    <button
-                      key={item.key}
-                      onClick={() => setActiveTab(item.key)}
-                      data-testid={`tab-${item.key === "active" ? "active-containers" : item.key === "otw" ? "otw-tracking" : "sold-containers"}`}
-                      className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${
-                        isActive
-                          ? "bg-background shadow-sm font-medium"
-                          : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+      {/* Container list */}
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-20 w-full rounded-xl" />
           ))}
-        </nav>
-
-        <div className="flex-1 min-w-0">
-          {activeTab === "active" && (
-          <div className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by container number..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-                data-testid="input-search-container"
-              />
-            </div>
-            <Popover open={showFilters} onOpenChange={setShowFilters}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="gap-2"
-                  data-testid="button-filter"
-                >
-                  <Filter className="h-4 w-4" />
-                  Filter
-                  {(statusFilter !== "ALL" || supplierFilter !== "ALL") && (
-                    <Badge
-                      variant="secondary"
-                      className="ml-1 px-1 min-w-5 h-5"
-                    >
-                      {
-                        [
-                          statusFilter !== "ALL",
-                          supplierFilter !== "ALL",
-                        ].filter(Boolean).length
-                      }
-                    </Badge>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80" data-testid="popover-filters">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Filters</h4>
-                    {(statusFilter !== "ALL" || supplierFilter !== "ALL") && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={clearFilters}
-                        data-testid="button-clear-filters"
-                      >
-                        <X className="h-4 w-4 mr-1" />
-                        Clear
-                      </Button>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Status</label>
-                    <Select
-                      value={statusFilter}
-                      onValueChange={setStatusFilter}
-                    >
-                      <SelectTrigger data-testid="select-status-filter">
-                        <SelectValue placeholder="All statuses" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ALL">All Statuses</SelectItem>
-                        <SelectItem value="OTW">OTW (On The Way)</SelectItem>
-                        <SelectItem value="ARRIVED">Arrived</SelectItem>
-                        <SelectItem value="OFFLOADED">Offloaded</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Supplier</label>
-                    <Select
-                      value={supplierFilter}
-                      onValueChange={setSupplierFilter}
-                    >
-                      <SelectTrigger data-testid="select-supplier-filter">
-                        <SelectValue placeholder="All suppliers" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ALL">All Suppliers</SelectItem>
-                        {suppliers.map((supplier) => (
-                          <SelectItem
-                            key={supplier.id}
-                            value={supplier.id.toString()}
-                          >
-                            {supplier.legalName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
+        </div>
+      ) : containers.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-14 h-14 rounded-xl bg-muted/60 flex items-center justify-center mb-4">
+            <Package className="w-7 h-7 text-muted-foreground" />
           </div>
-
-          {containers.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Package className="w-16 h-16 text-muted-foreground mb-4" />
-                <h2 className="text-xl font-semibold mb-2">
-                  No containers found
-                </h2>
-                <p className="text-muted-foreground mb-4">
-                  {allContainers.length === 0
-                    ? "Import your first purchase order to get started"
-                    : "Try adjusting your search or filters"}
-                </p>
-                {allContainers.length === 0 && (
-                  <Link href="/po-import">
-                    <Button>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Import PO
+          <h2 className="text-lg font-semibold mb-1">No containers found</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            {allContainers.length === 0
+              ? "Import your first purchase order to get started"
+              : "Try adjusting your search or filters"}
+          </p>
+          {allContainers.length === 0 && (
+            <Link href="/po-import">
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Import PO
+              </Button>
+            </Link>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {containers.map((container) => {
+            const statusColors: Record<string, string> = {
+              OTW: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-transparent",
+              ARRIVED: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-transparent",
+              OFFLOADED: "bg-green-500/10 text-green-700 dark:text-green-300 border-transparent",
+            };
+            return (
+              <div
+                key={container.id}
+                className="bg-card border rounded-xl p-4 flex items-center gap-4 hover-elevate"
+                data-testid={`row-container-${container.id}`}
+              >
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Package className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {editingNumberId === container.id ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          className="h-7 w-36 font-mono text-xs px-2"
+                          value={editingNumberValue}
+                          onChange={(e) => setEditingNumberValue(e.target.value.toUpperCase())}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") editContainerNumberMutation.mutate({ id: container.id, containerNumber: editingNumberValue });
+                            if (e.key === "Escape") { setEditingNumberId(null); setEditingNumberValue(""); }
+                          }}
+                          autoFocus
+                          data-testid={`input-container-number-${container.id}`}
+                        />
+                        <Button size="icon" variant="ghost" onClick={() => editContainerNumberMutation.mutate({ id: container.id, containerNumber: editingNumberValue })} disabled={editContainerNumberMutation.isPending} data-testid={`button-save-number-${container.id}`}>
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => { setEditingNumberId(null); setEditingNumberValue(""); }} data-testid={`button-cancel-number-${container.id}`}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 group">
+                        <span className="font-mono font-semibold text-sm">{container.containerNumber}</span>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => { e.stopPropagation(); setEditingNumberId(container.id); setEditingNumberValue(container.containerNumber); }}
+                          data-testid={`button-edit-number-${container.id}`}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+                    <Badge className={statusColors[container.status] || "border-transparent"} data-testid={`badge-status-${container.id}`}>
+                      {container.status}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">{getSupplierName(container.supplierId)}</p>
+                </div>
+                <div className="flex items-center gap-4 flex-shrink-0">
+                  <div className="text-right hidden sm:block">
+                    <p className="text-xs text-muted-foreground">Import date</p>
+                    <p className="text-sm font-mono">{formatDisplayDate(container.importDate)}</p>
+                  </div>
+                  {!hideContainerCosts && (
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground hidden sm:block">Total</p>
+                      <p className="text-sm font-mono font-semibold">{formatAmount(parseFloat(container.grandTotal || "0"))}</p>
+                    </div>
+                  )}
+                  <Link href={`/containers/${container.id}`}>
+                    <Button size="sm" variant="outline" onClick={(e) => e.stopPropagation()} data-testid={`button-view-${container.id}`}>
+                      <Eye className="h-4 w-4 mr-1" />
+                      View
                     </Button>
                   </Link>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              <div className={`grid gap-4 ${hideContainerCosts ? "grid-cols-1 max-w-xs" : "grid-cols-2"}`}>
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">
-                        Total Containers
-                      </p>
-                      <p
-                        className="text-2xl font-semibold"
-                        data-testid="text-total-containers"
-                      >
-                        {containers.length}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-                {!hideContainerCosts && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">
-                        Total Amount
-                      </p>
-                      <p
-                        className="text-2xl font-semibold font-mono"
-                        data-testid="text-total-amount"
-                      >
-                        {formatAmount(
-                          containers.reduce((sum, c) => {
-                            const gTotal = parseFloat(c.grandTotal ?? "0");
-                            return sum + (gTotal || parseFloat(c.itemsTotal ?? "0") || 0);
-                          }, 0)
-                        )}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-                )}
-              </div>
-
-              <Card>
-                <CardContent className="p-0 overflow-x-auto hidden md:block">
-                  <Table>
-                    <TableHeader className="sticky top-0 z-20 bg-background">
-                      <TableRow>
-                        <TableHead className="sticky left-0 bg-muted z-10 min-w-[140px]">
-                          Container Number
-                        </TableHead>
-                        <TableHead>Supplier</TableHead>
-                        <TableHead>Status</TableHead>
-                        {!hideContainerCosts && <TableHead>Grand Total</TableHead>}
-                        <TableHead>Import Date</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {containers.map((container) => (
-                        <TableRow
-                          key={container.id}
-                          data-testid={`row-container-${container.id}`}
-                        >
-                          <TableCell className="font-mono font-medium sticky left-0 bg-background z-10">
-                            {editingNumberId === container.id ? (
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  className="h-7 w-36 font-mono text-xs px-2"
-                                  value={editingNumberValue}
-                                  onChange={(e) => setEditingNumberValue(e.target.value.toUpperCase())}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") editContainerNumberMutation.mutate({ id: container.id, containerNumber: editingNumberValue });
-                                    if (e.key === "Escape") { setEditingNumberId(null); setEditingNumberValue(""); }
-                                  }}
-                                  autoFocus
-                                  data-testid={`input-container-number-${container.id}`}
-                                />
-                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => editContainerNumberMutation.mutate({ id: container.id, containerNumber: editingNumberValue })} disabled={editContainerNumberMutation.isPending} data-testid={`button-save-number-${container.id}`}>
-                                  <Check className="h-3 w-3" />
-                                </Button>
-                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditingNumberId(null); setEditingNumberValue(""); }} data-testid={`button-cancel-number-${container.id}`}>
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1 group">
-                                <span>{container.containerNumber}</span>
-                                <Button size="icon" variant="ghost" className="h-6 w-6 opacity-100 md:opacity-0 md:group-hover:opacity-100" onClick={() => { setEditingNumberId(container.id); setEditingNumberValue(container.containerNumber); }} data-testid={`button-edit-number-${container.id}`}>
-                                  <Pencil className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {getSupplierName(container.supplierId)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                container.status === "OTW"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                            >
-                              {container.status}
-                            </Badge>
-                          </TableCell>
-                          {!hideContainerCosts && <TableCell className="font-mono">
-                            {formatAmount(
-                              parseFloat(container.grandTotal || "0")
-                            )}
-                          </TableCell>}
-                          <TableCell className="font-mono">
-                            {formatDisplayDate(container.importDate)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Link href={`/containers/${container.id}`}>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                data-testid={`button-view-${container.id}`}
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                View
-                              </Button>
-                            </Link>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-                <div className="md:hidden p-3 space-y-2">
-                  {containers.map((container) => (
-                    <Link key={container.id} href={`/containers/${container.id}`}>
-                      <div
-                        className="p-3 rounded-md border cursor-pointer hover-elevate"
-                        data-testid={`row-container-${container.id}`}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-mono font-medium text-sm">{container.containerNumber}</span>
-                          <Badge
-                            variant={container.status === "OTW" ? "default" : "secondary"}
-                          >
-                            {container.status}
-                          </Badge>
-                        </div>
-                        <div className="text-xs text-muted-foreground mb-1">
-                          {getSupplierName(container.supplierId)}
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          {!hideContainerCosts && <span className="font-mono font-semibold">
-                            {formatAmount(parseFloat(container.grandTotal || "0"))}
-                          </span>}
-                          <span className="text-xs text-muted-foreground">
-                            {formatDisplayDate(container.importDate)}
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
                 </div>
-              </Card>
-            </>
-          )}
-          </div>
-          )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
           {activeTab === "otw" && (
           <div className="space-y-4">
@@ -1946,8 +1803,6 @@ export default function Containers() {
           )}
           </div>
           )}
-        </div>
-      </div>
 
       <AddContainerDialog
         open={addDialogOpen}
