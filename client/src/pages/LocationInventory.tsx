@@ -2629,14 +2629,14 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                         <tr
                           key={item.inventoryId}
                           data-testid={`row-item-desktop-${item.stockItemId}`}
-                          className={`border-t h-13 ${
+                          className={`border-t h-12 ${
                             index === selectedRowIndex 
                               ? (isNegative ? "bg-red-200 dark:bg-red-800/50 ring-2 ring-primary" : "bg-accent") 
                               : (isNegative ? "bg-rose-50 dark:bg-rose-950/30" : "hover-elevate")
                           }`}
                           onClick={() => setSelectedRowIndex(index)}
                         >
-                          <td className="px-3 py-2.5 font-medium">
+                          <td className="px-3 font-medium">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
