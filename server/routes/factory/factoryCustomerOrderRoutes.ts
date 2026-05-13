@@ -3825,18 +3825,22 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (!order) return res.status(404).json({ message: "Order not found" });
       if (order.status !== "PENDING_VERIFICATION") return res.status(400).json({ message: "Only PENDING_VERIFICATION orders can be returned to loading" });
 
-      // V5 guard: proformaIdUsed IS NOT NULL
-      // V5 bales are already SOLD at PENDING_VERIFICATION — reversal is not safe without admin
-      // tooling that reverts bale statuses. Block until admin reversal flow is implemented.
-      if (order.proformaIdUsed) {
-        return res.status(400).json({ message: "Reversal from PENDING_VERIFICATION is not supported for V5 orders. Contact admin." });
-      }
-
       const [updated] = await db.update(customerOrders).set({
         status: "LOADING",
         loadingFinalizedAt: null,
         updatedAt: new Date(),
       }).where(eq(customerOrders.id, orderId)).returning();
+
+      // V5 orders: revert bales from SOLD → RESERVED_FOR_ORDER so they can be re-scanned or edited.
+      // Legacy (non-V5) orders keep bales in RESERVED_FOR_ORDER throughout, so no change needed.
+      if (order.proformaIdUsed) {
+        const bales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+        for (const b of bales) {
+          await db.update(factoryBales)
+            .set({ status: "RESERVED_FOR_ORDER", updatedAt: new Date() })
+            .where(and(eq(factoryBales.id, b.baleId), eq(factoryBales.status, "SOLD")));
+        }
+      }
 
       res.json(updated);
     } catch (error: any) {
