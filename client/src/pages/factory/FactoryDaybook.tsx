@@ -1244,6 +1244,9 @@ export default function FactoryDaybook() {
                                   <TableCell className="pl-8 py-2">
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <Badge variant={ev} className={cn(ec, "whitespace-nowrap")}>{formatTxType(entry.txType)}</Badge>
+                                      {entry.optional && (
+                                        <Badge variant="outline" className="text-muted-foreground text-xs" data-testid={`badge-optional-${entry.id}`}>Optional</Badge>
+                                      )}
                                       <span className="text-sm text-muted-foreground truncate max-w-xs" title={formatDaybookDescription(entry)}>
                                         {formatDaybookDescription(entry)}
                                       </span>
