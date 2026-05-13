@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
-import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown, Globe, Eye, Pencil, FileSpreadsheet, MessageCircle, Check } from "lucide-react";
+import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown, Globe, Eye, Pencil, FileSpreadsheet, MessageCircle, Check, Warehouse, TrendingUp, TrendingDown } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
@@ -1635,92 +1635,69 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             onOpenChange={setCreateLocationDialogOpen}
           />
           
-          <Card className="p-4 w-full">
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                placeholder="Search locations by name..."
-                value={locationSearchTerm}
-                onChange={(e) => setLocationSearchTerm(e.target.value)}
-                className="pl-10"
-                data-testid="input-search-locations"
-              />
-            </div>
+          {/* Search */}
+          <div className="relative mb-6">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              placeholder="Search locations..."
+              value={locationSearchTerm}
+              onChange={(e) => setLocationSearchTerm(e.target.value)}
+              className="pl-10"
+              data-testid="input-search-locations"
+            />
+          </div>
 
-            {locationsLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
-            ) : locations.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No locations found. Create a location first.
-              </div>
-            ) : (
-              <div className="rounded-md border overflow-hidden w-full min-w-0">
-                <table className="w-full table-fixed text-sm">
-                  <thead className="bg-muted/50 sticky top-0 z-30">
-                    <tr className="h-12">
-                      <th className="text-left px-3 font-medium">Name</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredLocations.length === 0 ? (
-                      <tr>
-                        <td colSpan={1} className="text-center py-8 text-muted-foreground">
-                          No locations found matching your search
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredLocations.map((location) => (
-                        <tr
-                          key={location.id}
-                          className="border-t hover-elevate cursor-pointer h-12"
-                          onClick={() => handleLocationClick(location)}
-                          data-testid={`row-location-${location.id}`}
-                        >
-                          <td className="px-3 font-medium" data-testid={`name-${location.id}`}>
-                            <div className="flex items-center gap-2 justify-between">
-                              <div className="flex items-center gap-2">
-                                <MapPin className="h-4 w-4 text-muted-foreground" />
-                                {location.name}
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => openRenameDialog(location, e)}
-                                data-testid={`button-rename-location-${location.id}`}
-                                title="Rename location"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              {!posUser && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={(e) => openWaGroupDialog(location, e)}
-                                  data-testid={`button-wa-group-location-${location.id}`}
-                                  title={(location as any).whatsappGroupChatId ? "Change WhatsApp group" : "Set WhatsApp group"}
-                                >
-                                  <MessageCircle className={`h-4 w-4 ${(location as any).whatsappGroupChatId ? "text-green-600 dark:text-green-400" : ""}`} />
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+          {locationsLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}
+            </div>
+          ) : filteredLocations.length === 0 ? (
+            <div className="text-center py-16 text-muted-foreground">
+              {locationSearchTerm ? "No locations match your search." : "No locations found. Create a location first."}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredLocations.map((location) => (
+                <div
+                  key={location.id}
+                  className="bg-card border rounded-xl p-4 cursor-pointer hover-elevate flex items-center gap-4"
+                  onClick={() => handleLocationClick(location)}
+                  data-testid={`row-location-${location.id}`}
+                >
+                  <div className="flex-shrink-0 w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Warehouse className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-base truncate" data-testid={`name-${location.id}`}>{location.name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Tap to view inventory</p>
+                  </div>
+                  <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => openRenameDialog(location, e)}
+                      data-testid={`button-rename-location-${location.id}`}
+                      title="Rename location"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    {!posUser && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => openWaGroupDialog(location, e)}
+                        data-testid={`button-wa-group-location-${location.id}`}
+                        title={(location as any).whatsappGroupChatId ? "Change WhatsApp group" : "Set WhatsApp group"}
+                      >
+                        <MessageCircle className={`h-4 w-4 ${(location as any).whatsappGroupChatId ? "text-green-600 dark:text-green-400" : ""}`} />
+                      </Button>
                     )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {!locationsLoading && filteredLocations.length > 0 && (
-              <div className="mt-4 text-sm text-muted-foreground">
-                Showing {filteredLocations.length} of {locations.length} locations
-              </div>
-            )}
-          </Card>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -1998,31 +1975,39 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       {/* Stock Group List View */}
       {selectedLocationLocal && !selectedGroup && !viewAllItems && (
         <div>
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-6">
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl md:text-3xl font-bold">
-                {selectedLocationLocal.name} - Stock Groups
-              </h1>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => openRenameDialog(selectedLocationLocal, e)}
-                data-testid="button-rename-selected-location"
-                title="Rename location"
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-              {!posUser && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => openWaGroupDialog(selectedLocationLocal, e)}
-                  data-testid="button-wa-group-selected-location"
-                  title={(selectedLocationLocal as any).whatsappGroupChatId ? "Change WhatsApp group" : "Set WhatsApp group"}
-                >
-                  <MessageCircle className={`h-4 w-4 ${(selectedLocationLocal as any).whatsappGroupChatId ? "text-green-600 dark:text-green-400" : ""}`} />
-                </Button>
-              )}
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Warehouse className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl md:text-2xl font-bold leading-tight">
+                    {selectedLocationLocal.name}
+                  </h1>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => openRenameDialog(selectedLocationLocal, e)}
+                    data-testid="button-rename-selected-location"
+                    title="Rename location"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  {!posUser && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => openWaGroupDialog(selectedLocationLocal, e)}
+                      data-testid="button-wa-group-selected-location"
+                      title={(selectedLocationLocal as any).whatsappGroupChatId ? "Change WhatsApp group" : "Set WhatsApp group"}
+                    >
+                      <MessageCircle className={`h-4 w-4 ${(selectedLocationLocal as any).whatsappGroupChatId ? "text-green-600 dark:text-green-400" : ""}`} />
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Stock Groups</p>
+              </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
               {/* Export dropdown */}
@@ -2105,6 +2090,32 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               )}
             </div>
           </div>
+
+          {/* Stats bar */}
+          {!inventoryLoading && stockGroups.length > 0 && (
+            <div className="flex flex-wrap gap-3 mb-4">
+              <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
+                <Layers className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold">{stockGroups.length}</span>
+                <span className="text-xs text-muted-foreground">Groups</span>
+              </div>
+              <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
+                <Package className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold">{stockGroups.reduce((s, g) => s + g.itemCount, 0).toLocaleString()}</span>
+                <span className="text-xs text-muted-foreground">Items</span>
+              </div>
+              <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
+                <span className="text-sm font-semibold font-mono">{Math.floor(stockGroups.reduce((s, g) => s + g.totalQuantity, 0)).toLocaleString()}</span>
+                <span className="text-xs text-muted-foreground">BL total</span>
+              </div>
+              {!posUser && (
+                <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-3 py-2">
+                  <span className="text-sm font-semibold font-mono text-primary">{formatAmount(stockGroups.reduce((s, g) => s + g.totalValue, 0))}</span>
+                  <span className="text-xs text-muted-foreground">total value</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Delete Confirmation Dialog */}
           <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -2313,42 +2324,49 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           return (
                           <tr
                             key={group.groupId || 0}
-                            className={`border-t cursor-pointer h-12 ${isNegative ? "bg-red-100 dark:bg-red-900/30" : "hover-elevate"}`}
+                            className={`border-t cursor-pointer h-14 ${isNegative ? "bg-rose-50 dark:bg-rose-950/30" : "hover-elevate"}`}
                             onClick={() => setSelectedGroup(group)}
                             data-testid={`row-group-desktop-${group.groupId || 'uncategorized'}`}
                           >
                             <td className="px-3 font-medium" data-testid={`name-desktop-${group.groupId}`}>
-                              <div className="flex items-center gap-2">
-                                <Layers className="h-4 w-4 text-muted-foreground" />
-                                {group.groupName}
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                  <Layers className="h-3.5 w-3.5 text-primary" />
+                                </div>
+                                <span>{group.groupName}</span>
                               </div>
                             </td>
                             <td className="px-3 text-right" data-testid={`items-desktop-${group.groupId}`}>
-                              {group.itemCount.toLocaleString()}
+                              <Badge variant="secondary" className="font-mono">
+                                {group.itemCount.toLocaleString()}
+                              </Badge>
                             </td>
                             {showMovement ? (
                               <>
-                                <td className="px-3 text-right font-mono text-muted-foreground">
+                                <td className="px-3 text-right font-mono text-muted-foreground text-sm">
                                   {Math.floor(openingQty).toLocaleString()} BL
                                 </td>
-                                <td className={`px-3 text-right font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>
+                                <td className={`px-3 text-right font-mono font-semibold ${isNegative ? "text-red-600" : ""}`}>
                                   {Math.floor(closingQty).toLocaleString()} BL
                                 </td>
-                                <td className={`px-3 text-right font-mono font-medium ${isMovementNeg ? "text-red-600" : movement > 0 ? "text-green-600" : "text-muted-foreground"}`}>
-                                  {movement > 0 ? "+" : ""}{Math.floor(movement).toLocaleString()} BL
+                                <td className={`px-3 text-right font-mono font-semibold ${isMovementNeg ? "text-red-600" : movement > 0 ? "text-green-600" : "text-muted-foreground"}`}>
+                                  <span className="inline-flex items-center gap-1">
+                                    {movement > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : movement < 0 ? <TrendingDown className="h-3.5 w-3.5" /> : null}
+                                    {movement > 0 ? "+" : ""}{Math.floor(movement).toLocaleString()} BL
+                                  </span>
                                 </td>
                               </>
                             ) : (
-                              <td className={`px-3 text-right font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`} data-testid={`qty-desktop-${group.groupId}`}>
-                                {Math.floor(closingQty).toLocaleString()}<span className="ml-3">BL</span>
+                              <td className={`px-3 text-right font-mono font-semibold ${isNegative ? "text-red-600" : ""}`} data-testid={`qty-desktop-${group.groupId}`}>
+                                {Math.floor(closingQty).toLocaleString()}<span className="ml-2 text-xs font-normal text-muted-foreground">BL</span>
                               </td>
                             )}
                             {!posUser && (
                               <>
-                                <td className="px-3 text-right font-mono" data-testid={`rate-desktop-${group.groupId}`}>
+                                <td className="px-3 text-right font-mono text-sm text-muted-foreground" data-testid={`rate-desktop-${group.groupId}`}>
                                   {formatAmount(group.averageRate)}
                                 </td>
-                                <td className="px-3 text-right font-mono font-medium" data-testid={`value-desktop-${group.groupId}`}>
+                                <td className="px-3 text-right font-mono font-semibold" data-testid={`value-desktop-${group.groupId}`}>
                                   {formatAmount(group.totalValue)}
                                 </td>
                               </>
