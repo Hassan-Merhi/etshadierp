@@ -2283,7 +2283,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                         return (
                                           <TableRow key={`${groupKey}-v-${voucher.id}`} className="bg-muted/20">
                                             <TableCell className="sticky left-0 bg-muted/20 z-10 pl-14 max-w-0 w-full overflow-hidden">
-                                              <div className="truncate text-sm text-foreground" title={vDesc || voucher.voucherNumber}>{vDesc || voucher.voucherNumber}</div>
+                                              <div className="flex items-center gap-2 min-w-0">
+                                                <div className="truncate text-sm text-foreground" title={vDesc || voucher.voucherNumber}>{vDesc || voucher.voucherNumber}</div>
+                                                {voucher.optional && (
+                                                  <Badge variant="outline" className="text-xs text-muted-foreground shrink-0" data-testid={`badge-optional-condensed-${voucher.id}`}>Optional</Badge>
+                                                )}
+                                              </div>
                                             </TableCell>
                                             <TableCell />
                                             {!hideAmounts && (
