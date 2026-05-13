@@ -326,6 +326,11 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
         <div className="flex items-center gap-2 px-3 py-3 border-b">
           <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
           <span className="text-sm font-semibold text-sidebar-foreground">Locations</span>
+          {!locationsLoading && locations.length > 0 && (
+            <Badge variant="secondary" className="ml-auto text-xs px-1.5 py-0">
+              {locations.length}
+            </Badge>
+          )}
         </div>
         <div className="flex-1 overflow-y-auto py-1">
           {locationsLoading ? (
@@ -502,9 +507,12 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
         <div className="flex-1 overflow-auto p-4">
           {!selectedLocationId && !locationsLoading && (
-            <div className="flex flex-col items-center justify-center h-full text-center gap-2 text-muted-foreground">
-              <MapPin className="w-10 h-10 opacity-30" />
-              <p className="text-sm">Select a location to view prices.</p>
+            <div className="flex flex-col items-center justify-center h-full text-center gap-3 text-muted-foreground">
+              <MapPin className="w-12 h-12 opacity-25" />
+              <div>
+                <p className="text-base font-medium">Select a location</p>
+                <p className="text-sm mt-1 opacity-70">Choose a location from the panel on the left to view and edit prices.</p>
+              </div>
             </div>
           )}
 
@@ -516,14 +524,9 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
           )}
 
           {selectedLocationId && isLoading && (
-            <div className="divide-y rounded-md border overflow-hidden">
-              {Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-4 py-3">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-4 flex-1" />
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-4 w-20" />
-                </div>
+            <div className="space-y-2">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className="h-11 w-full" />
               ))}
             </div>
           )}
@@ -538,6 +541,35 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                     No price groups configured. Go to Settings → Price Groups to set up master locations.
                   </AlertDescription>
                 </Alert>
+              )}
+
+              {/* Stats pill bar */}
+              {locationPricedList.length > 0 && (
+                <div className="flex flex-wrap gap-3 mb-4">
+                  <div className="rounded-lg border bg-muted/40 px-4 py-2 flex items-center gap-3">
+                    <Tag className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground leading-none mb-0.5">Total Items</p>
+                      <p className="text-base font-semibold leading-none">{locationPricedList.length}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border bg-muted/40 px-4 py-2 flex items-center gap-3">
+                    <Check className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground leading-none mb-0.5">Priced</p>
+                      <p className="text-base font-semibold leading-none">{locationPricedList.length - unpricedCount}</p>
+                    </div>
+                  </div>
+                  {unpricedCount > 0 && (
+                    <div className="rounded-lg border bg-amber-500/10 border-amber-500/30 px-4 py-2 flex items-center gap-3">
+                      <EyeOff className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <div>
+                        <p className="text-xs text-amber-700 dark:text-amber-400 leading-none mb-0.5">Unpriced</p>
+                        <p className="text-base font-semibold leading-none text-amber-700 dark:text-amber-400">{unpricedCount}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
 
               {filteredItems.length === 0 && !(isAllMode && masters.length === 0) ? (
@@ -560,32 +592,32 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 </div>
               ) : filteredItems.length > 0 ? (
                 <>
-                  <div className="rounded-md border overflow-hidden">
+                  <div className="rounded-xl border overflow-hidden">
                     <Table>
                       <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-28">Code</TableHead>
-                          <TableHead>Item Name</TableHead>
-                          <TableHead className="hidden sm:table-cell">Group</TableHead>
+                        <TableRow className="bg-muted/40 hover:bg-muted/40">
+                          <TableHead className="w-28 text-xs">Code</TableHead>
+                          <TableHead className="text-xs">Item Name</TableHead>
+                          <TableHead className="text-xs hidden sm:table-cell">Group</TableHead>
                           {showCostPrice && (
-                            <TableHead className="text-right hidden sm:table-cell w-32">Cost Price</TableHead>
+                            <TableHead className="text-xs text-right hidden sm:table-cell w-32">Cost Price</TableHead>
                           )}
                           {showCostPrice && (
-                            <TableHead className="text-right hidden sm:table-cell w-32">Offloading Cost</TableHead>
+                            <TableHead className="text-xs text-right hidden sm:table-cell w-32">Offloading Cost</TableHead>
                           )}
 
                           {/* All-mode: one column per master */}
                           {isAllMode && masters.map((m) => (
-                            <TableHead key={m.id} className="text-right w-40">{m.name}</TableHead>
+                            <TableHead key={m.id} className="text-xs text-right w-40">{m.name}</TableHead>
                           ))}
 
                           {/* Single-location mode: one Selling Price column */}
                           {!isAllMode && (
-                            <TableHead className="text-right w-48">Selling Price</TableHead>
+                            <TableHead className="text-xs text-right w-48">Selling Price</TableHead>
                           )}
 
                           {!isAllMode && (
-                            <TableHead className="text-right hidden sm:table-cell w-28">Qty in Stock</TableHead>
+                            <TableHead className="text-xs text-right hidden sm:table-cell w-28">Qty in Stock</TableHead>
                           )}
                         </TableRow>
                       </TableHeader>
@@ -698,7 +730,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                                         {item.sellingPrice ? formatAmount(parseFloat(item.sellingPrice)) : "—"}
                                       </span>
                                       {!item.hasCustomPrice && item.sellingPrice && (
-                                        <Badge variant="outline" className="text-xs hidden sm:inline-flex">base</Badge>
+                                        <Badge variant="secondary" className="text-xs hidden sm:inline-flex">base</Badge>
                                       )}
                                       {canEdit && (
                                         <Pencil className="w-3 h-3 text-muted-foreground opacity-40 md:opacity-0 md:group-hover:opacity-60 transition-opacity shrink-0" />
