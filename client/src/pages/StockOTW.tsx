@@ -2,13 +2,13 @@ import { useState, useMemo, Fragment } from "react";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Package, Search, Ship, AlertCircle, ChevronRight, ChevronDown, Layers } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Package, Search, Ship, AlertCircle, ChevronRight, ChevronDown, Layers, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useLocation, useSearch } from "wouter";
@@ -77,13 +77,11 @@ function StockOTWContent() {
     queryKey: ["/api/suppliers"],
   });
 
-  // Filter only OTW containers
   const otwContainers = useMemo(
     () => containers.filter((c) => c.status === "OTW"),
     [containers],
   );
 
-  // Fetch details for each OTW container using useQueries
   const containerDetailsQueries = useQueries({
     queries: otwContainers.map((container) => ({
       queryKey: [`/api/containers/${container.id}`],
@@ -94,20 +92,16 @@ function StockOTWContent() {
   const isLoadingDetails = containerDetailsQueries.some((q) => q.isLoading);
   const isLoading = loadingContainers || isLoadingDetails;
 
-  // Check for errors
   const hasDetailsErrors = containerDetailsQueries.some((q) => q.error);
   const hasErrors = containersError || suppliersError || hasDetailsErrors;
 
-  // Compile all stock items from OTW containers
   const stockItems: StockItem[] = useMemo(() => {
     const items: StockItem[] = [];
-
     containerDetailsQueries.forEach((query, index) => {
       if (query.data) {
         const containerData = query.data as ContainerDetailData;
         const container = otwContainers[index];
         const supplier = suppliers.find((s) => s.id === container.supplierId);
-
         containerData.pos.forEach((po: any) => {
           po.items.forEach((item: any) => {
             items.push({
@@ -128,19 +122,15 @@ function StockOTWContent() {
         });
       }
     });
-
     return items;
   }, [containerDetailsQueries, otwContainers, suppliers]);
 
-  // Group items by stock item name
   const groupedItems: GroupedStockItem[] = useMemo(() => {
     const grouped = new Map<string, GroupedStockItem>();
-
     stockItems.forEach((item) => {
       const name = item.stockItemName;
       const qty = parseFloat(item.quantity || "0");
       const cost = parseFloat(item.totalCost || "0");
-
       if (!grouped.has(name)) {
         grouped.set(name, {
           stockItemName: name,
@@ -152,20 +142,14 @@ function StockOTWContent() {
           containers: [],
         });
       }
-
       const group = grouped.get(name)!;
-      // Carry first non-null grade/category (stock_item metadata is stable per item name)
       if (!group.gradeName && item.gradeName) group.gradeName = item.gradeName;
       if (!group.categoryName && item.categoryName) group.categoryName = item.categoryName;
-
       group.totalQuantity += isNaN(qty) ? 0 : qty;
       group.totalCost += isNaN(cost) ? 0 : cost;
-
-      // Check if this container already exists in the group
       const existingContainer = group.containers.find(
         (c) => c.containerNumber === item.containerNumber,
       );
-
       const itemRate = parseFloat(item.rate || "0");
       if (existingContainer) {
         existingContainer.quantity += isNaN(qty) ? 0 : qty;
@@ -180,15 +164,12 @@ function StockOTWContent() {
         });
       }
     });
-
     grouped.forEach((group) => {
       group.containerCount = group.containers.length;
     });
-
     return Array.from(grouped.values());
   }, [stockItems]);
 
-  // Derive unique grade/category options from grouped items (only what's present in OTW)
   const gradeOptions = useMemo(() => {
     const seen = new Map<string, string>();
     groupedItems.forEach((item) => {
@@ -205,7 +186,6 @@ function StockOTWContent() {
     return Array.from(seen.values()).sort();
   }, [groupedItems]);
 
-  // Apply search + grade + category filters
   const filteredItems = groupedItems.filter((item) => {
     if (selectedGrade !== "all" && item.gradeName !== selectedGrade) return false;
     if (selectedCategory !== "all" && item.categoryName !== selectedCategory) return false;
@@ -235,37 +215,42 @@ function StockOTWContent() {
     });
   };
 
-  // Calculate totals with NaN protection
   const totalQuantity = filteredItems.reduce((sum, item) => sum + item.totalQuantity, 0);
   const totalValue = filteredItems.reduce((sum, item) => sum + item.totalCost, 0);
   const uniqueItemCount = filteredItems.length;
 
-  // Container-level grand total (matches Container Tracking page) — includes freight, charges, discounts
   const containerGrandTotal = otwContainers.reduce(
     (sum, c) => sum + parseFloat((c as any).grandTotal || "0"),
     0,
   );
-  // When no filters are applied, show the authoritative container grand total so both pages agree.
-  // When filtered, fall back to the item-level partial total.
   const isFiltered = searchTerm.trim() !== "" || selectedGrade !== "all" || selectedCategory !== "all";
   const displayTotal = isFiltered ? totalValue : containerGrandTotal;
 
-  const hasFilters = gradeOptions.length > 0 || categoryOptions.length > 0;
+  const hasActiveFilters = searchTerm !== "" || selectedGrade !== "all" || selectedCategory !== "all";
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setSelectedGrade("all");
+    setSelectedCategory("all");
+  };
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-48 w-full" />
+      <div className="p-3 sm:p-0 space-y-4 sm:space-y-6">
+        <div className="flex flex-wrap gap-3">
+          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-10 w-32 rounded-lg" />)}
+        </div>
+        <Skeleton className="h-10 w-full rounded-md" />
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="p-3 sm:p-0 space-y-4 sm:space-y-6">
-      <div>
-        <PageHeader title="Stock On The Way" subtitle="View all stock items from containers currently in transit" />
-      </div>
+      <PageHeader title="Stock On The Way" subtitle="All stock items from containers currently in transit" />
 
       {hasErrors && (
         <Alert variant="destructive">
@@ -280,50 +265,40 @@ function StockOTWContent() {
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Containers OTW</CardTitle>
-            <Ship className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-containers-count">
+      {/* Stats bar */}
+      {otwContainers.length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          <div className="flex items-center gap-2 bg-blue-500/10 rounded-lg px-3 py-2">
+            <Ship className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <span className="text-sm font-semibold text-blue-700 dark:text-blue-300" data-testid="text-containers-count">
               {otwContainers.length}
-            </div>
-            <p className="text-xs text-muted-foreground">In transit</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+            </span>
+            <span className="text-xs text-muted-foreground">Containers OTW</span>
+          </div>
+          <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
             <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono" data-testid="text-total-items">
-              {uniqueItemCount}
-            </div>
-            <p className="text-xs text-muted-foreground">Unique stock items</p>
-          </CardContent>
-        </Card>
+            <span className="text-sm font-semibold" data-testid="text-total-items">{groupedItems.length}</span>
+            <span className="text-xs text-muted-foreground">Unique Items</span>
+          </div>
+          <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
+            <span className="text-sm font-semibold font-mono" data-testid="text-total-quantity">
+              {Math.round(groupedItems.reduce((s, i) => s + i.totalQuantity, 0)).toLocaleString()}
+            </span>
+            <span className="text-xs text-muted-foreground">Total Qty</span>
+          </div>
+          <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-3 py-2">
+            <span className="text-sm font-semibold font-mono text-primary" data-testid="text-summary-value">
+              {formatAmount(containerGrandTotal)}
+            </span>
+            <span className="text-xs text-muted-foreground">Total Value</span>
+          </div>
+        </div>
+      )}
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Quantity</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono" data-testid="text-total-quantity">
-              {Math.round(totalQuantity).toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground">Total bales/units</p>
-          </CardContent>
-        </Card>
-      </div>
-
+      {/* Inline filter row */}
       {stockItems.length > 0 && (
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1">
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by name, container, supplier, grade or category..."
@@ -334,242 +309,241 @@ function StockOTWContent() {
             />
           </div>
           {gradeOptions.length > 0 && (
-            <select
-              value={selectedGrade}
-              onChange={(e) => setSelectedGrade(e.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-              data-testid="select-grade-filter"
-            >
-              <option value="all">All Grades</option>
-              {gradeOptions.map((g) => (
-                <option key={g} value={g}>{g}</option>
-              ))}
-            </select>
+            <Select value={selectedGrade} onValueChange={setSelectedGrade}>
+              <SelectTrigger className="w-[140px]" data-testid="select-grade-filter">
+                <SelectValue placeholder="All Grades" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Grades</SelectItem>
+                {gradeOptions.map((g) => (
+                  <SelectItem key={g} value={g}>{g}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
           {categoryOptions.length > 0 && (
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-              data-testid="select-category-filter"
-            >
-              <option value="all">All Categories</option>
-              {categoryOptions.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-[150px]" data-testid="select-category-filter">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categoryOptions.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters">
+              <X className="h-4 w-4 mr-1" />
+              Clear
+            </Button>
           )}
         </div>
       )}
 
+      {/* Content */}
       {filteredItems.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Ship className="w-16 h-16 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">No stock on the way</h2>
-            <p className="text-muted-foreground">
-              {stockItems.length === 0
-                ? "There are no containers currently in transit"
-                : "No items match your search criteria"}
-            </p>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-14 h-14 rounded-xl bg-muted/60 flex items-center justify-center mb-4">
+            <Ship className="w-7 h-7 text-muted-foreground" />
+          </div>
+          <h2 className="text-lg font-semibold mb-1">No stock on the way</h2>
+          <p className="text-sm text-muted-foreground">
+            {stockItems.length === 0
+              ? "There are no containers currently in transit"
+              : "No items match your search criteria"}
+          </p>
+        </div>
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Stock Items ({uniqueItemCount})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {/* Desktop table */}
-            <div className="border rounded-md hidden md:block">
-              <Table>
-                <TableHeader className="sticky top-0 z-30 bg-background">
-                  <TableRow>
-                    <TableHead className="w-12"></TableHead>
-                    <TableHead>Item Name</TableHead>
-                    <TableHead className="text-right">Quantity</TableHead>
-                    <TableHead className="text-right">Total Cost</TableHead>
-                    <TableHead>Supplier</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredItems.map((item, index) => {
-                    const isExpanded = expandedItems.has(item.stockItemName);
-                    return (
-                      <Fragment key={item.stockItemName}>
-                        <TableRow
-                          data-testid={`row-item-${index}`}
-                          className="hover-elevate cursor-pointer"
-                          onClick={() => toggleItemExpanded(item.stockItemName)}
-                        >
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              data-testid={`button-expand-${index}`}
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            <div>{item.stockItemName}</div>
+        <>
+          {/* Desktop table — borderless card, full-width */}
+          <div className="hidden md:block border rounded-xl overflow-hidden">
+            <Table>
+              <TableHeader className="bg-muted/40">
+                <TableRow>
+                  <TableHead className="w-10 pl-4"></TableHead>
+                  <TableHead>Item Name</TableHead>
+                  <TableHead className="text-right">Quantity</TableHead>
+                  <TableHead className="text-right">Total Cost</TableHead>
+                  <TableHead>Supplier</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredItems.map((item, index) => {
+                  const isExpanded = expandedItems.has(item.stockItemName);
+                  const uniqueSuppliers = Array.from(new Set(item.containers.map((c) => c.supplierName)));
+                  return (
+                    <Fragment key={item.stockItemName}>
+                      <TableRow
+                        data-testid={`row-item-${index}`}
+                        className="hover-elevate cursor-pointer"
+                        onClick={() => toggleItemExpanded(item.stockItemName)}
+                      >
+                        <TableCell className="pl-4">
+                          <Button variant="ghost" size="icon" data-testid={`button-expand-${index}`}>
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          <div>{item.stockItemName}</div>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {item.gradeName && (
+                              <Badge variant="outline" className="text-xs" data-testid={`grade-${index}`}>
+                                {item.gradeName}
+                              </Badge>
+                            )}
+                            {item.categoryName && (
+                              <Badge variant="secondary" className="text-xs" data-testid={`category-${index}`}>
+                                {item.categoryName}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {item.containerCount} container{item.containerCount !== 1 ? "s" : ""}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-semibold">
+                          {Math.round(item.totalQuantity).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatAmount(item.totalCost)}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {uniqueSuppliers.length === 1
+                            ? uniqueSuppliers[0]
+                            : `${uniqueSuppliers[0]} +${uniqueSuppliers.length - 1}`}
+                        </TableCell>
+                      </TableRow>
+                      {isExpanded &&
+                        item.containers.map((container, containerIndex) => (
+                          <TableRow
+                            key={`${item.stockItemName}-${containerIndex}`}
+                            className="bg-muted/30"
+                            data-testid={`row-container-${index}-${containerIndex}`}
+                          >
+                            <TableCell className="pl-4"></TableCell>
+                            <TableCell className="pl-10 text-sm">
+                              <span className="font-mono text-foreground">{container.containerNumber}</span>
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              {Math.round(container.quantity).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              {formatAmount(container.rate)}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{container.supplierName}</TableCell>
+                          </TableRow>
+                        ))}
+                    </Fragment>
+                  );
+                })}
+              </TableBody>
+              <TableFooter className="bg-muted/40">
+                <TableRow className="font-semibold">
+                  <TableCell className="pl-4"></TableCell>
+                  <TableCell>Total ({uniqueItemCount} items)</TableCell>
+                  <TableCell className="text-right font-mono" data-testid="text-summary-quantity">
+                    {Math.round(totalQuantity).toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-right font-mono" data-testid="text-summary-value">
+                    {formatAmount(displayTotal)}
+                  </TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-2">
+            {filteredItems.map((item, index) => {
+              const isExpanded = expandedItems.has(item.stockItemName);
+              const uniqueSuppliers = Array.from(new Set(item.containers.map((c) => c.supplierName)));
+              return (
+                <div key={item.stockItemName} data-testid={`row-item-${index}`}>
+                  <div
+                    className="bg-card border rounded-xl p-4 cursor-pointer hover-elevate"
+                    onClick={() => toggleItemExpanded(item.stockItemName)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        )}
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm">{item.stockItemName}</div>
+                          {(item.gradeName || item.categoryName) && (
                             <div className="flex flex-wrap gap-1 mt-1">
                               {item.gradeName && (
-                                <Badge variant="outline" className="text-xs" data-testid={`grade-${index}`}>
+                                <Badge variant="outline" className="text-xs" data-testid={`grade-mobile-${index}`}>
                                   {item.gradeName}
                                 </Badge>
                               )}
                               {item.categoryName && (
-                                <Badge variant="secondary" className="text-xs" data-testid={`category-${index}`}>
+                                <Badge variant="secondary" className="text-xs" data-testid={`category-mobile-${index}`}>
                                   {item.categoryName}
                                 </Badge>
                               )}
                             </div>
-                            <div className="text-xs text-muted-foreground mt-0.5">
-                              {item.containerCount} container{item.containerCount !== 1 ? "s" : ""}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-semibold">
-                            {Math.round(item.totalQuantity).toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatAmount(item.totalCost)}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {(() => {
-                              const uniqueSuppliers = Array.from(
-                                new Set(item.containers.map((c) => c.supplierName)),
-                              );
-                              if (uniqueSuppliers.length === 1) return uniqueSuppliers[0];
-                              return `${uniqueSuppliers[0]} +${uniqueSuppliers.length - 1}`;
-                            })()}
-                          </TableCell>
-                        </TableRow>
-                        {isExpanded &&
-                          item.containers.map((container, containerIndex) => (
-                            <TableRow
-                              key={`${item.stockItemName}-${containerIndex}`}
-                              className="bg-muted/30"
-                              data-testid={`row-container-${index}-${containerIndex}`}
-                            >
-                              <TableCell></TableCell>
-                              <TableCell className="pl-8 text-sm text-muted-foreground">
-                                {container.containerNumber}
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-sm">
-                                {Math.round(container.quantity).toLocaleString()}
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-sm">
-                                {formatAmount(container.rate)}
-                              </TableCell>
-                              <TableCell className="text-sm">{container.supplierName}</TableCell>
-                            </TableRow>
-                          ))}
-                      </Fragment>
-                    );
-                  })}
-                </TableBody>
-                <TableFooter className="sticky bottom-0 z-10 bg-background border-t">
-                  <TableRow className="font-semibold">
-                    <TableCell></TableCell>
-                    <TableCell>Total</TableCell>
-                    <TableCell className="text-right font-mono" data-testid="text-summary-quantity">
-                      {Math.round(totalQuantity).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right font-mono" data-testid="text-summary-value">
-                      {formatAmount(displayTotal)}
-                    </TableCell>
-                    <TableCell></TableCell>
-                  </TableRow>
-                </TableFooter>
-              </Table>
-            </div>
-
-            {/* Mobile cards */}
-            <div className="md:hidden space-y-2">
-              {filteredItems.map((item, index) => {
-                const isExpanded = expandedItems.has(item.stockItemName);
-                const uniqueSuppliers = Array.from(
-                  new Set(item.containers.map((c) => c.supplierName)),
-                );
-                return (
-                  <div key={item.stockItemName} data-testid={`row-item-${index}`}>
-                    <div
-                      className="p-3 rounded-md border cursor-pointer hover-elevate"
-                      onClick={() => toggleItemExpanded(item.stockItemName)}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          {isExpanded ? (
-                            <ChevronDown className="h-4 w-4 shrink-0" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4 shrink-0" />
                           )}
-                          <div className="min-w-0">
-                            <div className="font-medium text-sm truncate">{item.stockItemName}</div>
-                            {(item.gradeName || item.categoryName) && (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {item.gradeName && (
-                                  <Badge variant="outline" className="text-xs" data-testid={`grade-mobile-${index}`}>
-                                    {item.gradeName}
-                                  </Badge>
-                                )}
-                                {item.categoryName && (
-                                  <Badge variant="secondary" className="text-xs" data-testid={`category-mobile-${index}`}>
-                                    {item.categoryName}
-                                  </Badge>
-                                )}
-                              </div>
-                            )}
-                            <div className="text-xs text-muted-foreground mt-0.5">
-                              {item.containerCount} container{item.containerCount !== 1 ? "s" : ""} |{" "}
-                              {uniqueSuppliers.length === 1
-                                ? uniqueSuppliers[0]
-                                : `${uniqueSuppliers[0]} +${uniqueSuppliers.length - 1}`}
-                            </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {item.containerCount} container{item.containerCount !== 1 ? "s" : ""} ·{" "}
+                            {uniqueSuppliers.length === 1
+                              ? uniqueSuppliers[0]
+                              : `${uniqueSuppliers[0]} +${uniqueSuppliers.length - 1}`}
                           </div>
                         </div>
                       </div>
-                      <div className="flex justify-between mt-2 text-sm pl-6">
-                        <span className="text-muted-foreground">
-                          Qty:{" "}
-                          <span className="font-mono font-semibold text-foreground">
-                            {Math.round(item.totalQuantity).toLocaleString()}
-                          </span>
-                        </span>
-                        <span className="font-mono">{formatAmount(item.totalCost)}</span>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-mono font-semibold">{formatAmount(item.totalCost)}</p>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          {Math.round(item.totalQuantity).toLocaleString()} units
+                        </p>
                       </div>
                     </div>
-                    {isExpanded && (
-                      <div className="ml-6 mt-1 space-y-1">
-                        {item.containers.map((container, containerIndex) => (
-                          <div
-                            key={containerIndex}
-                            className="p-2 rounded-md bg-muted/30 text-xs flex justify-between"
-                            data-testid={`row-container-${index}-${containerIndex}`}
-                          >
-                            <div>
-                              <span className="text-muted-foreground">{container.containerNumber}</span>
-                              <span className="ml-2">{container.supplierName}</span>
-                            </div>
-                            <div className="font-mono">
-                              {Math.round(container.quantity).toLocaleString()} | {formatAmount(container.cost)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
-                );
-              })}
+                  {isExpanded && (
+                    <div className="ml-4 mt-1 space-y-1">
+                      {item.containers.map((container, containerIndex) => (
+                        <div
+                          key={containerIndex}
+                          className="px-4 py-2 rounded-lg bg-muted/40 text-xs flex justify-between items-center"
+                          data-testid={`row-container-${index}-${containerIndex}`}
+                        >
+                          <div>
+                            <span className="font-mono font-medium">{container.containerNumber}</span>
+                            <span className="ml-2 text-muted-foreground">{container.supplierName}</span>
+                          </div>
+                          <div className="font-mono text-right">
+                            <span>{Math.round(container.quantity).toLocaleString()}</span>
+                            <span className="text-muted-foreground mx-1">·</span>
+                            <span>{formatAmount(container.cost)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {/* Mobile total row */}
+            <div className="bg-muted/40 rounded-xl px-4 py-3 flex justify-between items-center">
+              <span className="text-sm font-semibold">Total ({uniqueItemCount} items)</span>
+              <div className="text-right">
+                <p className="text-sm font-mono font-semibold">{formatAmount(displayTotal)}</p>
+                <p className="text-xs text-muted-foreground font-mono">{Math.round(totalQuantity).toLocaleString()} units</p>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </>
       )}
     </div>
   );
@@ -587,29 +561,27 @@ export default function StockOTW() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-1 px-3 sm:px-6 pt-3 sm:pt-6 pb-0">
-        <div className="flex items-center gap-1 rounded-md border p-1">
-          <Button
-            size="sm"
-            variant={activeTab === "otw" ? "secondary" : "ghost"}
-            onClick={() => switchTab("otw")}
-            data-testid="tab-stock-otw"
-          >
-            <Ship className="h-3.5 w-3.5 mr-1.5" />
-            Stock OTW
-          </Button>
-          <Button
-            size="sm"
-            variant={activeTab === "combined" ? "secondary" : "ghost"}
-            onClick={() => switchTab("combined")}
-            data-testid="tab-combined-inventory"
-          >
-            <Layers className="h-3.5 w-3.5 mr-1.5" />
-            Combined
-          </Button>
-        </div>
+      <div className="flex items-center gap-2 px-3 sm:px-6 pt-3 sm:pt-6 pb-0">
+        <Button
+          size="sm"
+          variant={activeTab === "otw" ? "default" : "outline"}
+          onClick={() => switchTab("otw")}
+          data-testid="tab-stock-otw"
+        >
+          <Ship className="h-3.5 w-3.5 mr-1.5" />
+          Stock OTW
+        </Button>
+        <Button
+          size="sm"
+          variant={activeTab === "combined" ? "default" : "outline"}
+          onClick={() => switchTab("combined")}
+          data-testid="tab-combined-inventory"
+        >
+          <Layers className="h-3.5 w-3.5 mr-1.5" />
+          Combined
+        </Button>
       </div>
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="flex-1 min-h-0 overflow-auto px-3 sm:px-6 pt-4 sm:pt-6">
         {activeTab === "combined" ? <CombinedInventory /> : <StockOTWContent />}
       </div>
     </div>
