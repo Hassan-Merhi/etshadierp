@@ -717,9 +717,16 @@ export default function FactoryWorkers() {
                               data-testid={`dot-docs-${worker.id}`}
                             />
                           </div>
-                          <span className="font-medium text-sm" data-testid={`text-name-${worker.id}`}>
-                            {worker.fullName}
-                          </span>
+                          <div className="flex flex-col min-w-0">
+                            {worker.employeeCode && (
+                              <span className="text-xs font-mono text-muted-foreground leading-tight" data-testid={`text-code-${worker.id}`}>
+                                {worker.employeeCode}
+                              </span>
+                            )}
+                            <span className="font-medium text-sm leading-tight" data-testid={`text-name-${worker.id}`}>
+                              {worker.fullName}
+                            </span>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="py-3 text-sm text-muted-foreground">
