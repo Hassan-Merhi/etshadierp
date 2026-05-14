@@ -1198,117 +1198,107 @@ export default function FactoryDaybook() {
             </div>
           ) : !isDetailed ? (
             /* ── CONDENSED VIEW ── */
-            <div className="overflow-x-auto" style={{ width: "calc(100% + 2rem)", margin: "0 -1rem" }}>
-              {(() => {
+            <div className="w-full">
+              {/* Header row */}
+              <div className={cn(
+                "sticky top-0 z-30 bg-background border-b grid w-full px-4 py-2",
+                showAmounts ? "grid-cols-[1fr_160px]" : "grid-cols-[1fr]",
+              )}>
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Date</span>
+                {showAmounts && <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-right">Amount</span>}
+              </div>
+              {/* Data rows */}
+              {condensedRows.map((row) => {
+                const isExpanded = expandedRowKey === row.key;
+                const expandedEntries = isExpanded ? getEntriesForCondensedRow(row.key) : [];
+                const { variant: bv, className: bc } = getFactoryTxTypeBadge(row.txType);
                 return (
-                  <Table className="w-full table-fixed" style={{ minWidth: "100%" }}>
-                    <colgroup>
-                      <col style={{ width: "75%" }} />
-                      {showAmounts && <col style={{ width: "25%" }} />}
-                      <col style={{ width: "0" }} />
-                    </colgroup>
-                    <TableHeader className="sticky top-0 z-30 bg-background">
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        {showAmounts && <TableHead className="text-right whitespace-nowrap">Amount</TableHead>}
-                        <TableHead className="w-0 p-0"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {condensedRows.map((row) => {
-                        const isExpanded = expandedRowKey === row.key;
-                        const expandedEntries = isExpanded ? getEntriesForCondensedRow(row.key) : [];
-                        const { variant: bv, className: bc } = getFactoryTxTypeBadge(row.txType);
-                        return (
-                          <tbody key={row.key}>
-                            <TableRow
-                              data-testid={`row-condensed-${row.date}-${row.txType}`}
-                              onClick={() => setExpandedRowKey(isExpanded ? null : row.key)}
-                              className="cursor-pointer hover-elevate"
-                            >
-                              <TableCell className="whitespace-nowrap py-4">
-                                <div className="flex items-center gap-2">
-                                  {isExpanded ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
-                                  <div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium text-sm">{formatDisplayDate(row.date + "T00:00:00")}</span>
-                                      <Badge variant={bv} className={cn(bc, "whitespace-nowrap")}>{formatTxType(row.txType)}</Badge>
-                                    </div>
-                                    <div className="text-xs text-muted-foreground font-mono mt-0.5">{row.count} {row.count === 1 ? "entry" : "entries"}</div>
-                                  </div>
-                                </div>
-                              </TableCell>
-                              {showAmounts && (
-                                <TableCell className="py-4 text-right">
-                                  <div className="font-mono font-semibold">{currencySymbol(row.currencyCode)}{formatNumber(row.totalAmountCurrency)}</div>
-                                  {row.currencyCode !== "USD" && (
-                                    <div className="text-xs text-muted-foreground font-mono mt-0.5">{row.currencyCode}</div>
-                                  )}
-                                </TableCell>
-                              )}
-                              <TableCell className="w-0 p-0" />
-                            </TableRow>
-                            {isExpanded && expandedEntries.map((entry) => {
-                              const isBaleTransfer = entry.txType === "BALE_TRANSFER";
-                              const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
-                              const canEdit = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId && entry.txType !== "BALE_STOCK_ENTRY";
-                              const { variant: ev, className: ec } = getFactoryTxTypeBadge(entry.txType);
-                              return (
-                                <TableRow
-                                  key={entry.id}
-                                  data-testid={`row-expanded-${entry.id}`}
-                                  className={`bg-muted/30 ${isBaleTransfer ? "cursor-pointer" : ""}`}
-                                  onClick={isBaleTransfer ? (e) => handleEntryClick(entry, e) : undefined}
-                                >
-                                  <TableCell className="pl-8 py-2">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <Badge variant={ev} className={cn(ec, "whitespace-nowrap")}>{formatTxType(entry.txType)}</Badge>
-                                      {entry.optional && (
-                                        <Badge variant="outline" className="text-muted-foreground text-xs" data-testid={`badge-optional-${entry.id}`}>Optional</Badge>
-                                      )}
-                                      <span className="text-sm text-muted-foreground truncate max-w-xs" title={formatDaybookDescription(entry)}>
-                                        {formatDaybookDescription(entry)}
-                                      </span>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="py-2 text-right font-mono font-medium">
-                                    {showAmounts ? `${currencySymbol(entry.currencyCode)}${formatNumber(parseFloat(entry.amountCurrency))}` : "—"}
-                                  </TableCell>
-                                  {false && (
-                                    <TableCell className="py-2 text-right font-mono text-muted-foreground">
-                                      {entry.currencyCode === "USD" ? "-" : entry.fxRateToUsd ? parseFloat(entry.fxRateToUsd).toFixed(4) : "-"}
-                                    </TableCell>
-                                  )}
-                                  <TableCell className="py-2">
-                                    <div className="flex gap-1">
-                                      <Button size="icon" variant="ghost" title="View details"
-                                        onClick={(e) => { e.stopPropagation(); setViewEntry(entry); }}
-                                        data-testid={`button-view-${entry.id}`}
-                                      ><Eye className="h-3 w-3" /></Button>
-                                      {canEdit && (
-                                        <Button size="icon" variant="ghost" title="Edit"
-                                          onClick={(e) => { e.stopPropagation(); editSourceRecord(entry); }}
-                                          data-testid={`button-edit-source-${entry.id}`}
-                                        ><ExternalLink className="h-3 w-3" /></Button>
-                                      )}
-                                      {isAdminOrOwner && isVoucherBacked && ["PAYMENT", "RECEIPT", "JOURNAL"].includes(entry.txType) && (
-                                        <Button size="icon" variant="ghost" title="Void"
-                                          onClick={(e) => { e.stopPropagation(); setVoidEntry(entry); }}
-                                          data-testid={`button-void-voucher-${entry.id}`}
-                                        ><Trash2 className="h-3 w-3" /></Button>
-                                      )}
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </tbody>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                  <div key={row.key} className="w-full border-b last:border-b-0">
+                    {/* Group header row */}
+                    <div
+                      data-testid={`row-condensed-${row.date}-${row.txType}`}
+                      onClick={() => setExpandedRowKey(isExpanded ? null : row.key)}
+                      className={cn(
+                        "grid w-full px-4 py-3 cursor-pointer hover-elevate items-center",
+                        showAmounts ? "grid-cols-[1fr_160px]" : "grid-cols-[1fr]",
+                      )}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {isExpanded
+                          ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-sm whitespace-nowrap">{formatDisplayDate(row.date + "T00:00:00")}</span>
+                            <Badge variant={bv} className={cn(bc, "whitespace-nowrap")}>{formatTxType(row.txType)}</Badge>
+                          </div>
+                          <div className="text-xs text-muted-foreground font-mono mt-0.5">{row.count} {row.count === 1 ? "entry" : "entries"}</div>
+                        </div>
+                      </div>
+                      {showAmounts && (
+                        <div className="text-right">
+                          <div className="font-mono font-semibold text-sm">{currencySymbol(row.currencyCode)}{formatNumber(row.totalAmountCurrency)}</div>
+                          {row.currencyCode !== "USD" && (
+                            <div className="text-xs text-muted-foreground font-mono">{row.currencyCode}</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {/* Expanded sub-rows */}
+                    {isExpanded && expandedEntries.map((entry) => {
+                      const isBaleTransfer = entry.txType === "BALE_TRANSFER";
+                      const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
+                      const canEdit = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId && entry.txType !== "BALE_STOCK_ENTRY";
+                      const { variant: ev, className: ec } = getFactoryTxTypeBadge(entry.txType);
+                      return (
+                        <div
+                          key={entry.id}
+                          data-testid={`row-expanded-${entry.id}`}
+                          onClick={isBaleTransfer ? (e) => handleEntryClick(entry, e) : undefined}
+                          className={cn(
+                            "grid w-full pl-10 pr-4 py-2 bg-muted/30 border-t items-center",
+                            showAmounts ? "grid-cols-[1fr_160px]" : "grid-cols-[1fr]",
+                            isBaleTransfer && "cursor-pointer",
+                          )}
+                        >
+                          <div className="flex items-center gap-2 flex-wrap min-w-0">
+                            <Badge variant={ev} className={cn(ec, "whitespace-nowrap")}>{formatTxType(entry.txType)}</Badge>
+                            {entry.optional && (
+                              <Badge variant="outline" className="text-muted-foreground text-xs" data-testid={`badge-optional-${entry.id}`}>Optional</Badge>
+                            )}
+                            <span className="text-sm text-muted-foreground truncate" title={formatDaybookDescription(entry)}>
+                              {formatDaybookDescription(entry)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-end gap-1">
+                            {showAmounts && (
+                              <span className="font-mono font-medium text-sm">
+                                {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency))}
+                              </span>
+                            )}
+                            <Button size="icon" variant="ghost" title="View details"
+                              onClick={(e) => { e.stopPropagation(); setViewEntry(entry); }}
+                              data-testid={`button-view-${entry.id}`}
+                            ><Eye className="h-3 w-3" /></Button>
+                            {canEdit && (
+                              <Button size="icon" variant="ghost" title="Edit"
+                                onClick={(e) => { e.stopPropagation(); editSourceRecord(entry); }}
+                                data-testid={`button-edit-source-${entry.id}`}
+                              ><ExternalLink className="h-3 w-3" /></Button>
+                            )}
+                            {isAdminOrOwner && isVoucherBacked && ["PAYMENT", "RECEIPT", "JOURNAL"].includes(entry.txType) && (
+                              <Button size="icon" variant="ghost" title="Void"
+                                onClick={(e) => { e.stopPropagation(); setVoidEntry(entry); }}
+                                data-testid={`button-void-voucher-${entry.id}`}
+                              ><Trash2 className="h-3 w-3" /></Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 );
-              })()}
+              })}
             </div>
           ) : (
             /* ── DETAILED VIEW ── */
