@@ -751,11 +751,12 @@ async function trackOneContainer(
   // Fetch the current ETA from the DB so we can preserve it if the provider
   // returns nothing — we never want to blank an existing ETA.
   const [currentRow] = await db
-    .select({ eta: containers.eta })
+    .select({ eta: containers.eta, trackingLastCheckedAt: containers.trackingLastCheckedAt })
     .from(containers)
     .where(eq(containers.id, containerId))
     .limit(1);
   const currentEta: string | null = currentRow?.eta ?? null;
+  const lastCheckedAt: Date | null = currentRow?.trackingLastCheckedAt ?? null;
 
   // Guard: reject invalid container numbers before any API call
   if (!isValidContainerNumber(containerNumber)) {
@@ -944,14 +945,29 @@ async function trackViaParcelsApp(
   // Maersk.com tracks CAJU containers when operator=MAEU, so include it here so
   // maersk_direct and maersk_public are attempted before falling back to CMA/ParcelsApp.
   const MAERSK_PREFIXES = /^(MAEU|MSKU|MRKU|MRSU|HASU|HJSC|HJCU|SUDU|SAFM|CAJU)/i;
+
+  // 6-hour ETA cache: if we already have a good ETA and checked < 6 h ago, skip both
+  // Maersk providers entirely. The scheduler already enforces intervals, but this
+  // in-process guard prevents redundant calls when trackOneContainer is invoked directly.
+  const SIX_HOURS_MS = 6 * 60 * 60 * 1_000;
+  if (
+    MAERSK_PREFIXES.test(containerNumber) &&
+    currentEta &&
+    lastCheckedAt &&
+    now.getTime() - lastCheckedAt.getTime() < SIX_HOURS_MS
+  ) {
+    console.log(`[ContainerTracking] ${containerNumber}: Maersk ETA cached (${currentEta}) checked ${Math.round((now.getTime() - lastCheckedAt.getTime()) / 60000)}min ago — skipping providers`);
+    return { success: true, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: lastCheckedAt, error: null };
+  }
+
   if (isMaerskDirectScraperAvailable() && MAERSK_PREFIXES.test(containerNumber)) {
     ep(containerId, "Maersk Puppeteer", "running");
-    console.log(`[ContainerTracking] ${containerNumber}: trying Maersk direct scraper...`);
+    console.log(`[ContainerTracking] ${containerNumber}: trying Maersk scraper...`);
     const mdResult = await scrapeMaerskDirect(containerNumber);
 
     await saveTrackingCheck(
       containerId,
-      "maersk_direct",
+      "maersk_scraper",
       mdResult.success ? "success" : mdResult.blocked ? "blocked" : "error",
       mdResult.error ?? null,
       mdResult.raw ?? null,
@@ -965,7 +981,7 @@ async function trackViaParcelsApp(
         trackingLastDescription: mdResult.latestDescription,
         trackingError: null,
         trackingChangedAt: now,
-        trackingProvider: "maersk_direct",
+        trackingProvider: "maersk_scraper",
         trackingDetectedCarrier: detectedCarrier,
         trackingFallbackUsed: !!fallbackReason,
         trackingFallbackReason: fallbackReason,
@@ -982,13 +998,13 @@ async function trackViaParcelsApp(
           mdResult.events,
           currentEta,
         ));
-        logEtaResolution(containerNumber, "maersk_direct", currentEta, mdResult.eta ?? null, finalEta, etaSrc);
+        logEtaResolution(containerNumber, "maersk_scraper", currentEta, mdResult.eta ?? null, finalEta, etaSrc);
         if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
 
         await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
         await logAndConfirmEta(
-          containerId, containerNumber, currentEta, finalEta ?? null, etaSrc ?? null, "maersk_direct",
-          !finalEta ? "no ETA from maersk_direct" : undefined,
+          containerId, containerNumber, currentEta, finalEta ?? null, etaSrc ?? null, "maersk_scraper",
+          !finalEta ? "no ETA from maersk_scraper" : undefined,
         );
 
         // Persist tracking events
@@ -1014,7 +1030,7 @@ async function trackViaParcelsApp(
       }
 
       ep(containerId, "Maersk Puppeteer", "success", mdResult.latestStatus ?? "got data");
-      console.log(`[ContainerTracking] ${containerNumber} → maersk_direct: status=${mdResult.latestStatus ?? "?"}`);
+      console.log(`[ContainerTracking] ${containerNumber} → maersk_scraper: status=${mdResult.latestStatus ?? "?"}`);
       if (finalEta || currentEta) {
         // ETA is known (new from provider or already in DB) — full success, stop here
         return {
@@ -1027,10 +1043,10 @@ async function trackViaParcelsApp(
         };
       }
       // Status/events saved but no ETA anywhere — continue to Maersk public / ParcelsApp for ETA
-      console.log(`[ContainerTracking] ${containerNumber}: maersk_direct got status/events but no ETA — continuing to Maersk public / ParcelsApp for ETA`);
+      console.log(`[ContainerTracking] ${containerNumber}: maersk_scraper got status/events but no ETA — continuing to Maersk public for ETA`);
     } else {
       ep(containerId, "Maersk Puppeteer", "fail", mdResult.error ?? "no data");
-      console.log(`[ContainerTracking] ${containerNumber}: maersk_direct got no data (${mdResult.error}) — trying Maersk public HTTP...`);
+      console.log(`[ContainerTracking] ${containerNumber}: maersk_scraper got no data (${mdResult.error}) — trying Maersk public HTTP...`);
     }
   } else if (MAERSK_PREFIXES.test(containerNumber) && !isMaerskDirectScraperAvailable()) {
     ep(containerId, "Maersk Puppeteer", "skip", "Chrome not available in this environment");
@@ -1106,11 +1122,22 @@ async function trackViaParcelsApp(
       // Status/events saved but no ETA anywhere — continue to ParcelsApp to try to get one
       console.log(`[ContainerTracking] ${containerNumber}: maersk_public got status/events but no ETA — continuing to ParcelsApp for ETA`);
     } else if (mpResult.error === "rate_limited") {
-      ep(containerId, "Maersk public HTTP", "skip", "rate-limited — 20 min cooldown");
+      ep(containerId, "Maersk public HTTP", "skip", "rate-limited — 6 h cooldown");
     } else {
       ep(containerId, "Maersk public HTTP", "fail", mpResult.error ?? "no data");
-      console.log(`[ContainerTracking] ${containerNumber}: maersk_public got no data (${mpResult.error}) — trying ParcelsApp...`);
+      console.log(`[ContainerTracking] ${containerNumber}: maersk_public got no data (${mpResult.error})`);
     }
+  }
+
+  // Maersk guard: NEVER fall through to ParcelsApp/generic scrapers for Maersk containers.
+  // ParcelsApp has stale/unreliable data for Maersk and risks clobbering correct ETAs.
+  // Both dedicated Maersk providers have been tried above — stop here and preserve state.
+  if (MAERSK_PREFIXES.test(containerNumber)) {
+    console.log(`[ContainerTracking] ${containerNumber}: Maersk chain exhausted — preserving ETA=${currentEta ?? "none"}`);
+    await db.update(containers)
+      .set({ trackingLastCheckedAt: now } as any)
+      .where(eq(containers.id, containerId));
+    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: "maersk_providers_unavailable" };
   }
 
   // ── CMA provider chain ────────────────────────────────────────────────────────

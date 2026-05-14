@@ -363,7 +363,7 @@ const API_WAIT_MS        = 20_000;
 
 const emptyResult = (containerNumber: string, error: string): CarrierTrackResult => ({
   success: false,
-  provider: "maersk_direct",
+  provider: "maersk_scraper",
   carrier: "MAERSK",
   containerNumber,
   latestStatus: null,
@@ -498,7 +498,7 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
         );
         return {
           success: true,
-          provider: "maersk_direct",
+          provider: "maersk_scraper",
           carrier: "MAERSK",
           containerNumber,
           latestStatus: status,
@@ -535,7 +535,7 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
         const latestActual = events.find((e) => e.date && e.date <= new Date()) ?? latest;
         return {
           success: true,
-          provider: "maersk_direct",
+          provider: "maersk_scraper",
           carrier: "MAERSK",
           containerNumber,
           latestStatus: ndStatus ?? latestActual?.status ?? latest?.status ?? null,
@@ -596,7 +596,7 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
         : [];
       return {
         success: true,
-        provider: "maersk_direct",
+        provider: "maersk_scraper",
         carrier: "MAERSK",
         containerNumber,
         latestStatus: status,

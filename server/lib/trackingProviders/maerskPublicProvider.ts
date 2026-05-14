@@ -19,7 +19,7 @@ const BROWSER_UA =
 const PUBLIC_BASE     = "https://www.maersk.com/api/tracking";
 const PUBLIC_PAGE     = "https://www.maersk.com/tracking";
 const TIMEOUT_MS      = 12_000;
-const RATE_LIMIT_MS   = 20 * 60 * 1_000;   // 20 min (was 60 min)
+const RATE_LIMIT_MS   = 6 * 60 * 60 * 1_000;   // 6 hours
 
 const _lastAttempt = new Map<string, number>();
 
