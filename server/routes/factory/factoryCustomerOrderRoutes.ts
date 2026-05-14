@@ -3823,13 +3823,23 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const [order] = await db.select().from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
-      if (order.status !== "PENDING_VERIFICATION") return res.status(400).json({ message: "Only PENDING_VERIFICATION orders can be returned to loading" });
+      if (!["PENDING_VERIFICATION", "VERIFIED"].includes(order.status)) return res.status(400).json({ message: "Only PENDING_VERIFICATION or VERIFIED orders can be returned to loading" });
 
       const [updated] = await db.update(customerOrders).set({
         status: "LOADING",
         loadingFinalizedAt: null,
+        verifiedAt: null,
         updatedAt: new Date(),
       }).where(eq(customerOrders.id, orderId)).returning();
+
+      // If the order was already VERIFIED, reverse the verification daybook entry.
+      if (order.status === "VERIFIED") {
+        await db.delete(factoryDaybookEntries).where(and(
+          eq(factoryDaybookEntries.companyId, companyId),
+          eq(factoryDaybookEntries.txType, "ORDER_VERIFIED"),
+          eq(factoryDaybookEntries.referenceId, orderId)
+        ));
+      }
 
       // V5 orders: revert bales from SOLD → RESERVED_FOR_ORDER so they can be re-scanned or edited.
       // Legacy (non-V5) orders keep bales in RESERVED_FOR_ORDER throughout, so no change needed.
