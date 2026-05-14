@@ -1312,6 +1312,8 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const [companyFilter, setCompanyFilter] = useState("ALL");
   const [transporterFilter, setTransporterFilter] = useState("ALL");
   const [agentFilter, setAgentFilter] = useState("ALL");
+  const [truckFilter, setTruckFilter] = useState("ALL");
+  const [locationFilter, setLocationFilter] = useState("ALL");
   const [docsFilter, setDocsFilter] = useState("ALL");
   const [delayedFilter, setDelayedFilter] = useState("ALL");
   const [search, setSearch] = useState("");
@@ -1423,6 +1425,8 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
       if (companyFilter !== "ALL" && c.companyName !== companyFilter) return false;
       if (transporterFilter !== "ALL" && c.transporter !== transporterFilter) return false;
       if (agentFilter !== "ALL" && c.agent !== agentFilter) return false;
+      if (truckFilter !== "ALL" && (c.numberPlate ?? "") !== truckFilter) return false;
+      if (locationFilter !== "ALL" && (c.trackingLocation ?? "") !== locationFilter) return false;
       if (docsFilter === "MISSING" && c.docReceived) return false;
       if (docsFilter === "RECEIVED" && !c.docReceived) return false;
       if (delayedFilter === "YES" && !(c.daysDelayed && c.daysDelayed > 0)) return false;
@@ -1445,7 +1449,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
       if (sh !== 0) return sh;
       return a.containerNumber.localeCompare(b.containerNumber);
     });
-  }, [allContainers, companyFilter, transporterFilter, agentFilter, docsFilter, delayedFilter, search]);
+  }, [allContainers, companyFilter, transporterFilter, agentFilter, truckFilter, locationFilter, docsFilter, delayedFilter, search]);
 
   // Summary stats (always over all loaded active containers)
   const atSea          = allContainers.filter((c) => c.status === "OTW" || c.status === "Sea").length;
@@ -1462,6 +1466,8 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const companies   = [...new Set(allContainers.map((c) => c.companyName))].sort();
   const transporters = [...new Set(allContainers.map((c) => c.transporter).filter(Boolean))].sort() as string[];
   const agents      = [...new Set(allContainers.map((c) => c.agent).filter(Boolean))].sort() as string[];
+  const trucks      = [...new Set(allContainers.map((c) => c.numberPlate).filter(Boolean))].sort() as string[];
+  const locations   = [...new Set(allContainers.map((c) => c.trackingLocation).filter(Boolean))].sort() as string[];
 
   function openDrawer(c: EnrichedContainerRow) {
     setDrawerContainer(c);
@@ -1472,6 +1478,8 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     setCompanyFilter("ALL");
     setTransporterFilter("ALL");
     setAgentFilter("ALL");
+    setTruckFilter("ALL");
+    setLocationFilter("ALL");
     setDocsFilter("ALL");
     setDelayedFilter("ALL");
     setSearch("");
@@ -1823,7 +1831,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
         {/* ── Expandable Filters ── */}
         {showFilters && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 p-3 rounded-md border bg-muted/30">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 gap-2 p-3 rounded-md border bg-muted/30">
             {allCompanies && (
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -1861,6 +1869,30 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                 <SelectContent>
                   <SelectItem value="ALL">All Agents</SelectItem>
                   {agents.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Truck #</p>
+              <Select value={truckFilter} onValueChange={setTruckFilter}>
+                <SelectTrigger className="h-8 text-xs" data-testid="select-otw-truck">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Trucks</SelectItem>
+                  {trucks.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Location</p>
+              <Select value={locationFilter} onValueChange={setLocationFilter}>
+                <SelectTrigger className="h-8 text-xs" data-testid="select-otw-location">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Locations</SelectItem>
+                  {locations.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
