@@ -517,6 +517,16 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
   // State for purchase order data (for Purchase vouchers)
   const [purchaseOrderData, setPurchaseOrderData] = useState<any>(null);
+  const [poSupplierBalance, setPoSupplierBalance] = useState<string | null>(null);
+
+  // Fetch supplier balance whenever the purchase order panel loads a new supplier
+  useEffect(() => {
+    if (!purchaseOrderData?.supplierId) { setPoSupplierBalance(null); return; }
+    fetch(`/api/suppliers/${purchaseOrderData.supplierId}/balance`, { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => setPoSupplierBalance(d?.balance?.toString() ?? null))
+      .catch(() => setPoSupplierBalance(null));
+  }, [purchaseOrderData?.supplierId]);
 
   // Fetch voucher entries when viewing (includes account names and stock items)
   const { data: viewVoucherEntriesRaw, isLoading: viewEntriesLoading } =
@@ -2910,20 +2920,16 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 <div className="font-medium">
                                   {purchaseOrderData.supplierName}
                                 </div>
+                                {!isPOSUser && poSupplierBalance !== null && (
+                                  <div className="text-xs text-muted-foreground">
+                                    Balance: {formatAmount(parseFloat(poSupplierBalance))}
+                                  </div>
+                                )}
                                 <div className="text-xs text-muted-foreground">
                                   Container: {purchaseOrderData.containerNumber}
                                 </div>
                               </div>
                               <div className="flex items-center gap-2 flex-wrap">
-                                {!isPOSUser && purchaseOrderData.itemsTotal && (
-                                  <div className="font-mono font-bold">
-                                    {formatAmount(
-                                      parseFloat(
-                                        purchaseOrderData.itemsTotal || "0",
-                                      ),
-                                    )}
-                                  </div>
-                                )}
                                 <Badge
                                   variant={
                                     purchaseOrderData.status === "Closed"
