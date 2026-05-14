@@ -301,6 +301,38 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
   const { variant: badgeVariant, className: badgeClass } = getFactoryTxTypeBadge(entry.txType);
 
   if (isVoucherBacked) {
+    // Determine voucher type from txType: PAYMENT → Payment, RECEIPT → Receipt, JOURNAL → Journal
+    const voucherType = entry.txType === "PAYMENT" ? "Payment"
+      : entry.txType === "RECEIPT" ? "Receipt"
+      : entry.txType === "JOURNAL" ? "Journal"
+      : entry.txType;
+
+    const isPayment = voucherType === "Payment";
+    const isReceipt = voucherType === "Receipt";
+    const isJournal = voucherType === "Journal";
+    const isPaymentOrReceipt = isPayment || isReceipt;
+
+    // Source account: For Payment = credit entry (cash going OUT), For Receipt = debit entry (cash coming IN)
+    const sourceEntry = isPayment
+      ? viewEntries.find((e: any) => parseFloat(e.creditAmount || "0") > 0)
+      : isReceipt
+      ? viewEntries.find((e: any) => parseFloat(e.debitAmount || "0") > 0)
+      : null;
+
+    // Total = opposite side of source for Payment/Receipt
+    const totalAmount = isPayment
+      ? viewEntries.reduce((s: number, e: any) => s + parseFloat(e.debitAmount || "0"), 0)
+      : isReceipt
+      ? viewEntries.reduce((s: number, e: any) => s + parseFloat(e.creditAmount || "0"), 0)
+      : Math.max(totalDebit, totalCredit);
+
+    // Display entries: Payment = debit side only, Receipt = credit side only, Journal = all
+    const displayEntries = isPayment
+      ? viewEntries.filter((e: any) => parseFloat(e.debitAmount || "0") > 0)
+      : isReceipt
+      ? viewEntries.filter((e: any) => parseFloat(e.creditAmount || "0") > 0)
+      : viewEntries;
+
     return (
       <>
         <DialogHeader>
@@ -315,13 +347,43 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Type</p>
-              <Badge variant={badgeVariant} className={badgeClass}>{formatTxType(entry.txType)}</Badge>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant={badgeVariant} className={badgeClass}>{voucherType}</Badge>
+                {entry.optional && <span className="text-sm text-muted-foreground">Optional</span>}
+              </div>
             </div>
           </div>
           <div>
             <p className="text-sm text-muted-foreground mb-1">Description</p>
-            <p className="text-sm">{formatDaybookDescription(entry)}</p>
+            <p className="text-sm font-medium">{formatDaybookDescription(entry)}</p>
           </div>
+
+          {/* Paid From / Received In card — Payment and Receipt only */}
+          {isPaymentOrReceipt && sourceEntry && (
+            <div className="p-3 md:p-4 bg-muted/50 rounded-md">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">
+                    {isPayment ? "Paid From" : "Received In"}
+                  </p>
+                  <p className="font-medium text-base md:text-lg">{sourceEntry.accountName}</p>
+                  {sourceEntry.balance !== undefined && (
+                    <p className="text-sm font-mono mt-2">
+                      Balance: {sym}{formatNumber(parseFloat(sourceEntry.balance || "0"))}
+                    </p>
+                  )}
+                </div>
+                <div className="sm:text-right">
+                  <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
+                  <p className="text-xl md:text-2xl font-bold font-mono">
+                    {sym} {formatNumber(totalAmount)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Entries table */}
           <div>
             <h3 className="font-semibold mb-3">Entries</h3>
             {viewEntries.length === 0 ? (
@@ -329,38 +391,58 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
             ) : (
               <div className="rounded-md border overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 z-30 bg-muted/50">
+                  <thead>
                     <tr className="border-b bg-muted/40">
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Account</th>
-                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Debit</th>
-                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Credit</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Account</th>
+                      {isPaymentOrReceipt || isJournal ? (
+                        <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Amount</th>
+                      ) : (
+                        <>
+                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Debit</th>
+                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Credit</th>
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
-                    {viewEntries.map((e: any, i: number) => (
+                    {displayEntries.map((e: any, i: number) => (
                       <tr key={e.id ?? i} className="border-b last:border-0">
                         <td className="px-3 py-2">
                           <p className="font-medium">{e.accountName || "—"}</p>
-                          {e.balance !== undefined && (
+                          {(isPaymentOrReceipt || isJournal) && e.balance !== undefined && (
                             <p className="text-xs text-muted-foreground mt-0.5">
                               Balance: {sym}{formatNumber(parseFloat(e.balance || "0"))}
                             </p>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-right font-mono">
-                          {parseFloat(e.debitAmount || "0") > 0 ? `${sym}${formatNumber(parseFloat(e.debitAmount))}` : "-"}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono">
-                          {parseFloat(e.creditAmount || "0") > 0 ? `${sym}${formatNumber(parseFloat(e.creditAmount))}` : "-"}
-                        </td>
+                        {isPaymentOrReceipt || isJournal ? (
+                          <td className="px-3 py-2 text-right font-mono">
+                            {sym}{formatNumber(Math.max(parseFloat(e.debitAmount || "0"), parseFloat(e.creditAmount || "0")))}
+                          </td>
+                        ) : (
+                          <>
+                            <td className="px-3 py-2 text-right font-mono">
+                              {parseFloat(e.debitAmount || "0") > 0 ? `${sym}${formatNumber(parseFloat(e.debitAmount))}` : "-"}
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono">
+                              {parseFloat(e.creditAmount || "0") > 0 ? `${sym}${formatNumber(parseFloat(e.creditAmount))}` : "-"}
+                            </td>
+                          </>
+                        )}
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-muted/50 font-bold">
+                    <tr className="bg-muted/50 font-bold border-t">
                       <td className="px-3 py-2">Total</td>
-                      <td className="px-3 py-2 text-right font-mono">{sym}{formatNumber(totalDebit)}</td>
-                      <td className="px-3 py-2 text-right font-mono">{sym}{formatNumber(totalCredit)}</td>
+                      {isPaymentOrReceipt || isJournal ? (
+                        <td className="px-3 py-2 text-right font-mono">{sym}{formatNumber(totalAmount)}</td>
+                      ) : (
+                        <>
+                          <td className="px-3 py-2 text-right font-mono">{sym}{formatNumber(totalDebit)}</td>
+                          <td className="px-3 py-2 text-right font-mono">{sym}{formatNumber(totalCredit)}</td>
+                        </>
+                      )}
                     </tr>
                   </tfoot>
                 </table>
