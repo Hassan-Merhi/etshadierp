@@ -1,15 +1,13 @@
 /**
  * maerskPublicProvider.ts — Maersk public tracking (no credentials required).
  *
- * Enabled only when:
- *   PUBLIC_CARRIER_TRACKING_ENABLED=true
- *   MAERSK_PUBLIC_TRACKING_ENABLED=true
+ * Always enabled — no env vars needed. Free HTTP-only (no browser / Puppeteer).
  *
  * Attempts Maersk's undocumented public JSON endpoint. If blocked by Akamai
  * (403/captcha), returns success=false immediately and the service falls back
  * to ParcelsApp. Never retries. Never crashes the server.
  *
- * Rate-limited: max 1 attempt per container per 60 minutes (in-process).
+ * Rate-limited: max 20 minutes per container (in-process).
  */
 
 import type { CarrierTrackResult, TrackingEvent } from "./types";
@@ -26,8 +24,7 @@ const RATE_LIMIT_MS   = 20 * 60 * 1_000;   // 20 min (was 60 min)
 const _lastAttempt = new Map<string, number>();
 
 export function isEnabled(): boolean {
-  if (process.env.PUBLIC_CARRIER_TRACKING_ENABLED?.toLowerCase() !== "true") return false;
-  return process.env.MAERSK_PUBLIC_TRACKING_ENABLED?.toLowerCase() === "true";
+  return true;
 }
 
 function isRateLimited(containerNumber: string): boolean {

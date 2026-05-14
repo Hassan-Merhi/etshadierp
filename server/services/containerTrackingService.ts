@@ -10,7 +10,7 @@
  *   - Skip records NEVER count against ParcelsApp quota.
  *
  * Provider order per carrier:
- *   MAERSK   → http_scraper (fast-fail, no network) → maersk_direct (Puppeteer intercepts Maersk API)
+ *   MAERSK   → http_scraper (fast-fail) → maersk_direct (Puppeteer, if available) → maersk_public (HTTP, always available) → parcelsapp
  *   CMA      → http_scraper (fast-fail, no network) → cma_public (if enabled) → 17track (if configured) → parcelsapp_scraper (Puppeteer, free) → parcelsapp API
  *   MSC      → http_scraper (direct MSC API)        → parcelsapp_scraper → 17track → parcelsapp API
  *   HAPAG    → http_scraper (direct Hapag API)      → parcelsapp_scraper → 17track → parcelsapp API
@@ -44,6 +44,7 @@ import {
 import { scrapeTracking, isScraperAvailable } from "../lib/parcelsAppScraper";
 import { httpScrapeTracking, isHttpScraperAvailable } from "../lib/httpTrackingScraper";
 import { scrapeMaerskDirect, isMaerskDirectScraperAvailable } from "../lib/maerskDirectScraper";
+import * as maerskPublicProvider from "../lib/trackingProviders/maerskPublicProvider";
 import * as seventeenTrack from "../lib/trackingProviders/seventeenTrackProvider";
 import * as cmaPublicProvider from "../lib/trackingProviders/cmaPublicProvider";
 import { resolveProvider } from "../lib/trackingProviders/providerResolver";
@@ -949,7 +950,75 @@ async function trackViaParcelsApp(
       };
     }
 
-    console.log(`[ContainerTracking] ${containerNumber}: maersk_direct got no data (${mdResult.error}) — trying ParcelsApp scraper...`);
+    console.log(`[ContainerTracking] ${containerNumber}: maersk_direct got no data (${mdResult.error}) — trying Maersk public HTTP...`);
+  }
+
+  // ── Attempt 2: Maersk public HTTP (no browser, no API key, always available) ──
+  // Runs when maersk_direct is unavailable (no Puppeteer) or returned no data.
+  // Hits Maersk's undocumented public JSON API after loading a session cookie.
+  // Blocked by Akamai roughly half the time — falls through gracefully.
+  if (MAERSK_PREFIXES.test(containerNumber)) {
+    console.log(`[ContainerTracking] ${containerNumber}: trying Maersk public HTTP provider...`);
+    const mpResult = await maerskPublicProvider.track(containerNumber);
+
+    const mpStatus = mpResult.success
+      ? "success"
+      : mpResult.blocked
+        ? "blocked"
+        : mpResult.error === "rate_limited"
+          ? "skipped"
+          : "error";
+
+    await saveTrackingCheck(
+      containerId,
+      "maersk_public",
+      mpStatus,
+      mpResult.error ?? null,
+      mpResult.raw ?? null,
+    );
+
+    if (mpResult.success && (mpResult.latestStatus || mpResult.events.length > 0)) {
+      await saveDirectEvents(containerId, mpResult);
+      const { eta: finalEta, source: etaSrc } = resolveEtaFromProvider(
+        mpResult.eta ?? null,
+        mpResult.events,
+        currentEta,
+      );
+
+      const updateSet: Record<string, unknown> = {
+        trackingLastCheckedAt: now,
+        trackingLastStatus: mpResult.latestStatus,
+        trackingLastEventDate: mpResult.latestEventDate,
+        trackingLastDescription: mpResult.latestDescription,
+        trackingError: null,
+        trackingChangedAt: now,
+        trackingProvider: "maersk_public",
+        trackingDetectedCarrier: detectedCarrier,
+        trackingFallbackUsed: !!fallbackReason,
+        trackingFallbackReason: fallbackReason,
+      };
+      if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
+
+      await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+      await logAndConfirmEta(
+        containerId, containerNumber, currentEta, finalEta ?? null, etaSrc ?? null, "maersk_public",
+        !finalEta ? "no ETA from maersk_public" : undefined,
+      );
+
+      console.log(`[ContainerTracking] ${containerNumber} → maersk_public: status=${mpResult.latestStatus ?? "?"}`);
+      return {
+        success: true,
+        lastStatus: mpResult.latestStatus,
+        lastLocation: mpResult.latestLocation,
+        lastDescription: mpResult.latestDescription,
+        lastCheckedAt: now,
+        error: null,
+      };
+    }
+
+    if (mpResult.error !== "rate_limited") {
+      console.log(`[ContainerTracking] ${containerNumber}: maersk_public got no data (${mpResult.error}) — trying ParcelsApp...`);
+    }
   }
 
   // ── CMA provider chain ────────────────────────────────────────────────────────

@@ -896,6 +896,8 @@ function ContainerDrawer({
                   const stOk      = trackingStatus.seventeenTrackConfigured && !trackingStatus.seventeenTrackQuotaExhausted;
                   const paOk      = trackingStatus.parcelsAppConfigured && !trackingStatus.parcelsAppQuotaExhausted;
 
+                  const maerskPublicOk = trackingStatus.maerskPublicEnabled;
+
                   return (
                     <div className="space-y-1.5">
                       {/* 1. HTTP scraper (no browser) */}
@@ -904,26 +906,35 @@ function ContainerDrawer({
                         label="1. HTTP scraper (no browser)"
                         badge="Ready"
                         badgeColor="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                        detail="Tries ParcelsApp API & page directly — fastest, no quota"
+                        detail="Direct carrier APIs — fastest, no quota. Fast-fails for Maersk/CMA."
                       />
 
-                      {/* 2. Puppeteer web scraper */}
+                      {/* 2. Maersk public HTTP */}
+                      <Row
+                        testId="row-maersk-public"
+                        label="2. Maersk public HTTP (no browser)"
+                        badge={maerskPublicOk ? "Ready" : "Ready"}
+                        badgeColor="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                        detail="Maersk containers only — free, no API key, no quota"
+                      />
+
+                      {/* 3. Puppeteer web scraper */}
                       <Row
                         testId="row-scraper"
-                        label="2. Puppeteer web scraper (no quota)"
+                        label="3. Puppeteer web scraper (no quota)"
                         badge={scraperOk ? "Ready" : "Unavailable"}
                         badgeColor={scraperOk
                           ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
                           : "bg-muted text-muted-foreground"}
                         detail={scraperOk
-                          ? "Stealth Chrome — handles reCaptcha via real browser"
+                          ? "Stealth Chrome — handles Maersk & CMA anti-bot protection"
                           : "Chrome not available in this environment"}
                       />
 
-                      {/* 3. 17track */}
+                      {/* 4. 17track */}
                       <Row
                         testId="row-17track"
-                        label="3. 17track API"
+                        label="4. 17track API"
                         badge={
                           !trackingStatus.seventeenTrackConfigured
                             ? "Not configured"
@@ -959,10 +970,10 @@ function ContainerDrawer({
                         }
                       />
 
-                      {/* 4. ParcelsApp API */}
+                      {/* 5. ParcelsApp API */}
                       <Row
                         testId="row-parcelsapp-api"
-                        label="4. ParcelsApp API (fallback)"
+                        label="5. ParcelsApp API (fallback)"
                         badge={
                           !trackingStatus.parcelsAppConfigured
                             ? "Not configured"
