@@ -101,16 +101,19 @@ function pickEta(obj: any): string | null {
     portCalls.find((p: any) => p.isDestination === true || p.isDestination === "true") ??
     (portCalls.length > 0 ? portCalls[portCalls.length - 1] : null);
 
+  // Destination port fields outrank generic top-level fields which may refer
+  // to any leg of the journey rather than the final destination.
   const raw =
     destPortCall?.eta ??
     destPortCall?.estimatedArrival ??
     destPortCall?.estimatedTimeOfArrival ??
+    obj.portOfDischarge?.eta ??
+    obj.portOfDischarge?.estimatedArrival ??
+    obj.portOfDischarge?.estimatedTimeOfArrival ??
     obj.eta ??
     obj.estimatedArrival ??
     obj.estimatedTimeOfArrival ??
     obj.estimatedDelivery ??
-    obj.portOfDischarge?.eta ??
-    obj.portOfDischarge?.estimatedArrival ??
     null;
   const d = parseDate(raw);
   return d ? d.toISOString().slice(0, 10) : null;

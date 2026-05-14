@@ -205,7 +205,15 @@ function parseResponse(
     portCalls.find((p: any) => p.isDestination === true || p.isDestination === "true") ??
     (portCalls.length > 0 ? portCalls[portCalls.length - 1] : null);
 
+  // Destination port call fields have highest priority — they represent the
+  // actual arrival ETA at the final destination, not a transit movement.
   const etaRaw =
+    destPortCall?.eta ??
+    destPortCall?.estimatedArrival ??
+    destPortCall?.estimatedTimeOfArrival ??
+    entry.portOfDischarge?.eta ??
+    entry.portOfDischarge?.estimatedArrival ??
+    entry.portOfDischarge?.estimatedTimeOfArrival ??
     entry.eta ??
     entry.estimatedTimeOfArrival ??
     entry.estimatedArrival ??
@@ -213,8 +221,6 @@ function parseResponse(
     entry.predictedETA ??
     entry.latestEstimatedArrival ??
     entry.scheduledArrival ??
-    destPortCall?.eta ??
-    destPortCall?.estimatedArrival ??
     entry.legs?.[entry.legs?.length - 1]?.eta ??
     entry.legs?.[entry.legs?.length - 1]?.estimatedArrival ??
     entry.containers?.[0]?.eta ??

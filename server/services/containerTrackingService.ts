@@ -648,23 +648,38 @@ export async function trackOneContainerById(containerId: number): Promise<TrackN
 
 /**
  * Resolve the best ETA from a direct carrier provider result.
- * Priority: provider explicit ETA → most recent event date → preserve existing DB value.
+ * Priority: provider explicit ETA → preserve existing DB value.
+ * NEVER derives ETA from event dates — event dates are movement records
+ * (gate-in, load, departure, discharge, etc.), not destination ETAs.
  * NEVER blanks an existing ETA.
  */
 function resolveEtaFromProvider(
   providerEta: string | null,
-  events: TrackingEvent[] | undefined,
+  _events: TrackingEvent[] | undefined,
   currentEta: string | null,
-): { eta: string | null; source: "api" | "event" | "manual" | null } {
+): { eta: string | null; source: "api" | "manual" | null } {
   if (providerEta) return { eta: providerEta, source: "api" };
-  if (events?.length) {
-    const best = events
-      .filter((e) => e.date)
-      .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0))[0];
-    if (best?.date) return { eta: best.date.toISOString().slice(0, 10), source: "event" };
-  }
   if (currentEta) return { eta: currentEta, source: "manual" };
   return { eta: null, source: null };
+}
+
+/** Log ETA resolution so field updates are visible in server output.
+ *  Does NOT log raw API payloads or secrets. */
+function logEtaResolution(
+  containerNumber: string,
+  provider: string,
+  currentEta: string | null,
+  providerEta: string | null,
+  finalEta: string | null,
+  source: string | null,
+): void {
+  const changed = finalEta !== null && finalEta !== currentEta;
+  console.log(
+    `[ETA] ${containerNumber} provider=${provider}` +
+    ` old=${currentEta ?? "—"} providerEta=${providerEta ?? "—"}` +
+    ` final=${finalEta ?? "—"} src=${source ?? "—"}` +
+    (changed ? " [UPDATED]" : ""),
+  );
 }
 
 /**
@@ -675,7 +690,7 @@ function resolveEtaFromProvider(
 function resolveEtaFromShipment(
   shipment: ParcelsAppShipment,
   currentEta: string | null,
-): { eta: string | null; source: "api" | "event" | "manual" | null } {
+): { eta: string | null; source: "api" | "manual" | null } {
   const derived = deriveEstimatedDeliveryDate(shipment);
   if (derived) return { eta: derived, source: "api" };
   if (currentEta) return { eta: currentEta, source: "manual" };
@@ -779,6 +794,7 @@ async function trackOneContainer(
         result.events,
         currentEta,
       );
+      logEtaResolution(containerNumber, result.provider, currentEta, result.eta ?? null, finalEta, etaSrc);
 
       const updateSet: Record<string, unknown> = {
         trackingLastCheckedAt: now,
@@ -952,6 +968,7 @@ async function trackViaParcelsApp(
           mdResult.events,
           currentEta,
         );
+        logEtaResolution(containerNumber, "maersk_direct", currentEta, mdResult.eta ?? null, finalEta, etaSrc);
         if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
 
         await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
@@ -1032,6 +1049,7 @@ async function trackViaParcelsApp(
         mpResult.events,
         currentEta,
       );
+      logEtaResolution(containerNumber, "maersk_public", currentEta, mpResult.eta ?? null, finalEta, etaSrc);
 
       const updateSet: Record<string, unknown> = {
         trackingLastCheckedAt: now,
@@ -1099,6 +1117,7 @@ async function trackViaParcelsApp(
           cmaResult.events,
           currentEta,
         );
+        logEtaResolution(containerNumber, "cma_public", currentEta, cmaResult.eta ?? null, finalEta, etaSrc);
         const updateSet: Record<string, unknown> = {
           trackingLastCheckedAt: now,
           trackingLastStatus: cmaResult.latestStatus,
@@ -1144,6 +1163,7 @@ async function trackViaParcelsApp(
             result17.events,
             currentEta,
           );
+          logEtaResolution(containerNumber, "17track", currentEta, result17.eta ?? null, finalEta, etaSrc);
           const updateSet: Record<string, unknown> = {
             trackingLastCheckedAt: now,
             trackingLastStatus: result17.latestStatus,
@@ -1257,6 +1277,7 @@ async function trackViaParcelsApp(
           result17.events,
           currentEta,
         );
+        logEtaResolution(containerNumber, "17track", currentEta, result17.eta ?? null, finalEta, etaSrc);
 
         const updateSet: Record<string, unknown> = {
           trackingLastCheckedAt: now,
