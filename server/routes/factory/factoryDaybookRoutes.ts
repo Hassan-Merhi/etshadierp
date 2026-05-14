@@ -78,7 +78,8 @@ export function registerFactoryDaybookRoutes(app: Express) {
           'LOADING_SUBMITTED',
           'ORDER_VERIFIED',
           'INVOICE_REVERTED',
-          'SUPPLIER_FX_TRANSFER_DELETE'
+          'SUPPLIER_FX_TRANSFER_DELETE',
+          'WORKER_CREATED'
         )`,
       ];
       // If user is restricted to own entries only, show their entries + unattributed ones (NULL createdBy)
