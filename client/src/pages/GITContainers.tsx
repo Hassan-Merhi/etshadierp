@@ -23,6 +23,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
   Table,
   TableBody,
   TableCell,
@@ -1305,15 +1311,91 @@ function ContainerDrawer({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+// ─── Multi-select filter dropdown ─────────────────────────────────────────────
+interface MultiOption { value: string; label: string; dividerBefore?: boolean }
+
+function MultiFilterSelect({
+  allLabel,
+  options,
+  selected,
+  onChange,
+  testId,
+}: {
+  allLabel: string;
+  options: MultiOption[];
+  selected: string[];
+  onChange: (vals: string[]) => void;
+  testId?: string;
+}) {
+  const toggle = (val: string) => {
+    onChange(selected.includes(val) ? selected.filter((v) => v !== val) : [...selected, val]);
+  };
+
+  const triggerLabel =
+    selected.length === 0
+      ? allLabel
+      : selected.length === 1
+        ? (options.find((o) => o.value === selected[0])?.label ?? selected[0])
+        : `${selected.length} selected`;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 text-xs w-full justify-between font-normal px-2"
+          data-testid={testId}
+        >
+          <span className="truncate">{triggerLabel}</span>
+          <ChevronDown className="h-3 w-3 shrink-0 ml-1 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-52 p-1" align="start">
+        <div className="max-h-56 overflow-y-auto">
+          {options.map((opt) => (
+            <div key={opt.value}>
+              {opt.dividerBefore && <div className="border-t my-1" />}
+              <div
+                className="flex items-center gap-2 px-2 py-1.5 rounded-sm cursor-pointer hover-elevate text-xs"
+                onClick={() => toggle(opt.value)}
+              >
+                <Checkbox
+                  checked={selected.includes(opt.value)}
+                  onCheckedChange={() => toggle(opt.value)}
+                  className="h-3 w-3 shrink-0"
+                />
+                <span>{opt.label}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        {selected.length > 0 && (
+          <div className="border-t mt-1 pt-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-full text-xs text-muted-foreground"
+              onClick={() => onChange([])}
+            >
+              Clear
+            </Button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function GITContainers({ embedded = false }: { embedded?: boolean } = {}) {
   const { data: user } = useQuery<AuthUser>({ queryKey: ["/api/auth/me"] });
 
   const [allCompanies, setAllCompanies] = useState(false);
   const [companyFilter, setCompanyFilter] = useState("ALL");
-  const [transporterFilter, setTransporterFilter] = useState("ALL");
-  const [agentFilter, setAgentFilter] = useState("ALL");
-  const [truckFilter, setTruckFilter] = useState("ALL");
-  const [locationFilter, setLocationFilter] = useState("ALL");
+  const [transporterFilters, setTransporterFilters] = useState<string[]>([]);
+  const [agentFilters, setAgentFilters] = useState<string[]>([]);
+  const [truckFilters, setTruckFilters] = useState<string[]>([]);
+  const [locationFilters, setLocationFilters] = useState<string[]>([]);
   const [docsFilter, setDocsFilter] = useState("ALL");
   const [delayedFilter, setDelayedFilter] = useState("ALL");
   const [search, setSearch] = useState("");
@@ -1423,14 +1505,26 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const filtered = useMemo(() => {
     return allContainers.filter((c) => {
       if (companyFilter !== "ALL" && c.companyName !== companyFilter) return false;
-      if (transporterFilter !== "ALL" && c.transporter !== transporterFilter) return false;
-      if (agentFilter !== "ALL" && c.agent !== agentFilter) return false;
-      if (truckFilter === "NO_TRUCK" && !!(c.numberPlate ?? "").trim()) return false;
-      if (truckFilter === "HAS_TRUCK" && !(c.numberPlate ?? "").trim()) return false;
-      if (truckFilter !== "ALL" && truckFilter !== "NO_TRUCK" && truckFilter !== "HAS_TRUCK" && (c.numberPlate ?? "") !== truckFilter) return false;
-      if (locationFilter === "NO_LOCATION" && !!(c.trackingLocation ?? "").trim()) return false;
-      if (locationFilter === "HAS_LOCATION" && !(c.trackingLocation ?? "").trim()) return false;
-      if (locationFilter !== "ALL" && locationFilter !== "NO_LOCATION" && locationFilter !== "HAS_LOCATION" && (c.trackingLocation ?? "") !== locationFilter) return false;
+      if (transporterFilters.length > 0 && !transporterFilters.includes(c.transporter ?? "")) return false;
+      if (agentFilters.length > 0 && !agentFilters.includes(c.agent ?? "")) return false;
+      if (truckFilters.length > 0) {
+        const plate = (c.numberPlate ?? "").trim();
+        const match = truckFilters.some((f) => {
+          if (f === "HAS_TRUCK") return !!plate;
+          if (f === "NO_TRUCK") return !plate;
+          return plate === f;
+        });
+        if (!match) return false;
+      }
+      if (locationFilters.length > 0) {
+        const loc = (c.trackingLocation ?? "").trim();
+        const match = locationFilters.some((f) => {
+          if (f === "HAS_LOCATION") return !!loc;
+          if (f === "NO_LOCATION") return !loc;
+          return loc === f;
+        });
+        if (!match) return false;
+      }
       if (docsFilter === "MISSING" && c.docReceived) return false;
       if (docsFilter === "RECEIVED" && !c.docReceived) return false;
       if (delayedFilter === "YES" && !(c.daysDelayed && c.daysDelayed > 0)) return false;
@@ -1453,7 +1547,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
       if (sh !== 0) return sh;
       return a.containerNumber.localeCompare(b.containerNumber);
     });
-  }, [allContainers, companyFilter, transporterFilter, agentFilter, truckFilter, locationFilter, docsFilter, delayedFilter, search]);
+  }, [allContainers, companyFilter, transporterFilters, agentFilters, truckFilters, locationFilters, docsFilter, delayedFilter, search]);
 
   // Summary stats (always over all loaded active containers)
   const atSea          = allContainers.filter((c) => c.status === "OTW" || c.status === "Sea").length;
@@ -1480,10 +1574,10 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
   function clearFilters() {
     setCompanyFilter("ALL");
-    setTransporterFilter("ALL");
-    setAgentFilter("ALL");
-    setTruckFilter("ALL");
-    setLocationFilter("ALL");
+    setTransporterFilters([]);
+    setAgentFilters([]);
+    setTruckFilters([]);
+    setLocationFilters([]);
     setDocsFilter("ALL");
     setDelayedFilter("ALL");
     setSearch("");
@@ -1854,61 +1948,51 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
             )}
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Transporter</p>
-              <Select value={transporterFilter} onValueChange={setTransporterFilter}>
-                <SelectTrigger className="h-8 text-xs" data-testid="select-otw-transporter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Transporters</SelectItem>
-                  {transporters.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <MultiFilterSelect
+                allLabel="All Transporters"
+                options={transporters.map((t) => ({ value: t, label: t }))}
+                selected={transporterFilters}
+                onChange={setTransporterFilters}
+                testId="select-otw-transporter"
+              />
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Agent / Declarant</p>
-              <Select value={agentFilter} onValueChange={setAgentFilter}>
-                <SelectTrigger className="h-8 text-xs" data-testid="select-otw-agent">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Agents</SelectItem>
-                  {agents.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <MultiFilterSelect
+                allLabel="All Agents"
+                options={agents.map((a) => ({ value: a, label: a }))}
+                selected={agentFilters}
+                onChange={setAgentFilters}
+                testId="select-otw-agent"
+              />
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Truck #</p>
-              <Select value={truckFilter} onValueChange={setTruckFilter}>
-                <SelectTrigger className="h-8 text-xs" data-testid="select-otw-truck">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Trucks</SelectItem>
-                  <SelectItem value="HAS_TRUCK">Has Truck #</SelectItem>
-                  <SelectItem value="NO_TRUCK">No Truck #</SelectItem>
-                  {trucks.length > 0 && (
-                    <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide border-t mt-1 pt-1">Specific</div>
-                  )}
-                  {trucks.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <MultiFilterSelect
+                allLabel="All Trucks"
+                options={[
+                  { value: "HAS_TRUCK", label: "Has Truck #" },
+                  { value: "NO_TRUCK", label: "No Truck #" },
+                  ...trucks.map((t, i) => ({ value: t, label: t, dividerBefore: i === 0 })),
+                ]}
+                selected={truckFilters}
+                onChange={setTruckFilters}
+                testId="select-otw-truck"
+              />
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Location</p>
-              <Select value={locationFilter} onValueChange={setLocationFilter}>
-                <SelectTrigger className="h-8 text-xs" data-testid="select-otw-location">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Locations</SelectItem>
-                  <SelectItem value="HAS_LOCATION">Has Location</SelectItem>
-                  <SelectItem value="NO_LOCATION">No Location</SelectItem>
-                  {locations.length > 0 && (
-                    <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide border-t mt-1 pt-1">Specific</div>
-                  )}
-                  {locations.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <MultiFilterSelect
+                allLabel="All Locations"
+                options={[
+                  { value: "HAS_LOCATION", label: "Has Location" },
+                  { value: "NO_LOCATION", label: "No Location" },
+                  ...locations.map((l, i) => ({ value: l, label: l, dividerBefore: i === 0 })),
+                ]}
+                selected={locationFilters}
+                onChange={setLocationFilters}
+                testId="select-otw-location"
+              />
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Docs</p>
