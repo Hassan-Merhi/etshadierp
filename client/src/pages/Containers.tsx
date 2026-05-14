@@ -89,6 +89,7 @@ export default function Containers() {
   const [otwSupplierFilter, setOtwSupplierFilter] = useState("ALL");
   const [otwAgentFilter, setOtwAgentFilter] = useState("ALL");
   const [otwTransporterFilter, setOtwTransporterFilter] = useState("ALL");
+  const [otwTruckFilter, setOtwTruckFilter] = useState("ALL");
   const [otwDocReceivedFilter, setOtwDocReceivedFilter] = useState("ALL");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingNumberId, setEditingNumberId] = useState<number | null>(null);
@@ -247,6 +248,9 @@ export default function Containers() {
   const uniqueOtwSuppliers = Array.from(
     new Set(otwContainers.map((c) => c.supplierId)),
   ).sort((a, b) => a - b);
+  const uniqueOtwTrucks = Array.from(
+    new Set(otwContainers.map((c) => c.numberPlate).filter(Boolean) as string[]),
+  ).sort();
 
   const filteredOtwContainers = otwContainers.filter((c) => {
     // Search filter
@@ -285,6 +289,10 @@ export default function Containers() {
       otwTransporterFilter !== "ALL" &&
       (c.transporter || "") !== otwTransporterFilter
     ) {
+      return false;
+    }
+    // Truck # filter
+    if (otwTruckFilter !== "ALL" && (c.numberPlate || "") !== otwTruckFilter) {
       return false;
     }
     // Doc Received filter
@@ -1086,6 +1094,22 @@ export default function Containers() {
                 {uniqueOtwLocations.map((loc) => (
                   <SelectItem key={loc} value={loc}>
                     {loc}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={otwTruckFilter} onValueChange={setOtwTruckFilter}>
+              <SelectTrigger
+                className="w-full sm:w-[120px]"
+                data-testid="select-otw-truck"
+              >
+                <SelectValue placeholder="Truck #" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Trucks</SelectItem>
+                {uniqueOtwTrucks.map((truck) => (
+                  <SelectItem key={truck} value={truck}>
+                    {truck}
                   </SelectItem>
                 ))}
               </SelectContent>
