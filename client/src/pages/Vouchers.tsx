@@ -81,7 +81,7 @@ import { useAppMode, useModePrefix } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useFormDraft } from "@/hooks/useFormDraft";
 import { DraftRestorePrompt } from "@/components/DraftRestorePrompt";
-import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, ChevronUp, FileDown, Loader2, ArrowDownCircle, ArrowUpCircle, BookOpen, ArrowLeftRight, SlidersHorizontal, FileText, LayoutGrid, ClipboardList, GitBranch, History } from "lucide-react";
+import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, AlertTriangle, XCircle, X, Search, ChevronDown, ChevronUp, FileDown, Loader2, ArrowDownCircle, ArrowUpCircle, BookOpen, ArrowLeftRight, SlidersHorizontal, FileText, LayoutGrid, ClipboardList, GitBranch, History } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { utils, writeFile } from "@/lib/excelHelper";
 import {
@@ -4029,29 +4029,35 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   </div>
                 )}
                 <Form {...journalForm}>
-                  <form noValidate onSubmit={journalForm.handleSubmit(onJournalSubmit)} className="space-y-6">
-                    {/* Header section */}
-                    <div className="flex flex-col sm:flex-row items-start sm:justify-end gap-4">
-                    <FormField
-                      control={journalForm.control}
-                      name="voucherDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Date</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="date"
-                              value={field.value instanceof Date ? format(field.value, "yyyy-MM-dd") : (typeof field.value === "string" ? field.value : "")}
-                              onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value + "T00:00:00") : new Date())}
-                              className="w-full sm:w-[200px]"
-                              data-testid="input-journal-date"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                  <form noValidate onSubmit={journalForm.handleSubmit(onJournalSubmit)} className="space-y-5">
+                    {/* Header row — title + date on one line */}
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <div>
+                        <p className="text-sm font-semibold">
+                          {voucherToEdit?.voucherNumber ? `#${voucherToEdit.voucherNumber}` : "New Journal Entry"}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Debit and credit must balance</p>
+                      </div>
+                      <FormField
+                        control={journalForm.control}
+                        name="voucherDate"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center gap-2 space-y-0">
+                            <FormLabel className="text-sm text-muted-foreground shrink-0">Date</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="date"
+                                value={field.value instanceof Date ? format(field.value, "yyyy-MM-dd") : (typeof field.value === "string" ? field.value : "")}
+                                onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value + "T00:00:00") : new Date())}
+                                className="w-[180px]"
+                                data-testid="input-journal-date"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
                   {/* ── Mobile journal cards (sm:hidden) ── */}
                   <div className="sm:hidden space-y-2">
@@ -4195,19 +4201,19 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   </div>
 
                   {/* ── Desktop/tablet journal table (hidden on mobile) ── */}
-                  <div className="hidden sm:block border rounded-md overflow-hidden overflow-x-auto">
+                  <div className="hidden sm:block border rounded-xl overflow-hidden overflow-x-auto">
                     <table className="w-full min-w-[500px]">
-                      <thead className="bg-muted/50 sticky top-0 z-30">
-                        <tr>
-                          <th className="text-left p-3 font-medium w-[10%]">DR/CR</th>
-                          <th className="text-left p-3 font-medium w-[50%]">Account</th>
-                          <th className="text-right p-3 font-medium w-[25%]">Amount</th>
-                          <th className="w-[10%]"></th>
+                      <thead className="bg-muted/40">
+                        <tr className="h-9">
+                          <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[12%]">DR/CR</th>
+                          <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[50%]">Account</th>
+                          <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[25%]">Amount</th>
+                          <th className="w-[8%]"></th>
                         </tr>
                       </thead>
                       <tbody>
                         {journalFields.map((field, index) => (
-                          <tr key={field.id} className="border-t">
+                          <tr key={field.id} className="border-t hover:bg-muted/20 transition-colors">
                             <td className="p-2">
                               <FormField
                                 control={journalForm.control}
@@ -4220,7 +4226,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     >
                                       <FormControl>
                                         <SelectTrigger 
-                                          className="w-20 text-center font-medium"
+                                          className={cn(
+                                            "w-20 text-center font-semibold border",
+                                            field.value === "DR"
+                                              ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800"
+                                              : "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800"
+                                          )}
                                           data-testid={`input-journal-type-${index}`}
                                           onKeyDown={(e) => {
                                             if (e.key === "Tab" && !e.shiftKey) {
@@ -4451,9 +4462,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot className="bg-muted/30 border-t-2">
+                      <tfoot className="bg-muted/40 border-t">
                         <tr>
-                          <td className="p-3">
+                          <td colSpan={4} className="px-3 py-2">
                             <Button
                               type="button"
                               variant="outline"
@@ -4473,27 +4484,41 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               Add Row
                             </Button>
                           </td>
-                          <td className="p-3 text-right text-sm text-muted-foreground">
-                            DR: {formatAmount(totalDebit)} | CR: {formatAmount(totalCredit)}
-                          </td>
-                          <td className="p-3">
-                            <div className="text-right font-bold font-mono">
-                              {formatAmount(Math.max(totalDebit, totalCredit))}
-                            </div>
-                          </td>
-                          <td></td>
                         </tr>
-                        {Math.abs(totalDebit - totalCredit) > 0.01 && (
-                          <tr>
-                            <td colSpan={4} className="p-3">
-                              <div className="text-center text-sm text-destructive">
-                                ⚠️ Debits and Credits must be equal. Difference: {formatAmount(Math.abs(totalDebit - totalCredit))}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
                       </tfoot>
                     </table>
+                  </div>
+
+                  {/* Stats pill bar */}
+                  <div className="flex flex-wrap gap-3">
+                    <div className="rounded-lg border bg-muted/40 px-4 py-2 flex flex-col gap-0.5">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Total Debit</span>
+                      <span className="text-sm font-semibold font-mono text-emerald-600 dark:text-emerald-400">{formatAmount(totalDebit)}</span>
+                    </div>
+                    <div className="rounded-lg border bg-muted/40 px-4 py-2 flex flex-col gap-0.5">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Total Credit</span>
+                      <span className="text-sm font-semibold font-mono text-red-600 dark:text-red-400">{formatAmount(totalCredit)}</span>
+                    </div>
+                    <div className={cn(
+                      "rounded-lg border px-4 py-2 flex items-center gap-2",
+                      Math.abs(totalDebit - totalCredit) <= 0.01
+                        ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800"
+                        : "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800"
+                    )}>
+                      {Math.abs(totalDebit - totalCredit) <= 0.01 ? (
+                        <>
+                          <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Balanced</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0" />
+                          <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                            Off by {formatAmount(Math.abs(totalDebit - totalCredit))}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   {/* Notes field */}
@@ -4516,30 +4541,25 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     )}
                   />
 
-                  {/* Optional checkbox */}
-                  <FormField
-                    control={journalForm.control}
-                    name="optional"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            data-testid="checkbox-journal-optional"
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>
-                            Mark as Optional
-                          </FormLabel>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-
-                    {/* Submit and Export buttons */}
-                    <div className="flex flex-wrap justify-end gap-2">
+                  {/* Bottom action row — Optional checkbox + Export + Save inline */}
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <FormField
+                      control={journalForm.control}
+                      name="optional"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center gap-2.5 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              data-testid="checkbox-journal-optional"
+                            />
+                          </FormControl>
+                          <FormLabel className="text-sm font-normal cursor-pointer">Mark as Optional</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex items-center gap-2">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
@@ -4570,6 +4590,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                         {journalMutation.isPending ? "Saving..." : "Save Journal Voucher"}
                       </Button>
                     </div>
+                  </div>
                   </form>
                 </Form>
                 </CardContent>
