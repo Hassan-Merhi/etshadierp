@@ -210,14 +210,37 @@ function extractFromJson(data: unknown): {
         d.eta_final_delivery ??
         null;
       if (!etaRaw) {
-        for (let i = locations.length - 1; i >= 0; i--) {
-          for (const ev of (locations[i].events ?? []).slice().reverse()) {
-            if (ev.event_time_type === "EXPECTED" && ev.event_time) {
-              etaRaw = ev.event_time;
-              break;
-            }
+        // Only look at the LAST location (final destination) for arrival/discharge
+        // expected events. Do NOT fall back to earlier transit ports — those
+        // expected events are departures, not the destination ETA.
+        const lastLoc = locations[locations.length - 1];
+        const lastLocEvents: any[] = lastLoc?.events ?? [];
+
+        // Priority 1: expected Arrived / Discharged event at the last location
+        const arrivalEv = lastLocEvents.find(
+          (ev: any) =>
+            ev.event_time_type === "EXPECTED" &&
+            ev.event_time &&
+            /arrived|discharged|discharge|arrival|delivered|delivery/i.test(ev.activity ?? ""),
+        );
+        if (arrivalEv?.event_time) {
+          etaRaw = arrivalEv.event_time;
+        } else {
+          // Priority 2: latest (by event_time) expected event at the last location
+          const expectedAtDest = lastLocEvents
+            .filter((ev: any) => ev.event_time_type === "EXPECTED" && ev.event_time)
+            .sort(
+              (a: any, b: any) =>
+                new Date(b.event_time).getTime() - new Date(a.event_time).getTime(),
+            );
+          if (expectedAtDest.length > 0) {
+            // Pick the earliest future expected event as the true ETA
+            const futureExpected = expectedAtDest
+              .slice()
+              .reverse()
+              .find((ev: any) => new Date(ev.event_time).getTime() > Date.now());
+            etaRaw = futureExpected?.event_time ?? expectedAtDest[expectedAtDest.length - 1]?.event_time ?? null;
           }
-          if (etaRaw) break;
         }
       }
 
@@ -254,13 +277,43 @@ function extractFromJson(data: unknown): {
   if (containers.length > 0) {
     const c = containers[0];
     rawEvents = c.containerEvents ?? c.events ?? c.milestones ?? c.movements ?? [];
-    etaRaw = c.eta ?? c.estimatedTimeOfArrival ?? c.estimatedArrival ?? c.plannedArrivalDate ?? null;
+
+    // portCalls: destination is the last entry or the one flagged isDestination.
+    // NEVER use portCalls[0] — that is the origin.
+    const cPortCalls: any[] = Array.isArray(c.portCalls) ? c.portCalls : [];
+    const cDestCall =
+      cPortCalls.find((p: any) => p.isDestination === true || p.isDestination === "true") ??
+      (cPortCalls.length > 0 ? cPortCalls[cPortCalls.length - 1] : null);
+
+    etaRaw =
+      cDestCall?.eta ??
+      cDestCall?.estimatedArrival ??
+      c.eta ??
+      c.estimatedTimeOfArrival ??
+      c.estimatedArrival ??
+      c.plannedArrivalDate ??
+      null;
   }
   if (!rawEvents.length) {
     rawEvents = d.events ?? d.milestones ?? d.containerEvents ?? d.movements ?? d.data?.events ?? [];
   }
   if (!etaRaw) {
-    etaRaw = d.eta ?? d.estimatedTimeOfArrival ?? d.estimatedArrival ?? d.plannedArrivalDate ?? null;
+    // Top-level portCalls (some API shapes put them here)
+    const dPortCalls: any[] = Array.isArray(d.portCalls) ? d.portCalls : [];
+    const dDestCall =
+      dPortCalls.find((p: any) => p.isDestination === true || p.isDestination === "true") ??
+      (dPortCalls.length > 0 ? dPortCalls[dPortCalls.length - 1] : null);
+
+    etaRaw =
+      dDestCall?.eta ??
+      dDestCall?.estimatedArrival ??
+      d.eta ??
+      d.estimatedTimeOfArrival ??
+      d.estimatedArrival ??
+      d.plannedArrivalDate ??
+      d.portOfDischarge?.eta ??
+      d.portOfDischarge?.estimatedArrival ??
+      null;
   }
 
   const events = parseEvents(Array.isArray(rawEvents) ? rawEvents : []);

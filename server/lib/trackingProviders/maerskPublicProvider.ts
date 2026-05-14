@@ -201,6 +201,13 @@ function parseResponse(
 
   const latest = events[0] ?? null;
 
+  // For portCalls, the destination is the last entry or the one flagged isDestination.
+  // portCalls[0] is the ORIGIN — never use index 0 for ETA.
+  const portCalls: any[] = Array.isArray(entry.portCalls) ? entry.portCalls : [];
+  const destPortCall =
+    portCalls.find((p: any) => p.isDestination === true || p.isDestination === "true") ??
+    (portCalls.length > 0 ? portCalls[portCalls.length - 1] : null);
+
   const etaRaw =
     entry.eta ??
     entry.estimatedTimeOfArrival ??
@@ -209,7 +216,8 @@ function parseResponse(
     entry.predictedETA ??
     entry.latestEstimatedArrival ??
     entry.scheduledArrival ??
-    entry.portCalls?.[0]?.eta ??
+    destPortCall?.eta ??
+    destPortCall?.estimatedArrival ??
     entry.legs?.[entry.legs?.length - 1]?.eta ??
     entry.legs?.[entry.legs?.length - 1]?.estimatedArrival ??
     entry.containers?.[0]?.eta ??

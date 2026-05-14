@@ -92,11 +92,25 @@ function parseEvents(rawEvents: unknown): TrackingEvent[] {
 }
 
 function pickEta(obj: any): string | null {
+  if (!obj) return null;
+
+  // portCalls: destination is the last entry or explicitly flagged isDestination.
+  // NEVER use portCalls[0] — that is the origin.
+  const portCalls: any[] = Array.isArray(obj.portCalls) ? obj.portCalls : [];
+  const destPortCall =
+    portCalls.find((p: any) => p.isDestination === true || p.isDestination === "true") ??
+    (portCalls.length > 0 ? portCalls[portCalls.length - 1] : null);
+
   const raw =
-    obj?.eta ??
-    obj?.estimatedArrival ??
-    obj?.estimatedTimeOfArrival ??
-    obj?.estimatedDelivery ??
+    destPortCall?.eta ??
+    destPortCall?.estimatedArrival ??
+    destPortCall?.estimatedTimeOfArrival ??
+    obj.eta ??
+    obj.estimatedArrival ??
+    obj.estimatedTimeOfArrival ??
+    obj.estimatedDelivery ??
+    obj.portOfDischarge?.eta ??
+    obj.portOfDischarge?.estimatedArrival ??
     null;
   const d = parseDate(raw);
   return d ? d.toISOString().slice(0, 10) : null;
