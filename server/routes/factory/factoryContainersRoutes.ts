@@ -155,6 +155,49 @@ export function registerFactoryContainersRoutes(app: Express) {
     }
   });
 
+  // ── GET single container by ID ────────────────────────────────────────────
+  app.get("/api/factory/containers/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+      const [row] = await db
+        .select({
+          id: factoryContainers.id,
+          containerNumber: factoryContainers.containerNumber,
+          supplierId: factoryContainers.supplierId,
+          origin: factoryContainers.origin,
+          totalKg: factoryContainers.totalKg,
+          declaredKg: factoryContainers.declaredKg,
+          actualReceivedKg: factoryContainers.actualReceivedKg,
+          ratePerKg: factoryContainers.ratePerKg,
+          ratePerKgUsd: factoryContainers.ratePerKgUsd,
+          currencyCode: factoryContainers.currencyCode,
+          fxRateToUsd: factoryContainers.fxRateToUsd,
+          finalPayableAmount: factoryContainers.finalPayableAmount,
+          finalPayableAmountUsd: factoryContainers.finalPayableAmountUsd,
+          freight: factoryContainers.freight,
+          freightCurrencyCode: factoryContainers.freightCurrencyCode,
+          otherCharges: factoryContainers.otherCharges,
+          commissionAmount: factoryContainers.commissionAmount,
+          commissionCurrencyCode: factoryContainers.commissionCurrencyCode,
+          commissionSupplierId: factoryContainers.commissionSupplierId,
+          arrivalDate: factoryContainers.arrivalDate,
+          status: factoryContainers.status,
+          notes: factoryContainers.notes,
+          supplierName: factorySuppliers.name,
+        })
+        .from(factoryContainers)
+        .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
+        .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId)));
+      if (!row) return res.status(404).json({ message: "Container not found" });
+      res.json(row);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/containers", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
