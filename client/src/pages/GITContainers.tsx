@@ -1590,7 +1590,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
   const trackingEnabledCount = allContainers.filter((c) => c.trackingEnabled).length;
 
-  const filtered = useMemo(() => {
+  const filteredContainers = useMemo(() => {
     return allContainers.filter((c) => {
       if (companyFilter !== "ALL" && c.companyName !== companyFilter) return false;
       if (transporterFilters.length > 0 && !transporterFilters.includes(c.transporter ?? "")) return false;
@@ -1850,7 +1850,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
               variant="outline"
               size="default"
               onClick={sendToWhatsApp}
-              disabled={waSending || filtered.length === 0}
+              disabled={waSending || filteredContainers.length === 0}
               data-testid="button-send-wa-containers"
             >
               {waSending
@@ -2144,7 +2144,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
         {/* ── Results count + Legend ── */}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <p className="text-xs text-muted-foreground">
-            Showing {filtered.length} of {allContainers.length} active containers — click a row to edit
+            Showing {filteredContainers.length} of {allContainers.length} active containers — click a row to edit
           </p>
           <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
@@ -2186,7 +2186,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.length === 0 ? (
+              {filteredContainers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={20} className="text-center py-8 text-muted-foreground">
                     {allContainers.length === 0
@@ -2195,7 +2195,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((c, i) => {
+                filteredContainers.map((c, i) => {
                   const statusMeta = STATUS_META[c.status] ?? STATUS_META["Closed"];
                   const rowBg = c.isOverdue
                     ? "bg-red-50/50 dark:bg-red-950/20"
@@ -2321,7 +2321,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: "22px", fontWeight: 700, color: "#f1f5f9" }}>
-              {filtered.length} Container{filtered.length !== 1 ? "s" : ""}
+              {filteredContainers.length} Container{filteredContainers.length !== 1 ? "s" : ""}
             </div>
             <div style={{ fontSize: "13px", color: "#8b949e", marginTop: "2px" }}>
               {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
@@ -2381,7 +2381,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
           <tbody>
             {(() => {
               const groups: { company: string; rows: EnrichedContainerRow[] }[] = [];
-              for (const c of filtered) {
+              for (const c of filteredContainers) {
                 const last = groups[groups.length - 1];
                 if (last && last.company === c.companyName) last.rows.push(c);
                 else groups.push({ company: c.companyName, rows: [c] });
