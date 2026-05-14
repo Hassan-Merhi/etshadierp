@@ -26,11 +26,12 @@ import {
 } from "../services/containerTrackingService";
 import { testConnection } from "../lib/parcelsAppClient";
 import { isConfigured as isMaerskConfigured } from "../lib/trackingProviders/maerskProvider";
-import { isEnabled as isMaerskPublicEnabled } from "../lib/trackingProviders/maerskPublicProvider";
+import { isEnabled as isMaerskPublicEnabled, track as maerskPublicTrack } from "../lib/trackingProviders/maerskPublicProvider";
 import { isEnabled as isCmaPublicEnabled } from "../lib/trackingProviders/cmaPublicProvider";
 import { isConfigured as is17trackConfigured, getMonthlyLimit as get17trackLimit } from "../lib/trackingProviders/seventeenTrackProvider";
 import { isScraperAvailable } from "../lib/parcelsAppScraper";
 import { isHttpScraperAvailable } from "../lib/httpTrackingScraper";
+import { scrapeMaerskDirect, isMaerskDirectScraperAvailable, deepScanForEta } from "../lib/maerskDirectScraper";
 
 const ALLOWED_ROLES = ["Admin", "Developer", "Owner"] as const;
 
@@ -300,6 +301,82 @@ export function registerContainerTrackingRoutes(app: Express) {
     } catch (err: any) {
       res.status(500).json({ message: err?.message ?? "Bulk track failed" });
     }
+  });
+
+  // POST /api/container-tracking/:id/debug-eta
+  // Runs maersk_direct and maersk_public against a container and returns
+  // safe diagnostic JSON (no API keys, no full payloads) describing what
+  // each provider returned and where the ETA was or was not found.
+  app.post("/api/container-tracking/:id/debug-eta", requireAuth, async (req: Request, res: Response) => {
+    if (!requireAllowedRole(req, res)) return;
+    const containerId = parseInt(req.params.id, 10);
+    if (isNaN(containerId)) { res.status(400).json({ message: "Invalid container ID" }); return; }
+
+    const [row] = await db
+      .select({ containerNumber: containers.containerNumber, eta: containers.eta })
+      .from(containers)
+      .where(eq(containers.id, containerId))
+      .limit(1);
+
+    if (!row) { res.status(404).json({ message: "Container not found" }); return; }
+
+    const { containerNumber, eta: currentEta } = row;
+    const providersAttempted: Array<Record<string, unknown>> = [];
+    let finalEta: string | null = null;
+    let finalReason = "No provider returned an ETA";
+
+    // ── maersk_direct ─────────────────────────────────────────────────────────
+    const directAvailable = isMaerskDirectScraperAvailable();
+    if (directAvailable) {
+      console.log(`[DebugEta] ${containerNumber}: running maersk_direct…`);
+      try {
+        const r = await scrapeMaerskDirect(containerNumber);
+        const deepEta = !r.eta ? deepScanForEta(r.raw ?? {}) : null;
+        const etaFound = r.eta ?? deepEta?.value ?? null;
+        if (etaFound && !finalEta) { finalEta = etaFound; finalReason = `maersk_direct returned ETA=${etaFound}`; }
+        providersAttempted.push({
+          provider: "maersk_direct",
+          success: r.success,
+          etaFound,
+          status: r.latestStatus,
+          error: r.error ?? null,
+          deepScanPath: deepEta?.path ?? null,
+          blocked: (r as any).blocked ?? false,
+        });
+      } catch (e: any) {
+        providersAttempted.push({ provider: "maersk_direct", success: false, etaFound: null, error: e?.message });
+      }
+    } else {
+      providersAttempted.push({ provider: "maersk_direct", success: false, etaFound: null, error: "puppeteer_not_available" });
+    }
+
+    // ── maersk_public ─────────────────────────────────────────────────────────
+    console.log(`[DebugEta] ${containerNumber}: running maersk_public…`);
+    try {
+      const r = await maerskPublicTrack(containerNumber);
+      const deepEta = !r.eta ? deepScanForEta(r.raw ?? {}) : null;
+      const etaFound = r.eta ?? deepEta?.value ?? null;
+      if (etaFound && !finalEta) { finalEta = etaFound; finalReason = `maersk_public returned ETA=${etaFound}`; }
+      providersAttempted.push({
+        provider: "maersk_public",
+        success: r.success,
+        etaFound,
+        status: r.latestStatus,
+        error: r.error ?? null,
+        deepScanPath: deepEta?.path ?? null,
+        blocked: (r as any).blocked ?? false,
+      });
+    } catch (e: any) {
+      providersAttempted.push({ provider: "maersk_public", success: false, etaFound: null, error: e?.message });
+    }
+
+    res.json({
+      containerNumber,
+      currentEtaInDb: currentEta ?? null,
+      providersAttempted,
+      finalEta,
+      reason: finalReason,
+    });
   });
 
   // PATCH /api/container-tracking/:id/settings

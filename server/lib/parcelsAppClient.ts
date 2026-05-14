@@ -121,7 +121,16 @@ async function initiateTracking(
     done?: boolean;
     shipments?: ParcelsAppShipment[];
     fromCache?: boolean;
+    error?: string;
   };
+
+  // ParcelsApp occasionally returns {"error":"BUSY"} when its workers are
+  // saturated — throw a typed error so callers can retry.
+  if (data.error === "BUSY") {
+    const e = new Error("ParcelsApp POST: server busy (BUSY)") as Error & { isBusy: boolean };
+    e.isBusy = true;
+    throw e;
+  }
 
   // ParcelsApp has three valid POST response shapes:
   //  A. { uuid, done:false }           → need to poll
@@ -130,7 +139,7 @@ async function initiateTracking(
   // Only throw if there is truly nothing usable.
   const hasShipments = (data.shipments?.length ?? 0) > 0;
   if (!data.uuid && !data.done && !hasShipments) {
-    throw new Error("ParcelsApp POST: no uuid in response");
+    throw new Error(`ParcelsApp POST: no uuid in response (raw=${JSON.stringify(data).slice(0, 120)})`);
   }
 
   // If shipments are present but uuid / done are missing, treat as immediately done.
@@ -205,8 +214,29 @@ export async function trackContainer(
 
   let rawResponse: unknown = null;
 
+  // Retry on BUSY up to 3 times with a 6-second back-off, then proceed.
+  const MAX_BUSY_RETRIES = 3;
+  const BUSY_RETRY_DELAY_MS = 6_000;
+
+  async function initiateWithRetry() {
+    for (let attempt = 0; attempt <= MAX_BUSY_RETRIES; attempt++) {
+      try {
+        return await initiateTracking(containerNumber, destinationCountry, carrier);
+      } catch (err: any) {
+        if (err?.isBusy && attempt < MAX_BUSY_RETRIES) {
+          console.warn(`[ParcelsApp] ${containerNumber}: BUSY — retry ${attempt + 1}/${MAX_BUSY_RETRIES} in ${BUSY_RETRY_DELAY_MS / 1000}s`);
+          await sleep(BUSY_RETRY_DELAY_MS);
+          continue;
+        }
+        throw err;
+      }
+    }
+    // unreachable — loop always returns or throws — but TS needs this
+    throw new Error("initiateWithRetry: unexpected exit");
+  }
+
   try {
-    const initiated = await initiateTracking(containerNumber, destinationCountry, carrier);
+    const initiated = await initiateWithRetry();
     rawResponse = initiated;
 
     if (initiated.done) {
@@ -338,8 +368,11 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
     return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
   };
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   // 1. Check top-level shipment fields that ParcelsApp returns directly.
-  //    Only genuine future-oriented / ETA fields — never delivered_by (past).
+  //    Try explicitly-named ETA fields first, then delivered_by as a future-only fallback.
+  //    delivered_by is excluded here; it's checked at the end only when it's a future date.
   const topLevel = [
     shipment.estimatedArrival,
     shipment.estimatedDeliveryDate,
@@ -398,6 +431,19 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
     if (!val || !etaKeyPattern.test(key)) continue;
     const d = tryDate(val);
     if (d) return d;
+  }
+
+  // Last resort: ParcelsApp sometimes puts the predicted arrival in `delivered_by`.
+  // It can also be a past actual-delivery date, so only use it when the date is
+  // strictly in the future (> today).  This is the ONLY circumstance where we
+  // use delivered_by — never for containers that have already been delivered.
+  const deliveredByRaw = (shipment as any).delivered_by as string | undefined;
+  if (deliveredByRaw) {
+    const d = tryDate(deliveredByRaw);
+    if (d && d > todayStr) {
+      console.log(`[ParcelsApp] deriveEDD: using delivered_by=${deliveredByRaw} as future ETA (${d})`);
+      return d;
+    }
   }
 
   // No real ETA field found — return null so the caller can preserve

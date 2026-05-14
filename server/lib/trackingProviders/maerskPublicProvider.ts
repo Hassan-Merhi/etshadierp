@@ -149,6 +149,37 @@ function parseDate(raw: unknown): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+/**
+ * Recursively search any JSON object for keys that explicitly mean ETA/estimated
+ * arrival.  Used as a supplemental pass after the primary field-path extraction,
+ * in case Maersk restructures their API response shape.
+ * Returns the first valid YYYY-MM-DD string found, or null.
+ */
+const DEEP_ETA_KEY_RE =
+  /^(eta|estimatedArrival|estimatedTimeOfArrival|plannedArrival|plannedArrivalDate|scheduledArrival|predictiveEstimatedArrival|latestEstimatedArrival|arrivalDate|vesselArrival|portArrival|destinationEstimatedArrival)$/i;
+
+function deepScanForEta(obj: unknown, depth = 0): { path: string; value: string } | null {
+  if (depth > 12 || !obj || typeof obj !== "object") return null;
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const r = deepScanForEta(item, depth + 1);
+      if (r) return r;
+    }
+    return null;
+  }
+  for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+    if (DEEP_ETA_KEY_RE.test(k) && typeof v === "string" && v.trim()) {
+      const d = new Date(v);
+      if (!isNaN(d.getTime())) return { path: k, value: d.toISOString().slice(0, 10) };
+    }
+    if (v && typeof v === "object") {
+      const r = deepScanForEta(v, depth + 1);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+
 function parseResponse(
   containerNumber: string,
   data: unknown,
@@ -228,7 +259,22 @@ function parseResponse(
     d.estimatedTimeOfArrival ??
     null;
   const etaDate = parseDate(etaRaw);
-  const eta = etaDate ? etaDate.toISOString().slice(0, 10) : null;
+  let eta = etaDate ? etaDate.toISOString().slice(0, 10) : null;
+
+  // ── Supplemental: recursive deep-scan for any ETA key we may have missed ────
+  // Runs only when the primary field-path chain found nothing, so it never
+  // overrides an already-extracted ETA.
+  let deepEtaPath: string | null = null;
+  if (!eta) {
+    const deepResult = deepScanForEta(data);
+    if (deepResult) {
+      eta = deepResult.value;
+      deepEtaPath = deepResult.path;
+      console.log(
+        `[MaerskPublic] ${containerNumber}: ETA from deep-scan path=${deepResult.path} val=${deepResult.value}`,
+      );
+    }
+  }
 
   if (!latest && !eta) {
     console.log(`[MaerskPublic] ${containerNumber}: response parseable but no useful data`);
@@ -236,7 +282,8 @@ function parseResponse(
   }
 
   console.log(
-    `[MaerskPublic] ${containerNumber}: success — status=${latest?.status ?? "?"} events=${events.length}`,
+    `[MaerskPublic] ${containerNumber}: success — status=${latest?.status ?? "?"} events=${events.length}` +
+    ` eta=${eta ?? "none"}${deepEtaPath ? ` (deep-scan path=${deepEtaPath})` : ""}`,
   );
 
   return {

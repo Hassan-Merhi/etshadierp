@@ -939,7 +939,10 @@ async function trackViaParcelsApp(
 
   // ── Attempt 1: Maersk direct Puppeteer scraper (intercepts Maersk's own API) ──
   // Only for Maersk-family containers (MAERSK, Hamburg Süd, etc.)
-  const MAERSK_PREFIXES = /^(MAEU|MSKU|MRKU|MRSU|HASU|HJSC|HJCU|SUDU|SAFM)/i;
+  // CAJU is a CMA-owned prefix but is operated by Maersk (MAEU) on some services.
+  // Maersk.com tracks CAJU containers when operator=MAEU, so include it here so
+  // maersk_direct and maersk_public are attempted before falling back to CMA/ParcelsApp.
+  const MAERSK_PREFIXES = /^(MAEU|MSKU|MRKU|MRSU|HASU|HJSC|HJCU|SUDU|SAFM|CAJU)/i;
   if (isMaerskDirectScraperAvailable() && MAERSK_PREFIXES.test(containerNumber)) {
     ep(containerId, "Maersk Puppeteer", "running");
     console.log(`[ContainerTracking] ${containerNumber}: trying Maersk direct scraper...`);
