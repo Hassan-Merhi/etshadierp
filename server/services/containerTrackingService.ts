@@ -47,6 +47,7 @@ import { scrapeMaerskDirect, isMaerskDirectScraperAvailable } from "../lib/maers
 import * as maerskPublicProvider from "../lib/trackingProviders/maerskPublicProvider";
 import * as seventeenTrack from "../lib/trackingProviders/seventeenTrackProvider";
 import * as cmaPublicProvider from "../lib/trackingProviders/cmaPublicProvider";
+import * as cmaCgmApiProvider from "../lib/trackingProviders/cmaCgmApiProvider";
 import { resolveProvider } from "../lib/trackingProviders/providerResolver";
 import type { CarrierTrackResult } from "../lib/trackingProviders/types";
 import {
@@ -1113,13 +1114,58 @@ async function trackViaParcelsApp(
   }
 
   // ── CMA provider chain ────────────────────────────────────────────────────────
-  // CMA CGM's own website is DataDome-protected so the HTTP scraper fast-fails.
-  // Try their undocumented public JSON endpoint first (free, no API key), then
-  // 17track, then ParcelsApp API.  Skip the Puppeteer browser scraper — it only
-  // scrapes parcelsapp.com which is tried explicitly further down.
+  // Priority order:
+  //   1. CMA CGM Official DCSA API (api key, most accurate ETA)
+  //   2. CMA CGM public JSON endpoint (free, no key, often blocked by DataDome)
+  //   3. 17track
+  //   4. ParcelsApp API
   const CMA_PREFIXES = /^(CMAU|CMDU|APZU|CGMU|APMU|APHU|CXDU|CAAU|CAJU|CAIU)/i;
   if (CMA_PREFIXES.test(containerNumber)) {
-    console.log(`[ContainerTracking] ${containerNumber}: CMA detected — trying CMA public endpoint...`);
+    console.log(`[ContainerTracking] ${containerNumber}: CMA detected — trying CMA CGM official API...`);
+
+    // ── Step 1: CMA CGM Official DCSA Track & Trace API ──────────────────────
+    if (cmaCgmApiProvider.isConfigured()) {
+      const apiResult = await cmaCgmApiProvider.track(containerNumber);
+      await saveTrackingCheck(
+        containerId,
+        "cma_cgm_api",
+        apiResult.success ? "success" : apiResult.noData ? "no_data" : "error",
+        apiResult.error ?? null,
+        apiResult.raw ?? null,
+      );
+
+      if (apiResult.success && (apiResult.latestStatus || apiResult.events.length > 0)) {
+        await saveDirectEvents(containerId, apiResult);
+        const { eta: finalEta, source: etaSrc } = resolveEtaFromProvider(
+          apiResult.eta ?? null,
+          apiResult.events,
+          currentEta,
+        );
+        logEtaResolution(containerNumber, "cma_cgm_api", currentEta, apiResult.eta ?? null, finalEta, etaSrc);
+        const updateSet: Record<string, unknown> = {
+          trackingLastCheckedAt: now,
+          trackingLastStatus: apiResult.latestStatus,
+          trackingLastEventDate: apiResult.latestEventDate,
+          trackingLastDescription: apiResult.latestDescription,
+          trackingError: null,
+          trackingChangedAt: now,
+          trackingProvider: "cma_cgm_api",
+          trackingDetectedCarrier: detectedCarrier,
+          trackingFallbackUsed: !!fallbackReason,
+          trackingFallbackReason: fallbackReason,
+        };
+        if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
+        await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+        await logAndConfirmEta(
+          containerId, containerNumber, currentEta, finalEta, etaSrc, "cma_cgm_api",
+          !finalEta ? "no ETA from CMA CGM official API" : undefined,
+        );
+        console.log(`[ContainerTracking] ${containerNumber} → cma_cgm_api: status=${apiResult.latestStatus ?? "?"} eta=${finalEta ?? "none"}`);
+        return { success: true, lastStatus: apiResult.latestStatus, lastLocation: apiResult.latestLocation, lastDescription: apiResult.latestDescription, lastCheckedAt: now, error: null };
+      }
+
+      console.log(`[ContainerTracking] ${containerNumber}: CMA official API returned no data (${apiResult.error}) — trying public endpoint...`);
+    }
 
     if (cmaPublicProvider.isEnabled()) {
       const cmaResult = await cmaPublicProvider.track(containerNumber);

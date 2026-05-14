@@ -54,3 +54,4 @@ timeoutMs = 20000
 [userenv.shared]
 PUBLIC_CARRIER_TRACKING_ENABLED = "true"
 CMA_PUBLIC_TRACKING_ENABLED = "true"
+CMA_CGM_API_KEY = "kEeKGT2FtWdeP1peQ2SGVv36d2gnKdpv"
