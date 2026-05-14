@@ -1368,7 +1368,7 @@ export default function FactoryDaybook() {
                       <TableHead className="w-[18%]">Type</TableHead>
                       <TableHead className="w-[43%]">Description</TableHead>
                       {showAmounts && <TableHead className="w-[12%] text-right whitespace-nowrap">Amount</TableHead>}
-                      <TableHead className="w-[15%]"></TableHead>
+                      <TableHead className="w-[15%] text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1477,7 +1477,9 @@ export default function FactoryDaybook() {
                           )}
                           {/* ACTIONS cell */}
                           <TableCell className="w-[15%] py-4">
-                            {renderEntryActions(entry)}
+                            <div className="flex justify-end">
+                              {renderEntryActions(entry)}
+                            </div>
                           </TableCell>
                         </TableRow>
                         {isInlineExpanded && (
