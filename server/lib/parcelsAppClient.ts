@@ -78,13 +78,16 @@ function getApiKey(): string | null {
  */
 async function initiateTracking(
   trackingId: string,
-  destinationCountry = "United States",
+  destinationCountry: string | null | undefined = "United States",
   carrier?: string,
 ): Promise<{ uuid: string; done: boolean; shipments: ParcelsAppShipment[]; fromCache: boolean }> {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("PARCELSAPP_API_KEY is not configured");
 
-  const shipmentEntry: Record<string, string> = { trackingId, destinationCountry };
+  const shipmentEntry: Record<string, string> = {
+    trackingId,
+    destinationCountry: destinationCountry ?? "United States",
+  };
   if (carrier) shipmentEntry.carrier = carrier;
 
   const body = {
