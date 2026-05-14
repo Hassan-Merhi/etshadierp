@@ -1353,20 +1353,22 @@ export default function FactoryDaybook() {
               </div>
 
               {/* Desktop table */}
-              <div className="hidden md:block overflow-x-auto" style={{ width: "calc(100% + 2rem)", margin: "0 -1rem" }}>
-                <Table className="w-full table-fixed" style={{ minWidth: "100%" }}>
+              <div className="hidden md:block w-full overflow-x-auto">
+                <Table className="w-full table-fixed">
                   <colgroup>
-                    <col style={{ width: "15%" }} />
-                    <col style={{ width: showAmounts ? "65%" : "80%" }} />
-                    {showAmounts && <col style={{ width: "12%" }} />}
-                    <col style={{ width: "8%" }} />
+                    <col className="w-[12%]" />
+                    <col className="w-[18%]" />
+                    <col className="w-[43%]" />
+                    {showAmounts && <col className="w-[12%]" />}
+                    <col className="w-[15%]" />
                   </colgroup>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead className="whitespace-nowrap">Date</TableHead>
-                      <TableHead>Description</TableHead>
-                      {showAmounts && <TableHead className="text-right whitespace-nowrap">Amount</TableHead>}
-                      <TableHead></TableHead>
+                      <TableHead className="w-[12%] whitespace-nowrap">Date</TableHead>
+                      <TableHead className="w-[18%]">Type</TableHead>
+                      <TableHead className="w-[43%]">Description</TableHead>
+                      {showAmounts && <TableHead className="w-[12%] text-right whitespace-nowrap">Amount</TableHead>}
+                      <TableHead className="w-[15%]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1381,7 +1383,7 @@ export default function FactoryDaybook() {
                       const { variant: bv, className: bc } = getFactoryTxTypeBadge(entry.txType);
                       const showDateSep = entry.txDate !== prevDate;
                       if (showDateSep) prevDate = entry.txDate;
-                      const colSpan = 2 + (showAmounts ? 1 : 0) + 1;
+                      const colSpan = 3 + (showAmounts ? 1 : 0) + 1;
                       const dayEntries = showDateSep
                         ? visibleEntries.filter((e) => e.txDate === entry.txDate)
                         : [];
@@ -1430,12 +1432,16 @@ export default function FactoryDaybook() {
                             }
                           }}
                         >
-                          <TableCell className="whitespace-nowrap py-4">
+                          {/* DATE cell — date + time only */}
+                          <TableCell className="w-[12%] whitespace-nowrap py-4">
                             <div className="font-medium text-sm">{formatDisplayDate(entry.txDate + "T00:00:00")}</div>
                             <div className="text-xs text-muted-foreground mt-0.5 font-mono">
                               {formatDisplayTime(entry.createdAt)}
                             </div>
-                            <div className="flex items-center gap-1 flex-wrap mt-1">
+                          </TableCell>
+                          {/* TYPE cell — badge + optional + expand indicator */}
+                          <TableCell className="w-[18%] py-4">
+                            <div className="flex items-center gap-1 flex-wrap">
                               <Badge variant={bv} className={cn(bc, "whitespace-nowrap")} data-testid={`badge-type-${entry.id}`}>
                                 {formatTxType(entry.txType)}
                               </Badge>
@@ -1456,18 +1462,21 @@ export default function FactoryDaybook() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="py-4 max-w-xs truncate" title={formatDaybookDescription(entry)}>
+                          {/* DESCRIPTION cell */}
+                          <TableCell className="w-[43%] py-4 truncate" title={formatDaybookDescription(entry)}>
                             {formatDaybookDescription(entry)}
                           </TableCell>
+                          {/* AMOUNT cell */}
                           {showAmounts && (
-                            <TableCell className="py-4 text-right">
+                            <TableCell className="w-[12%] py-4 text-right">
                               <div className="font-mono font-semibold">{currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency || "0"))}</div>
                               {entry.currencyCode !== "USD" && parseFloat(entry.amountUsd || "0") > 0 && (
                                 <div className="text-xs text-muted-foreground font-mono mt-0.5">${formatNumber(parseFloat(entry.amountUsd))}</div>
                               )}
                             </TableCell>
                           )}
-                          <TableCell className="py-4">
+                          {/* ACTIONS cell */}
+                          <TableCell className="w-[15%] py-4">
                             {renderEntryActions(entry)}
                           </TableCell>
                         </TableRow>
