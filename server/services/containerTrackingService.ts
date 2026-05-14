@@ -900,6 +900,7 @@ async function trackViaParcelsApp(
       const lastEventDate   = deriveLastEventDate(shipment);
       const lastDescription = shipment.states?.[0]?.description ?? null;
       const { eta: finalEta, source: etaSrc } = resolveEtaFromShipment(shipment, currentEta);
+      logEtaResolution(containerNumber, "http_scraper", currentEta, finalEta, finalEta, etaSrc);
 
       await saveParcelsAppEvents(containerId, shipment);
 
@@ -919,7 +920,7 @@ async function trackViaParcelsApp(
       await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
       await logAndConfirmEta(
         containerId, containerNumber, currentEta, finalEta, etaSrc, "http_scraper",
-        !finalEta ? "no ETA derived from shipment states" : undefined,
+        !finalEta ? "no explicit ETA field found — existing ETA preserved" : undefined,
       );
 
       ep(containerId, "HTTP scraper", "success", lastStatus ?? "got data");
@@ -1401,7 +1402,7 @@ async function trackViaParcelsAppApi(
         trackingFallbackReason: fallbackReason,
       } as any)
       .where(eq(containers.id, containerId));
-    await backfillEtaFromEvents(containerId);
+    // backfillEtaFromEvents removed — event dates must not be used as ETA
     return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: result.error ?? "Tracking failed" };
   }
 
@@ -1411,6 +1412,7 @@ async function trackViaParcelsAppApi(
   const lastEventDate   = deriveLastEventDate(shipment);
   const lastDescription = shipment.states?.[0]?.description ?? null;
   const { eta: finalEta, source: etaSrc } = resolveEtaFromShipment(shipment, currentEta);
+  logEtaResolution(containerNumber, "parcelsapp", currentEta, finalEta, finalEta, etaSrc);
 
   console.log(`[ContainerTracking] ${containerNumber} raw attributes:`, JSON.stringify(shipment.attributes ?? {}));
   await saveParcelsAppEvents(containerId, shipment);
@@ -1431,7 +1433,7 @@ async function trackViaParcelsAppApi(
   await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
   await logAndConfirmEta(
     containerId, containerNumber, currentEta, finalEta, etaSrc, "parcelsapp",
-    !finalEta ? "no ETA derived from shipment states" : undefined,
+    !finalEta ? "no explicit ETA field found — existing ETA preserved" : undefined,
   );
 
   ep(containerId, "ParcelsApp API", "success", lastStatus ?? "got data");

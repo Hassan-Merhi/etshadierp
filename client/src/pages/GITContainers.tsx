@@ -486,8 +486,8 @@ function ContainerDrawer({
       // 202 fire-and-forget: tracking is running in the background
       if ("started" in data && data.started) {
         toast({
-          title: `Tracking ${data.containerNumber}…`,
-          description: "Running in the background — results will appear shortly.",
+          title: "Tracking started",
+          description: "Results will refresh shortly.",
         });
         // Poll every 8 s for up to 80 s so the UI refreshes once tracking finishes
         let polls = 0;

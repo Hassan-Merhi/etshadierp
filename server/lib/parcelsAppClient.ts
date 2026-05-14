@@ -323,11 +323,12 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
   const attrs = shipment.attributes;
 
   if (attrs) {
-    // All known field names ParcelsApp uses for ETA across carrier integrations
+    // Only genuine future-oriented ETA / estimated-arrival fields.
+    // Deliberately excluded: ata, ATA, actualArrivalDate, actualDeliveryDate,
+    // dischargeDate — those are past/actual dates, not future estimates.
     const candidates = [
       attrs.estimatedDeliveryDate,
       attrs.estimatedDelivery,
-      attrs.deliveryDate,
       attrs.expectedDelivery,
       attrs.estimatedArrival,
       attrs.estimatedTimeOfArrival,
@@ -335,14 +336,8 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
       attrs.plannedArrival,
       attrs.plannedArrivalDate,
       attrs.predictedETA,
-      attrs.arrivalDate,
       attrs.eta,
       attrs.ETA,
-      attrs.ata,                // Actual Time of Arrival
-      attrs.ATA,
-      attrs.actualArrivalDate,
-      attrs.actualDeliveryDate,
-      attrs.dischargeDate,
     ];
 
     for (const raw of candidates) {
@@ -353,8 +348,10 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
       }
     }
 
-    // Catch-all: scan every attribute key for anything that looks like an ETA field
-    const etaKeyPattern = /eta|arrival|deliver|discharge|berth/i;
+    // Catch-all: scan attribute keys for unambiguous ETA/estimated-arrival terms.
+    // Explicitly excluded patterns: actual, ata, discharge, berth, gate, loaded,
+    // departed, movement — those all describe past events, not future ETAs.
+    const etaKeyPattern = /^(eta|estimatedArrival|estimatedDelivery|expectedDelivery|scheduledArrival|plannedArrival|predictedETA)/i;
     for (const [key, val] of Object.entries(attrs)) {
       if (!val || !etaKeyPattern.test(key)) continue;
       const d = new Date(val);
@@ -364,19 +361,8 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
     }
   }
 
-  // Last resort: use the most recent state date — always, regardless of whether
-  // the container has arrived. A past date (e.g. gate-out date) is still
-  // meaningful to show in the ETA column so it's never left blank after tracking.
-  if (shipment.states?.length) {
-    const sorted = shipment.states
-      .filter((s) => !!s.date)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    if (sorted[0]?.date) {
-      const d = new Date(sorted[0].date);
-      if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
-    }
-  }
-
+  // No real ETA field found — return null so the caller can preserve
+  // whatever ETA is already stored in the DB. Never use state/event dates.
   return null;
 }
 
