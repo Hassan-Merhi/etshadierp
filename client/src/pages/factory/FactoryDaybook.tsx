@@ -1606,7 +1606,7 @@ export default function FactoryDaybook() {
                   : "grid-cols-[minmax(0,1fr)_100px]",
               )}>
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Date / Type</span>
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-right">Count</span>
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-center">Count</span>
                 {showAmounts && <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-right">Total</span>}
               </div>
 
@@ -1655,7 +1655,7 @@ export default function FactoryDaybook() {
                                   : <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />}
                                 <Badge variant={bv} className={cn(bc, "whitespace-nowrap")}>{formatTxType(row.txType)}</Badge>
                               </div>
-                              <div className="text-right text-muted-foreground text-sm font-mono">{row.count}</div>
+                              <div className="text-center text-muted-foreground text-sm font-mono">{row.count}</div>
                               {showAmounts && (
                                 <div className="text-right font-mono font-medium text-sm">
                                   {currencySymbol(row.currencyCode)}{formatNumber(row.totalAmountCurrency)}
