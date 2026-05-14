@@ -27,8 +27,6 @@ import { PageHeader } from "@/components/PageHeader";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -3756,11 +3754,23 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   };
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <PageHeader 
-        title={isPOS ? "Stock Transfer" : "Vouchers"}
-        subtitle={isPOS ? "Transfer stock between locations" : "Manage payments, receipts, journals and inventory transactions"}
-      />
+    <div className="space-y-4 md:space-y-5">
+      {/* Page header */}
+      {isPOS ? (
+        <PageHeader
+          title="Stock Transfer"
+          subtitle="Transfer stock between locations"
+        />
+      ) : (
+        <div className="flex items-start justify-between gap-3 pb-4 border-b">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight">Vouchers</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Payments, receipts, journals and inventory transactions
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Hidden print template */}
       {!isPOS && (
@@ -3783,27 +3793,27 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       {/* Mobile tab selector — scrollable pills, visible on small screens only */}
       {!isPOS && (
         <div className="sm:hidden -mx-4 px-4 overflow-x-auto">
-          <div className="flex gap-2 pb-1 w-max">
+          <div className="flex gap-1.5 pb-1 w-max">
             {sidebarGroups.flatMap((group) =>
               group.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.key;
                 return (
-                  <Button
+                  <button
                     key={item.key}
                     type="button"
-                    variant="outline"
-                    size="sm"
                     onClick={() => setActiveTab(item.key as typeof activeTab)}
                     data-testid={`tab-mobile-${item.key}`}
                     className={cn(
-                      "shrink-0 gap-1.5",
-                      isActive && "bg-primary text-primary-foreground border-primary hover:bg-primary/90"
+                      "shrink-0 inline-flex items-center gap-1.5 px-3 h-8 rounded-lg text-sm font-medium border transition-colors",
+                      isActive
+                        ? "bg-accent text-accent-foreground border-accent/60"
+                        : "bg-transparent text-muted-foreground border-border hover:bg-muted/60 hover:text-foreground"
                     )}
                   >
-                    <Icon className="h-3.5 w-3.5" />
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
                     {item.label}
-                  </Button>
+                  </button>
                 );
               })
             )}
@@ -3811,34 +3821,35 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         </div>
       )}
 
-      <div className="flex gap-6">
+      <div className="flex gap-5">
         {!isPOS && (
-          <nav className="hidden sm:block w-52 shrink-0 space-y-4">
-            {sidebarGroups.map((group) => (
+          <nav className="hidden sm:flex flex-col w-48 shrink-0 rounded-xl border bg-card p-2 gap-3 self-start sticky top-4" style={{ zIndex: 10 }}>
+            {sidebarGroups.map((group, groupIdx) => (
               <div key={group.label}>
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-2">
+                {groupIdx > 0 && <div className="border-t -mx-2 mb-1" />}
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest px-2 mb-1 mt-0.5">
                   {group.label}
-                </h3>
+                </p>
                 <div className="space-y-0.5">
                   {group.items.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeTab === item.key;
                     return (
-                      <Button
+                      <button
                         key={item.key}
                         type="button"
-                        variant="ghost"
-                        size="sm"
                         onClick={() => setActiveTab(item.key as typeof activeTab)}
                         data-testid={`tab-${item.key}`}
                         className={cn(
-                          "w-full justify-start gap-2.5 font-normal",
-                          isActive && "toggle-elevate toggle-elevated font-medium"
+                          "w-full flex items-center gap-2.5 px-2.5 h-8 rounded-lg text-sm transition-colors text-left",
+                          isActive
+                            ? "bg-accent text-accent-foreground font-medium"
+                            : "text-muted-foreground hover:bg-muted/60 hover:text-foreground font-normal"
                         )}
                       >
-                        <Icon className="h-4 w-4 shrink-0" />
+                        <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-accent-foreground" : "text-muted-foreground")} />
                         {item.label}
-                      </Button>
+                      </button>
                     );
                   })}
                 </div>
@@ -3997,10 +4008,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             <div className="flex flex-col lg:flex-row gap-4">
               {/* Left Panel - Form */}
               <Card className="flex-1 min-w-0">
-                <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="text-base sm:text-lg">Journal Voucher</CardTitle>
-                </CardHeader>
-                <CardContent>
+                <CardContent className="pt-5">
+                <div className="flex items-center gap-2 mb-5">
+                  <span className="text-sm font-semibold">Journal Voucher</span>
+                </div>
                 {hasJournalDraft && !voucherIdToEdit && journalDraftAge && (
                   <div className="mb-4">
                     <DraftRestorePrompt
@@ -5873,24 +5884,23 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
           {/* ── Transfer Revision History Panel ── */}
           {voucherIdToEdit && stableTransferId && (
-            <Card className="mt-4">
-              <CardHeader
-                className="p-4 cursor-pointer select-none"
+            <div className="mt-4 border rounded-xl overflow-hidden">
+              <button
+                type="button"
+                className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-muted/40 hover:bg-muted/60 transition-colors text-left cursor-pointer select-none"
                 onClick={() => setTransferRevisionsExpanded(v => !v)}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <GitBranch className="h-4 w-4 text-muted-foreground" />
-                    <CardTitle className="text-base">Revision History</CardTitle>
-                    {transferRevisions.length > 0 && (
-                      <Badge variant="secondary" className="ml-1">{transferRevisions.length}</Badge>
-                    )}
-                  </div>
-                  {transferRevisionsExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                <div className="flex items-center gap-2">
+                  <GitBranch className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-semibold">Revision History</span>
+                  {transferRevisions.length > 0 && (
+                    <Badge variant="secondary" className="ml-1 text-xs no-default-active-elevate">{transferRevisions.length}</Badge>
+                  )}
                 </div>
-              </CardHeader>
+                {transferRevisionsExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+              </button>
               {transferRevisionsExpanded && (
-                <CardContent className="pt-0 space-y-4">
+                <div className="p-4 space-y-4">
                   {transferRevisions.length === 0 ? (
                     <EmptyState
                       icon={History}
@@ -5972,9 +5982,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                       </div>
                     ))
                   )}
-                </CardContent>
+                </div>
               )}
-            </Card>
+            </div>
           )}
           </div>
         )}
@@ -5982,10 +5992,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         {!isPOS && activeTab === "adjustment" && (
           <div className="space-y-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Production / Consumption Voucher</CardTitle>
-              </CardHeader>
-              <CardContent>
+              <CardContent className="pt-5">
+              <div className="flex items-center gap-2 mb-5">
+                <span className="text-sm font-semibold">Production / Consumption Voucher</span>
+              </div>
               <Form {...stockAdjustmentForm}>
                 <form noValidate onSubmit={stockAdjustmentForm.handleSubmit(onStockAdjustmentSubmit)} className="space-y-6">
                   {/* Header section */}
