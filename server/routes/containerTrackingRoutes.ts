@@ -19,6 +19,7 @@ import {
   trackOneContainerById,
   trackAllEnabledNow,
   isBulkTrackingRunning,
+  getBulkProgress,
   setBulkTrackingEnabled,
   getParcelsAppUsageStats,
   get17trackUsageStats,
@@ -271,6 +272,12 @@ export function registerContainerTrackingRoutes(app: Express) {
     } catch (err: any) {
       res.status(500).json({ message: err?.message ?? "Bulk update failed" });
     }
+  });
+
+  // GET /api/container-tracking/bulk-progress — live progress of the current bulk run
+  app.get("/api/container-tracking/bulk-progress", requireAuth, (req: Request, res: Response) => {
+    if (!requireAllowedRole(req, res)) return;
+    res.json(getBulkProgress());
   });
 
   // POST /api/container-tracking/bulk-track-now

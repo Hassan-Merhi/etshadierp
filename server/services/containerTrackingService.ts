@@ -485,6 +485,30 @@ export async function setBulkTrackingEnabled(enabled: boolean): Promise<number> 
 // soon as the background loop finishes (or errors out).
 let _bulkRunning = false;
 
+// ── Bulk-run progress tracking ────────────────────────────────────────────────
+export type BulkTrackingProgress = {
+  running: boolean;
+  total: number;
+  processed: number;
+  current: string | null;
+  startedAt: number | null;
+  completedAt: number | null;
+};
+
+let _bulkProgress: BulkTrackingProgress = {
+  running: false,
+  total: 0,
+  processed: 0,
+  current: null,
+  startedAt: null,
+  completedAt: null,
+};
+
+/** Returns a snapshot of the current bulk-tracking progress. */
+export function getBulkProgress(): BulkTrackingProgress {
+  return { ..._bulkProgress };
+}
+
 /** True while a bulk "Track All Now" run is in progress. */
 export function isBulkTrackingRunning(): boolean { return _bulkRunning; }
 
@@ -514,24 +538,42 @@ export async function trackAllEnabledNow(): Promise<number> {
   if (eligible.length === 0) return 0;
 
   _bulkRunning = true;
+  _bulkProgress = {
+    running: true,
+    total: eligible.length,
+    processed: 0,
+    current: eligible[0]?.containerNumber ?? null,
+    startedAt: Date.now(),
+    completedAt: null,
+  };
+
   (async () => {
     console.log(
       `[BulkTracking] Starting manual run for ${eligible.length} container(s): ` +
         eligible.map((r) => r.containerNumber).slice(0, 5).join(", ") +
         (eligible.length > 5 ? "…" : ""),
     );
-    for (const row of eligible) {
+    for (let i = 0; i < eligible.length; i++) {
+      const row = eligible[i];
+      _bulkProgress.current = row.containerNumber;
+      _bulkProgress.processed = i;
       try {
         await trackOneContainer(row.id, row.containerNumber, row.trackingCarrierHint ?? undefined);
         await sleep(2_000);
       } catch (err: any) {
         console.error(`[BulkTracking] Error tracking ${row.containerNumber}:`, err?.message);
       }
+      _bulkProgress.processed = i + 1;
     }
     console.log(`[BulkTracking] Manual run complete for ${eligible.length} containers.`);
   })()
     .catch((err: any) => console.error("[BulkTracking] Unexpected error:", err?.message))
-    .finally(() => { _bulkRunning = false; });
+    .finally(() => {
+      _bulkRunning = false;
+      _bulkProgress.running = false;
+      _bulkProgress.current = null;
+      _bulkProgress.completedAt = Date.now();
+    });
 
   return eligible.length;
 }
