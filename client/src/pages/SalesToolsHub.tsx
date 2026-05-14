@@ -1,8 +1,9 @@
 import { Suspense, lazy } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Book, ArrowLeftRight, Tag } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const POSDaybook   = lazy(() => import("@/pages/pos/POSDaybook"));
 const StockTransfers = lazy(() => import("@/pages/StockTransfers"));
@@ -22,12 +23,12 @@ export default function SalesToolsHub() {
 
   const tabs = isPOS
     ? [
-        { key: "daybook",   label: "POS Daybook",     icon: Book           },
-        { key: "transfers", label: "Stock Transfers",  icon: ArrowLeftRight },
+        { key: "daybook",   label: "POS Daybook",    icon: Book           },
+        { key: "transfers", label: "Stock Transfers", icon: ArrowLeftRight },
       ]
     : [
-        { key: "transfers", label: "Stock Transfers",  icon: ArrowLeftRight },
-        { key: "pricelist", label: "Price List",       icon: Tag            },
+        { key: "transfers", label: "Stock Transfers", icon: ArrowLeftRight },
+        { key: "pricelist", label: "Price List",      icon: Tag            },
       ];
 
   const defaultTab = tabs[0].key;
@@ -38,15 +39,30 @@ export default function SalesToolsHub() {
   return (
     <div className="flex flex-col h-full">
       <Tabs value={activeTab} onValueChange={setTab} className="flex flex-col h-full">
-        <div className="border-b bg-background px-4 pt-3">
-          <TabsList className="h-9">
-            {tabs.map(t => (
-              <TabsTrigger key={t.key} value={t.key} className="flex items-center gap-1.5 text-sm">
-                <t.icon className="h-3.5 w-3.5" />
-                {t.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+        {/* Tab strip header */}
+        <div className="border-b bg-background px-4 py-2.5 shrink-0">
+          <div className="flex gap-1 p-1 rounded-xl border bg-card w-fit">
+            {tabs.map(t => {
+              const isActive = activeTab === t.key;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setTab(t.key)}
+                  data-testid={`tab-${t.key}`}
+                  className={cn(
+                    "inline-flex items-center gap-2 px-4 h-9 rounded-lg text-sm transition-colors",
+                    isActive
+                      ? "bg-accent text-accent-foreground font-medium"
+                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground font-normal"
+                  )}
+                >
+                  <t.icon className="h-4 w-4 shrink-0" />
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {tabs.map(t => (
