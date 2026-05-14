@@ -72,9 +72,9 @@ export function PageHeader({
         </div>
       )}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 border-l-[3px] border-primary pl-3">
           <h1
-            className="text-xl sm:text-2xl font-semibold tracking-tight truncate flex items-center gap-2"
+            className="text-xl sm:text-2xl font-bold tracking-tight truncate flex items-center gap-2"
             data-testid="text-page-title"
           >
             {icon && <span className="shrink-0 text-muted-foreground inline-flex">{icon}</span>}

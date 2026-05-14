@@ -25,7 +25,7 @@ const baseLinkClasses =
 const inactiveClasses =
   "text-muted-foreground hover:bg-sidebar-accent/40 hover:text-foreground";
 const activeClasses =
-  "bg-sidebar-accent/70 text-sidebar-accent-foreground font-medium shadow-xs";
+  "bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-xs";
 
 interface ActiveRailProps {
   color: string;

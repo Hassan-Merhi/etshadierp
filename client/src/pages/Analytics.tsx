@@ -6,7 +6,7 @@ import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -1112,14 +1112,16 @@ export default function Analytics() {
         {activeSection === "assets" && (
           <Card>
             <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="font-medium flex items-center gap-2">
-                  <Package className="h-5 w-5 text-primary" />
-                  Asset Accounts
-                </h4>
+              <div className="flex items-center justify-between -mx-6 px-6 pb-4 mb-4 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <Package className="h-4 w-4" />
+                  </div>
+                  <h4 className="font-semibold text-base">Asset Accounts</h4>
+                </div>
                 <div className="text-right">
-                  <p className="text-sm text-muted-foreground">Total</p>
-                  <p className="text-xl font-bold font-mono">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total</p>
+                  <p className="text-2xl font-bold font-mono tabular-nums">
                     {formatSmartCurrency(calculateTotal(assetAccounts))}
                   </p>
                 </div>
@@ -1146,6 +1148,12 @@ export default function Analytics() {
                     <TableBody>
                       {renderHierarchicalAccounts(assetAccounts)}
                     </TableBody>
+                    <TableFooter>
+                      <TableRow>
+                        <TableCell className="font-semibold">Total</TableCell>
+                        <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateTotal(assetAccounts))}</TableCell>
+                      </TableRow>
+                    </TableFooter>
                   </Table>
                 </div>
               )}
@@ -1156,14 +1164,16 @@ export default function Analytics() {
         {activeSection === "liabilities" && (
           <Card>
             <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="font-medium flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-red-500" />
-                  Liability Accounts
-                </h4>
+              <div className="flex items-center justify-between -mx-6 px-6 pb-4 mb-4 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-destructive/10 text-destructive">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <h4 className="font-semibold text-base">Liability Accounts</h4>
+                </div>
                 <div className="text-right">
-                  <p className="text-sm text-muted-foreground">Total</p>
-                  <p className="text-xl font-bold font-mono">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total</p>
+                  <p className="text-2xl font-bold font-mono tabular-nums">
                     {formatSmartCurrency(calculateTotal(liabilityAccounts))}
                   </p>
                 </div>
@@ -1190,6 +1200,12 @@ export default function Analytics() {
                     <TableBody>
                       {renderHierarchicalAccounts(liabilityAccounts)}
                     </TableBody>
+                    <TableFooter>
+                      <TableRow>
+                        <TableCell className="font-semibold">Total</TableCell>
+                        <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateTotal(liabilityAccounts))}</TableCell>
+                      </TableRow>
+                    </TableFooter>
                   </Table>
                 </div>
               )}
@@ -1200,14 +1216,16 @@ export default function Analytics() {
         {activeSection === "cash" && (
           <Card>
             <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="font-medium flex items-center gap-2">
-                  <Wallet className="h-5 w-5 text-green-500" />
-                  Cash Accounts
-                </h4>
+              <div className="flex items-center justify-between -mx-6 px-6 pb-4 mb-4 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-green-500/10 text-green-600 dark:text-green-400">
+                    <Wallet className="h-4 w-4" />
+                  </div>
+                  <h4 className="font-semibold text-base">Cash Accounts</h4>
+                </div>
                 <div className="text-right">
-                  <p className="text-sm text-muted-foreground">Total Cash</p>
-                  <p className="text-xl font-bold font-mono">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total Cash</p>
+                  <p className="text-2xl font-bold font-mono tabular-nums">
                     {formatSmartCurrency(calculateTotal(cashAccounts))}
                   </p>
                 </div>
@@ -1234,6 +1252,12 @@ export default function Analytics() {
                     <TableBody>
                       {renderHierarchicalAccounts(cashAccounts)}
                     </TableBody>
+                    <TableFooter>
+                      <TableRow>
+                        <TableCell className="font-semibold">Total Cash</TableCell>
+                        <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateTotal(cashAccounts))}</TableCell>
+                      </TableRow>
+                    </TableFooter>
                   </Table>
                 </div>
               )}
@@ -1244,14 +1268,16 @@ export default function Analytics() {
         {activeSection === "loans-banks" && (
           <Card>
             <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="font-medium flex items-center gap-2">
-                  <Landmark className="h-5 w-5 text-blue-500" />
-                  Loans &amp; Bank Accounts
-                </h4>
+              <div className="flex items-center justify-between -mx-6 px-6 pb-4 mb-4 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                    <Landmark className="h-4 w-4" />
+                  </div>
+                  <h4 className="font-semibold text-base">Loans &amp; Bank Accounts</h4>
+                </div>
                 <div className="text-right">
-                  <p className="text-sm text-muted-foreground">Total Balance</p>
-                  <p className="text-xl font-bold font-mono">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total Balance</p>
+                  <p className="text-2xl font-bold font-mono tabular-nums">
                     {formatSmartCurrency(calculateTotal(loansBanksAccounts))}
                   </p>
                 </div>
@@ -1278,6 +1304,12 @@ export default function Analytics() {
                     <TableBody>
                       {renderHierarchicalAccounts(loansBanksAccounts)}
                     </TableBody>
+                    <TableFooter>
+                      <TableRow>
+                        <TableCell className="font-semibold">Total Balance</TableCell>
+                        <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateTotal(loansBanksAccounts))}</TableCell>
+                      </TableRow>
+                    </TableFooter>
                   </Table>
                 </div>
               )}
@@ -1287,14 +1319,16 @@ export default function Analytics() {
 
         {activeSection === "expenses" && (
               <Card className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium flex items-center gap-2">
-                    <TrendingDown className="h-5 w-5 text-destructive" />
-                    All Expense Accounts
-                  </h3>
+                <div className="flex items-center justify-between -mx-6 px-6 pb-4 mb-4 border-b border-border">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-destructive/10 text-destructive">
+                      <TrendingDown className="h-4 w-4" />
+                    </div>
+                    <h3 className="font-semibold text-base">All Expense Accounts</h3>
+                  </div>
                   <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Total</p>
-                    <p className="text-2xl font-bold font-mono">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total</p>
+                    <p className="text-2xl font-bold font-mono tabular-nums">
                       {netProfitData
                         ? formatSmartCurrency((netProfitData.leftPane.directExpenses.total ?? 0) + (netProfitData.leftPane.indirectExpenses.total ?? 0))
                         : formatSmartCurrency(calculateTotal(expenseAccounts))}
@@ -1322,6 +1356,12 @@ export default function Analytics() {
                           ...netProfitData.leftPane.indirectExpenses.accounts,
                         ])}
                       </TableBody>
+                      <TableFooter>
+                        <TableRow>
+                          <TableCell className="font-semibold">Total</TableCell>
+                          <TableCell className="text-right font-bold font-mono">{formatSmartCurrency((netProfitData.leftPane.directExpenses.total ?? 0) + (netProfitData.leftPane.indirectExpenses.total ?? 0))}</TableCell>
+                        </TableRow>
+                      </TableFooter>
                     </Table>
                   </div>
                 ) : expenseAccounts.length === 0 ? (
@@ -1340,6 +1380,12 @@ export default function Analytics() {
                       <TableBody>
                         {renderHierarchicalAccounts(expenseAccounts)}
                       </TableBody>
+                      <TableFooter>
+                        <TableRow>
+                          <TableCell className="font-semibold">Total</TableCell>
+                          <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateTotal(expenseAccounts))}</TableCell>
+                        </TableRow>
+                      </TableFooter>
                     </Table>
                   </div>
                 )}
@@ -1348,14 +1394,16 @@ export default function Analytics() {
 
         {activeSection === "direct-expenses" && (
               <Card className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium flex items-center gap-2">
-                    <DollarSign className="h-5 w-5 text-red-500" />
-                    Direct Expense Accounts
-                  </h3>
+                <div className="flex items-center justify-between -mx-6 px-6 pb-4 mb-4 border-b border-border">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-red-500/10 text-red-600 dark:text-red-400">
+                      <DollarSign className="h-4 w-4" />
+                    </div>
+                    <h3 className="font-semibold text-base">Direct Expense Accounts</h3>
+                  </div>
                   <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Total</p>
-                    <p className="text-2xl font-bold font-mono">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total</p>
+                    <p className="text-2xl font-bold font-mono tabular-nums">
                       {netProfitData
                         ? formatSmartCurrency(netProfitData.leftPane.directExpenses.total ?? 0)
                         : formatSmartCurrency(calculateTotal(directExpenseAccounts))}
@@ -1380,6 +1428,12 @@ export default function Analytics() {
                       <TableBody>
                         {renderNetProfitAccountsList(netProfitData.leftPane.directExpenses.accounts)}
                       </TableBody>
+                      <TableFooter>
+                        <TableRow>
+                          <TableCell className="font-semibold">Total</TableCell>
+                          <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(netProfitData.leftPane.directExpenses.total ?? 0)}</TableCell>
+                        </TableRow>
+                      </TableFooter>
                     </Table>
                   </div>
                 ) : directExpenseAccounts.length === 0 ? (
@@ -1398,6 +1452,12 @@ export default function Analytics() {
                       <TableBody>
                         {renderHierarchicalAccounts(directExpenseAccounts)}
                       </TableBody>
+                      <TableFooter>
+                        <TableRow>
+                          <TableCell className="font-semibold">Total</TableCell>
+                          <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateTotal(directExpenseAccounts))}</TableCell>
+                        </TableRow>
+                      </TableFooter>
                     </Table>
                   </div>
                 )}
@@ -1406,14 +1466,16 @@ export default function Analytics() {
 
         {activeSection === "indirect-expenses" && (
               <Card className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-orange-500" />
-                    Indirect Expense Accounts
-                  </h3>
+                <div className="flex items-center justify-between -mx-6 px-6 pb-4 mb-4 border-b border-border">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <h3 className="font-semibold text-base">Indirect Expense Accounts</h3>
+                  </div>
                   <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Total</p>
-                    <p className="text-2xl font-bold font-mono">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total</p>
+                    <p className="text-2xl font-bold font-mono tabular-nums">
                       {netProfitData
                         ? formatSmartCurrency(netProfitData.leftPane.indirectExpenses.total ?? 0)
                         : formatSmartCurrency(calculateTotal(indirectExpenseAccounts))}
@@ -1438,6 +1500,12 @@ export default function Analytics() {
                       <TableBody>
                         {renderNetProfitAccountsList(netProfitData.leftPane.indirectExpenses.accounts)}
                       </TableBody>
+                      <TableFooter>
+                        <TableRow>
+                          <TableCell className="font-semibold">Total</TableCell>
+                          <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(netProfitData.leftPane.indirectExpenses.total ?? 0)}</TableCell>
+                        </TableRow>
+                      </TableFooter>
                     </Table>
                   </div>
                 ) : indirectExpenseAccounts.length === 0 ? (
@@ -1999,18 +2067,24 @@ export default function Analytics() {
                 </div>
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">Click Generate to load the container report.</div>
+              <div className="flex flex-col items-center justify-center gap-3 py-14 text-muted-foreground">
+                <ContainerIcon className="h-10 w-10 opacity-25" />
+                <p className="text-sm font-medium">No data yet</p>
+                <p className="text-xs opacity-60">Set your filters above and click Generate to load the report</p>
+              </div>
             )}
           </Card>
         )}
 
         {activeSection === "containers" && appMode !== "factory" && (
           <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Container Report
-              </h3>
+            <div className="flex items-center justify-between -mx-6 px-6 pb-4 mb-4 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <ContainerIcon className="h-4 w-4" />
+                </div>
+                <h3 className="font-semibold text-base">Container Report</h3>
+              </div>
               <Button
                 size="sm"
                 onClick={() => refetchContainers()}
@@ -2233,8 +2307,10 @@ export default function Analytics() {
               </div>
               );
             })() : (
-              <div className="text-center py-8 text-muted-foreground">
-                No data available. Click Generate to load report.
+              <div className="flex flex-col items-center justify-center gap-3 py-14 text-muted-foreground">
+                <ContainerIcon className="h-10 w-10 opacity-25" />
+                <p className="text-sm font-medium">No data yet</p>
+                <p className="text-xs opacity-60">Set your filters above and click Generate to load the report</p>
               </div>
             )}
           </Card>
@@ -2569,8 +2645,10 @@ export default function Analytics() {
               </div>
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                No data available.
+              <div className="flex flex-col items-center justify-center gap-3 py-14 text-muted-foreground">
+                <BarChart3 className="h-10 w-10 opacity-25" />
+                <p className="text-sm font-medium">No data available</p>
+                <p className="text-xs opacity-60">Adjust your filters and try again</p>
               </div>
             )}
           </Card>
