@@ -967,13 +967,17 @@ async function trackViaParcelsApp(
         trackingFallbackReason: fallbackReason,
       };
 
+      // Hoist finalEta so the early-return guard below can see it regardless of events branch
+      let finalEta: string | null = null;
+      let etaSrc: string | null = null;
+
       // Save events
       if (mdResult.events?.length) {
-        const { eta: finalEta, source: etaSrc } = resolveEtaFromProvider(
+        ({ eta: finalEta, source: etaSrc } = resolveEtaFromProvider(
           mdResult.eta ?? null,
           mdResult.events,
           currentEta,
-        );
+        ));
         logEtaResolution(containerNumber, "maersk_direct", currentEta, mdResult.eta ?? null, finalEta, etaSrc);
         if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
 
@@ -1001,24 +1005,29 @@ async function trackViaParcelsApp(
         };
         await saveParcelsAppEvents(containerId, fakeShipment);
       } else {
-        if (mdResult.eta && !currentEta) { updateSet.eta = mdResult.eta; updateSet.etaSource = "api"; }
+        if (mdResult.eta && !currentEta) { finalEta = mdResult.eta; updateSet.eta = mdResult.eta; updateSet.etaSource = "api"; }
         await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
       }
 
       ep(containerId, "Maersk Puppeteer", "success", mdResult.latestStatus ?? "got data");
       console.log(`[ContainerTracking] ${containerNumber} → maersk_direct: status=${mdResult.latestStatus ?? "?"}`);
-      return {
-        success: true,
-        lastStatus: mdResult.latestStatus,
-        lastLocation: mdResult.latestLocation,
-        lastDescription: mdResult.latestDescription,
-        lastCheckedAt: now,
-        error: null,
-      };
+      if (finalEta || currentEta) {
+        // ETA is known (new from provider or already in DB) — full success, stop here
+        return {
+          success: true,
+          lastStatus: mdResult.latestStatus,
+          lastLocation: mdResult.latestLocation,
+          lastDescription: mdResult.latestDescription,
+          lastCheckedAt: now,
+          error: null,
+        };
+      }
+      // Status/events saved but no ETA anywhere — continue to Maersk public / ParcelsApp for ETA
+      console.log(`[ContainerTracking] ${containerNumber}: maersk_direct got status/events but no ETA — continuing to Maersk public / ParcelsApp for ETA`);
+    } else {
+      ep(containerId, "Maersk Puppeteer", "fail", mdResult.error ?? "no data");
+      console.log(`[ContainerTracking] ${containerNumber}: maersk_direct got no data (${mdResult.error}) — trying Maersk public HTTP...`);
     }
-
-    ep(containerId, "Maersk Puppeteer", "fail", mdResult.error ?? "no data");
-    console.log(`[ContainerTracking] ${containerNumber}: maersk_direct got no data (${mdResult.error}) — trying Maersk public HTTP...`);
   } else if (MAERSK_PREFIXES.test(containerNumber) && !isMaerskDirectScraperAvailable()) {
     ep(containerId, "Maersk Puppeteer", "skip", "Chrome not available in this environment");
   }
@@ -1348,6 +1357,7 @@ async function trackViaParcelsAppApi(
 }> {
   if (!process.env.PARCELSAPP_API_KEY) {
     ep(containerId, "ParcelsApp API", "skip", "API key not configured");
+    console.log(`[ContainerTracking] ${containerNumber}: ParcelsApp API skipped — PARCELSAPP_API_KEY is not configured`);
     const noProviderError = "No tracking provider configured (scraper unavailable, 17track not set, ParcelsApp key missing)";
     await db
       .update(containers)
