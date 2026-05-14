@@ -878,16 +878,16 @@ function ContainerDrawer({
                     detailNode?: React.ReactNode;
                     testId?: string;
                   }) => (
-                    <div className="flex items-start gap-2 flex-wrap" data-testid={testId}>
-                      <span className="text-xs text-muted-foreground flex-1 min-w-0">{label}</span>
-                      <div className="flex flex-col items-end gap-0.5 shrink-0">
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badgeColor}`}>{badge}</span>
-                        {detailNode
-                          ? <span className="text-xs text-muted-foreground/70 text-right">{detailNode}</span>
-                          : detail
-                            ? <span className="text-xs text-muted-foreground/70">{detail}</span>
-                            : null}
+                    <div className="space-y-0.5" data-testid={testId}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-muted-foreground">{label}</span>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${badgeColor}`}>{badge}</span>
                       </div>
+                      {(detail || detailNode) && (
+                        <p className="text-[11px] text-muted-foreground/70 text-right leading-snug">
+                          {detailNode ?? detail}
+                        </p>
+                      )}
                     </div>
                   );
 
