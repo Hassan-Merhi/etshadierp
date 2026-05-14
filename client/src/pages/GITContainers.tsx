@@ -1425,7 +1425,9 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
       if (companyFilter !== "ALL" && c.companyName !== companyFilter) return false;
       if (transporterFilter !== "ALL" && c.transporter !== transporterFilter) return false;
       if (agentFilter !== "ALL" && c.agent !== agentFilter) return false;
-      if (truckFilter !== "ALL" && (c.numberPlate ?? "") !== truckFilter) return false;
+      if (truckFilter === "NO_TRUCK" && !!(c.numberPlate ?? "").trim()) return false;
+      if (truckFilter === "HAS_TRUCK" && !(c.numberPlate ?? "").trim()) return false;
+      if (truckFilter !== "ALL" && truckFilter !== "NO_TRUCK" && truckFilter !== "HAS_TRUCK" && (c.numberPlate ?? "") !== truckFilter) return false;
       if (locationFilter === "NO_LOCATION" && !!(c.trackingLocation ?? "").trim()) return false;
       if (locationFilter === "HAS_LOCATION" && !(c.trackingLocation ?? "").trim()) return false;
       if (locationFilter !== "ALL" && locationFilter !== "NO_LOCATION" && locationFilter !== "HAS_LOCATION" && (c.trackingLocation ?? "") !== locationFilter) return false;
@@ -1882,6 +1884,11 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All Trucks</SelectItem>
+                  <SelectItem value="HAS_TRUCK">Has Truck #</SelectItem>
+                  <SelectItem value="NO_TRUCK">No Truck #</SelectItem>
+                  {trucks.length > 0 && (
+                    <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide border-t mt-1 pt-1">Specific</div>
+                  )}
                   {trucks.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
