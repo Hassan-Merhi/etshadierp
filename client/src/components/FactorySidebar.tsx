@@ -160,7 +160,7 @@ export const FACTORY_NAV_PAGES: { key: string; label: string; group: string }[] 
 ];
 
 const FACTORY_PINNED_DEFAULTS: NavItem[] = [
-  { title: "Production Analytics", url: "/factory/production-report", icon: BarChart3 },
+  { title: "Overview", url: "/factory/production-report", icon: BarChart3 },
   { title: "Daybook",              url: "/factory/daybook",           icon: BookOpen  },
   { title: "Agent Ledger",          url: "/factory/agents",            icon: UserRound },
 ];

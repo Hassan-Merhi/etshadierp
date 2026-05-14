@@ -912,7 +912,7 @@ export default function DailyProductionReport() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b flex-shrink-0">
-        <PageHeader title="Production Analytics" subtitle="Manufacturing overview — output metrics &amp; bale lifecycle" />
+        <PageHeader title="Overview" subtitle="Manufacturing overview — output metrics &amp; bale lifecycle" />
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 overflow-hidden">

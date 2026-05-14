@@ -94,7 +94,7 @@ const FACTORY_TABS: { key: string; label: string; group: string }[] = [
   { key: "hide_tab_workerdetail_advances",    label: "Advances",                group: "Worker Profile" },
   { key: "hide_tab_workerdetail_bales",       label: "Bales",                   group: "Worker Profile" },
   { key: "hide_tab_workerdetail_documents",   label: "Documents",               group: "Worker Profile" },
-  { key: "hide_tab_production_analytics",     label: "Production Analytics",    group: "Sidebar Pages" },
+  { key: "hide_tab_production_analytics",     label: "Overview",    group: "Sidebar Pages" },
   { key: "hide_tab_daybook",                  label: "Daybook",                 group: "Sidebar Pages" },
   { key: "hide_tab_agents",                   label: "Agent Ledger",            group: "Sidebar Pages" },
   { key: "hide_invoicing_proformas_tab",      label: "Proformas Tab",           group: "Invoicing" },
