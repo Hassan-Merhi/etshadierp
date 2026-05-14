@@ -77,7 +77,8 @@ export function registerFactoryDaybookRoutes(app: Express) {
         sql`${factoryDaybookEntries.txType} NOT IN (
           'LOADING_SUBMITTED',
           'ORDER_VERIFIED',
-          'INVOICE_REVERTED'
+          'INVOICE_REVERTED',
+          'SUPPLIER_FX_TRANSFER_DELETE'
         )`,
       ];
       // If user is restricted to own entries only, show their entries + unattributed ones (NULL createdBy)
