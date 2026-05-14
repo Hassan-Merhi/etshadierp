@@ -397,7 +397,7 @@ export default function FactoryPayrollPage() {
       </div>
 
       <Tabs defaultValue="payroll" className="space-y-4">
-        <TabsList>
+        <TabsList variant="underline">
           <TabsTrigger value="payroll" data-testid="tab-payroll-records">
             <FileText className="h-4 w-4 mr-1" />
             Payroll Records

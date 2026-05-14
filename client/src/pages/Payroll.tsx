@@ -2817,7 +2817,7 @@ export default function Payroll() {
           </DialogHeader>
 
           <Tabs value={bonusTab} onValueChange={(v) => { setBonusTab(v as "sales" | "bales"); setBonusSalesPreview(null); }}>
-            <TabsList className="w-full">
+            <TabsList variant="underline" className="w-full">
               <TabsTrigger value="sales" className="flex-1" data-testid="tab-sales-bonus">
                 <Percent className="h-4 w-4 mr-1" />
                 Sales %
