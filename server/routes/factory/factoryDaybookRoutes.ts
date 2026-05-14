@@ -73,8 +73,12 @@ export function registerFactoryDaybookRoutes(app: Express) {
         // Exclude void/delete audit entries — they are internal records, not daybook events
         sql`${factoryDaybookEntries.txType} NOT LIKE '%_VOIDED'`,
         sql`${factoryDaybookEntries.txType} NOT LIKE '%_DELETED'`,
-        // Exclude loading lifecycle events — these are operational, not financial
-        sql`${factoryDaybookEntries.txType} NOT IN ('LOADING_CREATED','LOADING_SUBMITTED')`,
+        // Exclude order-status-change events — operational/workflow events, not financial
+        sql`${factoryDaybookEntries.txType} NOT IN (
+          'LOADING_SUBMITTED',
+          'ORDER_VERIFIED',
+          'INVOICE_REVERTED'
+        )`,
       ];
       // If user is restricted to own entries only, show their entries + unattributed ones (NULL createdBy)
       if (ownOnly && currentUserId) {
