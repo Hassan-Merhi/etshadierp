@@ -42,7 +42,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { utils, writeFile, readFile, ExcelJS } from "@/lib/excelHelper";
-import { format, parseISO, startOfDay, startOfMonth, startOfYear } from "date-fns";
+import { format, parseISO, startOfDay, startOfMonth, startOfYear, addDays } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { formatNumber } from "@/lib/formatNumber";
@@ -113,6 +113,44 @@ const formatSmartNumber = (value: string | number | null | undefined) => {
 export default function SalesReport() {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("today"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
+
+  // Keyboard date navigation: "-" = back 1 day, "+" or "=" = forward 1 day
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "textarea") return;
+      if (tag === "input") {
+        const inputType = (target as HTMLInputElement).type || "text";
+        if (["text", "number", "email", "password", "search", "tel", "url"].includes(inputType)) return;
+      }
+      if (tag === "select") return;
+      if (hasAnyOpenDialog()) return;
+
+      const dateFmt = "yyyy-MM-dd";
+      const isBack = e.key === "-" || e.code === "Minus";
+      const isForward = (e.key === "+" && e.shiftKey) || (e.code === "Equal" && e.shiftKey) || e.key === "=";
+
+      if (isBack) {
+        e.preventDefault();
+        setPeriodFilter((prev) => ({
+          fromDate: format(addDays(new Date(prev.fromDate), -1), dateFmt),
+          toDate: format(addDays(new Date(prev.toDate), -1), dateFmt),
+          preset: "custom",
+        }));
+      } else if (isForward) {
+        e.preventDefault();
+        setPeriodFilter((prev) => ({
+          fromDate: format(addDays(new Date(prev.fromDate), 1), dateFmt),
+          toDate: format(addDays(new Date(prev.toDate), 1), dateFmt),
+          preset: "custom",
+        }));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, []);
+
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [selectedStockItem, setSelectedStockItem] = useState<string>("all");
   const [selectedStockGroup, setSelectedStockGroup] = useState<string>("all");
