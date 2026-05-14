@@ -1398,6 +1398,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const [locationFilters, setLocationFilters] = useState<string[]>([]);
   const [docsFilter, setDocsFilter] = useState("ALL");
   const [delayedFilter, setDelayedFilter] = useState("ALL");
+  const [sortOrder, setSortOrder] = useState("DEFAULT");
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -1541,13 +1542,18 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
       }
       return true;
     }).sort((a, b) => {
+      if (sortOrder === "ETA_ASC" || sortOrder === "ETA_DESC") {
+        const aMs = a.eta ? new Date(a.eta).getTime() : (sortOrder === "ETA_ASC" ? Infinity : -Infinity);
+        const bMs = b.eta ? new Date(b.eta).getTime() : (sortOrder === "ETA_ASC" ? Infinity : -Infinity);
+        if (aMs !== bMs) return sortOrder === "ETA_ASC" ? aMs - bMs : bMs - aMs;
+      }
       const co = a.companyName.localeCompare(b.companyName, undefined, { sensitivity: "base" });
       if (co !== 0) return co;
       const sh = (a.shopName ?? "").localeCompare(b.shopName ?? "", undefined, { numeric: true, sensitivity: "base" });
       if (sh !== 0) return sh;
       return a.containerNumber.localeCompare(b.containerNumber);
     });
-  }, [allContainers, companyFilter, transporterFilters, agentFilters, truckFilters, locationFilters, docsFilter, delayedFilter, search]);
+  }, [allContainers, companyFilter, transporterFilters, agentFilters, truckFilters, locationFilters, docsFilter, delayedFilter, sortOrder, search]);
 
   // Summary stats (always over all loaded active containers)
   const atSea          = allContainers.filter((c) => c.status === "OTW" || c.status === "Sea").length;
@@ -1580,6 +1586,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     setLocationFilters([]);
     setDocsFilter("ALL");
     setDelayedFilter("ALL");
+    setSortOrder("DEFAULT");
     setSearch("");
   }
 
@@ -2017,6 +2024,19 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                   <SelectItem value="ALL">All</SelectItem>
                   <SelectItem value="YES">Delayed only</SelectItem>
                   <SelectItem value="OVERDUE">Offload Overdue</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Sort by ETA</p>
+              <Select value={sortOrder} onValueChange={setSortOrder}>
+                <SelectTrigger className="h-8 text-xs" data-testid="select-otw-sort">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DEFAULT">Default</SelectItem>
+                  <SelectItem value="ETA_ASC">Oldest first</SelectItem>
+                  <SelectItem value="ETA_DESC">Newest first</SelectItem>
                 </SelectContent>
               </Select>
             </div>
