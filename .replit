@@ -48,3 +48,9 @@ integrations = ["javascript_mem_db:1.0.0", "javascript_database:1.0.0"]
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
+
+[userenv]
+
+[userenv.shared]
+PUBLIC_CARRIER_TRACKING_ENABLED = "true"
+CMA_PUBLIC_TRACKING_ENABLED = "true"

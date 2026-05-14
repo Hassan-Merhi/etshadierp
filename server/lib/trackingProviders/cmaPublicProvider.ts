@@ -62,8 +62,16 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     const url = `${PUBLIC_BASE}/${encodeURIComponent(containerNumber)}`;
     const res = await fetch(url, {
       headers: {
-        Accept: "application/json, text/javascript, */*",
-        "User-Agent": "Mozilla/5.0 (compatible; container-tracking/1.0)",
+        Accept: "application/json, text/javascript, */*; q=0.01",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": "https://www.cma-cgm.com/ebusiness/tracking",
+        "Origin": "https://www.cma-cgm.com",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
       },
       signal: AbortSignal.timeout(TIMEOUT_MS),
       redirect: "follow",
