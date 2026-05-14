@@ -1601,38 +1601,47 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     onError: (err: any) => toast({ title: "Track All failed", description: err.message, variant: "destructive" }),
   });
 
-  // Poll bulk progress while running (or banner visible)
+  const isBulkPending = bulkTrackMutation.isPending;
+
+  // Poll bulk progress while the mutation is pending OR the banner is visible
   useEffect(() => {
     if (!isAllowed) return;
+    if (!isBulkPending && !showProgressBanner) return;
+
+    let stopped = false;
     let intervalId: ReturnType<typeof setInterval> | null = null;
+    let stopTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const poll = async () => {
+      if (stopped) return;
       try {
         const res = await fetch("/api/container-tracking/bulk-progress", { credentials: "include" });
-        if (!res.ok) return;
+        if (!res.ok || stopped) return;
         const data: BulkProgress = await res.json();
         setBulkProgress(data);
-        if (!data.running && intervalId) {
-          // Keep banner visible for a few seconds after completion, then stop polling
-          setTimeout(() => {
-            clearInterval(intervalId!);
-            intervalId = null;
-            // Refresh containers table after bulk run completes
-            queryClient.invalidateQueries({ queryKey: [queryUrl] });
-          }, 5000);
+        // Auto-show banner whenever server confirms a run is live
+        if (data.running) setShowProgressBanner(true);
+        // Once running stops, keep banner visible for 6 s then refresh the table
+        if (!data.running && !stopTimeoutId && !isBulkPending) {
+          stopTimeoutId = setTimeout(() => {
+            if (!stopped) {
+              if (intervalId) { clearInterval(intervalId); intervalId = null; }
+              queryClient.invalidateQueries({ queryKey: [queryUrl] });
+            }
+          }, 6000);
         }
-      } catch { /* ignore network errors during polling */ }
+      } catch { /* ignore transient network errors */ }
     };
 
-    if (showProgressBanner) {
-      poll();
-      intervalId = setInterval(poll, 2000);
-    }
+    poll();
+    intervalId = setInterval(poll, 2000);
 
     return () => {
+      stopped = true;
       if (intervalId) clearInterval(intervalId);
+      if (stopTimeoutId) clearTimeout(stopTimeoutId);
     };
-  }, [showProgressBanner, isAllowed, queryUrl]);
+  }, [isBulkPending, showProgressBanner, isAllowed, queryUrl]);
 
   const trackingEnabledCount = allContainers.filter((c) => c.trackingEnabled).length;
 
@@ -1998,71 +2007,71 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
         </div>
 
         {/* ── Bulk tracking progress banner ── */}
-        {showProgressBanner && bulkProgress && (bulkProgress.running || (bulkProgress.completedAt && Date.now() - bulkProgress.completedAt < 8000)) && (
-          <div className={cn(
-            "rounded-md border p-3 space-y-2",
-            bulkProgress.running
-              ? "border-blue-300 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800"
-              : "border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-800",
-          )}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                {bulkProgress.running
-                  ? <Loader2 className="h-4 w-4 text-blue-600 dark:text-blue-400 animate-spin shrink-0" />
-                  : <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />}
-                <div className="min-w-0">
+        {(isBulkPending || showProgressBanner) && (isBulkPending || !bulkProgress || bulkProgress.running || (bulkProgress.completedAt && Date.now() - bulkProgress.completedAt < 8000)) && (() => {
+          const isRunning = isBulkPending || !bulkProgress || bulkProgress.running;
+          const processed  = bulkProgress?.processed ?? 0;
+          const total      = bulkProgress?.total ?? 0;
+          const pct        = total > 0 ? Math.round((processed / total) * 100) : 0;
+          return (
+            <div className={cn(
+              "rounded-md border p-3 space-y-2",
+              isRunning
+                ? "border-blue-300 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800"
+                : "border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-800",
+            )}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  {isRunning
+                    ? <Loader2 className="h-4 w-4 text-blue-600 dark:text-blue-400 animate-spin shrink-0" />
+                    : <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />}
+                  <div className="min-w-0">
+                    <span className={cn(
+                      "text-sm font-semibold",
+                      isRunning ? "text-blue-800 dark:text-blue-300" : "text-green-800 dark:text-green-300",
+                    )}>
+                      {isRunning
+                        ? (total > 0 ? `Tracking containers… ${processed} of ${total}` : "Preparing track run…")
+                        : `Tracking complete — ${total} container${total !== 1 ? "s" : ""} checked`}
+                    </span>
+                    {isRunning && bulkProgress?.current && (
+                      <p className="text-xs text-blue-600 dark:text-blue-400 font-mono truncate">
+                        Current: {bulkProgress.current}
+                      </p>
+                    )}
+                    {isRunning && bulkProgress?.startedAt && processed > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {(() => {
+                          const elapsed = (Date.now() - bulkProgress.startedAt!) / 1000;
+                          const perItem = elapsed / processed;
+                          const remaining = Math.round(perItem * (total - processed));
+                          return remaining < 60 ? `~${remaining}s remaining` : `~${Math.ceil(remaining / 60)}min remaining`;
+                        })()}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
                   <span className={cn(
-                    "text-sm font-semibold",
-                    bulkProgress.running ? "text-blue-800 dark:text-blue-300" : "text-green-800 dark:text-green-300",
+                    "text-sm font-bold tabular-nums",
+                    isRunning ? "text-blue-700 dark:text-blue-300" : "text-green-700 dark:text-green-300",
                   )}>
-                    {bulkProgress.running
-                      ? `Tracking containers… ${bulkProgress.processed} of ${bulkProgress.total}`
-                      : `Tracking complete — ${bulkProgress.total} container${bulkProgress.total !== 1 ? "s" : ""} checked`}
+                    {pct}%
                   </span>
-                  {bulkProgress.running && bulkProgress.current && (
-                    <p className="text-xs text-blue-600 dark:text-blue-400 font-mono truncate">
-                      Current: {bulkProgress.current}
-                    </p>
-                  )}
-                  {bulkProgress.running && bulkProgress.startedAt && bulkProgress.processed > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      {(() => {
-                        const elapsed = (Date.now() - bulkProgress.startedAt) / 1000;
-                        const perItem = elapsed / bulkProgress.processed;
-                        const remaining = Math.round(perItem * (bulkProgress.total - bulkProgress.processed));
-                        if (remaining < 60) return `~${remaining}s remaining`;
-                        return `~${Math.ceil(remaining / 60)}min remaining`;
-                      })()}
-                    </p>
-                  )}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6"
+                    onClick={() => setShowProgressBanner(false)}
+                    data-testid="button-dismiss-bulk-progress"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <span className={cn(
-                  "text-sm font-bold tabular-nums",
-                  bulkProgress.running ? "text-blue-700 dark:text-blue-300" : "text-green-700 dark:text-green-300",
-                )}>
-                  {bulkProgress.total > 0
-                    ? `${Math.round((bulkProgress.processed / bulkProgress.total) * 100)}%`
-                    : "0%"}
-                </span>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-6 w-6"
-                  onClick={() => setShowProgressBanner(false)}
-                  data-testid="button-dismiss-bulk-progress"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              </div>
+              <Progress value={pct} className="h-2" />
             </div>
-            <Progress
-              value={bulkProgress.total > 0 ? (bulkProgress.processed / bulkProgress.total) * 100 : 0}
-              className="h-2"
-            />
-          </div>
-        )}
+          );
+        })()}
 
         {/* ── Import result banner (inline, dismissible) ── */}
         {importResult && (
