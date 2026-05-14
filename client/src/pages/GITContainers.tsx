@@ -1642,17 +1642,17 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     });
   }, [allContainers, companyFilter, transporterFilters, agentFilters, truckFilters, locationFilters, docsFilter, delayedFilter, sortOrder, search]);
 
-  // Summary stats (always over all loaded active containers)
-  const atSea          = allContainers.filter((c) => c.status === "OTW" || c.status === "Sea").length;
-  const atPort         = allContainers.filter((c) => c.status === "At Port").length;
-  const leftDar        = allContainers.filter((c) => c.status === "Left Dar").length;
-  const inTransit      = allContainers.filter((c) => ["At Border", "In Transit"].includes(c.status)).length;
-  const arrived        = allContainers.filter((c) => c.status === "Arrived").length;
-  const delayed        = allContainers.filter((c) => c.daysDelayed !== null && c.daysDelayed > 0).length;
-  const offloadOverdue = allContainers.filter((c) => c.isOverdue).length;
-  const totalCost      = allContainers.reduce((s, c) => s + parseNum(c.grandTotal), 0);
-  const totalTransport = allContainers.reduce((s, c) => s + parseNum(c.transportFee), 0);
-  const totalDuty      = allContainers.reduce((s, c) => s + parseNum(c.dutyFee), 0);
+  // Summary stats — follow the active filters so they match what's visible in the table
+  const atSea          = filteredContainers.filter((c) => c.status === "OTW" || c.status === "Sea").length;
+  const atPort         = filteredContainers.filter((c) => c.status === "At Port").length;
+  const leftDar        = filteredContainers.filter((c) => c.status === "Left Dar").length;
+  const inTransit      = filteredContainers.filter((c) => ["At Border", "In Transit"].includes(c.status)).length;
+  const arrived        = filteredContainers.filter((c) => c.status === "Arrived").length;
+  const delayed        = filteredContainers.filter((c) => c.daysDelayed !== null && c.daysDelayed > 0).length;
+  const offloadOverdue = filteredContainers.filter((c) => c.isOverdue).length;
+  const totalCost      = filteredContainers.reduce((s, c) => s + parseNum(c.grandTotal), 0);
+  const totalTransport = filteredContainers.reduce((s, c) => s + parseNum(c.transportFee), 0);
+  const totalDuty      = filteredContainers.reduce((s, c) => s + parseNum(c.dutyFee), 0);
 
   const companies   = [...new Set(allContainers.map((c) => c.companyName))].sort();
   const transporters = [...new Set(allContainers.map((c) => c.transporter).filter(Boolean))].sort() as string[];
@@ -1808,7 +1808,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
         {/* ── Summary Cards ── */}
         <div className="flex flex-wrap gap-2">
-          <SummaryCard label="Active" value={allContainers.length} icon={<Package className="h-4 w-4 text-primary" />} accent="bg-primary/10" />
+          <SummaryCard label="Active" value={filteredContainers.length} icon={<Package className="h-4 w-4 text-primary" />} accent="bg-primary/10" />
           {atSea > 0 && <SummaryCard label="At Sea / OTW" value={atSea} icon={<Ship className="h-4 w-4 text-blue-600" />} accent="bg-blue-100 dark:bg-blue-900/30" />}
           {atPort > 0 && <SummaryCard label="At Port" value={atPort} icon={<Package className="h-4 w-4 text-amber-600" />} accent="bg-amber-100 dark:bg-amber-900/30" />}
           {leftDar > 0 && <SummaryCard label="Left Dar" value={leftDar} icon={<Truck className="h-4 w-4 text-violet-600" />} accent="bg-violet-100 dark:bg-violet-900/30" />}
