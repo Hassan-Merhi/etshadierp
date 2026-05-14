@@ -925,11 +925,16 @@ async function trackViaParcelsApp(
 
       ep(containerId, "HTTP scraper", "success", lastStatus ?? "got data");
       console.log(`[ContainerTracking] ${containerNumber} → http_scraper: status=${lastStatus ?? "?"}`);
-      return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
+      if (finalEta || currentEta) {
+        // ETA is known (new from provider or already in DB) — full success, stop here
+        return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
+      }
+      // Status/events saved but no ETA anywhere — fall through to next provider to try to get one
+      console.log(`[ContainerTracking] ${containerNumber}: http_scraper got status/events but no ETA — continuing to fallback provider for ETA`);
+    } else {
+      ep(containerId, "HTTP scraper", "skip", httpResult.error ?? "no data");
+      console.log(`[ContainerTracking] ${containerNumber}: HTTP scraper got no data (${httpResult.error}) — trying next provider...`);
     }
-
-    ep(containerId, "HTTP scraper", "skip", httpResult.error ?? "no data");
-    console.log(`[ContainerTracking] ${containerNumber}: HTTP scraper got no data (${httpResult.error}) — trying next provider...`);
   }
 
   // ── Attempt 1: Maersk direct Puppeteer scraper (intercepts Maersk's own API) ──
@@ -1074,17 +1079,20 @@ async function trackViaParcelsApp(
 
       ep(containerId, "Maersk public HTTP", "success", mpResult.latestStatus ?? "got data");
       console.log(`[ContainerTracking] ${containerNumber} → maersk_public: status=${mpResult.latestStatus ?? "?"}`);
-      return {
-        success: true,
-        lastStatus: mpResult.latestStatus,
-        lastLocation: mpResult.latestLocation,
-        lastDescription: mpResult.latestDescription,
-        lastCheckedAt: now,
-        error: null,
-      };
-    }
-
-    if (mpResult.error === "rate_limited") {
+      if (finalEta || currentEta) {
+        // ETA is known (new from provider or already in DB) — full success, stop here
+        return {
+          success: true,
+          lastStatus: mpResult.latestStatus,
+          lastLocation: mpResult.latestLocation,
+          lastDescription: mpResult.latestDescription,
+          lastCheckedAt: now,
+          error: null,
+        };
+      }
+      // Status/events saved but no ETA anywhere — continue to ParcelsApp to try to get one
+      console.log(`[ContainerTracking] ${containerNumber}: maersk_public got status/events but no ETA — continuing to ParcelsApp for ETA`);
+    } else if (mpResult.error === "rate_limited") {
       ep(containerId, "Maersk public HTTP", "skip", "rate-limited — 20 min cooldown");
     } else {
       ep(containerId, "Maersk public HTTP", "fail", mpResult.error ?? "no data");
