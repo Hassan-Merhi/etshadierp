@@ -1869,15 +1869,15 @@ export default function FactoryDaybook() {
                             }
                           }}
                         >
-                          {/* DATE cell — date + time only */}
-                          <TableCell className="w-[12%] whitespace-nowrap py-4">
-                            <div className="font-medium text-sm">{formatDisplayDate(entry.txDate + "T00:00:00")}</div>
-                            <div className="text-xs text-muted-foreground mt-0.5 font-mono">
-                              {formatDisplayTime(entry.createdAt)}
+                          {/* DATE cell */}
+                          <TableCell className="w-[12%] whitespace-nowrap py-2 font-medium">
+                            <div className="flex flex-col">
+                              <span>{formatDisplayDate(entry.txDate + "T00:00:00")}</span>
+                              <span className="text-xs text-muted-foreground">{formatDisplayTime(entry.createdAt)}</span>
                             </div>
                           </TableCell>
-                          {/* TYPE cell — badge + optional + expand indicator */}
-                          <TableCell className="w-[18%] py-4">
+                          {/* TYPE cell */}
+                          <TableCell className="w-[18%] py-2">
                             <div className="flex items-center gap-1 flex-wrap">
                               <Badge variant={bv} className={cn(bc, "whitespace-nowrap")} data-testid={`badge-type-${entry.id}`}>
                                 {formatTxType(entry.txType)}
@@ -1900,20 +1900,20 @@ export default function FactoryDaybook() {
                             </div>
                           </TableCell>
                           {/* DESCRIPTION cell */}
-                          <TableCell className="w-[43%] py-4 truncate" title={formatDaybookDescription(entry)}>
+                          <TableCell className="w-[43%] py-2 truncate" title={formatDaybookDescription(entry)}>
                             {formatDaybookDescription(entry)}
                           </TableCell>
                           {/* AMOUNT cell */}
                           {showAmounts && (
-                            <TableCell className="w-[12%] py-4 text-right">
-                              <div className="font-mono font-semibold">{currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency || "0"))}</div>
+                            <TableCell className="w-[12%] py-2 text-right">
+                              <div className="font-mono font-medium">{currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency || "0"))}</div>
                               {entry.currencyCode !== "USD" && parseFloat(entry.amountUsd || "0") > 0 && (
-                                <div className="text-xs text-muted-foreground font-mono mt-0.5">${formatNumber(parseFloat(entry.amountUsd))}</div>
+                                <div className="text-xs text-muted-foreground font-mono">${formatNumber(parseFloat(entry.amountUsd))}</div>
                               )}
                             </TableCell>
                           )}
                           {/* ACTIONS cell */}
-                          <TableCell className="w-[15%] py-4">
+                          <TableCell className="w-[15%] py-2">
                             <div className="flex justify-end">
                               {renderEntryActions(entry)}
                             </div>
