@@ -2262,44 +2262,44 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               </div>
 
               {/* Desktop table view */}
-              <div className="hidden md:block border-t -mx-4 -mb-4 w-[calc(100%+2rem)]">
+              <div className="w-full overflow-x-auto hidden md:block border-t -mx-4 -mb-4" style={{ width: "calc(100% + 2rem)" }}>
                 <table className="w-full table-fixed text-sm">
                   <colgroup>
-                    <col />
-                    <col style={{ width: "100px" }} />
+                    <col className="w-[34%]" />
+                    <col className="w-[12%]" />
                     {showMovement ? (
                       <>
-                        <col style={{ width: "130px" }} />
-                        <col style={{ width: "130px" }} />
-                        <col style={{ width: "120px" }} />
+                        <col className="w-[15%]" />
+                        <col className="w-[15%]" />
+                        <col className="w-[12%]" />
                       </>
                     ) : (
-                      <col style={{ width: "140px" }} />
+                      <col className="w-[18%]" />
                     )}
                     {!posUser && (
                       <>
-                        <col style={{ width: "120px" }} />
-                        <col style={{ width: "140px" }} />
+                        <col className="w-[18%]" />
+                        <col className="w-[18%]" />
                       </>
                     )}
                   </colgroup>
                   <thead className="bg-muted/50 sticky top-0 z-30">
                     <tr className="h-12">
-                      <th className="text-left px-3 font-medium">Name</th>
-                      <th className="text-right px-3 font-medium">Items</th>
+                      <th className="text-left px-3 font-medium w-[34%]">Name</th>
+                      <th className="text-right px-3 font-medium w-[12%]">Items</th>
                       {showMovement ? (
                         <>
-                          <th className="text-right px-3 font-medium">Opening (BL)</th>
-                          <th className="text-right px-3 font-medium">Closing (BL)</th>
-                          <th className="text-right px-3 font-medium">Movement</th>
+                          <th className="text-right px-3 font-medium w-[15%]">Opening (BL)</th>
+                          <th className="text-right px-3 font-medium w-[15%]">Closing (BL)</th>
+                          <th className="text-right px-3 font-medium w-[12%]">Movement</th>
                         </>
                       ) : (
-                        <th className={`text-right px-3 font-medium ${posUser ? "pr-6" : ""}`}>Total Qty (BL)</th>
+                        <th className={`text-right px-3 font-medium w-[18%] ${posUser ? "pr-6" : ""}`}>Total Qty (BL)</th>
                       )}
                       {!posUser && (
                         <>
-                          <th className="text-right px-3 font-medium">Avg Rate</th>
-                          <th className="text-right px-3 pr-6 font-medium">Total Value</th>
+                          <th className="text-right px-3 font-medium w-[18%]">Avg Rate</th>
+                          <th className="text-right px-3 pr-6 font-medium w-[18%]">Total Value</th>
                         </>
                       )}
                     </tr>
@@ -2326,12 +2326,12 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                             onClick={() => setSelectedGroup(group)}
                             data-testid={`row-group-desktop-${group.groupId || 'uncategorized'}`}
                           >
-                            <td className="px-3 font-medium" data-testid={`name-desktop-${group.groupId}`}>
-                              <div className="flex items-center gap-2.5">
+                            <td className="px-3 font-medium min-w-0" data-testid={`name-desktop-${group.groupId}`}>
+                              <div className="flex items-center gap-2.5 min-w-0">
                                 <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
                                   <Layers className="h-3.5 w-3.5 text-primary" />
                                 </div>
-                                <span>{group.groupName}</span>
+                                <span className="truncate">{group.groupName}</span>
                               </div>
                             </td>
                             <td className="px-3 text-right" data-testid={`items-desktop-${group.groupId}`}>
@@ -2571,42 +2571,42 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             </div>
 
             {/* Desktop table view */}
-            <div className="hidden md:block border-t -mx-3 md:-mx-4 -mb-3 md:-mb-4 w-[calc(100%+1.5rem)] md:w-[calc(100%+2rem)]">
+            <div className="w-full overflow-x-auto hidden md:block border-t -mx-3 md:-mx-4 -mb-3 md:-mb-4" style={{ width: "calc(100% + 2rem)" }}>
               <table className="w-full table-fixed text-sm">
                 <colgroup>
-                  <col />
+                  <col className="w-[46%]" />
                   {showMovement ? (
                     <>
-                      <col style={{ width: "130px" }} />
-                      <col style={{ width: "130px" }} />
-                      <col style={{ width: "120px" }} />
+                      <col className="w-[15%]" />
+                      <col className="w-[15%]" />
+                      <col className="w-[12%]" />
                     </>
                   ) : (
-                    <col style={{ width: "140px" }} />
+                    <col className="w-[18%]" />
                   )}
                   {!posUser && (
                     <>
-                      <col style={{ width: "120px" }} />
-                      <col style={{ width: "140px" }} />
+                      <col className="w-[18%]" />
+                      <col className="w-[18%]" />
                     </>
                   )}
                 </colgroup>
                 <thead className="bg-muted/50 sticky top-0 z-30">
                   <tr className="h-12">
-                    <th className="text-left px-3 font-medium">Name</th>
+                    <th className="text-left px-3 font-medium w-[46%]">Name</th>
                     {showMovement ? (
                       <>
-                        <th className="text-right px-3 font-medium">Opening (BL)</th>
-                        <th className="text-right px-3 font-medium">Closing (BL)</th>
-                        <th className="text-right px-3 font-medium">Movement</th>
+                        <th className="text-right px-3 font-medium w-[15%]">Opening (BL)</th>
+                        <th className="text-right px-3 font-medium w-[15%]">Closing (BL)</th>
+                        <th className="text-right px-3 font-medium w-[12%]">Movement</th>
                       </>
                     ) : (
-                      <th className={`text-right px-3 font-medium ${posUser ? "pr-6" : ""}`}>Quantity</th>
+                      <th className={`text-right px-3 font-medium w-[18%] ${posUser ? "pr-6" : ""}`}>Quantity</th>
                     )}
                     {!posUser && (
                       <>
-                        <th className="text-right px-3 font-medium">Avg Rate</th>
-                        <th className="text-right px-3 pr-6 font-medium">Total Value</th>
+                        <th className="text-right px-3 font-medium w-[18%]">Avg Rate</th>
+                        <th className="text-right px-3 pr-6 font-medium w-[18%]">Total Value</th>
                       </>
                     )}
                   </tr>
@@ -2636,18 +2636,18 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           }`}
                           onClick={() => setSelectedRowIndex(index)}
                         >
-                          <td className="px-3 font-medium">
+                          <td className="px-3 font-medium min-w-0">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 navigate(`/locations/${item.locationId}/stock-items/${item.stockItemId}/history`);
                               }}
-                              className="text-left text-primary hover:underline cursor-pointer"
+                              className="text-left text-primary hover:underline cursor-pointer w-full min-w-0"
                               data-testid={`link-item-desktop-${item.stockItemId}`}
                             >
-                              <span className="flex items-center gap-2 flex-wrap">
-                                {item.stockItemName}
-                                {item.stockItemActive === false && <Badge variant="outline" className="text-xs">Inactive</Badge>}
+                              <span className="flex items-center gap-2 min-w-0">
+                                <span className="truncate">{item.stockItemName}</span>
+                                {item.stockItemActive === false && <Badge variant="outline" className="text-xs shrink-0">Inactive</Badge>}
                               </span>
                             </button>
                           </td>
