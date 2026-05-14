@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useParams, useLocation } from "wouter";
+import { useParams, useLocation, useSearch } from "wouter";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -55,6 +55,8 @@ interface VerificationResult {
 export default function ContainerVerification() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const searchString = useSearch();
+  const autoCompare = new URLSearchParams(searchString).get("autoCompare") === "true";
   const params = useParams<{ containerId: string }>();
   useEscapeToParent();
   const containerId = parseInt(params.containerId);
@@ -63,6 +65,7 @@ export default function ContainerVerification() {
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
   const [selectedProformaId, setSelectedProformaId] = useState<string>("");
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
+  const [autoCompareTriggered, setAutoCompareTriggered] = useState(false);
   const [addingItem, setAddingItem] = useState(false);
   const [newItem, setNewItem] = useState({ barcode: "", itemName: "", qty: "0", weightPerBale: "0", pricePerBale: "0" });
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
@@ -189,20 +192,22 @@ export default function ContainerVerification() {
     e.target.value = "";
   };
 
-  const generateComparison = async () => {
-    if (!selectedSupplierId || !selectedProformaId) {
+  const generateComparison = useCallback(async (supplierId?: string, proformaId?: string) => {
+    const sid = supplierId ?? selectedSupplierId;
+    const pid = proformaId ?? selectedProformaId;
+    if (!sid || !pid) {
       toast({ title: "Select supplier and proforma first", variant: "destructive" });
       return;
     }
     try {
-      const res = await fetch(`/api/suppliers/${selectedSupplierId}/containers/${containerId}/verification-summary?proformaId=${selectedProformaId}`, { credentials: "include" });
+      const res = await fetch(`/api/suppliers/${sid}/containers/${containerId}/verification-summary?proformaId=${pid}`, { credentials: "include" });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
       const data = await res.json();
       setVerificationResult(data);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
-  };
+  }, [selectedSupplierId, selectedProformaId, containerId, toast]);
 
   const exportToExcel = () => {
     if (!selectedSupplierId || !selectedProformaId) return;
@@ -242,6 +247,20 @@ export default function ContainerVerification() {
       autoPopulateMutation.mutate();
     }
   }, [loadedItems, loadingItems, containerData]);
+
+  // Auto-select latest proforma when opened via "Compare" button from Daybook
+  useEffect(() => {
+    if (!autoCompare || !selectedSupplierId || proformas.length === 0 || selectedProformaId) return;
+    const latest = proformas[proformas.length - 1];
+    if (latest) setSelectedProformaId(String(latest.id));
+  }, [autoCompare, selectedSupplierId, proformas, selectedProformaId]);
+
+  // Auto-generate comparison once supplier + proforma are both set
+  useEffect(() => {
+    if (!autoCompare || !selectedSupplierId || !selectedProformaId || autoCompareTriggered) return;
+    setAutoCompareTriggered(true);
+    generateComparison(selectedSupplierId, selectedProformaId);
+  }, [autoCompare, selectedSupplierId, selectedProformaId, autoCompareTriggered, generateComparison]);
 
   const container = containerData?.container;
   const overloaded = verificationResult?.comparison.filter((c) => c.statusQty === "OVER_LOADED") || [];

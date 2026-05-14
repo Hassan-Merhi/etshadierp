@@ -2933,6 +2933,21 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 >
                                   {purchaseOrderData.status}
                                 </Badge>
+                                {purchaseOrderData.containerId && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      window.open(
+                                        `/containers/${purchaseOrderData.containerId}/verification?autoCompare=true`,
+                                        "_blank",
+                                      );
+                                    }}
+                                    data-testid="button-open-comparison"
+                                  >
+                                    Compare
+                                  </Button>
+                                )}
                                 <Button
                                   size="sm"
                                   variant="outline"
