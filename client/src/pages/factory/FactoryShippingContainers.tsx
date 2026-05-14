@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,8 @@ interface ShippingRow {
   shippingInvoiceFileUrl: string | null;
   shippingInvoiceOriginalName: string | null;
   shippingInvoiceFileType: string | null;
+  trackingLink: string | null;
+  grandTotal: string | null;
 }
 
 interface AvailableInvoice {
@@ -76,8 +78,17 @@ interface AvailableInvoice {
   containerNumber: string | null;
   shippingCompany: string | null;
   destination: string | null;
+  grandTotal: string | null;
   alreadyHasRow: boolean;
 }
+
+interface TrackingRow {
+  containerNumber: string | null;
+  eta: string | null;
+  grandTotal: string | null;
+}
+
+type DisplayRow = ShippingRow & { _isGhost: boolean; _trackedEta: string | null };
 
 interface ShippingDocument {
   isGhost?: boolean;
@@ -149,6 +160,15 @@ function statusLabel(s: string) {
 function statusColor(s: string) {
   return STATUS_COLORS[s] ?? "bg-gray-100 text-gray-600";
 }
+
+const STATUS_ORDER: Record<string, number> = {
+  LOADING: 0,
+  PENDING_VERIFICATION: 1,
+  VERIFIED: 2,
+  FINALIZED: 3,
+  DRAFT: 4,
+  CANCELLED: 5,
+};
 
 /** Format YYYY-MM-DD or ISO timestamp → dd/mm/yy, returns "—" for empty */
 function fmtDate(d: string | null | undefined): string {
@@ -1163,7 +1183,7 @@ export default function FactoryShippingContainers() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [filterDocs, setFilterDocs] = useState<"all" | "has" | "missing">("all");
-  const [filterFinalized, setFinalized] = useState<"all" | "yes" | "no">("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [docsRowId, setDocsRowId] = useState<number | null>(null);
@@ -1179,10 +1199,18 @@ export default function FactoryShippingContainers() {
     queryKey: [LIST_KEY],
   });
 
-  const active = rows.filter((r) => !r.isDone);
-  const done = rows.filter((r) => r.isDone);
+  const { data: trackingData = [] } = useQuery<TrackingRow[]>({
+    queryKey: ["/api/factory/invoice-container-tracking"],
+  });
 
-  // Current row for docs modal
+  const { data: availableInvoices = [] } = useQuery<AvailableInvoice[]>({
+    queryKey: [`${LIST_KEY}/available-invoices`],
+  });
+
+  const done = rows.filter((r) => r.isDone);
+  const activeRows = rows.filter((r) => !r.isDone);
+
+  // Current row for docs modal (search real rows only)
   const docsRow = docsRowId ? rows.find((r) => r.id === docsRowId) : null;
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
@@ -1271,9 +1299,76 @@ export default function FactoryShippingContainers() {
     e.target.value = "";
   }
 
-  // ── Filtering ─────────────────────────────────────────────────────────────────
+  // ── Tracking map: containerNumber → {eta, grandTotal} ────────────────────────
+  const trackingMap = useMemo(() => {
+    const m = new Map<string, TrackingRow>();
+    for (const t of trackingData) {
+      if (t.containerNumber) m.set(t.containerNumber.trim().toUpperCase(), t);
+    }
+    return m;
+  }, [trackingData]);
 
-  const filtered = active.filter((r) => {
+  // ── Ghost rows: invoices without a shipping row ───────────────────────────────
+  const ghostRows = useMemo((): DisplayRow[] =>
+    availableInvoices
+      .filter((inv) => !inv.alreadyHasRow)
+      .map((inv): DisplayRow => {
+        const ckey = (inv.containerNumber || "").trim().toUpperCase();
+        const tracked = ckey ? trackingMap.get(ckey) : undefined;
+        return {
+          id: -(inv.id),
+          companyId: 0,
+          customerOrderId: inv.id,
+          orderDate: inv.orderDate || "",
+          eta: null,
+          containerArrivedDate: null,
+          note: null,
+          ciNumber: null,
+          isDone: false,
+          doneAt: null,
+          doneBy: null,
+          whatsappSentAt: null,
+          createdAt: "",
+          invoiceNumber: inv.invoiceNumber,
+          customerId: null,
+          clientName: inv.customerName,
+          customerPhone: inv.customerPhone,
+          status: inv.status,
+          loadingDate: inv.loadingDate,
+          finalizedDate: inv.finalizedDate,
+          containerNumber: inv.containerNumber,
+          shippingCompany: inv.shippingCompany,
+          destination: inv.destination,
+          documentCount: 0,
+          shippingInvoiceFileUrl: null,
+          shippingInvoiceOriginalName: null,
+          shippingInvoiceFileType: null,
+          trackingLink: null,
+          grandTotal: inv.grandTotal ?? tracked?.grandTotal ?? null,
+          _isGhost: true,
+          _trackedEta: tracked?.eta ?? null,
+        };
+      }), [availableInvoices, trackingMap]);
+
+  // ── Merge real rows + ghost rows, sorted by status order ─────────────────────
+  const allDisplayRows = useMemo((): DisplayRow[] => {
+    const real: DisplayRow[] = activeRows.map((r) => {
+      const ckey = (r.containerNumber || "").trim().toUpperCase();
+      const tracked = ckey ? trackingMap.get(ckey) : undefined;
+      return { ...r, _isGhost: false, _trackedEta: tracked?.eta ?? null };
+    });
+    const merged = [...real, ...ghostRows];
+    merged.sort((a, b) => {
+      const sa = STATUS_ORDER[a.status] ?? 9;
+      const sb = STATUS_ORDER[b.status] ?? 9;
+      if (sa !== sb) return sa - sb;
+      return (b.orderDate || "").localeCompare(a.orderDate || "");
+    });
+    return merged;
+  }, [activeRows, ghostRows, trackingMap]);
+
+  // ── Filtering ─────────────────────────────────────────────────────────────────
+  const filtered = useMemo(() => allDisplayRows.filter((r) => {
     if (search) {
       const q = search.toLowerCase();
       if (
@@ -1286,12 +1381,11 @@ export default function FactoryShippingContainers() {
     }
     if (filterDocs === "has" && r.documentCount === 0) return false;
     if (filterDocs === "missing" && r.documentCount > 0) return false;
-    if (filterFinalized === "yes" && !r.finalizedDate) return false;
-    if (filterFinalized === "no" && r.finalizedDate) return false;
+    if (filterStatus !== "all" && r.status !== filterStatus) return false;
     return true;
-  });
+  }), [allDisplayRows, search, filterDocs, filterStatus]);
 
-  const hasActiveFilters = filterDocs !== "all" || filterFinalized !== "all";
+  const hasActiveFilters = filterDocs !== "all" || filterStatus !== "all";
 
   return (
     <>
@@ -1338,18 +1432,20 @@ export default function FactoryShippingContainers() {
               </Select>
             </div>
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Finalized</p>
-              <Select value={filterFinalized} onValueChange={(v: any) => setFinalized(v)}>
-                <SelectTrigger className="h-8 text-xs w-36" data-testid="select-filter-finalized"><SelectValue /></SelectTrigger>
+              <p className="text-xs text-muted-foreground">Status</p>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="h-8 text-xs w-44" data-testid="select-filter-status"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="yes">Finalized</SelectItem>
-                  <SelectItem value="no">Not Finalized</SelectItem>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="LOADING">Loading</SelectItem>
+                  <SelectItem value="PENDING_VERIFICATION">Pending</SelectItem>
+                  <SelectItem value="VERIFIED">Verified</SelectItem>
+                  <SelectItem value="FINALIZED">Finalized</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="flex items-end">
-              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setFilterDocs("all"); setFinalized("all"); }} data-testid="button-clear-filters">
+              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setFilterDocs("all"); setFilterStatus("all"); }} data-testid="button-clear-filters">
                 Clear All
               </Button>
             </div>
@@ -1376,11 +1472,11 @@ export default function FactoryShippingContainers() {
                 <TableHead className="text-xs min-w-[120px]">Destination</TableHead>
                 <TableHead className="text-xs min-w-[100px]">ETA</TableHead>
                 <TableHead className="text-xs min-w-[90px]">Arrived</TableHead>
-                <TableHead className="text-xs min-w-[90px]">Loading</TableHead>
                 <TableHead className="text-xs min-w-[90px]">Finalized</TableHead>
                 <TableHead className="text-xs min-w-[110px]">Shipping Co.</TableHead>
                 <TableHead className="text-xs min-w-[90px]">Documents</TableHead>
                 <TableHead className="text-xs min-w-[110px]">Shipping Invoice</TableHead>
+                <TableHead className="text-xs min-w-[100px]">Container Cost</TableHead>
                 <TableHead className="text-xs min-w-[100px]">CI No.</TableHead>
                 <TableHead className="text-xs min-w-[110px]">Note</TableHead>
                 <TableHead className="text-xs min-w-[90px]">WhatsApp</TableHead>
@@ -1397,7 +1493,7 @@ export default function FactoryShippingContainers() {
               ) : filtered.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={17} className="text-center py-10 text-muted-foreground">
-                    {active.length === 0 ? "No active records. Add one above." : "No records match the current filters."}
+                    {allDisplayRows.length === 0 ? "No active records." : "No records match the current filters."}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -1423,49 +1519,66 @@ export default function FactoryShippingContainers() {
                       </Badge>
                     </TableCell>
 
-                    {/* Sticky: Container # (editable → syncs to customer_orders) */}
+                    {/* Sticky: Container # (editable for real rows) */}
                     <TableCell className={stickyCellBase} style={{ left: CTR_LEFT }}>
-                      <EditableCellInput
-                        value={r.containerNumber || ""}
-                        placeholder="Enter #"
-                        onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { containerNumber: v || null } })}
-                        testId={`cell-container-${r.id}`}
-                        saving={syncOrderMutation.isPending}
-                      />
+                      {r._isGhost ? (
+                        <span className="text-xs text-muted-foreground font-mono">{r.containerNumber || "—"}</span>
+                      ) : (
+                        <EditableCellInput
+                          value={r.containerNumber || ""}
+                          placeholder="Enter #"
+                          onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { containerNumber: v || null } })}
+                          testId={`cell-container-${r.id}`}
+                          saving={syncOrderMutation.isPending}
+                        />
+                      )}
                     </TableCell>
 
-                    {/* Destination (editable → syncs to customer_orders) */}
+                    {/* Destination */}
                     <TableCell>
-                      <EditableCellInput
-                        value={r.destination || ""}
-                        placeholder="Enter destination"
-                        onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { destination: v || null } })}
-                        testId={`cell-destination-${r.id}`}
-                      />
+                      {r._isGhost ? (
+                        <span className="text-xs text-muted-foreground">{r.destination || "—"}</span>
+                      ) : (
+                        <EditableCellInput
+                          value={r.destination || ""}
+                          placeholder="Enter destination"
+                          onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { destination: v || null } })}
+                          testId={`cell-destination-${r.id}`}
+                        />
+                      )}
                     </TableCell>
 
-                    {/* ETA (editable → stays on row) */}
+                    {/* ETA: tracked ETA takes priority, then manual */}
                     <TableCell>
-                      <DateCellInput
-                        value={r.eta || ""}
-                        placeholder="Set ETA"
-                        onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { eta: v || null } })}
-                        testId={`cell-eta-${r.id}`}
-                      />
+                      {r._trackedEta ? (
+                        <span className="text-xs text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap" title="Auto from tracking">
+                          {fmtDate(r._trackedEta)}
+                        </span>
+                      ) : r._isGhost ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        <DateCellInput
+                          value={r.eta || ""}
+                          placeholder="Set ETA"
+                          onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { eta: v || null } })}
+                          testId={`cell-eta-${r.id}`}
+                        />
+                      )}
                     </TableCell>
 
-                    {/* Arrived Date (editable → stays on row) */}
+                    {/* Arrived Date */}
                     <TableCell>
-                      <DateCellInput
-                        value={r.containerArrivedDate || ""}
-                        placeholder="Not arrived"
-                        onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { containerArrivedDate: v || null } })}
-                        testId={`cell-arrived-${r.id}`}
-                      />
+                      {r._isGhost ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        <DateCellInput
+                          value={r.containerArrivedDate || ""}
+                          placeholder="Not arrived"
+                          onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { containerArrivedDate: v || null } })}
+                          testId={`cell-arrived-${r.id}`}
+                        />
+                      )}
                     </TableCell>
-
-                    {/* Loading Date (read-only from customer_orders) */}
-                    <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{fmtDate(r.loadingDate)}</TableCell>
 
                     {/* Finalized (read-only from customer_orders) */}
                     <TableCell className="whitespace-nowrap">
@@ -1474,24 +1587,34 @@ export default function FactoryShippingContainers() {
                         : <span className="text-amber-600 dark:text-amber-400 italic text-xs">Not finalized</span>}
                     </TableCell>
 
-                    {/* Shipping Company (editable → syncs to customer_orders) */}
+                    {/* Shipping Company */}
                     <TableCell>
-                      <EditableCellInput
-                        value={r.shippingCompany || ""}
-                        placeholder="Enter company"
-                        onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { shippingCompany: v || null } })}
-                        testId={`cell-shipping-${r.id}`}
-                      />
+                      {r._isGhost ? (
+                        <span className="text-xs text-muted-foreground">{r.shippingCompany || "—"}</span>
+                      ) : (
+                        <EditableCellInput
+                          value={r.shippingCompany || ""}
+                          placeholder="Enter company"
+                          onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { shippingCompany: v || null } })}
+                          testId={`cell-shipping-${r.id}`}
+                        />
+                      )}
                     </TableCell>
 
                     {/* Documents */}
                     <TableCell>
-                      <DocIndicator count={r.documentCount} onClick={() => setDocsRowId(r.id)} />
+                      {r._isGhost ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        <DocIndicator count={r.documentCount} onClick={() => setDocsRowId(r.id)} />
+                      )}
                     </TableCell>
 
-                    {/* Shipping Invoice (PDF uploaded for shipping company) */}
+                    {/* Shipping Invoice */}
                     <TableCell>
-                      {r.shippingInvoiceFileUrl ? (
+                      {r._isGhost ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : r.shippingInvoiceFileUrl ? (
                         <div className="flex items-center gap-1">
                           <Button
                             size="icon"
@@ -1534,59 +1657,89 @@ export default function FactoryShippingContainers() {
                       )}
                     </TableCell>
 
-                    {/* CI No. (editable → stays on row) */}
-                    <TableCell>
-                      <EditableCellInput
-                        value={r.ciNumber || ""}
-                        placeholder="Enter CI #"
-                        onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { ciNumber: v || null } })}
-                        testId={`cell-ci-${r.id}`}
-                      />
+                    {/* Container Cost (grandTotal from invoice) */}
+                    <TableCell className="text-xs whitespace-nowrap font-medium">
+                      {r.grandTotal
+                        ? <span className="text-foreground">{Number(r.grandTotal).toLocaleString()}</span>
+                        : <span className="text-muted-foreground">—</span>}
                     </TableCell>
 
-                    {/* Note (editable → stays on row) */}
+                    {/* CI No. */}
                     <TableCell>
-                      <EditableCellInput
-                        value={r.note || ""}
-                        placeholder="Add note"
-                        onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { note: v || null } })}
-                        testId={`cell-note-${r.id}`}
-                      />
+                      {r._isGhost ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        <EditableCellInput
+                          value={r.ciNumber || ""}
+                          placeholder="Enter CI #"
+                          onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { ciNumber: v || null } })}
+                          testId={`cell-ci-${r.id}`}
+                        />
+                      )}
+                    </TableCell>
+
+                    {/* Note */}
+                    <TableCell>
+                      {r._isGhost ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        <EditableCellInput
+                          value={r.note || ""}
+                          placeholder="Add note"
+                          onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { note: v || null } })}
+                          testId={`cell-note-${r.id}`}
+                        />
+                      )}
                     </TableCell>
 
                     {/* WhatsApp */}
                     <TableCell>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-green-300 text-green-700 dark:border-green-700 dark:text-green-400 whitespace-nowrap"
-                        onClick={() => setWaRowId(r.id)}
-                        data-testid={`button-prepare-wa-${r.id}`}
-                      >
-                        <MessageCircle className="h-3.5 w-3.5 mr-1" /> Prepare
-                      </Button>
-                    </TableCell>
-
-                    {/* Done + Delete */}
-                    <TableCell>
-                      <div className="flex items-center gap-1">
+                      {r._isGhost ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => setPendingDoneId(r.id)}
-                          data-testid={`button-mark-done-${r.id}`}
+                          className="border-green-300 text-green-700 dark:border-green-700 dark:text-green-400 whitespace-nowrap"
+                          onClick={() => setWaRowId(r.id)}
+                          data-testid={`button-prepare-wa-${r.id}`}
                         >
-                          <Check className="h-3.5 w-3.5 mr-1" /> Done
+                          <MessageCircle className="h-3.5 w-3.5 mr-1" /> Prepare
                         </Button>
+                      )}
+                    </TableCell>
+
+                    {/* Done + Delete (ghost rows show "+ Add" button) */}
+                    <TableCell>
+                      {r._isGhost ? (
                         <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setPendingDeleteId(r.id)}
-                          data-testid={`button-delete-row-${r.id}`}
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setAddOpen(true)}
+                          data-testid={`button-add-ghost-${r.id}`}
                         >
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          <Plus className="h-3.5 w-3.5 mr-1" /> Add
                         </Button>
-                      </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setPendingDoneId(r.id)}
+                            data-testid={`button-mark-done-${r.id}`}
+                          >
+                            <Check className="h-3.5 w-3.5 mr-1" /> Done
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setPendingDeleteId(r.id)}
+                            data-testid={`button-delete-row-${r.id}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))

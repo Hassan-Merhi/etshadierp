@@ -70,6 +70,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
           containerNumber: customerOrders.containerNumber,
           shippingCompany: customerOrders.shippingCompany,
           destination: customerOrders.destination,
+          grandTotal: customerOrders.grandTotal,
           alreadyHasRow: sql<boolean>`EXISTS (
             SELECT 1 FROM factory_shipping_container_rows fscr
             WHERE fscr.customer_order_id = ${customerOrders.id}

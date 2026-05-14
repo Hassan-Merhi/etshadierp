@@ -922,7 +922,7 @@ export default function DailyProductionReport() {
           <TabsTrigger value="ledger" data-testid="tab-ledger">Bale Ledger</TabsTrigger>
           <TabsTrigger value="shipping" data-testid="tab-shipping">Shipping Containers</TabsTrigger>
           <TabsTrigger value="sheets" data-testid="tab-sheets">Factory Sheets</TabsTrigger>
-          <TabsTrigger value="container-tracking" data-testid="tab-container-tracking" className="flex items-center gap-1.5">
+          <TabsTrigger value="container-tracking" data-testid="tab-container-tracking" className="hidden">
             <Ship className="h-3.5 w-3.5" />
             Container Tracking
           </TabsTrigger>
@@ -1515,8 +1515,8 @@ export default function DailyProductionReport() {
           <FactoryStatusBuilder />
         </TabsContent>
 
-        {/* ── Container Tracking tab ── */}
-        <TabsContent value="container-tracking" className="flex-1 overflow-y-auto p-4 mt-0 data-[state=inactive]:hidden">
+        {/* ── Container Tracking tab (hidden — data surfaced inside Shipping Containers) ── */}
+        <TabsContent value="container-tracking" className="hidden flex-1 overflow-y-auto p-4 mt-0 data-[state=inactive]:hidden">
           <FactoryContainerTracking />
         </TabsContent>
       </Tabs>
