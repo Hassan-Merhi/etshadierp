@@ -412,7 +412,7 @@ export default function ContainerVerification() {
               </Select>
             </div>
             <div className="flex items-center gap-2">
-              <Button onClick={generateComparison} disabled={!selectedSupplierId || !selectedProformaId} className="flex-1" data-testid="button-generate-comparison">
+              <Button onClick={() => generateComparison()} disabled={!selectedSupplierId || !selectedProformaId} className="flex-1" data-testid="button-generate-comparison">
                 <FileCheck className="mr-2 h-4 w-4" />
                 Generate Comparison
               </Button>
