@@ -1,9 +1,18 @@
 import { useSearch, useLocation } from "wouter";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { MapPin, Ship, Layers, Package } from "lucide-react";
+import { cn } from "@/lib/utils";
 import LocationInventory from "@/pages/LocationInventory";
 import StockOTW from "@/pages/StockOTW";
 import Containers from "@/pages/Containers";
 import CombinedInventory from "@/pages/CombinedInventory";
+
+const TABS = [
+  { value: "by-location", label: "By Location", icon: MapPin },
+  { value: "on-the-way",  label: "On The Way",  icon: Ship },
+  { value: "combined",    label: "Combined",     icon: Layers },
+  { value: "containers",  label: "Containers",   icon: Package },
+];
 
 export default function InventoryHub() {
   const search = useSearch();
@@ -15,12 +24,29 @@ export default function InventoryHub() {
   return (
     <div>
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="mb-5">
-          <TabsTrigger value="by-location" data-testid="tab-by-location">By Location</TabsTrigger>
-          <TabsTrigger value="on-the-way" data-testid="tab-on-the-way">On The Way</TabsTrigger>
-          <TabsTrigger value="combined" data-testid="tab-combined">Combined</TabsTrigger>
-          <TabsTrigger value="containers" data-testid="tab-containers">Containers</TabsTrigger>
-        </TabsList>
+        {/* Custom segment strip */}
+        <div className="flex flex-wrap gap-1 p-1 rounded-xl border bg-card mb-5 w-fit">
+          {TABS.map(({ value, label, icon: Icon }) => {
+            const isActive = tab === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setTab(value)}
+                data-testid={`tab-${value}`}
+                className={cn(
+                  "inline-flex items-center gap-2 px-4 h-9 rounded-lg text-sm transition-colors",
+                  isActive
+                    ? "bg-accent text-accent-foreground font-medium"
+                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground font-normal"
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {label}
+              </button>
+            );
+          })}
+        </div>
 
         <TabsContent value="by-location">
           <LocationInventory />
