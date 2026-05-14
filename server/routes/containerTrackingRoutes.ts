@@ -22,6 +22,7 @@ import {
   setBulkTrackingEnabled,
   getParcelsAppUsageStats,
   get17trackUsageStats,
+  getTrackingProgress,
 } from "../services/containerTrackingService";
 import { testConnection } from "../lib/parcelsAppClient";
 import { isConfigured as isMaerskConfigured } from "../lib/trackingProviders/maerskProvider";
@@ -67,6 +68,14 @@ const updateTrackingSettingsSchema = z.object({
 });
 
 export function registerContainerTrackingRoutes(app: Express) {
+
+  // GET /api/container-tracking/:id/progress — live progress for in-flight Track Now
+  app.get("/api/container-tracking/:id/progress", requireAuth, (req: Request, res: Response) => {
+    if (!requireAllowedRole(req, res)) return;
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) { res.status(400).json([]); return; }
+    res.json(getTrackingProgress(id));
+  });
 
   // GET /api/container-tracking/status — provider config (no keys exposed)
   app.get("/api/container-tracking/status", requireAuth, async (req: Request, res: Response) => {

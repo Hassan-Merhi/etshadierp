@@ -531,6 +531,32 @@ function ContainerDrawer({
     },
   });
 
+  // ── Live tracking progress polling ─────────────────────────────────────────
+  type TrackProgressStep = { label: string; status: string; detail: string | null; ts: number };
+  const [trackProgress, setTrackProgress] = useState<TrackProgressStep[]>([]);
+  const trackProgressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (trackNowMutation.isPending && container?.id) {
+      setTrackProgress([]);
+      trackProgressIntervalRef.current = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/container-tracking/${container.id}/progress`, { credentials: "include" });
+          if (res.ok) setTrackProgress(await res.json());
+        } catch { /* ignore */ }
+      }, 600);
+    } else {
+      if (trackProgressIntervalRef.current) {
+        clearInterval(trackProgressIntervalRef.current);
+        trackProgressIntervalRef.current = null;
+        setTimeout(() => setTrackProgress([]), 20_000);
+      }
+    }
+    return () => {
+      if (trackProgressIntervalRef.current) clearInterval(trackProgressIntervalRef.current);
+    };
+  }, [trackNowMutation.isPending, container?.id]);
+
   const eventsQueryKey = container?.id ? `/api/container-tracking/${container.id}/events` : null;
   const { data: events, isLoading: eventsLoading } = useQuery<any[]>({
     queryKey: [eventsQueryKey],
@@ -1245,6 +1271,56 @@ function ContainerDrawer({
                 {showEvents ? "Hide Events" : "View Events"}
               </Button>
             </div>
+
+            {/* Live tracking progress feed */}
+            {(trackNowMutation.isPending || trackProgress.length > 0) && (
+              <div className="rounded-md border bg-muted/30 px-3 py-2.5 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {trackNowMutation.isPending ? "Tracking in progress\u2026" : "Tracking complete"}
+                  </p>
+                  {!trackNowMutation.isPending && (
+                    <button
+                      onClick={() => setTrackProgress([])}
+                      className="text-muted-foreground hover:text-foreground"
+                      aria-label="Dismiss"
+                      data-testid="button-dismiss-progress"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+                {trackProgress.length === 0 && trackNowMutation.isPending && (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-3 w-3 animate-spin text-blue-500 shrink-0" />
+                    <span className="text-xs text-muted-foreground">Starting up\u2026</span>
+                  </div>
+                )}
+                {trackProgress.map((step, i) => (
+                  <div key={i} className="flex items-start gap-2" data-testid={`progress-step-${i}`}>
+                    {step.status === "running" ? (
+                      <Loader2 className="h-3 w-3 animate-spin text-blue-500 mt-0.5 shrink-0" />
+                    ) : step.status === "success" ? (
+                      <CheckCircle2 className="h-3 w-3 text-emerald-500 mt-0.5 shrink-0" />
+                    ) : step.status === "blocked" ? (
+                      <AlertTriangle className="h-3 w-3 text-amber-500 mt-0.5 shrink-0" />
+                    ) : step.status === "skip" ? (
+                      <Clock className="h-3 w-3 text-muted-foreground mt-0.5 shrink-0" />
+                    ) : (
+                      <XCircle className="h-3 w-3 text-red-500 mt-0.5 shrink-0" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <span className={`text-xs${step.status === "success" ? " font-medium" : ""}`}>
+                        {step.label}
+                      </span>
+                      {step.detail && (
+                        <p className="text-[11px] text-muted-foreground leading-snug">{step.detail}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Inline events list */}
             {showEvents && (

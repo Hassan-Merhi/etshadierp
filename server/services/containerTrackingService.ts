@@ -78,6 +78,42 @@ function isValidContainerNumber(containerNumber: string | null | undefined): boo
   return VALID_CONTAINER_REGEX.test(containerNumber.trim().toUpperCase());
 }
 
+// ── Live tracking progress — in-memory, keyed by container ID ────────────────
+
+export type ProgressStep = {
+  label: string;
+  status: "running" | "success" | "fail" | "skip" | "blocked";
+  detail: string | null;
+  ts: number;
+};
+
+const _progressStore = new Map<number, ProgressStep[]>();
+
+export function getTrackingProgress(containerId: number): ProgressStep[] {
+  return _progressStore.get(containerId) ?? [];
+}
+
+export function initTrackingProgress(containerId: number): void {
+  _progressStore.set(containerId, []);
+  // Auto-purge after 10 min so memory never grows indefinitely
+  setTimeout(() => _progressStore.delete(containerId), 10 * 60 * 1000);
+}
+
+/** Emit or update a progress step.  If a "running" step with the same label
+ *  already exists it is replaced in-place so there are no duplicates. */
+function ep(
+  containerId: number,
+  label: string,
+  status: ProgressStep["status"],
+  detail?: string | null,
+): void {
+  let steps = _progressStore.get(containerId);
+  if (!steps) { steps = []; _progressStore.set(containerId, steps); }
+  const step: ProgressStep = { label, status, detail: detail ?? null, ts: Date.now() };
+  const idx = steps.findIndex((s) => s.label === label && s.status === "running");
+  if (idx >= 0) steps[idx] = step; else steps.push(step);
+}
+
 // ── ParcelsApp quota — sourced from DB, not memory ───────────────────────────
 
 /**
@@ -824,8 +860,12 @@ async function trackViaParcelsApp(
   error: string | null;
 }> {
 
+  // Reset progress for this tracking run
+  initTrackingProgress(containerId);
+
   // ── Attempt 0: Lightweight HTTP scraper (no browser, no quota) ──────────────
   if (isHttpScraperAvailable()) {
+    ep(containerId, "HTTP scraper", "running");
     console.log(`[ContainerTracking] ${containerNumber}: trying HTTP scraper (no browser)...`);
     const httpResult = await httpScrapeTracking(containerNumber);
 
@@ -866,10 +906,12 @@ async function trackViaParcelsApp(
         !finalEta ? "no ETA derived from shipment states" : undefined,
       );
 
+      ep(containerId, "HTTP scraper", "success", lastStatus ?? "got data");
       console.log(`[ContainerTracking] ${containerNumber} → http_scraper: status=${lastStatus ?? "?"}`);
       return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
     }
 
+    ep(containerId, "HTTP scraper", "skip", httpResult.error ?? "no data");
     console.log(`[ContainerTracking] ${containerNumber}: HTTP scraper got no data (${httpResult.error}) — trying next provider...`);
   }
 
@@ -877,6 +919,7 @@ async function trackViaParcelsApp(
   // Only for Maersk-family containers (MAERSK, Hamburg Süd, etc.)
   const MAERSK_PREFIXES = /^(MAEU|MSKU|MRKU|MRSU|HASU|HJSC|HJCU|SUDU|SAFM)/i;
   if (isMaerskDirectScraperAvailable() && MAERSK_PREFIXES.test(containerNumber)) {
+    ep(containerId, "Maersk Puppeteer", "running");
     console.log(`[ContainerTracking] ${containerNumber}: trying Maersk direct scraper...`);
     const mdResult = await scrapeMaerskDirect(containerNumber);
 
@@ -939,6 +982,7 @@ async function trackViaParcelsApp(
         await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
       }
 
+      ep(containerId, "Maersk Puppeteer", "success", mdResult.latestStatus ?? "got data");
       console.log(`[ContainerTracking] ${containerNumber} → maersk_direct: status=${mdResult.latestStatus ?? "?"}`);
       return {
         success: true,
@@ -950,7 +994,10 @@ async function trackViaParcelsApp(
       };
     }
 
+    ep(containerId, "Maersk Puppeteer", "fail", mdResult.error ?? "no data");
     console.log(`[ContainerTracking] ${containerNumber}: maersk_direct got no data (${mdResult.error}) — trying Maersk public HTTP...`);
+  } else if (MAERSK_PREFIXES.test(containerNumber) && !isMaerskDirectScraperAvailable()) {
+    ep(containerId, "Maersk Puppeteer", "skip", "Chrome not available in this environment");
   }
 
   // ── Attempt 2: Maersk public HTTP (no browser, no API key, always available) ──
@@ -958,6 +1005,7 @@ async function trackViaParcelsApp(
   // Hits Maersk's undocumented public JSON API after loading a session cookie.
   // Blocked by Akamai roughly half the time — falls through gracefully.
   if (MAERSK_PREFIXES.test(containerNumber)) {
+    ep(containerId, "Maersk public HTTP", "running");
     console.log(`[ContainerTracking] ${containerNumber}: trying Maersk public HTTP provider...`);
     const mpResult = await maerskPublicProvider.track(containerNumber);
 
@@ -1005,6 +1053,7 @@ async function trackViaParcelsApp(
         !finalEta ? "no ETA from maersk_public" : undefined,
       );
 
+      ep(containerId, "Maersk public HTTP", "success", mpResult.latestStatus ?? "got data");
       console.log(`[ContainerTracking] ${containerNumber} → maersk_public: status=${mpResult.latestStatus ?? "?"}`);
       return {
         success: true,
@@ -1016,7 +1065,10 @@ async function trackViaParcelsApp(
       };
     }
 
-    if (mpResult.error !== "rate_limited") {
+    if (mpResult.error === "rate_limited") {
+      ep(containerId, "Maersk public HTTP", "skip", "rate-limited — 20 min cooldown");
+    } else {
+      ep(containerId, "Maersk public HTTP", "fail", mpResult.error ?? "no data");
       console.log(`[ContainerTracking] ${containerNumber}: maersk_public got no data (${mpResult.error}) — trying ParcelsApp...`);
     }
   }
@@ -1124,6 +1176,7 @@ async function trackViaParcelsApp(
 
   // ── Attempt 2: Puppeteer stealth scraper (ParcelsApp, no API key, no quota cost) ──
   if (isScraperAvailable()) {
+    ep(containerId, "Puppeteer scraper", "running");
     console.log(`[ContainerTracking] ${containerNumber}: trying ParcelsApp web scraper...`);
     const scraped = await scrapeTracking(containerNumber);
 
@@ -1164,10 +1217,12 @@ async function trackViaParcelsApp(
         !finalEta ? "no ETA derived from shipment states" : undefined,
       );
 
+      ep(containerId, "Puppeteer scraper", "success", lastStatus ?? "got data");
       console.log(`[ContainerTracking] ${containerNumber} → parcelsapp_scraper: status=${lastStatus ?? "?"}`);
       return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
     }
 
+    ep(containerId, "Puppeteer scraper", scraped.blocked ? "blocked" : "fail", scraped.error ?? "no data");
     if (scraped.blocked) {
       console.warn(`[ContainerTracking] ${containerNumber}: scraper blocked by reCaptcha — trying 17track...`);
     } else {
@@ -1179,8 +1234,10 @@ async function trackViaParcelsApp(
   if (seventeenTrack.isConfigured()) {
     const quotaOk17 = await check17trackQuota();
     if (!quotaOk17) {
+      ep(containerId, "17track API", "skip", "quota exhausted this month");
       console.warn(`[ContainerTracking] ${containerNumber}: 17track quota exhausted — skipping`);
     } else {
+      ep(containerId, "17track API", "running");
       console.log(`[ContainerTracking] ${containerNumber}: trying 17track...`);
       const result17 = await seventeenTrack.track(containerNumber);
 
@@ -1220,6 +1277,7 @@ async function trackViaParcelsApp(
           !finalEta ? "17track returned no ETA and no events with dates" : undefined,
         );
 
+        ep(containerId, "17track API", "success", result17.latestStatus ?? "got data");
         console.log(`[ContainerTracking] ${containerNumber} → 17track: status=${result17.latestStatus ?? "?"}`);
         return {
           success: true,
@@ -1231,6 +1289,7 @@ async function trackViaParcelsApp(
         };
       }
 
+      ep(containerId, "17track API", "fail", result17.error ?? "no data");
       console.warn(`[ContainerTracking] ${containerNumber}: 17track failed (${result17.error}) — trying ParcelsApp API...`);
     }
   }
@@ -1258,6 +1317,7 @@ async function trackViaParcelsAppApi(
   error: string | null;
 }> {
   if (!process.env.PARCELSAPP_API_KEY) {
+    ep(containerId, "ParcelsApp API", "skip", "API key not configured");
     const noProviderError = "No tracking provider configured (scraper unavailable, 17track not set, ParcelsApp key missing)";
     await db
       .update(containers)
@@ -1276,6 +1336,7 @@ async function trackViaParcelsAppApi(
   if (!quotaOk) {
     const { used, limit } = await getParcelsAppUsageStats();
     const quotaError = `ParcelsApp API quota used (${used}/${limit}) — all providers exhausted`;
+    ep(containerId, "ParcelsApp API", "skip", "quota exhausted this month");
     console.warn(`[ContainerTracking] ${containerNumber}: ${quotaError}`);
     await saveTrackingCheck(containerId, "skipped", "skipped_quota", quotaError, null);
     await db
@@ -1293,6 +1354,7 @@ async function trackViaParcelsAppApi(
 
   const hintCarrier = detectedCarrier && detectedCarrier !== "OTHER" ? detectedCarrier : undefined;
   const effectiveDestination = destinationCountry || "United States";
+  ep(containerId, "ParcelsApp API", "running");
   console.log(`[ContainerTracking] ${containerNumber}: ParcelsApp API attempt carrier=${hintCarrier ?? "auto"} destination="${effectiveDestination}"`);
 
   const result = await trackContainer(containerNumber, effectiveDestination, hintCarrier);
@@ -1306,6 +1368,7 @@ async function trackViaParcelsAppApi(
   );
 
   if (!result.success || !result.shipment) {
+    ep(containerId, "ParcelsApp API", "fail", result.error ?? "no data");
     await db
       .update(containers)
       .set({
@@ -1350,6 +1413,7 @@ async function trackViaParcelsAppApi(
     !finalEta ? "no ETA derived from shipment states" : undefined,
   );
 
+  ep(containerId, "ParcelsApp API", "success", lastStatus ?? "got data");
   console.log(`[ContainerTracking] ${containerNumber} → parcelsapp: status=${lastStatus ?? "?"}`);
   return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
 }
