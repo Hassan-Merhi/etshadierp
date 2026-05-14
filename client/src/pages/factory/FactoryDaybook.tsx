@@ -1011,8 +1011,6 @@ export default function FactoryDaybook() {
     );
   };
 
-  const hasNonUsd = filteredEntries.some((e) => e.currencyCode !== "USD");
-
   // ── JSX ───────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
@@ -1200,16 +1198,19 @@ export default function FactoryDaybook() {
             </div>
           ) : !isDetailed ? (
             /* ── CONDENSED VIEW ── */
-            <div className="table-responsive">
+            <div className="overflow-x-auto" style={{ width: "calc(100% + 2rem)", margin: "0 -1rem" }}>
               {(() => {
-                const hasNonUsdC = condensedRows.some((r) => r.currencyCode !== "USD");
                 return (
-                  <Table>
+                  <Table className="w-full table-fixed" style={{ minWidth: "100%" }}>
+                    <colgroup>
+                      <col style={{ width: "75%" }} />
+                      {showAmounts && <col style={{ width: "25%" }} />}
+                      <col style={{ width: "0" }} />
+                    </colgroup>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead className="w-full">Date</TableHead>
+                        <TableHead>Date</TableHead>
                         {showAmounts && <TableHead className="text-right whitespace-nowrap">Amount</TableHead>}
-                        {showAmounts && hasNonUsdC && <TableHead className="text-right whitespace-nowrap">FX Rate</TableHead>}
                         <TableHead className="w-0 p-0"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1245,11 +1246,6 @@ export default function FactoryDaybook() {
                                   )}
                                 </TableCell>
                               )}
-                              {showAmounts && hasNonUsdC && (
-                                <TableCell className="py-4 text-right font-mono text-muted-foreground text-sm">
-                                  {row.currencyCode === "USD" ? "—" : row.fxRateToUsd ? parseFloat(row.fxRateToUsd).toFixed(4) : "mixed"}
-                                </TableCell>
-                              )}
                               <TableCell className="w-0 p-0" />
                             </TableRow>
                             {isExpanded && expandedEntries.map((entry) => {
@@ -1278,7 +1274,7 @@ export default function FactoryDaybook() {
                                   <TableCell className="py-2 text-right font-mono font-medium">
                                     {showAmounts ? `${currencySymbol(entry.currencyCode)}${formatNumber(parseFloat(entry.amountCurrency))}` : "—"}
                                   </TableCell>
-                                  {showAmounts && hasNonUsdC && (
+                                  {false && (
                                     <TableCell className="py-2 text-right font-mono text-muted-foreground">
                                       {entry.currencyCode === "USD" ? "-" : entry.fxRateToUsd ? parseFloat(entry.fxRateToUsd).toFixed(4) : "-"}
                                     </TableCell>
@@ -1367,14 +1363,19 @@ export default function FactoryDaybook() {
               </div>
 
               {/* Desktop table */}
-              <div className="hidden md:block overflow-x-auto">
-                <Table>
+              <div className="hidden md:block overflow-x-auto" style={{ width: "calc(100% + 2rem)", margin: "0 -1rem" }}>
+                <Table className="w-full table-fixed" style={{ minWidth: "100%" }}>
+                  <colgroup>
+                    <col style={{ width: "15%" }} />
+                    <col style={{ width: showAmounts ? "65%" : "80%" }} />
+                    {showAmounts && <col style={{ width: "12%" }} />}
+                    <col style={{ width: "8%" }} />
+                  </colgroup>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead className="whitespace-nowrap">Date</TableHead>
-                      <TableHead className="w-full">Description</TableHead>
+                      <TableHead>Description</TableHead>
                       {showAmounts && <TableHead className="text-right whitespace-nowrap">Amount</TableHead>}
-                      {showAmounts && hasNonUsd && <TableHead className="text-right whitespace-nowrap">FX Rate</TableHead>}
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1390,7 +1391,7 @@ export default function FactoryDaybook() {
                       const { variant: bv, className: bc } = getFactoryTxTypeBadge(entry.txType);
                       const showDateSep = entry.txDate !== prevDate;
                       if (showDateSep) prevDate = entry.txDate;
-                      const colSpan = 2 + (showAmounts ? 1 : 0) + (showAmounts && hasNonUsd ? 1 : 0) + 1;
+                      const colSpan = 2 + (showAmounts ? 1 : 0) + 1;
                       const dayEntries = showDateSep
                         ? visibleEntries.filter((e) => e.txDate === entry.txDate)
                         : [];
@@ -1474,11 +1475,6 @@ export default function FactoryDaybook() {
                               {entry.currencyCode !== "USD" && parseFloat(entry.amountUsd || "0") > 0 && (
                                 <div className="text-xs text-muted-foreground font-mono mt-0.5">${formatNumber(parseFloat(entry.amountUsd))}</div>
                               )}
-                            </TableCell>
-                          )}
-                          {showAmounts && hasNonUsd && (
-                            <TableCell className="py-4 text-right font-mono text-muted-foreground text-sm">
-                              {entry.currencyCode === "USD" ? "—" : parseFloat(entry.fxRateToUsd).toFixed(4)}
                             </TableCell>
                           )}
                           <TableCell className="py-4">
