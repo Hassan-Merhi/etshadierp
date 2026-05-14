@@ -27,14 +27,15 @@ export interface ParcelsAppShipment {
   trackingId: string;
   done: boolean;
   fromCache?: boolean;
-  attributes?: {
+  // ParcelsApp returns attributes as an array of {l, val} objects in the real API
+  // response, but we also accept a plain dict for tests / legacy callers.
+  attributes?: Array<{ l: string; val?: string; [k: string]: unknown }> | {
     status?: string;
     location?: string;
     description?: string;
     weight?: string;
     origin?: string;
     destination?: string;
-    // ETA — ParcelsApp uses different field names depending on carrier/version
     estimatedDeliveryDate?: string;
     estimatedDelivery?: string;
     deliveryDate?: string;
@@ -42,14 +43,21 @@ export interface ParcelsAppShipment {
     estimatedArrival?: string;
     arrivalDate?: string;
     eta?: string;
-    [key: string]: string | undefined; // catch any other attribute fields
+    [key: string]: string | undefined;
   };
+  // Top-level ETA / delivery fields ParcelsApp may return directly on the shipment
+  estimatedArrival?: string;
+  estimatedDeliveryDate?: string;
+  estimatedDelivery?: string;
+  eta?: string;
+  delivered_by?: string;
   states?: Array<{
     date: string;
     status: string;
     location?: string;
     description?: string;
   }>;
+  status?: string;
   error?: string;
 }
 
@@ -323,45 +331,73 @@ export function deriveLastEventDate(shipment: ParcelsAppShipment): Date | null {
  * Returns an ISO date string (YYYY-MM-DD) or null if not available.
  */
 export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): string | null {
-  const attrs = shipment.attributes;
+  // Helper: parse and return YYYY-MM-DD if valid, else null.
+  const tryDate = (raw: unknown): string | null => {
+    if (!raw || typeof raw !== "string") return null;
+    const d = new Date(raw);
+    return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+  };
 
-  if (attrs) {
-    // Only genuine future-oriented ETA / estimated-arrival fields.
-    // Deliberately excluded: ata, ATA, actualArrivalDate, actualDeliveryDate,
-    // dischargeDate — those are past/actual dates, not future estimates.
-    const candidates = [
-      attrs.estimatedDeliveryDate,
-      attrs.estimatedDelivery,
-      attrs.expectedDelivery,
-      attrs.estimatedArrival,
-      attrs.estimatedTimeOfArrival,
-      attrs.scheduledArrival,
-      attrs.plannedArrival,
-      attrs.plannedArrivalDate,
-      attrs.predictedETA,
-      attrs.eta,
-      attrs.ETA,
-    ];
+  // 1. Check top-level shipment fields that ParcelsApp returns directly.
+  //    Only genuine future-oriented / ETA fields — never delivered_by (past).
+  const topLevel = [
+    shipment.estimatedArrival,
+    shipment.estimatedDeliveryDate,
+    shipment.estimatedDelivery,
+    shipment.eta,
+    (shipment as any).estimatedTimeOfArrival,
+    (shipment as any).scheduledArrival,
+    (shipment as any).plannedArrival,
+    (shipment as any).predictedETA,
+    (shipment as any).ETA,
+  ];
+  for (const raw of topLevel) {
+    const d = tryDate(raw);
+    if (d) return d;
+  }
 
-    for (const raw of candidates) {
-      if (!raw) continue;
-      const d = new Date(raw);
-      if (!isNaN(d.getTime())) {
-        return d.toISOString().slice(0, 10);
+  // 2. Normalise attributes to a plain key→value dict.
+  //    ParcelsApp returns attributes as an array of {l, val} objects in the real
+  //    API response; legacy / test callers may pass a plain dict.
+  const rawAttrs = shipment.attributes;
+  let attrsDict: Record<string, string> = {};
+  if (Array.isArray(rawAttrs)) {
+    for (const entry of rawAttrs) {
+      if (entry.l && typeof entry.val === "string") {
+        attrsDict[entry.l] = entry.val;
       }
     }
+  } else if (rawAttrs && typeof rawAttrs === "object") {
+    attrsDict = rawAttrs as Record<string, string>;
+  }
 
-    // Catch-all: scan attribute keys for unambiguous ETA/estimated-arrival terms.
-    // Explicitly excluded patterns: actual, ata, discharge, berth, gate, loaded,
-    // departed, movement — those all describe past events, not future ETAs.
-    const etaKeyPattern = /^(eta|estimatedArrival|estimatedDelivery|expectedDelivery|scheduledArrival|plannedArrival|predictedETA)/i;
-    for (const [key, val] of Object.entries(attrs)) {
-      if (!val || !etaKeyPattern.test(key)) continue;
-      const d = new Date(val);
-      if (!isNaN(d.getTime())) {
-        return d.toISOString().slice(0, 10);
-      }
-    }
+  // Known ETA field names inside the attributes dict.
+  const knownEtaKeys = [
+    "estimatedDeliveryDate",
+    "estimatedDelivery",
+    "expectedDelivery",
+    "estimatedArrival",
+    "estimatedTimeOfArrival",
+    "scheduledArrival",
+    "plannedArrival",
+    "plannedArrivalDate",
+    "predictedETA",
+    "eta",
+    "ETA",
+  ];
+  for (const key of knownEtaKeys) {
+    const d = tryDate(attrsDict[key]);
+    if (d) return d;
+  }
+
+  // Catch-all: scan attribute keys for unambiguous ETA/estimated-arrival terms.
+  // Explicitly excluded patterns: actual, ata, discharge, berth, gate, loaded,
+  // departed, movement — those all describe past events, not future ETAs.
+  const etaKeyPattern = /^(eta|estimatedArrival|estimatedDelivery|expectedDelivery|scheduledArrival|plannedArrival|predictedETA)/i;
+  for (const [key, val] of Object.entries(attrsDict)) {
+    if (!val || !etaKeyPattern.test(key)) continue;
+    const d = tryDate(val);
+    if (d) return d;
   }
 
   // No real ETA field found — return null so the caller can preserve
