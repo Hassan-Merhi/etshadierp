@@ -702,7 +702,7 @@ export function registerBaleRoutes(app: Express) {
 
     const seqMax = Math.max(refSeq?.nextNumber ?? 0, baleSeq?.nextNumber ?? 0);
     const safeNext = Math.max(dbMax + 1, seqMax);
-    const referenceNumber = `REF${String(safeNext).padStart(5, '0')}`;
+    const referenceNumber = `REF${String(safeNext).padStart(6, '0')}`;
 
     // Update (or insert) referenceSequences so next call gets safeNext+1
     if (refSeq) {

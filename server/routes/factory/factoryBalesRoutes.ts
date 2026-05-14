@@ -100,16 +100,16 @@ export function registerFactoryBalesRoutes(app: Express) {
             .set({ nextNumber: nextNumber + quantity })
             .where(eq(factoryBaleSequences.id, seqRecord.id));
         } else {
-          nextNumber = 100876;
+          nextNumber = 200000;
           await tx.insert(factoryBaleSequences).values({
             companyId,
-            nextNumber: 100876 + quantity,
+            nextNumber: 200000 + quantity,
           });
         }
 
         const bales: any[] = [];
         for (let i = 0; i < quantity; i++) {
-          const refNum = `REF${String(nextNumber + i).padStart(5, '0')}`;
+          const refNum = `REF${String(nextNumber + i).padStart(6, '0')}`;
           const [bale] = await tx
             .insert(factoryBales)
             .values({
@@ -184,10 +184,10 @@ export function registerFactoryBalesRoutes(app: Express) {
             .set({ nextNumber: nextNumber + totalExpected })
             .where(eq(factoryBaleSequences.id, seqRecord.id));
         } else {
-          nextNumber = 100876;
+          nextNumber = 200000;
           await tx.insert(factoryBaleSequences).values({
             companyId,
-            nextNumber: 100876 + totalExpected,
+            nextNumber: 200000 + totalExpected,
           });
         }
 
@@ -206,7 +206,7 @@ export function registerFactoryBalesRoutes(app: Express) {
           if (!product) throw new Error(`Product ID ${item.productId} not found`);
 
           for (let i = 0; i < qty; i++) {
-            const refNum = `REF${String(nextNumber + baleIndex).padStart(5, '0')}`;
+            const refNum = `REF${String(nextNumber + baleIndex).padStart(6, '0')}`;
             const [bale] = await tx
               .insert(factoryBales)
               .values({
@@ -288,16 +288,16 @@ export function registerFactoryBalesRoutes(app: Express) {
             .set({ nextNumber: nextNumber + quantity })
             .where(eq(factoryBaleSequences.id, seqRecord.id));
         } else {
-          nextNumber = 100876;
+          nextNumber = 200000;
           await tx.insert(factoryBaleSequences).values({
             companyId,
-            nextNumber: 100876 + quantity,
+            nextNumber: 200000 + quantity,
           });
         }
 
         const bales: any[] = [];
         for (let i = 0; i < quantity; i++) {
-          const refNum = `REF${String(nextNumber + i).padStart(5, '0')}`;
+          const refNum = `REF${String(nextNumber + i).padStart(6, '0')}`;
           const [bale] = await tx
             .insert(factoryBales)
             .values({
@@ -1661,14 +1661,14 @@ export function registerFactoryBalesRoutes(app: Express) {
             .set({ nextNumber: nextNumber + 1 })
             .where(eq(factoryBaleSequences.id, seqRecord.id));
         } else {
-          nextNumber = 100876;
+          nextNumber = 200000;
           await tx.insert(factoryBaleSequences).values({
             companyId,
-            nextNumber: 100877,
+            nextNumber: 200001,
           });
         }
 
-        const newRefNum = `REF${String(nextNumber).padStart(5, '0')}`;
+        const newRefNum = `REF${String(nextNumber).padStart(6, '0')}`;
 
         const [newBale] = await tx
           .insert(factoryBales)
@@ -2357,7 +2357,7 @@ export function registerFactoryBalesRoutes(app: Express) {
       }).returning();
 
       const maxRef = await db.select({ maxRef: sql`MAX(CAST(SUBSTRING(reference_number FROM 4) AS INTEGER))` }).from(factoryBales).where(eq(factoryBales.companyId, companyId));
-      let nextRef = Math.max((maxRef[0]?.maxRef || 0) + 1, 100876);
+      let nextRef = Math.max((maxRef[0]?.maxRef || 0) + 1, 200000);
 
       let imported = 0;
       let totalWeightKg = 0;

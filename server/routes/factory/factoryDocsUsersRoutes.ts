@@ -2408,16 +2408,16 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
           .for("update");
 
         const dbMaxResult = await tx.execute(
-          sql`SELECT COALESCE(MAX(CAST(REGEXP_REPLACE(reference_number, '[^0-9]', '', 'g') AS BIGINT)), 100875) as maxnum FROM factory_bales WHERE company_id = ${companyId}`
+          sql`SELECT COALESCE(MAX(CAST(REGEXP_REPLACE(reference_number, '[^0-9]', '', 'g') AS BIGINT)), 199999) as maxnum FROM factory_bales WHERE company_id = ${companyId}`
         );
         const dbMaxRow: any = Array.isArray(dbMaxResult) ? dbMaxResult[0] : (dbMaxResult?.rows?.[0] ?? {});
-        const dbMax = Number(dbMaxRow?.maxnum ?? 100875);
-        const storedNext = seqRow?.nextNumber ?? 1;
-        let nextNumber = Math.max(storedNext, dbMax + 1);
+        const dbMax = Number(dbMaxRow?.maxnum ?? 199999);
+        const storedNext = seqRow?.nextNumber ?? 200000;
+        let nextNumber = Math.max(storedNext, dbMax + 1, 200000);
 
         const newRefs: string[] = [];
         for (let i = 0; i < count; i++) {
-          newRefs.push(`REF${String(nextNumber + i).padStart(5, "0")}`);
+          newRefs.push(`REF${String(nextNumber + i).padStart(6, "0")}`);
         }
 
         // Upsert sequence

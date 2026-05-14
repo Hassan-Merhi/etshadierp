@@ -99,7 +99,7 @@ export function registerFactoryStockRoutes(app: Express) {
           .select({ m: sql<number>`COALESCE(MAX(CAST(REGEXP_REPLACE(reference_number, '[^0-9]', '', 'g') AS BIGINT)), 100875)` })
           .from(factoryBales)
           .where(and(eq(factoryBales.companyId, companyId), sql`reference_number ~ '^REF[0-9]+'`));
-        const dbMax = (Number(maxRow?.m) || 100875) + 1;
+        const dbMax = Math.max((Number(maxRow?.m) || 199999) + 1, 200000);
 
         let nextNumber: number;
         if (seqRecord) {
@@ -161,7 +161,7 @@ export function registerFactoryStockRoutes(app: Express) {
           const resolvedWorkerName: string | null = item.finalizedBy ? (workerNameMap.get(Number(item.finalizedBy)) ?? null) : null;
 
           for (let i = 0; i < qty; i++) {
-            const refNum = `REF${String(nextNumber + baleIndex).padStart(5, '0')}`;
+            const refNum = `REF${String(nextNumber + baleIndex).padStart(6, '0')}`;
             const isGarbage = product.articleCode?.startsWith("HMD16");
             const productionCostPerKg = parseFloat(product.productionPrice || "0");
             const effectiveCostPerKg = isGarbage ? 0 : productionCostPerKg;

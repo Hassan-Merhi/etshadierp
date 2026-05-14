@@ -1562,17 +1562,17 @@ export function registerFactoryProductsRoutes(app: Express) {
                 .set({ nextNumber: nextNumber + totalBalesNeeded })
                 .where(eq(factoryBaleSequences.id, seqRecord.id));
             } else {
-              nextNumber = 100876;
+              nextNumber = 200000;
               await tx.insert(factoryBaleSequences).values({
                 companyId,
-                nextNumber: 100876 + totalBalesNeeded,
+                nextNumber: 200000 + totalBalesNeeded,
               });
             }
 
             let baleIndex = 0;
             for (const group of rowGroups) {
               for (let i = 0; i < group.qty; i++) {
-                const refNum = `REF${String(nextNumber + baleIndex).padStart(5, '0')}`;
+                const refNum = `REF${String(nextNumber + baleIndex).padStart(6, '0')}`;
                 await tx
                   .insert(factoryBales)
                   .values({
