@@ -1197,108 +1197,146 @@ export default function FactoryDaybook() {
               )}
             </div>
           ) : !isDetailed ? (
-            /* ── CONDENSED VIEW ── */
+            /* ── CONDENSED VIEW — matches ERP Daybook: Date/Type | Count | Total ── */
             <div className="w-full">
-              {/* Header row */}
+              {/* Header */}
               <div className={cn(
                 "sticky top-0 z-30 bg-background border-b grid w-full px-4 py-2",
-                showAmounts ? "grid-cols-[1fr_160px]" : "grid-cols-[1fr]",
+                showAmounts
+                  ? "grid-cols-[minmax(0,1fr)_100px_180px]"
+                  : "grid-cols-[minmax(0,1fr)_100px]",
               )}>
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Date</span>
-                {showAmounts && <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-right">Amount</span>}
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Date / Type</span>
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-right">Count</span>
+                {showAmounts && <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-right">Total</span>}
               </div>
-              {/* Data rows */}
-              {condensedRows.map((row) => {
-                const isExpanded = expandedRowKey === row.key;
-                const expandedEntries = isExpanded ? getEntriesForCondensedRow(row.key) : [];
-                const { variant: bv, className: bc } = getFactoryTxTypeBadge(row.txType);
-                return (
-                  <div key={row.key} className="w-full border-b last:border-b-0">
-                    {/* Group header row */}
-                    <div
-                      data-testid={`row-condensed-${row.date}-${row.txType}`}
-                      onClick={() => setExpandedRowKey(isExpanded ? null : row.key)}
-                      className={cn(
-                        "grid w-full px-4 py-3 cursor-pointer hover-elevate items-center",
-                        showAmounts ? "grid-cols-[1fr_160px]" : "grid-cols-[1fr]",
-                      )}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        {isExpanded
-                          ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-                          : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-sm whitespace-nowrap">{formatDisplayDate(row.date + "T00:00:00")}</span>
-                            <Badge variant={bv} className={cn(bc, "whitespace-nowrap")}>{formatTxType(row.txType)}</Badge>
-                          </div>
-                          <div className="text-xs text-muted-foreground font-mono mt-0.5">{row.count} {row.count === 1 ? "entry" : "entries"}</div>
-                        </div>
+
+              {/* Group condensedRows by date for date-separator rows */}
+              {(() => {
+                const dateMap = new Map<string, typeof condensedRows>();
+                for (const row of condensedRows) {
+                  if (!dateMap.has(row.date)) dateMap.set(row.date, []);
+                  dateMap.get(row.date)!.push(row);
+                }
+                return Array.from(dateMap.entries()).map(([date, rows]) => {
+                  const dayTotal = rows.reduce((s, r) => s + r.totalAmountCurrency, 0);
+                  const dayCcy = rows[0]?.currencyCode ?? "USD";
+                  const colsClass = showAmounts
+                    ? "grid-cols-[minmax(0,1fr)_100px_180px]"
+                    : "grid-cols-[minmax(0,1fr)_100px]";
+                  return (
+                    <div key={date} className="w-full">
+                      {/* Date separator row */}
+                      <div className={cn("grid w-full px-4 py-1.5 bg-muted/40 border-b", colsClass)}>
+                        <span className="font-semibold text-sm">{formatDisplayDate(date + "T00:00:00")}</span>
+                        <span />
+                        {showAmounts && (
+                          <span className="font-mono font-medium text-sm text-right">
+                            {currencySymbol(dayCcy)}{formatNumber(dayTotal)}
+                          </span>
+                        )}
                       </div>
-                      {showAmounts && (
-                        <div className="text-right">
-                          <div className="font-mono font-semibold text-sm">{currencySymbol(row.currencyCode)}{formatNumber(row.totalAmountCurrency)}</div>
-                          {row.currencyCode !== "USD" && (
-                            <div className="text-xs text-muted-foreground font-mono">{row.currencyCode}</div>
-                          )}
-                        </div>
-                      )}
+
+                      {/* Type rows under this date */}
+                      {rows.map((row) => {
+                        const isExpanded = expandedRowKey === row.key;
+                        const expandedEntries = isExpanded ? getEntriesForCondensedRow(row.key) : [];
+                        const { variant: bv, className: bc } = getFactoryTxTypeBadge(row.txType);
+                        return (
+                          <div key={row.key} className="w-full border-b last:border-b-0">
+                            {/* Group type row */}
+                            <div
+                              data-testid={`row-condensed-${row.date}-${row.txType}`}
+                              onClick={() => setExpandedRowKey(isExpanded ? null : row.key)}
+                              className={cn("grid w-full pl-6 pr-4 py-3 cursor-pointer hover-elevate items-center", colsClass)}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                {isExpanded
+                                  ? <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+                                  : <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />}
+                                <Badge variant={bv} className={cn(bc, "whitespace-nowrap")}>{formatTxType(row.txType)}</Badge>
+                              </div>
+                              <div className="text-right text-muted-foreground text-sm font-mono">{row.count}</div>
+                              {showAmounts && (
+                                <div className="text-right font-mono font-medium text-sm">
+                                  {currencySymbol(row.currencyCode)}{formatNumber(row.totalAmountCurrency)}
+                                  {row.currencyCode !== "USD" && (
+                                    <div className="text-xs text-muted-foreground font-mono">{row.currencyCode}</div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Expanded entry sub-rows */}
+                            {isExpanded && expandedEntries.map((entry) => {
+                              const isBaleTransfer = entry.txType === "BALE_TRANSFER";
+                              const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
+                              const canEdit = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId && entry.txType !== "BALE_STOCK_ENTRY";
+                              return (
+                                <div
+                                  key={entry.id}
+                                  data-testid={`row-expanded-${entry.id}`}
+                                  onClick={isBaleTransfer ? (e) => handleEntryClick(entry, e) : undefined}
+                                  className={cn(
+                                    "grid w-full bg-muted/20 border-t items-center",
+                                    colsClass,
+                                    isBaleTransfer && "cursor-pointer",
+                                  )}
+                                >
+                                  {/* Description — deep indent to align under badge */}
+                                  <div className="pl-14 pr-2 py-2 min-w-0">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className="text-sm text-foreground truncate" title={formatDaybookDescription(entry)}>
+                                        {formatDaybookDescription(entry)}
+                                      </span>
+                                      {entry.optional && (
+                                        <Badge variant="outline" className="text-muted-foreground text-xs shrink-0" data-testid={`badge-optional-${entry.id}`}>Optional</Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {/* Empty count cell */}
+                                  <div />
+                                  {/* Amount + actions */}
+                                  {showAmounts ? (
+                                    <div className="flex items-center justify-end gap-1 pr-2 py-2">
+                                      <span className="text-sm font-mono font-medium">
+                                        {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency))}
+                                      </span>
+                                      <Button size="icon" variant="ghost" title="View details"
+                                        onClick={(e) => { e.stopPropagation(); setViewEntry(entry); }}
+                                        data-testid={`button-view-${entry.id}`}
+                                      ><Eye className="h-3 w-3" /></Button>
+                                      {canEdit && (
+                                        <Button size="icon" variant="ghost" title="Edit"
+                                          onClick={(e) => { e.stopPropagation(); editSourceRecord(entry); }}
+                                          data-testid={`button-edit-source-${entry.id}`}
+                                        ><ExternalLink className="h-3 w-3" /></Button>
+                                      )}
+                                      {isAdminOrOwner && isVoucherBacked && ["PAYMENT", "RECEIPT", "JOURNAL"].includes(entry.txType) && (
+                                        <Button size="icon" variant="ghost" title="Void"
+                                          onClick={(e) => { e.stopPropagation(); setVoidEntry(entry); }}
+                                          data-testid={`button-void-voucher-${entry.id}`}
+                                        ><Trash2 className="h-3 w-3" /></Button>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center justify-end gap-1 pr-2 py-2">
+                                      <Button size="icon" variant="ghost" title="View details"
+                                        onClick={(e) => { e.stopPropagation(); setViewEntry(entry); }}
+                                        data-testid={`button-view-${entry.id}`}
+                                      ><Eye className="h-3 w-3" /></Button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
                     </div>
-                    {/* Expanded sub-rows */}
-                    {isExpanded && expandedEntries.map((entry) => {
-                      const isBaleTransfer = entry.txType === "BALE_TRANSFER";
-                      const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
-                      const canEdit = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId && entry.txType !== "BALE_STOCK_ENTRY";
-                      const { variant: ev, className: ec } = getFactoryTxTypeBadge(entry.txType);
-                      return (
-                        <div
-                          key={entry.id}
-                          data-testid={`row-expanded-${entry.id}`}
-                          onClick={isBaleTransfer ? (e) => handleEntryClick(entry, e) : undefined}
-                          className={cn(
-                            "grid w-full pl-10 pr-4 py-2 bg-muted/30 border-t items-center",
-                            showAmounts ? "grid-cols-[1fr_160px]" : "grid-cols-[1fr]",
-                            isBaleTransfer && "cursor-pointer",
-                          )}
-                        >
-                          <div className="flex items-center gap-2 flex-wrap min-w-0">
-                            <Badge variant={ev} className={cn(ec, "whitespace-nowrap")}>{formatTxType(entry.txType)}</Badge>
-                            {entry.optional && (
-                              <Badge variant="outline" className="text-muted-foreground text-xs" data-testid={`badge-optional-${entry.id}`}>Optional</Badge>
-                            )}
-                            <span className="text-sm text-muted-foreground truncate" title={formatDaybookDescription(entry)}>
-                              {formatDaybookDescription(entry)}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-end gap-1">
-                            {showAmounts && (
-                              <span className="font-mono font-medium text-sm">
-                                {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency))}
-                              </span>
-                            )}
-                            <Button size="icon" variant="ghost" title="View details"
-                              onClick={(e) => { e.stopPropagation(); setViewEntry(entry); }}
-                              data-testid={`button-view-${entry.id}`}
-                            ><Eye className="h-3 w-3" /></Button>
-                            {canEdit && (
-                              <Button size="icon" variant="ghost" title="Edit"
-                                onClick={(e) => { e.stopPropagation(); editSourceRecord(entry); }}
-                                data-testid={`button-edit-source-${entry.id}`}
-                              ><ExternalLink className="h-3 w-3" /></Button>
-                            )}
-                            {isAdminOrOwner && isVoucherBacked && ["PAYMENT", "RECEIPT", "JOURNAL"].includes(entry.txType) && (
-                              <Button size="icon" variant="ghost" title="Void"
-                                onClick={(e) => { e.stopPropagation(); setVoidEntry(entry); }}
-                                data-testid={`button-void-voucher-${entry.id}`}
-                              ><Trash2 className="h-3 w-3" /></Button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           ) : (
             /* ── DETAILED VIEW ── */
