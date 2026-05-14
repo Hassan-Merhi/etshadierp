@@ -17,6 +17,7 @@ import {
   vouchers,
   voucherEntries,
   companies,
+  ledgerAccounts,
   insertFactoryPayrollSchema,
 } from "@shared/schema";
 
@@ -317,6 +318,56 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       res.json(formatted);
     } catch (error: any) {
       console.error("Error fetching payroll:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── GET single payroll summary (for daybook detail view) ─────────────────
+  app.get("/api/factory/payroll/:id/summary", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+
+      const [row] = await db
+        .select({
+          id: factoryPayrolls.id,
+          workerId: factoryPayrolls.workerId,
+          periodStart: factoryPayrolls.periodStart,
+          periodEnd: factoryPayrolls.periodEnd,
+          baseSalary: factoryPayrolls.baseSalary,
+          baleEarnings: factoryPayrolls.baleEarnings,
+          kgEarnings: factoryPayrolls.kgEarnings,
+          overtimePay: factoryPayrolls.overtimePay,
+          bonuses: factoryPayrolls.bonuses,
+          transport: factoryPayrolls.transport,
+          deductions: factoryPayrolls.deductions,
+          advances: factoryPayrolls.advances,
+          netSalary: factoryPayrolls.netSalary,
+          balesCount: factoryPayrolls.balesCount,
+          kgProcessed: factoryPayrolls.kgProcessed,
+          overtimeHours: factoryPayrolls.overtimeHours,
+          presentDays: factoryPayrolls.presentDays,
+          absentDays: factoryPayrolls.absentDays,
+          totalWorkingDays: factoryPayrolls.totalWorkingDays,
+          status: factoryPayrolls.status,
+          cashAccountId: factoryPayrolls.cashAccountId,
+          paidAt: factoryPayrolls.paidAt,
+          notes: factoryPayrolls.notes,
+          workerName: factoryWorkers.fullName,
+          workerCode: factoryWorkers.employeeCode,
+          workerPosition: factoryWorkers.position,
+          cashAccountName: ledgerAccounts.name,
+        })
+        .from(factoryPayrolls)
+        .leftJoin(factoryWorkers, eq(factoryPayrolls.workerId, factoryWorkers.id))
+        .leftJoin(ledgerAccounts, eq(factoryPayrolls.cashAccountId, ledgerAccounts.id))
+        .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)));
+
+      if (!row) return res.status(404).json({ message: "Payroll not found" });
+      res.json(row);
+    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
