@@ -398,7 +398,7 @@ export default function Suppliers() {
       <Dialog open={!!selectedSupplier} onOpenChange={handleCloseDialog}>
         <DialogContent className="max-w-5xl w-[95vw] max-h-[85vh] overflow-hidden flex flex-col gap-0 p-0">
           <DialogHeader className="px-5 pt-5 pb-4 border-b shrink-0">
-            <DialogTitle className="text-base">{selectedSupplier?.legalName}</DialogTitle>
+            <DialogTitle className="text-lg font-bold">{selectedSupplier?.legalName}</DialogTitle>
             {/* Compact filter bar */}
             <div className="flex flex-wrap items-center gap-2 pt-2">
               <Select value={companyFilter} onValueChange={setCompanyFilter}>
@@ -449,7 +449,7 @@ export default function Suppliers() {
             </div>
 
             {/* Transactions tab */}
-            <TabsContent value="transactions" className="flex-1 overflow-y-auto mt-0 px-5 pb-5 pt-3">
+            <TabsContent value="transactions" className="flex-1 overflow-hidden mt-0 px-5 pb-5 pt-3">
               {ledgerLoading ? (
                 <div className="border rounded-xl overflow-hidden">
                   <div className="bg-muted/40 px-4 py-2.5 border-b flex gap-6">
@@ -481,8 +481,7 @@ export default function Suppliers() {
                       <span className="font-mono font-semibold text-sm">{formatAmount(openingEntry.balance)}</span>
                     </div>
                   )}
-                  <div className="border rounded-xl overflow-hidden">
-                    <Table>
+                  <Table wrapperClassName="max-h-[calc(85vh-240px)]">
                       <TableHeader>
                         <TableRow className="bg-muted/40 hover:bg-muted/40">
                           <TableHead className="h-9 text-xs font-semibold">Date</TableHead>
@@ -545,13 +544,12 @@ export default function Suppliers() {
                         })}
                       </TableBody>
                     </Table>
-                  </div>
                 </div>
               )}
             </TabsContent>
 
             {/* Purchase Orders tab */}
-            <TabsContent value="purchase-orders" className="flex-1 overflow-y-auto mt-0 px-5 pb-5 pt-3">
+            <TabsContent value="purchase-orders" className="flex-1 overflow-hidden mt-0 px-5 pb-5 pt-3">
               {posLoading ? (
                 <div className="border rounded-xl overflow-hidden">
                   <div className="bg-muted/40 px-4 py-2.5 border-b flex gap-6">
@@ -593,8 +591,7 @@ export default function Suppliers() {
 
                 return (
                   <div className="space-y-3">
-                    <div className="border rounded-xl overflow-hidden">
-                      <Table>
+                    <Table wrapperClassName="max-h-[calc(85vh-200px)]">
                         <TableHeader>
                           <TableRow className="bg-muted/40 hover:bg-muted/40">
                             <TableHead className="h-9 text-xs font-semibold">Container</TableHead>
@@ -633,7 +630,6 @@ export default function Suppliers() {
                           ))}
                         </TableBody>
                       </Table>
-                    </div>
                     <div className="flex justify-end">
                       <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
                         <span className="text-muted-foreground">Grand Total</span>
