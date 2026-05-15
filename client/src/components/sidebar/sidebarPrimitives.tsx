@@ -4,6 +4,7 @@ import { ChevronDown, GripVertical } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
+import { useConnectivity } from "@/contexts/ConnectivityContext";
 
 export interface NavItem {
   title: string;
@@ -353,26 +354,39 @@ interface ModuleHeaderProps {
 }
 
 export function ModuleHeader({ icon: Icon, label, tagline, accent }: ModuleHeaderProps) {
+  const badgeLabel = tagline.split("/")[0].trim();
   return (
     <SidebarHeader
-      className="px-4 py-4 border-b border-sidebar-border"
+      className="px-4 py-4 border-b border-sidebar-border relative overflow-hidden"
       style={{
-        background: `linear-gradient(135deg, ${accent}28 0%, ${accent}0a 60%, transparent 100%)`,
+        background: `linear-gradient(135deg, ${accent}30 0%, ${accent}10 55%, transparent 100%)`,
       }}
     >
-      <div className="flex items-center gap-3">
+      {/* subtle radial glow behind the icon */}
+      <div
+        className="absolute -top-4 -left-4 h-20 w-20 rounded-full pointer-events-none"
+        style={{ background: `radial-gradient(circle, ${accent}22 0%, transparent 70%)` }}
+      />
+      <div className="flex items-center gap-3 relative">
+        {/* Icon tile — layered depth */}
         <div
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white"
           style={{
             backgroundColor: accent,
-            boxShadow: `0 2px 12px ${accent}55`,
+            boxShadow: `0 3px 16px ${accent}66, inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.15)`,
           }}
         >
-          <Icon className="h-5 w-5" />
+          <Icon className="h-5 w-5 drop-shadow-sm" />
         </div>
-        <div className="flex flex-col min-w-0">
+        <div className="flex flex-col min-w-0 gap-0.5">
           <span className="text-sm font-bold leading-tight">{label}</span>
-          <span className="text-xs text-muted-foreground leading-tight">{tagline}</span>
+          {/* Module badge beneath title */}
+          <span
+            className="inline-flex w-fit items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest"
+            style={{ backgroundColor: `${accent}22`, color: accent }}
+          >
+            {badgeLabel}
+          </span>
         </div>
       </div>
     </SidebarHeader>
@@ -389,17 +403,42 @@ interface ModuleFooterProps {
 
 export function ModuleFooter({ user, avatarClassName, accent }: ModuleFooterProps) {
   const initials = user?.username ? user.username.substring(0, 2).toUpperCase() : "AD";
+  const { isOnline } = useConnectivity();
   return (
-    <SidebarFooter className="px-4 py-3 border-t border-sidebar-border">
-      <div className="flex items-center gap-3">
-        <Avatar className="h-8 w-8 shrink-0">
-          <AvatarFallback
-            className={avatarClassName ?? "text-xs font-bold text-white"}
-            style={!avatarClassName && accent ? { backgroundColor: accent } : undefined}
+    <SidebarFooter
+      className="px-4 py-3 border-t border-sidebar-border relative overflow-hidden"
+      style={{
+        background: accent
+          ? `linear-gradient(to top, ${accent}22 0%, ${accent}08 55%, transparent 100%)`
+          : undefined,
+      }}
+    >
+      <div className="flex items-center gap-3 relative">
+        {/* Avatar with accent ring + connectivity dot */}
+        <div className="relative shrink-0">
+          <div
+            className="rounded-full p-[2px]"
+            style={{
+              background: accent
+                ? `linear-gradient(135deg, ${accent}cc, ${accent}44)`
+                : undefined,
+            }}
           >
-            {initials}
-          </AvatarFallback>
-        </Avatar>
+            <Avatar className="h-8 w-8 block">
+              <AvatarFallback
+                className={avatarClassName ?? "text-xs font-bold text-white"}
+                style={!avatarClassName && accent ? { backgroundColor: accent } : undefined}
+              >
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+          </div>
+          {/* Online / offline dot */}
+          <span
+            className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-sidebar"
+            style={{ backgroundColor: isOnline ? "#22c55e" : "#6b7280" }}
+          />
+        </div>
         <div className="flex flex-col flex-1 min-w-0">
           <span className="text-sm font-medium leading-tight truncate">
             {user?.username || "User"}
