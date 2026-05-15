@@ -2998,7 +2998,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-6 w-full">
                 {(() => {
                   // Group items by stock group, applying search filter
                   const searchLower = itemSearchTerm.toLowerCase();
@@ -3095,14 +3095,14 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                       <div className="screen-only hidden md:block w-full min-w-0">
                         <Card className="w-full overflow-hidden">
                           <div className="overflow-auto max-h-[calc(100vh-200px)] w-full min-w-0">
-                            <table className="w-full table-fixed text-sm">
+                            <table className="w-full min-w-full table-fixed text-sm">
                               <colgroup>
                                 <col />
-                                <col style={{ width: "140px" }} />
+                                <col className="w-36" />
                                 {!posUser && (
                                   <>
-                                    <col style={{ width: "120px" }} />
-                                    <col style={{ width: "140px" }} />
+                                    <col className="w-32" />
+                                    <col className="w-40" />
                                   </>
                                 )}
                               </colgroup>
