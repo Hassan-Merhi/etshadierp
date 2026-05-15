@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAdminOverride } from "@/hooks/use-admin-override";
-import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search, ArrowDown, AlertTriangle, RotateCcw, CheckSquare, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search, ArrowDown, AlertTriangle, RotateCcw, CheckSquare, ChevronDown, ChevronRight, Ship, Building2, StickyNote, Boxes, Package, LayoutList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -46,14 +46,124 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Textarea } from "@/components/ui/textarea";
 import type { FactoryContainer, FactorySupplier } from "@shared/schema";
 
 interface ContainerWithSupplier extends FactoryContainer {
   supplierName?: string | null;
 }
 
+// ── OTW Summary helpers ──────────────────────────────────────────────────────
+
+const OTW_NOTES_KEY = "factory-otw-notes";
+const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
+
+const CCY_SYMBOLS: Record<string, string> = {
+  USD: "$", EUR: "€", GBP: "£", AUD: "A$", CAD: "C$",
+  CHF: "CHF", JPY: "¥", CNY: "¥", AED: "AED", SAR: "SAR", LBP: "LL",
+};
+
+function otwNum(v: string | null | undefined): number {
+  if (!v) return 0;
+  const n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
+
+function otwCcySymbol(code: string | null | undefined): string {
+  if (!code) return "$";
+  return CCY_SYMBOLS[code] || code;
+}
+
+function otwFmtCcy(symbol: string, amount: number): string {
+  return `${symbol} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function otwAddToCurrency(map: Record<string, number>, ccy: string, amount: number) {
+  if (amount > 0 && ccy) map[ccy] = (map[ccy] || 0) + amount;
+}
+
+function otwContainerByCurrency(c: ContainerWithSupplier): Record<string, number> {
+  const amounts: Record<string, number> = {};
+  const containerCcy = (c as any).currencyCode || "USD";
+  const goodsValue = otwNum((c as any).finalPayableAmount) > 0
+    ? otwNum((c as any).finalPayableAmount)
+    : otwNum(c.ratePerKg) * otwNum(c.totalKg);
+  otwAddToCurrency(amounts, containerCcy, goodsValue);
+  otwAddToCurrency(amounts, (c as any).freightCurrencyCode || containerCcy, otwNum((c as any).freight));
+  otwAddToCurrency(amounts, (c as any).commissionCurrencyCode || "USD", otwNum((c as any).commissionAmount));
+  otwAddToCurrency(amounts, containerCcy, otwNum((c as any).otherCharges));
+  otwAddToCurrency(amounts, containerCcy, otwNum((c as any).additionalChargesSum));
+  otwAddToCurrency(amounts, containerCcy, otwNum((c as any).preRegisteredChargesSum));
+  return amounts;
+}
+
+function otwMergeCurrencyMaps(target: Record<string, number>, source: Record<string, number>) {
+  for (const [ccy, amt] of Object.entries(source)) {
+    target[ccy] = (target[ccy] || 0) + amt;
+  }
+}
+
+function OtwCurrencyInline({ amounts }: { amounts: Record<string, number> }) {
+  const entries = Object.entries(amounts).filter(([, v]) => v > 0);
+  if (entries.length === 0) return <span className="text-muted-foreground">—</span>;
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      {entries.map(([ccy, amt]) => (
+        <span key={ccy} className="font-mono text-sm font-semibold whitespace-nowrap">
+          {otwFmtCcy(otwCcySymbol(ccy), amt)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function OtwNotes() {
+  const [value, setValue] = useState(() => localStorage.getItem(OTW_NOTES_KEY) ?? "");
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setValue(e.target.value);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      localStorage.setItem(OTW_NOTES_KEY, e.target.value);
+    }, 600);
+  }
+
+  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
+
+  return (
+    <Card>
+      <CardContent className="pt-3 pb-3">
+        <div className="flex items-center gap-2 mb-2">
+          <StickyNote className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Notes</span>
+        </div>
+        <Textarea
+          value={value}
+          onChange={handleChange}
+          placeholder="Write anything here…"
+          className="min-h-[80px] resize-y text-sm border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+          data-testid="textarea-otw-notes"
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
+const OTW_STATUS_LABEL: Record<string, string> = {
+  PENDING: "Pending",
+  IN_TRANSIT: "In Transit",
+  ARRIVED: "Arrived",
+  OFFLOADED: "Offloaded",
+  PARTIALLY_RECEIVED: "Partially Received",
+  RECEIVED: "Received",
+};
+
 export default function FactoryContainers() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
+  const [viewMode, setViewMode] = useState<"list" | "summary">("list");
+  const [openOtwGroups, setOpenOtwGroups] = useState<Set<string>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
   const [editingContainer, setEditingContainer] = useState<ContainerWithSupplier | null>(null);
   const [expandedSuppliers, setExpandedSuppliers] = useState<Set<string>>(new Set(["__all__"]));
@@ -133,6 +243,56 @@ export default function FactoryContainers() {
   const { data: suppliers } = useQuery<FactorySupplier[]>({
     queryKey: ["/api/factory/suppliers"],
   });
+
+  // ── OTW Summary computed values ──────────────────────────────────────────
+  const otwContainers = useMemo(
+    () => (containers || []).filter((c) => STATUS_ACTIVE.has(c.status)),
+    [containers],
+  );
+
+  const otwSupplierGroups = useMemo(() => {
+    const map = new Map<string, { supplierId: number | null; supplierName: string; containers: ContainerWithSupplier[]; totalKg: number; totalsByCurrency: Record<string, number> }>();
+    for (const c of otwContainers) {
+      const key = String((c as any).supplierId ?? "none");
+      if (!map.has(key)) {
+        map.set(key, {
+          supplierId: (c as any).supplierId ?? null,
+          supplierName: c.supplierName || "No Supplier",
+          containers: [],
+          totalKg: 0,
+          totalsByCurrency: {},
+        });
+      }
+      const group = map.get(key)!;
+      group.containers.push(c);
+      group.totalKg += otwNum(c.totalKg);
+      otwMergeCurrencyMaps(group.totalsByCurrency, otwContainerByCurrency(c));
+    }
+    return Array.from(map.values()).sort((a, b) => a.supplierName.localeCompare(b.supplierName));
+  }, [otwContainers]);
+
+  const otwGrandTotals = useMemo(() => {
+    const totalsByCurrency: Record<string, number> = {};
+    let count = 0;
+    let kg = 0;
+    for (const g of otwSupplierGroups) {
+      count += g.containers.length;
+      kg += g.totalKg;
+      otwMergeCurrencyMaps(totalsByCurrency, g.totalsByCurrency);
+    }
+    return { containers: count, kg, totalsByCurrency };
+  }, [otwSupplierGroups]);
+
+  const fmtOtwKg = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+
+  function toggleOtwGroup(key: string) {
+    setOpenOtwGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   // Auto-fill broker (commissionSupplierId) when supplier changes
   useEffect(() => {
@@ -710,6 +870,26 @@ export default function FactoryContainers() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <div className="flex rounded-md border overflow-hidden">
+            <Button
+              variant={viewMode === "list" ? "default" : "ghost"}
+              className="rounded-none"
+              onClick={() => setViewMode("list")}
+              data-testid="button-view-list"
+            >
+              <LayoutList className="h-4 w-4 mr-2" />
+              List
+            </Button>
+            <Button
+              variant={viewMode === "summary" ? "default" : "ghost"}
+              className="rounded-none"
+              onClick={() => setViewMode("summary")}
+              data-testid="button-view-summary"
+            >
+              <Ship className="h-4 w-4 mr-2" />
+              OTW Summary
+            </Button>
+          </div>
           <Button
             onClick={() => navigate("/factory/containers/new")}
             data-testid="button-add-factory-container"
@@ -719,6 +899,164 @@ export default function FactoryContainers() {
           </Button>
         </div>
       </div>
+
+      {viewMode === "summary" ? (
+        <div className="space-y-4">
+          <OtwNotes />
+
+          {otwContainers.length === 0 ? (
+            <Card>
+              <CardContent className="py-16 text-center">
+                <Ship className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-40" />
+                <p className="text-muted-foreground">No containers currently on the way.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <Card>
+                {otwSupplierGroups.map((group, idx) => {
+                  const key = String(group.supplierId ?? "none");
+                  const isOpen = openOtwGroups.has(key);
+                  const isLast = idx === otwSupplierGroups.length - 1;
+                  return (
+                    <Collapsible key={key} open={isOpen} onOpenChange={() => toggleOtwGroup(key)}>
+                      <CollapsibleTrigger asChild>
+                        <div
+                          className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover-elevate transition-colors
+                            ${!isLast ? "border-b" : ""}
+                            ${isOpen ? "bg-muted/30" : ""}`}
+                          data-testid={`row-otw-supplier-${key}`}
+                        >
+                          <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="font-medium text-sm flex-1 min-w-0 truncate">
+                            {group.supplierName}
+                          </span>
+                          <Badge variant="secondary" className="text-xs shrink-0">
+                            {group.containers.length} ctr{group.containers.length !== 1 ? "s" : ""}
+                          </Badge>
+                          <span className="text-sm font-mono text-muted-foreground shrink-0 hidden sm:block w-28 text-right">
+                            {fmtOtwKg(group.totalKg)} kg
+                          </span>
+                          <div className="shrink-0 min-w-[100px] text-right">
+                            <OtwCurrencyInline amounts={group.totalsByCurrency} />
+                          </div>
+                          <ChevronDown
+                            className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                          />
+                        </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className={`border-t bg-muted/10 ${!isLast ? "border-b" : ""}`}>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Container</TableHead>
+                                <TableHead>Origin</TableHead>
+                                <TableHead className="text-right">KG</TableHead>
+                                <TableHead className="text-right">Value</TableHead>
+                                <TableHead>Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {group.containers.map((c) => {
+                                const byCurrency = otwContainerByCurrency(c);
+                                return (
+                                  <TableRow
+                                    key={c.id}
+                                    className="cursor-pointer hover-elevate"
+                                    onClick={() => setViewContainer(c)}
+                                    data-testid={`row-otw-container-${c.id}`}
+                                  >
+                                    <TableCell className="font-mono text-sm font-medium">
+                                      {c.containerNumber}
+                                    </TableCell>
+                                    <TableCell className="text-sm text-muted-foreground">
+                                      {c.origin || "—"}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-sm">
+                                      {fmtOtwKg(otwNum(c.totalKg))}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <OtwCurrencyInline amounts={byCurrency} />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline" className="text-xs">
+                                        {OTW_STATUS_LABEL[c.status] || c.status}
+                                      </Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                            <tfoot>
+                              <TableRow className="bg-muted/30 font-medium">
+                                <TableCell colSpan={2} className="text-sm text-muted-foreground">
+                                  Supplier total
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  {fmtOtwKg(group.totalKg)} kg
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <OtwCurrencyInline amounts={group.totalsByCurrency} />
+                                </TableCell>
+                                <TableCell />
+                              </TableRow>
+                            </tfoot>
+                          </Table>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  );
+                })}
+              </Card>
+
+              <div
+                className="sticky bottom-0 z-50 rounded-md border bg-background shadow-md"
+                data-testid="div-otw-grand-total"
+              >
+                <div className="flex flex-wrap items-center gap-6 p-4">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Containers</p>
+                      <p className="text-lg font-bold font-mono" data-testid="text-otw-grand-containers">
+                        {otwGrandTotals.containers}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Boxes className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total KG</p>
+                      <p className="text-lg font-bold font-mono" data-testid="text-otw-grand-kg">
+                        {fmtOtwKg(otwGrandTotals.kg)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 flex-1">
+                    <div className="w-full">
+                      <p className="text-xs text-muted-foreground mb-1">Total Value by Currency</p>
+                      <div className="flex flex-wrap gap-x-6 gap-y-1" data-testid="text-otw-grand-totals">
+                        {Object.entries(otwGrandTotals.totalsByCurrency)
+                          .filter(([, v]) => v > 0)
+                          .sort(([a], [b]) => a.localeCompare(b))
+                          .map(([ccy, amt]) => (
+                            <div key={ccy} className="flex flex-col">
+                              <span className="text-xs text-muted-foreground">{ccy}</span>
+                              <span className="text-lg font-bold font-mono whitespace-nowrap">
+                                {otwFmtCcy(otwCcySymbol(ccy), amt)}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
 
       <Card>
         <CardHeader className="pb-3">
@@ -1015,6 +1353,8 @@ export default function FactoryContainers() {
           )}
         </CardContent>
       </Card>
+
+      )}
 
       <Dialog open={createOpen || !!editingContainer} onOpenChange={(open) => {
         if (!open) { setCreateOpen(false); setEditingContainer(null); resetForm(); }
