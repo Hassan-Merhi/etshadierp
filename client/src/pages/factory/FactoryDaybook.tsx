@@ -955,6 +955,8 @@ export default function FactoryDaybook() {
   // ── Client-side filters (search, amount range, status) ────────────────────
   const filteredEntries = useMemo(() => {
     let result = entries;
+    // Always hide worker edit audit entries
+    result = result.filter((e) => e.txType !== "WORKER_EDITED");
     // Non-admins only see their own entries
     if (!isAdminOrOwner && currentUser?.id) {
       result = result.filter((e) => e.createdBy === currentUser.id);
