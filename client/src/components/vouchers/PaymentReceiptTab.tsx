@@ -153,6 +153,7 @@ export function PaymentReceiptTab({
   const iconColor = isPayment
     ? "text-amber-600 dark:text-amber-400"
     : "text-emerald-600 dark:text-emerald-400";
+  const accentColor = isPayment ? "#f59e0b" : "#10b981";
   const title = isPayment ? "Payment Voucher" : "Receipt Voucher";
   const accountLabel = isPayment ? "Pay From" : "Receive Into";
   const accountPlaceholder = isPayment ? "Pay from..." : "Receive into...";
@@ -247,31 +248,49 @@ export function PaymentReceiptTab({
         <Card>
           {/* Header */}
           <CardHeader
-            className={cn(
-              "p-4 sm:p-5 rounded-t-lg flex flex-row items-center gap-3 flex-wrap",
-              headerBg
-            )}
+            className="relative p-4 sm:p-5 rounded-t-lg flex flex-row items-center gap-3 flex-wrap overflow-hidden border-b border-border/50"
+            style={{
+              background: `linear-gradient(135deg, ${accentColor}22 0%, ${accentColor}08 55%, transparent 100%)`,
+            }}
           >
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <Icon className={cn("h-5 w-5 shrink-0", iconColor)} />
-              <CardTitle className="text-base sm:text-lg">{title}</CardTitle>
-              {isEditMode && (
-                <Badge
-                  variant="secondary"
-                  className="text-xs shrink-0"
-                  data-testid="badge-editing"
-                >
-                  Editing
-                </Badge>
-              )}
-              {voucherNumber && (
-                <span
-                  className="text-xs font-mono text-muted-foreground truncate"
-                  data-testid="text-voucher-number"
-                >
-                  #{voucherNumber}
-                </span>
-              )}
+            {/* Left accent stripe */}
+            <div
+              className="absolute left-0 top-0 bottom-0 w-[3px] rounded-tl-lg"
+              style={{ backgroundColor: accentColor }}
+            />
+
+            <div className="flex items-center gap-3 flex-1 min-w-0 pl-2">
+              {/* Icon tile */}
+              <div
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white"
+                style={{
+                  backgroundColor: accentColor,
+                  boxShadow: `0 2px 12px ${accentColor}55, inset 0 1px 0 rgba(255,255,255,0.2)`,
+                }}
+              >
+                <Icon className="h-5 w-5" />
+              </div>
+
+              <div className="flex flex-col min-w-0">
+                <CardTitle className="text-base sm:text-lg leading-snug">{title}</CardTitle>
+                {(isEditMode || voucherNumber) && (
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                    {isEditMode && (
+                      <Badge variant="secondary" className="text-xs" data-testid="badge-editing">
+                        Editing
+                      </Badge>
+                    )}
+                    {voucherNumber && (
+                      <span
+                        className="text-xs font-mono text-muted-foreground"
+                        data-testid="text-voucher-number"
+                      >
+                        #{voucherNumber}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Mobile accounts drawer trigger — hidden on sm+ */}
@@ -539,47 +558,54 @@ export function PaymentReceiptTab({
                 />
 
                 {/* ── Summary / validation ── */}
-                <div className="rounded-md border bg-muted/30 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex flex-wrap gap-4 text-sm">
-                    <span className="text-muted-foreground">
-                      Lines:{" "}
-                      <span className="font-medium text-foreground">
-                        {validEntryCount}
+                <div className="rounded-lg border bg-muted/20 overflow-hidden">
+                  <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                    {/* Left: stats + validation hints */}
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          Lines
+                        </span>
+                        <span className="text-sm font-semibold tabular-nums">
+                          {validEntryCount}
+                        </span>
+                      </div>
+
+                      {(missingAccount || missingEntries) && (
+                        <div className="flex flex-col gap-0.5 justify-center">
+                          {missingAccount && (
+                            <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                              <span>{accountLabel} account is required</span>
+                            </div>
+                          )}
+                          {!missingAccount && missingEntries && (
+                            <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                              <span>Add at least one entry with an amount</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right: large total */}
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Total
                       </span>
-                    </span>
-                    <span className="text-muted-foreground">
-                      Total:{" "}
                       <span
                         className={cn(
-                          "font-semibold tabular-nums",
-                          total > 0
-                            ? "text-foreground"
-                            : "text-muted-foreground"
+                          "text-2xl font-bold tabular-nums leading-tight",
+                          total === 0 && "text-muted-foreground"
                         )}
+                        style={total > 0 ? { color: accentColor } : undefined}
                         data-testid="text-total-amount"
                       >
                         {total > 0 ? formatAmount(total) : "—"}
                       </span>
-                    </span>
-                  </div>
-
-                  {/* Validation hints */}
-                  {(missingAccount || missingEntries) && (
-                    <div className="flex flex-col gap-1">
-                      {missingAccount && (
-                        <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
-                          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                          <span>{accountLabel} account is required</span>
-                        </div>
-                      )}
-                      {!missingAccount && missingEntries && (
-                        <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
-                          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                          <span>Add at least one entry with an amount</span>
-                        </div>
-                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 {/* ── Notes (collapsible) ── */}
@@ -629,7 +655,7 @@ export function PaymentReceiptTab({
                 </Collapsible>
 
                 {/* ── Optional toggle + Submit ── */}
-                <div className="flex items-center justify-between gap-4 pt-1 flex-wrap">
+                <div className="flex items-center justify-between gap-4 pt-4 flex-wrap border-t border-border/50">
                   <FormField
                     control={form.control}
                     name="optional"
