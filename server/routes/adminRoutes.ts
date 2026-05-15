@@ -42,6 +42,8 @@ import {
   snapshotPinnedAccounts,
   salaryAdvances, salaryAdvanceDeductions,
   insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
+  employeeGroupMembers, employeeBaleRates, employeeBalePctRates,
+  erpWorkerDocs, erpPayrollRunItems,
   chatMessages,
   
   systemSettings,
@@ -956,6 +958,17 @@ export function registerAdminRoutes(app: Express) {
             .where(and(eq(ledgerAccounts.id, itemId), eq(ledgerAccounts.companyId, companyId)));
           break;
         case "employee":
+          // Delete all FK-dependent rows before removing the employee
+          await db.delete(employeeGroupMembers).where(eq(employeeGroupMembers.employeeId, itemId));
+          await db.delete(employeeBaleRates).where(eq(employeeBaleRates.employeeId, itemId));
+          await db.delete(employeeBalePctRates).where(eq(employeeBalePctRates.employeeId, itemId));
+          await db.delete(salaryAdvances).where(eq(salaryAdvances.employeeId, itemId));
+          await db.delete(erpWorkerDocs).where(eq(erpWorkerDocs.employeeId, itemId));
+          await db.delete(erpPayrollRunItems).where(eq(erpPayrollRunItems.employeeId, itemId));
+          // Null-out the optional employee FK on voucher entries (don't delete the vouchers)
+          await db.update(voucherEntries)
+            .set({ employeeId: null })
+            .where(eq(voucherEntries.employeeId, itemId));
           await db.delete(employees)
             .where(and(eq(employees.id, itemId), eq(employees.companyId, companyId)));
           break;
