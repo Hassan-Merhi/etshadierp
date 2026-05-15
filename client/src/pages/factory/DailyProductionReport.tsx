@@ -1506,7 +1506,7 @@ export default function DailyProductionReport() {
         </TabsContent>
 
         {/* ── Shipping Containers tab ── */}
-        <TabsContent value="shipping" className="flex-1 overflow-y-auto p-4 mt-0 data-[state=inactive]:hidden">
+        <TabsContent value="shipping" className="flex-1 overflow-hidden p-4 mt-0 data-[state=inactive]:hidden">
           <FactoryShippingContainers />
         </TabsContent>
 

@@ -1332,8 +1332,8 @@ export default function FactoryShippingContainers() {
         </div>
 
         {/* ── Main Table ── */}
-        <div className="rounded-md border overflow-x-auto">
-          <Table className="text-xs" style={{ minWidth: "1100px" }}>
+        <div className="rounded-md border">
+          <Table className="text-xs" style={{ minWidth: "1100px" }} wrapperClassName="max-h-[calc(100vh-300px)] overflow-auto">
             <TableHeader>
               <TableRow>
                 {colVis.orderDate && <TableHead className="text-xs w-20 min-w-[80px]">Order Date</TableHead>}
