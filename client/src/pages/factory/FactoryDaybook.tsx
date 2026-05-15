@@ -270,6 +270,7 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
   const hasBalesMeta = isBaleStockEntry || isBaleRemoval;
   const isContainerImport = entry.txType === "CONTAINER_IMPORT" && !!entry.referenceId;
   const isPayrollPayment = entry.txType === "PAYROLL_PAYMENT" && !!entry.referenceId;
+  const isMixBatchCreated = (entry.txType === "MIX_BATCH_CREATED" || entry.txType === "MIX_BATCH_TOPUP") && !!entry.referenceId;
 
   const { data: viewEntries = [] } = useQuery<any[]>({
     queryKey: [`/api/vouchers/${entry.referenceId}/view-entries`],
@@ -289,6 +290,16 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
   const { data: payrollSummary } = useQuery<any>({
     queryKey: [`/api/factory/payroll/${entry.referenceId}/summary`],
     enabled: isPayrollPayment,
+  });
+
+  const { data: mixBatchDetail } = useQuery<any>({
+    queryKey: [`/api/factory/mix-batches/${entry.referenceId}`],
+    enabled: isMixBatchCreated,
+  });
+
+  const { data: mixBatchSources = [] } = useQuery<any[]>({
+    queryKey: [`/api/factory/mix-batches/${entry.referenceId}/sources`],
+    enabled: isMixBatchCreated,
   });
 
   // Balance fetching for Payment / Receipt / Journal vouchers
@@ -814,6 +825,148 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
               )}
             </>
           )}
+        </div>
+      </>
+    );
+  }
+
+  // ── MIX_BATCH_CREATED / MIX_BATCH_TOPUP enriched view ────────────────────
+  if (isMixBatchCreated) {
+    const mb = mixBatchDetail;
+    const totalKg = mb ? parseFloat(mb.totalWeightKg || "0") : 0;
+    const totalCost = mb ? parseFloat(mb.totalCost || "0") : 0;
+    const costPerKg = mb ? parseFloat(mb.costPerKg || "0") : 0;
+    const sourcesTotalKg = mixBatchSources.reduce((s: number, src: any) => s + parseFloat(src.weightKg || "0"), 0);
+
+    return (
+      <>
+        <DialogHeader>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <DialogTitle>Mix Batch Details</DialogTitle>
+            <Badge variant="outline" className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40">
+              {entry.txType === "MIX_BATCH_TOPUP" ? "Top-up" : "Mix Batch Created"}
+            </Badge>
+          </div>
+          <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Batch summary card */}
+          <div className="rounded-md border p-4 space-y-3">
+            {!mb ? (
+              <p className="text-sm text-muted-foreground">Loading batch details…</p>
+            ) : (
+              <>
+                <div className="flex items-start justify-between gap-2 flex-wrap">
+                  <div>
+                    <p className="font-semibold text-base font-mono">{mb.batchCode}</p>
+                    {mb.name && <p className="text-sm text-muted-foreground mt-0.5">{mb.name}</p>}
+                    {mb.operatorUser && (
+                      <p className="text-xs text-muted-foreground mt-0.5">Operator: {mb.operatorUser}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-xs">{mb.status}</Badge>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => { onClose(); onNavigate(`/factory/mix-batches`); }}
+                      data-testid="button-open-mix-batch"
+                    >
+                      Open
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 pt-1">
+                  <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
+                    <p className="text-xs text-muted-foreground">Total Weight</p>
+                    <p className="font-semibold font-mono">{formatNumber(totalKg)} kg</p>
+                  </div>
+                  <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
+                    <p className="text-xs text-muted-foreground">Total Cost</p>
+                    <p className="font-semibold font-mono">${formatNumber(totalCost)}</p>
+                  </div>
+                  <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
+                    <p className="text-xs text-muted-foreground">Cost / kg</p>
+                    <p className="font-semibold font-mono">${formatNumber(costPerKg)}</p>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Sources breakdown */}
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
+              Mixed From ({mixBatchSources.length} source{mixBatchSources.length !== 1 ? "s" : ""}{sourcesTotalKg > 0 ? ` · ${formatNumber(sourcesTotalKg)} kg total` : ""})
+            </p>
+            {mixBatchSources.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4 rounded-md border">No source records found</p>
+            ) : (
+              <div className="rounded-md border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/40 border-b">
+                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Source</th>
+                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Weight</th>
+                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">$/kg</th>
+                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mixBatchSources.map((src: any, i: number) => {
+                      const srcKg = parseFloat(src.weightKg || "0");
+                      const srcCpk = parseFloat(src.costPerKg || "0");
+                      const srcTotal = parseFloat(src.totalCost || "0");
+                      const pct = sourcesTotalKg > 0 ? (srcKg / sourcesTotalKg) * 100 : 0;
+
+                      let sourceLabel = "";
+                      let sourceSubLabel = "";
+                      if (src.sourceType === "batch" && src.sourceBatchCode) {
+                        sourceLabel = src.sourceBatchCode;
+                        sourceSubLabel = "Carry-forward batch";
+                      } else if (src.supplierName) {
+                        sourceLabel = src.supplierName;
+                        sourceSubLabel = src.containerNumber ? `Container: ${src.containerNumber}` : "";
+                      } else if (src.containerNumber) {
+                        sourceLabel = src.containerNumber;
+                      } else {
+                        sourceLabel = `Source #${src.id}`;
+                      }
+
+                      return (
+                        <tr key={src.id ?? i} className="border-b last:border-0">
+                          <td className="px-3 py-2.5">
+                            <p className="font-medium">{sourceLabel}</p>
+                            {sourceSubLabel && (
+                              <p className="text-xs text-muted-foreground mt-0.5">{sourceSubLabel}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-0.5">{pct.toFixed(1)}% of batch</p>
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-mono">{formatNumber(srcKg)} kg</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-muted-foreground">${formatNumber(srcCpk)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono font-medium">${formatNumber(srcTotal)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  {mixBatchSources.length > 1 && (
+                    <tfoot>
+                      <tr className="bg-muted/30 border-t">
+                        <td className="px-3 py-2 text-xs font-medium text-muted-foreground">Total</td>
+                        <td className="px-3 py-2 text-right font-mono font-medium">{formatNumber(sourcesTotalKg)} kg</td>
+                        <td />
+                        <td className="px-3 py-2 text-right font-mono font-medium">
+                          ${formatNumber(mixBatchSources.reduce((s: number, src: any) => s + parseFloat(src.totalCost || "0"), 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </>
     );
