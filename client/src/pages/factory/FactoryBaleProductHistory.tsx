@@ -839,6 +839,7 @@ export function FactoryBaleProductAllMonths() {
     queryKey: ["/api/factory/my-access"],
   });
   const hiddenCost = myAccess?.hiddenCostFields ?? [];
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const { data: responseData, isLoading } = useQuery<BaleDetailResponse>({
     queryKey: ["/api/factory/bale-product-history", productId, locationId, "all-bales", { year }],
@@ -855,6 +856,12 @@ export function FactoryBaleProductAllMonths() {
 
   const data = responseData?.bales;
   const sellingPricePerBale = parseFloat(responseData?.sellingPrice || "0");
+
+  const filteredData = (data ?? []).filter((bale) => {
+    const effectiveStatus = bale.status === "IN_STOCK" && bale.isInLoadingOrder ? "LOADING" : bale.status;
+    if (statusFilter !== "all" && effectiveStatus !== statusFilter) return false;
+    return true;
+  });
 
   const formatNumber = (num: number) => {
     if (num % 1 === 0) return num.toLocaleString();
@@ -893,20 +900,35 @@ export function FactoryBaleProductAllMonths() {
           </h1>
           <p className="text-sm text-muted-foreground" data-testid="text-bale-count">
             <Package className="inline h-4 w-4 mr-1" />
-            {data?.length || 0} bale(s)
+            {filteredData.length}{statusFilter !== "all" ? ` of ${data?.length || 0}` : ""} bale(s)
           </p>
         </div>
       </div>
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg" data-testid="text-detail-title">
-            All Bales — {year}
-          </CardTitle>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="text-lg" data-testid="text-detail-title">
+              All Bales — {year}
+            </CardTitle>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[150px]" data-testid="select-status-filter-all">
+                <SelectValue placeholder="All statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="IN_STOCK">In Stock</SelectItem>
+                <SelectItem value="LOADING">Loading</SelectItem>
+                <SelectItem value="SOLD">Sold</SelectItem>
+                <SelectItem value="DISPATCHED">Dispatched</SelectItem>
+                <SelectItem value="DELETED">Deleted</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="hidden md:block overflow-x-auto">
-            <Table>
+          <div className="hidden md:block">
+            <Table wrapperClassName="overflow-visible">
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Bale Code</TableHead>
@@ -920,7 +942,7 @@ export function FactoryBaleProductAllMonths() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data?.map((bale) => (
+                {filteredData.map((bale) => (
                   <TableRow key={bale.id} data-testid={`row-bale-${bale.id}`}>
                     <TableCell className="font-medium font-mono" data-testid={`text-bale-code-${bale.id}`}>
                       {bale.baleCode}
@@ -970,10 +992,10 @@ export function FactoryBaleProductAllMonths() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {(!data || data.length === 0) && (
+                {filteredData.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center text-muted-foreground py-8" data-testid="text-no-data">
-                      No bales found for {year}
+                      {statusFilter !== "all" ? "No bales match the selected status" : `No bales found for ${year}`}
                     </TableCell>
                   </TableRow>
                 )}
@@ -982,7 +1004,7 @@ export function FactoryBaleProductAllMonths() {
           </div>
 
           <div className="md:hidden space-y-2">
-            {data?.map((bale) => (
+            {filteredData.map((bale) => (
               <div key={bale.id} className="p-3 rounded-md border text-sm" data-testid={`card-bale-${bale.id}`}>
                 <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                   <span className="font-medium font-mono" data-testid={`text-mobile-bale-code-${bale.id}`}>
