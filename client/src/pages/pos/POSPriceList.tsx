@@ -506,7 +506,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
           </div>
         )}
 
-        <div className="flex-1 overflow-auto p-4">
+        <div className="flex-1 overflow-hidden p-4">
           {!selectedLocationId && !locationsLoading && (
             <div className="flex flex-col items-center justify-center h-full text-center gap-3 text-muted-foreground">
               <MapPin className="w-12 h-12 opacity-25" />
@@ -593,8 +593,8 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 </div>
               ) : filteredItems.length > 0 ? (
                 <>
-                  <div className="rounded-xl border overflow-hidden">
-                    <Table>
+                  <div className="rounded-xl border">
+                    <Table wrapperClassName="max-h-[calc(100vh-280px)]">
                       <TableHeader>
                         <TableRow className="bg-muted/40 hover:bg-muted/40">
                           <TableHead className="w-28 text-xs">Code</TableHead>
