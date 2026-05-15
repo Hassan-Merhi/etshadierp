@@ -717,8 +717,8 @@ export default function FactoryInvoiceDetail() {
         </AlertDialog>
       </div>
 
-      <Card className="overflow-x-auto mb-6">
-        <Table>
+      <Card className="mb-6">
+        <Table wrapperClassName="overflow-visible">
           <TableHeader className="sticky top-0 z-30 bg-background">
             <TableRow>
               <TableHead className="w-[50px]">#</TableHead>
