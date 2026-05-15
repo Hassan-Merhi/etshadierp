@@ -192,6 +192,7 @@ export type RawContainerRow = {
   containerNumber: string;
   supplierId: number;
   supplierName: string | null;
+  supplierCode: string | null;
   status: string;
   importDate: string;
   grandTotal: string | null;
@@ -264,6 +265,7 @@ export async function fetchActiveContainers(
       containerNumber: containers.containerNumber,
       supplierId: containers.supplierId,
       supplierName: suppliers.legalName,
+      supplierCode: suppliers.code,
       status: containers.status,
       importDate: containers.importDate,
       grandTotal: sql<string>`COALESCE(
