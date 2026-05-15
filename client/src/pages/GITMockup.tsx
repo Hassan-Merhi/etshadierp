@@ -2254,16 +2254,11 @@ export default function GITMockup({ embedded = false }: { embedded?: boolean } =
         </div>
 
         <Tabs defaultValue="detail">
-          <TabsList className="grid grid-cols-4 w-full">
-            <TabsTrigger value="summary"  data-testid="tab-git-summary">Summary</TabsTrigger>
+          <TabsList className="grid grid-cols-3 w-full">
             <TabsTrigger value="detail"   data-testid="tab-git-detail">Detail</TabsTrigger>
             <TabsTrigger value="trucks"   data-testid="tab-git-trucks">Truck / Location</TabsTrigger>
             <TabsTrigger value="agents"   data-testid="tab-git-agents">Agent / Duty</TabsTrigger>
           </TabsList>
-
-          <TabsContent value="summary" className="mt-4">
-            <TabSummary />
-          </TabsContent>
 
           <TabsContent value="detail" className="mt-4">
             <TabDetail />
