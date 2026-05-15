@@ -315,7 +315,7 @@ export function AppSidebar({ user }: { user?: any }) {
         </div>
       </SidebarContent>
 
-      <ModuleFooter user={user} />
+      <ModuleFooter user={user} accent={MODULE_ACCENT.erp} />
     </Sidebar>
   );
 }

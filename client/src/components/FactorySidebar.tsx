@@ -318,10 +318,7 @@ export function FactorySidebar({ user }: { user?: any }) {
         </div>
       </SidebarContent>
 
-      <ModuleFooter
-        user={user}
-        avatarClassName="text-xs font-semibold bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400"
-      />
+      <ModuleFooter user={user} accent={MODULE_ACCENT.factory} />
     </Sidebar>
   );
 }

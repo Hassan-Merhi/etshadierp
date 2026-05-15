@@ -101,10 +101,7 @@ export function PropertiesSidebar({ user }: { user?: any }) {
         </div>
       </SidebarContent>
 
-      <ModuleFooter
-        user={user}
-        avatarClassName="text-xs font-semibold bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400"
-      />
+      <ModuleFooter user={user} accent={MODULE_ACCENT.properties} />
     </Sidebar>
   );
 }

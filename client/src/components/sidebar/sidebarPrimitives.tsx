@@ -60,7 +60,16 @@ export function SidebarNavLink({ item, color, testId, trailing, draggable }: Sid
       className={`${baseLinkClasses} ${isActive ? activeClasses : inactiveClasses} flex-1`}
     >
       {isActive && <ActiveRail color={color} />}
-      <Icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color } : {}} />
+      {isActive ? (
+        <span
+          className="flex h-6 w-6 items-center justify-center rounded-md shrink-0"
+          style={{ backgroundColor: `${color}22` }}
+        >
+          <Icon className="h-3.5 w-3.5" style={{ color }} />
+        </span>
+      ) : (
+        <Icon className="h-3.5 w-3.5 shrink-0" />
+      )}
       <span className="flex-1 leading-tight">{item.title}</span>
       {trailing}
     </Link>
@@ -95,7 +104,16 @@ export function SidebarFlatLink({
       className={`${baseLinkClasses} ${isActive ? activeClasses : inactiveClasses}`}
     >
       {isActive && <ActiveRail color={color} />}
-      <Icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color } : {}} />
+      {isActive ? (
+        <span
+          className="flex h-6 w-6 items-center justify-center rounded-md shrink-0"
+          style={{ backgroundColor: `${color}22` }}
+        >
+          <Icon className="h-3.5 w-3.5" style={{ color }} />
+        </span>
+      ) : (
+        <Icon className="h-3.5 w-3.5 shrink-0" />
+      )}
       <span className="flex-1 leading-tight">{label}</span>
       {badge != null && badge > 0 && (
         <Badge variant="default" className="text-xs min-w-5 justify-center">
@@ -131,8 +149,12 @@ export function SidebarSectionGroup({
       <button
         onClick={onToggle}
         data-testid={sectionTestId}
-        className="flex w-full items-center gap-1.5 rounded-md px-2.5 py-1 text-left transition-colors hover:bg-sidebar-accent/30"
+        className="flex w-full items-center gap-2 rounded-md px-2.5 py-1 text-left transition-colors hover:bg-sidebar-accent/30"
       >
+        <span
+          className="h-1.5 w-1.5 rounded-full shrink-0 transition-opacity"
+          style={{ backgroundColor: section.color, opacity: hasActive ? 1 : 0.55 }}
+        />
         <span
           className="flex-1 text-[10px] font-semibold uppercase tracking-widest"
           style={{ color: section.color, opacity: hasActive ? 1 : 0.65 }}
@@ -149,7 +171,10 @@ export function SidebarSectionGroup({
         />
       </button>
       {isOpen && (
-        <div className="mt-0.5 space-y-0.5">
+        <div
+          className="mt-0.5 space-y-0.5 ml-[13px] border-l-2"
+          style={{ borderColor: `${section.color}28` }}
+        >
           {section.items.map((item) => (
             <SidebarNavLink
               key={item.url}
@@ -299,7 +324,16 @@ export function PinnedNavList({
               className={`${baseLinkClasses} flex-1 ${isActive ? activeClasses : inactiveClasses}`}
             >
               {isActive && <ActiveRail color={color} />}
-              <Icon className="h-3.5 w-3.5 shrink-0" style={isActive ? { color } : {}} />
+              {isActive ? (
+                <span
+                  className="flex h-6 w-6 items-center justify-center rounded-md shrink-0"
+                  style={{ backgroundColor: `${color}22` }}
+                >
+                  <Icon className="h-3.5 w-3.5" style={{ color }} />
+                </span>
+              ) : (
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+              )}
               <span className="flex-1 leading-tight">{item.title}</span>
               {trailingFor?.(item)}
             </Link>
@@ -320,16 +354,24 @@ interface ModuleHeaderProps {
 
 export function ModuleHeader({ icon: Icon, label, tagline, accent }: ModuleHeaderProps) {
   return (
-    <SidebarHeader className="px-4 py-3 border-b border-sidebar-border">
+    <SidebarHeader
+      className="px-4 py-4 border-b border-sidebar-border"
+      style={{
+        background: `linear-gradient(135deg, ${accent}28 0%, ${accent}0a 60%, transparent 100%)`,
+      }}
+    >
       <div className="flex items-center gap-3">
         <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-white"
-          style={{ backgroundColor: accent }}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white"
+          style={{
+            backgroundColor: accent,
+            boxShadow: `0 2px 12px ${accent}55`,
+          }}
         >
           <Icon className="h-5 w-5" />
         </div>
         <div className="flex flex-col min-w-0">
-          <span className="text-sm font-semibold leading-tight">{label}</span>
+          <span className="text-sm font-bold leading-tight">{label}</span>
           <span className="text-xs text-muted-foreground leading-tight">{tagline}</span>
         </div>
       </div>
@@ -339,20 +381,21 @@ export function ModuleHeader({ icon: Icon, label, tagline, accent }: ModuleHeade
 
 interface ModuleFooterProps {
   user?: { username?: string; role?: string };
-  /** Tailwind classes for the avatar tint (defaults to primary tint). */
+  /** Tailwind classes for the avatar tint (defaults to accent-colored). */
   avatarClassName?: string;
+  /** Module accent color — used as avatar background when no avatarClassName is set. */
+  accent?: string;
 }
 
-export function ModuleFooter({ user, avatarClassName }: ModuleFooterProps) {
+export function ModuleFooter({ user, avatarClassName, accent }: ModuleFooterProps) {
   const initials = user?.username ? user.username.substring(0, 2).toUpperCase() : "AD";
   return (
     <SidebarFooter className="px-4 py-3 border-t border-sidebar-border">
       <div className="flex items-center gap-3">
         <Avatar className="h-8 w-8 shrink-0">
           <AvatarFallback
-            className={
-              avatarClassName ?? "text-xs font-semibold bg-primary/10 text-primary"
-            }
+            className={avatarClassName ?? "text-xs font-bold text-white"}
+            style={!avatarClassName && accent ? { backgroundColor: accent } : undefined}
           >
             {initials}
           </AvatarFallback>
