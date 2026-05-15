@@ -2498,20 +2498,22 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             </div>
           )}
 
-          <Card className="p-3 md:p-4 w-full overflow-hidden">
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                placeholder="Search items by name..."
-                value={itemSearchTerm}
-                onChange={(e) => setItemSearchTerm(e.target.value)}
-                className="pl-10"
-                data-testid="input-search-items"
-              />
+          <Card className="w-full overflow-hidden">
+            <div className="p-3 md:p-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  placeholder="Search items by name..."
+                  value={itemSearchTerm}
+                  onChange={(e) => setItemSearchTerm(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search-items"
+                />
+              </div>
             </div>
 
             {/* Mobile card view */}
-            <div className="md:hidden space-y-2">
+            <div className="md:hidden space-y-2 px-3 pb-3">
               {filteredStockItems.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   {itemSearchTerm ? "No items found matching your search" : "No items in this group"}
@@ -2588,42 +2590,42 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             </div>
 
             {/* Desktop table view */}
-            <div className="w-full overflow-auto hidden md:block border-t -mx-3 md:-mx-4 -mb-3 md:-mb-4 max-h-[calc(100vh-260px)]" style={{ width: "calc(100% + 2rem)" }}>
-              <table className="w-full table-fixed text-sm">
+            <div className="hidden md:block w-full overflow-auto border-t max-h-[calc(100vh-260px)]">
+              <table className="w-full min-w-full table-fixed text-sm">
                 <colgroup>
-                  <col className="w-[46%]" />
+                  <col />
                   {showMovement ? (
                     <>
-                      <col className="w-[15%]" />
-                      <col className="w-[15%]" />
-                      <col className="w-[12%]" />
+                      <col className="w-36" />
+                      <col className="w-36" />
+                      <col className="w-32" />
                     </>
                   ) : (
-                    <col className="w-[18%]" />
+                    <col className="w-36" />
                   )}
                   {!posUser && (
                     <>
-                      <col className="w-[18%]" />
-                      <col className="w-[18%]" />
+                      <col className="w-32" />
+                      <col className="w-40" />
                     </>
                   )}
                 </colgroup>
                 <thead className="bg-muted/50 sticky top-0 z-30">
                   <tr className="h-12">
-                    <th className="text-left px-3 font-medium w-[46%]">Name</th>
+                    <th className="text-left px-3 font-medium">Name</th>
                     {showMovement ? (
                       <>
-                        <th className="text-right px-3 font-medium w-[15%]">Opening (BL)</th>
-                        <th className="text-right px-3 font-medium w-[15%]">Closing (BL)</th>
-                        <th className="text-right px-3 font-medium w-[12%]">Movement</th>
+                        <th className="text-right px-3 font-medium">Opening (BL)</th>
+                        <th className="text-right px-3 font-medium">Closing (BL)</th>
+                        <th className="text-right px-3 font-medium">Movement</th>
                       </>
                     ) : (
-                      <th className={`text-right px-3 font-medium w-[18%] ${posUser ? "pr-6" : ""}`}>Quantity</th>
+                      <th className={`text-right px-3 font-medium ${posUser ? "pr-6" : ""}`}>Quantity</th>
                     )}
                     {!posUser && (
                       <>
-                        <th className="text-right px-3 font-medium w-[18%]">Avg Rate</th>
-                        <th className="text-right px-3 pr-6 font-medium w-[18%]">Total Value</th>
+                        <th className="text-right px-3 font-medium">Avg Rate</th>
+                        <th className="text-right px-3 pr-6 font-medium">Total Value</th>
                       </>
                     )}
                   </tr>
@@ -2741,7 +2743,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               </table>
             </div>
             {filteredStockItems.length > 0 && (
-              <div className="mt-4 text-sm text-muted-foreground">
+              <div className="px-3 md:px-4 py-3 text-sm text-muted-foreground">
                 Showing {filteredStockItems.length} of {inventory.filter(i => i.stockGroupId === selectedGroup.groupId).length} items
               </div>
             )}
