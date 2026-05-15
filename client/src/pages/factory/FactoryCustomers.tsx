@@ -236,9 +236,7 @@ export default function FactoryCustomers() {
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Phone</TableHead>
                   <TableHead className="text-right">Balance</TableHead>
-                  <TableHead>Terms</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[90px]"></TableHead>
                 </TableRow>
@@ -246,7 +244,7 @@ export default function FactoryCustomers() {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                       {search ? "No customers match your search" : "No customers yet"}
                     </TableCell>
                   </TableRow>
@@ -262,9 +260,6 @@ export default function FactoryCustomers() {
                           {customer.legalName}
                         </button>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {customer.phone || "-"}
-                      </TableCell>
                       <TableCell className="text-right font-mono">
                         {customer.balance !== undefined ? (
                           <span data-testid={`text-customer-balance-${customer.id}`}>
@@ -273,16 +268,6 @@ export default function FactoryCustomers() {
                           </span>
                         ) : (
                           "-"
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {customer.paymentTermsDays != null ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground" data-testid={`text-payment-terms-${customer.id}`}>
-                            <Clock className="h-3 w-3" />
-                            Net {customer.paymentTermsDays}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -353,7 +338,6 @@ export default function FactoryCustomers() {
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Code</TableHead>
-                      <TableHead>Phone</TableHead>
                       <TableHead className="w-[80px]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -362,7 +346,6 @@ export default function FactoryCustomers() {
                       <TableRow key={customer.id} data-testid={`row-deleted-customer-${customer.id}`}>
                         <TableCell className="font-medium text-muted-foreground">{customer.legalName}</TableCell>
                         <TableCell className="text-xs text-muted-foreground font-mono">{customer.code}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{customer.phone || "-"}</TableCell>
                         <TableCell>
                           <Button
                             variant="outline"
