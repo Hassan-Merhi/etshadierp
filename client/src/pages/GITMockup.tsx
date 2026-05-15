@@ -175,28 +175,16 @@ function WorkbookDataRow({ r }: { r: EnrichedContainerApi }) {
       <td className="py-0.5 px-2 text-center">
         {r.docReceived ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" /> : <XCircle className="h-3.5 w-3.5 text-red-500 mx-auto" />}
       </td>
-      <td className="py-0.5 px-2 text-center">
-        {docsSent
-          ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
-          : "—"}
-      </td>
-      <td className="py-0.5 px-2">{r.freightStatus ?? "—"}</td>
       <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>
       <td className="py-0.5 px-2 text-right">{parseNum(r.transportFee) > 0 ? `$${fmt(parseNum(r.transportFee), 0)}` : "—"}</td>
       <td className="py-0.5 px-2">{r.agent ?? "—"}</td>
       <td className="py-0.5 px-2 text-right">{parseNum(r.dutyFee) > 0 ? `$${fmt(parseNum(r.dutyFee), 0)}` : "—"}</td>
-      <td className="py-0.5 px-2">
-        <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", (STATUS_BADGE as Record<string, string>)[r.status] ?? "bg-muted text-foreground")}>{r.status}</span>
-      </td>
-      <td className="py-0.5 px-2 text-center">
-        {r.trackingLink ? <a href={r.trackingLink} target="_blank" rel="noopener noreferrer" className="text-primary"><ExternalLink className="h-3.5 w-3.5 mx-auto" /></a> : "—"}
-      </td>
       <td className="py-0.5 px-2 max-w-40 truncate text-muted-foreground italic">{r.trackingDescription ?? "—"}</td>
     </tr>
   );
 }
 
-const WORKBOOK_COLS = 18;
+const WORKBOOK_COLS = 14;
 
 function groupBySupplier(rows: EnrichedContainerApi[]) {
   const groups: Array<{ name: string; rows: EnrichedContainerApi[] }> = [];
@@ -267,14 +255,10 @@ function RealWorkbookBlock({
       <th className="py-1 px-2 font-semibold text-center">BORDER DT.</th>
       <th className="py-1 px-2 font-semibold text-center">MAX OFFLOAD</th>
       <th className="py-1 px-2 font-semibold text-center">DOCS RCVD</th>
-      <th className="py-1 px-2 font-semibold text-center">DOCS→TRUCK</th>
-      <th className="py-1 px-2 font-semibold text-center">FREIGHT</th>
       <th className="py-1 px-2 font-semibold text-center">TRANSPORTER</th>
       <th className="py-1 px-2 font-semibold text-center">FEE</th>
       <th className="py-1 px-2 font-semibold text-center">AGENT</th>
       <th className="py-1 px-2 font-semibold text-center">DUTY</th>
-      <th className="py-1 px-2 font-semibold text-center">STATUS</th>
-      <th className="py-1 px-2 font-semibold text-center">LINK</th>
       <th className="py-1 px-2 font-semibold text-center">NOTES</th>
     </tr>
   );
@@ -312,11 +296,11 @@ function RealWorkbookBlock({
                         <td className="py-1 px-2">SUB-TOTAL — {shopRows.length} CTR</td>
                         <td />
                         <td className="py-1 px-2 text-right">${fmt(st.amount, 2)}</td>
-                        <td colSpan={9} />
+                        <td colSpan={7} />
                         <td className="py-1 px-2 text-right">{st.fee > 0 ? `$${fmt(st.fee, 0)}` : "—"}</td>
                         <td />
                         <td className="py-1 px-2 text-right">{st.duty > 0 ? `$${fmt(st.duty, 0)}` : "—"}</td>
-                        <td colSpan={3} />
+                        <td colSpan={1} />
                       </tr>
                     </tbody>
                   </table>
@@ -350,11 +334,11 @@ function RealWorkbookBlock({
                   <td className="py-1 px-2">TOTAL — {rows.length} CTR</td>
                   <td />
                   <td className="py-1 px-2 text-right">${fmt(total.amount, 2)}</td>
-                  <td colSpan={9} />
+                  <td colSpan={7} />
                   <td className="py-1 px-2 text-right">{total.fee > 0 ? `$${fmt(total.fee, 0)}` : "—"}</td>
                   <td />
                   <td className="py-1 px-2 text-right">{total.duty > 0 ? `$${fmt(total.duty, 0)}` : "—"}</td>
-                  <td colSpan={3} />
+                  <td colSpan={1} />
                 </tr>
               )}
             </tbody>
@@ -515,13 +499,10 @@ function TabDetail() {
                     <TableHead>Border Date</TableHead>
                     <TableHead>Max Offload</TableHead>
                     <TableHead className="text-center">Docs Rcvd</TableHead>
-                    <TableHead className="text-center">Docs→Truck</TableHead>
                     <TableHead>Transporter</TableHead>
                     <TableHead className="text-right">Fee</TableHead>
                     <TableHead>Agent</TableHead>
                     <TableHead className="text-right">Duty</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-center">Link</TableHead>
                     <TableHead>Notes</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -544,21 +525,10 @@ function TabDetail() {
                         <TableCell className="text-center">
                           {r.docReceived ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" /> : <XCircle className="h-3.5 w-3.5 text-red-500 mx-auto" />}
                         </TableCell>
-                        <TableCell className="text-center">
-                          {docsSent
-                            ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
-                            : "—"}
-                        </TableCell>
                         <TableCell>{r.transporter ?? "—"}</TableCell>
                         <TableCell className="text-right">{parseNum(r.transportFee) > 0 ? `$${fmt(parseNum(r.transportFee), 0)}` : "—"}</TableCell>
                         <TableCell>{r.agent ?? "—"}</TableCell>
                         <TableCell className="text-right">{parseNum(r.dutyFee) > 0 ? `$${fmt(parseNum(r.dutyFee), 0)}` : "—"}</TableCell>
-                        <TableCell>
-                          <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", (STATUS_BADGE as Record<string, string>)[r.status] ?? "bg-muted text-foreground")}>{r.status}</span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {r.trackingLink ? <a href={r.trackingLink} target="_blank" rel="noopener noreferrer" className="text-primary"><ExternalLink className="h-3.5 w-3.5 mx-auto" /></a> : "—"}
-                        </TableCell>
                         <TableCell className="max-w-32 truncate text-muted-foreground">{r.trackingDescription ?? "—"}</TableCell>
                       </TableRow>
                     );
@@ -566,11 +536,11 @@ function TabDetail() {
                   <TableRow className="border-t-2 font-semibold bg-muted/40">
                     <TableCell className="text-center">Totals ({filtered.length})</TableCell>
                     <TableCell className="text-right">${fmt(totals.amount, 2)}</TableCell>
-                    <TableCell colSpan={9} />
+                    <TableCell colSpan={8} />
                     <TableCell className="text-right">${fmt(totals.fee, 0)}</TableCell>
                     <TableCell />
                     <TableCell className="text-right">${fmt(totals.duty, 0)}</TableCell>
-                    <TableCell colSpan={3} />
+                    <TableCell colSpan={1} />
                   </TableRow>
                 </TableBody>
               </Table>
