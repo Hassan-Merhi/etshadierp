@@ -678,7 +678,7 @@ function ContainerDrawer({
               <div>
                 <p className="text-xs text-muted-foreground">Days Delayed</p>
                 <p className={cn("text-sm font-medium", daysDelayed ? "text-red-600" : "text-muted-foreground")}>
-                  {daysDelayed ? `+${daysDelayed}d` : "—"}
+                  {daysDelayed ? `-${daysDelayed}d` : "—"}
                 </p>
               </div>
               <div>
@@ -2340,7 +2340,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                       </TableCell>
                       <TableCell>
                         {c.daysDelayed && c.daysDelayed > 0
-                          ? <span className="text-red-600 font-medium">+{c.daysDelayed}d</span>
+                          ? <span className="text-red-600 font-medium">-{c.daysDelayed}d</span>
                           : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell>
