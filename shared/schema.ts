@@ -5328,6 +5328,7 @@ export const factoryShippingAvailability = pgTable("factory_shipping_availabilit
   date: date("date").notNull(),
   shippingCompany: text("shipping_company").notNull(),
   availableContainers: integer("available_containers").notNull().default(0),
+  note: text("note"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   companyIdx: index("fsa_company_idx").on(t.companyId),
@@ -5340,6 +5341,7 @@ export const insertFactoryShippingAvailabilitySchema = createInsertSchema(factor
   date: z.string().min(1),
   shippingCompany: z.string().min(1),
   availableContainers: z.number().int().min(0),
+  note: z.string().nullable().optional(),
 });
 export type InsertFactoryShippingAvailability = z.infer<typeof insertFactoryShippingAvailabilitySchema>;
 export type FactoryShippingAvailability = typeof factoryShippingAvailability.$inferSelect;

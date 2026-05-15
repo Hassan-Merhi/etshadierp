@@ -953,6 +953,7 @@ interface AvailRow {
   date: string;
   shippingCompany: string;
   availableContainers: number;
+  note: string | null;
 }
 
 interface EditingAvail {
@@ -960,13 +961,14 @@ interface EditingAvail {
   date: string;
   shippingCompany: string;
   availableContainers: string;
+  note: string;
 }
 
 function ShippingAvailabilityTable() {
   const { toast } = useToast();
   const [editing, setEditing] = useState<EditingAvail | null>(null);
   const [adding, setAdding] = useState(false);
-  const [newRow, setNewRow] = useState({ date: "", shippingCompany: "", availableContainers: "" });
+  const [newRow, setNewRow] = useState({ date: "", shippingCompany: "", availableContainers: "", note: "" });
 
   const { data: rows = [], isLoading } = useQuery<AvailRow[]>({
     queryKey: [AVAIL_KEY],
@@ -977,10 +979,11 @@ function ShippingAvailabilityTable() {
       date: newRow.date,
       shippingCompany: newRow.shippingCompany.trim(),
       availableContainers: parseInt(newRow.availableContainers) || 0,
+      note: newRow.note.trim() || null,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [AVAIL_KEY] });
-      setNewRow({ date: "", shippingCompany: "", availableContainers: "" });
+      setNewRow({ date: "", shippingCompany: "", availableContainers: "", note: "" });
       setAdding(false);
       toast({ title: "Row added" });
     },
@@ -992,6 +995,7 @@ function ShippingAvailabilityTable() {
       date: row.date,
       shippingCompany: row.shippingCompany.trim(),
       availableContainers: parseInt(row.availableContainers) || 0,
+      note: row.note.trim() || null,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [AVAIL_KEY] });
@@ -1011,12 +1015,12 @@ function ShippingAvailabilityTable() {
   });
 
   function startEdit(row: AvailRow) {
-    setEditing({ id: row.id, date: row.date, shippingCompany: row.shippingCompany, availableContainers: String(row.availableContainers) });
+    setEditing({ id: row.id, date: row.date, shippingCompany: row.shippingCompany, availableContainers: String(row.availableContainers), note: row.note || "" });
   }
 
   function handleAddKey(e: React.KeyboardEvent) {
     if (e.key === "Enter") addMutation.mutate();
-    if (e.key === "Escape") { setAdding(false); setNewRow({ date: "", shippingCompany: "", availableContainers: "" }); }
+    if (e.key === "Escape") { setAdding(false); setNewRow({ date: "", shippingCompany: "", availableContainers: "", note: "" }); }
   }
 
   function handleEditKey(e: React.KeyboardEvent) {
@@ -1040,19 +1044,20 @@ function ShippingAvailabilityTable() {
               <TableHead className="text-xs w-36">Date</TableHead>
               <TableHead className="text-xs">Shipping Company</TableHead>
               <TableHead className="text-xs w-40">Available Containers</TableHead>
+              <TableHead className="text-xs">Note</TableHead>
               <TableHead className="text-xs w-20" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin inline mr-2" />Loading…
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 && !adding ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
                   No rows yet. Click "Add Row" to start.
                 </TableCell>
               </TableRow>
@@ -1093,6 +1098,16 @@ function ShippingAvailabilityTable() {
                         />
                       </TableCell>
                       <TableCell>
+                        <Input
+                          value={editing.note}
+                          onChange={(e) => setEditing({ ...editing, note: e.target.value })}
+                          onKeyDown={handleEditKey}
+                          className="h-7 text-xs"
+                          placeholder="Optional note"
+                          data-testid={`input-avail-note-${row.id}`}
+                        />
+                      </TableCell>
+                      <TableCell>
                         <div className="flex items-center gap-1">
                           <Button size="icon" variant="ghost" onClick={() => saveMutation.mutate(editing)} disabled={saveMutation.isPending} data-testid={`button-avail-save-${row.id}`}>
                             <Check className="h-3.5 w-3.5 text-green-600" />
@@ -1108,6 +1123,7 @@ function ShippingAvailabilityTable() {
                       <TableCell>{row.date}</TableCell>
                       <TableCell>{row.shippingCompany}</TableCell>
                       <TableCell>{row.availableContainers}</TableCell>
+                      <TableCell className="text-muted-foreground">{row.note || "—"}</TableCell>
                       <TableCell>
                         <Button
                           size="icon" variant="ghost"
@@ -1157,11 +1173,21 @@ function ShippingAvailabilityTable() {
                       />
                     </TableCell>
                     <TableCell>
+                      <Input
+                        value={newRow.note}
+                        onChange={(e) => setNewRow({ ...newRow, note: e.target.value })}
+                        onKeyDown={handleAddKey}
+                        className="h-7 text-xs"
+                        placeholder="Optional note"
+                        data-testid="input-new-avail-note"
+                      />
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center gap-1">
                         <Button size="icon" variant="ghost" onClick={() => addMutation.mutate()} disabled={addMutation.isPending || !newRow.date || !newRow.shippingCompany.trim()} data-testid="button-new-avail-save">
                           <Check className="h-3.5 w-3.5 text-green-600" />
                         </Button>
-                        <Button size="icon" variant="ghost" onClick={() => { setAdding(false); setNewRow({ date: "", shippingCompany: "", availableContainers: "" }); }} data-testid="button-new-avail-cancel">
+                        <Button size="icon" variant="ghost" onClick={() => { setAdding(false); setNewRow({ date: "", shippingCompany: "", availableContainers: "", note: "" }); }} data-testid="button-new-avail-cancel">
                           <X className="h-3.5 w-3.5" />
                         </Button>
                       </div>

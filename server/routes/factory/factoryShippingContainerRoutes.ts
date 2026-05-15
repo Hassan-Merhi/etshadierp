@@ -852,11 +852,12 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
-      const { date, shippingCompany, availableContainers } = req.body;
+      const { date, shippingCompany, availableContainers, note } = req.body;
       const updates: Record<string, any> = {};
       if (date !== undefined) updates.date = date;
       if (shippingCompany !== undefined) updates.shippingCompany = shippingCompany;
       if (availableContainers !== undefined) updates.availableContainers = Number(availableContainers);
+      if (note !== undefined) updates.note = note || null;
       if (Object.keys(updates).length === 0) return res.status(400).json({ message: "No fields to update" });
       const [row] = await db
         .update(factoryShippingAvailability)
