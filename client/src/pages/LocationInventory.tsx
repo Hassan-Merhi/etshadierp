@@ -1861,7 +1861,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 description={allInventoryData.length === 0 ? "Stock has not been recorded across any location yet." : "Try adjusting your search to see other items."}
               />
             ) : (
-              <div className="table-responsive">
+              <div className="w-full overflow-auto max-h-[calc(100vh-200px)]">
                 <table className="w-full text-sm border-collapse">
                   <thead className="sticky top-0 z-30 bg-muted/50">
                     <tr className="bg-muted/60 border-b">
