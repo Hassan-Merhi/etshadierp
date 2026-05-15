@@ -1535,7 +1535,6 @@ const WARNING_META: Record<WarningCode, {
 // ─── Agent card sub-component ─────────────────────────────────────────────────
 
 function AgentCard({ agent }: { agent: AgentDutySummary }) {
-  const [showCleared, setShowCleared] = useState(false);
   const [showActive, setShowActive]   = useState(false);
 
   const {
@@ -1601,54 +1600,6 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
         );
       })}
 
-
-      {/* ── Cleared rows (collapsed) ── */}
-      {clearedRows.length > 0 && (
-        <>
-          <button
-            onClick={() => setShowCleared(v => !v)}
-            className="w-full flex items-center justify-between px-3 py-1.5 bg-muted/40 text-xs hover-elevate"
-            data-testid={`button-toggle-cleared-${agentName}`}
-          >
-            <span className="font-semibold uppercase tracking-wide text-muted-foreground">
-              {showCleared ? "Hide" : "Show"} Cleared — {clearedRows.length} containers, ${fmt(clearedByPayments, 0)} cleared
-            </span>
-            {showCleared ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
-          </button>
-
-          {showCleared && (
-            <div className="overflow-x-auto border-b">
-              <table className="w-full text-xs whitespace-nowrap border-collapse">
-                <thead>
-                  <tr className="bg-muted/50 border-b">
-                    {["CONTAINER #","SUPPLIER","PLATE","OFFLOAD DATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY","CLEARED","STATUS"].map(h => (
-                      <th key={h} className="py-1 px-2 font-bold text-muted-foreground text-center">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {clearedRows.map((r) => (
-                    <tr key={r.id} className="border-b bg-muted/15 text-muted-foreground">
-                      <td className="py-0.5 px-2 font-mono">{r.containerNumber}</td>
-                      <td className="py-0.5 px-2">{r.supplierName ?? "—"}</td>
-                      <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
-                      <td className="py-0.5 px-2">{fmtD(r.offloadDate ?? null)}</td>
-                      <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
-                      <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>
-                      <td className="py-0.5 px-2">{r.location ?? "—"}</td>
-                      <td className="py-0.5 px-2 text-right">${fmt(r.dutyFee, 0)}</td>
-                      <td className="py-0.5 px-2 text-right text-green-600 dark:text-green-500 font-semibold">${fmt(r.clearedAmount, 0)}</td>
-                      <td className="py-0.5 px-2 text-center">
-                        <Badge variant="outline" className="text-[10px] text-green-700 border-green-400 no-default-active-elevate">Cleared</Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </>
-      )}
 
       {/* ── Open / Partial rows (always visible) ── */}
       <div className="overflow-x-auto">
