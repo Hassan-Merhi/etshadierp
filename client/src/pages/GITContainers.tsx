@@ -2541,7 +2541,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                     <tr key={c.id} style={{ backgroundColor: rowBg }}>
                       <td style={{ ...cell, textAlign: "center", color: "#6e7681", fontSize: "12px" }}>{idx}</td>
                       <td style={{ ...cell, fontFamily: "monospace", fontWeight: 700, color: "#79c0ff", fontSize: "13px" }}>{c.containerNumber}</td>
-                      <td style={{ ...cell }}>{c.supplierName ?? "—"}</td>
+                      <td style={{ ...cell }}>{c.supplierCode ?? "—"}</td>
                       <td style={{ ...cell }}>{c.shopName ?? "—"}</td>
                       <td style={{ ...cell, fontFamily: "monospace", color: "#d2a8ff" }}>{c.numberPlate ?? "—"}</td>
                       <td style={{ ...cell, color: "#7ee787" }}>{c.trackingLocation ?? "—"}</td>
