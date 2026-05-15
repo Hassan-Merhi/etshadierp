@@ -18,18 +18,35 @@ import { NotebookPen, Save, Check } from "lucide-react";
 
 const NOTES_KEY = "/api/user/notes";
 const DEBOUNCE_MS = 1200;
+const POS_KEY = "user-notes-btn-pos";
 
 interface NotesData {
   content: string;
   updatedAt: string | null;
 }
 
+function getSavedPos(): { x: number; y: number } {
+  try {
+    const raw = localStorage.getItem(POS_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (typeof p.x === "number" && typeof p.y === "number") return p;
+    }
+  } catch {}
+  return { x: 20, y: window.innerHeight - 120 };
+}
+
 export function UserNotesPanel() {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string | null>(null);
   const [savedRecently, setSavedRecently] = useState(false);
+  const [pos, setPos] = useState<{ x: number; y: number }>(getSavedPos);
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragState = useRef<{ startMouseX: number; startMouseY: number; startBtnX: number; startBtnY: number } | null>(null);
+  const didDrag = useRef(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   const { data, isLoading } = useQuery<NotesData>({
     queryKey: [NOTES_KEY],
@@ -38,14 +55,11 @@ export function UserNotesPanel() {
   });
 
   useEffect(() => {
-    if (data && draft === null) {
-      setDraft(data.content);
-    }
+    if (data && draft === null) setDraft(data.content);
   }, [data, draft]);
 
   const saveMutation = useMutation({
-    mutationFn: (content: string) =>
-      apiRequest("PUT", NOTES_KEY, { content }),
+    mutationFn: (content: string) => apiRequest("PUT", NOTES_KEY, { content }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [NOTES_KEY] });
       setSavedRecently(true);
@@ -57,9 +71,7 @@ export function UserNotesPanel() {
   const scheduleSave = useCallback(
     (value: string) => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        saveMutation.mutate(value);
-      }, DEBOUNCE_MS);
+      debounceRef.current = setTimeout(() => saveMutation.mutate(value), DEBOUNCE_MS);
     },
     [saveMutation],
   );
@@ -74,11 +86,55 @@ export function UserNotesPanel() {
     setOpen(next);
     if (!next) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      if (draft !== null && draft !== (data?.content ?? "")) {
-        saveMutation.mutate(draft);
-      }
+      if (draft !== null && draft !== (data?.content ?? "")) saveMutation.mutate(draft);
       setDraft(null);
     }
+  }
+
+  function clamp(val: number, min: number, max: number) {
+    return Math.max(min, Math.min(max, val));
+  }
+
+  function onMouseDown(e: React.MouseEvent<HTMLButtonElement>) {
+    e.preventDefault();
+    didDrag.current = false;
+    dragState.current = {
+      startMouseX: e.clientX,
+      startMouseY: e.clientY,
+      startBtnX: pos.x,
+      startBtnY: pos.y,
+    };
+
+    function onMouseMove(ev: MouseEvent) {
+      if (!dragState.current) return;
+      const dx = ev.clientX - dragState.current.startMouseX;
+      const dy = ev.clientY - dragState.current.startMouseY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDrag.current = true;
+      if (!didDrag.current) return;
+
+      const newX = clamp(dragState.current.startBtnX + dx, 0, window.innerWidth - 48);
+      const newY = clamp(dragState.current.startBtnY + dy, 0, window.innerHeight - 48);
+      setPos({ x: newX, y: newY });
+    }
+
+    function onMouseUp() {
+      if (dragState.current && didDrag.current) {
+        setPos((p) => {
+          localStorage.setItem(POS_KEY, JSON.stringify(p));
+          return p;
+        });
+      }
+      dragState.current = null;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    }
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }
+
+  function handleClick() {
+    if (!didDrag.current) setOpen(true);
   }
 
   function formatUpdated(iso: string | null | undefined): string {
@@ -98,15 +154,18 @@ export function UserNotesPanel() {
       <Tooltip>
         <TooltipTrigger asChild>
           <button
-            onClick={() => setOpen(true)}
+            ref={btnRef}
+            onMouseDown={onMouseDown}
+            onClick={handleClick}
             data-testid="button-open-user-notes"
             aria-label="My notes"
-            className="fixed bottom-20 left-5 z-50 h-11 w-11 rounded-full flex items-center justify-center bg-primary text-primary-foreground shadow-md transition-transform duration-150 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            style={{ left: pos.x, top: pos.y }}
+            className="fixed z-50 h-11 w-11 rounded-full flex items-center justify-center bg-primary text-primary-foreground shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring select-none cursor-grab active:cursor-grabbing"
           >
             <NotebookPen className="h-5 w-5" />
           </button>
         </TooltipTrigger>
-        <TooltipContent side="right">My notes</TooltipContent>
+        <TooltipContent side="right">My notes — drag to move</TooltipContent>
       </Tooltip>
 
       <Sheet open={open} onOpenChange={handleOpenChange}>
