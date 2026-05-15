@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
-import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown, Globe, Eye, Pencil, FileSpreadsheet, MessageCircle, Check, Warehouse, TrendingUp, TrendingDown } from "lucide-react";
+import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown, Globe, Eye, Pencil, FileSpreadsheet, MessageCircle, Check, Warehouse, TrendingUp, TrendingDown, ArrowUpDown, ArrowRight, Loader2 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
@@ -1377,45 +1377,61 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       </PageHeader>
 
       {/* Date range filter bar */}
-      <div className="flex flex-wrap items-center gap-3 px-3 py-2.5 rounded-md bg-muted/40 border">
-        <span className="text-sm font-medium text-muted-foreground shrink-0">Movement Period:</span>
-        <div className="flex items-center gap-2">
-          <Label className="text-sm whitespace-nowrap text-muted-foreground">From:</Label>
-          <Input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="w-36 h-8 text-sm"
-            data-testid="input-from-date"
-          />
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-md bg-muted/30 border">
+        <div className="flex items-center gap-1.5 shrink-0 mr-1">
+          <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Movement</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Label className="text-sm whitespace-nowrap text-muted-foreground">To:</Label>
-          <Input
-            type="date"
-            value={asOfDate}
-            onChange={(e) => setAsOfDate(e.target.value)}
-            className="w-36 h-8 text-sm"
-            data-testid="input-to-date"
-          />
+
+        <div className="h-4 w-px bg-border shrink-0" />
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground shrink-0">From</span>
+            <DatePickerInput
+              value={fromDate}
+              onChange={setFromDate}
+              placeholder="Start date"
+              className="w-52"
+              data-testid="input-from-date"
+            />
+          </div>
+
+          <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground shrink-0">To</span>
+            <DatePickerInput
+              value={asOfDate}
+              onChange={setAsOfDate}
+              placeholder="End date"
+              className="w-52"
+              data-testid="input-to-date"
+            />
+          </div>
         </div>
-        {(fromDate || asOfDate) && (
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => { setFromDate(""); setAsOfDate(""); }}
-              data-testid="button-clear-dates"
-            >
-              Clear
-            </Button>
-            <span className="text-xs text-muted-foreground">
-              {fromDate || "Beginning"} — {asOfDate || "Present"}
-            </span>
-          </>
+
+        {showMovement && (
+          <Badge variant="secondary" className="text-xs gap-1 shrink-0">
+            <TrendingUp className="h-3 w-3" />
+            Movement Mode
+          </Badge>
         )}
+
         {showMovement && (openingInventoryLoading || closingInventoryLoading || isFetching) && (
-          <span className="text-xs text-muted-foreground italic">Loading...</span>
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0" />
+        )}
+
+        {(fromDate || asOfDate) && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => { setFromDate(""); setAsOfDate(""); }}
+            data-testid="button-clear-dates"
+            className="shrink-0 ml-auto"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         )}
       </div>
       {showNegativeStock && (
