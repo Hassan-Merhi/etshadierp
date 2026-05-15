@@ -677,7 +677,7 @@ export default function FactoryProformas() {
 
                       {proforma.lines && proforma.lines.length > 0 ? (
                         <div>
-                          <Table wrapperClassName="overflow-visible">
+                          <Table wrapperClassName="max-h-[420px] overflow-auto">
                             <TableHeader className="sticky top-0 z-30 bg-background">
                               <TableRow>
                                 <TableHead>Article Code</TableHead>
