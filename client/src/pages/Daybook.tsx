@@ -2178,7 +2178,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
             </div>
 
             {/* Desktop Table View */}
-            <div className="hidden md:block border rounded-md overflow-x-auto">
+            <div className="hidden md:block border rounded-md overflow-auto max-h-[calc(100vh-220px)]">
               {viewMode === "condensed" ? (
                 /* ── Condensed: group by date → type with subtotals ── */
                 (() => {
