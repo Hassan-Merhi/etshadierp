@@ -619,9 +619,9 @@ export default function StockItems() {
       ) : (
         <>
           {/* Desktop table */}
-          <div className="hidden md:block border rounded-xl overflow-hidden">
+          <div className="hidden md:block border rounded-xl overflow-auto max-h-[calc(100vh-300px)]">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky top-0 z-30 bg-muted/40">
                 <tr className="h-11 bg-muted/40 border-b">
                   <th className="w-10 px-3">
                     <Checkbox
