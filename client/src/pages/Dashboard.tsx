@@ -30,6 +30,8 @@ import {
   Wallet,
   ArrowUpRight,
   ArrowDownLeft,
+  ArrowDownRight,
+  Minus,
   Check,
   ChevronsUpDown,
   Truck,
@@ -47,6 +49,7 @@ import {
   Factory,
   CheckCircle2,
   Zap,
+  type LucideIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -162,6 +165,53 @@ type FactoryDashboardKPIs = {
   categories: { name: string; count: number; totalKg: number }[];
   balesDetail: { id: number; baleCode: string; productName: string | null; category: string | null; weightKg: string; pressedAt: string | null; status: string }[];
 };
+
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function DashboardKPICard({
+  title, value, change, changeType, icon: Icon, stripeClass, iconBgClass, iconFgClass, onClick, testId,
+}: {
+  title: string; value: string; change?: string; changeType?: "positive" | "negative" | "neutral";
+  icon: LucideIcon; stripeClass: string; iconBgClass: string; iconFgClass: string;
+  onClick?: () => void; testId?: string;
+}) {
+  const ChangeIcon = changeType === "positive" ? ArrowUpRight : changeType === "negative" ? ArrowDownRight : Minus;
+  return (
+    <Card
+      className={cn("overflow-hidden p-0", onClick && "cursor-pointer hover-elevate active-elevate-2")}
+      onClick={onClick}
+      data-testid={testId}
+    >
+      <div className={cn("h-1 w-full", stripeClass)} />
+      <div className="p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</span>
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight tabular-nums mt-1.5 leading-none">{value}</div>
+            {change && (
+              <span className={cn("mt-2 flex items-center gap-0.5 text-xs font-medium",
+                changeType === "positive" ? "text-chart-2" :
+                changeType === "negative" ? "text-destructive" :
+                "text-muted-foreground"
+              )}>
+                <ChangeIcon className="h-3 w-3 shrink-0" />
+                {change}
+              </span>
+            )}
+          </div>
+          <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl shrink-0", iconBgClass, iconFgClass)}>
+            <Icon className="h-5 w-5" />
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 export default function Dashboard() {
   const { selectedCompany } = useCompany();
@@ -437,6 +487,17 @@ export default function Dashboard() {
         showHomeButton={false}
       />
 
+      {/* ── Greeting banner ── */}
+      <div className="flex flex-wrap items-center justify-between gap-2 -mt-2 px-0.5">
+        <p className="text-sm text-muted-foreground">
+          <span className="font-semibold text-foreground">{getGreeting()}</span>
+          {selectedCompany?.name ? ` · ${selectedCompany.name}` : ""}
+        </p>
+        <p className="text-xs text-muted-foreground tabular-nums">
+          {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+        </p>
+      </div>
+
       {/* ── Quick Actions dropdown ── */}
       <div className="flex gap-2">
         <DropdownMenu>
@@ -495,49 +556,57 @@ export default function Dashboard() {
       {/* ── Top KPI row ── */}
       <div className={cn("grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4", !isFactoryMode ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
         {!isFactoryMode && (
-          <KPICard
+          <DashboardKPICard
             title="Total Income"
             value={isLoading ? "Loading..." : formatAmount(profitData?.totalIncome || 0)}
             change="All income accounts combined"
             changeType="positive"
             icon={DollarSign}
+            stripeClass="bg-gradient-to-r from-chart-2 via-chart-2/60 to-chart-2/20"
+            iconBgClass="bg-chart-2/15"
+            iconFgClass="text-chart-2"
             onClick={() => setLocation("/sales-report")}
-            data-testid="kpi-total-income"
+            testId="kpi-total-income"
           />
         )}
-        <KPICard
+        <DashboardKPICard
           title="Net Position"
           value={isLoading ? "Loading..." : formatAmount(profitData?.netPosition || 0)}
           change={profitData?.netPositionLabel || "What we have minus what we owe"}
           changeType={(profitData?.netPosition ?? 0) >= 0 ? "positive" : "negative"}
           icon={TrendingUp}
+          stripeClass={(profitData?.netPosition ?? 0) >= 0
+            ? "bg-gradient-to-r from-chart-2 via-chart-2/60 to-chart-2/20"
+            : "bg-gradient-to-r from-destructive via-destructive/60 to-destructive/20"}
+          iconBgClass={(profitData?.netPosition ?? 0) >= 0 ? "bg-chart-2/15" : "bg-destructive/15"}
+          iconFgClass={(profitData?.netPosition ?? 0) >= 0 ? "text-chart-2" : "text-destructive"}
           onClick={() => setLocation(modePrefix === "" ? "/net-position-details" : appMode === "properties" ? "/properties/net-position-details" : `${modePrefix}/net-position`)}
-          data-testid="kpi-net-position"
+          testId="kpi-net-position"
         />
-        <KPICard
+        <DashboardKPICard
           title="Import Cycle Balance"
           value={
-            importCycleIsError
-              ? "Unavailable"
-              : importCycleIsLoading
-              ? "Loading..."
-              : isImportCycleBalanced
-              ? "Balanced"
-              : formatAmount(Math.abs(importCycleBalance!))
+            importCycleIsError ? "Unavailable"
+            : importCycleIsLoading ? "Loading..."
+            : isImportCycleBalanced ? "Balanced"
+            : formatAmount(Math.abs(importCycleBalance!))
           }
           change={
-            importCycleIsError
-              ? "Could not load cycle data"
-              : importCycleIsLoading
-              ? ""
-              : isImportCycleBalanced
-              ? "All accounts net to zero"
-              : "Should be $0 when balanced"
+            importCycleIsError ? "Could not load cycle data"
+            : importCycleIsLoading ? ""
+            : isImportCycleBalanced ? "All accounts net to zero"
+            : "Should be $0 when balanced"
           }
           changeType={importCycleIsError ? "neutral" : isImportCycleBalanced ? "positive" : "negative"}
           icon={importCycleIsError ? Truck : isImportCycleBalanced ? CheckCircle2 : Truck}
+          stripeClass={isImportCycleBalanced
+            ? "bg-gradient-to-r from-chart-2 via-chart-2/60 to-chart-2/20"
+            : importCycleIsError ? "bg-muted"
+            : "bg-gradient-to-r from-destructive via-destructive/60 to-destructive/20"}
+          iconBgClass={isImportCycleBalanced ? "bg-chart-2/15" : importCycleIsError ? "bg-muted" : "bg-destructive/15"}
+          iconFgClass={isImportCycleBalanced ? "text-chart-2" : importCycleIsError ? "text-muted-foreground" : "text-destructive"}
           onClick={!importCycleIsError && !isImportCycleBalanced && !importCycleIsLoading ? () => setImportCycleExpanded((v) => !v) : undefined}
-          data-testid="kpi-import-cycle-balance"
+          testId="kpi-import-cycle-balance"
         />
       </div>
 
@@ -589,7 +658,7 @@ export default function Dashboard() {
         {/* ── Net Position Breakdown ── */}
         <Card className="p-4 sm:p-6">
           <div className="flex items-center justify-between mb-5">
-            <h3 className="text-base font-semibold">Net Position Breakdown</h3>
+            <h3 className="text-base font-semibold pl-3 border-l-[3px] border-primary">Net Position Breakdown</h3>
             <button
               onClick={() => setLocation(modePrefix === "" ? "/net-position-details" : appMode === "properties" ? "/properties/net-position-details" : `${modePrefix}/net-position`)}
               className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
@@ -599,6 +668,25 @@ export default function Dashboard() {
               <ChevronRight className="h-3 w-3" />
             </button>
           </div>
+
+          {!isLoading && profitData && (() => {
+            const total = (profitData.forUsTotal ?? 0) + (profitData.onUsTotal ?? 0);
+            const assetsPct = total > 0 ? Math.round(((profitData.forUsTotal ?? 0) / total) * 100) : 50;
+            return (
+              <div className="mb-4">
+                <div className="flex justify-between text-xs font-medium mb-1.5">
+                  <span className="text-chart-2">Assets {assetsPct}%</span>
+                  <span className="text-destructive">Liabilities {100 - assetsPct}%</span>
+                </div>
+                <div className="h-2 rounded-full bg-destructive/15 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-chart-2 transition-all duration-700"
+                    style={{ width: `${assetsPct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })()}
 
           {isLoading ? (
             <div className="flex items-center justify-center h-[200px]">
@@ -721,20 +809,20 @@ export default function Dashboard() {
           <Card className="p-0 overflow-hidden">
             {/* Summary bar */}
             <div className="grid grid-cols-3 divide-x border-b">
-              <div className="p-4 sm:p-5 text-center">
-                <p className="text-xs text-muted-foreground mb-1">Available</p>
+              <div className="p-4 sm:p-5 text-center bg-chart-2/5">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-chart-2/70 mb-1">Available</p>
                 <p className="text-xl sm:text-2xl font-bold font-mono text-chart-2" data-testid="text-total-available">
                   {formatCashAmount(totalAvailable)}
                 </p>
               </div>
-              <div className="p-4 sm:p-5 text-center">
-                <p className="text-xs text-muted-foreground mb-1">To Pay</p>
+              <div className="p-4 sm:p-5 text-center bg-destructive/5">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-destructive/70 mb-1">To Pay</p>
                 <p className="text-xl sm:text-2xl font-bold font-mono text-destructive" data-testid="text-total-payable">
                   {formatCashAmount(totalPayable)}
                 </p>
               </div>
-              <div className="p-4 sm:p-5 text-center">
-                <p className="text-xs text-muted-foreground mb-1">Net</p>
+              <div className={cn("p-4 sm:p-5 text-center", netCashPosition >= 0 ? "bg-chart-2/5" : "bg-destructive/5")}>
+                <p className={cn("text-[11px] font-semibold uppercase tracking-wider mb-1", netCashPosition >= 0 ? "text-chart-2/70" : "text-destructive/70")}>Net</p>
                 <p className={cn("text-xl sm:text-2xl font-bold font-mono", netCashPosition >= 0 ? "text-chart-2" : "text-destructive")} data-testid="text-net-position">
                   {formatCashAmount(netCashPosition)}
                 </p>
