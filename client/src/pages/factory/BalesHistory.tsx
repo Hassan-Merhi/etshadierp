@@ -1,7 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAdminOverride } from "@/hooks/use-admin-override";
-import { Printer, Trash2, Search, Package, Filter, CheckSquare, RefreshCw, Pencil, Check, X, Download } from "lucide-react";
+import { Printer, Trash2, Search, Package, Filter, CheckSquare, RefreshCw, Pencil, Check, X, Download, ChevronRight, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -72,6 +72,7 @@ export default function BalesHistory() {
   const [designPickerOpen, setDesignPickerOpen] = useState(false);
   const [pendingReprintLabels, setPendingReprintLabels] = useState<LabelData[] | null>(null);
   const [repackConfirm, setRepackConfirm] = useState<any>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const nameInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const appMode = useAppMode();
@@ -341,6 +342,41 @@ export default function BalesHistory() {
   const totalWeight = filtered.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
   const totalBales = filtered.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
 
+  const groupedFiltered = useMemo(() => {
+    const map = new Map<string, { key: string; productName: string; articleCode: string; sellingPrice: string | null; totalQty: number; totalWeightKg: number; rows: any[] }>();
+    for (const row of filtered) {
+      const { bale, product } = row;
+      const name = product?.name || bale.productName || bale.category || "-";
+      const article = product?.articleCode || bale.category || "-";
+      const key = `${name}|||${article}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          productName: name,
+          articleCode: article,
+          sellingPrice: product?.sellingPrice ?? null,
+          totalQty: 0,
+          totalWeightKg: 0,
+          rows: [],
+        });
+      }
+      const g = map.get(key)!;
+      g.rows.push(row);
+      g.totalQty += bale.quantity || 1;
+      g.totalWeightKg += parseFloat(bale.weightKg || "0");
+    }
+    return Array.from(map.values());
+  }, [filtered]);
+
+  function toggleGroup(key: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
   const todayStr = new Date().toLocaleDateString('en-CA');
   const summaryDate = dateFilter || todayStr;
   const todayInStock = (balesData || []).filter((row: any) => {
@@ -566,115 +602,168 @@ export default function BalesHistory() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((row: any) => {
-                    const bale = row.bale;
-                    const product = row.product;
-                    const batch = row.mixBatch;
-                    return (
-                      <TableRow key={bale.id} data-testid={`row-bale-${bale.id}`}>
+                  {groupedFiltered.map((group) => {
+                    const isExpanded = expandedGroups.has(group.key);
+                    const allGroupSelected = group.rows.every((r: any) => selectedIds.has(r.bale.id));
+                    const someGroupSelected = group.rows.some((r: any) => selectedIds.has(r.bale.id));
+                    const uniqueStatuses = [...new Set(group.rows.map((r: any) => r.bale.status as string))];
+
+                    return [
+                      // ── Group summary row ──
+                      <TableRow
+                        key={`group-${group.key}`}
+                        className="bg-muted/20 hover-elevate cursor-pointer"
+                        data-testid={`row-group-${group.key}`}
+                      >
                         <TableCell>
                           <Checkbox
-                            checked={selectedIds.has(bale.id)}
-                            onCheckedChange={() => toggleSelect(bale.id)}
-                            data-testid={`checkbox-bale-${bale.id}`}
+                            checked={allGroupSelected}
+                            data-state={someGroupSelected && !allGroupSelected ? "indeterminate" : undefined}
+                            onCheckedChange={() => {
+                              setSelectedIds((prev) => {
+                                const next = new Set(prev);
+                                if (allGroupSelected) group.rows.forEach((r: any) => next.delete(r.bale.id));
+                                else group.rows.forEach((r: any) => next.add(r.bale.id));
+                                return next;
+                              });
+                            }}
+                            data-testid={`checkbox-group-${group.key}`}
                           />
                         </TableCell>
-                        <TableCell className="font-mono text-xs">{bale.referenceNumber || bale.baleCode || "-"}</TableCell>
-                        <TableCell>
-                          {editingNameId === bale.id ? (
-                            <div className="flex items-center gap-1">
-                              <Input
-                                ref={nameInputRef}
-                                value={editingNameValue}
-                                onChange={(e) => setEditingNameValue(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") saveEditName(bale.id);
-                                  if (e.key === "Escape") setEditingNameId(null);
-                                }}
-                                className="h-7 text-xs w-[160px]"
-                                data-testid={`input-edit-name-${bale.id}`}
-                              />
-                              <Button size="icon" variant="ghost" onClick={() => saveEditName(bale.id)} data-testid={`button-save-name-${bale.id}`}>
-                                <Check className="h-3 w-3" />
-                              </Button>
-                              <Button size="icon" variant="ghost" onClick={() => setEditingNameId(null)} data-testid={`button-cancel-name-${bale.id}`}>
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1 group cursor-pointer" onClick={() => startEditName(bale.id, product?.name || bale.productName || "")} data-testid={`text-product-name-${bale.id}`}>
-                              <span>{product?.name || bale.productName || "-"}</span>
-                              <Pencil className="h-3 w-3 text-muted-foreground visible md:invisible md:group-hover:visible" />
-                            </div>
-                          )}
+                        <TableCell className="text-xs text-muted-foreground font-mono">
+                          <Badge variant="outline" className="text-xs font-mono">
+                            {group.rows.length} bale{group.rows.length !== 1 ? "s" : ""}
+                          </Badge>
                         </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{product?.articleCode || bale.category || "-"}</TableCell>
-                        <TableCell className="text-right">{bale.quantity}</TableCell>
-                        <TableCell className="text-right font-mono">{formatLabelNum(bale.weightKg)}</TableCell>
+                        <TableCell>
+                          <button
+                            className="flex items-center gap-1.5 text-left font-medium hover:underline"
+                            onClick={() => toggleGroup(group.key)}
+                            data-testid={`button-toggle-group-${group.key}`}
+                          >
+                            {isExpanded
+                              ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                              : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+                            {group.productName}
+                          </button>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{group.articleCode}</TableCell>
+                        <TableCell className="text-right font-semibold">{group.totalQty}</TableCell>
+                        <TableCell className="text-right font-mono font-semibold">{formatLabelNum(group.totalWeightKg)}</TableCell>
                         {!hiddenCost.includes("bales_list_cost_per_kg") && (
                           <TableCell className="text-right font-mono text-muted-foreground">
-                            {product?.sellingPrice && parseFloat(String(product.sellingPrice)) > 0
-                              ? formatLabelNum(String(product.sellingPrice))
+                            {group.sellingPrice && parseFloat(String(group.sellingPrice)) > 0
+                              ? formatLabelNum(String(group.sellingPrice))
                               : "—"}
                           </TableCell>
                         )}
                         <TableCell>
-                          <Select
-                            value={bale.status}
-                            onValueChange={(val) => wrapAdminAction(() => updateStatus.mutate({ id: bale.id, status: val }), "Update Bale Status")}
-                          >
-                            <SelectTrigger className="w-[140px] h-8 text-xs" data-testid={`select-status-${bale.id}`}>
-                              <Badge variant={(STATUS_COLORS[bale.status] || "secondary") as any} className="text-xs">
-                                {bale.status.replace(/_/g, " ")}
+                          <div className="flex flex-wrap gap-1">
+                            {uniqueStatuses.map((s) => (
+                              <Badge key={s} variant={(STATUS_COLORS[s] || "secondary") as any} className="text-xs">
+                                {s.replace(/_/g, " ")}
                               </Badge>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="PENDING_PRESSING">Pending Pressing</SelectItem>
-                              <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
-                              <SelectItem value="PRESSED">Pressed</SelectItem>
-                              <SelectItem value="FINALIZED">Finalized</SelectItem>
-                              <SelectItem value="IN_STOCK">In Stock</SelectItem>
-                              <SelectItem value="RESERVED">Reserved</SelectItem>
-                              <SelectItem value="SOLD">Sold</SelectItem>
-                              <SelectItem value="REPACKED">Repacked</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground" data-testid={`text-last-printed-${bale.id}`}>
-                          {row.lastPrintedAt ? new Date(row.lastPrintedAt).toLocaleString() : "Never"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setRepackConfirm(row)}
-                              disabled={bale.status === "REPACKED" || bale.status === "SOLD"}
-                              title="Repack bale"
-                              data-testid={`button-repack-${bale.id}`}
-                            >
-                              <RefreshCw className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleReprint(row)}
-                              data-testid={`button-reprint-${bale.id}`}
-                            >
-                              <Printer className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setDeleteConfirm(bale.id)}
-                              data-testid={`button-delete-${bale.id}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            ))}
                           </div>
                         </TableCell>
-                      </TableRow>
-                    );
+                        <TableCell />
+                        <TableCell />
+                      </TableRow>,
+
+                      // ── Expanded individual bale rows ──
+                      ...(isExpanded ? group.rows.map((row: any) => {
+                        const bale = row.bale;
+                        const product = row.product;
+                        return (
+                          <TableRow key={bale.id} className="bg-background" data-testid={`row-bale-${bale.id}`}>
+                            <TableCell className="pl-6">
+                              <Checkbox
+                                checked={selectedIds.has(bale.id)}
+                                onCheckedChange={() => toggleSelect(bale.id)}
+                                data-testid={`checkbox-bale-${bale.id}`}
+                              />
+                            </TableCell>
+                            <TableCell className="font-mono text-xs pl-6">{bale.referenceNumber || bale.baleCode || "-"}</TableCell>
+                            <TableCell className="pl-8">
+                              {editingNameId === bale.id ? (
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    ref={nameInputRef}
+                                    value={editingNameValue}
+                                    onChange={(e) => setEditingNameValue(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") saveEditName(bale.id);
+                                      if (e.key === "Escape") setEditingNameId(null);
+                                    }}
+                                    className="h-7 text-xs w-[160px]"
+                                    data-testid={`input-edit-name-${bale.id}`}
+                                  />
+                                  <Button size="icon" variant="ghost" onClick={() => saveEditName(bale.id)} data-testid={`button-save-name-${bale.id}`}>
+                                    <Check className="h-3 w-3" />
+                                  </Button>
+                                  <Button size="icon" variant="ghost" onClick={() => setEditingNameId(null)} data-testid={`button-cancel-name-${bale.id}`}>
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1 group cursor-pointer text-sm text-muted-foreground" onClick={() => startEditName(bale.id, product?.name || bale.productName || "")} data-testid={`text-product-name-${bale.id}`}>
+                                  <span>{product?.name || bale.productName || "-"}</span>
+                                  <Pencil className="h-3 w-3 text-muted-foreground visible md:invisible md:group-hover:visible" />
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{product?.articleCode || bale.category || "-"}</TableCell>
+                            <TableCell className="text-right">{bale.quantity}</TableCell>
+                            <TableCell className="text-right font-mono">{formatLabelNum(bale.weightKg)}</TableCell>
+                            {!hiddenCost.includes("bales_list_cost_per_kg") && (
+                              <TableCell className="text-right font-mono text-muted-foreground">
+                                {product?.sellingPrice && parseFloat(String(product.sellingPrice)) > 0
+                                  ? formatLabelNum(String(product.sellingPrice))
+                                  : "—"}
+                              </TableCell>
+                            )}
+                            <TableCell>
+                              <Select
+                                value={bale.status}
+                                onValueChange={(val) => wrapAdminAction(() => updateStatus.mutate({ id: bale.id, status: val }), "Update Bale Status")}
+                              >
+                                <SelectTrigger className="w-[140px] h-8 text-xs" data-testid={`select-status-${bale.id}`}>
+                                  <Badge variant={(STATUS_COLORS[bale.status] || "secondary") as any} className="text-xs">
+                                    {bale.status.replace(/_/g, " ")}
+                                  </Badge>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="PENDING_PRESSING">Pending Pressing</SelectItem>
+                                  <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
+                                  <SelectItem value="PRESSED">Pressed</SelectItem>
+                                  <SelectItem value="FINALIZED">Finalized</SelectItem>
+                                  <SelectItem value="IN_STOCK">In Stock</SelectItem>
+                                  <SelectItem value="RESERVED">Reserved</SelectItem>
+                                  <SelectItem value="SOLD">Sold</SelectItem>
+                                  <SelectItem value="REPACKED">Repacked</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground" data-testid={`text-last-printed-${bale.id}`}>
+                              {row.lastPrintedAt ? new Date(row.lastPrintedAt).toLocaleString() : "Never"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button size="icon" variant="ghost" onClick={() => setRepackConfirm(row)} disabled={bale.status === "REPACKED" || bale.status === "SOLD"} title="Repack bale" data-testid={`button-repack-${bale.id}`}>
+                                  <RefreshCw className="h-4 w-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" onClick={() => handleReprint(row)} data-testid={`button-reprint-${bale.id}`}>
+                                  <Printer className="h-4 w-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" onClick={() => setDeleteConfirm(bale.id)} data-testid={`button-delete-${bale.id}`}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }) : []),
+                    ];
                   })}
                 </TableBody>
               </Table>
