@@ -1178,7 +1178,7 @@ function TabTruckLocation() {
                 <thead>
                   <tr className="bg-yellow-400 text-yellow-950 font-bold border-b-2 border-yellow-600">
                     <th className="py-1.5 px-3 text-center">CONTAINER #</th>
-                    <th className="py-1.5 px-3 text-center">SUPPLIER</th>
+                    <th className="py-1.5 px-3 text-center">SUPPLIER CODE</th>
                     <th className="py-1.5 px-3 text-center">NUMBER PLATE</th>
                     <th className="py-1.5 px-3 text-center">LOCATION</th>
                     <th className="py-1.5 px-3 text-center">AGENT</th>
@@ -1209,7 +1209,7 @@ function TabTruckLocation() {
                       const rows = supRows.map(r => (
                         <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/40">
                           <td className="py-0.5 px-3 text-center font-mono font-semibold tracking-tight">{r.containerNumber}</td>
-                          <td className="py-0.5 px-3 text-center">{r.supplierName ?? <span className="text-muted-foreground">—</span>}</td>
+                          <td className="py-0.5 px-3 text-center">{r.supplierCode ?? <span className="text-muted-foreground">—</span>}</td>
                           <td className="py-0.5 px-3 text-center font-mono">{r.numberPlate ?? <span className="text-muted-foreground">—</span>}</td>
                           <td className="py-0.5 px-3 text-center">{r.trackingLocation ?? <span className="text-muted-foreground">—</span>}</td>
                           <td className="py-0.5 px-3 text-center">{r.agent ?? <span className="text-muted-foreground">—</span>}</td>
