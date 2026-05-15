@@ -2498,22 +2498,20 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             </div>
           )}
 
-          <Card className="w-full overflow-hidden">
-            <div className="p-3 md:p-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  placeholder="Search items by name..."
-                  value={itemSearchTerm}
-                  onChange={(e) => setItemSearchTerm(e.target.value)}
-                  className="pl-10"
-                  data-testid="input-search-items"
-                />
-              </div>
+          <Card className="p-4 w-full overflow-hidden">
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                placeholder="Search items by name..."
+                value={itemSearchTerm}
+                onChange={(e) => setItemSearchTerm(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-items"
+              />
             </div>
 
             {/* Mobile card view */}
-            <div className="md:hidden space-y-2 px-3 pb-3">
+            <div className="md:hidden space-y-2">
               {filteredStockItems.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   {itemSearchTerm ? "No items found matching your search" : "No items in this group"}
@@ -2590,23 +2588,32 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             </div>
 
             {/* Desktop table view */}
-            <div className="hidden md:block w-full overflow-auto border-t max-h-[calc(100vh-260px)]">
-              <table className="w-full min-w-full table-fixed text-sm">
+            <div className="overflow-auto hidden md:block border-t -mx-4 -mb-4 max-h-[calc(100vh-260px)]" style={{ width: "calc(100% + 2rem)" }}>
+              <table className="w-full table-fixed text-sm">
                 <colgroup>
-                  <col />
                   {showMovement ? (
                     <>
-                      <col className="w-36" />
-                      <col className="w-36" />
-                      <col className="w-32" />
+                      <col className="w-[34%]" />
+                      <col className="w-[15%]" />
+                      <col className="w-[15%]" />
+                      <col className="w-[12%]" />
+                      {!posUser && (
+                        <>
+                          <col className="w-[12%]" />
+                          <col className="w-[12%]" />
+                        </>
+                      )}
                     </>
                   ) : (
-                    <col className="w-36" />
-                  )}
-                  {!posUser && (
                     <>
-                      <col className="w-32" />
-                      <col className="w-40" />
+                      <col className={posUser ? "w-[82%]" : "w-[46%]"} />
+                      <col className="w-[18%]" />
+                      {!posUser && (
+                        <>
+                          <col className="w-[18%]" />
+                          <col className="w-[18%]" />
+                        </>
+                      )}
                     </>
                   )}
                 </colgroup>
@@ -2743,7 +2750,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               </table>
             </div>
             {filteredStockItems.length > 0 && (
-              <div className="px-3 md:px-4 py-3 text-sm text-muted-foreground">
+              <div className="mt-4 text-sm text-muted-foreground">
                 Showing {filteredStockItems.length} of {inventory.filter(i => i.stockGroupId === selectedGroup.groupId).length} items
               </div>
             )}
@@ -3095,16 +3102,16 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
                       {/* Screen view - Desktop table */}
                       <div className="screen-only hidden md:block w-full min-w-0">
-                        <Card className="w-full overflow-hidden">
-                          <div className="overflow-auto max-h-[calc(100vh-200px)] w-full min-w-0">
-                            <table className="w-full min-w-full table-fixed text-sm">
+                        <Card className="p-4 w-full overflow-hidden">
+                          <div className="overflow-auto max-h-[calc(100vh-200px)] -mx-4 -mt-4 -mb-4" style={{ width: "calc(100% + 2rem)" }}>
+                            <table className="w-full table-fixed text-sm">
                               <colgroup>
-                                <col />
-                                <col className="w-36" />
+                                <col className="w-[40%]" />
+                                <col className={posUser ? "w-[60%]" : "w-[20%]"} />
                                 {!posUser && (
                                   <>
-                                    <col className="w-32" />
-                                    <col className="w-40" />
+                                    <col className="w-[20%]" />
+                                    <col className="w-[20%]" />
                                   </>
                                 )}
                               </colgroup>
