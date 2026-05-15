@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
@@ -7,13 +7,66 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Package, TrendingUp, MapPin, X } from "lucide-react";
+import { ArrowLeft, Package, TrendingUp, MapPin, X, Calendar, ChevronDown } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 import { PageHeader } from "@/components/PageHeader";
+
+type DatePreset = "all" | "today" | "yesterday" | "this-month" | "last-1-month" | "last-6-months" | "this-year" | "custom";
+
+function getPresetDates(preset: DatePreset): { from: string; to: string } {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const today = fmt(now);
+  switch (preset) {
+    case "all": return { from: "", to: "" };
+    case "today": return { from: today, to: today };
+    case "yesterday": {
+      const y = new Date(now); y.setDate(y.getDate() - 1);
+      return { from: fmt(y), to: fmt(y) };
+    }
+    case "this-month": {
+      const first = new Date(now.getFullYear(), now.getMonth(), 1);
+      const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      return { from: fmt(first), to: fmt(last) };
+    }
+    case "last-1-month": {
+      const from = new Date(now); from.setMonth(from.getMonth() - 1);
+      return { from: fmt(from), to: today };
+    }
+    case "last-6-months": {
+      const from = new Date(now); from.setMonth(from.getMonth() - 6);
+      return { from: fmt(from), to: today };
+    }
+    case "this-year": {
+      const first = new Date(now.getFullYear(), 0, 1);
+      return { from: fmt(first), to: today };
+    }
+    default: return { from: "", to: "" };
+  }
+}
+
+const PRESET_LABELS: Record<DatePreset, string> = {
+  "all": "All Time",
+  "today": "Today",
+  "yesterday": "Yesterday",
+  "this-month": "This Month",
+  "last-1-month": "Last 1 Month",
+  "last-6-months": "Last 6 Months",
+  "this-year": "This Year",
+  "custom": "Custom Range",
+};
 
 interface StockItem {
   id: number;
@@ -73,8 +126,19 @@ export default function StockItemDetail() {
   const [_location, navigate] = useLocation();
   const itemId = params?.id ? parseInt(params.id) : null;
 
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const [preset, setPreset] = useState<DatePreset>("this-month");
+  const initialDates = useMemo(() => getPresetDates("this-month"), []);
+  const [fromDate, setFromDate] = useState(initialDates.from);
+  const [toDate, setToDate] = useState(initialDates.to);
+
+  const applyPreset = (p: DatePreset) => {
+    setPreset(p);
+    if (p !== "custom") {
+      const { from, to } = getPresetDates(p);
+      setFromDate(from);
+      setToDate(to);
+    }
+  };
 
   const { data: stockItems = [] } = useQuery<StockItem[]>({
     queryKey: ["/api/stock-items"],
@@ -162,45 +226,84 @@ export default function StockItemDetail() {
 
       {/* Date filter */}
       <Card className="p-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="filter-from" className="text-xs text-muted-foreground">From</Label>
-            <Input
-              id="filter-from"
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="w-40"
-              data-testid="input-filter-from-date"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="filter-to" className="text-xs text-muted-foreground">To</Label>
-            <Input
-              id="filter-to"
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="w-40"
-              data-testid="input-filter-to-date"
-            />
-          </div>
-          {(fromDate || toDate) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => { setFromDate(""); setToDate(""); }}
-              className="gap-1.5"
-              data-testid="button-clear-date-filter"
-            >
-              <X className="h-3.5 w-3.5" />
-              Clear
-            </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2" data-testid="button-date-preset">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span>{PRESET_LABELS[preset]}</span>
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {(["all","today","yesterday","this-month","last-1-month","last-6-months","this-year"] as DatePreset[]).map((p) => (
+                <DropdownMenuItem
+                  key={p}
+                  onClick={() => applyPreset(p)}
+                  className={preset === p ? "bg-accent" : ""}
+                  data-testid={`option-preset-${p}`}
+                >
+                  {PRESET_LABELS[p]}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => applyPreset("custom")}
+                className={preset === "custom" ? "bg-accent" : ""}
+                data-testid="option-preset-custom"
+              >
+                Custom Range...
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {preset === "custom" && (
+            <>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="filter-from" className="text-xs text-muted-foreground">From</Label>
+                <Input
+                  id="filter-from"
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="w-40"
+                  data-testid="input-filter-from-date"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="filter-to" className="text-xs text-muted-foreground">To</Label>
+                <Input
+                  id="filter-to"
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="w-40"
+                  data-testid="input-filter-to-date"
+                />
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => applyPreset("all")}
+                className="gap-1.5 self-end"
+                data-testid="button-clear-date-filter"
+              >
+                <X className="h-3.5 w-3.5" />
+                Clear
+              </Button>
+            </>
           )}
-          {(fromDate || toDate) && (
-            <p className="text-xs text-muted-foreground self-end pb-2">
+
+          {preset !== "all" && preset !== "custom" && fromDate && toDate && (
+            <span className="text-sm text-muted-foreground">
+              {fromDate} — {toDate}
+            </span>
+          )}
+
+          {preset !== "all" && (
+            <span className="text-xs text-muted-foreground">
               Filtering purchases &amp; sales by date
-            </p>
+            </span>
           )}
         </div>
       </Card>
