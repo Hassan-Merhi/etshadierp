@@ -2178,7 +2178,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
             </div>
 
             {/* Desktop Table View */}
-            <div className="hidden md:block border rounded-md overflow-auto max-h-[calc(100vh-220px)]">
+            <div className="hidden md:block">
               {viewMode === "condensed" ? (
                 /* ── Condensed: group by date → type with subtotals ── */
                 (() => {
@@ -2201,7 +2201,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                     filters.sortOrder === "desc" ? b.localeCompare(a) : a.localeCompare(b),
                   );
                   return (
-                    <Table>
+                    <Table wrapperClassName="max-h-[calc(100vh-220px)]">
                       <TableHeader className="sticky top-0 z-20 bg-background">
                         <TableRow>
                           <TableHead className="sticky left-0 bg-muted z-10">Date / Type</TableHead>
@@ -2327,7 +2327,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 })()
               ) : (
                 /* ── Detailed view: date separator rows + inline expand ── */
-                <Table>
+                <Table wrapperClassName="max-h-[calc(100vh-220px)]">
                   <TableHeader className="sticky top-0 z-20 bg-background">
                     <TableRow>
                       <TableHead className="sticky left-0 bg-muted z-10">Date</TableHead>
