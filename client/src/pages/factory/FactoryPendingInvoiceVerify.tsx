@@ -685,7 +685,7 @@ export default function FactoryPendingInvoiceVerify() {
                 <div>
                   <h3 className="font-semibold text-sm mb-3" data-testid="text-proforma-header">Proforma Expected <span className="text-muted-foreground font-normal">(mismatches only)</span></h3>
                   {sortedProformaLines.length > 0 ? (
-                    <Table wrapperClassName="overflow-visible">
+                    <Table wrapperClassName="max-h-[50vh] overflow-auto">
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Article</TableHead>
@@ -753,7 +753,7 @@ export default function FactoryPendingInvoiceVerify() {
                 <div>
                   <h3 className="font-semibold text-sm mb-3" data-testid="text-loaded-header">Loaded Bales</h3>
                   {verification?.loadedItems && verification.loadedItems.length > 0 ? (
-                    <Table wrapperClassName="overflow-visible">
+                    <Table wrapperClassName="max-h-[50vh] overflow-auto">
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>Article</TableHead>
