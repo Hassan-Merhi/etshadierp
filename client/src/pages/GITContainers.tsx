@@ -2273,7 +2273,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
               <TableRow>
                 <TableHead className="w-8">#</TableHead>
                 <TableHead>Container #</TableHead>
-                <TableHead>Supplier Code</TableHead>
+                <TableHead>Supplier</TableHead>
                 <TableHead>Company</TableHead>
                 <TableHead>Shop Name</TableHead>
                 <TableHead>ETA</TableHead>

@@ -248,7 +248,7 @@ function RealWorkbookBlock({
   const columnHeaders = (
     <tr className="bg-muted/60 border-b text-muted-foreground">
       <th className="py-1 px-2 font-semibold text-center">CTR #</th>
-      <th className="py-1 px-2 font-semibold text-center">SUPPLIER CODE</th>
+      <th className="py-1 px-2 font-semibold text-center">SUPPLIER</th>
       <th className="py-1 px-2 font-semibold text-center">AMOUNT</th>
       <th className="py-1 px-2 font-semibold text-center">ETA</th>
       <th className="py-1 px-2 font-semibold text-center">TRUCK #</th>
@@ -1179,7 +1179,7 @@ function TabTruckLocation() {
                 <thead>
                   <tr className="bg-yellow-400 text-yellow-950 font-bold border-b-2 border-yellow-600">
                     <th className="py-1.5 px-3 text-center">CONTAINER #</th>
-                    <th className="py-1.5 px-3 text-center">SUPPLIER CODE</th>
+                    <th className="py-1.5 px-3 text-center">SUPPLIER</th>
                     <th className="py-1.5 px-3 text-center">NUMBER PLATE</th>
                     <th className="py-1.5 px-3 text-center">LOCATION</th>
                     <th className="py-1.5 px-3 text-center">AGENT</th>
