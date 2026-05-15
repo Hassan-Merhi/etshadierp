@@ -104,6 +104,7 @@ import {
   Lock,
   LayoutList,
   Layers,
+  Search,
 } from "lucide-react";
 import { format, parseISO, isToday, addDays } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -1783,121 +1784,174 @@ export default function Daybook({ user }: { user?: any } = {}) {
         </div>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Filter className="w-5 h-5" />
-              <CardTitle>Filters</CardTitle>
-            </div>
-            {hasActiveFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                data-testid="button-clear-filters"
-                className="gap-1"
+      {/* Filter Bar */}
+      <div className="rounded-lg border bg-muted/30 px-4 py-3 flex flex-col gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <PeriodFilter
+            value={periodFilter}
+            onChange={setPeriodFilter}
+            data-testid="period-filter"
+          />
+
+          <div className="h-6 w-px bg-border hidden sm:block" />
+
+          <Select
+            value={filters.voucherType}
+            onValueChange={(value) => setFilters({ ...filters, voucherType: value })}
+          >
+            <SelectTrigger id="voucher-type" data-testid="select-voucher-type" className="w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="Sales">Sales</SelectItem>
+              <SelectItem value="Purchase">Purchase</SelectItem>
+              <SelectItem value="Payment">Payment</SelectItem>
+              <SelectItem value="Receipt">Receipt</SelectItem>
+              <SelectItem value="Journal">Journal</SelectItem>
+              <SelectItem value="Contra">Contra</SelectItem>
+              <SelectItem value="Offload">Offload</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={filters.statusFilter}
+            onValueChange={(value) => setFilters({ ...filters, statusFilter: value as "all" | "active" | "optional" })}
+          >
+            <SelectTrigger id="status-filter" data-testid="select-status-filter" className="w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active Only</SelectItem>
+              <SelectItem value="optional">Optional Only</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <div className="h-6 w-px bg-border hidden sm:block" />
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">Amount</span>
+            <Input
+              id="min-amount"
+              type="number"
+              placeholder="0"
+              value={filters.minAmount}
+              onChange={(e) => setFilters({ ...filters, minAmount: e.target.value })}
+              data-testid="input-min-amount"
+              className="w-[80px]"
+            />
+            <span className="text-muted-foreground text-sm">—</span>
+            <Input
+              id="max-amount"
+              type="number"
+              placeholder="∞"
+              value={filters.maxAmount}
+              onChange={(e) => setFilters({ ...filters, maxAmount: e.target.value })}
+              data-testid="input-max-amount"
+              className="w-[80px]"
+            />
+          </div>
+
+          <div className="h-6 w-px bg-border hidden sm:block" />
+
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              id="search"
+              placeholder="Voucher # or description..."
+              value={filters.searchQuery}
+              onChange={(e) => setFilters({ ...filters, searchQuery: e.target.value })}
+              data-testid="input-search"
+              className="pl-9"
+            />
+          </div>
+        </div>
+
+        {hasActiveFilters && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Active:</span>
+            {periodFilter.preset !== "today" && (
+              <Badge
+                variant="secondary"
+                className="gap-1 cursor-pointer text-xs"
+                onClick={() => setPeriodFilter(getDefaultPeriodValue("today"))}
+                data-testid="chip-period"
               >
-                <X className="w-4 h-4" />
-                Clear Filters
-              </Button>
+                {periodFilter.preset === "custom"
+                  ? `${periodFilter.fromDate} – ${periodFilter.toDate}`
+                  : periodFilter.preset}
+                <X className="h-3 w-3" />
+              </Badge>
             )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="space-y-2">
-              <Label>Period</Label>
-              <PeriodFilter
-                value={periodFilter}
-                onChange={setPeriodFilter}
-                data-testid="period-filter"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="voucher-type">Voucher Type</Label>
-              <Select
-                value={filters.voucherType}
-                onValueChange={(value) =>
-                  setFilters({ ...filters, voucherType: value })
-                }
+            {filters.voucherType !== "all" && (
+              <Badge
+                variant="secondary"
+                className="gap-1 cursor-pointer text-xs"
+                onClick={() => setFilters({ ...filters, voucherType: "all" })}
+                data-testid="chip-type"
               >
-                <SelectTrigger
-                  id="voucher-type"
-                  data-testid="select-voucher-type"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="Sales">Sales</SelectItem>
-                  <SelectItem value="Purchase">Purchase</SelectItem>
-                  <SelectItem value="Payment">Payment</SelectItem>
-                  <SelectItem value="Receipt">Receipt</SelectItem>
-                  <SelectItem value="Journal">Journal</SelectItem>
-                  <SelectItem value="Contra">Contra</SelectItem>
-                  <SelectItem value="Offload">Offload</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="status-filter">Status</Label>
-              <Select
-                value={filters.statusFilter}
-                onValueChange={(value) =>
-                  setFilters({ ...filters, statusFilter: value as "all" | "active" | "optional" })
-                }
+                {filters.voucherType}
+                <X className="h-3 w-3" />
+              </Badge>
+            )}
+            {filters.statusFilter !== "all" && (
+              <Badge
+                variant="secondary"
+                className="gap-1 cursor-pointer text-xs"
+                onClick={() => setFilters({ ...filters, statusFilter: "all" })}
+                data-testid="chip-status"
               >
-                <SelectTrigger id="status-filter" data-testid="select-status-filter" className="w-[130px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="active">Active Only</SelectItem>
-                  <SelectItem value="optional">Optional Only</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="min-amount">Min Amount</Label>
-              <Input
-                id="min-amount"
-                type="number"
-                placeholder="0"
-                value={filters.minAmount}
-                onChange={(e) => setFilters({ ...filters, minAmount: e.target.value })}
-                data-testid="input-min-amount"
-                className="w-[110px]"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="max-amount">Max Amount</Label>
-              <Input
-                id="max-amount"
-                type="number"
-                placeholder="∞"
-                value={filters.maxAmount}
-                onChange={(e) => setFilters({ ...filters, maxAmount: e.target.value })}
-                data-testid="input-max-amount"
-                className="w-[110px]"
-              />
-            </div>
-            <div className="space-y-2 flex-1 min-w-0 w-full md:min-w-[200px] md:w-auto">
-              <Label htmlFor="search">Search</Label>
-              <Input
-                id="search"
-                placeholder="Voucher # or description..."
-                value={filters.searchQuery}
-                onChange={(e) =>
-                  setFilters({ ...filters, searchQuery: e.target.value })
-                }
-                data-testid="input-search"
-              />
-            </div>
+                {filters.statusFilter === "active" ? "Active Only" : "Optional Only"}
+                <X className="h-3 w-3" />
+              </Badge>
+            )}
+            {filters.minAmount && (
+              <Badge
+                variant="secondary"
+                className="gap-1 cursor-pointer text-xs"
+                onClick={() => setFilters({ ...filters, minAmount: "" })}
+                data-testid="chip-min"
+              >
+                Min: {filters.minAmount}
+                <X className="h-3 w-3" />
+              </Badge>
+            )}
+            {filters.maxAmount && (
+              <Badge
+                variant="secondary"
+                className="gap-1 cursor-pointer text-xs"
+                onClick={() => setFilters({ ...filters, maxAmount: "" })}
+                data-testid="chip-max"
+              >
+                Max: {filters.maxAmount}
+                <X className="h-3 w-3" />
+              </Badge>
+            )}
+            {filters.searchQuery && (
+              <Badge
+                variant="secondary"
+                className="gap-1 cursor-pointer text-xs"
+                onClick={() => setFilters({ ...filters, searchQuery: "" })}
+                data-testid="chip-search"
+              >
+                &ldquo;{filters.searchQuery}&rdquo;
+                <X className="h-3 w-3" />
+              </Badge>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              data-testid="button-clear-filters"
+              className="h-6 px-2 text-xs text-muted-foreground gap-1"
+            >
+              <X className="h-3 w-3" />
+              Clear all
+            </Button>
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
 
       {/* Vouchers Table */}
       <Card>
