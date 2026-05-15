@@ -1830,31 +1830,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
           <div className="h-6 w-px bg-border hidden sm:block" />
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground whitespace-nowrap">Amount</span>
-            <Input
-              id="min-amount"
-              type="number"
-              placeholder="0"
-              value={filters.minAmount}
-              onChange={(e) => setFilters({ ...filters, minAmount: e.target.value })}
-              data-testid="input-min-amount"
-              className="w-[80px]"
-            />
-            <span className="text-muted-foreground text-sm">—</span>
-            <Input
-              id="max-amount"
-              type="number"
-              placeholder="∞"
-              value={filters.maxAmount}
-              onChange={(e) => setFilters({ ...filters, maxAmount: e.target.value })}
-              data-testid="input-max-amount"
-              className="w-[80px]"
-            />
-          </div>
-
-          <div className="h-6 w-px bg-border hidden sm:block" />
-
           <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input
