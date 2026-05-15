@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useDebounce } from "@/hooks/use-debounce";
 import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
@@ -84,6 +85,7 @@ export default function Suppliers() {
   const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [hideZeroBalance, setHideZeroBalance] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearch = useDebounce(searchTerm, 300);
   const [dialogTab, setDialogTab] = useState<"transactions" | "purchase-orders">("transactions");
   const [supplierToDelete, setSupplierToDelete] = useState<{ id: number; name: string } | null>(null);
 
@@ -168,7 +170,7 @@ export default function Suppliers() {
 
   const sortedSuppliers = [...suppliers]
     .filter(s => hideZeroBalance ? s.balance !== 0 : true)
-    .filter(s => searchTerm.trim() === "" || s.legalName.toLowerCase().includes(searchTerm.toLowerCase()))
+    .filter(s => debouncedSearch.trim() === "" || s.legalName.toLowerCase().includes(debouncedSearch.toLowerCase()))
     .sort((a, b) => a.legalName.localeCompare(b.legalName));
 
   const handleSupplierClick = (supplier: SupplierWithStats) => {

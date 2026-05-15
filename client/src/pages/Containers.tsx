@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { useDebounce } from "@/hooks/use-debounce";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Link } from "wouter";
@@ -82,6 +83,9 @@ export default function Containers() {
   const [searchTerm, setSearchTerm] = useState("");
   const [soldSearchTerm, setSoldSearchTerm] = useState("");
   const [otwSearchTerm, setOtwSearchTerm] = useState("");
+  const debouncedSearch = useDebounce(searchTerm, 300);
+  const debouncedSoldSearch = useDebounce(soldSearchTerm, 300);
+  const debouncedOtwSearch = useDebounce(otwSearchTerm, 300);
   const [statusFilter, setStatusFilter] = useState("OTW");
   const [supplierFilter, setSupplierFilter] = useState("ALL");
   // OTW Tracking filters
@@ -254,8 +258,8 @@ export default function Containers() {
 
   const filteredOtwContainers = otwContainers.filter((c) => {
     // Search filter
-    if (otwSearchTerm) {
-      const search = (otwSearchTerm || "").toLowerCase();
+    if (debouncedOtwSearch) {
+      const search = (debouncedOtwSearch || "").toLowerCase();
       if (
         !(
           (c.containerNumber || "").toLowerCase().includes(search) ||
@@ -305,8 +309,8 @@ export default function Containers() {
   });
 
   const filteredSoldContainers = soldContainers.filter((sale) => {
-    if (!soldSearchTerm) return true;
-    const searchLower = (soldSearchTerm || "").toLowerCase();
+    if (!debouncedSoldSearch) return true;
+    const searchLower = (debouncedSoldSearch || "").toLowerCase();
     return (
       (sale.containerNumber || "").toLowerCase().includes(searchLower) ||
       (sale.customerName || "").toLowerCase().includes(searchLower)
@@ -315,10 +319,10 @@ export default function Containers() {
 
   const containers = allContainers.filter((c) => {
     if (
-      searchTerm &&
+      debouncedSearch &&
       !(c.containerNumber || "")
         .toLowerCase()
-        .includes((searchTerm || "").toLowerCase())
+        .includes((debouncedSearch || "").toLowerCase())
     ) {
       return false;
     }

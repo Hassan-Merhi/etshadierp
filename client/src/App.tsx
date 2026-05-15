@@ -223,6 +223,7 @@ const MySettings = lazy(() => import("@/pages/MySettings"));
 import { CommandPalette } from "@/components/CommandPalette";
 import { AppTopBar } from "@/components/AppTopBar";
 import { UserNotesPanel } from "@/components/UserNotesPanel";
+import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowLeft } from "lucide-react";
 import {
@@ -1238,6 +1239,7 @@ export default function App() {
                       <ChatWidget />
                       <DateJumpDialog />
                       <AuthGatedUserNotesPanel />
+                      <KeyboardShortcuts />
                     </CursorNavProvider>
                   </CurrencyProvider>
                 </DateFormatProvider>

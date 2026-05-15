@@ -37,8 +37,10 @@ import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
 import { useQuery } from "@tanstack/react-query";
 import { ROUTE_TO_FEATURE } from "@shared/schema";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useMemo } from "react";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useRecentNav } from "@/hooks/use-recent-nav";
+import { Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -218,6 +220,16 @@ export function AppSidebar({ user }: { user?: any }) {
 
   const { openSections, toggleSection } = useOpenSections(visibleSections);
 
+  const allNavItems = useMemo(
+    () => [
+      ...defaultPinnedItems,
+      ...ERP_NAV_SECTIONS.flatMap((s) => s.items),
+      ...utilityItems,
+    ],
+    [],
+  );
+  const recentItems = useRecentNav(allNavItems);
+
   const trailingFor = (item: NavItem) => {
     if (item.url !== "/chat") return null;
     const unread = chatUnread?.count || 0;
@@ -261,6 +273,25 @@ export function AppSidebar({ user }: { user?: any }) {
             />
           ))}
         </div>
+
+        {recentItems.length > 0 && (
+          <div className="mt-3">
+            <p className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+              Recent
+            </p>
+            <div className="space-y-0.5">
+              {recentItems.map((item) => (
+                <SidebarFlatLink
+                  key={item.url}
+                  href={item.url}
+                  icon={Clock}
+                  label={item.title}
+                  testId={`link-recent-${item.url.replace(/\//g, "-")}`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {utilityItems.filter(isItemVisible).length > 0 && (
           <div className="mt-4">

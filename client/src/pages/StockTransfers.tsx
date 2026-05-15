@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useDebounce } from "@/hooks/use-debounce";
 import { useLocation } from "wouter";
 import {
   Table,
@@ -76,6 +77,7 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
   const [period, setPeriod] = useState<PeriodFilterValue>(getDefaultPeriodValue());
   useDateJump((date) => setPeriod({ fromDate: date, toDate: date, preset: "custom" }));
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 300);
   const [editingTransfer, setEditingTransfer] = useState<StockTransferRow | null>(null);
   const [editNotes, setEditNotes] = useState("");
 
@@ -115,8 +117,8 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
   });
 
   const filtered = transfers.filter((t) => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
+    if (!debouncedSearch.trim()) return true;
+    const q = debouncedSearch.toLowerCase();
     return (
       t.voucherNumber?.toLowerCase().includes(q) ||
       t.sourceLocationName?.toLowerCase().includes(q) ||

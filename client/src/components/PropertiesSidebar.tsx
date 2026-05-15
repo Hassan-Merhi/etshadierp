@@ -10,6 +10,9 @@ import {
   KeyRound,
 } from "lucide-react";
 import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
+import { useMemo } from "react";
+import { useRecentNav } from "@/hooks/use-recent-nav";
+import { Clock } from "lucide-react";
 import {
   ModuleHeader,
   ModuleFooter,
@@ -61,6 +64,15 @@ export function PropertiesSidebar({ user }: { user?: any }) {
     defaultFirstWhenNoneActive: true,
   });
 
+  const allNavItems = useMemo(
+    () => [
+      ...PROPERTIES_PINNED_DEFAULTS,
+      ...PROPERTIES_NAV_SECTIONS.flatMap((s) => s.items),
+    ],
+    [],
+  );
+  const recentItems = useRecentNav(allNavItems);
+
   const testIdFor = (i: NavItem) => `link-properties-${i.url.split("/").pop()}`;
 
   return (
@@ -92,6 +104,25 @@ export function PropertiesSidebar({ user }: { user?: any }) {
             />
           ))}
         </div>
+
+        {recentItems.length > 0 && (
+          <div className="mt-3">
+            <p className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+              Recent
+            </p>
+            <div className="space-y-0.5">
+              {recentItems.map((item) => (
+                <SidebarFlatLink
+                  key={item.url}
+                  href={item.url}
+                  icon={Clock}
+                  label={item.title}
+                  testId={`link-props-recent-${item.url.replace(/\//g, "-")}`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="mt-4 pt-3 border-t border-sidebar-border/60 space-y-0.5">
           <SidebarFlatLink href="/my-settings" icon={KeyRound} label="My Settings" testId="link-properties-my-settings" />

@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../lib/parseId";
+import { logAudit } from "./_helpers";
 import { Express } from "express";
 import { db } from "../db";
 import { eq, and, inArray } from "drizzle-orm";
@@ -94,6 +95,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         await db.insert(supplierProformaLines).values(lineValues);
       }
       const allLines = await db.select().from(supplierProformaLines).where(eq(supplierProformaLines.proformaId, proforma.id));
+      await logAudit({ userId: (req as any).session.userId!, username: (req as any).session.username || "unknown", companyId, action: "create", tableName: "supplier_proformas", recordId: proforma.id, recordIdentifier: proforma.reference || `Proforma#${proforma.id}`, changes: { supplierId: { old: null, new: supplierId }, reference: { old: null, new: proforma.reference } } });
       res.json({ ...proforma, lines: allLines });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -129,6 +131,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       await db.delete(supplierProformaLines).where(eq(supplierProformaLines.proformaId, proformaId));
       await db.delete(supplierProformas)
         .where(and(eq(supplierProformas.id, proformaId), eq(supplierProformas.companyId, companyId)));
+      await logAudit({ userId: (req as any).session.userId!, username: (req as any).session.username || "unknown", companyId, action: "delete", tableName: "supplier_proformas", recordId: proformaId, recordIdentifier: `Proforma#${proformaId}`, changes: { deleted: { old: false, new: true } } });
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

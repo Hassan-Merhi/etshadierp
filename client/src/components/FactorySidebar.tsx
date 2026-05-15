@@ -48,7 +48,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useMemo } from "react";
+import { useRecentNav } from "@/hooks/use-recent-nav";
+import { Clock } from "lucide-react";
 import {
   ModuleHeader,
   ModuleFooter,
@@ -256,6 +258,15 @@ export function FactorySidebar({ user }: { user?: any }) {
 
   const { openSections, toggleSection } = useOpenSections(visibleSections);
 
+  const allNavItems = useMemo(
+    () => [
+      ...FACTORY_PINNED_DEFAULTS,
+      ...FACTORY_NAV_SECTIONS.flatMap((s) => s.items),
+    ],
+    [],
+  );
+  const recentItems = useRecentNav(allNavItems);
+
   const testIdFor = (i: NavItem) => `link-factory-${i.url.split("/").pop()}`;
 
   return (
@@ -288,6 +299,25 @@ export function FactorySidebar({ user }: { user?: any }) {
             />
           ))}
         </div>
+
+        {recentItems.length > 0 && (
+          <div className="mt-3">
+            <p className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+              Recent
+            </p>
+            <div className="space-y-0.5">
+              {recentItems.map((item) => (
+                <SidebarFlatLink
+                  key={item.url}
+                  href={item.url}
+                  icon={Clock}
+                  label={item.title}
+                  testId={`link-factory-recent-${item.url.replace(/\//g, "-")}`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="mt-4 pt-3 border-t border-sidebar-border/60 space-y-0.5">
           {isDeveloper && <SidebarFlatLink href="/factory/spreadsheet" icon={TableProperties} label="Spreadsheet" testId="link-factory-spreadsheet" />}

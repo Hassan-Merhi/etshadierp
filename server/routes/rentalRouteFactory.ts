@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../lib/parseId";
+import { logAudit } from "./_helpers";
 import type { Express, Request, Response } from "express";
 import { db } from "../db";
 import { requireAuth } from "../auth";
@@ -441,6 +442,7 @@ export function registerRentalRoutes(
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const data = insertPropertyUnitSchema.parse({ ...req.body, companyId });
       const [created] = await db.insert(propertyUnits).values({ ...data, module } as any).returning();
+      await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "create", tableName: "property_units", recordId: created.id, recordIdentifier: created.unitNumber || String(created.id), changes: { unitNumber: { old: null, new: created.unitNumber } } });
       res.json(created);
     } catch (e: any) {
       if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
@@ -513,6 +515,7 @@ export function registerRentalRoutes(
 
       const [created] = await db.insert(propertyContracts).values({ ...data, module } as any).returning();
       await ensureMonthlyLedgerRows(created.id);
+      await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "create", tableName: "property_contracts", recordId: created.id, recordIdentifier: `Contract#${created.id} Unit#${created.unitId}`, changes: { unitId: { old: null, new: created.unitId }, rentalAmount: { old: null, new: created.rentalAmount }, startDate: { old: null, new: created.startDate } } });
       res.json(created);
     } catch (e: any) {
       if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
@@ -873,6 +876,7 @@ export function registerRentalRoutes(
         WHERE contract_id = ${id} AND paid_amount = 0
           AND ((year > ${ey}) OR (year = ${ey} AND month > ${em}))
       `);
+      await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "update", tableName: "property_contracts", recordId: id, recordIdentifier: `Contract#${id}`, changes: { status: { old: "ACTIVE", new: "ENDED" }, endDate: { old: null, new: endDate } } });
       res.json({ ok: true });
     } catch (e: any) {
       if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
