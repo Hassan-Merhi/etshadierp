@@ -801,7 +801,7 @@ export default function FactoryStatusBuilder() {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === "i") { e.preventDefault(); addColumn(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === "i") { e.preventDefault(); addColumn(); }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);

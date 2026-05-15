@@ -509,7 +509,7 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
                     {warningCount} product{warningCount !== 1 ? "s" : ""} with shortage
                   </span>
                 )}
-                <span className="text-[10px] text-muted-foreground/60">Ctrl+S to save</span>
+                <span className="text-[10px] text-muted-foreground/60">Ctrl/⌘+S to save</span>
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={onClose} data-testid="button-edit-v5-cancel">

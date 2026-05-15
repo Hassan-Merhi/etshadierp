@@ -506,7 +506,7 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
                 {warningCount} over Free to Promise
               </span>
             )}
-            <span className="text-[10px] text-muted-foreground/60">Ctrl+S to save</span>
+            <span className="text-[10px] text-muted-foreground/60">Ctrl/⌘+S to save</span>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="default" onClick={onClose} data-testid="button-cancel-proforma">Cancel</Button>

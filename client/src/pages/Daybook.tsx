@@ -1660,7 +1660,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
         return;
       }
 
-      if (e.ctrlKey && e.key === "h") {
+      if ((e.ctrlKey || e.metaKey) && e.key === "h") {
         e.preventDefault();
         if (
           selectedRowId &&
@@ -1684,7 +1684,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
         return;
       }
 
-      if (e.ctrlKey && e.key === "u") {
+      if ((e.ctrlKey || e.metaKey) && e.key === "u") {
         e.preventDefault();
         if (selectedRowId && hiddenRowIds.has(selectedRowId)) {
           const rid = selectedRowId;

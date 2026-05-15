@@ -1086,7 +1086,7 @@ export default function FactoryDaybook() {
         return;
       }
 
-      if (e.ctrlKey && e.key === "h" && isDetailed) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "h" && isDetailed) {
         e.preventDefault();
         if (selectedRowId && !hiddenRowIds.has(selectedRowId)) {
           const toHide = selectedRowId;
@@ -1099,7 +1099,7 @@ export default function FactoryDaybook() {
         return;
       }
 
-      if (e.ctrlKey && e.key === "u" && isDetailed) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "u" && isDetailed) {
         e.preventDefault();
         if (selectedRowId && hiddenRowIds.has(selectedRowId)) {
           const rid = selectedRowId;
