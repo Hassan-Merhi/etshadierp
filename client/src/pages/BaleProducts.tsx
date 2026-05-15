@@ -1263,16 +1263,6 @@ export default function BaleProducts() {
                   </DropdownMenu>
                 );
               })()}
-              <div className="flex items-center gap-2">
-                <List className="h-4 w-4 text-muted-foreground" />
-                <Switch
-                  checked={condensedView}
-                  onCheckedChange={setCondensedView}
-                  data-testid="switch-condensed-view"
-                />
-                <LayoutGrid className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">{condensedView ? "Condensed" : "Normal"}</span>
-              </div>
             </div>
           </div>
         </CardHeader>
@@ -1285,7 +1275,7 @@ export default function BaleProducts() {
             </div>
           ) : condensedView ? (
             groupedProducts.length > 0 ? (
-              <Table>
+              <Table wrapperClassName="overflow-visible">
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead className="w-8"></TableHead>
@@ -1413,7 +1403,7 @@ export default function BaleProducts() {
               <EmptyState onCreateClick={() => setCreateDialogOpen(true)} />
             )
           ) : activeProducts && activeProducts.length > 0 ? (
-            <Table>
+            <Table wrapperClassName="overflow-visible">
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead className="w-8">
@@ -1516,7 +1506,7 @@ export default function BaleProducts() {
                 <EyeOff className="h-4 w-4" />
                 Hidden Products ({hiddenProducts.length})
               </h3>
-              <Table>
+              <Table wrapperClassName="overflow-visible">
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead className="w-8">
