@@ -2262,7 +2262,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               </div>
 
               {/* Desktop table view */}
-              <div className="w-full overflow-x-auto hidden md:block border-t -mx-4 -mb-4" style={{ width: "calc(100% + 2rem)" }}>
+              <div className="w-full overflow-auto hidden md:block border-t -mx-4 -mb-4 max-h-[calc(100vh-200px)]" style={{ width: "calc(100% + 2rem)" }}>
                 <table className="w-full table-fixed text-sm">
                   <colgroup>
                     <col className="w-[34%]" />
@@ -2571,7 +2571,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             </div>
 
             {/* Desktop table view */}
-            <div className="w-full overflow-x-auto hidden md:block border-t -mx-3 md:-mx-4 -mb-3 md:-mb-4" style={{ width: "calc(100% + 2rem)" }}>
+            <div className="w-full overflow-auto hidden md:block border-t -mx-3 md:-mx-4 -mb-3 md:-mb-4 max-h-[calc(100vh-200px)]" style={{ width: "calc(100% + 2rem)" }}>
               <table className="w-full table-fixed text-sm">
                 <colgroup>
                   <col className="w-[46%]" />
