@@ -718,7 +718,7 @@ export default function FactoryInvoiceDetail() {
       </div>
 
       <Card className="mb-6">
-        <Table wrapperClassName="overflow-visible">
+        <Table wrapperClassName="max-h-[calc(100vh-260px)] overflow-auto">
           <TableHeader className="sticky top-0 z-30 bg-background">
             <TableRow>
               <TableHead className="w-[50px]">#</TableHead>
