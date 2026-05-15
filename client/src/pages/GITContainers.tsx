@@ -1824,7 +1824,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
         />
       )}
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-hidden p-4 space-y-4">
 
         {/* ── Company Mode ── */}
         <div className="flex items-center gap-2 flex-wrap">
