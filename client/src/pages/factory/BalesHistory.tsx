@@ -1,7 +1,8 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
+import { addDays, format } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAdminOverride } from "@/hooks/use-admin-override";
-import { Printer, Trash2, Search, Package, Filter, CheckSquare, RefreshCw, Pencil, Check, X, Download, ChevronRight, ChevronDown } from "lucide-react";
+import { Printer, Trash2, Search, Package, Filter, CheckSquare, RefreshCw, Pencil, Check, X, Download, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -77,6 +78,24 @@ export default function BalesHistory() {
   const { toast } = useToast();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
+
+  // Keyboard +/- date navigation
+  useEffect(() => {
+    const fmt = "yyyy-MM-dd";
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (e.key === "-") {
+        e.preventDefault();
+        setDateFilter((prev) => prev ? format(addDays(new Date(prev + "T00:00:00"), -1), fmt) : prev);
+      } else if (e.key === "+" || (e.key === "=" && e.shiftKey)) {
+        e.preventDefault();
+        setDateFilter((prev) => prev ? format(addDays(new Date(prev + "T00:00:00"), 1), fmt) : prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const handleExport = async () => {
     setExportLoading(true);
@@ -489,32 +508,38 @@ export default function BalesHistory() {
                 data-testid="input-bales-search"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setDateFilter((prev) => prev ? format(addDays(new Date(prev + "T00:00:00"), -1), "yyyy-MM-dd") : prev)}
+                disabled={!dateFilter}
+                data-testid="button-prev-date"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
               <Input
                 type="date"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="w-[160px]"
+                className="w-[150px]"
                 data-testid="input-date-filter"
               />
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setDateFilter((prev) => prev ? format(addDays(new Date(prev + "T00:00:00"), 1), "yyyy-MM-dd") : prev)}
+                disabled={!dateFilter}
+                data-testid="button-next-date"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
               {dateFilter && (
                 <Button variant="ghost" size="sm" onClick={() => setDateFilter("")} data-testid="button-clear-date">
                   Clear
                 </Button>
               )}
             </div>
-            <Select value={batchFilter} onValueChange={setBatchFilter}>
-              <SelectTrigger className="w-[200px]" data-testid="select-batch-filter">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="All Batches" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Batches</SelectItem>
-                {mixBatches?.map((b) => (
-                  <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[160px]" data-testid="select-status-filter">
                 <SelectValue placeholder="All Status" />
@@ -579,8 +604,8 @@ export default function BalesHistory() {
               {searchTerm && <p className="text-xs mt-1">Try a different search term</p>}
             </div>
           ) : (
-            <div className="border rounded-md overflow-auto">
-              <Table>
+            <div className="border rounded-md overflow-hidden">
+              <Table wrapperClassName="max-h-[calc(100vh-380px)] overflow-auto">
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead className="w-10">
