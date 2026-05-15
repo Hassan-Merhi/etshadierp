@@ -325,15 +325,6 @@ export default function FactoryAttendance() {
           <CalendarDays className="h-4 w-4 mr-2" />
           Daily View
         </Button>
-        <Button
-          variant={mode === "perWorker" ? "default" : "outline"}
-          size="default"
-          data-testid="button-mode-per-worker"
-          onClick={() => handleSetMode("perWorker")}
-        >
-          <User className="h-4 w-4 mr-2" />
-          Per Worker
-        </Button>
       </div>
 
       {mode === "perWorker" ? (
