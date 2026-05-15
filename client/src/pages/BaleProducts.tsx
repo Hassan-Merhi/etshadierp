@@ -1275,7 +1275,7 @@ export default function BaleProducts() {
             </div>
           ) : condensedView ? (
             groupedProducts.length > 0 ? (
-              <Table wrapperClassName="overflow-visible">
+              <Table wrapperClassName="max-h-[calc(100vh-320px)] overflow-auto">
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead className="w-8"></TableHead>
@@ -1403,7 +1403,7 @@ export default function BaleProducts() {
               <EmptyState onCreateClick={() => setCreateDialogOpen(true)} />
             )
           ) : activeProducts && activeProducts.length > 0 ? (
-            <Table wrapperClassName="overflow-visible">
+            <Table wrapperClassName="max-h-[calc(100vh-320px)] overflow-auto">
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead className="w-8">
@@ -1506,7 +1506,7 @@ export default function BaleProducts() {
                 <EyeOff className="h-4 w-4" />
                 Hidden Products ({hiddenProducts.length})
               </h3>
-              <Table wrapperClassName="overflow-visible">
+              <Table wrapperClassName="max-h-[400px] overflow-auto">
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead className="w-8">
