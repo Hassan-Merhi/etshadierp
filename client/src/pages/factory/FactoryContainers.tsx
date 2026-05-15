@@ -1173,7 +1173,7 @@ export default function FactoryContainers() {
               );
             };
             return (
-              <Table>
+              <Table wrapperClassName="overflow-visible">
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead className="w-10">
@@ -1187,7 +1187,6 @@ export default function FactoryContainers() {
                       />
                     </TableHead>
                     <TableHead>Container #</TableHead>
-                    <TableHead>Broker</TableHead>
                     <TableHead>Commission</TableHead>
                     <TableHead>Total Value</TableHead>
                     <TableHead>Status</TableHead>
@@ -1226,7 +1225,7 @@ export default function FactoryContainers() {
                             ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
                             : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                         </TableCell>
-                        <TableCell colSpan={3}>
+                        <TableCell colSpan={2}>
                           <div className="flex items-center gap-2">
                             <span className="font-semibold">{supplierName}</span>
                             <Badge variant="outline" className="text-xs">{count} container{count !== 1 ? "s" : ""}</Badge>
@@ -1280,11 +1279,6 @@ export default function FactoryContainers() {
                               >
                                 {c.containerNumber}
                               </button>
-                            </TableCell>
-                            <TableCell>
-                              {brokerName
-                                ? <span className="text-sm text-muted-foreground">{brokerName}</span>
-                                : <span className="text-muted-foreground">—</span>}
                             </TableCell>
                             <TableCell className="font-mono text-sm">
                               {commAmt > 0 ? `${commCcy} ${formatNumber(commAmt)}` : <span className="text-muted-foreground">—</span>}
