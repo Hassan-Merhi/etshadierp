@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useRoute, useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Package, TrendingUp, MapPin } from "lucide-react";
+import { ArrowLeft, Package, TrendingUp, MapPin, X } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -70,6 +73,9 @@ export default function StockItemDetail() {
   const [_location, navigate] = useLocation();
   const itemId = params?.id ? parseInt(params.id) : null;
 
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+
   const { data: stockItems = [] } = useQuery<StockItem[]>({
     queryKey: ["/api/stock-items"],
   });
@@ -77,9 +83,13 @@ export default function StockItemDetail() {
   const selectedItem = stockItems.find(item => item.id === itemId);
 
   const { data: itemDetails, isLoading: detailsLoading, error: detailsError, refetch: refetchDetails } = useQuery<StockItemDetails>({
-    queryKey: ["/api/stock-items", itemId, "details"],
+    queryKey: ["/api/stock-items", itemId, "details", fromDate, toDate],
     queryFn: async () => {
-      const res = await fetch(`/api/stock-items/${itemId}/details`, { credentials: "include" });
+      const params = new URLSearchParams();
+      if (fromDate) params.set("from", fromDate);
+      if (toDate) params.set("to", toDate);
+      const qs = params.toString();
+      const res = await fetch(`/api/stock-items/${itemId}/details${qs ? `?${qs}` : ""}`, { credentials: "include" });
       if (!res.ok) {
         const body = await res.json().catch(() => ({ message: res.statusText }));
         throw new Error(body.message || res.statusText);
@@ -149,6 +159,51 @@ export default function StockItemDetail() {
       <div>
         <PageHeader title={selectedItem?.name || "Loading..."} subtitle="Purchase history, sales history, and current inventory locations" />
       </div>
+
+      {/* Date filter */}
+      <Card className="p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="filter-from" className="text-xs text-muted-foreground">From</Label>
+            <Input
+              id="filter-from"
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-40"
+              data-testid="input-filter-from-date"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="filter-to" className="text-xs text-muted-foreground">To</Label>
+            <Input
+              id="filter-to"
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-40"
+              data-testid="input-filter-to-date"
+            />
+          </div>
+          {(fromDate || toDate) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setFromDate(""); setToDate(""); }}
+              className="gap-1.5"
+              data-testid="button-clear-date-filter"
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear
+            </Button>
+          )}
+          {(fromDate || toDate) && (
+            <p className="text-xs text-muted-foreground self-end pb-2">
+              Filtering purchases &amp; sales by date
+            </p>
+          )}
+        </div>
+      </Card>
 
       {detailsLoading ? (
         <div className="space-y-6">

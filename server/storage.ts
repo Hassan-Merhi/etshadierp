@@ -266,8 +266,8 @@ export interface IStorage {
   getLastPurchaseOrderForItem(stockItemId: number, companyId: number): Promise<any | null>;
   getLastSaleForItem(stockItemId: number, companyId: number): Promise<any | null>;
   getLastSoldPrices(companyId: number): Promise<Record<number, string>>;
-  getAllPurchasesForItem(stockItemId: number, companyId: number): Promise<any[]>;
-  getAllSalesForItem(stockItemId: number, companyId: number): Promise<any[]>;
+  getAllPurchasesForItem(stockItemId: number, companyId: number, fromDate?: string, toDate?: string): Promise<any[]>;
+  getAllSalesForItem(stockItemId: number, companyId: number, fromDate?: string, toDate?: string): Promise<any[]>;
   getInventoryLocationsByItem(stockItemId: number, companyId: number): Promise<any[]>;
   getVoucherHistoryForItem(stockItemId: number, companyId: number): Promise<any[]>;
 
@@ -5097,9 +5097,18 @@ export class DbStorage implements IStorage {
     return priceMap;
   }
 
-  async getAllPurchasesForItem(stockItemId: number, companyId: number): Promise<any[]> {
-    // Only show purchases from containers that are NOT yet offloaded
-    // (once offloaded, the stock is in inventory, so the purchase is "complete")
+  async getAllPurchasesForItem(stockItemId: number, companyId: number, fromDate?: string, toDate?: string): Promise<any[]> {
+    const conditions = [
+      eq(schema.poLineItems.stockItemId, stockItemId),
+      eq(schema.purchaseOrders.companyId, companyId),
+      or(
+        isNull(schema.purchaseOrders.containerId),
+        sql`${schema.containers.status} NOT IN ('OFFLOADED', 'SOLD')`
+      ),
+    ];
+    if (fromDate) conditions.push(sql`${schema.purchaseOrders.createdAt}::date >= ${fromDate}::date`);
+    if (toDate) conditions.push(sql`${schema.purchaseOrders.createdAt}::date <= ${toDate}::date`);
+
     const results = await db
       .select({
         poNumber: schema.purchaseOrders.poNumber,
@@ -5114,22 +5123,21 @@ export class DbStorage implements IStorage {
       .innerJoin(schema.purchaseOrders, eq(schema.poLineItems.poId, schema.purchaseOrders.id))
       .innerJoin(schema.suppliers, eq(schema.purchaseOrders.supplierId, schema.suppliers.id))
       .leftJoin(schema.containers, eq(schema.purchaseOrders.containerId, schema.containers.id))
-      .where(and(
-        eq(schema.poLineItems.stockItemId, stockItemId),
-        eq(schema.purchaseOrders.companyId, companyId),
-        // Exclude purchases from offloaded containers
-        // Either no container (containerId is null) or container is not offloaded
-        or(
-          isNull(schema.purchaseOrders.containerId),
-          sql`${schema.containers.status} NOT IN ('OFFLOADED', 'SOLD')`
-        )
-      ))
+      .where(and(...conditions))
       .orderBy(sql`${schema.purchaseOrders.createdAt} DESC`);
 
     return results;
   }
 
-  async getAllSalesForItem(stockItemId: number, companyId: number): Promise<any[]> {
+  async getAllSalesForItem(stockItemId: number, companyId: number, fromDate?: string, toDate?: string): Promise<any[]> {
+    const conditions = [
+      eq(schema.salesItems.stockItemId, stockItemId),
+      eq(schema.vouchers.companyId, companyId),
+      eq(schema.vouchers.optional, false),
+    ];
+    if (fromDate) conditions.push(sql`${schema.vouchers.voucherDate}::date >= ${fromDate}::date`);
+    if (toDate) conditions.push(sql`${schema.vouchers.voucherDate}::date <= ${toDate}::date`);
+
     const results = await db
       .select({
         voucherId: schema.vouchers.id,
@@ -5144,11 +5152,7 @@ export class DbStorage implements IStorage {
       .from(schema.salesItems)
       .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
       .leftJoin(schema.locations, eq(schema.vouchers.locationId, schema.locations.id))
-      .where(and(
-        eq(schema.salesItems.stockItemId, stockItemId),
-        eq(schema.vouchers.companyId, companyId),
-        eq(schema.vouchers.optional, false)
-      ))
+      .where(and(...conditions))
       .orderBy(sql`${schema.vouchers.voucherDate} DESC`);
 
     return results;

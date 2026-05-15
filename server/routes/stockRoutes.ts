@@ -1815,13 +1815,18 @@ export function registerStockRoutes(app: Express) {
           });
       }
 
+      const fromDate = typeof req.query.from === "string" ? req.query.from : undefined;
+      const toDate = typeof req.query.to === "string" ? req.query.to : undefined;
+
       // Get all purchases, all sales, and current locations
       const [purchases, sales, inventoryLocations] = await Promise.all([
         storage.getAllPurchasesForItem(
           stockItemId,
           req.session.currentCompanyId,
+          fromDate,
+          toDate,
         ),
-        storage.getAllSalesForItem(stockItemId, req.session.currentCompanyId),
+        storage.getAllSalesForItem(stockItemId, req.session.currentCompanyId, fromDate, toDate),
         storage.getInventoryLocationsByItem(
           stockItemId,
           req.session.currentCompanyId,
