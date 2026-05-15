@@ -23,10 +23,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Plus, Search, Filter, ChevronDown, ChevronRight,
   CheckCircle2, XCircle, MessageCircle, Download, Copy, ExternalLink,
   Upload, Eye, Trash2, RotateCcw, Check, X, Paperclip,
-  RefreshCw, Loader2,
+  RefreshCw, Loader2, SlidersHorizontal,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -163,6 +166,27 @@ function fmtDate(d: string | null | undefined): string {
   const [y, m, day] = parts;
   return `${day}/${m}/${y.slice(2)}`;
 }
+
+// ─── Column visibility config ──────────────────────────────────────────────────
+const SHIPPING_COLS = [
+  { id: "orderDate",     label: "Order Date" },
+  { id: "status",        label: "Status" },
+  { id: "destination",   label: "Destination" },
+  { id: "eta",           label: "ETA" },
+  { id: "arrived",       label: "Arrived" },
+  { id: "finalized",     label: "Finalized" },
+  { id: "shippingCo",    label: "Shipping Co." },
+  { id: "documents",     label: "Documents" },
+  { id: "containerCost", label: "Container Cost" },
+  { id: "ciNumber",      label: "CI No." },
+  { id: "note",          label: "Note" },
+  { id: "whatsapp",      label: "WhatsApp" },
+  { id: "done",          label: "Done" },
+] as const;
+type ShippingColId = typeof SHIPPING_COLS[number]["id"];
+const DEFAULT_COL_VIS: Record<ShippingColId, boolean> = Object.fromEntries(
+  SHIPPING_COLS.map((c) => [c.id, true])
+) as Record<ShippingColId, boolean>;
 
 // ─── Sticky column helpers ─────────────────────────────────────────────────────
 const stickyHeadBase = "sticky z-20 bg-background border-r border-border/50 text-xs";
@@ -1015,6 +1039,25 @@ export default function FactoryShippingContainers() {
   const [pendingDoneId, setPendingDoneId] = useState<number | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
+  // ── Column visibility (per-user, persisted to localStorage) ───────────────────
+  const { data: me } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const [colVis, setColVis] = useState<Record<ShippingColId, boolean>>(DEFAULT_COL_VIS);
+  useEffect(() => {
+    if (!me?.id) return;
+    try {
+      const saved = localStorage.getItem(`fsc_col_vis_${me.id}`);
+      if (saved) setColVis({ ...DEFAULT_COL_VIS, ...JSON.parse(saved) });
+    } catch {}
+  }, [me?.id]);
+  function toggleCol(id: ShippingColId) {
+    setColVis((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      try { if (me?.id) localStorage.setItem(`fsc_col_vis_${me.id}`, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }
+  const hiddenCount = SHIPPING_COLS.filter((c) => !colVis[c.id]).length;
+
   // ── Data ──────────────────────────────────────────────────────────────────────
   const { data: rows = [], isLoading } = useQuery<ShippingRow[]>({
     queryKey: [LIST_KEY],
@@ -1213,6 +1256,37 @@ export default function FactoryShippingContainers() {
             Filters
             {hasActiveFilters && <span className="ml-1 h-2 w-2 rounded-full bg-primary inline-block" />}
           </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" data-testid="button-toggle-columns">
+                <SlidersHorizontal className="h-4 w-4 mr-1" />
+                Columns
+                {hiddenCount > 0 && (
+                  <span className="ml-1 text-xs bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 leading-none">
+                    {hiddenCount}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-52 p-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">Show / Hide Columns</p>
+              <div className="space-y-0.5">
+                {SHIPPING_COLS.map((col) => (
+                  <label
+                    key={col.id}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover-elevate cursor-pointer text-sm"
+                    data-testid={`col-toggle-${col.id}`}
+                  >
+                    <Checkbox
+                      checked={colVis[col.id]}
+                      onCheckedChange={() => toggleCol(col.id)}
+                    />
+                    {col.label}
+                  </label>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* ── Filter Panel ── */}
@@ -1262,22 +1336,22 @@ export default function FactoryShippingContainers() {
           <Table className="text-xs" style={{ minWidth: "1100px" }}>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-xs w-20 min-w-[80px]">Order Date</TableHead>
+                {colVis.orderDate && <TableHead className="text-xs w-20 min-w-[80px]">Order Date</TableHead>}
                 <TableHead className={stickyHeadBase} style={{ left: INV_LEFT, minWidth: "130px", width: "130px" }}>Invoice #</TableHead>
                 <TableHead className={stickyHeadBase} style={{ left: CLI_LEFT, minWidth: "144px", width: "144px" }}>Client</TableHead>
-                <TableHead className="text-xs w-24 min-w-[96px]">Status</TableHead>
+                {colVis.status && <TableHead className="text-xs w-24 min-w-[96px]">Status</TableHead>}
                 <TableHead className={stickyHeadBase} style={{ left: CTR_LEFT, minWidth: "120px", width: "120px" }}>Container #</TableHead>
-                <TableHead className="text-xs min-w-[120px]">Destination</TableHead>
-                <TableHead className="text-xs min-w-[100px]">ETA</TableHead>
-                <TableHead className="text-xs min-w-[90px]">Arrived</TableHead>
-                <TableHead className="text-xs min-w-[90px]">Finalized</TableHead>
-                <TableHead className="text-xs min-w-[110px]">Shipping Co.</TableHead>
-                <TableHead className="text-xs min-w-[90px]">Documents</TableHead>
-                <TableHead className="text-xs min-w-[100px]">Container Cost</TableHead>
-                <TableHead className="text-xs min-w-[100px]">CI No.</TableHead>
-                <TableHead className="text-xs min-w-[110px]">Note</TableHead>
-                <TableHead className="text-xs min-w-[90px]">WhatsApp</TableHead>
-                <TableHead className="text-xs min-w-[80px]">Done</TableHead>
+                {colVis.destination && <TableHead className="text-xs min-w-[120px]">Destination</TableHead>}
+                {colVis.eta && <TableHead className="text-xs min-w-[100px]">ETA</TableHead>}
+                {colVis.arrived && <TableHead className="text-xs min-w-[90px]">Arrived</TableHead>}
+                {colVis.finalized && <TableHead className="text-xs min-w-[90px]">Finalized</TableHead>}
+                {colVis.shippingCo && <TableHead className="text-xs min-w-[110px]">Shipping Co.</TableHead>}
+                {colVis.documents && <TableHead className="text-xs min-w-[90px]">Documents</TableHead>}
+                {colVis.containerCost && <TableHead className="text-xs min-w-[100px]">Container Cost</TableHead>}
+                {colVis.ciNumber && <TableHead className="text-xs min-w-[100px]">CI No.</TableHead>}
+                {colVis.note && <TableHead className="text-xs min-w-[110px]">Note</TableHead>}
+                {colVis.whatsapp && <TableHead className="text-xs min-w-[90px]">WhatsApp</TableHead>}
+                {colVis.done && <TableHead className="text-xs min-w-[80px]">Done</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1296,8 +1370,7 @@ export default function FactoryShippingContainers() {
               ) : (
                 filtered.map((r) => (
                   <TableRow key={r.id} data-testid={`row-record-${r.id}`}>
-                    {/* Order Date */}
-                    <TableCell className="text-xs whitespace-nowrap">{fmtDate(r.orderDate)}</TableCell>
+                    {colVis.orderDate && <TableCell className="text-xs whitespace-nowrap">{fmtDate(r.orderDate)}</TableCell>}
 
                     {/* Sticky: Invoice # */}
                     <TableCell className={stickyCellBase} style={{ left: INV_LEFT }}>
@@ -1309,12 +1382,13 @@ export default function FactoryShippingContainers() {
                       {r.clientName || "—"}
                     </TableCell>
 
-                    {/* Status */}
-                    <TableCell>
-                      <Badge className={cn("text-xs no-default-active-elevate whitespace-nowrap", statusColor(r.status))}>
-                        {statusLabel(r.status)}
-                      </Badge>
-                    </TableCell>
+                    {colVis.status && (
+                      <TableCell>
+                        <Badge className={cn("text-xs no-default-active-elevate whitespace-nowrap", statusColor(r.status))}>
+                          {statusLabel(r.status)}
+                        </Badge>
+                      </TableCell>
+                    )}
 
                     {/* Sticky: Container # */}
                     <TableCell className={stickyCellBase} style={{ left: CTR_LEFT }}>
@@ -1327,107 +1401,117 @@ export default function FactoryShippingContainers() {
                       />
                     </TableCell>
 
-                    {/* Destination */}
-                    <TableCell>
-                      <EditableCellInput
-                        value={r.destination || ""}
-                        placeholder="Enter destination"
-                        onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { destination: v || null } })}
-                        testId={`cell-destination-${r.id}`}
-                      />
-                    </TableCell>
-
-                    {/* ETA: tracked ETA takes priority, then manual */}
-                    <TableCell>
-                      {r._trackedEta ? (
-                        <span className="text-xs text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap" title="Auto from tracking">
-                          {fmtDate(r._trackedEta)}
-                        </span>
-                      ) : (
-                        <DateCellInput
-                          value={r.eta || ""}
-                          placeholder="Set ETA"
-                          onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { eta: v || null } })}
-                          testId={`cell-eta-${r.id}`}
+                    {colVis.destination && (
+                      <TableCell>
+                        <EditableCellInput
+                          value={r.destination || ""}
+                          placeholder="Enter destination"
+                          onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { destination: v || null } })}
+                          testId={`cell-destination-${r.id}`}
                         />
-                      )}
-                    </TableCell>
+                      </TableCell>
+                    )}
 
-                    {/* Arrived Date */}
-                    <TableCell>
-                      <DateCellInput
-                        value={r.containerArrivedDate || ""}
-                        placeholder="Not arrived"
-                        onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { containerArrivedDate: v || null } })}
-                        testId={`cell-arrived-${r.id}`}
-                      />
-                    </TableCell>
+                    {colVis.eta && (
+                      <TableCell>
+                        {r._trackedEta ? (
+                          <span className="text-xs text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap" title="Auto from tracking">
+                            {fmtDate(r._trackedEta)}
+                          </span>
+                        ) : (
+                          <DateCellInput
+                            value={r.eta || ""}
+                            placeholder="Set ETA"
+                            onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { eta: v || null } })}
+                            testId={`cell-eta-${r.id}`}
+                          />
+                        )}
+                      </TableCell>
+                    )}
 
-                    {/* Finalized (read-only from customer_orders) */}
-                    <TableCell className="whitespace-nowrap">
-                      {r.finalizedDate
-                        ? <span className="text-green-700 dark:text-green-400 font-medium text-xs">{fmtDate(r.finalizedDate)}</span>
-                        : <span className="text-amber-600 dark:text-amber-400 italic text-xs">Not finalized</span>}
-                    </TableCell>
+                    {colVis.arrived && (
+                      <TableCell>
+                        <DateCellInput
+                          value={r.containerArrivedDate || ""}
+                          placeholder="Not arrived"
+                          onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { containerArrivedDate: v || null } })}
+                          testId={`cell-arrived-${r.id}`}
+                        />
+                      </TableCell>
+                    )}
 
-                    {/* Shipping Company */}
-                    <TableCell>
-                      <EditableCellInput
-                        value={r.shippingCompany || ""}
-                        placeholder="Enter company"
-                        onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { shippingCompany: v || null } })}
-                        testId={`cell-shipping-${r.id}`}
-                      />
-                    </TableCell>
+                    {colVis.finalized && (
+                      <TableCell className="whitespace-nowrap">
+                        {r.finalizedDate
+                          ? <span className="text-green-700 dark:text-green-400 font-medium text-xs">{fmtDate(r.finalizedDate)}</span>
+                          : <span className="text-amber-600 dark:text-amber-400 italic text-xs">Not finalized</span>}
+                      </TableCell>
+                    )}
 
-                    {/* Documents */}
-                    <TableCell>
-                      <DocIndicator count={r.documentCount} onClick={() => setDocsRowId(r.id)} />
-                    </TableCell>
+                    {colVis.shippingCo && (
+                      <TableCell>
+                        <EditableCellInput
+                          value={r.shippingCompany || ""}
+                          placeholder="Enter company"
+                          onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { shippingCompany: v || null } })}
+                          testId={`cell-shipping-${r.id}`}
+                        />
+                      </TableCell>
+                    )}
 
-                    {/* Container Cost (grandTotal from invoice) */}
-                    <TableCell className="text-xs whitespace-nowrap font-medium">
-                      {r.grandTotal
-                        ? <span className="text-foreground">${Number(r.grandTotal).toLocaleString()}</span>
-                        : <span className="text-muted-foreground">—</span>}
-                    </TableCell>
+                    {colVis.documents && (
+                      <TableCell>
+                        <DocIndicator count={r.documentCount} onClick={() => setDocsRowId(r.id)} />
+                      </TableCell>
+                    )}
 
-                    {/* CI No. */}
-                    <TableCell>
-                      <EditableCellInput
-                        value={r.ciNumber || ""}
-                        placeholder="Enter CI #"
-                        onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { ciNumber: v || null } })}
-                        testId={`cell-ci-${r.id}`}
-                      />
-                    </TableCell>
+                    {colVis.containerCost && (
+                      <TableCell className="text-xs whitespace-nowrap font-medium">
+                        {r.grandTotal
+                          ? <span className="text-foreground">${Number(r.grandTotal).toLocaleString()}</span>
+                          : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                    )}
 
-                    {/* Note */}
-                    <TableCell>
-                      <EditableCellInput
-                        value={r.note || ""}
-                        placeholder="Add note"
-                        onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { note: v || null } })}
-                        testId={`cell-note-${r.id}`}
-                      />
-                    </TableCell>
+                    {colVis.ciNumber && (
+                      <TableCell>
+                        <EditableCellInput
+                          value={r.ciNumber || ""}
+                          placeholder="Enter CI #"
+                          onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { ciNumber: v || null } })}
+                          testId={`cell-ci-${r.id}`}
+                        />
+                      </TableCell>
+                    )}
 
-                    {/* WhatsApp */}
-                    <TableCell>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-green-300 text-green-700 dark:border-green-700 dark:text-green-400 whitespace-nowrap"
-                        onClick={() => setWaRowId(r.id)}
-                        data-testid={`button-prepare-wa-${r.id}`}
-                      >
-                        <MessageCircle className="h-3.5 w-3.5 mr-1" /> Prepare
-                      </Button>
-                    </TableCell>
+                    {colVis.note && (
+                      <TableCell>
+                        <EditableCellInput
+                          value={r.note || ""}
+                          placeholder="Add note"
+                          onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { note: v || null } })}
+                          testId={`cell-note-${r.id}`}
+                        />
+                      </TableCell>
+                    )}
 
-                    {/* Done + Delete */}
-                    <TableCell>
-                      <div className="flex items-center gap-1">
+                    {colVis.whatsapp && (
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-green-300 text-green-700 dark:border-green-700 dark:text-green-400 whitespace-nowrap"
+                          onClick={() => setWaRowId(r.id)}
+                          data-testid={`button-prepare-wa-${r.id}`}
+                        >
+                          <MessageCircle className="h-3.5 w-3.5 mr-1" /> Prepare
+                        </Button>
+                      </TableCell>
+                    )}
+
+                    {colVis.done && (
+                      <TableCell>
+                        <div className="flex items-center gap-1">
                           <Button
                             size="sm"
                             variant="outline"
@@ -1445,7 +1529,8 @@ export default function FactoryShippingContainers() {
                             <Trash2 className="h-3.5 w-3.5 text-destructive" />
                           </Button>
                         </div>
-                    </TableCell>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               )}
