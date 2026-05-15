@@ -2269,8 +2269,8 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
         {/* ── Main Table ── */}
         <div className="rounded-md border overflow-auto max-h-[calc(100vh-260px)]">
           <Table className="text-xs whitespace-nowrap">
-            <TableHeader>
-              <TableRow className="sticky top-0 z-10 bg-muted">
+            <TableHeader className="sticky top-0 z-10 bg-muted">
+              <TableRow>
                 <TableHead className="w-8">#</TableHead>
                 <TableHead>Container #</TableHead>
                 <TableHead>Supplier</TableHead>
