@@ -6,7 +6,6 @@ import BalesHistory from "./BalesHistory";
 import BarcodeLookup from "../BarcodeLookup";
 import { RemoveFromStockTab } from "./BaleStockEntry";
 import BaleProducts from "../BaleProducts";
-import FactoryBaleImportHistory from "./FactoryBaleImportHistory";
 import { History, ShieldAlert } from "lucide-react";
 
 export default function FactoryBalesHub() {
@@ -28,7 +27,7 @@ export default function FactoryBalesHub() {
   const showBarcode = settings?.balesTabBarcodeEnabled !== false && !hiddenTabs.includes("hide_tab_bales_barcode");
   const showRemove  = settings?.balesTabRemoveEnabled  !== false && !hiddenTabs.includes("hide_tab_bales_remove");
 
-  const defaultTab = hash === "imports" ? "imports" : hash === "products" ? "products" : hash === "barcode" && showBarcode ? "barcode" : "history";
+  const defaultTab = hash === "products" ? "products" : hash === "barcode" && showBarcode ? "barcode" : "history";
 
   function handleTabChange(value: string) {
     window.history.replaceState(null, "", `#${value}`);
@@ -44,7 +43,6 @@ export default function FactoryBalesHub() {
               <TabsTrigger value="barcode" data-testid="tab-barcode-lookup">Barcode Lookup</TabsTrigger>
             )}
             <TabsTrigger value="products" data-testid="tab-bale-products">Bale Products</TabsTrigger>
-            <TabsTrigger value="imports" data-testid="tab-import-history">Import History</TabsTrigger>
           </TabsList>
         </div>
 
@@ -90,9 +88,6 @@ export default function FactoryBalesHub() {
           <BaleProducts />
         </TabsContent>
 
-        <TabsContent value="imports" className="flex-1 overflow-auto mt-0">
-          <FactoryBaleImportHistory />
-        </TabsContent>
       </Tabs>
     </div>
   );
