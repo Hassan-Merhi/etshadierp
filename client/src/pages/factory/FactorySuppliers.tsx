@@ -454,17 +454,21 @@ export default function FactorySuppliers() {
 
   const fxConversionMutation = useMutation({
     mutationFn: async (data: typeof fxConversionForm) => {
-      const fxRate = parseFloat(data.fxRateToUsd) || 0;
+      const displayRate = parseFloat(data.fxRateToUsd) || 0;
       const amt = parseFloat(data.amount) || 0;
-      if (amt <= 0 || fxRate <= 0) throw new Error("Amount and rate must be greater than zero");
+      if (amt <= 0 || displayRate <= 0) throw new Error("Amount and rate must be greater than zero");
       if (!data.toSupplierId) throw new Error("No parent supplier found for this transfer");
-      const toAmountUsd = amt / fxRate;
+      // displayRate is "USD per 1 foreign" (e.g. 1.10 USD per EUR)
+      // toAmountUsd = foreign_amount × (USD per foreign)
+      const toAmountUsd = amt * displayRate;
+      // Backend stores fxRateToUsd as "foreign per USD" — invert for compatibility
+      const storedRate = (1 / displayRate).toFixed(6);
       const payload = {
         fromSupplierId: data.fromSupplierId,
         toSupplierId: data.toSupplierId,
         fromCurrencyCode: data.selectedCurrency,
         fromAmount: data.amount,
-        fxRateToUsd: data.fxRateToUsd,
+        fxRateToUsd: storedRate,
         toAmountUsd: toAmountUsd.toFixed(4),
         date: data.date,
         notes: data.notes || null,
@@ -487,7 +491,7 @@ export default function FactorySuppliers() {
         queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", fxConversionForm.toSupplierId, "statement"] });
       }
       const isSelfSettle = fxConversionForm.toSupplierId === fxConversionForm.fromSupplierId;
-      toast({ title: "FX Transfer recorded", description: isSelfSettle ? `${fxConversionForm.selectedCurrency} balance settled to USD` : `${fxConversionForm.selectedCurrency} balance transferred to parent USD` });
+      toast({ title: "FX Transfer recorded", description: isSelfSettle ? `${fxConversionForm.selectedCurrency} balance settled to EUR` : `${fxConversionForm.selectedCurrency} balance transferred to broker` });
       setFxConversionOpen(false);
     },
     onError: (err: Error) => {
@@ -1322,7 +1326,7 @@ export default function FactorySuppliers() {
                         data-testid="button-fx-convert"
                       >
                         <ArrowRightLeft className="h-3.5 w-3.5 mr-1.5" />
-                        {statementData.supplier.parentId ? "Settle FX to Broker" : "Settle FX to USD"}
+                        {statementData.supplier.parentId ? "Settle FX to Broker" : "Settle FX to EUR"}
                       </Button>
                     )}
                   </CardTitle>
@@ -2055,22 +2059,22 @@ export default function FactorySuppliers() {
                     <ArrowRightLeft className="h-4 w-4" />
                     {fxConversionForm.selectedCurrency === "USD"
                       ? (parseFloat(fxConversionForm.commissionBalance || "0") > 0
-                          ? (isSelf ? "Settle Commission to USD" : "Transfer Commission to Broker")
-                          : (isSelf ? "Settle Freight to USD" : "Transfer Freight to Broker"))
-                      : (isSelf ? `FX Settlement to USD` : "FX Settlement to Broker (USD)")}
+                          ? (isSelf ? "Settle Commission to EUR" : "Transfer Commission to Broker")
+                          : (isSelf ? "Settle Freight to EUR" : "Transfer Freight to Broker"))
+                      : (isSelf ? `FX Settlement to EUR` : "FX Settlement to Broker (EUR)")}
                   </DialogTitle>
                   <DialogDescription>
                     {fxConversionForm.selectedCurrency === "USD"
                       ? parseFloat(fxConversionForm.commissionBalance || "0") > 0
                         ? (isSelf
-                            ? "Direct USD settlement: records this commission as settled at 1:1. Not a voucher payment."
-                            : "Direct USD transfer: moves this commission from the linked supplier to the broker's USD pool at 1:1 rate. Not a voucher payment.")
+                            ? "Direct settlement: records this USD commission as settled. Not a voucher payment."
+                            : "Direct transfer: moves this USD commission from the linked supplier to the broker at 1:1 rate. Not a voucher payment.")
                         : (isSelf
-                            ? "Direct USD settlement: records this freight obligation as settled at 1:1. Not a voucher payment."
-                            : "Direct USD transfer: moves this freight obligation from the linked supplier to the broker's USD pool at 1:1 rate. Not a voucher payment.")
+                            ? "Direct settlement: records this USD freight obligation as settled. Not a voucher payment."
+                            : "Direct transfer: moves this USD freight obligation from the linked supplier to the broker at 1:1 rate. Not a voucher payment.")
                       : (isSelf
-                          ? "Internal settlement: converts this supplier's foreign currency balance to its USD equivalent. Not a voucher payment."
-                          : "Internal settlement: converts this linked supplier's foreign currency balance into the broker's USD pool. Not a voucher payment.")}
+                          ? "Internal settlement: records the USD amount paid to settle this supplier's foreign currency balance. Not a voucher payment."
+                          : "Internal settlement: records the USD cost of settling this linked supplier's foreign currency balance into the broker's pool. Not a voucher payment.")}
                   </DialogDescription>
                 </DialogHeader>
               );
@@ -2152,19 +2156,19 @@ export default function FactorySuppliers() {
                 </div>
               ) : (
                 <div>
-                  <Label>Exchange Rate (units of {fxConversionForm.selectedCurrency} per 1 USD)</Label>
+                  <Label>Exchange Rate (USD per 1 {fxConversionForm.selectedCurrency})</Label>
                   <Input
                     type="number"
                     step="any"
                     min="0"
-                    placeholder="e.g. 0.91 for EUR (EUR per 1 USD)"
+                    placeholder={`e.g. 1.10 (USD per 1 ${fxConversionForm.selectedCurrency})`}
                     value={fxConversionForm.fxRateToUsd}
                     onChange={(e) => setFxConversionForm(prev => ({ ...prev, fxRateToUsd: e.target.value }))}
                     data-testid="input-fx-rate"
                   />
                   {fxConversionForm.amount && fxConversionForm.fxRateToUsd && parseFloat(fxConversionForm.fxRateToUsd) > 0 && parseFloat(fxConversionForm.amount) > 0 && (
                     <p className="text-sm font-medium mt-1.5 text-primary">
-                      = ${(parseFloat(fxConversionForm.amount) / parseFloat(fxConversionForm.fxRateToUsd)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                      = ${(parseFloat(fxConversionForm.amount) * parseFloat(fxConversionForm.fxRateToUsd)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                     </p>
                   )}
                 </div>
