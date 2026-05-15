@@ -3077,8 +3077,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
                       {/* Screen view - Desktop table */}
                       <div className="screen-only hidden md:block w-full min-w-0">
-                        <Card className="w-full">
-                          <div className="rounded-md border overflow-hidden w-full min-w-0">
+                        <Card className="w-full overflow-hidden">
+                          <div className="overflow-auto max-h-[calc(100vh-200px)] w-full min-w-0">
                             <table className="w-full table-fixed text-sm">
                               <colgroup>
                                 <col />
