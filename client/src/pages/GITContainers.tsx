@@ -318,15 +318,15 @@ function SummaryCard({ label, value, icon, accent }: {
   accent?: string;
 }) {
   return (
-    <Card className="min-w-0">
-      <CardContent className="p-3 flex items-start gap-2.5">
-        <div className={cn("p-1.5 rounded-md shrink-0", accent ?? "bg-muted")}>{icon}</div>
-        <div className="min-w-0">
-          <p className="text-xs text-muted-foreground leading-tight truncate">{label}</p>
-          <p className="text-lg font-bold leading-tight">{value}</p>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3 min-w-0">
+      <div className={cn("flex items-center justify-center h-9 w-9 rounded-md shrink-0", accent ?? "bg-muted")}>
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs text-muted-foreground font-medium leading-none mb-1 whitespace-nowrap">{label}</p>
+        <p className="text-xl font-bold leading-none tracking-tight whitespace-nowrap">{value}</p>
+      </div>
+    </div>
   );
 }
 
