@@ -2320,13 +2320,8 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                     >
                       <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                       <TableCell className="font-mono font-medium">{c.containerNumber}</TableCell>
-                      <TableCell>
-                        {c.supplierName
-                          ? <div className="flex flex-col leading-tight">
-                              {c.supplierCode && <span className="text-[10px] font-mono text-muted-foreground">{c.supplierCode}</span>}
-                              <span>{c.supplierName}</span>
-                            </div>
-                          : <span className="text-muted-foreground">—</span>}
+                      <TableCell className="font-mono">
+                        {c.supplierCode ?? <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell>{c.companyName}</TableCell>
                       <TableCell>{c.shopName ?? <span className="text-muted-foreground">—</span>}</TableCell>
