@@ -312,9 +312,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const isPOS = !!posUser;
   const posLocationId = posUser?.assignedLocationId;
 
-  const sidebarGroups: { label: string; items: { key: string; label: string; icon: LucideIcon }[] }[] = [
+  const sidebarGroups: { label: string; color: string; items: { key: string; label: string; icon: LucideIcon }[] }[] = [
     {
       label: "Financial",
+      color: "#3b82f6",
       items: [
         { key: "payment", label: "Payment", icon: ArrowDownCircle },
         { key: "receipt", label: "Receipt", icon: ArrowUpCircle },
@@ -322,7 +323,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       ],
     },
     {
-      label: "Inventory & Adjustments",
+      label: "Adjustments",
+      color: "#f59e0b",
       items: [
         { key: "transfer", label: "Stock Transfer", icon: ArrowLeftRight },
         { key: "transferorder", label: "Transfer Order", icon: ClipboardList },
@@ -3823,13 +3825,23 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
       <div className="flex gap-5">
         {!isPOS && (
-          <nav className="hidden sm:flex flex-col w-48 shrink-0 rounded-xl border bg-card p-2 gap-3 self-start sticky top-4" style={{ zIndex: 10 }}>
+          <nav className="hidden sm:flex flex-col w-52 shrink-0 rounded-xl border bg-card p-2 gap-3 self-start sticky top-4" style={{ zIndex: 10 }}>
             {sidebarGroups.map((group, groupIdx) => (
               <div key={group.label}>
                 {groupIdx > 0 && <div className="border-t -mx-2 mb-1" />}
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest px-2 mb-1 mt-0.5">
-                  {group.label}
-                </p>
+                {/* Section label with colored dot */}
+                <div className="flex items-center gap-1.5 px-2 mb-1 mt-0.5">
+                  <span
+                    className="h-1.5 w-1.5 rounded-full shrink-0"
+                    style={{ backgroundColor: group.color }}
+                  />
+                  <p
+                    className="text-[10px] font-semibold uppercase tracking-widest"
+                    style={{ color: group.color, opacity: 0.85 }}
+                  >
+                    {group.label}
+                  </p>
+                </div>
                 <div className="space-y-0.5">
                   {group.items.map((item) => {
                     const Icon = item.icon;
@@ -3841,13 +3853,29 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                         onClick={() => setActiveTab(item.key as typeof activeTab)}
                         data-testid={`tab-${item.key}`}
                         className={cn(
-                          "w-full flex items-center gap-2.5 px-2.5 h-8 rounded-lg text-sm transition-colors text-left",
-                          isActive
-                            ? "bg-accent text-accent-foreground font-medium"
-                            : "text-muted-foreground hover:bg-muted/60 hover:text-foreground font-normal"
+                          "relative w-full flex items-center gap-2.5 px-2.5 h-8 rounded-lg text-sm transition-colors text-left",
+                          isActive ? "font-medium" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground font-normal"
                         )}
+                        style={isActive ? { backgroundColor: `${group.color}18`, color: group.color } : undefined}
                       >
-                        <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-accent-foreground" : "text-muted-foreground")} />
+                        {/* Active left rail */}
+                        {isActive && (
+                          <span
+                            className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full"
+                            style={{ backgroundColor: group.color }}
+                          />
+                        )}
+                        {/* Icon tile when active, plain icon when not */}
+                        {isActive ? (
+                          <span
+                            className="flex h-6 w-6 items-center justify-center rounded-md shrink-0"
+                            style={{ backgroundColor: `${group.color}22` }}
+                          >
+                            <Icon className="h-3.5 w-3.5" style={{ color: group.color }} />
+                          </span>
+                        ) : (
+                          <Icon className="h-4 w-4 shrink-0" />
+                        )}
                         {item.label}
                       </button>
                     );
