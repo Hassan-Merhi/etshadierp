@@ -7,7 +7,6 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/components/ThemeProvider";
-import hmdLogo from "../assets/hmd-logo.jpeg";
 import { PageHeader } from "@/components/PageHeader";
 
 const features = [
@@ -17,61 +16,54 @@ const features = [
   { icon: BarChart3,    title: "Business Analytics",     description: "Live reports to drive smarter decisions" },
 ];
 
+const GOLD       = "#C9A84C";
+const GOLD_LIGHT = "#F0C547";
+const GOLD_DARK  = "#8A6E20";
+
 const tk = {
   light: {
-    /* left navy panel */
-    leftBg:      "linear-gradient(150deg, hsl(222 72% 10%) 0%, hsl(221 68% 15%) 55%, hsl(218 62% 21%) 100%)",
-    /* right — soft tinted, NOT white */
-    rightBg:     "linear-gradient(145deg, hsl(210 45% 94%) 0%, hsl(196 35% 95%) 45%, hsl(200 25% 97%) 100%)",
-    /* bridge: left-edge glow bleeding into the right panel */
-    bridge:      "linear-gradient(to right, hsl(221 68% 20% / 0.35) 0%, transparent 100%)",
-    /* cyan glow behind card */
-    cardGlow:    "radial-gradient(ellipse 60% 50% at 50% 50%, hsl(185 80% 68% / 0.12) 0%, transparent 70%)",
-    /* card glass */
-    cardBg:      "rgba(255,255,255,0.72)",
-    cardBorder:  "rgba(185,215,230,0.55)",
-    cardShadow:  "0 8px 40px rgba(20,60,120,0.10), 0 1px 4px rgba(20,60,120,0.06)",
-    /* blobs */
-    blob:        "hsl(185 85% 55%)",
-    /* text */
-    headline:    "hsl(185 80% 70%)",
-    body:        "hsl(220 18% 65%)",
-    fTitle:      "hsl(185 60% 84%)",
-    fDesc:       "hsl(220 14% 52%)",
-    iconBg:      "rgba(32,210,200,0.11)",
-    iconBorder:  "rgba(32,210,200,0.20)",
-    iconColor:   "hsl(185 80% 68%)",
-    footer:      "hsl(220 14% 32%)",
-    stripe:      "linear-gradient(90deg, hsl(222 72% 18%) 0%, hsl(185 80% 48%) 100%)",
-    brandLabel:  "hsl(200 65% 38%)",
-    btnBg:       "linear-gradient(135deg, hsl(221 68% 22%) 0%, hsl(210 65% 32%) 100%)",
-    btnShadow:   "0 4px 18px rgba(15,40,100,0.26)",
-    /* mobile logo: on light tinted bg, show normally */
+    leftBg:    "linear-gradient(160deg, #0D0D0D 0%, #111118 55%, #0A0A16 100%)",
+    rightBg:   "linear-gradient(145deg, hsl(210 45% 94%) 0%, hsl(196 35% 95%) 45%, hsl(200 25% 97%) 100%)",
+    bridge:    "linear-gradient(to right, rgba(201,168,76,0.14) 0%, transparent 100%)",
+    cardGlow:  "radial-gradient(ellipse 65% 55% at 50% 50%, rgba(201,168,76,0.09) 0%, transparent 70%)",
+    cardBg:    "rgba(255,255,255,0.76)",
+    cardBorder:"rgba(201,168,76,0.30)",
+    cardShadow:"0 8px 48px rgba(10,8,0,0.12), 0 1px 4px rgba(10,8,0,0.08)",
+    headline:  GOLD_LIGHT,
+    body:      "rgba(201,168,76,0.55)",
+    fTitle:    "#F5E8B0",
+    fDesc:     "rgba(201,168,76,0.42)",
+    iconBg:    "rgba(201,168,76,0.10)",
+    iconBorder:"rgba(201,168,76,0.24)",
+    iconColor: GOLD,
+    footer:    "rgba(201,168,76,0.22)",
+    stripe:    `linear-gradient(90deg, ${GOLD_DARK} 0%, ${GOLD_LIGHT} 45%, ${GOLD_DARK} 100%)`,
+    brandLabel:"hsl(200 55% 36%)",
+    btnBg:     `linear-gradient(135deg, ${GOLD_DARK} 0%, ${GOLD_LIGHT} 50%, ${GOLD_DARK} 100%)`,
+    btnShadow: "0 4px 22px rgba(201,168,76,0.38)",
     mobileLogoFilter: "none",
   },
   dark: {
-    leftBg:      "linear-gradient(150deg, hsl(222 72% 6%) 0%, hsl(221 68% 10%) 55%, hsl(218 62% 14%) 100%)",
-    /* right dark: slightly lighter navy, distinct but harmonious */
-    rightBg:     "linear-gradient(145deg, hsl(220 50% 9%) 0%, hsl(217 44% 11%) 50%, hsl(215 38% 13%) 100%)",
-    bridge:      "linear-gradient(to right, hsl(185 72% 40% / 0.10) 0%, transparent 100%)",
-    cardGlow:    "radial-gradient(ellipse 60% 50% at 50% 50%, hsl(185 70% 55% / 0.07) 0%, transparent 70%)",
-    cardBg:      "rgba(255,255,255,0.04)",
-    cardBorder:  "rgba(100,160,185,0.14)",
-    cardShadow:  "0 8px 40px rgba(0,0,0,0.35), 0 1px 4px rgba(0,0,0,0.25)",
-    blob:        "hsl(185 75% 45%)",
-    headline:    "hsl(185 72% 62%)",
-    body:        "hsl(220 14% 48%)",
-    fTitle:      "hsl(185 55% 73%)",
-    fDesc:       "hsl(220 12% 40%)",
-    iconBg:      "rgba(32,190,185,0.09)",
-    iconBorder:  "rgba(32,190,185,0.17)",
-    iconColor:   "hsl(185 72% 60%)",
-    footer:      "hsl(220 12% 24%)",
-    stripe:      "linear-gradient(90deg, hsl(222 72% 12%) 0%, hsl(185 72% 38%) 100%)",
-    brandLabel:  "hsl(185 60% 50%)",
-    btnBg:       "linear-gradient(135deg, hsl(221 68% 16%) 0%, hsl(210 62% 24%) 100%)",
-    btnShadow:   "0 4px 18px rgba(8,20,55,0.45)",
-    mobileLogoFilter: "brightness(1.15)",
+    leftBg:    "linear-gradient(160deg, #080808 0%, #0D0D12 55%, #080812 100%)",
+    rightBg:   "linear-gradient(145deg, hsl(220 50% 9%) 0%, hsl(217 44% 11%) 50%, hsl(215 38% 13%) 100%)",
+    bridge:    "linear-gradient(to right, rgba(201,168,76,0.10) 0%, transparent 100%)",
+    cardGlow:  "radial-gradient(ellipse 65% 55% at 50% 50%, rgba(201,168,76,0.06) 0%, transparent 70%)",
+    cardBg:    "rgba(255,255,255,0.04)",
+    cardBorder:"rgba(201,168,76,0.20)",
+    cardShadow:"0 8px 48px rgba(0,0,0,0.55), 0 1px 4px rgba(0,0,0,0.35)",
+    headline:  GOLD_LIGHT,
+    body:      "rgba(201,168,76,0.45)",
+    fTitle:    "#E8D080",
+    fDesc:     "rgba(201,168,76,0.35)",
+    iconBg:    "rgba(201,168,76,0.09)",
+    iconBorder:"rgba(201,168,76,0.18)",
+    iconColor: GOLD,
+    footer:    "rgba(201,168,76,0.16)",
+    stripe:    `linear-gradient(90deg, ${GOLD_DARK} 0%, ${GOLD_LIGHT} 45%, ${GOLD_DARK} 100%)`,
+    brandLabel:"#8A7030",
+    btnBg:     `linear-gradient(135deg, ${GOLD_DARK} 0%, ${GOLD} 50%, ${GOLD_DARK} 100%)`,
+    btnShadow: "0 4px 22px rgba(201,168,76,0.28)",
+    mobileLogoFilter: "brightness(1.1)",
   },
 };
 
@@ -112,70 +104,91 @@ export default function Login() {
       style={{ background: t.rightBg, transition: "background 0.4s ease" }}
     >
 
-      {/* ═══════════════════════════════════════
+      {/* ══════════════════════════════════════════
           LEFT — Branding panel (desktop only)
-      ═══════════════════════════════════════ */}
+      ══════════════════════════════════════════ */}
       <div
-        className="hidden lg:flex lg:w-[48%] shrink-0 flex-col justify-between px-12 py-10 relative overflow-hidden"
+        className="hidden lg:flex lg:w-[46%] shrink-0 flex-col justify-between px-12 py-10 relative overflow-hidden"
         style={{ background: t.leftBg, transition: "background 0.4s ease" }}
       >
-        {/* Teal glow blobs */}
-        <div className="pointer-events-none absolute -top-24 -right-24 w-96 h-96 rounded-full opacity-[0.09]"
-          style={{ background: t.blob, filter: "blur(4px)", transition: "background 0.4s ease" }} />
-        <div className="pointer-events-none absolute -bottom-16 -left-12 w-72 h-72 rounded-full opacity-[0.07]"
-          style={{ background: t.blob, filter: "blur(4px)", transition: "background 0.4s ease" }} />
+        {/* Gold radial glow behind logo */}
+        <div
+          className="pointer-events-none absolute top-0 left-0 right-0 h-[55%]"
+          style={{
+            background: `radial-gradient(ellipse 80% 60% at 50% 10%, rgba(201,168,76,0.13) 0%, transparent 70%)`,
+          }}
+        />
 
-        {/* Logo — glass container so the purple jpg bg feels intentional */}
-        <div className="relative z-10 w-fit">
-          <div
-            className="rounded-2xl p-2 overflow-hidden"
-            style={{
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(100,180,200,0.18)",
-              boxShadow: "0 2px 16px rgba(0,0,0,0.30)",
-              backdropFilter: "blur(6px)",
-            }}
-          >
+        {/* Subtle corner glows */}
+        <div className="pointer-events-none absolute -top-32 -right-20 w-80 h-80 rounded-full opacity-[0.06]"
+          style={{ background: GOLD_LIGHT, filter: "blur(40px)" }} />
+        <div className="pointer-events-none absolute -bottom-20 -left-16 w-64 h-64 rounded-full opacity-[0.04]"
+          style={{ background: GOLD, filter: "blur(40px)" }} />
+
+        {/* Logo — large, screen-blended so black bg disappears */}
+        <div className="relative z-10 flex flex-col items-start gap-5">
+          <div className="relative">
+            {/* Gold ring glow behind logo */}
+            <div
+              className="absolute inset-0 rounded-full"
+              style={{
+                background: `radial-gradient(circle, rgba(201,168,76,0.18) 0%, transparent 70%)`,
+                transform: "scale(1.15)",
+                filter: "blur(12px)",
+              }}
+            />
             <img
-              src={hmdLogo}
+              src="/hmd-logo-new.jpeg"
               alt="HMD International Group"
-              className="w-40 h-auto object-contain rounded-xl"
+              className="relative w-44 h-auto object-contain rounded-full"
               style={{ mixBlendMode: "screen" }}
             />
           </div>
+
+          {/* Gold divider under logo */}
+          <div
+            className="w-28 h-[1px]"
+            style={{ background: `linear-gradient(90deg, ${GOLD} 0%, transparent 100%)`, opacity: 0.45 }}
+          />
         </div>
 
         {/* Headline + features */}
-        <div className="relative z-10 space-y-7">
+        <div className="relative z-10 space-y-8">
           <div className="space-y-3">
             <h2
-              className="text-[2.2rem] font-extrabold leading-tight tracking-tight"
+              className="text-[2.1rem] font-extrabold leading-tight tracking-tight"
               style={{ color: t.headline, transition: "color 0.4s ease" }}
             >
               Run your business<br />with confidence.
             </h2>
-            <div className="w-10 h-[3px] rounded-full opacity-60"
-              style={{ background: t.headline, transition: "background 0.4s ease" }} />
+            <div
+              className="w-8 h-[2px] rounded-full"
+              style={{ background: `linear-gradient(90deg, ${GOLD} 0%, transparent 100%)`, opacity: 0.7 }}
+            />
             <p className="text-sm leading-relaxed max-w-xs"
               style={{ color: t.body, transition: "color 0.4s ease" }}>
               Production, inventory, payroll, invoices, and reporting — all in one unified platform.
             </p>
           </div>
 
-          <div className="space-y-3.5">
+          <div className="space-y-4">
             {features.map((f) => (
-              <div key={f.title} className="flex items-center gap-3">
+              <div key={f.title} className="flex items-center gap-3.5">
                 <div
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-                  style={{ background: t.iconBg, border: `1px solid ${t.iconBorder}`, transition: "background 0.4s ease" }}
+                  style={{
+                    background: t.iconBg,
+                    border: `1px solid ${t.iconBorder}`,
+                    transition: "background 0.4s ease",
+                  }}
                 >
-                  <f.icon className="h-[15px] w-[15px]" style={{ color: t.iconColor, transition: "color 0.4s ease" }} />
+                  <f.icon className="h-[15px] w-[15px]" style={{ color: t.iconColor }} />
                 </div>
                 <div>
                   <p className="font-semibold text-[0.8rem] leading-tight"
-                    style={{ color: t.fTitle, transition: "color 0.4s ease" }}>{f.title}</p>
-                  <p className="text-[0.72rem] leading-tight"
-                    style={{ color: t.fDesc, transition: "color 0.4s ease" }}>{f.description}</p>
+                    style={{ color: t.fTitle }}>{f.title}</p>
+                  <p className="text-[0.71rem] leading-tight mt-0.5"
+                    style={{ color: t.fDesc }}>{f.description}</p>
                 </div>
               </div>
             ))}
@@ -183,42 +196,44 @@ export default function Login() {
         </div>
 
         {/* Footer */}
-        <p className="relative z-10 text-[0.68rem]"
+        <p className="relative z-10 text-[0.67rem]"
           style={{ color: t.footer, transition: "color 0.4s ease" }}>
           &copy; {new Date().getFullYear()} HMD International Group. All rights reserved.
         </p>
       </div>
 
-      {/* ═══════════════════════════════════════
-          RIGHT — Form panel (glass/tinted)
-      ═══════════════════════════════════════ */}
+      {/* ══════════════════════════════════════════
+          RIGHT — Form panel
+      ══════════════════════════════════════════ */}
       <div className="flex flex-1 flex-col lg:overflow-y-auto relative">
 
-        {/* Bridge: left-edge glow bleeding from the navy */}
+        {/* Left-edge gold bleed from the dark panel */}
         <div
           className="hidden lg:block pointer-events-none absolute top-0 left-0 bottom-0 w-32 z-0"
           style={{ background: t.bridge, transition: "background 0.4s ease" }}
         />
 
-        {/* Soft cyan radial glow centred behind the card */}
+        {/* Soft gold radial glow behind the card */}
         <div
           className="pointer-events-none absolute inset-0 z-0"
           style={{ background: t.cardGlow, transition: "background 0.4s ease" }}
         />
 
-        {/* Gradient accent stripe */}
-        <div className="absolute top-0 left-0 right-0 h-[3px] z-10"
-          style={{ background: t.stripe, transition: "background 0.4s ease" }} />
+        {/* Gold gradient accent stripe at the very top */}
+        <div
+          className="absolute top-0 left-0 right-0 h-[3px] z-10"
+          style={{ background: t.stripe, transition: "background 0.4s ease" }}
+        />
 
         {/* Top bar */}
         <div className="relative z-10 flex items-center justify-between px-6 pt-5 pb-2">
           {/* Mobile logo */}
           <div className="flex lg:hidden items-center gap-2">
             <img
-              src={hmdLogo}
+              src="/hmd-logo-new.jpeg"
               alt="HMD International Group"
-              className="h-8 w-auto object-contain rounded-md"
-              style={{ mixBlendMode: "multiply", filter: t.mobileLogoFilter }}
+              className="h-9 w-9 object-contain rounded-full"
+              style={{ filter: t.mobileLogoFilter, mixBlendMode: isLight ? "multiply" : "screen" }}
             />
           </div>
           <div className="hidden lg:block" />
@@ -228,7 +243,7 @@ export default function Login() {
             className="rounded-lg border p-0.5"
             style={{
               background: isLight ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.06)",
-              borderColor: isLight ? "rgba(185,215,230,0.50)" : "rgba(100,160,185,0.18)",
+              borderColor: isLight ? "rgba(201,168,76,0.30)" : "rgba(201,168,76,0.16)",
               backdropFilter: "blur(8px)",
               transition: "background 0.4s ease, border-color 0.4s ease",
             }}
@@ -239,7 +254,7 @@ export default function Login() {
 
         {/* Centred form */}
         <div className="relative z-10 flex flex-1 items-center justify-center px-6 py-10">
-          <div className="w-full max-w-[420px]">
+          <div className="w-full max-w-[400px]">
 
             {/* Glass card */}
             <div
@@ -248,12 +263,12 @@ export default function Login() {
                 background: t.cardBg,
                 border: `1px solid ${t.cardBorder}`,
                 boxShadow: t.cardShadow,
-                backdropFilter: "blur(14px)",
-                WebkitBackdropFilter: "blur(14px)",
+                backdropFilter: "blur(16px)",
+                WebkitBackdropFilter: "blur(16px)",
                 transition: "background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease",
               }}
             >
-              {/* Brand label */}
+              {/* Brand + greeting */}
               <div className="space-y-0.5">
                 <span
                   className="hidden lg:block text-[0.6rem] font-bold tracking-[0.3em] uppercase"
@@ -261,12 +276,17 @@ export default function Login() {
                 >
                   HMD International Group
                 </span>
-                <PageHeader title="Welcome back" subtitle="Sign in to continue to your account" showBackButton={false} showHomeButton={false} showCursorNavButtons={false} />
+                <PageHeader
+                  title="Welcome back"
+                  subtitle="Sign in to continue to your account"
+                  showBackButton={false}
+                  showHomeButton={false}
+                  showCursorNavButtons={false}
+                />
               </div>
 
               {/* Form */}
               <form onSubmit={handleLogin} className="space-y-4" noValidate>
-
                 <div className="space-y-1.5">
                   <Label htmlFor="username">Username</Label>
                   <Input
@@ -310,7 +330,7 @@ export default function Login() {
                   type="submit"
                   data-testid="button-login"
                   disabled={loginMutation.isPending}
-                  className="w-full h-10 rounded-md font-semibold text-sm text-white hover:opacity-90 active:scale-[0.985] disabled:opacity-60 mt-1"
+                  className="w-full h-10 rounded-md font-semibold text-sm text-black hover:opacity-90 active:scale-[0.985] disabled:opacity-60 mt-1"
                   style={{
                     background: t.btnBg,
                     boxShadow: t.btnShadow,
