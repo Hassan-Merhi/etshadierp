@@ -90,6 +90,7 @@ interface EnrichedContainerApi {
   containerNumber: string;
   supplierId: number;
   supplierName: string | null;
+  supplierCode: string | null;
   status: string;
   importDate: string;
   grandTotal: string | null;
@@ -162,7 +163,7 @@ function WorkbookDataRow({ r }: { r: EnrichedContainerApi }) {
   return (
     <tr className={cn("border-b last:border-b-0", getRealRowBg(r))}>
       <td className="py-0.5 px-2 font-mono font-bold">{r.containerNumber}</td>
-      <td className="py-0.5 px-2">{r.supplierName ?? "—"}</td>
+      <td className="py-0.5 px-2">{r.supplierCode ?? "—"}</td>
       <td className="py-0.5 px-2 text-right font-semibold">${fmt(parseNum(r.grandTotal), 2)}</td>
       <td className="py-0.5 px-2">{fmtD(r.eta)}</td>
       <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
@@ -247,7 +248,7 @@ function RealWorkbookBlock({
   const columnHeaders = (
     <tr className="bg-muted/60 border-b text-muted-foreground">
       <th className="py-1 px-2 font-semibold text-center">CTR #</th>
-      <th className="py-1 px-2 font-semibold text-center">SUPPLIER</th>
+      <th className="py-1 px-2 font-semibold text-center">SUPPLIER CODE</th>
       <th className="py-1 px-2 font-semibold text-center">AMOUNT</th>
       <th className="py-1 px-2 font-semibold text-center">ETA</th>
       <th className="py-1 px-2 font-semibold text-center">TRUCK #</th>
@@ -1360,7 +1361,7 @@ function TabTruckLocation() {
                         <tr key={`hd-row-${r.id}`} style={{ backgroundColor: rowBg }}>
                           <td style={{ ...cell, textAlign: "center", color: "#94a3b8", fontSize: "18px" }}>{idx}</td>
                           <td style={{ ...cell, textAlign: "center", fontFamily: "monospace", fontWeight: 700, color: "#1d4ed8" }}>{r.containerNumber}</td>
-                          <td style={{ ...cell, textAlign: "center", fontWeight: 500 }}>{r.supplierName ?? "—"}</td>
+                          <td style={{ ...cell, textAlign: "center", fontWeight: 500 }}>{r.supplierCode ?? "—"}</td>
                           <td style={{ ...cell, textAlign: "center", fontFamily: "monospace", fontWeight: 700, color: "#6d28d9" }}>{r.numberPlate ?? "—"}</td>
                           <td style={{ ...cell, textAlign: "center", fontWeight: 700, color: "#065f46" }}>{r.trackingLocation ?? "—"}</td>
                           <td style={{ ...cell, textAlign: "center", fontWeight: 500 }}>{r.agent ?? "—"}</td>
@@ -1444,6 +1445,7 @@ interface ApiAllocatedRow {
   remainingAmount: number;
   allocationStatus: ApiAllocStatus;
   supplierName: string | null;
+  supplierCode: string | null;
 }
 
 interface ApiPreviewRow {
@@ -1457,6 +1459,7 @@ interface ApiPreviewRow {
   dutyFee: number;
   status: string;
   supplierName: string | null;
+  supplierCode: string | null;
 }
 
 interface AgentDutySummary {
@@ -1625,7 +1628,7 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
                   r.allocationStatus === "Partially Cleared" && "bg-amber-50/80 dark:bg-amber-950/20"
                 )}>
                   <td className="py-0.5 px-2 font-mono font-semibold">{r.containerNumber}</td>
-                  <td className="py-0.5 px-2">{r.supplierName ?? "—"}</td>
+                  <td className="py-0.5 px-2">{r.supplierCode ?? "—"}</td>
                   <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
                   <td className="py-0.5 px-2">{fmtD(r.offloadDate ?? null)}</td>
                   <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
@@ -1689,7 +1692,7 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
                   {activePreviewRows.map((r) => (
                     <tr key={r.id} className="border-b bg-sky-50/30 dark:bg-sky-950/10 text-muted-foreground">
                       <td className="py-0.5 px-2 font-mono">{r.containerNumber}</td>
-                      <td className="py-0.5 px-2">{r.supplierName ?? "—"}</td>
+                      <td className="py-0.5 px-2">{r.supplierCode ?? "—"}</td>
                       <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
                       <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
                       <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>

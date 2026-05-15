@@ -53,6 +53,7 @@ interface ContainerRow {
   dutyFee: number;
   status: string;
   supplierName: string | null;
+  supplierCode: string | null;
 }
 
 interface AllocatedRow extends ContainerRow {
@@ -72,6 +73,7 @@ interface PreviewRow {
   dutyFee: number;
   status: string;
   supplierName: string | null;
+  supplierCode: string | null;
 }
 
 // ─── Container statuses treated as "offloaded / completed" ───────────────────
@@ -170,6 +172,7 @@ async function buildAgentsForCompany(cid: number) {
       agent: containers.agent,
       status: containers.status,
       supplierName: suppliers.legalName,
+      supplierCode: suppliers.code,
     })
     .from(containers)
     .leftJoin(suppliers, eq(containers.supplierId, suppliers.id))
@@ -328,6 +331,7 @@ async function buildAgentsForCompany(cid: number) {
           dutyFee: parseFloat(r.dutyFee || "0"),
           status: r.status,
           supplierName: r.supplierName ?? null,
+          supplierCode: r.supplierCode ?? null,
         }));
 
       const offloadedContainers = agentContainers.filter((r) =>
