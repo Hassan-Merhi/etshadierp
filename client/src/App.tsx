@@ -1210,6 +1210,12 @@ function UpdateBanner() {
   return null;
 }
 
+function AuthGatedUserNotesPanel() {
+  const [location] = useLocation();
+  if (location === "/login") return null;
+  return <UserNotesPanel />;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -1231,7 +1237,7 @@ export default function App() {
                       <UpdateBanner />
                       <ChatWidget />
                       <DateJumpDialog />
-                      <UserNotesPanel />
+                      <AuthGatedUserNotesPanel />
                     </CursorNavProvider>
                   </CurrencyProvider>
                 </DateFormatProvider>

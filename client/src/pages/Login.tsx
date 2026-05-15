@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, BarChart3, ShoppingCart, Boxes, Factory } from "lucide-react";
@@ -41,7 +41,6 @@ const tk = {
     stripe:     `linear-gradient(90deg, ${GOLD_DARK} 0%, ${GOLD_LIGHT} 45%, ${GOLD_DARK} 100%)`,
     btnBg:      `linear-gradient(135deg, ${GOLD_DARK} 0%, ${GOLD_LIGHT} 50%, ${GOLD_DARK} 100%)`,
     btnShadow:  "0 4px 22px rgba(201,168,76,0.40)",
-    /* form labels / heading on the right panel */
     formHeading: "#1a1a2e",
     formSub:    "#4a4a6a",
     labelColor: "#2a2a3e",
@@ -77,9 +76,20 @@ export default function Login() {
   const [username, setUsername]         = useState("");
   const [password, setPassword]         = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isMobile, setIsMobile]         = useState(() => typeof window !== "undefined" && window.innerWidth < 1024);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const handler = (e: MediaQueryListEvent) => setIsMobile(!e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   const t = tk[theme as "light" | "dark"] ?? tk.light;
   const isLight = (theme as string) !== "dark";
+
+  // On mobile the background is always dark, so form tokens always use dark palette
+  const ft = isMobile ? tk.dark : t;
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: { username: string; password: string }) => {
@@ -172,7 +182,7 @@ export default function Login() {
       ══════════════════════════════════════════ */}
       <div
         className="flex flex-1 flex-col lg:overflow-y-auto relative"
-        style={{ background: t.rightBg }}
+        style={{ background: isMobile ? DARK_BG : t.rightBg }}
       >
         {/* Desktop: left-edge gold bleed */}
         <div className="hidden lg:block pointer-events-none absolute top-0 left-0 bottom-0 w-32 z-0"
@@ -180,7 +190,7 @@ export default function Login() {
 
         {/* Desktop: soft gold glow behind card */}
         <div className="pointer-events-none absolute inset-0 z-0"
-          style={{ background: t.cardGlow }} />
+          style={{ background: isMobile ? "radial-gradient(ellipse 80% 50% at 50% 100%, rgba(201,168,76,0.08) 0%, transparent 70%)" : t.cardGlow }} />
 
         {/* Gold gradient accent stripe */}
         <div className="absolute top-0 left-0 right-0 h-[3px] z-10"
@@ -189,7 +199,6 @@ export default function Login() {
         {/* ── MOBILE HERO (hidden on desktop) ── */}
         <div
           className="lg:hidden relative overflow-hidden flex flex-col items-center pb-8 pt-14 px-6"
-          style={{ background: DARK_BG }}
         >
           {/* Top glow */}
           <div className="pointer-events-none absolute top-0 left-0 right-0 h-64"
@@ -257,9 +266,9 @@ export default function Login() {
             <div
               className="rounded-2xl p-7 sm:p-8 space-y-6"
               style={{
-                background: t.cardBg,
-                border: `1px solid ${t.cardBorder}`,
-                boxShadow: t.cardShadow,
+                background: ft.cardBg,
+                border: `1px solid ${ft.cardBorder}`,
+                boxShadow: ft.cardShadow,
                 backdropFilter: "blur(18px)",
                 WebkitBackdropFilter: "blur(18px)",
               }}
@@ -270,10 +279,10 @@ export default function Login() {
                   style={{ color: isLight ? "hsl(200 55% 36%)" : "rgba(201,168,76,0.45)" }}>
                   HMD International Group
                 </p>
-                <h2 className="text-2xl font-bold leading-tight" style={{ color: t.formHeading }}>
+                <h2 className="text-2xl font-bold leading-tight" style={{ color: ft.formHeading }}>
                   Welcome back
                 </h2>
-                <p className="text-sm" style={{ color: t.formSub }}>
+                <p className="text-sm" style={{ color: ft.formSub }}>
                   Sign in to continue to your account
                 </p>
               </div>
@@ -285,7 +294,7 @@ export default function Login() {
               {/* Form */}
               <form onSubmit={handleLogin} className="space-y-4" noValidate>
                 <div className="space-y-1.5">
-                  <Label htmlFor="username" style={{ color: t.labelColor }}>Username</Label>
+                  <Label htmlFor="username" style={{ color: ft.labelColor }}>Username</Label>
                   <Input
                     id="username"
                     type="text"
@@ -298,7 +307,7 @@ export default function Login() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="password" style={{ color: t.labelColor }}>Password</Label>
+                  <Label htmlFor="password" style={{ color: ft.labelColor }}>Password</Label>
                   <div className="relative">
                     <Input
                       id="password"
@@ -329,8 +338,8 @@ export default function Login() {
                   disabled={loginMutation.isPending}
                   className="w-full h-10 rounded-md font-bold text-sm text-black hover:opacity-90 active:scale-[0.985] disabled:opacity-60 mt-1"
                   style={{
-                    background: t.btnBg,
-                    boxShadow: t.btnShadow,
+                    background: ft.btnBg,
+                    boxShadow: ft.btnShadow,
                     transition: "opacity 0.15s, transform 0.1s",
                   }}
                 >
@@ -340,7 +349,7 @@ export default function Login() {
             </div>
 
             <p className="text-center text-[0.67rem] mt-4"
-              style={{ color: isLight ? "rgba(0,0,0,0.25)" : "rgba(201,168,76,0.22)" }}>
+              style={{ color: isMobile ? "rgba(201,168,76,0.28)" : (isLight ? "rgba(0,0,0,0.25)" : "rgba(201,168,76,0.22)") }}>
               HMD International Group &mdash; ERP &amp; POS Platform
             </p>
           </div>
