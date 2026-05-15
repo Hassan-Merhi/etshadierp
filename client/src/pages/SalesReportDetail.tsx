@@ -411,8 +411,8 @@ export default function SalesReportDetail() {
           {/* Item-grouped table */}
           <Card>
             <CardContent className="p-0">
-              <div className="hidden md:block overflow-x-auto">
-                <Table>
+              <div className="hidden md:block">
+                <Table wrapperClassName="max-h-[calc(100vh-320px)]">
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead className="w-6"></TableHead>
