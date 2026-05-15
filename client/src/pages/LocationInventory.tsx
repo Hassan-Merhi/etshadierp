@@ -567,6 +567,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     setSelectedGroup(null);
     setViewAllItems(false);
     setSelectedRowIndex(0);
+    setItemSearchTerm("");
   };
 
   const escapeBackHandler = selectedGroup
@@ -2804,6 +2805,30 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             </div>
           )}
 
+          {/* Search bar */}
+          <div className="screen-only flex items-center gap-2 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search items by name or code..."
+                value={itemSearchTerm}
+                onChange={(e) => setItemSearchTerm(e.target.value)}
+                className="pl-10"
+                data-testid="input-all-stock-items-search"
+              />
+            </div>
+            {itemSearchTerm && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setItemSearchTerm("")}
+                data-testid="button-clear-all-stock-search"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
           {/* Printable area */}
           <div ref={printRef}>
             <style>{`
@@ -2959,12 +2984,21 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             ) : (
               <div className="space-y-6">
                 {(() => {
-                  // Group items by stock group
-                  const sortedInventory = [...inventory].sort((a, b) => {
-                    const groupCompare = (a.stockGroupName || "").localeCompare(b.stockGroupName || "");
-                    if (groupCompare !== 0) return groupCompare;
-                    return a.stockItemName.localeCompare(b.stockItemName);
-                  });
+                  // Group items by stock group, applying search filter
+                  const searchLower = itemSearchTerm.toLowerCase();
+                  const sortedInventory = [...inventory]
+                    .filter((item) => {
+                      if (!searchLower) return true;
+                      return (
+                        (item.stockItemName ?? "").toLowerCase().includes(searchLower) ||
+                        (item.stockItemCode ?? "").toLowerCase().includes(searchLower)
+                      );
+                    })
+                    .sort((a, b) => {
+                      const groupCompare = (a.stockGroupName || "").localeCompare(b.stockGroupName || "");
+                      if (groupCompare !== 0) return groupCompare;
+                      return a.stockItemName.localeCompare(b.stockItemName);
+                    });
 
                   const groupedInventory = sortedInventory.reduce((acc, item) => {
                     const groupKey = item.stockGroupCode || "UNCAT";
