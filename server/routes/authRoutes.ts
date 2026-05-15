@@ -161,6 +161,99 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
+  // ── ACTIVE SESSIONS ──
+  // GET /api/sessions — list sessions for the current user (or all users for admins)
+  app.get("/api/sessions", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      const userRole = req.session.currentRole;
+      const isAdmin = ["Admin", "Owner", "Developer"].includes(userRole || "");
+
+      const { pool: rawPool } = await import("../db");
+
+      // The connect-pg-simple table has columns: sid, sess, expire
+      let rows: any[];
+      if (isAdmin) {
+        const result = await rawPool.query(
+          `SELECT sid, sess, expire FROM session WHERE expire > NOW() ORDER BY (sess->>'userId') NULLS LAST, expire DESC`
+        );
+        rows = result.rows;
+      } else {
+        const result = await rawPool.query(
+          `SELECT sid, sess, expire FROM session WHERE expire > NOW() AND sess->>'userId' = $1 ORDER BY expire DESC`,
+          [userId]
+        );
+        rows = result.rows;
+      }
+
+      const currentSid = (req as any).sessionID;
+
+      const sessions = rows.map((row: any) => {
+        const s = row.sess;
+        return {
+          sid: row.sid,
+          isCurrent: row.sid === currentSid,
+          userId: s.userId,
+          username: s.username,
+          role: s.currentRole,
+          expires: row.expire,
+          userAgent: s.userAgent || null,
+          ip: s.ip || null,
+        };
+      });
+
+      res.json(sessions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // DELETE /api/sessions/:sid — revoke a specific session
+  app.delete("/api/sessions/:sid", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      const userRole = req.session.currentRole;
+      const isAdmin = ["Admin", "Owner", "Developer"].includes(userRole || "");
+      const { sid } = req.params;
+
+      const { pool: rawPool } = await import("../db");
+
+      // First verify ownership unless admin
+      const check = await rawPool.query(
+        `SELECT sess FROM session WHERE sid = $1`,
+        [sid]
+      );
+      if (check.rows.length === 0) return res.status(404).json({ message: "Session not found" });
+
+      const sessionUserId = check.rows[0].sess?.userId;
+      if (!isAdmin && sessionUserId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      await rawPool.query(`DELETE FROM session WHERE sid = $1`, [sid]);
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // DELETE /api/sessions — revoke all OTHER sessions for current user
+  app.delete("/api/sessions", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      const currentSid = (req as any).sessionID;
+      const { pool: rawPool } = await import("../db");
+
+      await rawPool.query(
+        `DELETE FROM session WHERE sess->>'userId' = $1 AND sid != $2`,
+        [userId, currentSid]
+      );
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Login History endpoint (Admin only)
   app.get("/api/login-history", requireAuth, async (req, res) => {
     try {

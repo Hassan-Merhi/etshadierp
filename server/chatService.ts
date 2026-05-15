@@ -966,7 +966,7 @@ export async function chat(
   companyId: number,
   conversationHistory: { role: string; content: string }[] = [],
   userPreferences?: UserPreferences
-): Promise<{ response: string; suggestions: string[]; provider?: string }> {
+): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any }> {
   const available = getAvailableProviders();
   
   if (available.length === 0) {
@@ -998,10 +998,46 @@ export async function chat(
     
     console.log(`[ChatService] Response received from ${usedProvider}`);
 
+    // ── Phase 5b: detect voucher creation intent ──────────────────────────
+    // Ask the AI to extract a voucher draft if the message contains creation intent.
+    // We do a lightweight structured extraction call only when keywords are found.
+    const VOUCHER_KEYWORDS = /\b(create|make|record|add|post|enter)\b.{0,60}\b(payment|receipt|journal|voucher|entry|invoice)\b|\b(pay|paid|received|collected)\b.{0,40}\$?\d/i;
+    let voucherDraft: any = undefined;
+
+    if (VOUCHER_KEYWORDS.test(userMessage)) {
+      try {
+        // Fetch ledger accounts once for the company (top 30 most common)
+        const accts = await db
+          .select({ id: schema.ledgerAccounts.id, name: schema.ledgerAccounts.name, accountType: schema.ledgerAccounts.accountType })
+          .from(schema.ledgerAccounts)
+          .where(and(eq(schema.ledgerAccounts.companyId, companyId), isNull(schema.ledgerAccounts.deletedAt)))
+          .limit(80);
+
+        const extractionPrompt = `You are a voucher extraction assistant for an accounting system. The user said: "${userMessage}". 
+Available ledger accounts: ${accts.map(a => `${a.id}:${a.name}(${a.accountType})`).join(", ")}
+If the user clearly intends to CREATE a voucher/payment/receipt/journal entry, respond with ONLY valid JSON (no markdown) in this exact shape:
+{"type":"Payment"|"Receipt"|"Journal","date":"YYYY-MM-DD","description":"...","entries":[{"accountId":NUMBER,"accountName":"...","debit":NUMBER,"credit":NUMBER}]}
+Both sides must balance (sum of debits == sum of credits). Date defaults to today if not specified. Use ${new Date().toISOString().slice(0,10)} as today.
+If the intent is not clear or amounts/accounts are too ambiguous, respond with exactly: null`;
+
+        const extractionResult = await callAIWithFallback(selectedProvider, extractionPrompt, [], "Extract voucher or return null");
+        const raw = extractionResult.response.trim().replace(/```json|```/g, "").trim();
+        if (raw !== "null" && raw.startsWith("{")) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.type && parsed.entries && parsed.entries.length >= 2) {
+            voucherDraft = parsed;
+          }
+        }
+      } catch (_) {
+        // Extraction failed silently — no voucherDraft
+      }
+    }
+
     return {
       response,
       suggestions,
       provider: usedProvider,
+      voucherDraft,
     };
   } catch (error: any) {
     console.error("[ChatService] ERROR:", error.message);

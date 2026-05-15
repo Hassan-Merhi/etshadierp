@@ -94,6 +94,7 @@ import { DailyAutoSendSection } from "./settings/DailyAutoSendSection";
 import { ExportCenter } from "./settings/ExportCenter";
 import { BulkRenameTab } from "./settings/BulkRenameTab";
 import { LoginHistoryTab } from "./settings/LoginHistoryTab";
+import { ActiveSessionsTab } from "./settings/ActiveSessionsTab";
 import { POSReceiptSettings, IntercompanyPosTab } from "./settings/IntercompanyPosTab";
 import { OfflineSyncPanel, formatRelativeTime } from "./settings/OfflineSyncPanel";
 import { PriceGroupsTab } from "./settings/PriceGroupsTab";
@@ -695,6 +696,7 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
         label: "Users & Access",
         items: [
           { key: "users-permissions", label: "Users & Permissions", icon: Users },
+          { key: "active-sessions", label: "Active Sessions", icon: Shield },
           { key: "users", label: "Users (legacy)", icon: Users, devOnly: true },
         ],
       },
@@ -1258,6 +1260,10 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
           )}
 
           {activeSection === "login-history" && currentUser?.role === "Developer" && <LoginHistoryTab />}
+
+          {activeSection === "active-sessions" && (
+            <ActiveSessionsTab isAdmin={["Admin", "Owner", "Developer"].includes(currentUser?.role || "")} />
+          )}
 
 
           {activeSection === "edit-log" && (
