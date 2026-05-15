@@ -1501,7 +1501,6 @@ export default function FactoryShippingContainers() {
                 <TableHead className="text-xs min-w-[90px]">Finalized</TableHead>
                 <TableHead className="text-xs min-w-[110px]">Shipping Co.</TableHead>
                 <TableHead className="text-xs min-w-[90px]">Documents</TableHead>
-                <TableHead className="text-xs min-w-[110px]">Shipping Invoice</TableHead>
                 <TableHead className="text-xs min-w-[100px]">Container Cost</TableHead>
                 <TableHead className="text-xs min-w-[100px]">CI No.</TableHead>
                 <TableHead className="text-xs min-w-[110px]">Note</TableHead>
@@ -1636,57 +1635,10 @@ export default function FactoryShippingContainers() {
                       )}
                     </TableCell>
 
-                    {/* Shipping Invoice */}
-                    <TableCell>
-                      {r._isGhost ? (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      ) : r.shippingInvoiceFileUrl ? (
-                        <div className="flex items-center gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            asChild
-                            title={r.shippingInvoiceOriginalName || "View"}
-                            data-testid={`button-view-si-${r.id}`}
-                          >
-                            <a href={r.shippingInvoiceFileUrl} target="_blank" rel="noreferrer">
-                              <Eye className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                            </a>
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => deleteShippingInvoiceMutation.mutate(r.id)}
-                            disabled={deleteShippingInvoiceMutation.isPending}
-                            title="Remove shipping invoice"
-                            data-testid={`button-delete-si-${r.id}`}
-                          >
-                            <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          title="Upload shipping invoice PDF"
-                          onClick={() => {
-                            setShippingInvoiceUploadingId(r.id);
-                            shippingInvoiceInputRef.current?.click();
-                          }}
-                          disabled={uploadShippingInvoiceMutation.isPending && shippingInvoiceUploadingId === r.id}
-                          data-testid={`button-upload-si-${r.id}`}
-                        >
-                          {uploadShippingInvoiceMutation.isPending && shippingInvoiceUploadingId === r.id
-                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            : <Upload className="h-3.5 w-3.5 text-muted-foreground" />}
-                        </Button>
-                      )}
-                    </TableCell>
-
                     {/* Container Cost (grandTotal from invoice) */}
                     <TableCell className="text-xs whitespace-nowrap font-medium">
                       {r.grandTotal
-                        ? <span className="text-foreground">{Number(r.grandTotal).toLocaleString()}</span>
+                        ? <span className="text-foreground">${Number(r.grandTotal).toLocaleString()}</span>
                         : <span className="text-muted-foreground">—</span>}
                     </TableCell>
 
