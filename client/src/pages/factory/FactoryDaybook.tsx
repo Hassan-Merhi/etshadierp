@@ -1860,8 +1860,8 @@ export default function FactoryDaybook() {
               </div>
 
               {/* Desktop table */}
-              <div className="hidden md:block w-full overflow-x-auto">
-                <Table className="w-full table-fixed">
+              <div className="hidden md:block w-full">
+                <Table className="w-full table-fixed" wrapperClassName="overflow-visible">
                   <colgroup>
                     <col className="w-[12%]" />
                     <col className="w-[18%]" />
