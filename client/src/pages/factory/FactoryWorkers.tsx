@@ -653,9 +653,9 @@ export default function FactoryWorkers() {
           </div>
 
           {/* Table */}
-          <div className="border rounded-xl overflow-hidden">
-            <Table>
-              <TableHeader>
+          <div className="border rounded-xl">
+            <Table wrapperClassName="overflow-visible">
+              <TableHeader className="sticky top-0 z-30">
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
                   <TableHead className="text-xs h-9 font-semibold">Worker</TableHead>
                   <TableHead className="text-xs h-9 font-semibold">Position</TableHead>
