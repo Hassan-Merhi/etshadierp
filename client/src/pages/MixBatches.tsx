@@ -284,22 +284,24 @@ export default function MixBatches() {
               <Skeleton className="h-12 w-full" />
             </div>
           ) : filteredBatches && filteredBatches.length > 0 ? (
-            <div className="table-responsive">
-            <Table>
+            <div>
+            <Table wrapperClassName="overflow-visible">
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead className="text-right">Total (kg)</TableHead>
                   <TableHead className="text-right">Cost/kg</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="w-20"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredBatches.map((batch) => {
+                {[...filteredBatches].sort((a, b) => {
+                  const da = (a as any).batchDate || a.createdAt || "";
+                  const db = (b as any).batchDate || b.createdAt || "";
+                  return db > da ? 1 : db < da ? -1 : b.id - a.id;
+                }).map((batch) => {
                   const total = parseFloat(batch.totalWeightKg || "0");
-                  const remaining = parseFloat(batch.totalWeightKg || "0") - parseFloat(batch.usedKg || "0");
                   return (
                     <TableRow
                       key={batch.id}
@@ -315,16 +317,6 @@ export default function MixBatches() {
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         ${parseFloat(batch.costPerKg).toFixed(4)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={getStatusVariant(batch.status)}
-                          className="gap-1"
-                          data-testid={`badge-status-${batch.id}`}
-                        >
-                          {getStatusIcon(batch.status)}
-                          {batch.status}
-                        </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {formatDisplayDate((batch as any).batchDate || batch.createdAt)}
@@ -355,8 +347,6 @@ export default function MixBatches() {
               </TableBody>
               {(() => {
                 const summaryTotal = filteredBatches.reduce((s, b) => s + parseFloat(b.totalWeightKg || "0"), 0);
-                const summaryUsed = filteredBatches.reduce((s, b) => s + parseFloat(b.usedKg || "0"), 0);
-                const summaryRemaining = summaryTotal - summaryUsed;
                 const weightedCost = filteredBatches.reduce((s, b) => s + parseFloat(b.totalWeightKg || "0") * parseFloat(b.costPerKg || "0"), 0);
                 const blendedCost = summaryTotal > 0 ? weightedCost / summaryTotal : 0;
                 return (
@@ -369,16 +359,10 @@ export default function MixBatches() {
                       <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-summary-total-kg">
                         {formatNumber(summaryTotal)}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold text-sm">
-                        {formatNumber(summaryUsed)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold text-sm">
-                        {formatNumber(summaryRemaining)}
-                      </td>
                       <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-summary-blended-cost">
                         ${blendedCost.toFixed(4)}<span className="text-xs text-muted-foreground font-normal">/kg</span>
                       </td>
-                      <td colSpan={3} />
+                      <td colSpan={2} />
                     </tr>
                   </tfoot>
                 );
