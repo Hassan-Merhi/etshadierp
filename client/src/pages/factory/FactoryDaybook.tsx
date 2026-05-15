@@ -291,6 +291,74 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
     enabled: isPayrollPayment,
   });
 
+  // Balance fetching for Payment / Receipt / Journal vouchers
+  const [sourceBalance, setSourceBalance] = useState<string | null>(null);
+  const [entryBalances, setEntryBalances] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    if (!isVoucherBacked || viewEntries.length === 0) {
+      setSourceBalance(null);
+      setEntryBalances({});
+      return;
+    }
+    const txType = entry.txType;
+    if (txType !== "PAYMENT" && txType !== "RECEIPT" && txType !== "JOURNAL") {
+      setSourceBalance(null);
+      setEntryBalances({});
+      return;
+    }
+
+    // Determine source entry (the "Paid From" / "Received In" account)
+    const src = txType === "PAYMENT"
+      ? viewEntries.find((e: any) => parseFloat(e.creditAmount || "0") > 0)
+      : txType === "RECEIPT"
+      ? viewEntries.find((e: any) => parseFloat(e.debitAmount || "0") > 0)
+      : null;
+
+    // Determine display entries
+    const display = txType === "PAYMENT"
+      ? viewEntries.filter((e: any) => parseFloat(e.debitAmount || "0") > 0)
+      : txType === "RECEIPT"
+      ? viewEntries.filter((e: any) => parseFloat(e.creditAmount || "0") > 0)
+      : viewEntries;
+
+    const resolveUrl = (e: any): string | null => {
+      if (e.ledgerAccountId) return `/api/accounts/ledger/${e.ledgerAccountId}/balance`;
+      if (e.bankAccountId) return `/api/accounts/ledger/${e.bankAccountId}/balance`;
+      if (e.customerId) return `/api/customers/${e.customerId}/balance`;
+      if (e.employeeId) return `/api/employees/${e.employeeId}/balance`;
+      if (e.supplierId) return `/api/suppliers/${e.supplierId}/balance`;
+      if (e.factorySupplierId) return `/api/factory/suppliers/${e.factorySupplierId}/balance`;
+      return null;
+    };
+
+    const fetchAll = async () => {
+      // Source balance
+      if (src) {
+        const url = resolveUrl(src);
+        if (url) {
+          try {
+            const r = await fetch(url, { credentials: "include" });
+            if (r.ok) { const d = await r.json(); setSourceBalance(d.balance?.toString() ?? null); }
+          } catch { /* ignore */ }
+        }
+      }
+      // Per-entry balances
+      const results: Record<number, string> = {};
+      await Promise.all(display.map(async (e: any) => {
+        const url = resolveUrl(e);
+        if (!url) return;
+        try {
+          const r = await fetch(url, { credentials: "include" });
+          if (r.ok) { const d = await r.json(); results[e.id] = d.balance?.toString() || "0"; }
+        } catch { /* ignore */ }
+      }));
+      setEntryBalances(results);
+    };
+
+    fetchAll();
+  }, [isVoucherBacked, viewEntries, entry.txType]);
+
   const bales = parseBalesMeta(entry);
   const amt = parseFloat(entry.amountCurrency || "0");
   const sym = currencySymbol(entry.currencyCode);
@@ -367,9 +435,9 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                     {isPayment ? "Paid From" : "Received In"}
                   </p>
                   <p className="font-medium text-base md:text-lg">{sourceEntry.accountName}</p>
-                  {sourceEntry.balance !== undefined && (
-                    <p className="text-sm font-mono mt-2">
-                      Balance: {sym}{formatNumber(parseFloat(sourceEntry.balance || "0"))}
+                  {sourceBalance !== null && (
+                    <p className="text-sm font-mono mt-2 text-muted-foreground">
+                      Balance: {sym}{formatNumber(parseFloat(sourceBalance))}
                     </p>
                   )}
                 </div>
@@ -409,9 +477,9 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                       <tr key={e.id ?? i} className="border-b last:border-0">
                         <td className="px-3 py-2">
                           <p className="font-medium">{e.accountName || "—"}</p>
-                          {(isPaymentOrReceipt || isJournal) && e.balance !== undefined && (
+                          {(isPaymentOrReceipt || isJournal) && entryBalances[e.id] !== undefined && (
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              Balance: {sym}{formatNumber(parseFloat(e.balance || "0"))}
+                              Balance: {sym}{formatNumber(parseFloat(entryBalances[e.id] || "0"))}
                             </p>
                           )}
                         </td>
