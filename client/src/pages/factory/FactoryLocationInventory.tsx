@@ -1681,7 +1681,7 @@ export default function FactoryLocationInventory() {
         {/* Desktop table */}
         {!inventoryLoading && !(proformaMode && availableLoading) && (
           <div className="hidden md:block space-y-0 w-full">
-            <div className="rounded-md border w-full">
+            <div className="rounded-md border w-full overflow-auto max-h-[calc(100vh-300px)]">
               <table className="table-fixed text-sm" style={{ minWidth: "820px", width: "100%" }}>
                 <colgroup>
                   {proformaMode && <col style={{ width: "36px" }} />}
@@ -1750,7 +1750,7 @@ export default function FactoryLocationInventory() {
             {specialProducts.length > 0 && (
               <div className="mt-6">
                 <p className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Wipers &amp; Garbage</p>
-                <div className="rounded-md border w-full">
+                <div className="rounded-md border w-full overflow-auto max-h-[500px]">
                   <table className="table-fixed text-sm" style={{ minWidth: "820px", width: "100%" }}>
                     <colgroup>
                       {proformaMode && <col style={{ width: "36px" }} />}
