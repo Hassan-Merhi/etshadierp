@@ -71,6 +71,7 @@ interface LoadedGroup {
   totalWeight: number;
   totalPrice: number;
   pricePerBale: string;
+  stockQty: number;
 }
 
 interface VerificationSummary {
@@ -760,6 +761,7 @@ export default function FactoryPendingInvoiceVerify() {
                           <TableHead>Product</TableHead>
                           <TableHead className="text-right">Qty</TableHead>
                           <TableHead className="text-right">Weight</TableHead>
+                          <TableHead className="text-right">Stock</TableHead>
                           {isAdminOrOwner && <TableHead className="text-right">Price</TableHead>}
                         </TableRow>
                       </TableHeader>
@@ -772,6 +774,26 @@ export default function FactoryPendingInvoiceVerify() {
                             <TableCell className="text-sm">{group.productName}</TableCell>
                             <TableCell className="text-right font-mono">{group.qty}</TableCell>
                             <TableCell className="text-right font-mono">{fmtNum(group.totalWeight || 0)}</TableCell>
+                            <TableCell className="text-right font-mono" data-testid={`text-loaded-stock-${group.articleCode}`}>
+                              {(group.stockQty ?? 0) > 0 ? (
+                                <button
+                                  className="underline underline-offset-2 cursor-pointer hover-elevate rounded px-0.5 text-foreground font-medium"
+                                  onClick={() => {
+                                    const p = new URLSearchParams({
+                                      articleCode: group.articleCode,
+                                      productName: group.productName,
+                                      back: window.location.pathname + window.location.search,
+                                    });
+                                    navigate(`/factory/stock-bale-list?${p}`);
+                                  }}
+                                  data-testid={`button-loaded-stock-detail-${group.articleCode}`}
+                                >
+                                  {group.stockQty}
+                                </button>
+                              ) : (
+                                <span className="text-muted-foreground">0</span>
+                              )}
+                            </TableCell>
                             {isAdminOrOwner && <TableCell className="text-right font-mono">{fmtNum(group.totalPrice || 0)}</TableCell>}
                           </TableRow>
                         ))}

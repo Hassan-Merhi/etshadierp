@@ -3466,9 +3466,14 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         stockQty: stockQtyMap[pl.articleCode] ?? 0,
       }));
 
+      const loadedItemsWithStock = Object.values(loadedByArticle).map((li) => ({
+        ...li,
+        stockQty: stockQtyMap[li.articleCode] ?? 0,
+      }));
+
       res.json({
         order,
-        loadedItems: Object.values(loadedByArticle),
+        loadedItems: loadedItemsWithStock,
         proformaLines: proformaLinesWithStock,
         comparison,
         totalLoadedBales: effectiveBales.length,
