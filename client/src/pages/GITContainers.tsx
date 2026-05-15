@@ -2268,7 +2268,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
         {/* ── Main Table ── */}
         <Table className="text-xs whitespace-nowrap" wrapperClassName="max-h-[calc(100vh-260px)]">
-            <TableHeader className="sticky top-0 z-10 bg-muted">
+            <TableHeader className="sticky top-0 z-10 bg-amber-100 dark:bg-amber-900/30">
               <TableRow>
                 <TableHead className="w-8">#</TableHead>
                 <TableHead>Container #</TableHead>
