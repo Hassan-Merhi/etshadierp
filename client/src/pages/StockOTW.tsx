@@ -359,8 +359,8 @@ function StockOTWContent() {
       ) : (
         <>
           {/* Desktop table — borderless card, full-width */}
-          <div className="hidden md:block border rounded-xl overflow-hidden">
-            <Table>
+          <div className="hidden md:block">
+            <Table wrapperClassName="max-h-[calc(100vh-300px)]">
               <TableHeader className="bg-muted/40">
                 <TableRow>
                   <TableHead className="w-10 pl-4"></TableHead>
