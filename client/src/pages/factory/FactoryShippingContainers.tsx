@@ -66,22 +66,6 @@ interface ShippingRow {
   grandTotal: string | null;
 }
 
-interface AvailableInvoice {
-  id: number;
-  invoiceNumber: string;
-  customerName: string | null;
-  customerPhone: string | null;
-  status: string;
-  orderDate: string | null;
-  loadingDate: string | null;
-  finalizedDate: string | null;
-  containerNumber: string | null;
-  shippingCompany: string | null;
-  destination: string | null;
-  grandTotal: string | null;
-  alreadyHasRow: boolean;
-}
-
 interface TrackingRow {
   containerNumber: string | null;
   eta: string | null;
@@ -280,194 +264,6 @@ function DateCellInput({
         if (e.key === "Escape") setEditing(false);
       }}
     />
-  );
-}
-
-// ─── Add Record Dialog ─────────────────────────────────────────────────────────
-
-function AddRecordDialog({
-  open, onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const { toast } = useToast();
-  const [selectedOrderId, setSelectedOrderId] = useState("");
-  const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10));
-  const [containerNumber, setContainerNumber] = useState("");
-  const [destination, setDestination] = useState("");
-  const [containerArrivedDate, setArrivedDate] = useState("");
-  const [shippingCompany, setShippingCompany] = useState("");
-  const [note, setNote] = useState("");
-
-  const { data: invoices = [], isLoading: loadingInvoices } = useQuery<AvailableInvoice[]>({
-    queryKey: [`${LIST_KEY}/available-invoices`],
-    enabled: open,
-  });
-
-  const selectedInvoice = invoices.find((i) => String(i.id) === selectedOrderId);
-
-  useEffect(() => {
-    if (selectedInvoice) {
-      setContainerNumber(selectedInvoice.containerNumber || "");
-      setDestination(selectedInvoice.destination || "");
-      setShippingCompany(selectedInvoice.shippingCompany || "");
-    }
-  }, [selectedInvoice?.id]);
-
-  const createMutation = useMutation({
-    mutationFn: async (body: object) => {
-      const res = await apiRequest("POST", LIST_KEY, body);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Failed to create record" }));
-        throw new Error(err.message || "Failed to create record");
-      }
-      return res.json() as Promise<{ id: number }>;
-    },
-    onSuccess: async (newRow) => {
-      // Sync editable order fields to customer_orders using the real row ID
-      if (containerNumber || destination || shippingCompany) {
-        await apiRequest("PATCH", `${LIST_KEY}/${newRow.id}/sync-order`, {
-          containerNumber: containerNumber || null,
-          shippingCompany: shippingCompany || null,
-          destination: destination || null,
-        }).catch(() => {});
-      }
-      queryClient.invalidateQueries({ queryKey: [LIST_KEY] });
-      toast({ title: "Record added" });
-      reset();
-      onClose();
-    },
-    onError: (e: any) => {
-      const msg = e?.message || "Failed to create record";
-      if (msg.includes("already has")) {
-        toast({ title: "Invoice already used", description: "This invoice already has a shipping container row.", variant: "destructive" });
-      } else {
-        toast({ title: "Error", description: msg, variant: "destructive" });
-      }
-    },
-  });
-
-  function reset() {
-    setSelectedOrderId(""); setContainerNumber(""); setDestination("");
-    setArrivedDate(""); setShippingCompany(""); setNote("");
-    setOrderDate(new Date().toISOString().slice(0, 10));
-  }
-
-  function handleAdd() {
-    if (!selectedOrderId) { toast({ title: "Select a commercial invoice", variant: "destructive" }); return; }
-    if (!orderDate) { toast({ title: "Enter an order date", variant: "destructive" }); return; }
-
-    createMutation.mutate({
-      customerOrderId: Number(selectedOrderId),
-      orderDate,
-      containerArrivedDate: containerArrivedDate || null,
-      note: note || null,
-    });
-
-    // Also sync the editable order fields if provided
-    if ((containerNumber || destination || shippingCompany) && selectedOrderId) {
-      apiRequest("PATCH", `${LIST_KEY}/0/sync-order`, {
-        containerNumber: containerNumber || null,
-        shippingCompany: shippingCompany || null,
-        destination: destination || null,
-      }).catch(() => {});
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); onClose(); } }}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Plus className="h-4 w-4" /> Add Container Record
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4 pt-1">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Order Date <span className="text-red-500">*</span></Label>
-            <Input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} data-testid="input-order-date" />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs">Commercial Invoice <span className="text-red-500">*</span></Label>
-            <Select value={selectedOrderId} onValueChange={setSelectedOrderId}>
-              <SelectTrigger data-testid="select-commercial-invoice">
-                <SelectValue placeholder={loadingInvoices ? "Loading invoices…" : "Select invoice…"} />
-              </SelectTrigger>
-              <SelectContent>
-                {invoices.map((inv) => (
-                  <SelectItem key={inv.id} value={String(inv.id)} disabled={inv.alreadyHasRow}>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs">{inv.invoiceNumber || `#${inv.id}`}</span>
-                      <span className="text-muted-foreground text-xs">— {inv.customerName || "—"}</span>
-                      <span className={cn("text-xs px-1 rounded", statusColor(inv.status))}>{statusLabel(inv.status)}</span>
-                      {inv.alreadyHasRow && <span className="text-xs text-red-500">(already used)</span>}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {selectedInvoice && (
-            <div className="rounded-md border bg-muted/30 p-3 space-y-1.5 text-xs">
-              <p className="font-semibold text-muted-foreground uppercase tracking-wide text-xs">Auto-filled from invoice</p>
-              <div className="grid grid-cols-2 gap-2">
-                <div><span className="text-muted-foreground">Client:</span> <span className="font-medium">{selectedInvoice.customerName || "—"}</span></div>
-                <div><span className="text-muted-foreground">Loading Date:</span> <span className="font-medium">{fmtDate(selectedInvoice.loadingDate)}</span></div>
-                <div>
-                  <span className="text-muted-foreground">Finalized:</span>{" "}
-                  {selectedInvoice.finalizedDate
-                    ? <span className="font-medium text-green-700">{fmtDate(selectedInvoice.finalizedDate)}</span>
-                    : <span className="text-amber-600">Not finalized</span>}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Status:</span>{" "}
-                  <span className={cn("px-1 rounded", statusColor(selectedInvoice.status))}>{statusLabel(selectedInvoice.status)}</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Container Number</Label>
-              <Input placeholder="e.g. MSCU7654321" value={containerNumber} onChange={(e) => setContainerNumber(e.target.value)} data-testid="input-container-number" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Destination</Label>
-              <Input placeholder="e.g. Kampala, Uganda" value={destination} onChange={(e) => setDestination(e.target.value)} data-testid="input-destination" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Container Arrived Date</Label>
-              <Input type="date" value={containerArrivedDate} onChange={(e) => setArrivedDate(e.target.value)} data-testid="input-arrived-date" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Shipping Company</Label>
-              <Input placeholder="e.g. Maersk Line" value={shippingCompany} onChange={(e) => setShippingCompany(e.target.value)} data-testid="input-shipping-company" />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs">Note</Label>
-            <Textarea rows={2} placeholder="Optional note…" value={note} onChange={(e) => setNote(e.target.value)} data-testid="input-note" />
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => { reset(); onClose(); }}>Cancel</Button>
-          <Button onClick={handleAdd} disabled={createMutation.isPending} data-testid="button-confirm-add">
-            {createMutation.isPending && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}
-            Add Record
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -1211,7 +1007,6 @@ export default function FactoryShippingContainers() {
   const [filterDocs, setFilterDocs] = useState<"all" | "has" | "missing">("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
   const [docsRowId, setDocsRowId] = useState<number | null>(null);
   const [waRowId, setWaRowId] = useState<number | null>(null);
   const shippingInvoiceInputRef = useRef<HTMLInputElement>(null);
@@ -1229,6 +1024,13 @@ export default function FactoryShippingContainers() {
     queryKey: ["/api/factory/invoice-container-tracking"],
   });
 
+  // Auto-create backing rows for all active orders on mount
+  const syncMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `${LIST_KEY}/sync`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
+  });
+  useEffect(() => { syncMutation.mutate(); }, []);
+
   const trackAllMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/factory/shipping-containers/track-now"),
     onSuccess: (data: any) => {
@@ -1236,10 +1038,6 @@ export default function FactoryShippingContainers() {
       setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/factory/invoice-container-tracking"] }), 8000);
     },
     onError: (err: any) => toast({ title: "Tracking failed", description: err.message, variant: "destructive" }),
-  });
-
-  const { data: availableInvoices = [] } = useQuery<AvailableInvoice[]>({
-    queryKey: [`${LIST_KEY}/available-invoices`],
   });
 
   const done = rows.filter((r) => r.isDone);
@@ -1343,64 +1141,21 @@ export default function FactoryShippingContainers() {
     return m;
   }, [trackingData]);
 
-  // ── Ghost rows: invoices without a shipping row ───────────────────────────────
-  const ghostRows = useMemo((): DisplayRow[] =>
-    availableInvoices
-      .filter((inv) => !inv.alreadyHasRow)
-      .map((inv): DisplayRow => {
-        const ckey = (inv.containerNumber || "").trim().toUpperCase();
-        const tracked = ckey ? trackingMap.get(ckey) : undefined;
-        return {
-          id: -(inv.id),
-          companyId: 0,
-          customerOrderId: inv.id,
-          orderDate: inv.orderDate || "",
-          eta: null,
-          containerArrivedDate: null,
-          note: null,
-          ciNumber: null,
-          isDone: false,
-          doneAt: null,
-          doneBy: null,
-          whatsappSentAt: null,
-          createdAt: "",
-          invoiceNumber: inv.invoiceNumber,
-          customerId: null,
-          clientName: inv.customerName,
-          customerPhone: inv.customerPhone,
-          status: inv.status,
-          loadingDate: inv.loadingDate,
-          finalizedDate: inv.finalizedDate,
-          containerNumber: inv.containerNumber,
-          shippingCompany: inv.shippingCompany,
-          destination: inv.destination,
-          documentCount: 0,
-          shippingInvoiceFileUrl: null,
-          shippingInvoiceOriginalName: null,
-          shippingInvoiceFileType: null,
-          trackingLink: null,
-          grandTotal: inv.grandTotal ?? tracked?.grandTotal ?? null,
-          _isGhost: true,
-          _trackedEta: tracked?.eta ?? null,
-        };
-      }), [availableInvoices, trackingMap]);
-
-  // ── Merge real rows + ghost rows, sorted by status order ─────────────────────
+  // ── All display rows sorted by status ────────────────────────────────────────
   const allDisplayRows = useMemo((): DisplayRow[] => {
-    const real: DisplayRow[] = activeRows.map((r) => {
+    const display: DisplayRow[] = activeRows.map((r) => {
       const ckey = (r.containerNumber || "").trim().toUpperCase();
       const tracked = ckey ? trackingMap.get(ckey) : undefined;
       return { ...r, _isGhost: false, _trackedEta: tracked?.eta ?? null };
     });
-    const merged = [...real, ...ghostRows];
-    merged.sort((a, b) => {
+    display.sort((a, b) => {
       const sa = STATUS_ORDER[a.status] ?? 9;
       const sb = STATUS_ORDER[b.status] ?? 9;
       if (sa !== sb) return sa - sb;
       return (b.orderDate || "").localeCompare(a.orderDate || "");
     });
-    return merged;
-  }, [activeRows, ghostRows, trackingMap]);
+    return display;
+  }, [activeRows, trackingMap]);
 
   // ── Filtering ─────────────────────────────────────────────────────────────────
   const filtered = useMemo(() => allDisplayRows.filter((r) => {
@@ -1428,9 +1183,6 @@ export default function FactoryShippingContainers() {
 
         {/* ── Top Controls ── */}
         <div className="flex items-center gap-2 flex-wrap">
-          <Button onClick={() => setAddOpen(true)} data-testid="button-add-record">
-            <Plus className="h-4 w-4 mr-1" /> Add Container Record
-          </Button>
           <div className="relative flex-1 min-w-48">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -1564,33 +1316,25 @@ export default function FactoryShippingContainers() {
                       </Badge>
                     </TableCell>
 
-                    {/* Sticky: Container # (editable for real rows) */}
+                    {/* Sticky: Container # */}
                     <TableCell className={stickyCellBase} style={{ left: CTR_LEFT }}>
-                      {r._isGhost ? (
-                        <span className="text-xs text-muted-foreground font-mono">{r.containerNumber || "—"}</span>
-                      ) : (
-                        <EditableCellInput
-                          value={r.containerNumber || ""}
-                          placeholder="Enter #"
-                          onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { containerNumber: v || null } })}
-                          testId={`cell-container-${r.id}`}
-                          saving={syncOrderMutation.isPending}
-                        />
-                      )}
+                      <EditableCellInput
+                        value={r.containerNumber || ""}
+                        placeholder="Enter #"
+                        onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { containerNumber: v || null } })}
+                        testId={`cell-container-${r.id}`}
+                        saving={syncOrderMutation.isPending}
+                      />
                     </TableCell>
 
                     {/* Destination */}
                     <TableCell>
-                      {r._isGhost ? (
-                        <span className="text-xs text-muted-foreground">{r.destination || "—"}</span>
-                      ) : (
-                        <EditableCellInput
-                          value={r.destination || ""}
-                          placeholder="Enter destination"
-                          onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { destination: v || null } })}
-                          testId={`cell-destination-${r.id}`}
-                        />
-                      )}
+                      <EditableCellInput
+                        value={r.destination || ""}
+                        placeholder="Enter destination"
+                        onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { destination: v || null } })}
+                        testId={`cell-destination-${r.id}`}
+                      />
                     </TableCell>
 
                     {/* ETA: tracked ETA takes priority, then manual */}
@@ -1599,8 +1343,6 @@ export default function FactoryShippingContainers() {
                         <span className="text-xs text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap" title="Auto from tracking">
                           {fmtDate(r._trackedEta)}
                         </span>
-                      ) : r._isGhost ? (
-                        <span className="text-xs text-muted-foreground">—</span>
                       ) : (
                         <DateCellInput
                           value={r.eta || ""}
@@ -1613,16 +1355,12 @@ export default function FactoryShippingContainers() {
 
                     {/* Arrived Date */}
                     <TableCell>
-                      {r._isGhost ? (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      ) : (
-                        <DateCellInput
-                          value={r.containerArrivedDate || ""}
-                          placeholder="Not arrived"
-                          onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { containerArrivedDate: v || null } })}
-                          testId={`cell-arrived-${r.id}`}
-                        />
-                      )}
+                      <DateCellInput
+                        value={r.containerArrivedDate || ""}
+                        placeholder="Not arrived"
+                        onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { containerArrivedDate: v || null } })}
+                        testId={`cell-arrived-${r.id}`}
+                      />
                     </TableCell>
 
                     {/* Finalized (read-only from customer_orders) */}
@@ -1634,25 +1372,17 @@ export default function FactoryShippingContainers() {
 
                     {/* Shipping Company */}
                     <TableCell>
-                      {r._isGhost ? (
-                        <span className="text-xs text-muted-foreground">{r.shippingCompany || "—"}</span>
-                      ) : (
-                        <EditableCellInput
-                          value={r.shippingCompany || ""}
-                          placeholder="Enter company"
-                          onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { shippingCompany: v || null } })}
-                          testId={`cell-shipping-${r.id}`}
-                        />
-                      )}
+                      <EditableCellInput
+                        value={r.shippingCompany || ""}
+                        placeholder="Enter company"
+                        onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { shippingCompany: v || null } })}
+                        testId={`cell-shipping-${r.id}`}
+                      />
                     </TableCell>
 
                     {/* Documents */}
                     <TableCell>
-                      {r._isGhost ? (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      ) : (
-                        <DocIndicator count={r.documentCount} onClick={() => setDocsRowId(r.id)} />
-                      )}
+                      <DocIndicator count={r.documentCount} onClick={() => setDocsRowId(r.id)} />
                     </TableCell>
 
                     {/* Container Cost (grandTotal from invoice) */}
@@ -1664,62 +1394,40 @@ export default function FactoryShippingContainers() {
 
                     {/* CI No. */}
                     <TableCell>
-                      {r._isGhost ? (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      ) : (
-                        <EditableCellInput
-                          value={r.ciNumber || ""}
-                          placeholder="Enter CI #"
-                          onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { ciNumber: v || null } })}
-                          testId={`cell-ci-${r.id}`}
-                        />
-                      )}
+                      <EditableCellInput
+                        value={r.ciNumber || ""}
+                        placeholder="Enter CI #"
+                        onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { ciNumber: v || null } })}
+                        testId={`cell-ci-${r.id}`}
+                      />
                     </TableCell>
 
                     {/* Note */}
                     <TableCell>
-                      {r._isGhost ? (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      ) : (
-                        <EditableCellInput
-                          value={r.note || ""}
-                          placeholder="Add note"
-                          onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { note: v || null } })}
-                          testId={`cell-note-${r.id}`}
-                        />
-                      )}
+                      <EditableCellInput
+                        value={r.note || ""}
+                        placeholder="Add note"
+                        onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { note: v || null } })}
+                        testId={`cell-note-${r.id}`}
+                      />
                     </TableCell>
 
                     {/* WhatsApp */}
                     <TableCell>
-                      {r._isGhost ? (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-green-300 text-green-700 dark:border-green-700 dark:text-green-400 whitespace-nowrap"
-                          onClick={() => setWaRowId(r.id)}
-                          data-testid={`button-prepare-wa-${r.id}`}
-                        >
-                          <MessageCircle className="h-3.5 w-3.5 mr-1" /> Prepare
-                        </Button>
-                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-green-300 text-green-700 dark:border-green-700 dark:text-green-400 whitespace-nowrap"
+                        onClick={() => setWaRowId(r.id)}
+                        data-testid={`button-prepare-wa-${r.id}`}
+                      >
+                        <MessageCircle className="h-3.5 w-3.5 mr-1" /> Prepare
+                      </Button>
                     </TableCell>
 
-                    {/* Done + Delete (ghost rows show "+ Add" button) */}
+                    {/* Done + Delete */}
                     <TableCell>
-                      {r._isGhost ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setAddOpen(true)}
-                          data-testid={`button-add-ghost-${r.id}`}
-                        >
-                          <Plus className="h-3.5 w-3.5 mr-1" /> Add
-                        </Button>
-                      ) : (
-                        <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1">
                           <Button
                             size="sm"
                             variant="outline"
@@ -1737,7 +1445,6 @@ export default function FactoryShippingContainers() {
                             <Trash2 className="h-3.5 w-3.5 text-destructive" />
                           </Button>
                         </div>
-                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -1843,8 +1550,6 @@ export default function FactoryShippingContainers() {
       />
 
       {/* ── Dialogs ── */}
-      <AddRecordDialog open={addOpen} onClose={() => setAddOpen(false)} />
-
       <DocumentsModal
         open={!!docsRowId}
         rowId={docsRowId}

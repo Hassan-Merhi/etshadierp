@@ -93,6 +93,43 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
     }
   });
 
+  // ── POST sync: auto-create backing rows for all active orders ────────────────
+  // Called on page load — idempotent, uses unique constraint to skip duplicates.
+  app.post("/api/factory/shipping-container-rows/sync", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orders = await db
+        .select({ id: customerOrders.id, orderDate: customerOrders.orderDate })
+        .from(customerOrders)
+        .where(and(
+          eq(customerOrders.companyId, companyId),
+          isNull(customerOrders.deletedAt),
+          sql`${customerOrders.status} = ANY(ARRAY['LOADING','PENDING_VERIFICATION','VERIFIED','FINALIZED'])`,
+          sql`NOT EXISTS (
+            SELECT 1 FROM factory_shipping_container_rows fscr
+            WHERE fscr.customer_order_id = ${customerOrders.id}
+              AND fscr.company_id = ${companyId}
+          )`,
+        ));
+
+      if (orders.length > 0) {
+        await db.insert(factoryShippingContainerRows).values(
+          orders.map((o) => ({
+            companyId,
+            customerOrderId: o.id,
+            orderDate: o.orderDate || new Date().toISOString().slice(0, 10),
+          }))
+        ).onConflictDoNothing();
+      }
+
+      res.json({ created: orders.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ── GET list all shipping container rows ─────────────────────────────────────
   app.get("/api/factory/shipping-container-rows", requireAuth, async (req: any, res: any) => {
     try {
