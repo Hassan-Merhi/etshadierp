@@ -1,3 +1,4 @@
+import { trackOneContainerById } from "../../services/containerTrackingService";
 import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getClientDate } from "../../lib/dateUtils";
 import { getExportPriceVisibility } from "../../helpers/exportVisibility";
@@ -4963,6 +4964,68 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         .orderBy(desc(customerOrders.orderDate), desc(customerOrders.id));
 
       res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/factory/shipping-containers/track-now
+  // Finds all active factory customer orders with container numbers, matches
+  // them to ERP containers table, and triggers live tracking for each one.
+  app.post("/api/factory/shipping-containers/track-now", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // Get all active factory customer orders with a container number
+      const orders = await db
+        .select({ containerNumber: customerOrders.containerNumber })
+        .from(customerOrders)
+        .where(
+          and(
+            eq(customerOrders.companyId, companyId),
+            isNull(customerOrders.deletedAt),
+            sql`${customerOrders.containerNumber} IS NOT NULL AND TRIM(${customerOrders.containerNumber}) <> ''`,
+          )
+        );
+
+      const containerNumbers = [...new Set(
+        orders.map((o) => (o.containerNumber || "").trim().toUpperCase()).filter(Boolean)
+      )];
+
+      if (containerNumbers.length === 0) {
+        return res.json({ tracked: 0, message: "No container numbers found on active orders." });
+      }
+
+      // Find matching ERP containers
+      const matched = await db
+        .select({ id: containers.id, containerNumber: containers.containerNumber })
+        .from(containers)
+        .where(
+          and(
+            inArray(sql`UPPER(TRIM(${containers.containerNumber}))`, containerNumbers),
+            isNull(containers.deletedAt),
+          )
+        );
+
+      if (matched.length === 0) {
+        return res.json({
+          tracked: 0,
+          message: "No matching containers found in tracking system. Ensure container numbers are registered as ERP containers.",
+        });
+      }
+
+      // Fire tracking for each matched container in parallel (fire-and-forget)
+      let queued = 0;
+      for (const c of matched) {
+        trackOneContainerById(c.id).catch(() => {});
+        queued++;
+      }
+
+      res.json({
+        tracked: queued,
+        message: `Tracking started for ${queued} container${queued !== 1 ? "s" : ""}. ETAs will update shortly.`,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

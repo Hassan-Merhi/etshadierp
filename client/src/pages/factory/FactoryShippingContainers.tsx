@@ -1229,6 +1229,15 @@ export default function FactoryShippingContainers() {
     queryKey: ["/api/factory/invoice-container-tracking"],
   });
 
+  const trackAllMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/factory/shipping-containers/track-now"),
+    onSuccess: (data: any) => {
+      toast({ title: "Tracking started", description: data?.message ?? "ETA updates will appear shortly." });
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/factory/invoice-container-tracking"] }), 8000);
+    },
+    onError: (err: any) => toast({ title: "Tracking failed", description: err.message, variant: "destructive" }),
+  });
+
   const { data: availableInvoices = [] } = useQuery<AvailableInvoice[]>({
     queryKey: [`${LIST_KEY}/available-invoices`],
   });
@@ -1432,6 +1441,17 @@ export default function FactoryShippingContainers() {
               data-testid="input-search"
             />
           </div>
+          <Button
+            variant="outline"
+            onClick={() => trackAllMutation.mutate()}
+            disabled={trackAllMutation.isPending}
+            data-testid="button-track-all-eta"
+          >
+            {trackAllMutation.isPending
+              ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              : <RefreshCw className="h-4 w-4 mr-1" />}
+            {trackAllMutation.isPending ? "Tracking…" : "Track All ETAs"}
+          </Button>
           <Button
             variant={showFilters ? "secondary" : "outline"}
             onClick={() => setShowFilters((v) => !v)}
