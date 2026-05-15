@@ -221,6 +221,7 @@ const FactoryRentalPayments = lazy(() => import("@/pages/factory/FactoryRentalPa
 const PropertiesRentalPayments = lazy(() => import("@/pages/properties/PropertiesRentalPayments"));
 const MySettings = lazy(() => import("@/pages/MySettings"));
 import { CommandPalette } from "@/components/CommandPalette";
+import { AppTopBar } from "@/components/AppTopBar";
 import { UserNotesPanel } from "@/components/UserNotesPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowLeft } from "lucide-react";
@@ -718,38 +719,19 @@ function AuthenticatedApp() {
           <div className="flex h-screen w-full">
             <PropertiesSidebar user={user} />
             <div className="flex flex-col flex-1 overflow-hidden">
-              <header className="flex items-center justify-between p-2 sm:p-4 border-b min-h-14 sm:h-16 gap-2 sm:gap-4 no-print">
-                <div className="flex items-center gap-2">
-                  <SidebarTrigger data-testid="button-sidebar-toggle" />
+              <AppTopBar
+                accentColor="#6366f1"
+                user={user}
+                onLogout={handleLogout}
+                onSearchOpen={() => setPaletteOpen(true)}
+                showSearch={user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer"}
+                leftContent={
                   <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-indigo-600/10 border border-indigo-600/20">
                     <Building2 className="h-4 w-4 text-indigo-600" />
                     <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wider">Properties</span>
                   </div>
-                </div>
-                <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">
-                  {(user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer") && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex items-center gap-1.5 text-muted-foreground"
-                    onClick={() => setPaletteOpen(true)}
-                    data-testid="button-open-palette"
-                  >
-                    <Search className="h-4 w-4" />
-                    <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 text-[10px] font-mono">
-                      Ctrl /
-                    </kbd>
-                  </Button>
-                  )}
-                  <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>
-                  <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
-                    <LogOut className="h-4 w-4" />
-                  </Button>
-                  <CurrencyToggle />
-                  <CompanySelector />
-                  <ThemeToggle />
-                </div>
-              </header>
+                }
+              />
               <OfflineBanner />
               <main className="flex-1 overflow-y-auto p-3 sm:p-6">
                 <div className="w-full">
@@ -966,9 +948,13 @@ function AuthenticatedApp() {
             {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
             <FactorySidebar user={user} />
             <div className="flex flex-col flex-1 overflow-hidden">
-              <header className="flex items-center justify-between p-2 sm:p-4 border-b min-h-14 sm:h-16 gap-2 sm:gap-4 no-print">
-                <div className="flex items-center gap-2">
-                  <SidebarTrigger data-testid="button-sidebar-toggle" />
+              <AppTopBar
+                accentColor="#f97316"
+                user={user}
+                onLogout={handleLogout}
+                onSearchOpen={() => setPaletteOpen(true)}
+                showSearch={user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer"}
+                leftContent={
                   <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-orange-600/10 border border-orange-600/20">
                     <Factory className="h-4 w-4 text-orange-600" />
                     <span className="text-xs font-semibold text-orange-600 uppercase tracking-wider">Factory Mode</span>
@@ -976,43 +962,16 @@ function AuthenticatedApp() {
                       <span className="hidden sm:inline text-xs text-orange-600/70 font-normal normal-case tracking-normal border-l border-orange-600/20 pl-2">{myAccess.companyName}</span>
                     )}
                   </div>
-                </div>
-                <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">
-                  {!isFactoryCompany && hasErpAccess && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setLocation("/")}
-                      data-testid="button-switch-erp"
-                    >
+                }
+                extraActions={
+                  !isFactoryCompany && hasErpAccess ? (
+                    <Button variant="outline" size="sm" onClick={() => setLocation("/")} data-testid="button-switch-erp">
                       <Package className="h-4 w-4 mr-1" />
                       Switch to ERP
                     </Button>
-                  )}
-                  {(user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer") && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex items-center gap-1.5 text-muted-foreground"
-                    onClick={() => setPaletteOpen(true)}
-                    data-testid="button-open-palette"
-                  >
-                    <Search className="h-4 w-4" />
-                    <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 text-[10px] font-mono">
-                      Ctrl /
-                    </kbd>
-                  </Button>
-                  )}
-                  <PendingSyncIndicator />
-                  <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>
-                  <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
-                    <LogOut className="h-4 w-4" />
-                  </Button>
-                  <CurrencyToggle />
-                  <CompanySelector />
-                  <ThemeToggle />
-                </div>
-              </header>
+                  ) : undefined
+                }
+              />
               <OfflineBanner />
               <main className="flex-1 overflow-y-auto p-3 sm:p-6">
                 <div className="w-full">
@@ -1154,33 +1113,13 @@ function AuthenticatedApp() {
           {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
           <AppSidebar user={user} />
           <div className="flex flex-col flex-1 overflow-hidden">
-            <header className="flex items-center justify-between p-2 sm:p-4 border-b min-h-14 sm:h-16 gap-2 sm:gap-4 no-print">
-              <SidebarTrigger data-testid="button-sidebar-toggle" />
-              <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">
-                <PendingSyncIndicator />
-                {(user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer") && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex items-center gap-1.5 text-muted-foreground"
-                  onClick={() => setPaletteOpen(true)}
-                  data-testid="button-open-palette"
-                >
-                  <Search className="h-4 w-4" />
-                  <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 text-[10px] font-mono">
-                    Ctrl /
-                  </kbd>
-                </Button>
-                )}
-                <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>
-                <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
-                  <LogOut className="h-4 w-4" />
-                </Button>
-                <CurrencyToggle />
-                <CompanySelector />
-                <ThemeToggle />
-              </div>
-            </header>
+            <AppTopBar
+              accentColor="#3b82f6"
+              user={user}
+              onLogout={handleLogout}
+              onSearchOpen={() => setPaletteOpen(true)}
+              showSearch={user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer"}
+            />
             <OfflineBanner />
             <main className="flex-1 overflow-y-auto p-3 sm:p-6">
               <div className="w-full">
