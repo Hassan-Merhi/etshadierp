@@ -2372,25 +2372,6 @@ import { PageHeader } from "@/components/PageHeader";
           <PageHeader title="Bale Stock Entry" />
           <div className="flex items-center gap-2">
             <LabelPrintSettings />
-            {productionAlreadyEnded ? (
-              <Badge variant="secondary" className="gap-1" data-testid="badge-production-ended">
-                <CheckCircle className="h-3 w-3" />
-                Production Ended
-              </Badge>
-            ) : (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => endProductionMutation.mutate()}
-                disabled={endProductionMutation.isPending}
-                data-testid="button-end-production"
-              >
-                {endProductionMutation.isPending
-                  ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                  : <Square className="h-3 w-3 mr-1" />}
-                End Production
-              </Button>
-            )}
             <Badge variant="secondary" data-testid="badge-stock-entry">STOCK ENTRY</Badge>
           </div>
         </div>
