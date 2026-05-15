@@ -245,9 +245,8 @@ export default function OptionalVouchers() {
               <thead>
                 <tr className="h-11 bg-muted/40 border-b">
                   <th className="text-left px-4 font-medium">Date</th>
-                  <th className="text-left px-4 font-medium">Voucher #</th>
                   <th className="text-left px-4 font-medium">Type</th>
-                  <th className="text-left px-4 font-medium">Location</th>
+                  <th className="text-left px-4 font-medium">Description</th>
                   <th className="text-right px-4 font-medium">Total</th>
                   <th className="text-right px-4 font-medium">Actions</th>
                 </tr>
@@ -258,16 +257,13 @@ export default function OptionalVouchers() {
                     <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                       {v.voucherDate ? format(new Date(v.voucherDate + "T00:00:00"), "dd MMM yyyy") : "—"}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                      {v.voucherNumber || <span className="italic">Draft</span>}
-                    </td>
                     <td className="px-4 py-3">
                       <Badge variant={getTypeBadgeVariant(v.voucherType)} className="text-xs">
                         {v.voucherType}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {v.locationName || "—"}
+                    <td className="px-4 py-3 text-muted-foreground text-sm">
+                      {v.description || "—"}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums font-medium">
                       {parseFloat(v.totalAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
@@ -310,7 +306,7 @@ export default function OptionalVouchers() {
               </tbody>
               <tfoot>
                 <tr className="border-t bg-muted/40">
-                  <td colSpan={4} className="px-4 py-2 text-sm font-medium">
+                  <td colSpan={3} className="px-4 py-2 text-sm font-medium">
                     Total ({vouchers.length} voucher{vouchers.length !== 1 ? "s" : ""})
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums font-semibold" data-testid="text-optional-grand-total-footer">
@@ -331,16 +327,15 @@ export default function OptionalVouchers() {
                     <div className="text-sm font-medium">
                       {v.voucherDate ? format(new Date(v.voucherDate + "T00:00:00"), "dd MMM yyyy") : "—"}
                     </div>
-                    {v.voucherNumber && (
-                      <div className="text-xs font-mono text-muted-foreground mt-0.5">{v.voucherNumber}</div>
+                    {v.description && (
+                      <div className="text-xs text-muted-foreground mt-0.5">{v.description}</div>
                     )}
                   </div>
                   <Badge variant={getTypeBadgeVariant(v.voucherType)} className="text-xs shrink-0">
                     {v.voucherType}
                   </Badge>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{v.locationName || "—"}</span>
+                <div className="flex items-center justify-end text-sm">
                   <span className="font-semibold tabular-nums">
                     {parseFloat(v.totalAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   </span>
