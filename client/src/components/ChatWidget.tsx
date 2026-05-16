@@ -31,6 +31,8 @@ import {
   Paperclip,
   Upload,
   ShoppingCart,
+  Download,
+  FileCheck,
 } from "lucide-react";
 import {
   Select,
@@ -184,10 +186,21 @@ interface POImportResult {
   poId: number;
   poNumber: string;
   containerNumber: string;
+  containerId: number;
+  supplierId: number;
   lineCount: number;
   itemsTotal: string;
   grandTotal: string;
   crossCompany: boolean;
+  availableProformas: { id: number; reference: string }[];
+}
+
+interface VerifyContainerDraft {
+  containerNumber: string;
+  containerId: number;
+  supplierId: number;
+  supplierName: string;
+  proformas: { id: number; reference: string }[];
 }
 
 interface ChatResponse {
@@ -199,6 +212,7 @@ interface ChatResponse {
   stockItemDraft?: StockItemDraft | null;
   priceUpdateDraft?: PriceUpdateDraft | null;
   accountQueryResult?: AccountQueryResult | null;
+  verifyContainerDraft?: VerifyContainerDraft | null;
 }
 
 interface VoucherDraft {
@@ -882,15 +896,50 @@ function POImportDraftCard({
               Cross-company transfer vouchers created in parent company.
             </p>
           )}
-          <Button
-            size="sm"
-            variant="outline"
-            className="mt-3 h-7 text-xs"
-            onClick={() => setLocation(`/containers`)}
-            data-testid="button-view-po"
-          >
-            View Containers
-          </Button>
+          <div className="flex gap-2 mt-3 flex-wrap">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={() => setLocation(`/containers`)}
+              data-testid="button-view-po"
+            >
+              View Containers
+            </Button>
+          </div>
+          {result.availableProformas && result.availableProformas.length > 0 && (
+            <div className="mt-3 border-t pt-3">
+              <p className="text-[11px] font-semibold text-muted-foreground mb-1.5">Download Verification Excel</p>
+              {result.availableProformas.length === 1 ? (
+                <a
+                  href={`/api/suppliers/${result.supplierId}/containers/${result.containerId}/verification-export.xlsx?proformaId=${result.availableProformas[0].id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Button size="sm" variant="outline" className="h-7 text-xs w-full" data-testid="button-download-verification-excel">
+                    <Download className="h-3 w-3 mr-1.5" />
+                    {result.availableProformas[0].reference}
+                  </Button>
+                </a>
+              ) : (
+                <div className="space-y-1">
+                  {result.availableProformas.map(p => (
+                    <a
+                      key={p.id}
+                      href={`/api/suppliers/${result.supplierId}/containers/${result.containerId}/verification-export.xlsx?proformaId=${p.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block"
+                    >
+                      <Button variant="outline" size="sm" className="w-full h-7 text-xs justify-start" data-testid={`button-download-proforma-${p.id}`}>
+                        <Download className="h-3 w-3 mr-1.5 shrink-0" />{p.reference}
+                      </Button>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <div>
@@ -1278,6 +1327,66 @@ function VoucherConfirmCard({
   );
 }
 
+// ── Verify Container Card ─────────────────────────────────────────────
+function VerifyContainerCard({
+  draft,
+  onDismiss,
+}: {
+  draft: VerifyContainerDraft;
+  onDismiss: () => void;
+}) {
+  const downloadUrl = (proformaId: number) =>
+    `/api/suppliers/${draft.supplierId}/containers/${draft.containerId}/verification-export.xlsx?proformaId=${proformaId}`;
+
+  return (
+    <div className="mt-2 rounded-md border border-blue-500/30 bg-blue-500/5 overflow-hidden" data-testid="verify-container-card">
+      <div className="px-3 py-2 bg-blue-500/10 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <FileCheck className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+          <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">
+            Container Verification: {draft.containerNumber}
+          </span>
+        </div>
+        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onDismiss} data-testid="button-dismiss-verify-container">
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+      <div className="px-3 py-3">
+        {draft.supplierName && (
+          <p className="text-xs text-muted-foreground mb-2">Supplier: {draft.supplierName}</p>
+        )}
+        {draft.proformas.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No proformas found for this supplier. Please create a proforma first.</p>
+        ) : draft.proformas.length === 1 ? (
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">Proforma: <span className="font-medium text-foreground">{draft.proformas[0].reference}</span></p>
+            <a href={downloadUrl(draft.proformas[0].id)} target="_blank" rel="noreferrer">
+              <Button size="sm" className="w-full h-7 text-xs" data-testid="button-download-verify-excel">
+                <Download className="h-3 w-3 mr-1.5" />
+                Download Verification Excel
+              </Button>
+            </a>
+          </div>
+        ) : (
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">Select a proforma to compare against:</p>
+            <div className="space-y-1">
+              {draft.proformas.map(p => (
+                <a key={p.id} href={downloadUrl(p.id)} target="_blank" rel="noreferrer" className="block">
+                  <Button variant="outline" size="sm" className="w-full h-7 text-xs justify-start" data-testid={`button-verify-proforma-${p.id}`}>
+                    <Download className="h-3 w-3 mr-1.5 shrink-0" />
+                    {p.reference}
+                  </Button>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main ChatWidget ──────────────────────────────────────────────────
 export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -1303,6 +1412,7 @@ export function ChatWidget() {
   const [poDraftUploading, setPoDraftUploading] = useState(false);
   const [poDraftSubmitting, setPoDraftSubmitting] = useState(false);
   const [poDraftResult, setPoDraftResult] = useState<POImportResult | null>(null);
+  const [verifyContainerDraft, setVerifyContainerDraft] = useState<VerifyContainerDraft | null>(null);
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -1358,6 +1468,11 @@ export function ChatWidget() {
         setAccountQueryResult(data.accountQueryResult);
       } else {
         setAccountQueryResult(null);
+      }
+      if (data.verifyContainerDraft) {
+        setVerifyContainerDraft(data.verifyContainerDraft);
+      } else {
+        setVerifyContainerDraft(null);
       }
     },
   });
@@ -1567,6 +1682,7 @@ export function ChatWidget() {
     setAccountQueryResult(null);
     setPoDraft(null);
     setPoDraftResult(null);
+    setVerifyContainerDraft(null);
     setShowAlerts(true);
     queryClient.removeQueries({ queryKey: [`/api/chatbot/history/${sessionId}`] });
   };
@@ -1885,9 +2001,17 @@ export function ChatWidget() {
                     <POImportDraftCard
                       draft={poDraft}
                       onConfirm={handleConfirmPOImport}
-                      onDismiss={() => { setPoDraft(null); setPoDraftResult(null); }}
+                      onDismiss={() => { setPoDraft(null); setPoDraftResult(null); setVerifyContainerDraft(null); }}
                       isSubmitting={poDraftSubmitting}
                       result={poDraftResult}
+                    />
+                  )}
+
+                  {/* ── 5i: Verify Container Download Card ── */}
+                  {verifyContainerDraft && !sendMutation.isPending && (
+                    <VerifyContainerCard
+                      draft={verifyContainerDraft}
+                      onDismiss={() => setVerifyContainerDraft(null)}
                     />
                   )}
                 </div>

@@ -155,7 +155,7 @@ export function registerChatbotRoutes(app: Express) {
       // Save assistant response
       await saveMessage(companyId, userId, "assistant", result.response, sessionId);
 
-      res.json({ response: result.response, suggestions: result.suggestions, voucherDraft: result.voucherDraft ?? null, stockAdjustmentDraft: result.stockAdjustmentDraft ?? null, voucherSearchResults: result.voucherSearchResults ?? null, stockItemDraft: result.stockItemDraft ?? null, priceUpdateDraft: result.priceUpdateDraft ?? null, accountQueryResult: result.accountQueryResult ?? null });
+      res.json({ response: result.response, suggestions: result.suggestions, voucherDraft: result.voucherDraft ?? null, stockAdjustmentDraft: result.stockAdjustmentDraft ?? null, voucherSearchResults: result.voucherSearchResults ?? null, stockItemDraft: result.stockItemDraft ?? null, priceUpdateDraft: result.priceUpdateDraft ?? null, accountQueryResult: result.accountQueryResult ?? null, verifyContainerDraft: result.verifyContainerDraft ?? null });
     } catch (error: any) {
       console.error("[Chatbot] ERROR:", error.message);
       console.error("[Chatbot] Stack:", error.stack);
@@ -668,15 +668,26 @@ export function registerChatbotRoutes(app: Express) {
         });
       }
 
+      // Fetch available proformas for the download-after-import offer
+      const { supplierProformas } = await import("@shared/schema");
+      const availableProformas = await db
+        .select({ id: supplierProformas.id, reference: supplierProformas.reference })
+        .from(supplierProformas)
+        .where(and(eq(supplierProformas.companyId, companyId), eq(supplierProformas.supplierId, Number(supplierId))))
+        .orderBy(desc(supplierProformas.createdAt));
+
       res.json({
-        success:         true,
-        poId:            po.id,
-        poNumber:        po.poNumber,
+        success:            true,
+        poId:               po.id,
+        poNumber:           po.poNumber,
         containerNumber,
-        lineCount:       lines.length,
-        itemsTotal:      itemsTotal.toFixed(2),
-        grandTotal:      grandTotal.toFixed(2),
-        crossCompany:    !!(await storage.getParentCompanyId()),
+        containerId:        container.id,
+        supplierId:         Number(supplierId),
+        lineCount:          lines.length,
+        itemsTotal:         itemsTotal.toFixed(2),
+        grandTotal:         grandTotal.toFixed(2),
+        crossCompany:       !!(await storage.getParentCompanyId()),
+        availableProformas,
       });
     } catch (error: any) {
       console.error("PO import confirm error:", error);

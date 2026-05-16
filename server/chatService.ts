@@ -1258,7 +1258,7 @@ export async function chat(
   companyId: number,
   conversationHistory: { role: string; content: string }[] = [],
   userPreferences?: UserPreferences
-): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any; voucherSearchResults?: any[]; stockItemDraft?: any; priceUpdateDraft?: any; accountQueryResult?: any }> {
+): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any; voucherSearchResults?: any[]; stockItemDraft?: any; priceUpdateDraft?: any; accountQueryResult?: any; verifyContainerDraft?: any }> {
   const available = getAvailableProviders();
   
   if (available.length === 0) {
@@ -1738,6 +1738,53 @@ If intent is not about an account query, respond with exactly: null`;
       }
     }
 
+    // ── Verify Container Excel detection ──────────────────────────────
+    const VERIFY_CONTAINER_KEYWORDS = /\b(verif(y|ication)|container\s+verif|verif.*container|verification\s+excel|excel.*verif|download.*verif|container.*excel)\b/i;
+    let verifyContainerDraft: any = undefined;
+
+    if (VERIFY_CONTAINER_KEYWORDS.test(userMessage)) {
+      try {
+        // Try to extract a container number from the message
+        const containerNumMatch =
+          userMessage.match(/container\s+(?:no\.?\s*|number\s+|#\s*)?["']?([A-Z0-9][A-Z0-9\-\/]{3,25})["']?/i) ||
+          userMessage.match(/\b([A-Z]{4}\d{6,7})\b/) ||
+          userMessage.match(/\bfor\s+["']?([A-Z0-9][A-Z0-9\-]{4,20})["']?\s*(?:$|\s)/i);
+
+        const containerNumber = containerNumMatch ? containerNumMatch[1].toUpperCase() : null;
+
+        if (containerNumber) {
+          const [container] = await db
+            .select({ id: schema.containers.id, containerNumber: schema.containers.containerNumber, supplierId: schema.containers.supplierId })
+            .from(schema.containers)
+            .where(and(eq(schema.containers.companyId, companyId), ilike(schema.containers.containerNumber, containerNumber)))
+            .limit(1);
+
+          if (container) {
+            const [proformas, supplierRow] = await Promise.all([
+              db.select({ id: schema.supplierProformas.id, reference: schema.supplierProformas.reference })
+                .from(schema.supplierProformas)
+                .where(and(eq(schema.supplierProformas.companyId, companyId), eq(schema.supplierProformas.supplierId, container.supplierId)))
+                .orderBy(desc(schema.supplierProformas.createdAt)),
+              db.select({ name: schema.suppliers.legalName })
+                .from(schema.suppliers)
+                .where(eq(schema.suppliers.id, container.supplierId))
+                .limit(1),
+            ]);
+
+            verifyContainerDraft = {
+              containerNumber: container.containerNumber,
+              containerId: container.id,
+              supplierId: container.supplierId,
+              supplierName: supplierRow[0]?.name || "",
+              proformas,
+            };
+          }
+        }
+      } catch (_) {
+        // Failed silently
+      }
+    }
+
     return {
       response,
       suggestions,
@@ -1748,6 +1795,7 @@ If intent is not about an account query, respond with exactly: null`;
       stockItemDraft,
       priceUpdateDraft,
       accountQueryResult,
+      verifyContainerDraft,
     };
   } catch (error: any) {
     console.error("[ChatService] ERROR:", error.message);
