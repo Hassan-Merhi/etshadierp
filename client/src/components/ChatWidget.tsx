@@ -1919,7 +1919,7 @@ export function ChatWidget() {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".xlsx,.xls,.csv"
+                    accept=".pdf,.xlsx,.xls,.csv"
                     className="hidden"
                     onChange={handleFileSelect}
                     data-testid="input-po-file"

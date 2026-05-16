@@ -1574,3 +1574,69 @@ export async function saveFeedback(
 ): Promise<void> {
   console.log(`Feedback saved: Message ${messageId} - ${feedback} by user ${userId}`);
 }
+
+// ── AI-powered PO text extraction ────────────────────────────────────
+// Used by the PO file import feature to parse any text content (PDF, CSV, Excel raw text)
+// into a structured PO object regardless of layout or column names.
+export async function extractPOFromText(rawText: string): Promise<{
+  poNumber: string;
+  containerNumber: string;
+  supplierName: string;
+  supplierCode: string;
+  importDate: string;
+  currency: string;
+  items: { name: string; code: string; quantity: number; rate: number }[];
+  freight: number;
+  surcharge: number;
+  fumigation: number;
+  documentCharges: number;
+  discount: number;
+  otherCharges: number;
+} | null> {
+  const available = getAvailableProviders();
+  if (!available.length) return null;
+
+  const today = new Date().toISOString().split("T")[0];
+  const systemPrompt = `You are a data extraction assistant. Extract purchase order data from the provided text and return ONLY valid JSON with no markdown, no explanation.
+
+Required JSON structure:
+{
+  "poNumber": "string (PO/invoice number, or empty if not found)",
+  "containerNumber": "string (container/shipment number, or empty if not found)",
+  "supplierName": "string (supplier/vendor name, or empty)",
+  "supplierCode": "string (supplier code, or empty)",
+  "importDate": "string (YYYY-MM-DD format, use ${today} if not found)",
+  "currency": "string (USD, EUR, etc. Default USD)",
+  "items": [
+    { "name": "string", "code": "string (barcode/SKU/item code or empty)", "quantity": number, "rate": number }
+  ],
+  "freight": number,
+  "surcharge": number,
+  "fumigation": number,
+  "documentCharges": number,
+  "discount": number,
+  "otherCharges": number
+}
+
+Rules:
+- items array must include every product/item line with quantity > 0 and rate > 0
+- All numeric fields default to 0 if not found
+- Return ONLY the JSON object, nothing else`;
+
+  const selectedProvider = await getSelectedAIProvider();
+  try {
+    const { response } = await callAIWithFallback(
+      selectedProvider,
+      systemPrompt,
+      [],
+      `Extract PO data from this text:\n\n${rawText.slice(0, 8000)}`
+    );
+    const cleaned = response.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const parsed = JSON.parse(cleaned);
+    if (!Array.isArray(parsed.items)) return null;
+    return parsed;
+  } catch (err) {
+    console.error("[ChatService] extractPOFromText AI error:", err);
+    return null;
+  }
+}
