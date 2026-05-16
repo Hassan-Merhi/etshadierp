@@ -35,6 +35,7 @@ import {
   salaryAdvances, salaryAdvanceDeductions,
   insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
   chatMessages,
+  supplierProformas,
   
   systemSettings,
 } from "@shared/schema";
@@ -669,7 +670,6 @@ export function registerChatbotRoutes(app: Express) {
       }
 
       // Fetch available proformas for the download-after-import offer
-      const { supplierProformas } = await import("@shared/schema");
       const availableProformas = await db
         .select({ id: supplierProformas.id, reference: supplierProformas.reference })
         .from(supplierProformas)
