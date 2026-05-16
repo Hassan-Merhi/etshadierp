@@ -228,7 +228,7 @@ export function AppSidebar({ user }: { user?: any }) {
     ],
     [],
   );
-  const recentItems = useRecentNav(allNavItems);
+  const recentItems = useRecentNav(allNavItems, selectedCompany?.id);
 
   const trailingFor = (item: NavItem) => {
     if (item.url !== "/chat") return null;

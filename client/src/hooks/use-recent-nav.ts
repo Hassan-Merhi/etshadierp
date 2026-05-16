@@ -7,21 +7,24 @@ export interface RecentNavEntry {
   visitedAt: number;
 }
 
-const STORAGE_KEY = "recent-nav-v1";
 const MAX_ITEMS = 5;
 
-function loadFromStorage(): RecentNavEntry[] {
+function storageKey(companyId: number | undefined) {
+  return companyId ? `recent-nav-v1-company-${companyId}` : "recent-nav-v1-global";
+}
+
+function loadFromStorage(companyId: number | undefined): RecentNavEntry[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey(companyId));
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 
-function saveToStorage(entries: RecentNavEntry[]) {
+function saveToStorage(entries: RecentNavEntry[], companyId: number | undefined) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    localStorage.setItem(storageKey(companyId), JSON.stringify(entries));
   } catch {}
 }
 
@@ -30,9 +33,13 @@ interface NavItemLike {
   title: string;
 }
 
-export function useRecentNav(allNavItems: NavItemLike[]) {
+export function useRecentNav(allNavItems: NavItemLike[], companyId?: number) {
   const [location] = useLocation();
-  const [recent, setRecent] = useState<RecentNavEntry[]>(loadFromStorage);
+  const [recent, setRecent] = useState<RecentNavEntry[]>(() => loadFromStorage(companyId));
+
+  useEffect(() => {
+    setRecent(loadFromStorage(companyId));
+  }, [companyId]);
 
   const titleMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -51,10 +58,10 @@ export function useRecentNav(allNavItems: NavItemLike[]) {
         { url: location, title, visitedAt: Date.now() },
         ...filtered,
       ].slice(0, MAX_ITEMS);
-      saveToStorage(next);
+      saveToStorage(next, companyId);
       return next;
     });
-  }, [location, titleMap]);
+  }, [location, titleMap, companyId]);
 
   return recent;
 }

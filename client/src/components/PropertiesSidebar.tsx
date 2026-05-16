@@ -12,6 +12,7 @@ import {
 import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
 import { useMemo } from "react";
 import { useRecentNav } from "@/hooks/use-recent-nav";
+import { useCompany } from "@/contexts/CompanyContext";
 import { Clock } from "lucide-react";
 import {
   ModuleHeader,
@@ -71,7 +72,8 @@ export function PropertiesSidebar({ user }: { user?: any }) {
     ],
     [],
   );
-  const recentItems = useRecentNav(allNavItems);
+  const { selectedCompany } = useCompany();
+  const recentItems = useRecentNav(allNavItems, selectedCompany?.id);
 
   const testIdFor = (i: NavItem) => `link-properties-${i.url.split("/").pop()}`;
 

@@ -50,6 +50,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { useRef, useEffect, useMemo } from "react";
 import { useRecentNav } from "@/hooks/use-recent-nav";
+import { useCompany } from "@/contexts/CompanyContext";
 import { Clock } from "lucide-react";
 import {
   ModuleHeader,
@@ -265,7 +266,8 @@ export function FactorySidebar({ user }: { user?: any }) {
     ],
     [],
   );
-  const recentItems = useRecentNav(allNavItems);
+  const { selectedCompany } = useCompany();
+  const recentItems = useRecentNav(allNavItems, selectedCompany?.id);
 
   const testIdFor = (i: NavItem) => `link-factory-${i.url.split("/").pop()}`;
 
