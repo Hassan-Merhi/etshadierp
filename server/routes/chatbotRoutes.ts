@@ -155,7 +155,7 @@ export function registerChatbotRoutes(app: Express) {
       // Save assistant response
       await saveMessage(companyId, userId, "assistant", result.response, sessionId);
 
-      res.json({ response: result.response, suggestions: result.suggestions, voucherDraft: result.voucherDraft ?? null, stockAdjustmentDraft: result.stockAdjustmentDraft ?? null });
+      res.json({ response: result.response, suggestions: result.suggestions, voucherDraft: result.voucherDraft ?? null, stockAdjustmentDraft: result.stockAdjustmentDraft ?? null, voucherSearchResults: result.voucherSearchResults ?? null });
     } catch (error: any) {
       console.error("[Chatbot] ERROR:", error.message);
       console.error("[Chatbot] Stack:", error.stack);

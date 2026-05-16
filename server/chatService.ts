@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import { db } from "./db";
 import * as schema from "@shared/schema";
-import { eq, and, desc, sql, lt, gt, isNull, asc } from "drizzle-orm";
+import { eq, and, desc, sql, lt, gt, isNull, asc, ilike, or } from "drizzle-orm";
 
 // AI Provider types
 type AIProvider = "gemini" | "chatgpt" | "grok";
@@ -966,7 +966,7 @@ export async function chat(
   companyId: number,
   conversationHistory: { role: string; content: string }[] = [],
   userPreferences?: UserPreferences
-): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any }> {
+): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any; voucherSearchResults?: any[] }> {
   const available = getAvailableProviders();
   
   if (available.length === 0) {
@@ -1119,12 +1119,55 @@ If intent is unclear, respond with exactly: null`;
       }
     }
 
+    // ── Voucher search by description ─────────────────────────────────
+    const VOUCHER_SEARCH_KEYWORDS = /\b(when did (i|we) pay|find (the )?(payment|receipt|voucher|transaction)|search (for )?(voucher|payment|receipt)|show (me )?(the )?(voucher|payment|receipt)|paid for|receipt for|voucher for|payment (for|of)|what voucher|which voucher|show.*payment.*for|show.*receipt.*for)\b/i;
+    let voucherSearchResults: any[] | undefined = undefined;
+
+    if (VOUCHER_SEARCH_KEYWORDS.test(userMessage)) {
+      try {
+        const termPrompt = `Extract the description search term the user wants to search for in their voucher records.
+User message: "${userMessage}"
+Return ONLY the search term as plain text (e.g. "rent", "electricity bill", "client ABC"). If no clear term, return null.`;
+        const termResult = await callAIWithFallback(selectedProvider, termPrompt, [], "Extract voucher search term");
+        const searchTerm = termResult.response.trim().replace(/^["']|["']$/g, "").toLowerCase();
+        if (searchTerm && searchTerm !== "null" && searchTerm.length > 0) {
+          const results = await db
+            .select({
+              id: schema.vouchers.id,
+              voucherNumber: schema.vouchers.voucherNumber,
+              voucherType: schema.vouchers.voucherType,
+              voucherDate: schema.vouchers.voucherDate,
+              description: schema.vouchers.description,
+              totalAmount: schema.vouchers.totalAmount,
+              optional: schema.vouchers.optional,
+            })
+            .from(schema.vouchers)
+            .where(and(
+              eq(schema.vouchers.companyId, companyId),
+              isNull(schema.vouchers.deletedAt),
+              or(
+                ilike(schema.vouchers.description, `%${searchTerm}%`),
+                ilike(schema.vouchers.voucherNumber, `%${searchTerm}%`),
+              ),
+            ))
+            .orderBy(desc(schema.vouchers.voucherDate))
+            .limit(10);
+          if (results.length > 0) {
+            voucherSearchResults = results;
+          }
+        }
+      } catch (_) {
+        // Search failed silently
+      }
+    }
+
     return {
       response,
       suggestions,
       provider: usedProvider,
       voucherDraft,
       stockAdjustmentDraft,
+      voucherSearchResults,
     };
   } catch (error: any) {
     console.error("[ChatService] ERROR:", error.message);

@@ -27,7 +27,9 @@ import {
   ChevronUp,
   Check,
   XCircle,
+  Search,
 } from "lucide-react";
+import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
@@ -74,11 +76,22 @@ interface StockAdjustmentDraft {
   }[];
 }
 
+interface VoucherSearchResult {
+  id: number;
+  voucherNumber: string;
+  voucherType: string;
+  voucherDate: string;
+  description: string | null;
+  totalAmount: string;
+  optional: boolean;
+}
+
 interface ChatResponse {
   response: string;
   suggestions: string[];
   voucherDraft?: VoucherDraft | null;
   stockAdjustmentDraft?: StockAdjustmentDraft | null;
+  voucherSearchResults?: VoucherSearchResult[] | null;
 }
 
 interface VoucherDraft {
@@ -358,6 +371,74 @@ function StockAdjustmentConfirmCard({
   );
 }
 
+// ── Voucher Search Results Card ──────────────────────────────────────
+const VOUCHER_TYPE_TAB: Record<string, string> = {
+  Payment: "payment",
+  Receipt: "receipt",
+  Journal: "journal",
+  "Stock Transfer": "transfer",
+  Production: "adjustment",
+  Consumption: "adjustment",
+  Mixed: "adjustment",
+  "Credit Note": "creditnote",
+};
+
+function VoucherSearchResultsCard({
+  results,
+  onDismiss,
+}: {
+  results: VoucherSearchResult[];
+  onDismiss: () => void;
+}) {
+  const [, setLocation] = useLocation();
+  return (
+    <div className="mt-2 rounded-md border border-blue-500/30 bg-blue-500/5 overflow-hidden" data-testid="voucher-search-results-card">
+      <div className="px-3 py-2 bg-blue-500/10 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Search className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+          <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">
+            {results.length} Voucher{results.length !== 1 ? "s" : ""} Found
+          </span>
+        </div>
+        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onDismiss}>
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+      <div className="divide-y">
+        {results.map(v => {
+          const tab = VOUCHER_TYPE_TAB[v.voucherType] ?? "payment";
+          const amount = parseFloat(v.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          return (
+            <div key={v.id} className="px-3 py-2 flex items-start justify-between gap-2 hover-elevate">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-semibold text-foreground">{v.voucherNumber}</span>
+                  <span className="text-[10px] text-muted-foreground bg-muted rounded px-1 py-0.5">{v.voucherType}</span>
+                  {v.optional && <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded px-1 py-0.5">Optional</span>}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{v.description || "—"}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[10px] text-muted-foreground">{v.voucherDate}</span>
+                  <span className="text-[10px] font-medium text-foreground">${amount}</span>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="shrink-0 text-xs h-7 px-2"
+                onClick={() => setLocation(`/vouchers?tab=${tab}`)}
+                data-testid={`button-view-voucher-${v.id}`}
+              >
+                View
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Voucher Confirmation Card ────────────────────────────────────────
 function VoucherConfirmCard({
   draft,
@@ -450,6 +531,7 @@ export function ChatWidget() {
   const [voucherSubmitting, setVoucherSubmitting] = useState(false);
   const [pendingStockAdj, setPendingStockAdj] = useState<StockAdjustmentDraft | null>(null);
   const [stockAdjSubmitting, setStockAdjSubmitting] = useState(false);
+  const [voucherSearchResults, setVoucherSearchResults] = useState<VoucherSearchResult[] | null>(null);
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -484,6 +566,11 @@ export function ChatWidget() {
       } else if (data.stockAdjustmentDraft) {
         setPendingStockAdj(data.stockAdjustmentDraft);
         setPendingVoucher(null);
+      }
+      if (data.voucherSearchResults && data.voucherSearchResults.length > 0) {
+        setVoucherSearchResults(data.voucherSearchResults);
+      } else {
+        setVoucherSearchResults(null);
       }
     },
   });
@@ -603,6 +690,7 @@ export function ChatWidget() {
     setFeedbackGiven({});
     setPendingVoucher(null);
     setPendingStockAdj(null);
+    setVoucherSearchResults(null);
     setShowAlerts(true);
     queryClient.removeQueries({ queryKey: [`/api/chatbot/history/${sessionId}`] });
   };
@@ -877,6 +965,14 @@ export function ChatWidget() {
                       onConfirm={handleConfirmStockAdj}
                       onDismiss={() => setPendingStockAdj(null)}
                       isSubmitting={stockAdjSubmitting}
+                    />
+                  )}
+
+                  {/* ── 5d: Voucher Search Results ── */}
+                  {voucherSearchResults && voucherSearchResults.length > 0 && !sendMutation.isPending && (
+                    <VoucherSearchResultsCard
+                      results={voucherSearchResults}
+                      onDismiss={() => setVoucherSearchResults(null)}
                     />
                   )}
                 </div>
