@@ -1025,9 +1025,11 @@ RULES:
 4. Voucher type rules: "Payment" = money going out (debit expense/asset, credit cash/bank), "Receipt" = money coming in (debit cash/bank, credit income/liability), "Journal" = any other adjustment.
 5. Both sides MUST balance: sum of all debits must equal sum of all credits.
 6. Date defaults to today (${today}) if not specified by the user.
+7. CALCULATE percentages automatically. If the user says "$20,000 with 2.5% transfer charges", compute: main amount = 20000, charges = 20000 * 0.025 = 500. Create separate entries for each — e.g. one line for the 20000 payment and one line for the 500 charges — each going to the account the user specifies. The credit side (source, e.g. bank) should equal the total (20500). Do the math yourself, never ask the user to calculate.
+8. If the user says "optional", "mark as optional", "put as optional", or similar, set "optional": true in the JSON. Otherwise omit it or set false.
 
 Respond with ONLY this JSON shape:
-{"type":"Payment"|"Receipt"|"Journal","date":"YYYY-MM-DD","description":"<user's own wording or short description>","entries":[{"accountId":NUMBER,"accountName":"EXACT name from list","debit":NUMBER,"credit":NUMBER}]}
+{"type":"Payment"|"Receipt"|"Journal","date":"YYYY-MM-DD","description":"<user's own wording or short description>","optional":false,"entries":[{"accountId":NUMBER,"accountName":"EXACT name from list","debit":NUMBER,"credit":NUMBER}]}
 
 If the intent is unclear or amounts/accounts are too ambiguous to resolve, respond with exactly: null`;
 

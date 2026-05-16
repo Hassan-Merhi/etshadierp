@@ -56,6 +56,7 @@ interface VoucherDraft {
   type: "Payment" | "Receipt" | "Journal";
   date: string;
   description: string;
+  optional?: boolean;
   entries: {
     accountId: number;
     accountName: string;
@@ -323,7 +324,7 @@ export function ChatWidget() {
           voucherType: pendingVoucher.type,
           voucherDate: pendingVoucher.date,
           description: pendingVoucher.description,
-          optional: false,
+          optional: pendingVoucher.optional ?? false,
         },
         entries: pendingVoucher.entries.map(e => ({
           ledgerAccountId: e.accountId,
