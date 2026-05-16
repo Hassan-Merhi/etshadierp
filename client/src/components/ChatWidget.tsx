@@ -46,10 +46,26 @@ interface ChatStatus {
   isAdminOrOwner: boolean;
 }
 
+interface StockAdjustmentDraft {
+  date: string;
+  locationId: number;
+  locationName: string;
+  notes: string;
+  optional?: boolean;
+  items: {
+    type: "PRODUCE" | "CONSUME";
+    stockItemId: number;
+    stockItemName: string;
+    quantity: number;
+    rate: number;
+  }[];
+}
+
 interface ChatResponse {
   response: string;
   suggestions: string[];
   voucherDraft?: VoucherDraft | null;
+  stockAdjustmentDraft?: StockAdjustmentDraft | null;
 }
 
 interface VoucherDraft {
@@ -189,6 +205,75 @@ function AlertsDigest({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ── Stock Adjustment Confirmation Card ───────────────────────────────
+function StockAdjustmentConfirmCard({
+  draft,
+  onConfirm,
+  onDismiss,
+  isSubmitting,
+}: {
+  draft: StockAdjustmentDraft;
+  onConfirm: () => void;
+  onDismiss: () => void;
+  isSubmitting: boolean;
+}) {
+  const produces = draft.items.filter(i => i.type === "PRODUCE");
+  const consumes = draft.items.filter(i => i.type === "CONSUME");
+  const adjType = produces.length > 0 && consumes.length > 0 ? "Mixed" : produces.length > 0 ? "Production" : "Consumption";
+
+  return (
+    <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 overflow-hidden" data-testid="stock-adj-confirm-card">
+      <div className="px-3 py-2 bg-amber-500/10 flex items-center gap-2">
+        <Package className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+        <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+          Create {adjType} Voucher?
+        </span>
+      </div>
+      <div className="px-3 py-2 space-y-1.5 text-xs">
+        <div className="flex justify-between gap-2 text-muted-foreground">
+          <span>Date</span><span className="font-medium text-foreground">{draft.date}</span>
+        </div>
+        <div className="flex justify-between gap-2 text-muted-foreground">
+          <span>Location</span><span className="font-medium text-foreground">{draft.locationName}</span>
+        </div>
+        {draft.notes && (
+          <div className="flex justify-between gap-2 text-muted-foreground">
+            <span>Notes</span><span className="font-medium text-foreground truncate max-w-[180px]">{draft.notes}</span>
+          </div>
+        )}
+        {draft.optional && (
+          <div className="flex justify-between gap-2 text-muted-foreground">
+            <span>Status</span><span className="font-medium text-amber-600 dark:text-amber-400">Optional</span>
+          </div>
+        )}
+        <div className="border-t pt-1.5 mt-1.5 space-y-1">
+          <div className="grid grid-cols-4 gap-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+            <span className="col-span-2">Item</span><span className="text-center">Type</span><span className="text-right">Qty</span>
+          </div>
+          {draft.items.map((item, i) => (
+            <div key={i} className="grid grid-cols-4 gap-1 items-center">
+              <span className="col-span-2 truncate text-foreground">{item.stockItemName}</span>
+              <span className={`text-center text-[10px] font-semibold ${item.type === "PRODUCE" ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
+                {item.type === "PRODUCE" ? "Produce" : "Consume"}
+              </span>
+              <span className="text-right text-foreground">{item.quantity.toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="px-3 py-2 border-t flex gap-2 justify-end">
+        <Button variant="outline" size="sm" onClick={onDismiss} disabled={isSubmitting} data-testid="button-dismiss-stock-adj">
+          <XCircle className="h-3.5 w-3.5 mr-1" /> Dismiss
+        </Button>
+        <Button size="sm" onClick={onConfirm} disabled={isSubmitting} data-testid="button-confirm-stock-adj">
+          {isSubmitting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Check className="h-3.5 w-3.5 mr-1" />}
+          Confirm & Create
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ── Voucher Confirmation Card ────────────────────────────────────────
 function VoucherConfirmCard({
   draft,
@@ -279,6 +364,8 @@ export function ChatWidget() {
   const [showAlerts, setShowAlerts] = useState(true);
   const [pendingVoucher, setPendingVoucher] = useState<VoucherDraft | null>(null);
   const [voucherSubmitting, setVoucherSubmitting] = useState(false);
+  const [pendingStockAdj, setPendingStockAdj] = useState<StockAdjustmentDraft | null>(null);
+  const [stockAdjSubmitting, setStockAdjSubmitting] = useState(false);
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -309,6 +396,10 @@ export function ChatWidget() {
       }
       if (data.voucherDraft) {
         setPendingVoucher(data.voucherDraft);
+        setPendingStockAdj(null);
+      } else if (data.stockAdjustmentDraft) {
+        setPendingStockAdj(data.stockAdjustmentDraft);
+        setPendingVoucher(null);
       }
     },
   });
@@ -341,6 +432,47 @@ export function ChatWidget() {
       sendMutation.mutate(`Voucher creation failed: ${err.message}`);
     } finally {
       setVoucherSubmitting(false);
+    }
+  };
+
+  const handleConfirmStockAdj = async () => {
+    if (!pendingStockAdj) return;
+    setStockAdjSubmitting(true);
+    try {
+      const adjType = (() => {
+        const hasP = pendingStockAdj.items.some(i => i.type === "PRODUCE");
+        const hasC = pendingStockAdj.items.some(i => i.type === "CONSUME");
+        return hasP && hasC ? "Mixed" : hasP ? "Production" : "Consumption";
+      })();
+      const totalAmount = pendingStockAdj.items.reduce((sum, i) => sum + i.quantity * i.rate, 0);
+      const voucherNumber = `AI-${Date.now()}`;
+      const voucherRes = await apiRequest("POST", "/api/vouchers", {
+        voucherNumber,
+        voucherType: adjType,
+        voucherDate: pendingStockAdj.date,
+        description: pendingStockAdj.notes || `${adjType} voucher`,
+        totalAmount: String(totalAmount),
+        optional: pendingStockAdj.optional ?? false,
+      });
+      const voucherData = await voucherRes.json();
+      const voucherId = voucherData.id;
+      await apiRequest("POST", "/api/stock-adjustments", {
+        voucherId,
+        locationId: pendingStockAdj.locationId,
+        adjustmentType: adjType,
+        notes: pendingStockAdj.notes || "",
+        items: pendingStockAdj.items.map(i => ({
+          stockItemId: i.stockItemId,
+          quantity: i.type === "CONSUME" ? -Math.abs(i.quantity) : Math.abs(i.quantity),
+          rate: i.rate,
+        })),
+      });
+      setPendingStockAdj(null);
+      sendMutation.mutate(`Stock adjustment created: ${adjType} voucher on ${pendingStockAdj.date} at ${pendingStockAdj.locationName}`);
+    } catch (err: any) {
+      sendMutation.mutate(`Stock adjustment failed: ${err.message}`);
+    } finally {
+      setStockAdjSubmitting(false);
     }
   };
 
@@ -389,6 +521,7 @@ export function ChatWidget() {
     setSuggestions([]);
     setFeedbackGiven({});
     setPendingVoucher(null);
+    setPendingStockAdj(null);
     setShowAlerts(true);
     queryClient.removeQueries({ queryKey: [`/api/chatbot/history/${sessionId}`] });
   };
@@ -653,6 +786,16 @@ export function ChatWidget() {
                       onConfirm={handleConfirmVoucher}
                       onDismiss={() => setPendingVoucher(null)}
                       isSubmitting={voucherSubmitting}
+                    />
+                  )}
+
+                  {/* ── 5c: Stock Adjustment Confirmation Card ── */}
+                  {pendingStockAdj && !sendMutation.isPending && (
+                    <StockAdjustmentConfirmCard
+                      draft={pendingStockAdj}
+                      onConfirm={handleConfirmStockAdj}
+                      onDismiss={() => setPendingStockAdj(null)}
+                      isSubmitting={stockAdjSubmitting}
                     />
                   )}
                 </div>

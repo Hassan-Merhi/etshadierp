@@ -966,7 +966,7 @@ export async function chat(
   companyId: number,
   conversationHistory: { role: string; content: string }[] = [],
   userPreferences?: UserPreferences
-): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any }> {
+): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any }> {
   const available = getAvailableProviders();
   
   if (available.length === 0) {
@@ -1050,11 +1050,62 @@ If the intent is unclear or amounts/accounts are too ambiguous to resolve, respo
       }
     }
 
+    // ── Stock adjustment detection ─────────────────────────────────────
+    const STOCK_ADJ_KEYWORDS = /\b(produce|producing|production|consume|consuming|consumption|stock\s+adjust|adjust\s+stock|record\s+production|record\s+consumption|produced|consumed)\b/i;
+    let stockAdjustmentDraft: any = undefined;
+
+    if (STOCK_ADJ_KEYWORDS.test(userMessage)) {
+      try {
+        const [items, locs] = await Promise.all([
+          db.select({ id: schema.stockItems.id, name: schema.stockItems.name, code: schema.stockItems.code })
+            .from(schema.stockItems)
+            .where(and(eq(schema.stockItems.companyId, companyId), eq(schema.stockItems.active, true)))
+            .limit(120),
+          db.select({ id: schema.locations.id, name: schema.locations.name })
+            .from(schema.locations)
+            .where(eq(schema.locations.companyId, companyId))
+            .limit(30),
+        ]);
+
+        const adjPrompt = `You are a stock adjustment extraction assistant.
+User message: "${userMessage}"
+Today: ${today}
+Stock items (id:name:code): ${items.map(i => `${i.id}:${i.name}:${i.code}`).join(" | ")}
+Locations (id:name): ${locs.map(l => `${l.id}:${l.name}`).join(" | ")}
+
+RULES:
+1. Extract a stock adjustment (Production/Consumption voucher) only if the user clearly intends to produce or consume items.
+2. Match item names and location names FUZZILY — partial names are fine.
+3. Each entry has a type of "PRODUCE" (adding stock) or "CONSUME" (removing stock). "Production" = PRODUCE, "Consumption" = CONSUME.
+4. Rate is the unit cost/value of the item. If the user doesn't specify a rate, use 0.
+5. Use the user's description/notes if provided.
+6. If the user says "optional", set optional: true.
+7. Date defaults to today (${today}) if not specified.
+
+Respond with ONLY valid JSON (no markdown):
+{"date":"YYYY-MM-DD","locationId":NUMBER,"locationName":"...","notes":"...","optional":false,"items":[{"type":"PRODUCE"|"CONSUME","stockItemId":NUMBER,"stockItemName":"...","quantity":NUMBER,"rate":NUMBER}]}
+
+If intent is unclear, respond with exactly: null`;
+
+        const adjResult = await callAIWithFallback(selectedProvider, adjPrompt, [], "Extract stock adjustment or return null");
+        const rawAdj = adjResult.response.trim().replace(/```json\n?|```/g, "").trim();
+        if (rawAdj !== "null" && rawAdj.startsWith("{")) {
+          const parsedAdj = JSON.parse(rawAdj);
+          if (parsedAdj && parsedAdj.locationId && parsedAdj.items && parsedAdj.items.length > 0) {
+            stockAdjustmentDraft = parsedAdj;
+          }
+        }
+      } catch (_) {
+        // Extraction failed silently
+      }
+    }
+
     return {
       response,
       suggestions,
       provider: usedProvider,
       voucherDraft,
+      stockAdjustmentDraft,
     };
   } catch (error: any) {
     console.error("[ChatService] ERROR:", error.message);
