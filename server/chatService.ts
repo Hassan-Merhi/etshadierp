@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import { db } from "./db";
 import * as schema from "@shared/schema";
-import { eq, and, desc, sql, lt, gt, isNull, asc, ilike, or } from "drizzle-orm";
+import { eq, and, desc, sql, lt, gt, isNull, asc, ilike, or, inArray } from "drizzle-orm";
 
 // AI Provider types
 type AIProvider = "gemini" | "chatgpt" | "grok";
@@ -966,7 +966,7 @@ export async function chat(
   companyId: number,
   conversationHistory: { role: string; content: string }[] = [],
   userPreferences?: UserPreferences
-): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any; voucherSearchResults?: any[]; stockItemDraft?: any; priceUpdateDraft?: any }> {
+): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any; voucherSearchResults?: any[]; stockItemDraft?: any; priceUpdateDraft?: any; accountQueryResult?: any }> {
   const available = getAvailableProviders();
   
   if (available.length === 0) {
@@ -1297,6 +1297,155 @@ If intent is not a price update, respond with exactly: null`;
       }
     }
 
+    // ── Account queries: balance / transaction search / balance history ──
+    const ACCOUNT_QUERY_KEYWORDS = /\b(balance of|account.*balance|how much.*account|account.*how much|what.*balance|balance.*account|when did.*account|account.*transactions|transactions.*account|paid.*from account|received.*account|when.*balance.*was|balance.*was.*when|ledger.*balance|account.*paid|account.*received)\b/i;
+    let accountQueryResult: any = undefined;
+
+    if (ACCOUNT_QUERY_KEYWORDS.test(userMessage)) {
+      try {
+        const accounts = await db
+          .select({ id: schema.ledgerAccounts.id, name: schema.ledgerAccounts.name, code: schema.ledgerAccounts.code, accountType: schema.ledgerAccounts.accountType, openingBalance: schema.ledgerAccounts.openingBalance, openingBalanceSide: schema.ledgerAccounts.openingBalanceSide })
+          .from(schema.ledgerAccounts)
+          .where(and(eq(schema.ledgerAccounts.companyId, companyId), eq(schema.ledgerAccounts.active, true), isNull(schema.ledgerAccounts.deletedAt)))
+          .orderBy(schema.ledgerAccounts.name)
+          .limit(150);
+
+        const acctPrompt = `You are an accounts query extraction assistant.
+User message: "${userMessage}"
+Ledger accounts (id:name:code:type): ${accounts.map(a => `${a.id}:${a.name}:${a.code}:${a.accountType}`).join(" | ")}
+
+Determine the query type and extract fields:
+- queryType: "balance" | "transactions" | "balance_history"
+  - "balance": user wants current balance of an account
+  - "transactions": user wants to find payments/transactions by description or amount for an account
+  - "balance_history": user wants to know when an account had a specific balance amount
+- accountId: best matching account id (fuzzy match on name or code)
+- accountName: matching account name
+- searchTerm: description keyword to search (for transactions queryType, if any)
+- searchAmount: specific amount to find (number, for transactions or balance_history queryType, if any)
+- targetBalance: the balance amount they are asking about (for balance_history queryType)
+
+RULES:
+1. Fuzzy match account names — partial names and abbreviations work.
+2. searchTerm, searchAmount, targetBalance are optional — only include if clearly in the message.
+3. For "balance" queries: just accountId and accountName are needed.
+4. For "transactions": accountId + at least one of searchTerm or searchAmount.
+5. For "balance_history": accountId + targetBalance.
+
+Respond with ONLY valid JSON (no markdown):
+{"queryType":"balance"|"transactions"|"balance_history","accountId":NUMBER,"accountName":"...","searchTerm":"...","searchAmount":NUMBER_OR_NULL,"targetBalance":NUMBER_OR_NULL}
+
+If intent is not about an account query, respond with exactly: null`;
+
+        const acctResult = await callAIWithFallback(selectedProvider, acctPrompt, [], "Extract account query");
+        const rawAcct = acctResult.response.trim().replace(/```json\n?|```/g, "").trim();
+
+        if (rawAcct !== "null" && rawAcct.startsWith("{")) {
+          const parsed = JSON.parse(rawAcct);
+          if (parsed && parsed.accountId && parsed.queryType) {
+            const acct = accounts.find(a => a.id === parsed.accountId);
+            if (!acct) throw new Error("Account not found");
+
+            if (parsed.queryType === "balance") {
+              // Compute current balance from voucher entries
+              const rows = await db
+                .select({
+                  totalDebit: sql<string>`COALESCE(SUM(CAST(${schema.voucherEntries.debitAmount} AS numeric)), 0)`,
+                  totalCredit: sql<string>`COALESCE(SUM(CAST(${schema.voucherEntries.creditAmount} AS numeric)), 0)`,
+                })
+                .from(schema.voucherEntries)
+                .innerJoin(schema.vouchers, and(eq(schema.voucherEntries.voucherId, schema.vouchers.id), eq(schema.vouchers.optional, false), isNull(schema.vouchers.deletedAt)))
+                .where(eq(schema.voucherEntries.ledgerAccountId, parsed.accountId));
+
+              const dr = parseFloat(rows[0]?.totalDebit || "0");
+              const cr = parseFloat(rows[0]?.totalCredit || "0");
+              const ob = parseFloat(acct.openingBalance || "0");
+              const obSide = acct.openingBalanceSide || "Dr";
+              const balance = (obSide === "Cr" ? -ob : ob) + dr - cr;
+              accountQueryResult = { queryType: "balance", accountId: parsed.accountId, accountName: acct.name, balance: parseFloat(balance.toFixed(2)) };
+
+            } else if (parsed.queryType === "transactions") {
+              // Search transactions by description and/or amount
+              const conditions: any[] = [
+                eq(schema.voucherEntries.ledgerAccountId, parsed.accountId),
+                eq(schema.vouchers.optional, false),
+                isNull(schema.vouchers.deletedAt),
+              ];
+              if (parsed.searchTerm) {
+                conditions.push(or(
+                  ilike(schema.vouchers.description, `%${parsed.searchTerm}%`),
+                  ilike(schema.voucherEntries.narration, `%${parsed.searchTerm}%`),
+                  ilike(schema.vouchers.voucherNumber, `%${parsed.searchTerm}%`),
+                ));
+              }
+              if (parsed.searchAmount) {
+                const amt = String(parseFloat(parsed.searchAmount).toFixed(2));
+                conditions.push(or(
+                  sql`CAST(${schema.voucherEntries.debitAmount} AS numeric) = ${parseFloat(amt)}`,
+                  sql`CAST(${schema.voucherEntries.creditAmount} AS numeric) = ${parseFloat(amt)}`,
+                  sql`CAST(${schema.vouchers.totalAmount} AS numeric) = ${parseFloat(amt)}`,
+                ));
+              }
+              const txRows = await db
+                .select({
+                  voucherId: schema.voucherEntries.voucherId,
+                  voucherNumber: schema.vouchers.voucherNumber,
+                  voucherType: schema.vouchers.voucherType,
+                  voucherDate: schema.vouchers.voucherDate,
+                  description: schema.vouchers.description,
+                  narration: schema.voucherEntries.narration,
+                  debitAmount: schema.voucherEntries.debitAmount,
+                  creditAmount: schema.voucherEntries.creditAmount,
+                  totalAmount: schema.vouchers.totalAmount,
+                })
+                .from(schema.voucherEntries)
+                .innerJoin(schema.vouchers, and(eq(schema.voucherEntries.voucherId, schema.vouchers.id)))
+                .where(and(...conditions))
+                .orderBy(desc(schema.vouchers.voucherDate))
+                .limit(10);
+
+              accountQueryResult = { queryType: "transactions", accountId: parsed.accountId, accountName: acct.name, searchTerm: parsed.searchTerm, searchAmount: parsed.searchAmount, transactions: txRows };
+
+            } else if (parsed.queryType === "balance_history") {
+              // Get all transactions sorted by date, compute running balance, find when it crossed target
+              const allRows = await db
+                .select({
+                  voucherId: schema.voucherEntries.voucherId,
+                  voucherNumber: schema.vouchers.voucherNumber,
+                  voucherType: schema.vouchers.voucherType,
+                  voucherDate: schema.vouchers.voucherDate,
+                  description: schema.vouchers.description,
+                  debitAmount: schema.voucherEntries.debitAmount,
+                  creditAmount: schema.voucherEntries.creditAmount,
+                })
+                .from(schema.voucherEntries)
+                .innerJoin(schema.vouchers, and(eq(schema.voucherEntries.voucherId, schema.vouchers.id), eq(schema.vouchers.optional, false), isNull(schema.vouchers.deletedAt)))
+                .where(eq(schema.voucherEntries.ledgerAccountId, parsed.accountId))
+                .orderBy(asc(schema.vouchers.voucherDate));
+
+              const ob = parseFloat(acct.openingBalance || "0");
+              const obSide = acct.openingBalanceSide || "Dr";
+              let running = obSide === "Cr" ? -ob : ob;
+              const target = parseFloat(parsed.targetBalance);
+              const tolerance = Math.max(Math.abs(target) * 0.01, 1); // 1% or ±1
+
+              const matches: any[] = [];
+              for (const row of allRows) {
+                running += parseFloat(row.debitAmount || "0") - parseFloat(row.creditAmount || "0");
+                if (Math.abs(running - target) <= tolerance) {
+                  matches.push({ ...row, balanceAfter: parseFloat(running.toFixed(2)) });
+                  if (matches.length >= 5) break;
+                }
+              }
+              accountQueryResult = { queryType: "balance_history", accountId: parsed.accountId, accountName: acct.name, targetBalance: target, matches };
+            }
+          }
+        }
+      } catch (_) {
+        // Account query failed silently
+      }
+    }
+
     return {
       response,
       suggestions,
@@ -1306,6 +1455,7 @@ If intent is not a price update, respond with exactly: null`;
       voucherSearchResults,
       stockItemDraft,
       priceUpdateDraft,
+      accountQueryResult,
     };
   } catch (error: any) {
     console.error("[ChatService] ERROR:", error.message);
