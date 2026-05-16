@@ -761,8 +761,8 @@ export default function FactoryPendingInvoiceVerify() {
                           <TableHead>Product</TableHead>
                           <TableHead className="text-right">Qty</TableHead>
                           <TableHead className="text-right">Weight</TableHead>
-                          <TableHead className="text-right">Stock</TableHead>
                           {isAdminOrOwner && <TableHead className="text-right">Price</TableHead>}
+                          <TableHead className="text-right text-teal-500 dark:text-teal-400">Stock</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -774,10 +774,11 @@ export default function FactoryPendingInvoiceVerify() {
                             <TableCell className="text-sm">{group.productName}</TableCell>
                             <TableCell className="text-right font-mono">{group.qty}</TableCell>
                             <TableCell className="text-right font-mono">{fmtNum(group.totalWeight || 0)}</TableCell>
-                            <TableCell className="text-right font-mono" data-testid={`text-loaded-stock-${group.articleCode}`}>
+                            {isAdminOrOwner && <TableCell className="text-right font-mono">{fmtNum(group.totalPrice || 0)}</TableCell>}
+                            <TableCell className="text-right font-mono text-teal-600 dark:text-teal-400" data-testid={`text-loaded-stock-${group.articleCode}`}>
                               {(group.stockQty ?? 0) > 0 ? (
                                 <button
-                                  className="underline underline-offset-2 cursor-pointer hover-elevate rounded px-0.5 text-foreground font-medium"
+                                  className="underline underline-offset-2 cursor-pointer hover-elevate rounded px-0.5 text-teal-600 dark:text-teal-400 font-medium"
                                   onClick={() => {
                                     const p = new URLSearchParams({
                                       articleCode: group.articleCode,
@@ -794,7 +795,6 @@ export default function FactoryPendingInvoiceVerify() {
                                 <span className="text-muted-foreground">0</span>
                               )}
                             </TableCell>
-                            {isAdminOrOwner && <TableCell className="text-right font-mono">{fmtNum(group.totalPrice || 0)}</TableCell>}
                           </TableRow>
                         ))}
                       </TableBody>
