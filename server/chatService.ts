@@ -208,6 +208,10 @@ interface ERPContext {
   itemProfitabilityReport: any[];
   // Price vs cost for items currently in stock
   pricingHealthReport: any[];
+  // Sales broken down by stock group
+  salesByGroup: any[];
+  salesByGroupToday: any[];
+  salesByGroupThisMonth: any[];
 }
 
 interface UserPreferences {
@@ -497,6 +501,87 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
       lossAmount:        profit < 0 ? Math.abs(profit).toFixed(2) : "0",
     };
   }).sort((a, b) => parseFloat(a.totalProfit) - parseFloat(b.totalProfit)); // most losing first
+
+  // ── Sales by stock group ────────────────────────────────────────────
+  const [salesByGroupRaw, salesByGroupTodayRaw, salesByGroupThisMonthRaw] = await Promise.all([
+    // All-time by group
+    db
+      .select({
+        stockGroupId:  schema.stockItems.stockGroupId,
+        totalQty:      sql<string>`SUM(CAST(${schema.salesItems.quantity} AS NUMERIC))`,
+        totalRevenue:  sql<string>`SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC))`,
+        totalCost:     sql<string>`SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC))`,
+        totalProfit:   sql<string>`SUM(CAST(${schema.salesItems.profit} AS NUMERIC))`,
+      })
+      .from(schema.salesItems)
+      .innerJoin(schema.vouchers,    eq(schema.salesItems.voucherId,    schema.vouchers.id))
+      .innerJoin(schema.stockItems,  eq(schema.salesItems.stockItemId,  schema.stockItems.id))
+      .where(and(eq(schema.vouchers.companyId, companyId), isNull(schema.vouchers.deletedAt)))
+      .groupBy(schema.stockItems.stockGroupId),
+
+    // Today by group
+    db
+      .select({
+        stockGroupId:  schema.stockItems.stockGroupId,
+        totalQty:      sql<string>`SUM(CAST(${schema.salesItems.quantity} AS NUMERIC))`,
+        totalRevenue:  sql<string>`SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC))`,
+        totalCost:     sql<string>`SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC))`,
+        totalProfit:   sql<string>`SUM(CAST(${schema.salesItems.profit} AS NUMERIC))`,
+      })
+      .from(schema.salesItems)
+      .innerJoin(schema.vouchers,    eq(schema.salesItems.voucherId,    schema.vouchers.id))
+      .innerJoin(schema.stockItems,  eq(schema.salesItems.stockItemId,  schema.stockItems.id))
+      .where(and(
+        eq(schema.vouchers.companyId, companyId),
+        eq(schema.vouchers.voucherDate, todayStr),
+        isNull(schema.vouchers.deletedAt)
+      ))
+      .groupBy(schema.stockItems.stockGroupId),
+
+    // This month by group
+    db
+      .select({
+        stockGroupId:  schema.stockItems.stockGroupId,
+        totalQty:      sql<string>`SUM(CAST(${schema.salesItems.quantity} AS NUMERIC))`,
+        totalRevenue:  sql<string>`SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC))`,
+        totalCost:     sql<string>`SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC))`,
+        totalProfit:   sql<string>`SUM(CAST(${schema.salesItems.profit} AS NUMERIC))`,
+      })
+      .from(schema.salesItems)
+      .innerJoin(schema.vouchers,    eq(schema.salesItems.voucherId,    schema.vouchers.id))
+      .innerJoin(schema.stockItems,  eq(schema.salesItems.stockItemId,  schema.stockItems.id))
+      .where(and(
+        eq(schema.vouchers.companyId, companyId),
+        gte(schema.vouchers.voucherDate, monthStartStr),
+        isNull(schema.vouchers.deletedAt)
+      ))
+      .groupBy(schema.stockItems.stockGroupId),
+  ]);
+
+  // Helper: enrich group row with name
+  function enrichGroupRow(row: any) {
+    const grp = stockGroups.find((g: any) => g.id === row.stockGroupId);
+    const rev  = parseFloat(row.totalRevenue || "0");
+    const prof = parseFloat(row.totalProfit  || "0");
+    return {
+      groupId:      row.stockGroupId,
+      groupName:    grp?.name || (row.stockGroupId ? "Unknown Group" : "Uncategorized"),
+      groupCode:    grp?.code || "",
+      totalQty:     parseFloat(row.totalQty || "0").toFixed(2),
+      totalRevenue: rev.toFixed(2),
+      totalCost:    parseFloat(row.totalCost || "0").toFixed(2),
+      totalProfit:  prof.toFixed(2),
+      profitMargin: rev > 0 ? ((prof / rev) * 100).toFixed(1) + "%" : "0%",
+      isLosing:     prof < 0,
+    };
+  }
+
+  const salesByGroup          = salesByGroupRaw.map(enrichGroupRow)
+                                   .sort((a, b) => parseFloat(a.totalProfit) - parseFloat(b.totalProfit));
+  const salesByGroupToday     = salesByGroupTodayRaw.map(enrichGroupRow)
+                                   .sort((a, b) => parseFloat(b.totalRevenue) - parseFloat(a.totalRevenue));
+  const salesByGroupThisMonth = salesByGroupThisMonthRaw.map(enrichGroupRow)
+                                   .sort((a, b) => parseFloat(b.totalRevenue) - parseFloat(a.totalRevenue));
 
   // Pricing health: current stock items where selling price < average cost (selling below cost)
   const inventoryMap = new Map(inventory.map(i => [i.stockItemId, i]));
@@ -891,6 +976,10 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
     // Profit/loss per item
     itemProfitabilityReport,
     pricingHealthReport,
+    // Sales by stock group
+    salesByGroup,
+    salesByGroupToday,
+    salesByGroupThisMonth,
   };
 }
 
@@ -1002,6 +1091,27 @@ Total Employee Deposits: $${context.employeeBalances.reduce((sum, e) => sum + e.
 ${context.topSellingItems.length > 0 ? context.topSellingItems.slice(0, 5).map((item, i) => 
   `${i+1}. ${item.itemName} - Revenue: $${parseFloat(item.totalRevenue).toLocaleString()}, Profit: $${parseFloat(item.totalProfit).toLocaleString()} (${item.profitMargin} margin)`
 ).join('\n') : 'No sales data available yet.'}
+
+### 🗂️ SALES BY STOCK GROUP — TODAY (${context.todaysSales.date}):
+${context.salesByGroupToday.length > 0
+  ? context.salesByGroupToday.map(g =>
+      `${g.groupCode}|${g.groupName}|qty:${g.totalQty}|rev:$${g.totalRevenue}|profit:$${g.totalProfit}|${g.profitMargin}${g.isLosing ? "|LOSING" : ""}`
+    ).join('\n')
+  : 'No sales today yet.'}
+
+### 🗂️ SALES BY STOCK GROUP — THIS MONTH (since ${context.thisMonthSales.monthStart}):
+${context.salesByGroupThisMonth.length > 0
+  ? context.salesByGroupThisMonth.map(g =>
+      `${g.groupCode}|${g.groupName}|qty:${g.totalQty}|rev:$${g.totalRevenue}|profit:$${g.totalProfit}|${g.profitMargin}${g.isLosing ? "|LOSING" : ""}`
+    ).join('\n')
+  : 'No sales this month yet.'}
+
+### 🗂️ SALES BY STOCK GROUP — ALL TIME (sorted most losing first):
+${context.salesByGroup.length > 0
+  ? context.salesByGroup.map(g =>
+      `${g.groupCode}|${g.groupName}|qty:${g.totalQty}|rev:$${g.totalRevenue}|profit:$${g.totalProfit}|${g.profitMargin}${g.isLosing ? "|LOSING" : ""}`
+    ).join('\n')
+  : 'No group sales data yet.'}
 
 ### 📊 ITEM PROFITABILITY REPORT (all items ever sold, sorted MOST LOSING first):
 Format: ITEM | QTY_SOLD | REVENUE | COST | PROFIT | MARGIN | AVG_CONFIG_PRICE | AVG_COST_PRICE | STATUS
