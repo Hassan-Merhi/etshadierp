@@ -1028,6 +1028,8 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           batchCode: factoryMixBatches.batchCode,
           name: factoryMixBatches.name,
           totalWeightKg: factoryMixBatches.totalWeightKg,
+          usedKg: factoryMixBatches.usedKg,
+          status: factoryMixBatches.status,
           costPerKg: factoryMixBatches.costPerKg,
           totalCost: factoryMixBatches.totalCost,
           batchDate: factoryMixBatches.batchDate,
@@ -1039,6 +1041,15 @@ export function registerFactoryBaleExportRoutes(app: Express) {
 
       const totalMixWeightKg = mixBatchRows.reduce((s: number, r: any) => s + parseFloat(r.totalWeightKg || "0"), 0);
       const totalMixCost = mixBatchRows.reduce((s: number, r: any) => s + parseFloat(r.totalCost || "0"), 0);
+
+      // Material from period batches that is still on the pressing table (not yet turned into bales).
+      // Only ACTIVE batches have meaningful on-table material; COMPLETED batches set usedKg = totalWeightKg
+      // when closed, so their contribution is already 0 by definition.
+      const periodOnTableKg = mixBatchRows.reduce((s: number, r: any) => {
+        if ((r.status || "ACTIVE") !== "ACTIVE") return s;
+        const remaining = Math.max(0, parseFloat(r.totalWeightKg || "0") - parseFloat(r.usedKg || "0"));
+        return s + remaining;
+      }, 0);
 
       // ── Balance on table ──
       // "Balance on Table" is a CURRENT STATE metric: how much raw material has been mixed into
@@ -1100,6 +1111,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         rawMaterial: {
           totalBatches: mixBatchRows.length,
           totalWeightKg: totalMixWeightKg,
+          onTableKg: periodOnTableKg,
           totalCost: totalMixCost,
           blendedCostPerKg,
           batches: mixBatchRows,

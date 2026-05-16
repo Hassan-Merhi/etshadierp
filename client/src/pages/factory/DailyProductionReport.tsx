@@ -1070,8 +1070,11 @@ export default function DailyProductionReport() {
               {/* Row 2 — weight breakdown */}
               {(() => {
                 const origKg = data?.rawMaterial.totalWeightKg ?? 0;
+                const onTableKg = data?.rawMaterial.onTableKg ?? 0;
                 const productionsKg = (data?.production.totalWeightKg ?? 0) + (data?.wipersGarbage.totalWeightKg ?? 0);
-                const totalKg = productionsKg - origKg;
+                // Net waste = Productions − (Original Batches − On Table)
+                // i.e. exclude material still being processed from the "used" side
+                const totalKg = productionsKg - origKg + onTableKg;
                 const isPositive = totalKg >= 0;
                 return (
                   <div className="flex flex-wrap items-center gap-5 pt-2 border-t border-border">
@@ -1088,9 +1091,20 @@ export default function DailyProductionReport() {
                         {fmtKg(origKg)}
                       </span>
                     </div>
+                    {onTableKg > 0 && (
+                      <>
+                        <span className="text-muted-foreground text-base font-semibold">+</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-muted-foreground">On Table</span>
+                          <span className="text-base font-bold text-amber-600 dark:text-amber-400" data-testid="text-weight-on-table">
+                            {fmtKg(onTableKg)}
+                          </span>
+                        </div>
+                      </>
+                    )}
                     <span className="text-muted-foreground text-base font-semibold">=</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-muted-foreground">Total</span>
+                      <span className="text-sm font-semibold text-muted-foreground">Net Waste</span>
                       <span
                         className={`text-base font-bold ${isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
                         data-testid="text-weight-total"
