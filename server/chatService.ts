@@ -1787,7 +1787,7 @@ If intent is not about an account query, respond with exactly: null`;
 
     // ── Phase 1: Data Query Handler ───────────────────────────────────────────
     // Handles read-only ERP data queries: P&L, cash position, statements, etc.
-    const PHASE1_KEYWORDS = /profit.{0,15}loss|p&l\b|pl\b.{0,10}report|balance.{0,8}sheet|cash.{0,12}(balance|position|account)|who.{0,20}owe[ds]?|overdue|outstanding.{0,15}(balance|amount|supplier)|customer.{0,15}statement|supplier.{0,15}statement|top.{0,10}(customer|buyer)s?|worker.{0,12}attend|how many.{0,20}(absent|present|worker)|bale.{0,12}(produc|today|week|this|last)|produc.{0,12}bale|how many bale|container.{0,12}status|where.{0,12}(is.{0,5})?container|pending.{0,10}offload|not.{0,10}offload|how much.{0,20}(stock|do we have|in stock)|stock.{0,10}(level|balance|position)|inventory.{0,10}(level|check|status)|low.{0,10}stock|below.{0,10}reorder|reorder.{0,10}level|stock.{0,10}movement|stock.{0,10}histor|movement.{0,10}(for|of).{0,20}\w|open.{0,10}(purchase order|po\b|p\.o\.)|pending.{0,10}(po\b|purchase)|aging|age.{0,10}(report|analysis)|receivable|payable.{0,10}(aging|due)|container.{0,10}list|all container|month.{0,10}(comparison|vs|versus|compare)|last month vs|rental.{0,10}(summary|report|occupan)|occupan|tenant|rent.{0,10}(due|overdue|collect)|payroll.{0,10}(summary|total|report)|total.{0,10}payroll|salary.{0,10}(total|summary)|sales.{0,10}(analys|by item|report|revenue)|how much.{0,15}(did we sell|sold)|top.{0,10}(sell|item|product)|best.{0,10}(sell|item)|container.{0,10}profit|profit.{0,10}per container|how much.{0,15}profit.{0,15}container|stock.{0,10}valuat|inventory.{0,10}value|total.{0,10}inventory.{0,10}(value|worth)|expense.{0,10}(break|categ|by type)|top.{0,10}expense|where.{0,20}money.{0,10}(going|spent)|customer.{0,10}order.{0,10}status|order.{0,10}(pending|draft|verified|finalized|loading)|credit.{0,10}note|recent.{0,10}credit|bank.{0,10}(transaction|movement|histor)|cash.{0,10}(transaction|movement|histor)|recent.{0,10}(payment|receipt|bank)|fixed.{0,10}asset|asset.{0,10}(list|register|summar)|kpi|factory.{0,10}(kpi|performance|daily)|daily.{0,10}(production|output)|efficiency|pos.{0,10}(sale|revenue|summary)|point.{0,10}of.{0,10}sale|shop.{0,10}sale|intercompany|inter.{0,10}company.{0,10}transfer|money.{0,10}(moved|transferred).{0,15}between|offload.{0,10}detail|what.{0,15}(was|were).{0,10}offload|what.{0,10}(arrive|came).{0,15}(in|container)|worker.{0,10}(product|rank|top|best)|top.{0,10}worker|best.{0,10}worker|supplier.{0,10}(spend|history|bought|purchase.{0,10}from)|how much.{0,15}(bought|spend).{0,10}(from|supplier)|upcoming.{0,10}(arrival|container|shipment)|container.{0,10}(arriving|due|expected)|waste.{0,10}(analys|report|trend|summary)|factory.{0,10}waste|customer.{0,10}(payment.{0,10}histor|paid|receipt)|when.{0,10}did.{0,15}pay|voucher.{0,10}(summary|count|by type|breakdown)|how many.{0,10}voucher|stock.{0,10}by.{0,10}location|per.{0,10}location.{0,10}stock|location.{0,10}stock|trial.{0,5}balance|all.{0,10}account.{0,10}balance|balance.{0,10}(of all|per account)|po.{0,10}(detail|line|item)|purchase.{0,10}order.{0,10}(detail|items|break)|what.{0,10}(is|was).{0,10}in.{0,10}(the.{0,5})?po|container.{0,10}(cost|charge|break)|cost.{0,10}break.{0,10}(of|for).{0,10}container|document.{0,10}expir|visa.{0,10}expir|permit.{0,10}expir|worker.{0,10}(doc|expir)|stock.{0,10}transfer|transfer.{0,10}(between|from.{0,10}to).{0,10}(location|warehouse)|move.{0,10}stock|cash.{0,10}flow|money.{0,10}(in|out).{0,10}(this|last|for)|inflow.{0,10}outflow|account.{0,10}(movement|ledger|balance.{0,10}for)|ledger.{0,10}(balance|statement|for)|transaction.{0,10}(of|for).{0,10}account|day.{0,10}(summary|report|sales)|today.{0,10}(sales|voucher)|sale.{0,10}today|profit.{0,10}(by|per).{0,10}location|location.{0,10}profit|which.{0,10}location.{0,10}(most|best)|debit.{0,10}note|supplier.{0,10}debit/i;
+    const PHASE1_KEYWORDS = /profit.{0,15}loss|p&l\b|pl\b.{0,10}report|balance.{0,8}sheet|cash.{0,12}(balance|position|account)|who.{0,20}owe[ds]?|overdue|outstanding.{0,15}(balance|amount|supplier)|customer.{0,15}statement|supplier.{0,15}statement|top.{0,10}(customer|buyer)s?|worker.{0,12}attend|how many.{0,20}(absent|present|worker)|bale.{0,12}(produc|today|week|this|last)|produc.{0,12}bale|how many bale|container.{0,12}status|where.{0,12}(is.{0,5})?container|pending.{0,10}offload|not.{0,10}offload|how much.{0,20}(stock|do we have|in stock)|stock.{0,10}(level|balance|position)|inventory.{0,10}(level|check|status)|low.{0,10}stock|below.{0,10}reorder|reorder.{0,10}level|stock.{0,10}movement|stock.{0,10}histor|movement.{0,10}(for|of).{0,20}\w|open.{0,10}(purchase order|po\b|p\.o\.)|pending.{0,10}(po\b|purchase)|aging|age.{0,10}(report|analysis)|receivable|payable.{0,10}(aging|due)|container.{0,10}list|all container|month.{0,10}(comparison|vs|versus|compare)|last month vs|rental.{0,10}(summary|report|occupan)|occupan|tenant|rent.{0,10}(due|overdue|collect)|payroll.{0,10}(summary|total|report)|total.{0,10}payroll|salary.{0,10}(total|summary)|sales.{0,10}(analys|by item|report|revenue)|how much.{0,15}(did we sell|sold)|top.{0,10}(sell|item|product)|best.{0,10}(sell|item)|container.{0,10}profit|profit.{0,10}per container|how much.{0,15}profit.{0,15}container|stock.{0,10}valuat|inventory.{0,10}value|total.{0,10}inventory.{0,10}(value|worth)|expense.{0,10}(break|categ|by type)|top.{0,10}expense|where.{0,20}money.{0,10}(going|spent)|customer.{0,10}order.{0,10}status|order.{0,10}(pending|draft|verified|finalized|loading)|credit.{0,10}note|recent.{0,10}credit|bank.{0,10}(transaction|movement|histor)|cash.{0,10}(transaction|movement|histor)|recent.{0,10}(payment|receipt|bank)|fixed.{0,10}asset|asset.{0,10}(list|register|summar)|kpi|factory.{0,10}(kpi|performance|daily)|daily.{0,10}(production|output)|efficiency|pos.{0,10}(sale|revenue|summary)|point.{0,10}of.{0,10}sale|shop.{0,10}sale|intercompany|inter.{0,10}company.{0,10}transfer|money.{0,10}(moved|transferred).{0,15}between|offload.{0,10}detail|what.{0,15}(was|were).{0,10}offload|what.{0,10}(arrive|came).{0,15}(in|container)|worker.{0,10}(product|rank|top|best)|top.{0,10}worker|best.{0,10}worker|supplier.{0,10}(spend|history|bought|purchase.{0,10}from)|how much.{0,15}(bought|spend).{0,10}(from|supplier)|upcoming.{0,10}(arrival|container|shipment)|container.{0,10}(arriving|due|expected)|waste.{0,10}(analys|report|trend|summary)|factory.{0,10}waste|customer.{0,10}(payment.{0,10}histor|paid|receipt)|when.{0,10}did.{0,15}pay|voucher.{0,10}(summary|count|by type|breakdown)|how many.{0,10}voucher|stock.{0,10}by.{0,10}location|per.{0,10}location.{0,10}stock|location.{0,10}stock|trial.{0,5}balance|all.{0,10}account.{0,10}balance|balance.{0,10}(of all|per account)|po.{0,10}(detail|line|item)|purchase.{0,10}order.{0,10}(detail|items|break)|what.{0,10}(is|was).{0,10}in.{0,10}(the.{0,5})?po|container.{0,10}(cost|charge|break)|cost.{0,10}break.{0,10}(of|for).{0,10}container|document.{0,10}expir|visa.{0,10}expir|permit.{0,10}expir|worker.{0,10}(doc|expir)|stock.{0,10}transfer|transfer.{0,10}(between|from.{0,10}to).{0,10}(location|warehouse)|move.{0,10}stock|cash.{0,10}flow|money.{0,10}(in|out).{0,10}(this|last|for)|inflow.{0,10}outflow|account.{0,10}(movement|ledger|balance.{0,10}for)|ledger.{0,10}(balance|statement|for)|transaction.{0,10}(of|for).{0,10}account|day.{0,10}(summary|report|sales)|today.{0,10}(sales|voucher)|sale.{0,10}today|profit.{0,10}(by|per).{0,10}location|location.{0,10}profit|which.{0,10}location.{0,10}(most|best)|debit.{0,10}note|supplier.{0,10}debit|customer.{0,10}list|list.{0,10}(of.{0,5})?customer|all.{0,10}customer|supplier.{0,10}list|list.{0,10}(of.{0,5})?supplier|all.{0,10}supplier|stock.{0,10}item.{0,10}(detail|info|profile)|item.{0,10}(detail|info|profile).{0,10}(for|of)|what.{0,10}(is|are).{0,5}(the.{0,5})?details.{0,10}(of|for).{0,10}item|mix.{0,10}batch|batch.{0,10}(list|status|summary)|material.{0,10}batch|customer.{0,10}proforma|price.{0,10}list.{0,10}(for.{0,5})?customer|proforma.{0,10}(for|customer)|supplier.{0,10}proforma|price.{0,10}(list|sheet).{0,10}(from|supplier)|weekly.{0,10}(sale|revenue|breakdown)|sale.{0,10}(by week|per week|week.{0,5}by.{0,5}week)|container.{0,10}(items|content|loaded|what.{0,10}inside)|what.{0,10}(is|are|was).{0,10}(in|inside|loaded).{0,5}container|employee.{0,10}(list|roster|staff)|all.{0,10}(employee|staff)|staff.{0,10}list|journal.{0,10}(entry|entries|voucher)|recent.{0,10}journal|journal.{0,10}posting/i;
     let dataQueryResult: any = undefined;
 
     if (PHASE1_KEYWORDS.test(userMessage) && !voucherDraft && !stockAdjustmentDraft) {
@@ -1864,6 +1864,16 @@ ledger_account_balance = all debit/credit transactions for a specific named ledg
 daily_report = all vouchers (every type) posted on a specific date — use dateFrom as the target date
 profit_by_location = sales profit grouped by warehouse/location for a period
 debit_note_summary = recent debit notes issued (supplier charge-backs or purchase corrections)
+customer_list = all customers with their current outstanding balance and contact info
+supplier_list = all suppliers with total PO amounts and contact info
+stock_item_detail = detailed profile of a named stock item including qty per location
+factory_mix_batches = list of factory material mix batches with status and usage
+customer_proformas = customer price lists/proformas with item prices and quantities
+supplier_proformas = supplier proformas/price sheets with item barcodes and prices
+weekly_sales = sales revenue and profit broken down by calendar week for a period
+container_items_list = stock items loaded in a specific container (from PO line items)
+employee_list = ERP employee roster with salary, balance and department info
+journal_entries = recent journal vouchers posted with their account debit/credit entries
 
 Output this JSON shape:
 {"queryType":"<one of the above>","entityName":<string or null>,"containerNumber":<string or null>,"locationName":<string or null>,"containerStatus":<string or null>,"dateFrom":<YYYY-MM-DD or null>,"dateTo":"${todayStr}","limit":10}
@@ -3934,6 +3944,425 @@ If the intent does not match any type, output: null`;
                   stats: stats5,
                   table: { headers: ["Date", "Voucher #", "Description", "Amount", "Currency"], rows: tableRows5 },
                   noData: tableRows5.length === 0,
+                };
+                break;
+              }
+
+              // ── Phase 6 Cases ────────────────────────────────────────────────
+
+              case "customer_list": {
+                const nameFilter6 = params.entityName;
+                const rows = await db.execute(sql`
+                  SELECT c.code, c.legal_name, c.phone, c.payment_terms_days, c.active,
+                    COALESCE(
+                      CAST(c.opening_balance AS numeric) * CASE WHEN c.opening_balance_side = 'Dr' THEN 1 ELSE -1 END
+                      + COALESCE(SUM(CAST(ve.debit_amount AS numeric) - CAST(ve.credit_amount AS numeric)), 0),
+                      CAST(c.opening_balance AS numeric) * CASE WHEN c.opening_balance_side = 'Dr' THEN 1 ELSE -1 END
+                    ) AS net_balance
+                  FROM customers c
+                  LEFT JOIN ledger_accounts la ON la.id = c.ledger_account_id AND la.deleted_at IS NULL
+                  LEFT JOIN voucher_entries ve ON ve.ledger_account_id = la.id
+                  LEFT JOIN vouchers v ON v.id = ve.voucher_id AND v.deleted_at IS NULL AND v.optional = false
+                  WHERE c.company_id = ${companyId}
+                    AND c.deleted_at IS NULL
+                    ${nameFilter6 ? sql`AND c.legal_name ILIKE ${'%' + nameFilter6 + '%'}` : sql``}
+                  GROUP BY c.id, c.code, c.legal_name, c.phone, c.payment_terms_days, c.active, c.opening_balance, c.opening_balance_side
+                  ORDER BY c.legal_name
+                  LIMIT ${rowLimit}
+                `);
+                let totalBalance = 0;
+                const tableRows6 = (rows.rows as any[]).map(r => {
+                  const bal = parseFloat(r.net_balance || "0");
+                  totalBalance += Math.max(bal, 0);
+                  const balLabel = bal >= 0 ? fmt(bal) + " Dr" : fmt(Math.abs(bal)) + " Cr";
+                  return [r.code, r.legal_name, r.phone || "—", r.payment_terms_days ? `${r.payment_terms_days}d` : "—", balLabel, r.active ? "Active" : "Inactive"];
+                });
+                const stats6 = [
+                  { label: "Total Customers", value: String(tableRows6.length) },
+                  { label: "Total Outstanding (Dr)", value: fmt(totalBalance), highlight: "positive" },
+                ];
+                dataQueryResult = {
+                  queryType: "customer_list",
+                  title: nameFilter6 ? `Customers: ${nameFilter6}` : "Customer List",
+                  subtitle: `${tableRows6.length} customer(s)`,
+                  stats: stats6,
+                  table: { headers: ["Code", "Name", "Phone", "Terms", "Balance", "Status"], rows: tableRows6 },
+                  noData: tableRows6.length === 0,
+                };
+                break;
+              }
+
+              case "supplier_list": {
+                const nameFilter6 = params.entityName;
+                const rows = await db.execute(sql`
+                  SELECT s.code, s.legal_name, s.email, s.phone, s.payment_terms, s.active,
+                    COUNT(DISTINCT po.id) AS po_count,
+                    COALESCE(SUM(CAST(po.items_total AS numeric)), 0) AS total_ordered
+                  FROM suppliers s
+                  JOIN purchase_orders po ON po.supplier_id = s.id AND po.company_id = ${companyId}
+                  WHERE s.deleted_at IS NULL
+                    ${nameFilter6 ? sql`AND s.legal_name ILIKE ${'%' + nameFilter6 + '%'}` : sql``}
+                  GROUP BY s.id, s.code, s.legal_name, s.email, s.phone, s.payment_terms, s.active
+                  ORDER BY total_ordered DESC
+                  LIMIT ${rowLimit}
+                `);
+                const tableRows6 = (rows.rows as any[]).map(r => [
+                  r.code || "—",
+                  r.legal_name,
+                  r.email || "—",
+                  r.phone || "—",
+                  r.payment_terms || "—",
+                  String(r.po_count),
+                  fmt(parseFloat(r.total_ordered || "0")),
+                  r.active ? "Active" : "Inactive",
+                ]);
+                const stats6 = [
+                  { label: "Suppliers", value: String(tableRows6.length) },
+                  { label: "Total POs", value: String(tableRows6.reduce((s, r) => s + parseInt(r[5]), 0)) },
+                ];
+                dataQueryResult = {
+                  queryType: "supplier_list",
+                  title: nameFilter6 ? `Suppliers: ${nameFilter6}` : "Supplier List",
+                  subtitle: `${tableRows6.length} supplier(s) · ranked by total ordered`,
+                  stats: stats6,
+                  table: { headers: ["Code", "Name", "Email", "Phone", "Terms", "POs", "Total Ordered", "Status"], rows: tableRows6 },
+                  noData: tableRows6.length === 0,
+                };
+                break;
+              }
+
+              case "stock_item_detail": {
+                const itemName6 = params.entityName;
+                if (!itemName6) {
+                  dataQueryResult = { queryType: "stock_item_detail", title: "Stock Item Detail", summary: "Please specify an item name." };
+                  break;
+                }
+                const itemRow = await db.execute(sql`
+                  SELECT si.id, si.code, si.name, si.uom, si.selling_price, si.reorder_level,
+                    si.opening_qty, si.opening_rate, si.opening_value, si.active,
+                    sg.name AS group_name
+                  FROM stock_items si
+                  LEFT JOIN stock_groups sg ON sg.id = si.stock_group_id
+                  WHERE si.company_id = ${companyId}
+                    AND si.deleted_at IS NULL
+                    AND si.name ILIKE ${'%' + itemName6 + '%'}
+                  ORDER BY si.name LIMIT 1
+                `);
+                if (!itemRow.rows.length) {
+                  dataQueryResult = { queryType: "stock_item_detail", title: "Stock Item Detail", summary: `No item found matching "${itemName6}".` };
+                  break;
+                }
+                const si6 = itemRow.rows[0] as any;
+                const invRows = await db.execute(sql`
+                  SELECT l.name AS location,
+                    CAST(inv.quantity AS numeric) AS qty,
+                    CAST(inv.avg_rate AS numeric) AS avg_rate,
+                    CAST(inv.total_value AS numeric) AS total_value
+                  FROM inventory inv
+                  JOIN locations l ON l.id = inv.location_id
+                  WHERE inv.stock_item_id = ${si6.id}
+                    AND inv.company_id = ${companyId}
+                    AND inv.quantity > 0
+                  ORDER BY inv.quantity DESC
+                `);
+                let totalQty = 0, totalVal = 0;
+                const tableRows6 = (invRows.rows as any[]).map(r => {
+                  const qty = parseFloat(r.qty || "0");
+                  const val = parseFloat(r.total_value || "0");
+                  totalQty += qty; totalVal += val;
+                  return [r.location, fmtDec(qty), fmtDec(parseFloat(r.avg_rate || "0")), fmt(val)];
+                });
+                const stats6 = [
+                  { label: "Code", value: si6.code },
+                  { label: "Group", value: si6.group_name || "—" },
+                  { label: "UOM", value: si6.uom },
+                  { label: "Selling Price", value: fmtDec(parseFloat(si6.selling_price || "0")) },
+                  { label: "Reorder Level", value: `${fmtDec(parseFloat(si6.reorder_level || "0"))} ${si6.uom}` },
+                  { label: "Total Stock", value: `${fmtDec(totalQty)} ${si6.uom}`, highlight: totalQty > 0 ? "positive" : "negative" },
+                  { label: "Total Value", value: fmt(totalVal), highlight: "positive" },
+                ];
+                dataQueryResult = {
+                  queryType: "stock_item_detail",
+                  title: `Item: ${si6.name}`,
+                  subtitle: `${tableRows6.length} location(s) with stock`,
+                  stats: stats6,
+                  table: { headers: ["Location", "Qty", "Avg Rate", "Value"], rows: tableRows6 },
+                  noData: tableRows6.length === 0,
+                };
+                break;
+              }
+
+              case "factory_mix_batches": {
+                const statusFilter6 = params.entityName?.toUpperCase() || null;
+                const rows = await db.execute(sql`
+                  SELECT fmb.batch_code, fmb.name, fmb.batch_date, fmb.status,
+                    CAST(fmb.total_weight_kg AS numeric) AS total_kg,
+                    CAST(fmb.used_kg AS numeric) AS used_kg,
+                    CAST(fmb.cost_per_kg AS numeric) AS cost_per_kg,
+                    CAST(fmb.total_cost AS numeric) AS total_cost,
+                    fmb.operator_user
+                  FROM factory_mix_batches fmb
+                  WHERE fmb.company_id = ${companyId}
+                    AND fmb.deleted_at IS NULL
+                    ${statusFilter6 ? sql`AND fmb.status = ${statusFilter6}` : sql``}
+                    ${params.dateFrom ? sql`AND fmb.batch_date >= ${params.dateFrom}` : sql``}
+                  ORDER BY fmb.batch_date DESC, fmb.id DESC
+                  LIMIT ${rowLimit}
+                `);
+                let totWeight = 0, totUsed = 0, totCost = 0;
+                const tableRows6 = (rows.rows as any[]).map(r => {
+                  const totalKg = parseFloat(r.total_kg || "0");
+                  const usedKg = parseFloat(r.used_kg || "0");
+                  const remainKg = totalKg - usedKg;
+                  const pct = totalKg > 0 ? ((usedKg / totalKg) * 100).toFixed(1) + "%" : "—";
+                  totWeight += totalKg; totUsed += usedKg; totCost += parseFloat(r.total_cost || "0");
+                  return [r.batch_code, r.name || "—", r.batch_date ? String(r.batch_date).slice(0, 10) : "—", r.status, fmtDec(totalKg), fmtDec(usedKg), fmtDec(remainKg), pct, fmtDec(parseFloat(r.cost_per_kg || "0")), r.operator_user || "—"];
+                });
+                const stats6 = [
+                  { label: "Batches", value: String(tableRows6.length) },
+                  { label: "Total Weight Kg", value: fmtDec(totWeight) },
+                  { label: "Used Kg", value: fmtDec(totUsed) },
+                  { label: "Remaining Kg", value: fmtDec(totWeight - totUsed), highlight: "positive" },
+                  { label: "Total Cost", value: fmt(totCost) },
+                ];
+                dataQueryResult = {
+                  queryType: "factory_mix_batches",
+                  title: statusFilter6 ? `Mix Batches — ${statusFilter6}` : "Factory Mix Batches",
+                  subtitle: `${tableRows6.length} batch(es)`,
+                  stats: stats6,
+                  table: { headers: ["Code", "Name", "Date", "Status", "Total Kg", "Used Kg", "Remaining", "Usage%", "Cost/Kg", "Operator"], rows: tableRows6 },
+                  noData: tableRows6.length === 0,
+                };
+                break;
+              }
+
+              case "customer_proformas": {
+                const custFilter6 = params.entityName;
+                const rows = await db.execute(sql`
+                  SELECT cp.id, cp.name AS proforma_name, cu.legal_name AS customer,
+                    cp.is_active, cp.created_at,
+                    COUNT(cpl.id) AS line_count,
+                    COALESCE(SUM(cpl.quantity), 0) AS total_qty,
+                    COALESCE(SUM(CAST(cpl.price_per_bale AS numeric) * cpl.quantity), 0) AS total_value
+                  FROM customer_proformas cp
+                  JOIN customers cu ON cu.id = cp.customer_id
+                  LEFT JOIN customer_proforma_lines cpl ON cpl.proforma_id = cp.id
+                  WHERE cp.company_id = ${companyId}
+                    AND cp.deleted_at IS NULL
+                    ${custFilter6 ? sql`AND cu.legal_name ILIKE ${'%' + custFilter6 + '%'}` : sql``}
+                  GROUP BY cp.id, cp.name, cu.legal_name, cp.is_active, cp.created_at
+                  ORDER BY cp.is_active DESC, cu.legal_name
+                  LIMIT ${rowLimit}
+                `);
+                const tableRows6 = (rows.rows as any[]).map(r => [
+                  r.proforma_name,
+                  r.customer,
+                  String(r.line_count),
+                  String(r.total_qty),
+                  fmt(parseFloat(r.total_value || "0")),
+                  r.is_active ? "Active" : "Inactive",
+                  String(r.created_at).slice(0, 10),
+                ]);
+                dataQueryResult = {
+                  queryType: "customer_proformas",
+                  title: custFilter6 ? `Customer Proformas: ${custFilter6}` : "Customer Proformas",
+                  subtitle: `${tableRows6.length} proforma(s)`,
+                  table: { headers: ["Proforma", "Customer", "Items", "Total Qty", "Total Value", "Status", "Created"], rows: tableRows6 },
+                  noData: tableRows6.length === 0,
+                };
+                break;
+              }
+
+              case "supplier_proformas": {
+                const suppFilter6 = params.entityName;
+                const rows = await db.execute(sql`
+                  SELECT sp.id, sp.reference, s.legal_name AS supplier, sp.notes, sp.created_at,
+                    COUNT(spl.id) AS line_count,
+                    COALESCE(SUM(spl.qty), 0) AS total_qty,
+                    COALESCE(SUM(CAST(spl.price_per_bale AS numeric) * spl.qty), 0) AS total_value
+                  FROM supplier_proformas sp
+                  JOIN suppliers s ON s.id = sp.supplier_id
+                  LEFT JOIN supplier_proforma_lines spl ON spl.proforma_id = sp.id
+                  WHERE sp.company_id = ${companyId}
+                    ${suppFilter6 ? sql`AND s.legal_name ILIKE ${'%' + suppFilter6 + '%'}` : sql``}
+                  GROUP BY sp.id, sp.reference, s.legal_name, sp.notes, sp.created_at
+                  ORDER BY sp.created_at DESC
+                  LIMIT ${rowLimit}
+                `);
+                const tableRows6 = (rows.rows as any[]).map(r => [
+                  r.reference,
+                  r.supplier,
+                  String(r.line_count),
+                  String(r.total_qty),
+                  fmt(parseFloat(r.total_value || "0")),
+                  String(r.created_at).slice(0, 10),
+                  (r.notes || "").slice(0, 40),
+                ]);
+                dataQueryResult = {
+                  queryType: "supplier_proformas",
+                  title: suppFilter6 ? `Supplier Proformas: ${suppFilter6}` : "Supplier Proformas",
+                  subtitle: `${tableRows6.length} proforma(s)`,
+                  table: { headers: ["Reference", "Supplier", "Items", "Total Qty", "Total Value", "Date", "Notes"], rows: tableRows6 },
+                  noData: tableRows6.length === 0,
+                };
+                break;
+              }
+
+              case "weekly_sales": {
+                const rows = await db.execute(sql`
+                  SELECT DATE_TRUNC('week', CAST(v.voucher_date AS date)) AS week_start,
+                    COUNT(DISTINCT v.id) AS sales_count,
+                    SUM(CAST(sal.total_sales AS numeric)) AS revenue,
+                    SUM(CAST(sal.total_cost AS numeric)) AS cost,
+                    SUM(CAST(sal.profit AS numeric)) AS profit
+                  FROM sales_items sal
+                  JOIN vouchers v ON v.id = sal.voucher_id AND v.deleted_at IS NULL
+                  WHERE v.company_id = ${companyId}
+                    AND CAST(v.voucher_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
+                  GROUP BY week_start
+                  ORDER BY week_start DESC
+                  LIMIT ${rowLimit}
+                `);
+                let totRev = 0, totCost = 0, totProfit = 0;
+                const tableRows6 = (rows.rows as any[]).map(r => {
+                  const rev = parseFloat(r.revenue || "0");
+                  const cost = parseFloat(r.cost || "0");
+                  const profit6 = parseFloat(r.profit || "0");
+                  const margin = rev > 0 ? ((profit6 / rev) * 100).toFixed(1) + "%" : "—";
+                  totRev += rev; totCost += cost; totProfit += profit6;
+                  const ws = String(r.week_start).slice(0, 10);
+                  return [ws, String(r.sales_count), fmt(rev), fmt(cost), fmt(profit6), margin];
+                });
+                if (tableRows6.length) {
+                  const totMargin = totRev > 0 ? ((totProfit / totRev) * 100).toFixed(1) + "%" : "—";
+                  tableRows6.push(["TOTAL", "", fmt(totRev), fmt(totCost), fmt(totProfit), totMargin]);
+                }
+                dataQueryResult = {
+                  queryType: "weekly_sales",
+                  title: "Weekly Sales Breakdown",
+                  subtitle: `${dateFrom} → ${dateTo}`,
+                  table: { headers: ["Week Starting", "Invoices", "Revenue", "Cost", "Profit", "Margin"], rows: tableRows6 },
+                  noData: tableRows6.length === 0,
+                };
+                break;
+              }
+
+              case "container_items_list": {
+                const cn6 = params.containerNumber || params.entityName;
+                if (!cn6) {
+                  dataQueryResult = { queryType: "container_items_list", title: "Container Items", summary: "Please specify a container number." };
+                  break;
+                }
+                const rows = await db.execute(sql`
+                  SELECT c.container_number, s.legal_name AS supplier, c.import_date,
+                    pli.item_name, si.code, si.uom,
+                    CAST(pli.quantity AS numeric) AS qty,
+                    CAST(pli.rate AS numeric) AS rate,
+                    CAST(pli.line_total AS numeric) AS line_total,
+                    po.po_number, po.currency
+                  FROM po_line_items pli
+                  JOIN purchase_orders po ON po.id = pli.po_id
+                  JOIN containers c ON c.id = po.container_id
+                  JOIN suppliers s ON s.id = c.supplier_id
+                  JOIN stock_items si ON si.id = pli.stock_item_id
+                  WHERE c.container_number ILIKE ${'%' + cn6 + '%'}
+                    AND po.company_id = ${companyId}
+                  ORDER BY pli.item_name
+                  LIMIT ${rowLimit}
+                `);
+                let grandItems = 0;
+                const tableRows6 = (rows.rows as any[]).map(r => {
+                  const lt = parseFloat(r.line_total || "0");
+                  grandItems += lt;
+                  return [r.item_name, r.code, `${fmtDec(parseFloat(r.qty))} ${r.uom}`, fmtDec(parseFloat(r.rate)), fmt(lt), r.po_number, r.currency];
+                });
+                const hdr = rows.rows[0] as any;
+                tableRows6.push(["TOTAL", "", "", "", fmt(grandItems), "", ""]);
+                dataQueryResult = {
+                  queryType: "container_items_list",
+                  title: `Items in Container: ${hdr?.container_number || cn6}`,
+                  subtitle: hdr ? `Supplier: ${hdr.supplier} · Import: ${String(hdr.import_date).slice(0, 10)}` : "",
+                  table: { headers: ["Item", "Code", "Qty", "Rate", "Total", "PO #", "Currency"], rows: tableRows6 },
+                  noData: tableRows6.length <= 1,
+                };
+                break;
+              }
+
+              case "employee_list": {
+                const deptFilter6 = params.entityName;
+                const rows = await db.execute(sql`
+                  SELECT e.code, e.first_name, e.last_name, e.department, e.employee_type,
+                    CAST(e.monthly_salary AS numeric) AS monthly_salary,
+                    CAST(e.current_balance AS numeric) AS current_balance,
+                    e.join_date, e.active
+                  FROM employees e
+                  WHERE e.company_id = ${companyId}
+                    AND e.active = true
+                    ${deptFilter6 ? sql`AND e.department ILIKE ${'%' + deptFilter6 + '%'}` : sql``}
+                  ORDER BY e.department, e.first_name, e.last_name
+                  LIMIT ${rowLimit}
+                `);
+                let totalSalary = 0, totalBalance = 0;
+                const tableRows6 = (rows.rows as any[]).map(r => {
+                  const sal = parseFloat(r.monthly_salary || "0");
+                  const bal = parseFloat(r.current_balance || "0");
+                  totalSalary += sal; totalBalance += bal;
+                  return [r.code || "—", `${r.first_name} ${r.last_name}`, r.department || "—", r.employee_type, fmt(sal), fmt(bal), r.join_date ? String(r.join_date).slice(0, 10) : "—"];
+                });
+                const stats6 = [
+                  { label: "Total Employees", value: String(tableRows6.length) },
+                  { label: "Total Monthly Salary", value: fmt(totalSalary), highlight: "positive" },
+                  { label: "Total Outstanding Balance", value: fmt(totalBalance) },
+                ];
+                dataQueryResult = {
+                  queryType: "employee_list",
+                  title: deptFilter6 ? `Employees — ${deptFilter6}` : "Employee Roster",
+                  subtitle: `${tableRows6.length} active employee(s)`,
+                  stats: stats6,
+                  table: { headers: ["Code", "Name", "Dept", "Type", "Monthly Salary", "Balance", "Join Date"], rows: tableRows6 },
+                  noData: tableRows6.length === 0,
+                };
+                break;
+              }
+
+              case "journal_entries": {
+                const rows = await db.execute(sql`
+                  SELECT v.voucher_date, v.voucher_number, v.description,
+                    CAST(v.total_amount AS numeric) AS total_amount,
+                    v.currency,
+                    json_agg(json_build_object(
+                      'account', la.name,
+                      'dr', CAST(ve.debit_amount AS numeric),
+                      'cr', CAST(ve.credit_amount AS numeric)
+                    ) ORDER BY ve.id) AS entries
+                  FROM vouchers v
+                  JOIN voucher_entries ve ON ve.voucher_id = v.id
+                  JOIN ledger_accounts la ON la.id = ve.ledger_account_id
+                  WHERE v.company_id = ${companyId}
+                    AND v.deleted_at IS NULL
+                    AND v.voucher_type = 'Journal'
+                    AND v.optional = false
+                    AND CAST(v.voucher_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
+                  GROUP BY v.id, v.voucher_date, v.voucher_number, v.description, v.total_amount, v.currency
+                  ORDER BY v.voucher_date DESC
+                  LIMIT ${rowLimit}
+                `);
+                const tableRows6: string[][] = [];
+                for (const r of rows.rows as any[]) {
+                  const entries = typeof r.entries === "string" ? JSON.parse(r.entries) : r.entries;
+                  const firstEntry = entries?.[0];
+                  tableRows6.push([String(r.voucher_date).slice(0, 10), r.voucher_number, (r.description || "").slice(0, 35), firstEntry?.account || "—", firstEntry?.dr > 0 ? fmt(firstEntry.dr) : "—", firstEntry?.cr > 0 ? fmt(firstEntry.cr) : "—", r.currency]);
+                  for (let i = 1; i < (entries || []).length && i < 4; i++) {
+                    const e = entries[i];
+                    tableRows6.push(["", "", "", e.account, e.dr > 0 ? fmt(e.dr) : "—", e.cr > 0 ? fmt(e.cr) : "—", ""]);
+                  }
+                }
+                dataQueryResult = {
+                  queryType: "journal_entries",
+                  title: "Journal Entries",
+                  subtitle: `${dateFrom} → ${dateTo} · ${rows.rows.length} journal(s)`,
+                  table: { headers: ["Date", "Voucher #", "Description", "Account", "Dr", "Cr", "Currency"], rows: tableRows6 },
+                  noData: tableRows6.length === 0,
                 };
                 break;
               }
