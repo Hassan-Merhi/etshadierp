@@ -125,11 +125,6 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error("[ErrorBoundary] Uncaught error:", error, info.componentStack);
 
     if (isChunkLoadError(error)) {
-      // In development, Vite HMR handles reconnection — never auto-reload here.
-      // Auto-reloading fights Vite's own recovery and creates a loop on every
-      // dev server restart.
-      if (import.meta.env.DEV) return;
-
       // If we're offline, the chunk simply isn't cached — reloading won't help.
       if (!navigator.onLine) return;
       const path = window.location.pathname;
