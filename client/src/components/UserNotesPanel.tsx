@@ -160,9 +160,12 @@ export function UserNotesPanel() {
             data-testid="button-open-user-notes"
             aria-label="My notes"
             style={{ left: pos.x, top: pos.y }}
-            className="fixed z-50 h-11 w-11 rounded-full flex items-center justify-center bg-primary text-primary-foreground shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring select-none cursor-grab active:cursor-grabbing"
+            className="group fixed z-50 flex items-center gap-2 rounded-full bg-primary text-primary-foreground shadow-md px-3 py-2 opacity-30 hover:opacity-100 transition-all duration-300 ease-in-out overflow-hidden max-w-[2.25rem] hover:max-w-[120px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring select-none cursor-grab active:cursor-grabbing"
           >
-            <NotebookPen className="h-5 w-5" />
+            <NotebookPen className="h-4 w-4 flex-shrink-0" />
+            <span className="text-sm font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 delay-100">
+              My Notes
+            </span>
           </button>
         </TooltipTrigger>
         <TooltipContent side="right">My notes — drag to move</TooltipContent>
