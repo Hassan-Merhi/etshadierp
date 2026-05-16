@@ -347,6 +347,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const isFactoryMode = appMode === "factory";
+  const visibleSidebarGroups = isFactoryMode
+    ? sidebarGroups.filter((g) => g.label !== "Adjustments")
+    : sidebarGroups;
   const modePrefix = useModePrefix();
 
   // Handle opening voucher for editing
@@ -3796,7 +3799,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       {!isPOS && (
         <div className="sm:hidden -mx-4 px-4 overflow-x-auto">
           <div className="flex gap-1.5 pb-1 w-max">
-            {sidebarGroups.flatMap((group) =>
+            {visibleSidebarGroups.flatMap((group) =>
               group.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.key;
@@ -3826,7 +3829,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       <div className="flex gap-5">
         {!isPOS && (
           <nav className="hidden sm:flex flex-col w-52 shrink-0 rounded-xl border bg-card p-2 gap-3 self-start sticky top-4" style={{ zIndex: 10 }}>
-            {sidebarGroups.map((group, groupIdx) => (
+            {visibleSidebarGroups.map((group, groupIdx) => (
               <div key={group.label}>
                 {groupIdx > 0 && <div className="border-t -mx-2 mb-1" />}
                 {/* Section label with colored dot */}
