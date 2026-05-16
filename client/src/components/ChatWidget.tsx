@@ -827,12 +827,14 @@ function POImportDraftCard({
   onDismiss,
   isSubmitting,
   result,
+  importError,
 }: {
   draft: POImportDraft;
   onConfirm: (resolved: any) => void;
   onDismiss: () => void;
   isSubmitting: boolean;
   result: POImportResult | null;
+  importError: string | null;
 }) {
   const [, setLocation] = useLocation();
   const fmt = (n: number | string) =>
@@ -1123,6 +1125,11 @@ function POImportDraftCard({
             {!supplierId && (
               <p className="text-[11px] text-orange-600 dark:text-orange-400 mb-2">
                 Please select a supplier before importing.
+              </p>
+            )}
+            {importError && (
+              <p className="text-[11px] text-red-600 dark:text-red-400 mb-2 bg-red-50 dark:bg-red-950/30 rounded px-2 py-1.5">
+                {importError}
               </p>
             )}
             <Button
@@ -1502,6 +1509,7 @@ export function ChatWidget() {
   const [poDraftUploading, setPoDraftUploading] = useState(false);
   const [poDraftSubmitting, setPoDraftSubmitting] = useState(false);
   const [poDraftResult, setPoDraftResult] = useState<POImportResult | null>(null);
+  const [poDraftError, setPoDraftError] = useState<string | null>(null);
   const [verifyContainerDraft, setVerifyContainerDraft] = useState<VerifyContainerDraft | null>(null);
   const [dataQueryResult, setDataQueryResult] = useState<DataQueryResult | null>(null);
 
@@ -1728,6 +1736,7 @@ export function ChatWidget() {
     setPoDraftUploading(true);
     setPoDraft(null);
     setPoDraftResult(null);
+    setPoDraftError(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -1748,6 +1757,7 @@ export function ChatWidget() {
 
   const handleConfirmPOImport = async (resolved: any) => {
     setPoDraftSubmitting(true);
+    setPoDraftError(null);
     try {
       const resp = await fetch("/api/chatbot/confirm-po-import", {
         method: "POST",
@@ -1759,7 +1769,7 @@ export function ChatWidget() {
       if (!resp.ok) throw new Error(data.message || "Import failed");
       setPoDraftResult(data as POImportResult);
     } catch (err: any) {
-      alert(`Import failed: ${err.message}`);
+      setPoDraftError(err.message);
     } finally {
       setPoDraftSubmitting(false);
     }
@@ -1778,6 +1788,7 @@ export function ChatWidget() {
     setAccountQueryResult(null);
     setPoDraft(null);
     setPoDraftResult(null);
+    setPoDraftError(null);
     setVerifyContainerDraft(null);
     setShowAlerts(true);
     queryClient.removeQueries({ queryKey: [`/api/chatbot/history/${sessionId}`] });
@@ -2097,9 +2108,10 @@ export function ChatWidget() {
                     <POImportDraftCard
                       draft={poDraft}
                       onConfirm={handleConfirmPOImport}
-                      onDismiss={() => { setPoDraft(null); setPoDraftResult(null); setVerifyContainerDraft(null); }}
+                      onDismiss={() => { setPoDraft(null); setPoDraftResult(null); setPoDraftError(null); setVerifyContainerDraft(null); }}
                       isSubmitting={poDraftSubmitting}
                       result={poDraftResult}
+                      importError={poDraftError}
                     />
                   )}
 

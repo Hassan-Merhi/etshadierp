@@ -628,6 +628,19 @@ export function registerChatbotRoutes(app: Express) {
           status: "OTW",
           importDate: importDate || new Date().toISOString().split("T")[0],
         });
+      } else {
+        // Container-level duplicate check: prevent re-importing same container
+        const existingPOs = await db
+          .select({ id: purchaseOrders.id, poNumber: purchaseOrders.poNumber })
+          .from(purchaseOrders)
+          .where(and(eq(purchaseOrders.containerId, container.id), eq(purchaseOrders.companyId, companyId)))
+          .limit(5);
+
+        if (existingPOs.length > 0) {
+          return res.status(409).json({
+            message: `Container "${containerNumber}" already has ${existingPOs.length} PO(s) imported (${existingPOs.map((p: any) => p.poNumber).join(', ')}). To avoid duplicates, please delete the existing POs first or use a different container number.`,
+          });
+        }
       }
 
       const itemsTotal      = lines.reduce((s: number, l: any) => s + parseFloat(l.qty) * parseFloat(l.rate), 0);

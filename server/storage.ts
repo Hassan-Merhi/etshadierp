@@ -1512,6 +1512,29 @@ export class DbStorage implements IStorage {
     const poTotal = poItemsTotal + poChargesAmount;
     
     if (poTotal > 0 && po.companyId) {
+      // Look up container number and supplier name for daybook description
+      let containerNum = '';
+      let supplierDisplayName = '';
+      if (po.containerId) {
+        const [cont] = await db
+          .select({ containerNumber: schema.containers.containerNumber })
+          .from(schema.containers)
+          .where(eq(schema.containers.id, po.containerId))
+          .limit(1);
+        containerNum = cont?.containerNumber || '';
+      }
+      if (po.supplierId) {
+        const [sup] = await db
+          .select({ legalName: schema.suppliers.legalName })
+          .from(schema.suppliers)
+          .where(eq(schema.suppliers.id, po.supplierId))
+          .limit(1);
+        supplierDisplayName = sup?.legalName || '';
+      }
+      const descBase = containerNum || supplierDisplayName
+        ? [containerNum, supplierDisplayName].filter(Boolean).join(' ')
+        : '';
+
       // Get parent company from system settings (not hardcoded name)
       const parentCompanyId = await this.getParentCompanyId();
       const allCompanies = await db.select().from(schema.companies);
@@ -1591,7 +1614,7 @@ export class DbStorage implements IStorage {
           voucherNumber: subsidiaryVoucherNumber,
           voucherType: "Purchase",
           voucherDate,
-          description: `Purchase for PO ${created.poNumber} (${parentCompany.name} paid supplier)`,
+          description: descBase || `Purchase for PO ${created.poNumber} (${parentCompany.name} paid supplier)`,
           totalAmount: poTotal.toFixed(2),
           optional: false,
         }).returning();
@@ -1692,7 +1715,7 @@ export class DbStorage implements IStorage {
           voucherNumber,
           voucherType: "Purchase",
           voucherDate,
-          description: `Purchase for PO ${created.poNumber}`,
+          description: descBase || `Purchase for PO ${created.poNumber}`,
           totalAmount: poTotal.toFixed(2),
           optional: false,
         }).returning();
