@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useState, useRef, lazy, Suspense } from "react";
 import { useButtonClickFeedback } from "@/hooks/use-button-click-feedback";
+import { useServerRestart } from "@/hooks/use-server-restart";
 import { Switch, Route, useLocation, Redirect } from "wouter";
 import { hasActiveEscapeHandler } from "@/hooks/use-escape-back";
 import { getParentRoute } from "@/lib/parent-routes";
@@ -1217,6 +1218,11 @@ function AuthGatedUserNotesPanel() {
   return <UserNotesPanel />;
 }
 
+function ServerRestartWatcher() {
+  useServerRestart();
+  return null;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -1228,6 +1234,7 @@ export default function App() {
                 <DateFormatProvider>
                   <CurrencyProvider>
                     <CursorNavProvider>
+                      <ServerRestartWatcher />
                       <Switch>
                         <Route path="/login" component={Login} />
                         <Route>

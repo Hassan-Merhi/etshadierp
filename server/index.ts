@@ -30,6 +30,11 @@ const BUILD_VERSION =
   process.env.RENDER_GIT_COMMIT?.substring(0, 8) ||
   "dev";
 
+// Unique ID generated fresh on every server start.
+// The frontend polls /api/boot and reloads when this changes, which recovers
+// stale Vite chunks in Replit's dev environment (where HMR WebSocket can't connect).
+const SERVER_BOOT_ID = Math.random().toString(36).slice(2);
+
 const app = express();
 
 // Compress all HTTP responses (gzip/deflate) — reduces bandwidth by 60-80%
@@ -201,6 +206,7 @@ const ORIGIN_GUARD_EXEMPT_PATHS = new Set<string>([
   "/api/health",
   "/api/health/db",
   "/api/build-info",
+  "/api/boot",
   // /api/user-presence/leave is the only sendBeacon-driven write path (fired
   // on tab close from use-presence.ts:53). sendBeacon cannot attach custom
   // headers so it cannot send X-CSRF-Token. The endpoint only marks the user
@@ -3019,6 +3025,13 @@ let migrationsDone = false;
   // Build info endpoint for frontend version checking (must be before registerRoutes)
   app.get("/api/build-info", (_req, res) => {
     res.json({ version: BUILD_VERSION });
+  });
+
+  // Boot ID endpoint — returns a random ID generated once per server process start.
+  // The frontend polls this in dev mode and reloads when it changes, recovering
+  // stale Vite chunks after a server restart (Replit's HMR WS can't connect).
+  app.get("/api/boot", (_req, res) => {
+    res.json({ bootId: SERVER_BOOT_ID });
   });
 
   const server = await registerRoutes(app);

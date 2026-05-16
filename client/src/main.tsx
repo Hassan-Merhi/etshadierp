@@ -2,6 +2,20 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 
+// Clear stale chunk-retry/reload counters from sessionStorage on every fresh page load.
+// These keys are written before a hard-reload attempt; if a reload succeeds the keys are
+// never cleaned up, leaving the browser permanently "retry-exhausted" until the session ends.
+try {
+  const toDelete: string[] = [];
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const k = sessionStorage.key(i);
+    if (k && (k.startsWith("chunkRetry:") || k.startsWith("chunkReload:"))) {
+      toDelete.push(k);
+    }
+  }
+  toDelete.forEach((k) => sessionStorage.removeItem(k));
+} catch { /* ignore — sessionStorage may be blocked in some contexts */ }
+
 // Global handler: catches dynamic import failures that happen before React renders
 // (e.g. Suspense boundaries that aren't yet inside an ErrorBoundary).
 window.addEventListener("unhandledrejection", (event) => {
