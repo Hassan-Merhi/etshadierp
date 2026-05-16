@@ -1787,7 +1787,7 @@ If intent is not about an account query, respond with exactly: null`;
 
     // ── Phase 1: Data Query Handler ───────────────────────────────────────────
     // Handles read-only ERP data queries: P&L, cash position, statements, etc.
-    const PHASE1_KEYWORDS = /profit.{0,15}loss|p&l\b|pl\b.{0,10}report|balance.{0,8}sheet|cash.{0,12}(balance|position|account)|who.{0,20}owe[ds]?|overdue|outstanding.{0,15}(balance|amount|supplier)|customer.{0,15}statement|supplier.{0,15}statement|top.{0,10}(customer|buyer)s?|worker.{0,12}attend|how many.{0,20}(absent|present|worker)|bale.{0,12}(produc|today|week|this|last)|produc.{0,12}bale|how many bale|container.{0,12}status|where.{0,12}(is.{0,5})?container|pending.{0,10}offload|not.{0,10}offload|how much.{0,20}(stock|do we have|in stock)|stock.{0,10}(level|balance|position)|inventory.{0,10}(level|check|status)|low.{0,10}stock|below.{0,10}reorder|reorder.{0,10}level|stock.{0,10}movement|stock.{0,10}histor|movement.{0,10}(for|of).{0,20}\w|open.{0,10}(purchase order|po\b|p\.o\.)|pending.{0,10}(po\b|purchase)|aging|age.{0,10}(report|analysis)|receivable|payable.{0,10}(aging|due)|container.{0,10}list|all container|month.{0,10}(comparison|vs|versus|compare)|last month vs|rental.{0,10}(summary|report|occupan)|occupan|tenant|rent.{0,10}(due|overdue|collect)|payroll.{0,10}(summary|total|report)|total.{0,10}payroll|salary.{0,10}(total|summary)|sales.{0,10}(analys|by item|report|revenue)|how much.{0,15}(did we sell|sold)|top.{0,10}(sell|item|product)|best.{0,10}(sell|item)|container.{0,10}profit|profit.{0,10}per container|how much.{0,15}profit.{0,15}container|stock.{0,10}valuat|inventory.{0,10}value|total.{0,10}inventory.{0,10}(value|worth)|expense.{0,10}(break|categ|by type)|top.{0,10}expense|where.{0,20}money.{0,10}(going|spent)|customer.{0,10}order.{0,10}status|order.{0,10}(pending|draft|verified|finalized|loading)|credit.{0,10}note|recent.{0,10}credit|bank.{0,10}(transaction|movement|histor)|cash.{0,10}(transaction|movement|histor)|recent.{0,10}(payment|receipt|bank)|fixed.{0,10}asset|asset.{0,10}(list|register|summar)|kpi|factory.{0,10}(kpi|performance|daily)|daily.{0,10}(production|output)|efficiency/i;
+    const PHASE1_KEYWORDS = /profit.{0,15}loss|p&l\b|pl\b.{0,10}report|balance.{0,8}sheet|cash.{0,12}(balance|position|account)|who.{0,20}owe[ds]?|overdue|outstanding.{0,15}(balance|amount|supplier)|customer.{0,15}statement|supplier.{0,15}statement|top.{0,10}(customer|buyer)s?|worker.{0,12}attend|how many.{0,20}(absent|present|worker)|bale.{0,12}(produc|today|week|this|last)|produc.{0,12}bale|how many bale|container.{0,12}status|where.{0,12}(is.{0,5})?container|pending.{0,10}offload|not.{0,10}offload|how much.{0,20}(stock|do we have|in stock)|stock.{0,10}(level|balance|position)|inventory.{0,10}(level|check|status)|low.{0,10}stock|below.{0,10}reorder|reorder.{0,10}level|stock.{0,10}movement|stock.{0,10}histor|movement.{0,10}(for|of).{0,20}\w|open.{0,10}(purchase order|po\b|p\.o\.)|pending.{0,10}(po\b|purchase)|aging|age.{0,10}(report|analysis)|receivable|payable.{0,10}(aging|due)|container.{0,10}list|all container|month.{0,10}(comparison|vs|versus|compare)|last month vs|rental.{0,10}(summary|report|occupan)|occupan|tenant|rent.{0,10}(due|overdue|collect)|payroll.{0,10}(summary|total|report)|total.{0,10}payroll|salary.{0,10}(total|summary)|sales.{0,10}(analys|by item|report|revenue)|how much.{0,15}(did we sell|sold)|top.{0,10}(sell|item|product)|best.{0,10}(sell|item)|container.{0,10}profit|profit.{0,10}per container|how much.{0,15}profit.{0,15}container|stock.{0,10}valuat|inventory.{0,10}value|total.{0,10}inventory.{0,10}(value|worth)|expense.{0,10}(break|categ|by type)|top.{0,10}expense|where.{0,20}money.{0,10}(going|spent)|customer.{0,10}order.{0,10}status|order.{0,10}(pending|draft|verified|finalized|loading)|credit.{0,10}note|recent.{0,10}credit|bank.{0,10}(transaction|movement|histor)|cash.{0,10}(transaction|movement|histor)|recent.{0,10}(payment|receipt|bank)|fixed.{0,10}asset|asset.{0,10}(list|register|summar)|kpi|factory.{0,10}(kpi|performance|daily)|daily.{0,10}(production|output)|efficiency|pos.{0,10}(sale|revenue|summary)|point.{0,10}of.{0,10}sale|shop.{0,10}sale|intercompany|inter.{0,10}company.{0,10}transfer|money.{0,10}(moved|transferred).{0,15}between|offload.{0,10}detail|what.{0,15}(was|were).{0,10}offload|what.{0,10}(arrive|came).{0,15}(in|container)|worker.{0,10}(product|rank|top|best)|top.{0,10}worker|best.{0,10}worker|supplier.{0,10}(spend|history|bought|purchase.{0,10}from)|how much.{0,15}(bought|spend).{0,10}(from|supplier)|upcoming.{0,10}(arrival|container|shipment)|container.{0,10}(arriving|due|expected)|waste.{0,10}(analys|report|trend|summary)|factory.{0,10}waste|customer.{0,10}(payment.{0,10}histor|paid|receipt)|when.{0,10}did.{0,15}pay|voucher.{0,10}(summary|count|by type|breakdown)|how many.{0,10}voucher|stock.{0,10}by.{0,10}location|per.{0,10}location.{0,10}stock|location.{0,10}stock/i;
     let dataQueryResult: any = undefined;
 
     if (PHASE1_KEYWORDS.test(userMessage) && !voucherDraft && !stockAdjustmentDraft) {
@@ -1844,6 +1844,16 @@ credit_notes_summary = recent credit notes issued (returns/reversals)
 bank_transactions = recent transactions on a specific bank or cash account
 fixed_assets_summary = list of fixed assets with purchase amounts and categories
 factory_kpi = factory daily KPI snapshots (kg input, kg pressed, bales produced, waste)
+pos_sales_summary = POS register sales totals by product or overall for a period
+intercompany_transfers = inter-company money transfer history between entities
+container_offload_details = detailed breakdown of stock items offloaded from a specific container
+worker_productivity = factory worker productivity ranking by bales produced or kg pressed
+supplier_spend = total purchase spend per supplier ranked by amount
+upcoming_arrivals = containers currently in transit with ETA in the next N days
+factory_waste_analysis = factory waste entries analysis by type/date range
+customer_payment_history = recent receipts and payments received from customers (named or all)
+voucher_type_summary = count and total amounts grouped by voucher type for a period
+location_stock_summary = inventory stock totals (items, qty, value) grouped per warehouse location
 
 Output this JSON shape:
 {"queryType":"<one of the above>","entityName":<string or null>,"containerNumber":<string or null>,"locationName":<string or null>,"containerStatus":<string or null>,"dateFrom":<YYYY-MM-DD or null>,"dateTo":"${todayStr}","limit":10}
@@ -3046,6 +3056,374 @@ If the intent does not match any type, output: null`;
                   stats: stats3,
                   table: { headers: ["Date", "Kg In", "Kg Pressed", "Bales", "Waste Kg", "Efficiency"], rows: tableRows2 },
                   noData: tableRows2.length === 0,
+                };
+                break;
+              }
+
+              // ── Phase 4 Cases ────────────────────────────────────────────────
+
+              case "pos_sales_summary": {
+                const itemFilter = params.entityName;
+                const rows = await db.execute(sql`
+                  SELECT fpsi.product_name, fpsi.article_code,
+                    SUM(fpsi.quantity) AS total_qty,
+                    SUM(CAST(fpsi.total_amount AS numeric)) AS total_revenue,
+                    COUNT(DISTINCT fps.id) AS num_sales,
+                    fpsi.currency_code
+                  FROM factory_pos_sale_items fpsi
+                  JOIN factory_pos_sales fps ON fps.id = fpsi.sale_id AND fps.status = 'COMPLETED'
+                  WHERE fps.company_id = ${companyId}
+                    AND CAST(fps.tx_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
+                    ${itemFilter ? sql`AND fpsi.product_name ILIKE ${'%' + itemFilter + '%'}` : sql``}
+                  GROUP BY fpsi.product_name, fpsi.article_code, fpsi.currency_code
+                  ORDER BY total_revenue DESC
+                  LIMIT ${rowLimit}
+                `);
+                const totalsRow = await db.execute(sql`
+                  SELECT COUNT(id) AS num_transactions,
+                    SUM(CAST(total_amount AS numeric)) AS grand_total
+                  FROM factory_pos_sales
+                  WHERE company_id = ${companyId} AND status = 'COMPLETED'
+                    AND CAST(tx_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
+                `);
+                const t4 = totalsRow.rows[0] as any;
+                let grandRev = 0;
+                const tableRows4 = (rows.rows as any[]).map(r => {
+                  const rev = parseFloat(r.total_revenue || "0");
+                  grandRev += rev;
+                  return [r.product_name, r.article_code || "—", String(r.total_qty), fmt(rev), r.currency_code, String(r.num_sales)];
+                });
+                const stats4 = [
+                  { label: "Total Transactions", value: String(t4?.num_transactions || 0) },
+                  { label: "Grand Total Revenue", value: fmt(parseFloat(t4?.grand_total || "0")), highlight: "positive" },
+                ];
+                dataQueryResult = {
+                  queryType: "pos_sales_summary",
+                  title: itemFilter ? `POS Sales: ${itemFilter}` : "POS Sales Summary",
+                  subtitle: `${dateFrom} → ${dateTo}`,
+                  stats: stats4,
+                  table: { headers: ["Product", "Article Code", "Qty", "Revenue", "Currency", "Sales"], rows: tableRows4 },
+                  noData: tableRows4.length === 0,
+                };
+                break;
+              }
+
+              case "intercompany_transfers": {
+                const rows = await db.execute(sql`
+                  SELECT ict.transfer_date, ict.transfer_type,
+                    fc.name AS from_company, tc.name AS to_company,
+                    CAST(ict.amount AS numeric) AS amount,
+                    ict.description
+                  FROM inter_company_transfers ict
+                  JOIN companies fc ON fc.id = ict.from_company_id
+                  JOIN companies tc ON tc.id = ict.to_company_id
+                  WHERE (ict.from_company_id = ${companyId} OR ict.to_company_id = ${companyId})
+                    AND CAST(ict.transfer_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
+                  ORDER BY ict.transfer_date DESC
+                  LIMIT ${rowLimit}
+                `);
+                let totalOut = 0, totalIn = 0;
+                const tableRows4 = (rows.rows as any[]).map(r => {
+                  const amt = parseFloat(r.amount || "0");
+                  const isOut = r.from_company === (rows.rows[0] as any)?.from_company;
+                  totalOut += amt; // simplified — show all
+                  return [String(r.transfer_date).slice(0, 10), r.transfer_type, r.from_company, r.to_company, fmt(amt), (r.description || "").slice(0, 40)];
+                });
+                dataQueryResult = {
+                  queryType: "intercompany_transfers",
+                  title: "Inter-Company Transfers",
+                  subtitle: `${dateFrom} → ${dateTo} · ${tableRows4.length} transfer(s)`,
+                  table: { headers: ["Date", "Type", "From", "To", "Amount", "Description"], rows: tableRows4 },
+                  noData: tableRows4.length === 0,
+                };
+                break;
+              }
+
+              case "container_offload_details": {
+                const cnFilter = params.containerNumber || params.entityName;
+                if (!cnFilter) {
+                  dataQueryResult = { queryType: "container_offload_details", title: "Container Offload Details", summary: "Please specify a container number." };
+                  break;
+                }
+                const rows = await db.execute(sql`
+                  SELECT c.container_number, l.name AS location,
+                    si.name AS item_name, si.code, si.uom,
+                    CAST(coi.quantity AS numeric) AS qty,
+                    CAST(coi.rate AS numeric) AS rate,
+                    CAST(coi.total_value AS numeric) AS total_value,
+                    co.offloaded_at
+                  FROM container_offload_items coi
+                  JOIN container_offloads co ON co.id = coi.offload_id
+                  JOIN containers c ON c.id = co.container_id
+                  JOIN locations l ON l.id = co.location_id
+                  JOIN stock_items si ON si.id = coi.stock_item_id
+                  WHERE c.container_number ILIKE ${'%' + cnFilter + '%'}
+                    AND c.company_id = ${companyId}
+                  ORDER BY si.name
+                  LIMIT ${rowLimit}
+                `);
+                let totalVal = 0;
+                const tableRows4 = (rows.rows as any[]).map(r => {
+                  const val = parseFloat(r.total_value || "0");
+                  totalVal += val;
+                  return [r.item_name, r.code, r.location, `${fmtDec(parseFloat(r.qty))} ${r.uom}`, fmtDec(parseFloat(r.rate)), fmt(val)];
+                });
+                const cn = (rows.rows[0] as any)?.container_number || cnFilter;
+                dataQueryResult = {
+                  queryType: "container_offload_details",
+                  title: `Offload Details: ${cn}`,
+                  subtitle: `${tableRows4.length} line(s) · Total value: ${fmt(totalVal)}`,
+                  table: { headers: ["Item", "Code", "Location", "Qty", "Rate", "Total Value"], rows: tableRows4 },
+                  noData: tableRows4.length === 0,
+                };
+                break;
+              }
+
+              case "worker_productivity": {
+                const rows = await db.execute(sql`
+                  SELECT fw.full_name,
+                    COUNT(fb.id) AS total_bales,
+                    COALESCE(SUM(CAST(fb.weight_kg AS numeric)), 0) AS total_kg,
+                    COALESCE(AVG(CAST(fb.weight_kg AS numeric)), 0) AS avg_kg_per_bale
+                  FROM factory_bales fb
+                  JOIN factory_workers fw ON fw.id = fb.worker_id
+                  WHERE fb.company_id = ${companyId}
+                    AND fb.status = 'Pressed'
+                    AND CAST(fb.pressed_at AS text) BETWEEN ${dateFrom} AND ${dateTo}
+                  GROUP BY fw.id, fw.full_name
+                  ORDER BY total_bales DESC
+                  LIMIT ${rowLimit}
+                `);
+                const tableRows4 = (rows.rows as any[]).map((r, i) => [
+                  String(i + 1),
+                  r.full_name,
+                  String(r.total_bales),
+                  fmtDec(parseFloat(r.total_kg || "0")),
+                  fmtDec(parseFloat(r.avg_kg_per_bale || "0")),
+                ]);
+                dataQueryResult = {
+                  queryType: "worker_productivity",
+                  title: "Worker Productivity Ranking",
+                  subtitle: `${dateFrom} → ${dateTo} · by bales pressed`,
+                  table: { headers: ["Rank", "Worker", "Bales", "Total Kg", "Avg Kg/Bale"], rows: tableRows4 },
+                  noData: tableRows4.length === 0,
+                };
+                break;
+              }
+
+              case "supplier_spend": {
+                const supplierFilter = params.entityName;
+                const rows = await db.execute(sql`
+                  SELECT s.legal_name AS supplier,
+                    COUNT(po.id) AS po_count,
+                    SUM(CAST(po.items_total AS numeric)) AS total_items,
+                    SUM(CAST(po.freight AS numeric) + CAST(po.surcharge AS numeric) + CAST(po.fumigation AS numeric)
+                        + CAST(po.document_charges AS numeric) + CAST(po.other_charges AS numeric)
+                        - CAST(po.discount AS numeric)) AS total_charges,
+                    po.currency
+                  FROM purchase_orders po
+                  JOIN suppliers s ON s.id = po.supplier_id
+                  WHERE po.company_id = ${companyId}
+                    AND po.created_at >= ${dateFrom}
+                    ${supplierFilter ? sql`AND s.legal_name ILIKE ${'%' + supplierFilter + '%'}` : sql``}
+                  GROUP BY s.id, s.legal_name, po.currency
+                  ORDER BY total_items DESC
+                  LIMIT ${rowLimit}
+                `);
+                let grandItems = 0;
+                const tableRows4 = (rows.rows as any[]).map(r => {
+                  const items = parseFloat(r.total_items || "0");
+                  const charges = parseFloat(r.total_charges || "0");
+                  grandItems += items;
+                  return [r.supplier, String(r.po_count), fmt(items), fmt(charges), fmt(items + charges), r.currency];
+                });
+                dataQueryResult = {
+                  queryType: "supplier_spend",
+                  title: supplierFilter ? `Supplier Spend: ${supplierFilter}` : "Supplier Purchase Spend",
+                  subtitle: `Since ${dateFrom} · ${tableRows4.length} supplier(s)`,
+                  table: { headers: ["Supplier", "POs", "Items Total", "Charges", "Grand Total", "Currency"], rows: tableRows4 },
+                  noData: tableRows4.length === 0,
+                };
+                break;
+              }
+
+              case "upcoming_arrivals": {
+                const daysAhead = 30;
+                const futureDate = new Date(todayDate.getTime() + daysAhead * 86400000).toISOString().slice(0, 10);
+                const rows = await db.execute(sql`
+                  SELECT c.container_number, c.status, c.eta,
+                    s.legal_name AS supplier,
+                    c.transporter, c.tracking_location,
+                    c.import_date,
+                    CAST(c.grand_total AS numeric) AS grand_total,
+                    c.currency,
+                    CAST(c.eta AS date) - CURRENT_DATE AS days_until_eta
+                  FROM containers c
+                  JOIN suppliers s ON s.id = c.supplier_id
+                  WHERE c.company_id = ${companyId}
+                    AND c.status NOT IN ('Offloaded', 'Arrived')
+                    AND c.eta IS NOT NULL
+                    AND CAST(c.eta AS date) <= ${futureDate}
+                  ORDER BY c.eta ASC
+                  LIMIT ${rowLimit}
+                `);
+                const tableRows4 = (rows.rows as any[]).map(r => {
+                  const days = parseInt(r.days_until_eta || "0");
+                  const daysLabel = days <= 0 ? "TODAY/OVERDUE" : `${days}d`;
+                  return [r.container_number, r.status, String(r.eta).slice(0, 10), daysLabel, r.supplier, r.transporter || "—", r.tracking_location || "—"];
+                });
+                dataQueryResult = {
+                  queryType: "upcoming_arrivals",
+                  title: "Upcoming Container Arrivals",
+                  subtitle: `Next ${daysAhead} days · ${tableRows4.length} container(s) expected`,
+                  table: { headers: ["Container #", "Status", "ETA", "Days Away", "Supplier", "Transporter", "Last Location"], rows: tableRows4 },
+                  noData: tableRows4.length === 0,
+                };
+                break;
+              }
+
+              case "factory_waste_analysis": {
+                const rows = await db.execute(sql`
+                  SELECT fwe.date, fwe.waste_type,
+                    CAST(fwe.kg_waste AS numeric) AS kg_waste,
+                    fwe.reason
+                  FROM factory_waste_entries fwe
+                  WHERE fwe.company_id = ${companyId}
+                    AND fwe.date BETWEEN ${dateFrom} AND ${dateTo}
+                  ORDER BY fwe.date DESC
+                  LIMIT ${rowLimit}
+                `);
+                let totalWaste = 0;
+                const typeMap: Record<string, number> = {};
+                const tableRows4 = (rows.rows as any[]).map(r => {
+                  const kg = parseFloat(r.kg_waste || "0");
+                  totalWaste += kg;
+                  const wt = r.waste_type || "Unknown";
+                  typeMap[wt] = (typeMap[wt] || 0) + kg;
+                  return [String(r.date).slice(0, 10), wt, fmtDec(kg), (r.reason || "—").slice(0, 40)];
+                });
+                const byType = Object.entries(typeMap).sort((a, b) => b[1] - a[1]).map(([t, kg]) => `${t}: ${fmtDec(kg)} kg`).join(" | ");
+                const stats4 = [
+                  { label: "Total Waste Entries", value: String(tableRows4.length) },
+                  { label: "Total Waste Kg", value: fmtDec(totalWaste), highlight: "negative" },
+                  { label: "By Type", value: byType || "—" },
+                ];
+                dataQueryResult = {
+                  queryType: "factory_waste_analysis",
+                  title: "Factory Waste Analysis",
+                  subtitle: `${dateFrom} → ${dateTo}`,
+                  stats: stats4,
+                  table: { headers: ["Date", "Waste Type", "Kg", "Reason"], rows: tableRows4 },
+                  noData: tableRows4.length === 0,
+                };
+                break;
+              }
+
+              case "customer_payment_history": {
+                const custName = params.entityName;
+                const rows = await db.execute(sql`
+                  SELECT v.voucher_date, v.voucher_type, v.description, v.voucher_number,
+                    CAST(v.total_amount AS numeric) AS amount, v.currency
+                  FROM vouchers v
+                  WHERE v.company_id = ${companyId}
+                    AND v.deleted_at IS NULL
+                    AND v.voucher_type IN ('Receipt', 'Payment')
+                    AND CAST(v.voucher_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
+                    ${custName ? sql`AND v.description ILIKE ${'%' + custName + '%'}` : sql``}
+                  ORDER BY v.voucher_date DESC
+                  LIMIT ${rowLimit}
+                `);
+                let totalReceipts = 0, totalPayments = 0;
+                const tableRows4 = (rows.rows as any[]).map(r => {
+                  const amt = parseFloat(r.amount || "0");
+                  if (r.voucher_type === "Receipt") totalReceipts += amt;
+                  else totalPayments += amt;
+                  return [String(r.voucher_date).slice(0, 10), r.voucher_number, r.voucher_type, (r.description || "").slice(0, 40), fmt(amt), r.currency];
+                });
+                const stats4 = [
+                  { label: "Total Receipts", value: fmt(totalReceipts), highlight: "positive" },
+                  { label: "Total Payments", value: fmt(totalPayments) },
+                ];
+                dataQueryResult = {
+                  queryType: "customer_payment_history",
+                  title: custName ? `Payment History: ${custName}` : "Customer Payment History",
+                  subtitle: `${dateFrom} → ${dateTo} · ${tableRows4.length} transaction(s)`,
+                  stats: stats4,
+                  table: { headers: ["Date", "Voucher #", "Type", "Description", "Amount", "Currency"], rows: tableRows4 },
+                  noData: tableRows4.length === 0,
+                };
+                break;
+              }
+
+              case "voucher_type_summary": {
+                const rows = await db.execute(sql`
+                  SELECT v.voucher_type,
+                    COUNT(v.id) AS count,
+                    SUM(CAST(v.total_amount AS numeric)) AS total_amount,
+                    MIN(CAST(v.voucher_date AS text)) AS first_date,
+                    MAX(CAST(v.voucher_date AS text)) AS last_date
+                  FROM vouchers v
+                  WHERE v.company_id = ${companyId}
+                    AND v.deleted_at IS NULL
+                    AND v.optional = false
+                    AND CAST(v.voucher_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
+                  GROUP BY v.voucher_type
+                  ORDER BY count DESC
+                `);
+                let grandCount = 0, grandTotal = 0;
+                const tableRows4 = (rows.rows as any[]).map(r => {
+                  const cnt = parseInt(r.count || "0");
+                  const amt = parseFloat(r.total_amount || "0");
+                  grandCount += cnt; grandTotal += amt;
+                  return [r.voucher_type, String(cnt), fmt(amt), r.first_date?.slice(0, 10) || "—", r.last_date?.slice(0, 10) || "—"];
+                });
+                tableRows4.push(["TOTAL", String(grandCount), fmt(grandTotal), "", ""]);
+                dataQueryResult = {
+                  queryType: "voucher_type_summary",
+                  title: "Voucher Summary by Type",
+                  subtitle: `${dateFrom} → ${dateTo}`,
+                  table: { headers: ["Voucher Type", "Count", "Total Amount", "First", "Last"], rows: tableRows4 },
+                  noData: tableRows4.length <= 1,
+                };
+                break;
+              }
+
+              case "location_stock_summary": {
+                const locFilter = params.entityName || params.locationName;
+                const rows = await db.execute(sql`
+                  SELECT l.name AS location,
+                    COUNT(DISTINCT inv.stock_item_id) AS item_count,
+                    SUM(CAST(inv.quantity AS numeric)) AS total_qty,
+                    SUM(CAST(inv.total_value AS numeric)) AS total_value
+                  FROM inventory inv
+                  JOIN locations l ON l.id = inv.location_id
+                  WHERE inv.company_id = ${companyId}
+                    AND inv.quantity > 0
+                    ${locFilter ? sql`AND l.name ILIKE ${'%' + locFilter + '%'}` : sql``}
+                  GROUP BY l.id, l.name
+                  ORDER BY total_value DESC
+                  LIMIT ${rowLimit}
+                `);
+                let grandItems = 0, grandValue = 0;
+                const tableRows4 = (rows.rows as any[]).map(r => {
+                  const items = parseInt(r.item_count || "0");
+                  const val = parseFloat(r.total_value || "0");
+                  grandItems += items; grandValue += val;
+                  return [r.location, String(items), fmtDec(parseFloat(r.total_qty || "0")), fmt(val)];
+                });
+                tableRows4.push(["GRAND TOTAL", String(grandItems), "—", fmt(grandValue)]);
+                const stats4 = [
+                  { label: "Locations", value: String(tableRows4.length - 1) },
+                  { label: "Total Stock Items", value: String(grandItems) },
+                  { label: "Total Value", value: fmt(grandValue), highlight: "positive" },
+                ];
+                dataQueryResult = {
+                  queryType: "location_stock_summary",
+                  title: locFilter ? `Stock Summary: ${locFilter}` : "Stock by Location",
+                  subtitle: `As of ${todayStr}`,
+                  stats: stats4,
+                  table: { headers: ["Location", "Items", "Total Qty", "Total Value"], rows: tableRows4 },
+                  noData: tableRows4.length <= 1,
                 };
                 break;
               }
