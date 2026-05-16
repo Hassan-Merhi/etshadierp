@@ -1787,7 +1787,7 @@ If intent is not about an account query, respond with exactly: null`;
 
     // ── Phase 1: Data Query Handler ───────────────────────────────────────────
     // Handles read-only ERP data queries: P&L, cash position, statements, etc.
-    const PHASE1_KEYWORDS = /profit.{0,15}loss|p&l\b|pl\b.{0,10}report|balance.{0,8}sheet|cash.{0,12}(balance|position|account)|who.{0,20}owe[ds]?|overdue|outstanding.{0,15}(balance|amount|supplier)|customer.{0,15}statement|supplier.{0,15}statement|top.{0,10}(customer|buyer)s?|worker.{0,12}attend|how many.{0,20}(absent|present|worker)|bale.{0,12}(produc|today|week|this|last)|produc.{0,12}bale|how many bale|container.{0,12}status|where.{0,12}(is.{0,5})?container|pending.{0,10}offload|not.{0,10}offload|how much.{0,20}(stock|do we have|in stock)|stock.{0,10}(level|balance|position)|inventory.{0,10}(level|check|status)|low.{0,10}stock|below.{0,10}reorder|reorder.{0,10}level|stock.{0,10}movement|stock.{0,10}histor|movement.{0,10}(for|of).{0,20}\w|open.{0,10}(purchase order|po\b|p\.o\.)|pending.{0,10}(po\b|purchase)|aging|age.{0,10}(report|analysis)|receivable|payable.{0,10}(aging|due)|container.{0,10}list|all container|month.{0,10}(comparison|vs|versus|compare)|last month vs|rental.{0,10}(summary|report|occupan)|occupan|tenant|rent.{0,10}(due|overdue|collect)|payroll.{0,10}(summary|total|report)|total.{0,10}payroll|salary.{0,10}(total|summary)/i;
+    const PHASE1_KEYWORDS = /profit.{0,15}loss|p&l\b|pl\b.{0,10}report|balance.{0,8}sheet|cash.{0,12}(balance|position|account)|who.{0,20}owe[ds]?|overdue|outstanding.{0,15}(balance|amount|supplier)|customer.{0,15}statement|supplier.{0,15}statement|top.{0,10}(customer|buyer)s?|worker.{0,12}attend|how many.{0,20}(absent|present|worker)|bale.{0,12}(produc|today|week|this|last)|produc.{0,12}bale|how many bale|container.{0,12}status|where.{0,12}(is.{0,5})?container|pending.{0,10}offload|not.{0,10}offload|how much.{0,20}(stock|do we have|in stock)|stock.{0,10}(level|balance|position)|inventory.{0,10}(level|check|status)|low.{0,10}stock|below.{0,10}reorder|reorder.{0,10}level|stock.{0,10}movement|stock.{0,10}histor|movement.{0,10}(for|of).{0,20}\w|open.{0,10}(purchase order|po\b|p\.o\.)|pending.{0,10}(po\b|purchase)|aging|age.{0,10}(report|analysis)|receivable|payable.{0,10}(aging|due)|container.{0,10}list|all container|month.{0,10}(comparison|vs|versus|compare)|last month vs|rental.{0,10}(summary|report|occupan)|occupan|tenant|rent.{0,10}(due|overdue|collect)|payroll.{0,10}(summary|total|report)|total.{0,10}payroll|salary.{0,10}(total|summary)|sales.{0,10}(analys|by item|report|revenue)|how much.{0,15}(did we sell|sold)|top.{0,10}(sell|item|product)|best.{0,10}(sell|item)|container.{0,10}profit|profit.{0,10}per container|how much.{0,15}profit.{0,15}container|stock.{0,10}valuat|inventory.{0,10}value|total.{0,10}inventory.{0,10}(value|worth)|expense.{0,10}(break|categ|by type)|top.{0,10}expense|where.{0,20}money.{0,10}(going|spent)|customer.{0,10}order.{0,10}status|order.{0,10}(pending|draft|verified|finalized|loading)|credit.{0,10}note|recent.{0,10}credit|bank.{0,10}(transaction|movement|histor)|cash.{0,10}(transaction|movement|histor)|recent.{0,10}(payment|receipt|bank)|fixed.{0,10}asset|asset.{0,10}(list|register|summar)|kpi|factory.{0,10}(kpi|performance|daily)|daily.{0,10}(production|output)|efficiency/i;
     let dataQueryResult: any = undefined;
 
     if (PHASE1_KEYWORDS.test(userMessage) && !voucherDraft && !stockAdjustmentDraft) {
@@ -1834,6 +1834,16 @@ container_list = list containers filtered by status (e.g. "In Transit", "Arrived
 monthly_comparison = compare this month vs last month for revenue / expenses / net profit
 rental_summary = rental occupancy, rent due and overdue amounts across all units
 payroll_summary = factory payroll totals for a date range
+sales_analysis = sales revenue and profit by stock item for a period
+top_selling_items = top items ranked by sales quantity or revenue
+container_profitability = profit analysis per container (cost vs sale price)
+stock_valuation = total inventory value grouped by stock group/category
+expense_breakdown = top expense accounts ranked by total spend for a period
+customer_order_status = customer orders filtered by status (DRAFT/LOADING/VERIFIED/FINALIZED/CANCELLED)
+credit_notes_summary = recent credit notes issued (returns/reversals)
+bank_transactions = recent transactions on a specific bank or cash account
+fixed_assets_summary = list of fixed assets with purchase amounts and categories
+factory_kpi = factory daily KPI snapshots (kg input, kg pressed, bales produced, waste)
 
 Output this JSON shape:
 {"queryType":"<one of the above>","entityName":<string or null>,"containerNumber":<string or null>,"locationName":<string or null>,"containerStatus":<string or null>,"dateFrom":<YYYY-MM-DD or null>,"dateTo":"${todayStr}","limit":10}
@@ -2653,6 +2663,388 @@ If the intent does not match any type, output: null`;
                   subtitle: `${dateFrom} → ${dateTo}`,
                   stats: stats2,
                   table: { headers: ["Worker", "Period From", "Period To", "Base", "Bale Earn.", "Deductions", "Net", "Status"], rows: tableRows2 },
+                  noData: tableRows2.length === 0,
+                };
+                break;
+              }
+
+              // ── Phase 3 Cases ────────────────────────────────────────────────
+
+              case "sales_analysis": {
+                const itemNameFilter = params.entityName;
+                const rows = await db.execute(sql`
+                  SELECT si.name AS item_name, si.code, si.uom,
+                    COUNT(sal.id) AS tx_count,
+                    SUM(CAST(sal.quantity AS numeric)) AS total_qty,
+                    SUM(CAST(sal.total_sales AS numeric)) AS total_revenue,
+                    SUM(CAST(sal.total_cost AS numeric)) AS total_cost,
+                    SUM(CAST(sal.profit AS numeric)) AS total_profit
+                  FROM sales_items sal
+                  JOIN stock_items si ON si.id = sal.stock_item_id
+                  JOIN vouchers v ON v.id = sal.voucher_id AND v.deleted_at IS NULL
+                  WHERE si.company_id = ${companyId}
+                    AND CAST(v.voucher_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
+                    ${itemNameFilter ? sql`AND si.name ILIKE ${'%' + itemNameFilter + '%'}` : sql``}
+                  GROUP BY si.id, si.name, si.code, si.uom
+                  ORDER BY total_revenue DESC
+                  LIMIT ${rowLimit}
+                `);
+                let totRev = 0, totCost = 0, totProfit = 0, totQty = 0;
+                const tableRows2 = (rows.rows as any[]).map(r => {
+                  const rev = parseFloat(r.total_revenue || "0");
+                  const cost = parseFloat(r.total_cost || "0");
+                  const profit3 = parseFloat(r.total_profit || "0");
+                  const qty = parseFloat(r.total_qty || "0");
+                  const margin = rev > 0 ? ((profit3 / rev) * 100).toFixed(1) + "%" : "—";
+                  totRev += rev; totCost += cost; totProfit += profit3; totQty += qty;
+                  return [r.item_name, `${fmtDec(qty)} ${r.uom}`, fmt(rev), fmt(cost), fmt(profit3), margin];
+                });
+                if (tableRows2.length) {
+                  const totMargin = totRev > 0 ? ((totProfit / totRev) * 100).toFixed(1) + "%" : "—";
+                  tableRows2.push(["TOTAL", fmtDec(totQty), fmt(totRev), fmt(totCost), fmt(totProfit), totMargin]);
+                }
+                dataQueryResult = {
+                  queryType: "sales_analysis",
+                  title: itemNameFilter ? `Sales Analysis: ${itemNameFilter}` : "Sales Analysis by Item",
+                  subtitle: `${dateFrom} → ${dateTo}`,
+                  table: { headers: ["Item", "Qty Sold", "Revenue", "Cost", "Profit", "Margin"], rows: tableRows2 },
+                  noData: tableRows2.length === 0,
+                };
+                break;
+              }
+
+              case "top_selling_items": {
+                const rows = await db.execute(sql`
+                  SELECT si.name AS item_name, si.code, si.uom,
+                    SUM(CAST(sal.quantity AS numeric)) AS total_qty,
+                    SUM(CAST(sal.total_sales AS numeric)) AS total_revenue,
+                    SUM(CAST(sal.profit AS numeric)) AS total_profit,
+                    COUNT(DISTINCT v.id) AS num_transactions
+                  FROM sales_items sal
+                  JOIN stock_items si ON si.id = sal.stock_item_id
+                  JOIN vouchers v ON v.id = sal.voucher_id AND v.deleted_at IS NULL
+                  WHERE si.company_id = ${companyId}
+                    AND CAST(v.voucher_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
+                  GROUP BY si.id, si.name, si.code, si.uom
+                  ORDER BY total_revenue DESC
+                  LIMIT ${rowLimit}
+                `);
+                const tableRows2 = (rows.rows as any[]).map((r, i) => [
+                  String(i + 1),
+                  r.item_name,
+                  r.code,
+                  `${fmtDec(parseFloat(r.total_qty || "0"))} ${r.uom}`,
+                  fmt(parseFloat(r.total_revenue || "0")),
+                  fmt(parseFloat(r.total_profit || "0")),
+                  String(r.num_transactions),
+                ]);
+                dataQueryResult = {
+                  queryType: "top_selling_items",
+                  title: "Top Selling Items",
+                  subtitle: `${dateFrom} → ${dateTo} · by revenue`,
+                  table: { headers: ["#", "Item", "Code", "Qty Sold", "Revenue", "Profit", "Transactions"], rows: tableRows2 },
+                  noData: tableRows2.length === 0,
+                };
+                break;
+              }
+
+              case "container_profitability": {
+                const rows = await db.execute(sql`
+                  SELECT c.container_number,
+                    s.legal_name AS supplier,
+                    cu.legal_name AS customer,
+                    c.currency,
+                    CAST(c.grand_total AS numeric) AS cost,
+                    CAST(cs.total_amount AS numeric) AS sale_amount,
+                    CAST(cs.commission AS numeric) AS commission,
+                    cs.payment_status,
+                    c.import_date
+                  FROM container_sales cs
+                  JOIN containers c ON c.id = cs.container_id
+                  JOIN suppliers s ON s.id = c.supplier_id
+                  JOIN customers cu ON cu.id = cs.customer_id
+                  WHERE c.company_id = ${companyId}
+                    AND CAST(cs.sale_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
+                  ORDER BY cs.sale_date DESC
+                  LIMIT ${rowLimit}
+                `);
+                let totCost = 0, totSale = 0, totProfit = 0;
+                const tableRows2 = (rows.rows as any[]).map(r => {
+                  const cost = parseFloat(r.cost || "0");
+                  const sale = parseFloat(r.sale_amount || "0");
+                  const comm = parseFloat(r.commission || "0");
+                  const profit3 = sale - cost - comm;
+                  const margin = sale > 0 ? ((profit3 / sale) * 100).toFixed(1) + "%" : "—";
+                  totCost += cost; totSale += sale; totProfit += profit3;
+                  return [r.container_number, r.supplier, r.customer, r.currency, fmt(cost), fmt(sale), fmt(comm), fmt(profit3), margin, r.payment_status];
+                });
+                if (tableRows2.length) {
+                  const totMargin = totSale > 0 ? ((totProfit / totSale) * 100).toFixed(1) + "%" : "—";
+                  tableRows2.push(["TOTAL", "", "", "", fmt(totCost), fmt(totSale), "", fmt(totProfit), totMargin, ""]);
+                }
+                dataQueryResult = {
+                  queryType: "container_profitability",
+                  title: "Container Profitability",
+                  subtitle: `${dateFrom} → ${dateTo}`,
+                  table: { headers: ["Container #", "Supplier", "Customer", "Curr.", "Cost", "Sale", "Comm.", "Profit", "Margin", "Payment"], rows: tableRows2 },
+                  noData: tableRows2.length === 0,
+                };
+                break;
+              }
+
+              case "stock_valuation": {
+                const rows = await db.execute(sql`
+                  SELECT COALESCE(sg.name, 'Ungrouped') AS group_name,
+                    COUNT(DISTINCT si.id) AS item_count,
+                    SUM(CAST(inv.quantity AS numeric)) AS total_qty,
+                    SUM(CAST(inv.total_value AS numeric)) AS total_value
+                  FROM inventory inv
+                  JOIN stock_items si ON si.id = inv.stock_item_id AND si.deleted_at IS NULL
+                  LEFT JOIN stock_groups sg ON sg.id = si.stock_group_id
+                  WHERE inv.company_id = ${companyId} AND inv.quantity > 0
+                  GROUP BY sg.id, sg.name
+                  ORDER BY total_value DESC
+                  LIMIT ${rowLimit}
+                `);
+                let grandTotalValue = 0, grandTotalItems = 0;
+                const tableRows2 = (rows.rows as any[]).map(r => {
+                  const val = parseFloat(r.total_value || "0");
+                  grandTotalValue += val;
+                  grandTotalItems += parseInt(r.item_count || "0");
+                  return [r.group_name, String(r.item_count), fmtDec(parseFloat(r.total_qty || "0")), fmt(val)];
+                });
+                tableRows2.push(["GRAND TOTAL", String(grandTotalItems), "—", fmt(grandTotalValue)]);
+                const stats3 = [
+                  { label: "Total Stock Groups", value: String(tableRows2.length - 1) },
+                  { label: "Total Distinct Items", value: String(grandTotalItems) },
+                  { label: "Total Inventory Value", value: fmt(grandTotalValue), highlight: "positive" },
+                ];
+                dataQueryResult = {
+                  queryType: "stock_valuation",
+                  title: "Stock Valuation by Group",
+                  subtitle: `As of ${todayStr}`,
+                  stats: stats3,
+                  table: { headers: ["Stock Group", "Items", "Total Qty", "Total Value"], rows: tableRows2 },
+                  noData: tableRows2.length <= 1,
+                };
+                break;
+              }
+
+              case "expense_breakdown": {
+                const rows = await db.execute(sql`
+                  SELECT la.name, la.account_type,
+                    SUM(CAST(ve.debit_amount AS numeric) - CAST(ve.credit_amount AS numeric)) AS net_spend
+                  FROM voucher_entries ve
+                  JOIN vouchers v ON v.id = ve.voucher_id AND v.deleted_at IS NULL AND v.optional = false
+                  JOIN ledger_accounts la ON la.id = ve.ledger_account_id
+                  WHERE la.company_id = ${companyId}
+                    AND la.account_type IN ('Expense', 'Direct Expense', 'Indirect Expense', 'Government Taxes')
+                    AND CAST(v.voucher_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
+                  GROUP BY la.id, la.name, la.account_type
+                  HAVING SUM(CAST(ve.debit_amount AS numeric) - CAST(ve.credit_amount AS numeric)) > 0
+                  ORDER BY net_spend DESC
+                  LIMIT ${rowLimit}
+                `);
+                let grandSpend = 0;
+                const tableRows2 = (rows.rows as any[]).map(r => {
+                  const spend = parseFloat(r.net_spend || "0");
+                  grandSpend += spend;
+                  return [r.name, r.account_type, fmt(spend)];
+                });
+                if (tableRows2.length) tableRows2.push(["TOTAL", "", fmt(grandSpend)]);
+                dataQueryResult = {
+                  queryType: "expense_breakdown",
+                  title: "Expense Breakdown",
+                  subtitle: `${dateFrom} → ${dateTo} · top ${tableRows2.length - 1} accounts`,
+                  table: { headers: ["Account", "Type", "Amount"], rows: tableRows2 },
+                  noData: tableRows2.length === 0,
+                };
+                break;
+              }
+
+              case "customer_order_status": {
+                const statusFilter = (params.entityName || "").toUpperCase() || null;
+                const rows = await db.execute(sql`
+                  SELECT co.invoice_number, cu.legal_name AS customer,
+                    co.order_date, co.status,
+                    CAST(co.grand_total AS numeric) AS grand_total,
+                    co.total_qty_bales, co.destination, co.container_number
+                  FROM customer_orders co
+                  JOIN customers cu ON cu.id = co.customer_id
+                  WHERE co.company_id = ${companyId}
+                    AND co.deleted_at IS NULL
+                    ${statusFilter ? sql`AND co.status = ${statusFilter}` : sql``}
+                    AND co.order_date BETWEEN ${dateFrom} AND ${dateTo}
+                  ORDER BY co.order_date DESC
+                  LIMIT ${rowLimit}
+                `);
+                const tableRows2 = (rows.rows as any[]).map(r => [
+                  r.invoice_number || "—",
+                  r.customer,
+                  String(r.order_date).slice(0, 10),
+                  r.status,
+                  fmt(parseFloat(r.grand_total || "0")),
+                  String(r.total_qty_bales || 0),
+                  r.destination || "—",
+                ]);
+                dataQueryResult = {
+                  queryType: "customer_order_status",
+                  title: statusFilter ? `Customer Orders — ${statusFilter}` : "Customer Orders",
+                  subtitle: `${dateFrom} → ${dateTo} · ${tableRows2.length} order(s)`,
+                  table: { headers: ["Invoice", "Customer", "Date", "Status", "Total", "Bales", "Destination"], rows: tableRows2 },
+                  noData: tableRows2.length === 0,
+                };
+                break;
+              }
+
+              case "credit_notes_summary": {
+                const rows = await db.execute(sql`
+                  SELECT v.voucher_date, v.description,
+                    si.name AS item_name, si.uom,
+                    l.name AS location,
+                    CAST(cni.quantity AS numeric) AS qty,
+                    CAST(cni.rate AS numeric) AS rate,
+                    CAST(cni.total_value AS numeric) AS total_value
+                  FROM credit_note_items cni
+                  JOIN vouchers v ON v.id = cni.voucher_id AND v.deleted_at IS NULL
+                  JOIN stock_items si ON si.id = cni.stock_item_id
+                  JOIN locations l ON l.id = cni.location_id
+                  WHERE si.company_id = ${companyId}
+                    AND CAST(v.voucher_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
+                  ORDER BY v.voucher_date DESC
+                  LIMIT ${rowLimit}
+                `);
+                let totValue = 0;
+                const tableRows2 = (rows.rows as any[]).map(r => {
+                  const val = parseFloat(r.total_value || "0");
+                  totValue += val;
+                  return [String(r.voucher_date).slice(0, 10), r.item_name, r.location, `${fmtDec(parseFloat(r.qty))} ${r.uom}`, fmtDec(parseFloat(r.rate)), fmt(val), (r.description || "").slice(0, 35)];
+                });
+                dataQueryResult = {
+                  queryType: "credit_notes_summary",
+                  title: "Credit Notes",
+                  subtitle: `${dateFrom} → ${dateTo} · Total returned: ${fmt(totValue)}`,
+                  table: { headers: ["Date", "Item", "Location", "Qty", "Rate", "Value", "Description"], rows: tableRows2 },
+                  noData: tableRows2.length === 0,
+                };
+                break;
+              }
+
+              case "bank_transactions": {
+                const accountName = params.entityName || params.locationName;
+                const acctTypes = ['Bank', 'Cash'];
+                const acctRows = await db.execute(sql`
+                  SELECT id, name, account_type FROM ledger_accounts
+                  WHERE company_id = ${companyId} AND account_type IN ('Bank','Cash') AND deleted_at IS NULL
+                    ${accountName ? sql`AND name ILIKE ${'%' + accountName + '%'}` : sql``}
+                  ORDER BY account_type, name
+                  LIMIT 1
+                `);
+                if (!acctRows.rows.length) {
+                  dataQueryResult = { queryType: "bank_transactions", title: "Bank/Cash Transactions", summary: accountName ? `No account found matching "${accountName}".` : "Please specify an account name." };
+                  break;
+                }
+                const acct3 = acctRows.rows[0] as any;
+                const txRows3 = await db.execute(sql`
+                  SELECT v.voucher_date, v.voucher_type, v.description,
+                    CAST(ve.debit_amount AS numeric) AS debit,
+                    CAST(ve.credit_amount AS numeric) AS credit
+                  FROM voucher_entries ve
+                  JOIN vouchers v ON v.id = ve.voucher_id AND v.deleted_at IS NULL AND v.optional = false
+                  WHERE ve.ledger_account_id = ${acct3.id}
+                    AND CAST(v.voucher_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
+                  ORDER BY v.voucher_date DESC, v.id DESC
+                  LIMIT ${rowLimit}
+                `);
+                const tableRows2 = (txRows3.rows as any[]).map(r => [
+                  String(r.voucher_date).slice(0, 10),
+                  r.voucher_type || "—",
+                  (r.description || "").slice(0, 40),
+                  parseFloat(r.debit || "0") > 0 ? fmt(parseFloat(r.debit)) : "—",
+                  parseFloat(r.credit || "0") > 0 ? fmt(parseFloat(r.credit)) : "—",
+                ]);
+                dataQueryResult = {
+                  queryType: "bank_transactions",
+                  title: `Transactions: ${acct3.name}`,
+                  subtitle: `${dateFrom} → ${dateTo} · ${acct3.account_type} account`,
+                  table: { headers: ["Date", "Type", "Description", "In (Dr)", "Out (Cr)"], rows: tableRows2 },
+                  noData: tableRows2.length === 0,
+                };
+                break;
+              }
+
+              case "fixed_assets_summary": {
+                const categoryFilter = params.entityName;
+                const rows = await db.execute(sql`
+                  SELECT fa.code, fa.name, fa.category,
+                    fa.purchase_date,
+                    CAST(fa.purchase_amount AS numeric) AS purchase_amount,
+                    fa.depreciation_method, fa.useful_life, fa.active
+                  FROM fixed_assets fa
+                  WHERE fa.company_id = ${companyId}
+                    ${categoryFilter ? sql`AND fa.category ILIKE ${'%' + categoryFilter + '%'}` : sql``}
+                  ORDER BY fa.category, fa.purchase_date DESC
+                  LIMIT ${rowLimit}
+                `);
+                let grandTotal = 0;
+                const tableRows2 = (rows.rows as any[]).map(r => {
+                  const amt = parseFloat(r.purchase_amount || "0");
+                  grandTotal += amt;
+                  return [r.code, r.name, r.category, String(r.purchase_date).slice(0, 10), fmt(amt), r.depreciation_method, r.useful_life ? `${r.useful_life} yr` : "—", r.active ? "Active" : "Inactive"];
+                });
+                const stats3 = [
+                  { label: "Total Assets", value: String(tableRows2.length) },
+                  { label: "Total Purchase Value", value: fmt(grandTotal), highlight: "positive" },
+                ];
+                dataQueryResult = {
+                  queryType: "fixed_assets_summary",
+                  title: categoryFilter ? `Fixed Assets — ${categoryFilter}` : "Fixed Assets Register",
+                  subtitle: `${tableRows2.length} asset(s)`,
+                  stats: stats3,
+                  table: { headers: ["Code", "Name", "Category", "Purchase Date", "Amount", "Depreciation", "Life", "Status"], rows: tableRows2 },
+                  noData: tableRows2.length === 0,
+                };
+                break;
+              }
+
+              case "factory_kpi": {
+                const rows = await db.execute(sql`
+                  SELECT date,
+                    CAST(total_kg_in AS numeric) AS kg_in,
+                    CAST(total_kg_pressed AS numeric) AS kg_pressed,
+                    total_bales_produced,
+                    CAST(total_waste_kg AS numeric) AS waste_kg
+                  FROM factory_daily_kpi_snapshots
+                  WHERE company_id = ${companyId}
+                    AND date BETWEEN ${dateFrom} AND ${dateTo}
+                  ORDER BY date DESC
+                  LIMIT ${rowLimit}
+                `);
+                let totKgIn = 0, totKgPressed = 0, totBales = 0, totWaste = 0;
+                const tableRows2 = (rows.rows as any[]).map(r => {
+                  const kgIn = parseFloat(r.kg_in || "0");
+                  const kgPressed = parseFloat(r.kg_pressed || "0");
+                  const bales = parseInt(r.total_bales_produced || "0");
+                  const waste = parseFloat(r.waste_kg || "0");
+                  const efficiency = kgIn > 0 ? ((kgPressed / kgIn) * 100).toFixed(1) + "%" : "—";
+                  totKgIn += kgIn; totKgPressed += kgPressed; totBales += bales; totWaste += waste;
+                  return [String(r.date).slice(0, 10), fmtDec(kgIn), fmtDec(kgPressed), String(bales), fmtDec(waste), efficiency];
+                });
+                const avgEff = totKgIn > 0 ? ((totKgPressed / totKgIn) * 100).toFixed(1) + "%" : "—";
+                if (tableRows2.length) tableRows2.push(["TOTAL", fmtDec(totKgIn), fmtDec(totKgPressed), String(totBales), fmtDec(totWaste), avgEff]);
+                const stats3 = [
+                  { label: "Total Kg In", value: fmtDec(totKgIn) },
+                  { label: "Total Kg Pressed", value: fmtDec(totKgPressed) },
+                  { label: "Total Bales", value: String(totBales) },
+                  { label: "Total Waste Kg", value: fmtDec(totWaste) },
+                  { label: "Avg Efficiency", value: avgEff, highlight: "positive" },
+                ];
+                dataQueryResult = {
+                  queryType: "factory_kpi",
+                  title: "Factory Daily KPIs",
+                  subtitle: `${dateFrom} → ${dateTo}`,
+                  stats: stats3,
+                  table: { headers: ["Date", "Kg In", "Kg Pressed", "Bales", "Waste Kg", "Efficiency"], rows: tableRows2 },
                   noData: tableRows2.length === 0,
                 };
                 break;
