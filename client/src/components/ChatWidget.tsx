@@ -86,12 +86,22 @@ interface VoucherSearchResult {
   optional: boolean;
 }
 
+interface StockItemDraft {
+  name: string;
+  code: string;
+  uom: string;
+  stockGroupId: number | null;
+  stockGroupName: string;
+  groupCandidates: { id: number; name: string }[];
+}
+
 interface ChatResponse {
   response: string;
   suggestions: string[];
   voucherDraft?: VoucherDraft | null;
   stockAdjustmentDraft?: StockAdjustmentDraft | null;
   voucherSearchResults?: VoucherSearchResult[] | null;
+  stockItemDraft?: StockItemDraft | null;
 }
 
 interface VoucherDraft {
@@ -439,6 +449,121 @@ function VoucherSearchResultsCard({
   );
 }
 
+// ── Stock Item Confirmation Card ────────────────────────────────────
+function StockItemConfirmCard({
+  draft,
+  onConfirm,
+  onDismiss,
+  isSubmitting,
+}: {
+  draft: StockItemDraft;
+  onConfirm: (resolved: StockItemDraft) => void;
+  onDismiss: () => void;
+  isSubmitting: boolean;
+}) {
+  const [name, setName] = useState(draft.name);
+  const [code, setCode] = useState(draft.code);
+  const [uom, setUom] = useState(draft.uom);
+  const [groupId, setGroupId] = useState<number | null>(draft.stockGroupId);
+  const [groupName, setGroupName] = useState(draft.stockGroupName);
+
+  const handleGroupChange = (val: string) => {
+    const id = parseInt(val, 10);
+    const found = draft.groupCandidates.find(g => g.id === id);
+    setGroupId(id);
+    setGroupName(found?.name ?? "");
+  };
+
+  const handleConfirm = () => {
+    onConfirm({ ...draft, name, code, uom, stockGroupId: groupId, stockGroupName: groupName });
+  };
+
+  return (
+    <div className="mt-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 overflow-hidden" data-testid="stock-item-confirm-card">
+      <div className="px-3 py-2 bg-emerald-500/10 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Package className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Create Stock Item?</span>
+        </div>
+        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onDismiss} disabled={isSubmitting}>
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+      <div className="px-3 py-3 space-y-2 text-sm">
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground font-medium">Item Name</label>
+            <input
+              className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              data-testid="input-stock-item-name"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground font-medium">Code</label>
+            <input
+              className="w-full rounded-md border bg-background px-2 py-1 text-sm uppercase"
+              value={code}
+              onChange={e => setCode(e.target.value.toUpperCase())}
+              data-testid="input-stock-item-code"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground font-medium">UOM</label>
+            <input
+              className="w-full rounded-md border bg-background px-2 py-1 text-sm uppercase"
+              value={uom}
+              onChange={e => setUom(e.target.value.toUpperCase())}
+              data-testid="input-stock-item-uom"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground font-medium">Stock Group</label>
+            {draft.groupCandidates.length > 0 ? (
+              <select
+                className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+                value={groupId ?? ""}
+                onChange={e => handleGroupChange(e.target.value)}
+                data-testid="select-stock-item-group"
+              >
+                <option value="">— Select group —</option>
+                {draft.groupCandidates.map(g => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+                value={groupName}
+                readOnly
+                data-testid="input-stock-item-group"
+              />
+            )}
+          </div>
+        </div>
+        {!groupId && (
+          <p className="text-xs text-amber-600 dark:text-amber-400">A stock group is required to create the item.</p>
+        )}
+      </div>
+      <div className="px-3 pb-3 flex items-center gap-2 justify-end">
+        <Button size="sm" variant="outline" onClick={onDismiss} disabled={isSubmitting} data-testid="button-cancel-stock-item">
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          onClick={handleConfirm}
+          disabled={isSubmitting || !name.trim() || !code.trim() || !uom.trim() || !groupId}
+          data-testid="button-confirm-stock-item"
+        >
+          {isSubmitting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
+          Create Item
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ── Voucher Confirmation Card ────────────────────────────────────────
 function VoucherConfirmCard({
   draft,
@@ -532,6 +657,8 @@ export function ChatWidget() {
   const [pendingStockAdj, setPendingStockAdj] = useState<StockAdjustmentDraft | null>(null);
   const [stockAdjSubmitting, setStockAdjSubmitting] = useState(false);
   const [voucherSearchResults, setVoucherSearchResults] = useState<VoucherSearchResult[] | null>(null);
+  const [pendingStockItem, setPendingStockItem] = useState<StockItemDraft | null>(null);
+  const [stockItemSubmitting, setStockItemSubmitting] = useState(false);
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -571,6 +698,11 @@ export function ChatWidget() {
         setVoucherSearchResults(data.voucherSearchResults);
       } else {
         setVoucherSearchResults(null);
+      }
+      if (data.stockItemDraft) {
+        setPendingStockItem(data.stockItemDraft);
+      } else {
+        setPendingStockItem(null);
       }
     },
   });
@@ -644,6 +776,26 @@ export function ChatWidget() {
     }
   };
 
+  const handleConfirmStockItem = async (resolved: StockItemDraft) => {
+    if (!resolved.stockGroupId) return;
+    setStockItemSubmitting(true);
+    try {
+      await apiRequest("POST", "/api/stock-items", {
+        name: resolved.name,
+        code: resolved.code,
+        uom: resolved.uom,
+        stockGroupId: resolved.stockGroupId,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      setPendingStockItem(null);
+      sendMutation.mutate(`Stock item "${resolved.name}" (${resolved.code}) created successfully in group "${resolved.stockGroupName}".`);
+    } catch (err: any) {
+      sendMutation.mutate(`Failed to create stock item: ${err.message}`);
+    } finally {
+      setStockItemSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector(
@@ -691,6 +843,7 @@ export function ChatWidget() {
     setPendingVoucher(null);
     setPendingStockAdj(null);
     setVoucherSearchResults(null);
+    setPendingStockItem(null);
     setShowAlerts(true);
     queryClient.removeQueries({ queryKey: [`/api/chatbot/history/${sessionId}`] });
   };
@@ -973,6 +1126,16 @@ export function ChatWidget() {
                     <VoucherSearchResultsCard
                       results={voucherSearchResults}
                       onDismiss={() => setVoucherSearchResults(null)}
+                    />
+                  )}
+
+                  {/* ── 5e: Stock Item Confirmation Card ── */}
+                  {pendingStockItem && !sendMutation.isPending && (
+                    <StockItemConfirmCard
+                      draft={pendingStockItem}
+                      onConfirm={handleConfirmStockItem}
+                      onDismiss={() => setPendingStockItem(null)}
+                      isSubmitting={stockItemSubmitting}
                     />
                   )}
                 </div>

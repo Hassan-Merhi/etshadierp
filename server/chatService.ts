@@ -966,7 +966,7 @@ export async function chat(
   companyId: number,
   conversationHistory: { role: string; content: string }[] = [],
   userPreferences?: UserPreferences
-): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any; voucherSearchResults?: any[] }> {
+): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any; voucherSearchResults?: any[]; stockItemDraft?: any }> {
   const available = getAvailableProviders();
   
   if (available.length === 0) {
@@ -1161,6 +1161,61 @@ Return ONLY the search term as plain text (e.g. "rent", "electricity bill", "cli
       }
     }
 
+    // ── New stock item creation ────────────────────────────────────────
+    const STOCK_ITEM_CREATE_KEYWORDS = /\b(create\s+(a\s+)?stock\s+item|add\s+(a\s+)?stock\s+item|new\s+stock\s+item|create\s+(a\s+)?new\s+item|add\s+(a\s+)?new\s+item|new\s+item)\b/i;
+    let stockItemDraft: any = undefined;
+
+    if (STOCK_ITEM_CREATE_KEYWORDS.test(userMessage)) {
+      try {
+        const groups = await db
+          .select({ id: schema.stockGroups.id, name: schema.stockGroups.name })
+          .from(schema.stockGroups)
+          .where(and(eq(schema.stockGroups.companyId, companyId), eq(schema.stockGroups.active, true)))
+          .orderBy(schema.stockGroups.name)
+          .limit(60);
+
+        const itemPrompt = `You are a stock item creation assistant.
+User message: "${userMessage}"
+Available stock groups (id:name): ${groups.map(g => `${g.id}:${g.name}`).join(" | ")}
+
+Extract the following fields from the user's message:
+- name: full item name
+- code: item code (short identifier, usually letters/numbers)
+- uom: unit of measure (e.g. KG, PCS, MTR, LTR, BOX)
+- stockGroupId: best matching group id from the list above (fuzzy match)
+- stockGroupName: matching group name
+
+RULES:
+1. Match stock group name FUZZILY — abbreviations and partial names are fine.
+2. If no group matches, set stockGroupId: null and stockGroupName: "".
+3. If code is not mentioned, generate a sensible short code from the name (uppercase, max 8 chars).
+4. UOM should be normalized to common abbreviations (KG, PCS, MTR, LTR, BOX, etc.).
+
+Respond with ONLY valid JSON (no markdown):
+{"name":"...","code":"...","uom":"...","stockGroupId":NUMBER_OR_NULL,"stockGroupName":"..."}
+
+If the user is not clearly trying to create a stock item, respond with exactly: null`;
+
+        const itemResult = await callAIWithFallback(selectedProvider, itemPrompt, [], "Extract stock item creation details");
+        const rawItem = itemResult.response.trim().replace(/```json\n?|```/g, "").trim();
+        if (rawItem !== "null" && rawItem.startsWith("{")) {
+          const parsedItem = JSON.parse(rawItem);
+          if (parsedItem && parsedItem.name && parsedItem.code && parsedItem.uom) {
+            stockItemDraft = {
+              name: parsedItem.name,
+              code: parsedItem.code.toUpperCase(),
+              uom: parsedItem.uom.toUpperCase(),
+              stockGroupId: parsedItem.stockGroupId ?? null,
+              stockGroupName: parsedItem.stockGroupName ?? "",
+              groupCandidates: groups.slice(0, 20).map(g => ({ id: g.id, name: g.name })),
+            };
+          }
+        }
+      } catch (_) {
+        // Extraction failed silently
+      }
+    }
+
     return {
       response,
       suggestions,
@@ -1168,6 +1223,7 @@ Return ONLY the search term as plain text (e.g. "rent", "electricity bill", "cli
       voucherDraft,
       stockAdjustmentDraft,
       voucherSearchResults,
+      stockItemDraft,
     };
   } catch (error: any) {
     console.error("[ChatService] ERROR:", error.message);
