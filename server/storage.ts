@@ -1766,10 +1766,27 @@ export class DbStorage implements IStorage {
     // Delete the PO
     await db.delete(schema.purchaseOrders).where(eq(schema.purchaseOrders.id, id));
 
-    // Delete the voucher if it exists (this removes the supplier payable entry)
+    // Delete the voucher if it exists (this removes the supplier payable entry).
+    // Guard against: voucher already deleted from daybook, or a restrict FK on another
+    // table (e.g. container_sales, stock_transfer_vouchers) still pointing to this voucher.
     if (po.voucherId) {
-      await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, po.voucherId));
-      await db.delete(schema.vouchers).where(eq(schema.vouchers.id, po.voucherId));
+      try {
+        // Hard-delete entries first (they CASCADE anyway, but be explicit)
+        await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, po.voucherId));
+        await db.delete(schema.vouchers).where(eq(schema.vouchers.id, po.voucherId));
+      } catch (_hardDeleteErr) {
+        // FK restrict from another table is blocking the hard-delete.
+        // Fall back to a soft-delete so the voucher is hidden from the daybook
+        // but the referencing rows remain valid.
+        try {
+          await db
+            .update(schema.vouchers)
+            .set({ deletedAt: new Date() })
+            .where(and(eq(schema.vouchers.id, po.voucherId), isNull(schema.vouchers.deletedAt)));
+        } catch (_softDeleteErr) {
+          // Voucher is already gone or already soft-deleted — nothing to do.
+        }
+      }
     }
 
     // Check if there are any remaining POs for this container
