@@ -1001,27 +1001,38 @@ export async function chat(
     // ── Phase 5b: detect voucher creation intent ──────────────────────────
     // Ask the AI to extract a voucher draft if the message contains creation intent.
     // We do a lightweight structured extraction call only when keywords are found.
-    const VOUCHER_KEYWORDS = /\b(create|make|record|add|post|enter)\b.{0,60}\b(payment|receipt|journal|voucher|entry|invoice)\b|\b(pay|paid|received|collected)\b.{0,40}\$?\d/i;
+    const VOUCHER_KEYWORDS = /\b(create|make|record|add|post|enter|book)\b.{0,80}\b(payment|receipt|journal|voucher|entry|invoice|transaction)\b|\b(pay|paid|receive[d]?|collect[ed]?|transfer[red]?|deposit[ed]?)\b.{0,60}\$?\d|\b(journal|receipt|payment)\b.{0,40}\$?\d/i;
     let voucherDraft: any = undefined;
 
     if (VOUCHER_KEYWORDS.test(userMessage)) {
       try {
-        // Fetch ledger accounts once for the company (top 30 most common)
         const accts = await db
           .select({ id: schema.ledgerAccounts.id, name: schema.ledgerAccounts.name, accountType: schema.ledgerAccounts.accountType })
           .from(schema.ledgerAccounts)
           .where(and(eq(schema.ledgerAccounts.companyId, companyId), isNull(schema.ledgerAccounts.deletedAt)))
-          .limit(80);
+          .limit(120);
 
-        const extractionPrompt = `You are a voucher extraction assistant for an accounting system. The user said: "${userMessage}". 
-Available ledger accounts: ${accts.map(a => `${a.id}:${a.name}(${a.accountType})`).join(", ")}
-If the user clearly intends to CREATE a voucher/payment/receipt/journal entry, respond with ONLY valid JSON (no markdown) in this exact shape:
-{"type":"Payment"|"Receipt"|"Journal","date":"YYYY-MM-DD","description":"...","entries":[{"accountId":NUMBER,"accountName":"...","debit":NUMBER,"credit":NUMBER}]}
-Both sides must balance (sum of debits == sum of credits). Date defaults to today if not specified. Use ${new Date().toISOString().slice(0,10)} as today.
-If the intent is not clear or amounts/accounts are too ambiguous, respond with exactly: null`;
+        const today = new Date().toISOString().slice(0, 10);
+        const extractionPrompt = `You are a voucher extraction assistant for an accounting system.
+User message: "${userMessage}"
+Today's date: ${today}
+Available ledger accounts (id:name:type): ${accts.map(a => `${a.id}:${a.name}:${a.accountType}`).join(" | ")}
+
+RULES:
+1. If the user clearly intends to CREATE a payment, receipt, or journal entry, extract the details and respond with ONLY valid JSON (no markdown, no explanation).
+2. Match account names FUZZILY — if the user types a partial name (e.g. "cash", "rent", "salary"), find the best matching account from the list above. Always resolve to a real accountId from the list.
+3. Use the EXACT description/narration the user provided (any phrase after "for", "re:", "being", or at the end of the message). If none, write a short descriptive one.
+4. Voucher type rules: "Payment" = money going out (debit expense/asset, credit cash/bank), "Receipt" = money coming in (debit cash/bank, credit income/liability), "Journal" = any other adjustment.
+5. Both sides MUST balance: sum of all debits must equal sum of all credits.
+6. Date defaults to today (${today}) if not specified by the user.
+
+Respond with ONLY this JSON shape:
+{"type":"Payment"|"Receipt"|"Journal","date":"YYYY-MM-DD","description":"<user's own wording or short description>","entries":[{"accountId":NUMBER,"accountName":"EXACT name from list","debit":NUMBER,"credit":NUMBER}]}
+
+If the intent is unclear or amounts/accounts are too ambiguous to resolve, respond with exactly: null`;
 
         const extractionResult = await callAIWithFallback(selectedProvider, extractionPrompt, [], "Extract voucher or return null");
-        const raw = extractionResult.response.trim().replace(/```json|```/g, "").trim();
+        const raw = extractionResult.response.trim().replace(/```json\n?|```/g, "").trim();
         if (raw !== "null" && raw.startsWith("{")) {
           const parsed = JSON.parse(raw);
           if (parsed && parsed.type && parsed.entries && parsed.entries.length >= 2) {
