@@ -571,7 +571,7 @@ export function registerAuthRoutes(app: Express) {
 
         const logs = rawLogs.map(({ storedUsername, resolvedUsername, displayName, ...row }) => ({
           ...row,
-          username: displayName || resolvedUsername || storedUsername || "Unknown",
+          username: resolvedUsername || displayName || storedUsername || "Unknown",
         }));
 
         res.json(logs);
