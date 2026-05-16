@@ -195,6 +195,7 @@ export function useErpVisibleSections(user?: any): {
 export function AppSidebar({ user }: { user?: any }) {
   const { toast } = useToast();
   const { conflictCount } = useConnectivity();
+  const { selectedCompany } = useCompany();
   const prevUnreadRef = useRef<number>(-1);
 
   const { items: pinnedItems, reorder: reorderPinned } = usePinnedOrder(
