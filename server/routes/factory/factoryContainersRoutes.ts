@@ -264,13 +264,23 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       const [container] = await db.insert(factoryContainers).values(values).returning();
 
+      let supplierNameForDesc = "";
+      if (container.supplierId) {
+        const [sup] = await db.select({ name: factorySuppliers.name }).from(factorySuppliers).where(eq(factorySuppliers.id, container.supplierId));
+        supplierNameForDesc = sup?.name || "";
+      }
+      const kgForDesc = parseFloat(container.totalKg || "0");
+      const rateForDesc = parseFloat(container.ratePerKg || "0");
+      const ccyForDesc = container.currencyCode || "USD";
+      const descParts = [container.containerNumber, supplierNameForDesc, kgForDesc > 0 ? `${kgForDesc.toLocaleString()} kg` : null, rateForDesc > 0 ? `${rateForDesc} ${ccyForDesc}/kg` : null].filter(Boolean);
+
       await writeDaybookEntry(db, {
         companyId,
         txDate: container.arrivalDate || today,
         txType: "CONTAINER_IMPORT",
         referenceId: container.id,
-        description: `Container imported: ${container.containerNumber}`,
-        currencyCode: container.currencyCode || "USD",
+        description: descParts.join(" · "),
+        currencyCode: ccyForDesc,
         amountCurrency: parseFloat(container.ratePerKg || "0") * parseFloat(container.totalKg || "0"),
         fxRateToUsd: parseFloat(container.fxRateToUsd || "1"),
       });
@@ -1225,12 +1235,13 @@ export function registerFactoryContainersRoutes(app: Express) {
               commissionCurrencyCode: commCcy,
             }).returning();
 
+            const excelDescParts = [container.containerNumber, row.supplierName?.trim() || null, totalKg > 0 ? `${totalKg.toLocaleString()} kg` : null, ratePerKg > 0 ? `${ratePerKg} ${currencyCode}/kg` : null].filter(Boolean);
             await writeDaybookEntry(tx, {
               companyId,
               txDate: container.arrivalDate || importDate,
               txType: "CONTAINER_IMPORT",
               referenceId: container.id,
-              description: `Container imported (Excel): ${container.containerNumber}`,
+              description: excelDescParts.join(" · "),
               currencyCode: container.currencyCode || "USD",
               amountCurrency: ratePerKg * totalKg,
               fxRateToUsd: fxRate,
