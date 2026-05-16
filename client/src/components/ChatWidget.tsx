@@ -306,14 +306,14 @@ function StockAdjustmentConfirmCard({
 
         {/* Items table */}
         <div className="border-t pt-1.5 mt-0.5 space-y-1.5">
-          <div className="grid grid-cols-[1fr_56px_40px] gap-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-            <span>Item</span><span className="text-center">Type</span><span className="text-right">Qty</span>
+          <div className="grid grid-cols-[1fr_50px_36px_48px] gap-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+            <span>Item</span><span className="text-center">Type</span><span className="text-right">Qty</span><span className="text-right">Rate</span>
           </div>
           {draft.items.map((item, i) => {
             const candidates = item.candidates ?? [];
             const hasChoice = candidates.length > 1;
             return (
-              <div key={i} className="grid grid-cols-[1fr_56px_40px] gap-1 items-center">
+              <div key={i} className="grid grid-cols-[1fr_50px_36px_48px] gap-1 items-center">
                 {hasChoice ? (
                   <select
                     className="text-xs font-medium text-foreground bg-background border rounded px-1.5 py-0.5 w-full"
@@ -337,6 +337,9 @@ function StockAdjustmentConfirmCard({
                   {item.type === "PRODUCE" ? "Produce" : "Consume"}
                 </span>
                 <span className="text-right text-foreground">{item.quantity.toLocaleString()}</span>
+                <span className="text-right text-muted-foreground">
+                  {item.rate > 0 ? item.rate.toLocaleString(undefined, { maximumFractionDigits: 2 }) : <span className="italic text-[10px]">—</span>}
+                </span>
               </div>
             );
           })}

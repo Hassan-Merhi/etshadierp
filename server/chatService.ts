@@ -1074,18 +1074,19 @@ Stock items (id:name:code): ${items.map(i => `${i.id}:${i.name}:${i.code}`).join
 Locations (id:name): ${locs.map(l => `${l.id}:${l.name}`).join(" | ")}
 
 RULES:
-1. Extract a stock adjustment (Production/Consumption voucher) only if the user clearly intends to produce or consume items.
-2. Match item names and location names FUZZILY — partial names, abbreviations, and codes are fine.
-3. Each entry has a type of "PRODUCE" (adding stock) or "CONSUME" (removing stock). "Production" = PRODUCE, "Consumption" = CONSUME.
-4. Rate is the unit cost/value of the item. If the user doesn't specify a rate, use 0.
-5. Use the user's description/notes if provided.
-6. If the user says "optional", set optional: true.
-7. Date defaults to today (${today}) if not specified.
-8. For each item, pick the best match as stockItemId/stockItemName. ALSO include a "candidates" array of up to 3 items from the list that could plausibly match the user's text (include the best match as the first candidate). If there is only one plausible match, candidates should have just that one entry. Each candidate: {"id":NUMBER,"name":"...","code":"..."}.
-9. For location, also return up to 3 location candidates: {"id":NUMBER,"name":"..."}.
+1. Extract a stock adjustment only if the user clearly intends to produce or consume items.
+2. Match item names and location names FUZZILY — partial names, abbreviations, and codes all work.
+3. The user may mention ANY number of items (one or many). Extract ALL of them into the items array.
+4. Each entry has type "PRODUCE" (adding stock) or "CONSUME" (removing stock).
+5. Do NOT worry about rate — always set rate: 0. Rates are auto-filled from inventory.
+6. Use the user's description/notes if provided.
+7. If the user says "optional", set optional: true.
+8. Date defaults to today (${today}) if not specified.
+9. For each item, pick the best match as stockItemId/stockItemName. ALSO include a "candidates" array of up to 3 plausible matches (best first). Each candidate: {"id":NUMBER,"name":"...","code":"..."}.
+10. For location, return up to 3 location candidates: {"id":NUMBER,"name":"..."}.
 
 Respond with ONLY valid JSON (no markdown):
-{"date":"YYYY-MM-DD","locationId":NUMBER,"locationName":"...","locationCandidates":[{"id":NUMBER,"name":"..."}],"notes":"...","optional":false,"items":[{"type":"PRODUCE"|"CONSUME","stockItemId":NUMBER,"stockItemName":"...","quantity":NUMBER,"rate":NUMBER,"candidates":[{"id":NUMBER,"name":"...","code":"..."}]}]}
+{"date":"YYYY-MM-DD","locationId":NUMBER,"locationName":"...","locationCandidates":[{"id":NUMBER,"name":"..."}],"notes":"...","optional":false,"items":[{"type":"PRODUCE"|"CONSUME","stockItemId":NUMBER,"stockItemName":"...","quantity":NUMBER,"rate":0,"candidates":[{"id":NUMBER,"name":"...","code":"..."}]}]}
 
 If intent is unclear, respond with exactly: null`;
 
@@ -1094,6 +1095,22 @@ If intent is unclear, respond with exactly: null`;
         if (rawAdj !== "null" && rawAdj.startsWith("{")) {
           const parsedAdj = JSON.parse(rawAdj);
           if (parsedAdj && parsedAdj.locationId && parsedAdj.items && parsedAdj.items.length > 0) {
+            // Auto-fill rates from inventory averageRate
+            const itemIds = parsedAdj.items.map((i: any) => i.stockItemId).filter(Boolean);
+            if (itemIds.length > 0) {
+              const invRows = await db
+                .select({ stockItemId: schema.inventory.stockItemId, averageRate: schema.inventory.averageRate })
+                .from(schema.inventory)
+                .where(and(
+                  eq(schema.inventory.locationId, parsedAdj.locationId),
+                  eq(schema.inventory.companyId, companyId),
+                ));
+              const rateMap = new Map(invRows.map(r => [r.stockItemId, parseFloat(r.averageRate ?? "0")]));
+              parsedAdj.items = parsedAdj.items.map((item: any) => ({
+                ...item,
+                rate: rateMap.get(item.stockItemId) ?? 0,
+              }));
+            }
             stockAdjustmentDraft = parsedAdj;
           }
         }
