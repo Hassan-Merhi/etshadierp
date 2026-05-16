@@ -889,8 +889,11 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       // (e.g. wipers/garbage entered via stock import) are still included using their creation date.
       const baleConditions: any[] = [
         eq(factoryBales.companyId, companyId),
-        // Include all bales except manually deleted ones (DELETED or legacy REMOVED)
-        sql`${factoryBales.status} NOT IN ('DELETED', 'REMOVED')`,
+        // Exclude deleted/removed bales and REPACKED originals.
+        // REPACKED: when a bale is repacked a new IN_STOCK bale is created with the same
+        // weight; the original bale stays in the DB with status REPACKED.  Counting both
+        // would double-count that weight in Productions.
+        sql`${factoryBales.status} NOT IN ('DELETED', 'REMOVED', 'REPACKED')`,
       ];
       if (from) baleConditions.push(sql`COALESCE(DATE(${factoryBales.stockEntryDate}), DATE(${factoryBales.createdAt})) >= ${from}`);
       if (to)   baleConditions.push(sql`COALESCE(DATE(${factoryBales.stockEntryDate}), DATE(${factoryBales.createdAt})) <= ${to}`);
@@ -899,9 +902,12 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       // CARRY_FORWARD batches represent leftover material from a parent batch whose weight is
       // already counted in the parent's totalWeightKg.  Including them would double-count
       // that leftover and inflate the raw-material total.
+      // Also exclude soft-deleted batches (deletedAt IS NOT NULL): their bales are deleted
+      // and excluded from Productions, so counting them here would widen the gap unfairly.
       const mixBatchConditions: any[] = [
         eq(factoryMixBatches.companyId, companyId),
         sql`${factoryMixBatches.carryForwardFromId} IS NULL`,
+        isNull(factoryMixBatches.deletedAt),
       ];
       if (from) mixBatchConditions.push(sql`COALESCE(${factoryMixBatches.batchDate}, DATE(${factoryMixBatches.createdAt})) >= ${from}`);
       if (to)   mixBatchConditions.push(sql`COALESCE(${factoryMixBatches.batchDate}, DATE(${factoryMixBatches.createdAt})) <= ${to}`);
