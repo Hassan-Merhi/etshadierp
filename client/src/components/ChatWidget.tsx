@@ -95,6 +95,19 @@ interface StockItemDraft {
   groupCandidates: { id: number; name: string }[];
 }
 
+interface PriceUpdateDraft {
+  stockItemId: number;
+  stockItemName: string;
+  stockItemCode: string;
+  locationId: number | null;
+  locationName: string;
+  newPrice: number;
+  followerCount: number;
+  itemCandidates: { id: number; name: string; code: string }[];
+  locationCandidates: { id: number; name: string }[];
+  allLocations: { id: number; name: string }[];
+}
+
 interface ChatResponse {
   response: string;
   suggestions: string[];
@@ -102,6 +115,7 @@ interface ChatResponse {
   stockAdjustmentDraft?: StockAdjustmentDraft | null;
   voucherSearchResults?: VoucherSearchResult[] | null;
   stockItemDraft?: StockItemDraft | null;
+  priceUpdateDraft?: PriceUpdateDraft | null;
 }
 
 interface VoucherDraft {
@@ -564,6 +578,132 @@ function StockItemConfirmCard({
   );
 }
 
+// ── Price Update Confirmation Card ──────────────────────────────────
+function PriceUpdateConfirmCard({
+  draft,
+  onConfirm,
+  onDismiss,
+  isSubmitting,
+}: {
+  draft: PriceUpdateDraft;
+  onConfirm: (resolved: PriceUpdateDraft) => void;
+  onDismiss: () => void;
+  isSubmitting: boolean;
+}) {
+  const [itemId, setItemId] = useState(draft.stockItemId);
+  const [itemName, setItemName] = useState(draft.stockItemName);
+  const [itemCode, setItemCode] = useState(draft.stockItemCode);
+  const [locationId, setLocationId] = useState<number | null>(draft.locationId);
+  const [locationName, setLocationName] = useState(draft.locationName);
+  const [price, setPrice] = useState(String(draft.newPrice));
+
+  const followerCount = draft.allLocations.length > 0
+    ? (draft.allLocations.find(l => l.id === locationId) ? draft.followerCount : 0)
+    : draft.followerCount;
+
+  const handleItemChange = (val: string) => {
+    const id = parseInt(val, 10);
+    const found = draft.itemCandidates.find(c => c.id === id);
+    setItemId(id);
+    setItemName(found?.name ?? "");
+    setItemCode(found?.code ?? "");
+  };
+
+  const handleLocationChange = (val: string) => {
+    const id = parseInt(val, 10);
+    const found = draft.allLocations.find(l => l.id === id);
+    setLocationId(id);
+    setLocationName(found?.name ?? "");
+  };
+
+  const priceNum = parseFloat(price);
+  const valid = itemId > 0 && locationId && !isNaN(priceNum) && priceNum > 0;
+
+  return (
+    <div className="mt-2 rounded-md border border-violet-500/30 bg-violet-500/5 overflow-hidden" data-testid="price-update-confirm-card">
+      <div className="px-3 py-2 bg-violet-500/10 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-violet-600 dark:text-violet-400 shrink-0" />
+          <span className="text-sm font-semibold text-violet-700 dark:text-violet-400">Update Price List?</span>
+        </div>
+        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onDismiss} disabled={isSubmitting}>
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+      <div className="px-3 py-3 space-y-2 text-sm">
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground font-medium">Stock Item</label>
+          {draft.itemCandidates.length > 1 ? (
+            <select
+              className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+              value={itemId}
+              onChange={e => handleItemChange(e.target.value)}
+              data-testid="select-price-item"
+            >
+              {draft.itemCandidates.map(c => (
+                <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-sm font-medium">{itemName} <span className="text-xs text-muted-foreground">({itemCode})</span></p>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground font-medium">Price Group / Location</label>
+            {draft.allLocations.length > 0 ? (
+              <select
+                className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+                value={locationId ?? ""}
+                onChange={e => handleLocationChange(e.target.value)}
+                data-testid="select-price-location"
+              >
+                <option value="">— Select —</option>
+                {draft.allLocations.map(l => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
+                ))}
+              </select>
+            ) : (
+              <p className="text-sm font-medium">{locationName || "—"}</p>
+            )}
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground font-medium">New Price</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+              value={price}
+              onChange={e => setPrice(e.target.value)}
+              data-testid="input-new-price"
+            />
+          </div>
+        </div>
+        {locationId && draft.followerCount > 0 && (
+          <p className="text-xs text-violet-600 dark:text-violet-400">
+            This price group has {draft.followerCount} follower location{draft.followerCount !== 1 ? "s" : ""} — price will cascade to all of them automatically.
+          </p>
+        )}
+      </div>
+      <div className="px-3 pb-3 flex items-center gap-2 justify-end">
+        <Button size="sm" variant="outline" onClick={onDismiss} disabled={isSubmitting} data-testid="button-cancel-price-update">
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          onClick={() => onConfirm({ ...draft, stockItemId: itemId, stockItemName: itemName, stockItemCode: itemCode, locationId, locationName, newPrice: priceNum })}
+          disabled={isSubmitting || !valid}
+          data-testid="button-confirm-price-update"
+        >
+          {isSubmitting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
+          Update Price
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ── Voucher Confirmation Card ────────────────────────────────────────
 function VoucherConfirmCard({
   draft,
@@ -659,6 +799,8 @@ export function ChatWidget() {
   const [voucherSearchResults, setVoucherSearchResults] = useState<VoucherSearchResult[] | null>(null);
   const [pendingStockItem, setPendingStockItem] = useState<StockItemDraft | null>(null);
   const [stockItemSubmitting, setStockItemSubmitting] = useState(false);
+  const [pendingPriceUpdate, setPendingPriceUpdate] = useState<PriceUpdateDraft | null>(null);
+  const [priceUpdateSubmitting, setPriceUpdateSubmitting] = useState(false);
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -703,6 +845,11 @@ export function ChatWidget() {
         setPendingStockItem(data.stockItemDraft);
       } else {
         setPendingStockItem(null);
+      }
+      if (data.priceUpdateDraft) {
+        setPendingPriceUpdate(data.priceUpdateDraft);
+      } else {
+        setPendingPriceUpdate(null);
       }
     },
   });
@@ -796,6 +943,26 @@ export function ChatWidget() {
     }
   };
 
+  const handleConfirmPriceUpdate = async (resolved: PriceUpdateDraft) => {
+    if (!resolved.locationId) return;
+    setPriceUpdateSubmitting(true);
+    try {
+      await apiRequest("POST", `/api/stock-items/${resolved.stockItemId}/location-prices`, {
+        locationId: resolved.locationId,
+        sellingPrice: String(resolved.newPrice),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list-by-masters"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list"] });
+      setPendingPriceUpdate(null);
+      const cascadeNote = resolved.followerCount > 0 ? ` (cascaded to ${resolved.followerCount} follower location${resolved.followerCount !== 1 ? "s" : ""})` : "";
+      sendMutation.mutate(`Price updated: "${resolved.stockItemName}" set to ${resolved.newPrice} for "${resolved.locationName}"${cascadeNote}.`);
+    } catch (err: any) {
+      sendMutation.mutate(`Failed to update price: ${err.message}`);
+    } finally {
+      setPriceUpdateSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector(
@@ -844,6 +1011,7 @@ export function ChatWidget() {
     setPendingStockAdj(null);
     setVoucherSearchResults(null);
     setPendingStockItem(null);
+    setPendingPriceUpdate(null);
     setShowAlerts(true);
     queryClient.removeQueries({ queryKey: [`/api/chatbot/history/${sessionId}`] });
   };
@@ -1136,6 +1304,16 @@ export function ChatWidget() {
                       onConfirm={handleConfirmStockItem}
                       onDismiss={() => setPendingStockItem(null)}
                       isSubmitting={stockItemSubmitting}
+                    />
+                  )}
+
+                  {/* ── 5f: Price Update Confirmation Card ── */}
+                  {pendingPriceUpdate && !sendMutation.isPending && (
+                    <PriceUpdateConfirmCard
+                      draft={pendingPriceUpdate}
+                      onConfirm={handleConfirmPriceUpdate}
+                      onDismiss={() => setPendingPriceUpdate(null)}
+                      isSubmitting={priceUpdateSubmitting}
                     />
                   )}
                 </div>

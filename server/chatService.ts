@@ -966,7 +966,7 @@ export async function chat(
   companyId: number,
   conversationHistory: { role: string; content: string }[] = [],
   userPreferences?: UserPreferences
-): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any; voucherSearchResults?: any[]; stockItemDraft?: any }> {
+): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any; voucherSearchResults?: any[]; stockItemDraft?: any; priceUpdateDraft?: any }> {
   const available = getAvailableProviders();
   
   if (available.length === 0) {
@@ -1216,6 +1216,87 @@ If the user is not clearly trying to create a stock item, respond with exactly: 
       }
     }
 
+    // ── Price list update ──────────────────────────────────────────────
+    const PRICE_UPDATE_KEYWORDS = /\b(update.*price|change.*price|set.*price|price.*to|price.*for|update.*selling|change.*selling|new price|price list)\b/i;
+    let priceUpdateDraft: any = undefined;
+
+    if (PRICE_UPDATE_KEYWORDS.test(userMessage)) {
+      try {
+        const [items, masterRows] = await Promise.all([
+          db.select({ id: schema.stockItems.id, name: schema.stockItems.name, code: schema.stockItems.code })
+            .from(schema.stockItems)
+            .where(and(eq(schema.stockItems.companyId, companyId), eq(schema.stockItems.active, true), isNull(schema.stockItems.deletedAt)))
+            .limit(120),
+          db.select({ masterLocationId: schema.locationPriceGroups.masterLocationId })
+            .from(schema.locationPriceGroups)
+            .where(eq(schema.locationPriceGroups.companyId, companyId)),
+        ]);
+
+        const masterIds = [...new Set(masterRows.map(r => r.masterLocationId))];
+        const masterLocations = masterIds.length > 0
+          ? await db.select({ id: schema.locations.id, name: schema.locations.name })
+              .from(schema.locations)
+              .where(and(eq(schema.locations.companyId, companyId), inArray(schema.locations.id, masterIds)))
+          : await db.select({ id: schema.locations.id, name: schema.locations.name })
+              .from(schema.locations)
+              .where(eq(schema.locations.companyId, companyId))
+              .limit(20);
+
+        // Fetch follower counts per master for display
+        const followerCounts = new Map<number, number>();
+        if (masterIds.length > 0) {
+          const fRows = await db.select({
+            masterLocationId: schema.locationPriceGroups.masterLocationId,
+            followerLocationId: schema.locationPriceGroups.followerLocationId,
+          }).from(schema.locationPriceGroups).where(eq(schema.locationPriceGroups.companyId, companyId));
+          for (const r of fRows) {
+            followerCounts.set(r.masterLocationId, (followerCounts.get(r.masterLocationId) ?? 0) + 1);
+          }
+        }
+
+        const pricePrompt = `You are a price update extraction assistant.
+User message: "${userMessage}"
+Stock items (id:name:code): ${items.map(i => `${i.id}:${i.name}:${i.code}`).join(" | ")}
+Price group / master locations (id:name): ${masterLocations.map(l => `${l.id}:${l.name}`).join(" | ")}
+
+Extract:
+- stockItemId: best matching stock item id (fuzzy match on name or code)
+- stockItemName: matching item name
+- stockItemCode: matching item code
+- locationId: best matching master location id (fuzzy match)
+- locationName: matching location name
+- newPrice: the new selling price as a number
+
+RULES:
+1. Match item name/code and location name FUZZILY.
+2. newPrice must be a positive number.
+3. If the user says "all locations" or doesn't specify a location, pick locationId: null and locationName: "".
+4. Also include candidates arrays for disambiguation:
+   - itemCandidates: up to 3 item matches [{"id":N,"name":"...","code":"..."}]
+   - locationCandidates: up to 3 location matches [{"id":N,"name":"..."}]
+
+Respond with ONLY valid JSON (no markdown):
+{"stockItemId":NUMBER,"stockItemName":"...","stockItemCode":"...","locationId":NUMBER_OR_NULL,"locationName":"...","newPrice":NUMBER,"itemCandidates":[...],"locationCandidates":[...]}
+
+If intent is not a price update, respond with exactly: null`;
+
+        const priceResult = await callAIWithFallback(selectedProvider, pricePrompt, [], "Extract price update details");
+        const rawPrice = priceResult.response.trim().replace(/```json\n?|```/g, "").trim();
+        if (rawPrice !== "null" && rawPrice.startsWith("{")) {
+          const parsedPrice = JSON.parse(rawPrice);
+          if (parsedPrice && parsedPrice.stockItemId && parsedPrice.newPrice > 0) {
+            priceUpdateDraft = {
+              ...parsedPrice,
+              followerCount: parsedPrice.locationId ? (followerCounts.get(parsedPrice.locationId) ?? 0) : 0,
+              allLocations: masterLocations.map(l => ({ id: l.id, name: l.name })),
+            };
+          }
+        }
+      } catch (_) {
+        // Extraction failed silently
+      }
+    }
+
     return {
       response,
       suggestions,
@@ -1224,6 +1305,7 @@ If the user is not clearly trying to create a stock item, respond with exactly: 
       stockAdjustmentDraft,
       voucherSearchResults,
       stockItemDraft,
+      priceUpdateDraft,
     };
   } catch (error: any) {
     console.error("[ChatService] ERROR:", error.message);
