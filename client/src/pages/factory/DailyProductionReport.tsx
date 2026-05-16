@@ -1104,7 +1104,7 @@ export default function DailyProductionReport() {
                     )}
                     <span className="text-muted-foreground text-base font-semibold">=</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-muted-foreground">Net Waste</span>
+                      <span className="text-sm font-semibold text-muted-foreground">Total</span>
                       <span
                         className={`text-base font-bold ${isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
                         data-testid="text-weight-total"
