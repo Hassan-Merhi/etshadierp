@@ -33,6 +33,8 @@ import {
   ShoppingCart,
   Download,
   FileCheck,
+  ArrowLeftRight,
+  TrendingUp,
 } from "lucide-react";
 import {
   Select,
@@ -226,6 +228,7 @@ interface ChatResponse {
   suggestions: string[];
   voucherDraft?: VoucherDraft | null;
   stockAdjustmentDraft?: StockAdjustmentDraft | null;
+  stockTransferDraft?: StockTransferDraft | null;
   voucherSearchResults?: VoucherSearchResult[] | null;
   stockItemDraft?: StockItemDraft | null;
   priceUpdateDraft?: PriceUpdateDraft | null;
@@ -244,7 +247,25 @@ interface VoucherDraft {
     accountName: string;
     debit: number;
     credit: number;
+    balanceBefore?: number;
   }[];
+}
+
+interface StockTransferDraft {
+  date: string;
+  sourceLocationId: number;
+  sourceLocationName: string;
+  destinationLocationId: number;
+  destinationLocationName: string;
+  notes?: string;
+  items: {
+    stockItemId: number;
+    stockItemName: string;
+    quantity: number;
+    currentStock?: number;
+    candidates?: { id: number; name: string; code?: string }[];
+  }[];
+  locationCandidates?: { id: number; name: string }[];
 }
 
 interface AlertDigest {
@@ -255,7 +276,7 @@ interface AlertDigest {
 }
 
 // ── Alerts Digest Card ────────────────────────────────────────────────
-function AlertsDigest({ onClose }: { onClose: () => void }) {
+function AlertsDigest({ onClose, onPrefill }: { onClose: () => void; onPrefill: (text: string) => void }) {
   const [expanded, setExpanded] = useState(false);
 
   const { data: alerts, isLoading } = useQuery<AlertDigest>({
@@ -303,14 +324,22 @@ function AlertsDigest({ onClose }: { onClose: () => void }) {
                 <Package className="h-3 w-3" /> Low Stock ({alerts.lowStock.length})
               </p>
               <ul className="space-y-0.5">
-                {alerts.lowStock.slice(0, 5).map(item => (
-                  <li key={item.id} className="text-xs text-muted-foreground flex justify-between gap-2">
+                {alerts.lowStock.slice(0, 4).map(item => (
+                  <li key={item.id} className="text-xs text-muted-foreground flex items-center justify-between gap-2">
                     <span className="truncate">{item.name}</span>
-                    <span className="shrink-0 text-amber-600 dark:text-amber-400">{item.qty} / {item.reorderLevel}</span>
+                    <span className="flex items-center gap-1 shrink-0">
+                      <span className="text-amber-600 dark:text-amber-400">{item.qty} / {item.reorderLevel}</span>
+                      <button
+                        className="text-xs text-primary underline shrink-0"
+                        onClick={() => onPrefill(`Record stock adjustment for "${item.name}" (code: ${item.code})`)}
+                        data-testid={`alert-action-stock-adj-${item.id}`}
+                        title="Record adjustment"
+                      >Adjust</button>
+                    </span>
                   </li>
                 ))}
-                {alerts.lowStock.length > 5 && (
-                  <li className="text-xs text-muted-foreground italic">+{alerts.lowStock.length - 5} more</li>
+                {alerts.lowStock.length > 4 && (
+                  <li className="text-xs text-muted-foreground italic">+{alerts.lowStock.length - 4} more</li>
                 )}
               </ul>
             </div>
@@ -323,7 +352,14 @@ function AlertsDigest({ onClose }: { onClose: () => void }) {
               </p>
               <ul className="space-y-0.5">
                 {alerts.openPOs.slice(0, 3).map(po => (
-                  <li key={po.id} className="text-xs text-muted-foreground">{po.poNumber}</li>
+                  <li key={po.id} className="text-xs text-muted-foreground flex items-center justify-between gap-2">
+                    <span>{po.poNumber}</span>
+                    <button
+                      className="text-xs text-primary underline shrink-0"
+                      onClick={() => onPrefill(`Show details for purchase order ${po.poNumber}`)}
+                      data-testid={`alert-action-po-${po.id}`}
+                    >Details</button>
+                  </li>
                 ))}
                 {alerts.openPOs.length > 3 && (
                   <li className="text-xs text-muted-foreground italic">+{alerts.openPOs.length - 3} more</li>
@@ -339,9 +375,16 @@ function AlertsDigest({ onClose }: { onClose: () => void }) {
               </p>
               <ul className="space-y-0.5">
                 {alerts.overdueCustomers.slice(0, 3).map(c => (
-                  <li key={c.customerId} className="text-xs text-muted-foreground flex justify-between gap-2">
+                  <li key={c.customerId} className="text-xs text-muted-foreground flex items-center justify-between gap-2">
                     <span className="truncate">{c.name}</span>
-                    <span className="shrink-0 text-amber-600 dark:text-amber-400">${c.balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                    <span className="flex items-center gap-1 shrink-0">
+                      <span className="text-amber-600 dark:text-amber-400">${c.balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                      <button
+                        className="text-xs text-primary underline"
+                        onClick={() => onPrefill(`Record a payment receipt from customer "${c.name}"`)}
+                        data-testid={`alert-action-customer-${c.customerId}`}
+                      >Receipt</button>
+                    </span>
                   </li>
                 ))}
                 {alerts.overdueCustomers.length > 3 && (
@@ -358,8 +401,13 @@ function AlertsDigest({ onClose }: { onClose: () => void }) {
               </p>
               <ul className="space-y-0.5">
                 {alerts.pendingPayrolls.map(p => (
-                  <li key={p.id} className="text-xs text-muted-foreground">
-                    {p.periodStart} – {p.periodEnd}
+                  <li key={p.id} className="text-xs text-muted-foreground flex items-center justify-between gap-2">
+                    <span>{p.periodStart} – {p.periodEnd}</span>
+                    <button
+                      className="text-xs text-primary underline shrink-0"
+                      onClick={() => onPrefill(`Show payroll summary for ${p.periodStart} to ${p.periodEnd}`)}
+                      data-testid={`alert-action-payroll-${p.id}`}
+                    >Details</button>
                   </li>
                 ))}
               </ul>
@@ -459,44 +507,72 @@ function StockAdjustmentConfirmCard({
 
         {/* Items table */}
         <div className="border-t pt-1.5 mt-0.5 space-y-1.5">
-          <div className="grid grid-cols-[1fr_50px_36px_48px] gap-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-            <span>Item</span><span className="text-center">Type</span><span className="text-right">Qty</span><span className="text-right">Rate</span>
-          </div>
-          {draft.items.map((item, i) => {
-            const candidates = item.candidates ?? [];
-            const hasChoice = candidates.length > 1;
+          {(() => {
+            const hasStockPreview = draft.items.some(i => i.currentStock !== undefined);
+            const cols = hasStockPreview
+              ? "grid-cols-[1fr_42px_32px_48px_70px]"
+              : "grid-cols-[1fr_50px_36px_48px]";
             return (
-              <div key={i} className="grid grid-cols-[1fr_50px_36px_48px] gap-1 items-center">
-                {hasChoice ? (
-                  <select
-                    className="text-xs font-medium text-foreground bg-background border rounded px-1.5 py-0.5 w-full"
-                    value={selectedItems[i].id}
-                    onChange={e => {
-                      const id = Number(e.target.value);
-                      const c = candidates.find(c => c.id === id);
-                      if (c) {
-                        setSelectedItems(prev => prev.map((s, idx) => idx === i ? { id: c.id, name: c.name } : s));
-                      }
-                    }}
-                  >
-                    {candidates.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}{c.code ? ` (${c.code})` : ""}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <span className="truncate text-foreground">{selectedItems[i].name}</span>
-                )}
-                <span className={`text-center text-[10px] font-semibold ${item.type === "PRODUCE" ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
-                  {item.type === "PRODUCE" ? "Produce" : "Consume"}
-                </span>
-                <span className="text-right text-foreground">{item.quantity.toLocaleString()}</span>
-                <span className="text-right text-muted-foreground">
-                  {item.rate > 0 ? item.rate.toLocaleString(undefined, { maximumFractionDigits: 2 }) : <span className="italic text-[10px]">—</span>}
-                </span>
-              </div>
+              <>
+                <div className={`grid ${cols} gap-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide`}>
+                  <span>Item</span>
+                  <span className="text-center">Type</span>
+                  <span className="text-right">Qty</span>
+                  <span className="text-right">Rate</span>
+                  {hasStockPreview && <span className="text-right">Stock</span>}
+                </div>
+                {draft.items.map((item, i) => {
+                  const candidates = item.candidates ?? [];
+                  const hasChoice = candidates.length > 1;
+                  const isNegative = item.projectedStock !== undefined && item.projectedStock < 0;
+                  return (
+                    <div key={i} className={`grid ${cols} gap-1 items-center`}>
+                      {hasChoice ? (
+                        <select
+                          className="text-xs font-medium text-foreground bg-background border rounded px-1.5 py-0.5 w-full"
+                          value={selectedItems[i].id}
+                          onChange={e => {
+                            const id = Number(e.target.value);
+                            const c = candidates.find(c => c.id === id);
+                            if (c) {
+                              setSelectedItems(prev => prev.map((s, idx) => idx === i ? { id: c.id, name: c.name } : s));
+                            }
+                          }}
+                        >
+                          {candidates.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}{c.code ? ` (${c.code})` : ""}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="truncate text-foreground">{selectedItems[i].name}</span>
+                      )}
+                      <span className={`text-center text-[10px] font-semibold ${item.type === "PRODUCE" ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
+                        {item.type === "PRODUCE" ? "Produce" : "Consume"}
+                      </span>
+                      <span className="text-right text-foreground">{item.quantity.toLocaleString()}</span>
+                      <span className="text-right text-muted-foreground">
+                        {item.rate > 0 ? item.rate.toLocaleString(undefined, { maximumFractionDigits: 2 }) : <span className="italic text-[10px]">—</span>}
+                      </span>
+                      {hasStockPreview && (
+                        <span className={`text-right text-[10px] ${isNegative ? "text-destructive font-semibold" : "text-muted-foreground"}`}>
+                          {item.currentStock !== undefined ? `${item.currentStock}→` : ""}
+                          {item.projectedStock !== undefined ? (
+                            <span className={isNegative ? "text-destructive" : "text-green-600 dark:text-green-400"}>
+                              {item.projectedStock}
+                            </span>
+                          ) : null}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </>
             );
-          })}
+          })()}
         </div>
+        {draft.items.some(i => i.projectedStock !== undefined && i.projectedStock < 0) && (
+          <p className="text-[10px] text-destructive border-t pt-1">Warning: stock would go negative for one or more items.</p>
+        )}
       </div>
       <div className="px-3 py-2 border-t flex gap-2 justify-end">
         <Button variant="outline" size="sm" onClick={onDismiss} disabled={isSubmitting} data-testid="button-dismiss-stock-adj">
@@ -1284,13 +1360,46 @@ function VoucherConfirmCard({
   isSubmitting,
 }: {
   draft: VoucherDraft;
-  onConfirm: () => void;
+  onConfirm: (edited: VoucherDraft) => void;
   onDismiss: () => void;
   isSubmitting: boolean;
 }) {
-  const totalDebit = draft.entries.reduce((s, e) => s + (e.debit || 0), 0);
-  const totalCredit = draft.entries.reduce((s, e) => s + (e.credit || 0), 0);
+  const [editDate, setEditDate] = useState(draft.date);
+  const [editDesc, setEditDesc] = useState(draft.description);
+  const [editEntries, setEditEntries] = useState(
+    () => draft.entries.map(e => ({ ...e, debitStr: e.debit > 0 ? String(e.debit) : "", creditStr: e.credit > 0 ? String(e.credit) : "" }))
+  );
+
+  const parsedEntries = editEntries.map(e => ({
+    ...e,
+    debit: parseFloat(e.debitStr) || 0,
+    credit: parseFloat(e.creditStr) || 0,
+  }));
+  const totalDebit = parsedEntries.reduce((s, e) => s + e.debit, 0);
+  const totalCredit = parsedEntries.reduce((s, e) => s + e.credit, 0);
   const balanced = Math.abs(totalDebit - totalCredit) < 0.01;
+
+  const handleConfirmClick = () => {
+    const edited: VoucherDraft = {
+      ...draft,
+      date: editDate,
+      description: editDesc,
+      entries: parsedEntries.map(e => ({
+        accountId: e.accountId,
+        accountName: e.accountName,
+        debit: e.debit,
+        credit: e.credit,
+        balanceBefore: e.balanceBefore,
+      })),
+    };
+    onConfirm(edited);
+  };
+
+  const setEntryField = (i: number, field: "debitStr" | "creditStr", val: string) => {
+    setEditEntries(prev => prev.map((e, idx) => idx === i ? { ...e, [field]: val } : e));
+  };
+
+  const hasBalanceBefore = draft.entries.some(e => e.balanceBefore !== undefined);
 
   return (
     <div className="mt-2 rounded-md border border-primary/30 bg-primary/5 overflow-hidden" data-testid="voucher-confirm-card">
@@ -1301,30 +1410,76 @@ function VoucherConfirmCard({
         </span>
       </div>
       <div className="px-3 py-2 space-y-1.5 text-xs">
-        <div className="flex justify-between gap-2 text-muted-foreground">
-          <span>Date</span><span className="font-medium text-foreground">{draft.date}</span>
+        <div className="flex justify-between gap-2 text-muted-foreground items-center">
+          <span className="shrink-0">Date</span>
+          <input
+            type="date"
+            value={editDate}
+            onChange={e => setEditDate(e.target.value)}
+            className="text-xs font-medium text-foreground bg-background border rounded px-1.5 py-0.5"
+            data-testid="input-voucher-date"
+          />
         </div>
-        <div className="flex justify-between gap-2 text-muted-foreground">
-          <span>Description</span><span className="font-medium text-foreground truncate max-w-[180px]">{draft.description}</span>
+        <div className="flex justify-between gap-2 text-muted-foreground items-center">
+          <span className="shrink-0">Description</span>
+          <input
+            type="text"
+            value={editDesc}
+            onChange={e => setEditDesc(e.target.value)}
+            className="text-xs font-medium text-foreground bg-background border rounded px-1.5 py-0.5 max-w-[170px] w-full"
+            data-testid="input-voucher-description"
+          />
         </div>
-        <div className="border-t pt-1.5 mt-1.5 space-y-1">
-          <div className="grid grid-cols-3 gap-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-            <span>Account</span><span className="text-right">Debit</span><span className="text-right">Credit</span>
+        <div className="border-t pt-1.5 mt-1.5 space-y-1.5">
+          <div className={`grid gap-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide ${hasBalanceBefore ? "grid-cols-[1fr_52px_52px_60px]" : "grid-cols-3"}`}>
+            <span>Account</span>
+            <span className="text-right">Debit</span>
+            <span className="text-right">Credit</span>
+            {hasBalanceBefore && <span className="text-right">Balance</span>}
           </div>
-          {draft.entries.map((e, i) => (
-            <div key={i} className="grid grid-cols-3 gap-1">
-              <span className="truncate text-foreground">{e.accountName}</span>
-              <span className="text-right text-foreground">{e.debit > 0 ? `$${e.debit.toLocaleString()}` : ""}</span>
-              <span className="text-right text-foreground">{e.credit > 0 ? `$${e.credit.toLocaleString()}` : ""}</span>
-            </div>
-          ))}
-          <div className="grid grid-cols-3 gap-1 border-t pt-1 font-semibold text-xs">
+          {editEntries.map((e, i) => {
+            const debit = parseFloat(e.debitStr) || 0;
+            const credit = parseFloat(e.creditStr) || 0;
+            const balAfter = e.balanceBefore !== undefined ? e.balanceBefore + debit - credit : undefined;
+            return (
+              <div key={i} className={`grid gap-1 items-center ${hasBalanceBefore ? "grid-cols-[1fr_52px_52px_60px]" : "grid-cols-3"}`}>
+                <span className="truncate text-foreground">{e.accountName}</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={e.debitStr}
+                  onChange={ev => setEntryField(i, "debitStr", ev.target.value)}
+                  className="text-right text-foreground bg-background border rounded px-1 py-0.5 text-[11px] w-full"
+                  placeholder="0"
+                  data-testid={`input-voucher-debit-${i}`}
+                />
+                <input
+                  type="number"
+                  min="0"
+                  value={e.creditStr}
+                  onChange={ev => setEntryField(i, "creditStr", ev.target.value)}
+                  className="text-right text-foreground bg-background border rounded px-1 py-0.5 text-[11px] w-full"
+                  placeholder="0"
+                  data-testid={`input-voucher-credit-${i}`}
+                />
+                {hasBalanceBefore && (
+                  <span className={`text-right text-[10px] ${balAfter !== undefined && balAfter < 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                    {e.balanceBefore !== undefined ? (
+                      <>{e.balanceBefore.toLocaleString(undefined, { maximumFractionDigits: 0 })} → <span className={balAfter !== undefined && balAfter < 0 ? "text-destructive font-semibold" : "text-foreground"}>{balAfter !== undefined ? balAfter.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "?"}</span></>
+                    ) : "—"}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+          <div className={`grid gap-1 border-t pt-1 font-semibold text-xs ${hasBalanceBefore ? "grid-cols-[1fr_52px_52px_60px]" : "grid-cols-3"}`}>
             <span>Total</span>
-            <span className="text-right">${totalDebit.toLocaleString()}</span>
-            <span className="text-right">${totalCredit.toLocaleString()}</span>
+            <span className="text-right">{totalDebit > 0 ? totalDebit.toLocaleString(undefined, { maximumFractionDigits: 2 }) : ""}</span>
+            <span className="text-right">{totalCredit > 0 ? totalCredit.toLocaleString(undefined, { maximumFractionDigits: 2 }) : ""}</span>
+            {hasBalanceBefore && <span />}
           </div>
           {!balanced && (
-            <p className="text-destructive text-[10px]">Warning: debits and credits don't balance.</p>
+            <p className="text-destructive text-[10px]">Warning: debits and credits don't balance (diff: {Math.abs(totalDebit - totalCredit).toFixed(2)}).</p>
           )}
         </div>
       </div>
@@ -1341,12 +1496,142 @@ function VoucherConfirmCard({
         </Button>
         <Button
           size="sm"
-          onClick={onConfirm}
+          onClick={handleConfirmClick}
           disabled={isSubmitting || !balanced}
           data-testid="button-confirm-voucher"
         >
           {isSubmitting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Check className="h-3.5 w-3.5 mr-1" />}
           Confirm & Create
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Stock Transfer Confirm Card ─────────────────────────────────────────
+function StockTransferConfirmCard({
+  draft,
+  onConfirm,
+  onDismiss,
+  isSubmitting,
+}: {
+  draft: StockTransferDraft;
+  onConfirm: (resolved: StockTransferDraft) => void;
+  onDismiss: () => void;
+  isSubmitting: boolean;
+}) {
+  const [editDate, setEditDate] = useState(draft.date);
+  const [editNotes, setEditNotes] = useState(draft.notes || "");
+  const [editItems, setEditItems] = useState(() => draft.items.map(i => ({ ...i, selectedId: i.stockItemId, selectedName: i.stockItemName, qtyStr: String(i.quantity) })));
+
+  const hasInsufficientStock = editItems.some(i => {
+    const qty = parseFloat(i.qtyStr) || 0;
+    return i.currentStock !== undefined && qty > i.currentStock;
+  });
+
+  const handleConfirmClick = () => {
+    const resolved: StockTransferDraft = {
+      ...draft,
+      date: editDate,
+      notes: editNotes,
+      items: editItems.map(i => ({
+        ...i,
+        stockItemId: i.selectedId,
+        stockItemName: i.selectedName,
+        quantity: parseFloat(i.qtyStr) || i.quantity,
+      })),
+    };
+    onConfirm(resolved);
+  };
+
+  return (
+    <div className="mt-2 rounded-md border border-blue-500/30 bg-blue-500/5 overflow-hidden" data-testid="stock-transfer-confirm-card">
+      <div className="px-3 py-2 bg-blue-500/10 flex items-center gap-2">
+        <ArrowLeftRight className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+        <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">Stock Transfer?</span>
+      </div>
+      <div className="px-3 py-2 space-y-1.5 text-xs">
+        <div className="flex justify-between gap-2 text-muted-foreground items-center">
+          <span className="shrink-0">Date</span>
+          <input
+            type="date"
+            value={editDate}
+            onChange={e => setEditDate(e.target.value)}
+            className="text-xs font-medium text-foreground bg-background border rounded px-1.5 py-0.5"
+            data-testid="input-transfer-date"
+          />
+        </div>
+        <div className="flex justify-between gap-2 text-muted-foreground items-center">
+          <span className="shrink-0">From</span>
+          <span className="font-medium text-foreground truncate max-w-[170px]">{draft.sourceLocationName}</span>
+        </div>
+        <div className="flex justify-between gap-2 text-muted-foreground items-center">
+          <span className="shrink-0">To</span>
+          <span className="font-medium text-foreground truncate max-w-[170px]">{draft.destinationLocationName}</span>
+        </div>
+        <div className="flex justify-between gap-2 text-muted-foreground items-center">
+          <span className="shrink-0">Notes</span>
+          <input
+            type="text"
+            value={editNotes}
+            onChange={e => setEditNotes(e.target.value)}
+            placeholder="Optional notes"
+            className="text-xs font-medium text-foreground bg-background border rounded px-1.5 py-0.5 max-w-[170px] w-full"
+            data-testid="input-transfer-notes"
+          />
+        </div>
+        <div className="border-t pt-1.5 mt-1.5 space-y-1.5">
+          <div className="grid grid-cols-[1fr_50px_60px] gap-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+            <span>Item</span><span className="text-right">Qty</span><span className="text-right">In Stock</span>
+          </div>
+          {editItems.map((item, i) => {
+            const qty = parseFloat(item.qtyStr) || 0;
+            const insufficient = item.currentStock !== undefined && qty > item.currentStock;
+            const candidates = item.candidates ?? [];
+            const hasChoice = candidates.length > 1;
+            return (
+              <div key={i} className="grid grid-cols-[1fr_50px_60px] gap-1 items-center">
+                {hasChoice ? (
+                  <select
+                    className="text-xs font-medium text-foreground bg-background border rounded px-1.5 py-0.5 w-full"
+                    value={item.selectedId}
+                    onChange={e => {
+                      const id = Number(e.target.value);
+                      const c = candidates.find(c => c.id === id);
+                      if (c) setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, selectedId: c.id, selectedName: c.name } : it));
+                    }}
+                  >
+                    {candidates.map(c => <option key={c.id} value={c.id}>{c.name}{c.code ? ` (${c.code})` : ""}</option>)}
+                  </select>
+                ) : (
+                  <span className="truncate text-foreground">{item.selectedName}</span>
+                )}
+                <input
+                  type="number"
+                  min="0"
+                  value={item.qtyStr}
+                  onChange={e => setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, qtyStr: e.target.value } : it))}
+                  className={`text-right text-foreground bg-background border rounded px-1 py-0.5 text-[11px] w-full ${insufficient ? "border-destructive" : ""}`}
+                  data-testid={`input-transfer-qty-${i}`}
+                />
+                <span className={`text-right text-[10px] ${insufficient ? "text-destructive font-semibold" : "text-muted-foreground"}`}>
+                  {item.currentStock !== undefined ? item.currentStock.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        {hasInsufficientStock && (
+          <p className="text-[10px] text-destructive border-t pt-1">Warning: transfer quantity exceeds available stock for one or more items.</p>
+        )}
+      </div>
+      <div className="px-3 py-2 border-t flex gap-2 justify-end">
+        <Button variant="outline" size="sm" onClick={onDismiss} disabled={isSubmitting} data-testid="button-dismiss-stock-transfer">
+          <XCircle className="h-3.5 w-3.5 mr-1" /> Dismiss
+        </Button>
+        <Button size="sm" onClick={handleConfirmClick} disabled={isSubmitting} data-testid="button-confirm-stock-transfer">
+          {isSubmitting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <ArrowLeftRight className="h-3.5 w-3.5 mr-1" />}
+          Confirm Transfer
         </Button>
       </div>
     </div>
@@ -1512,6 +1797,9 @@ export function ChatWidget() {
   const [poDraftError, setPoDraftError] = useState<string | null>(null);
   const [verifyContainerDraft, setVerifyContainerDraft] = useState<VerifyContainerDraft | null>(null);
   const [dataQueryResult, setDataQueryResult] = useState<DataQueryResult | null>(null);
+  const [pendingStockTransfer, setPendingStockTransfer] = useState<StockTransferDraft | null>(null);
+  const [stockTransferSubmitting, setStockTransferSubmitting] = useState(false);
+  const [location] = useLocation();
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -1532,6 +1820,7 @@ export function ChatWidget() {
       const response = await apiRequest("POST", "/api/chatbot/message", {
         message: msg,
         sessionId,
+        pageContext: { currentRoute: location },
       });
       return response.json() as Promise<ChatResponse>;
     },
@@ -1544,9 +1833,17 @@ export function ChatWidget() {
       if (data.voucherDraft) {
         setPendingVoucher(data.voucherDraft);
         setPendingStockAdj(null);
+        setPendingStockTransfer(null);
       } else if (data.stockAdjustmentDraft) {
         setPendingStockAdj(data.stockAdjustmentDraft);
         setPendingVoucher(null);
+        setPendingStockTransfer(null);
+      } else if (data.stockTransferDraft) {
+        setPendingStockTransfer(data.stockTransferDraft);
+        setPendingVoucher(null);
+        setPendingStockAdj(null);
+      } else {
+        setPendingStockTransfer(null);
       }
       if (data.voucherSearchResults && data.voucherSearchResults.length > 0) {
         setVoucherSearchResults(data.voucherSearchResults);
@@ -1581,34 +1878,66 @@ export function ChatWidget() {
     },
   });
 
-  const handleConfirmVoucher = async () => {
-    if (!pendingVoucher) return;
+  const handleConfirmVoucher = async (edited: VoucherDraft) => {
     setVoucherSubmitting(true);
     try {
       const voucherNumber = `AI-${Date.now()}`;
       const body = {
         voucher: {
           voucherNumber,
-          voucherType: pendingVoucher.type,
-          voucherDate: pendingVoucher.date,
-          description: pendingVoucher.description,
-          optional: pendingVoucher.optional ?? false,
+          voucherType: edited.type,
+          voucherDate: edited.date,
+          description: edited.description,
+          optional: edited.optional ?? false,
         },
-        entries: pendingVoucher.entries.map(e => ({
+        entries: edited.entries.map(e => ({
           ledgerAccountId: e.accountId,
           debitAmount: String(e.debit || 0),
           creditAmount: String(e.credit || 0),
-          narration: pendingVoucher.description,
+          narration: edited.description,
         })),
       };
-      await apiRequest("POST", "/api/vouchers/with-entries", body);
+      const res = await apiRequest("POST", "/api/vouchers/with-entries", body);
+      const resData = await res.json();
       setPendingVoucher(null);
-      // Confirm by sending a message
-      sendMutation.mutate(`Voucher created successfully: ${pendingVoucher.type} of $${Math.max(...pendingVoucher.entries.map(e => e.debit || e.credit))} on ${pendingVoucher.date}`);
+      // Audit log (fire-and-forget)
+      apiRequest("POST", "/api/chatbot/log-action", {
+        sessionId, prompt: edited.description, draftJson: edited, actionType: "voucher", createdRecordId: resData?.id || null, status: "confirmed",
+      }).catch(() => {});
+      sendMutation.mutate(`Voucher created: ${edited.type} of $${Math.max(...edited.entries.map(e => e.debit || e.credit))} on ${edited.date}`);
     } catch (err: any) {
       sendMutation.mutate(`Voucher creation failed: ${err.message}`);
     } finally {
       setVoucherSubmitting(false);
+    }
+  };
+
+  const handleConfirmStockTransfer = async (resolved: StockTransferDraft) => {
+    setStockTransferSubmitting(true);
+    try {
+      const resp = await fetch("/api/chatbot/confirm-stock-transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: resolved.date,
+          sourceLocationId: resolved.sourceLocationId,
+          destinationLocationId: resolved.destinationLocationId,
+          notes: resolved.notes || "",
+          items: resolved.items.map(i => ({ stockItemId: i.stockItemId, quantity: i.quantity })),
+          sessionId,
+          prompt: `Transfer stock from ${resolved.sourceLocationName} to ${resolved.destinationLocationName}`,
+        }),
+        credentials: "include",
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.message || "Transfer failed");
+      setPendingStockTransfer(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      sendMutation.mutate(`Stock transfer created from "${resolved.sourceLocationName}" to "${resolved.destinationLocationName}" on ${resolved.date}. ${resolved.items.length} item(s) transferred.`);
+    } catch (err: any) {
+      sendMutation.mutate(`Stock transfer failed: ${err.message}`);
+    } finally {
+      setStockTransferSubmitting(false);
     }
   };
 
@@ -1782,6 +2111,7 @@ export function ChatWidget() {
     setFeedbackGiven({});
     setPendingVoucher(null);
     setPendingStockAdj(null);
+    setPendingStockTransfer(null);
     setVoucherSearchResults(null);
     setPendingStockItem(null);
     setPendingPriceUpdate(null);
@@ -1790,9 +2120,26 @@ export function ChatWidget() {
     setPoDraftResult(null);
     setPoDraftError(null);
     setVerifyContainerDraft(null);
+    setDataQueryResult(null);
     setShowAlerts(true);
     queryClient.removeQueries({ queryKey: [`/api/chatbot/history/${sessionId}`] });
   };
+
+  // Listen for "openAIChat" custom event (fired by CommandPalette "Ask AI..." item)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setIsOpen(true);
+      setIsMinimized(false);
+      if (detail?.prefill) {
+        setMessage(detail.prefill);
+        // Auto-focus input after a tiny delay
+        setTimeout(() => inputRef.current?.focus(), 80);
+      }
+    };
+    window.addEventListener("openAIChat", handler);
+    return () => window.removeEventListener("openAIChat", handler);
+  }, []);
 
   if (!status || !status.enabled || !status.hasApiKey) {
     return null;
@@ -1880,7 +2227,13 @@ export function ChatWidget() {
             <CardContent className="p-0 flex flex-col flex-1 overflow-hidden">
               {/* ── 5a: Alerts Digest ── */}
               {showAlerts && (
-                <AlertsDigest onClose={() => setShowAlerts(false)} />
+                <AlertsDigest
+                  onClose={() => setShowAlerts(false)}
+                  onPrefill={(text) => {
+                    setMessage(text);
+                    inputRef.current?.focus();
+                  }}
+                />
               )}
 
               <ScrollArea ref={scrollAreaRef} className="flex-1 px-4 py-3">
@@ -2054,6 +2407,16 @@ export function ChatWidget() {
                       onConfirm={handleConfirmVoucher}
                       onDismiss={() => setPendingVoucher(null)}
                       isSubmitting={voucherSubmitting}
+                    />
+                  )}
+
+                  {/* ── 5b2: Stock Transfer Confirmation Card ── */}
+                  {pendingStockTransfer && !sendMutation.isPending && (
+                    <StockTransferConfirmCard
+                      draft={pendingStockTransfer}
+                      onConfirm={handleConfirmStockTransfer}
+                      onDismiss={() => setPendingStockTransfer(null)}
+                      isSubmitting={stockTransferSubmitting}
                     />
                   )}
 

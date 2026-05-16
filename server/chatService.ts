@@ -1257,8 +1257,9 @@ export async function chat(
   userMessage: string,
   companyId: number,
   conversationHistory: { role: string; content: string }[] = [],
-  userPreferences?: UserPreferences
-): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any; voucherSearchResults?: any[]; stockItemDraft?: any; priceUpdateDraft?: any; accountQueryResult?: any; verifyContainerDraft?: any; dataQueryResult?: any }> {
+  userPreferences?: UserPreferences,
+  pageContext?: { currentRoute?: string; entityType?: string; entityId?: number; entityName?: string }
+): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any; stockTransferDraft?: any; voucherSearchResults?: any[]; stockItemDraft?: any; priceUpdateDraft?: any; accountQueryResult?: any; verifyContainerDraft?: any; dataQueryResult?: any }> {
   const available = getAvailableProviders();
   
   if (available.length === 0) {
@@ -1273,9 +1274,20 @@ export async function chat(
     const context = await getERPContext(companyId);
     console.log("[ChatService] ERP context retrieved successfully");
     
-    const systemPrompt = buildSystemPrompt(context, userPreferences);
+    let systemPrompt = buildSystemPrompt(context, userPreferences);
     const suggestions = generateQuickSuggestions(context);
     console.log("[ChatService] System prompt built, suggestions generated");
+
+    // Inject page context if provided
+    if (pageContext?.currentRoute) {
+      const pageLines: string[] = [`\n## CURRENT PAGE CONTEXT:`];
+      pageLines.push(`- User is currently on route: ${pageContext.currentRoute}`);
+      if (pageContext.entityType) pageLines.push(`- Viewing entity type: ${pageContext.entityType}`);
+      if (pageContext.entityName) pageLines.push(`- Entity name: ${pageContext.entityName}`);
+      if (pageContext.entityId) pageLines.push(`- Entity ID: ${pageContext.entityId}`);
+      pageLines.push(`Use this context to give more relevant and specific answers (e.g. if they are on the vouchers page, answers about vouchers should be especially specific).`);
+      systemPrompt = systemPrompt + pageLines.join("\n");
+    }
 
     // Get selected provider and call with fallback
     const selectedProvider = await getSelectedAIProvider();
@@ -1334,6 +1346,24 @@ If the intent is unclear or amounts/accounts are too ambiguous to resolve, respo
         if (raw !== "null" && raw.startsWith("{")) {
           const parsed = JSON.parse(raw);
           if (parsed && parsed.type && parsed.entries && parsed.entries.length >= 2) {
+            // Enrich entries with balanceBefore by fetching current account balances
+            try {
+              for (const entry of parsed.entries) {
+                if (entry.accountId) {
+                  const balResult = await db.execute(sql`
+                    SELECT
+                      COALESCE(SUM(CAST(ve.debit_amount AS numeric)), 0) -
+                      COALESCE(SUM(CAST(ve.credit_amount AS numeric)), 0) AS net
+                    FROM voucher_entries ve
+                    JOIN vouchers v ON v.id = ve.voucher_id
+                      AND v.deleted_at IS NULL AND v.optional = false
+                      AND v.company_id = ${companyId}
+                    WHERE ve.ledger_account_id = ${entry.accountId}
+                  `);
+                  entry.balanceBefore = parseFloat((balResult.rows[0] as any)?.net || "0");
+                }
+              }
+            } catch (_) {}
             voucherDraft = parsed;
           }
         }
@@ -1403,6 +1433,26 @@ If intent is unclear, respond with exactly: null`;
                 rate: rateMap.get(item.stockItemId) ?? 0,
               }));
             }
+            // Enrich items with currentStock and projectedStock
+            try {
+              if (parsedAdj.locationId) {
+                for (const item of parsedAdj.items) {
+                  if (item.stockItemId) {
+                    const invResult = await db.execute(sql`
+                      SELECT COALESCE(SUM(CAST(quantity AS numeric)), 0) AS qty
+                      FROM inventory
+                      WHERE stock_item_id = ${item.stockItemId}
+                        AND location_id = ${parsedAdj.locationId}
+                        AND company_id = ${companyId}
+                    `);
+                    const currentStock = parseFloat((invResult.rows[0] as any)?.qty || "0");
+                    item.currentStock = parseFloat(currentStock.toFixed(3));
+                    const delta = item.type === "PRODUCE" ? item.quantity : -item.quantity;
+                    item.projectedStock = parseFloat((currentStock + delta).toFixed(3));
+                  }
+                }
+              }
+            } catch (_) {}
             stockAdjustmentDraft = parsedAdj;
           }
         }
@@ -1735,6 +1785,68 @@ If intent is not about an account query, respond with exactly: null`;
         }
       } catch (_) {
         // Account query failed silently
+      }
+    }
+
+    // ── Stock transfer detection ───────────────────────────────────────
+    const STOCK_TRANSFER_KEYWORDS = /\b(transfer|move|shift)\b.{0,80}\b(stock|item|inventory)\b|\b(stock|item|inventory)\b.{0,60}\b(transfer|move|shift)\b|\btransfer\b.{0,40}\bfrom\b.{0,40}\bto\b/i;
+    let stockTransferDraft: any = undefined;
+
+    if (STOCK_TRANSFER_KEYWORDS.test(userMessage) && !voucherDraft && !stockAdjustmentDraft) {
+      try {
+        const [items, locs] = await Promise.all([
+          db.select({ id: schema.stockItems.id, name: schema.stockItems.name, code: schema.stockItems.code })
+            .from(schema.stockItems)
+            .where(and(eq(schema.stockItems.companyId, companyId), eq(schema.stockItems.active, true)))
+            .limit(120),
+          db.select({ id: schema.locations.id, name: schema.locations.name })
+            .from(schema.locations)
+            .where(eq(schema.locations.companyId, companyId))
+            .limit(30),
+        ]);
+
+        const today = new Date().toISOString().slice(0, 10);
+        const transferPrompt = `You are a stock transfer extraction assistant.
+User message: "${userMessage}"
+Today: ${today}
+Stock items (id:name:code): ${items.map(i => `${i.id}:${i.name}:${i.code}`).join(" | ")}
+Locations (id:name): ${locs.map(l => `${l.id}:${l.name}`).join(" | ")}
+
+RULES:
+1. Extract a stock transfer only if the user clearly wants to move/transfer stock between locations.
+2. Match item names and location names FUZZILY.
+3. Extract one source location, one destination location, and a list of items with quantities.
+4. Date defaults to today (${today}) if not specified.
+5. Also include candidates arrays for disambiguation.
+
+Respond with ONLY valid JSON (no markdown):
+{"date":"YYYY-MM-DD","sourceLocationId":NUMBER,"sourceLocationName":"...","destinationLocationId":NUMBER,"destinationLocationName":"...","notes":"...","items":[{"stockItemId":NUMBER,"stockItemName":"...","quantity":NUMBER,"candidates":[{"id":NUMBER,"name":"...","code":"..."}]}],"locationCandidates":[{"id":NUMBER,"name":"..."}]}
+
+If intent is unclear or this is not a stock transfer request, respond with exactly: null`;
+
+        const tfResult = await callAIWithFallback(selectedProvider, transferPrompt, [], "Extract stock transfer or return null");
+        const rawTf = tfResult.response.trim().replace(/```json\n?|```/g, "").trim();
+        if (rawTf !== "null" && rawTf.startsWith("{")) {
+          const parsedTf = JSON.parse(rawTf);
+          if (parsedTf && parsedTf.sourceLocationId && parsedTf.destinationLocationId && parsedTf.items?.length > 0) {
+            // Enrich with currentStock
+            for (const item of parsedTf.items) {
+              if (item.stockItemId && parsedTf.sourceLocationId) {
+                const invResult = await db.execute(sql`
+                  SELECT COALESCE(SUM(CAST(quantity AS numeric)), 0) AS qty
+                  FROM inventory
+                  WHERE stock_item_id = ${item.stockItemId}
+                    AND location_id = ${parsedTf.sourceLocationId}
+                    AND company_id = ${companyId}
+                `);
+                item.currentStock = parseFloat((invResult.rows[0] as any)?.qty || "0");
+              }
+            }
+            stockTransferDraft = parsedTf;
+          }
+        }
+      } catch (_) {
+        // Extraction failed silently
       }
     }
 
@@ -4831,6 +4943,7 @@ If the intent does not match any type, output: null`;
       provider: usedProvider,
       voucherDraft,
       stockAdjustmentDraft,
+      stockTransferDraft,
       voucherSearchResults,
       stockItemDraft,
       priceUpdateDraft,

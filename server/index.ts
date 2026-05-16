@@ -3011,6 +3011,21 @@ let migrationsDone = false;
       updated_at timestamptz NOT NULL DEFAULT now(),
       created_at timestamptz NOT NULL DEFAULT now()
     )`,
+    // ── AI Action Audit Log (Phase 1 chatbot upgrade) ────────────────────────
+    `CREATE TABLE IF NOT EXISTS ai_action_log (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      user_id varchar NOT NULL,
+      session_id varchar,
+      prompt text,
+      draft_json jsonb,
+      action_type varchar(80),
+      created_record_id integer,
+      status varchar(20) DEFAULT 'confirmed',
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS ai_action_log_company_idx ON ai_action_log(company_id)`,
+    `CREATE INDEX IF NOT EXISTS ai_action_log_user_idx ON ai_action_log(user_id)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

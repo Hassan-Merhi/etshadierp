@@ -2046,6 +2046,24 @@ export const chatMessages = pgTable("chat_messages", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// ── AI Action Audit Log ───────────────────────────────────────────────────────
+export const aiActionLog = pgTable("ai_action_log", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  sessionId: varchar("session_id"),
+  prompt: text("prompt"),
+  draftJson: jsonb("draft_json"),
+  actionType: varchar("action_type", { length: 80 }),
+  createdRecordId: integer("created_record_id"),
+  status: varchar("status", { length: 20 }).default("confirmed"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  companyIdx: index("ai_action_log_company_idx").on(t.companyId),
+  userIdx: index("ai_action_log_user_idx").on(t.userId),
+}));
+export type AiActionLog = typeof aiActionLog.$inferSelect;
+
 // Direct Messages - user-to-user chat
 export const directMessages = pgTable("direct_messages", {
   id: serial("id").primaryKey(),

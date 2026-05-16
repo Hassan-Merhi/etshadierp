@@ -34,6 +34,7 @@ import {
   FileText,
   Ship,
   HardHat,
+  Sparkles,
 } from "lucide-react";
 import { useErpVisibleSections } from "@/components/AppSidebar";
 import { useFactoryVisibleSections } from "@/components/FactorySidebar";
@@ -355,6 +356,23 @@ export function CommandPalette({
             {adminPages.map((p) => <PaletteItem key={p.path} page={p} onSelect={navigate} />)}
           </CommandGroup>
         )}
+
+        <CommandSeparator />
+        <CommandGroup heading="AI Assistant">
+          <CommandItem
+            onSelect={() => {
+              setOpen(false);
+              window.dispatchEvent(new CustomEvent("openAIChat", { detail: { prefill: "" } }));
+            }}
+            data-testid="command-ask-ai"
+          >
+            <Sparkles className="mr-2 h-4 w-4 text-primary" />
+            <div className="flex flex-col">
+              <span>Ask AI Assistant</span>
+              <span className="text-xs text-muted-foreground">Open the ERP AI chatbot</span>
+            </div>
+          </CommandItem>
+        </CommandGroup>
       </CommandList>
     </CommandDialog>
   );

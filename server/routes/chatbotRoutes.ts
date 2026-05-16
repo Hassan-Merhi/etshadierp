@@ -38,6 +38,9 @@ import {
   supplierProformas,
   
   systemSettings,
+  aiActionLog,
+  stockItems,
+  locations as locationsTable,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
@@ -139,7 +142,7 @@ export function registerChatbotRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { message, sessionId } = req.body;
+      const { message, sessionId, pageContext } = req.body;
       if (!message || !sessionId) {
         return res.status(400).json({ message: "Message and sessionId are required" });
       }
@@ -151,12 +154,24 @@ export function registerChatbotRoutes(app: Express) {
       const history = await getConversationHistoryForAI(sessionId, 10);
 
       // Get AI response (excluding current message from history context)
-      const result = await chat(message, companyId, history.slice(0, -1));
+      const result = await chat(message, companyId, history.slice(0, -1), undefined, pageContext);
 
       // Save assistant response
       await saveMessage(companyId, userId, "assistant", result.response, sessionId);
 
-      res.json({ response: result.response, suggestions: result.suggestions, voucherDraft: result.voucherDraft ?? null, stockAdjustmentDraft: result.stockAdjustmentDraft ?? null, voucherSearchResults: result.voucherSearchResults ?? null, stockItemDraft: result.stockItemDraft ?? null, priceUpdateDraft: result.priceUpdateDraft ?? null, accountQueryResult: result.accountQueryResult ?? null, verifyContainerDraft: result.verifyContainerDraft ?? null });
+      res.json({
+        response: result.response,
+        suggestions: result.suggestions,
+        voucherDraft: result.voucherDraft ?? null,
+        stockAdjustmentDraft: result.stockAdjustmentDraft ?? null,
+        stockTransferDraft: result.stockTransferDraft ?? null,
+        voucherSearchResults: result.voucherSearchResults ?? null,
+        stockItemDraft: result.stockItemDraft ?? null,
+        priceUpdateDraft: result.priceUpdateDraft ?? null,
+        accountQueryResult: result.accountQueryResult ?? null,
+        verifyContainerDraft: result.verifyContainerDraft ?? null,
+        dataQueryResult: result.dataQueryResult ?? null,
+      });
     } catch (error: any) {
       console.error("[Chatbot] ERROR:", error.message);
       console.error("[Chatbot] Stack:", error.stack);
@@ -341,6 +356,178 @@ export function registerChatbotRoutes(app: Express) {
         .where(eq(users.active, true));
 
       res.json(allUsers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── AI Action Audit Log endpoint ────────────────────────────────────
+  app.post("/api/chatbot/log-action", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      const companyId = req.session.currentCompanyId;
+      if (!userId || !companyId) return res.status(400).json({ message: "No company selected" });
+      const { sessionId, prompt, draftJson, actionType, createdRecordId, status } = req.body;
+      await db.insert(aiActionLog).values({
+        companyId,
+        userId,
+        sessionId: sessionId || null,
+        prompt: prompt || null,
+        draftJson: draftJson || null,
+        actionType: actionType || null,
+        createdRecordId: createdRecordId || null,
+        status: status || "confirmed",
+      } as any);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Confirm Stock Transfer ────────────────────────────────────────────
+  app.post("/api/chatbot/confirm-stock-transfer", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      const userId = req.session.userId;
+      if (!companyId || !userId) return res.status(400).json({ message: "No company selected" });
+
+      const { date, sourceLocationId, destinationLocationId, notes, items, sessionId, prompt } = req.body;
+      if (!sourceLocationId || !destinationLocationId) return res.status(400).json({ message: "Source and destination locations are required" });
+      if (!items?.length) return res.status(400).json({ message: "At least one item is required" });
+      if (sourceLocationId === destinationLocationId) return res.status(400).json({ message: "Source and destination must be different" });
+
+      const resp = await fetch(`http://localhost:${process.env.PORT || 5000}/api/stock-transfers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: req.headers.cookie || "" },
+        body: JSON.stringify({
+          sourceLocationId: Number(sourceLocationId),
+          destinationLocationId: Number(destinationLocationId),
+          notes: notes || "",
+          voucherDate: date || new Date().toISOString().split("T")[0],
+          items: items.map((i: any) => ({
+            stockItemId: Number(i.stockItemId),
+            quantity: String(i.quantity),
+            sourceLocationId: Number(sourceLocationId),
+          })),
+        }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) return res.status(resp.status).json(data);
+
+      // Write audit log
+      try {
+        await db.insert(aiActionLog).values({
+          companyId,
+          userId,
+          sessionId: sessionId || null,
+          prompt: prompt || null,
+          draftJson: req.body,
+          actionType: "stock_transfer",
+          createdRecordId: data.id || data.voucherId || null,
+          status: "confirmed",
+        } as any);
+      } catch (_) {}
+
+      res.json({ success: true, transferId: data.id, voucherId: data.voucherId });
+    } catch (error: any) {
+      console.error("[Chatbot] confirm-stock-transfer error:", error.message);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Last Transaction Lookup ──────────────────────────────────────────
+  app.get("/api/chatbot/last-transaction", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const type = (req.query.type as string) || "";
+      const typeFilter = ["Payment", "Receipt", "Journal"].includes(type) ? type : null;
+
+      const rows = await db
+        .select({
+          id: vouchers.id,
+          voucherNumber: vouchers.voucherNumber,
+          voucherType: vouchers.voucherType,
+          voucherDate: vouchers.voucherDate,
+          description: vouchers.description,
+          totalAmount: vouchers.totalAmount,
+        })
+        .from(vouchers)
+        .where(and(
+          eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
+          ...(typeFilter ? [eq(vouchers.voucherType, typeFilter)] : []),
+        ))
+        .orderBy(desc(vouchers.createdAt))
+        .limit(1);
+
+      if (!rows.length) return res.json({ found: false });
+
+      const v = rows[0];
+      const entries = await db
+        .select({
+          ledgerAccountId: voucherEntries.ledgerAccountId,
+          accountName: ledgerAccounts.name,
+          debitAmount: voucherEntries.debitAmount,
+          creditAmount: voucherEntries.creditAmount,
+          narration: voucherEntries.narration,
+        })
+        .from(voucherEntries)
+        .leftJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
+        .where(eq(voucherEntries.voucherId, v.id));
+
+      res.json({ found: true, voucher: v, entries });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Smart Search ─────────────────────────────────────────────────────
+  app.get("/api/chatbot/search", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const q = ((req.query.q as string) || "").trim();
+      const modules = ((req.query.modules as string) || "").split(",").filter(Boolean);
+      if (!q) return res.json({ results: [] });
+
+      const searchModules = modules.length > 0 ? modules : ["vouchers", "customers", "suppliers", "items"];
+      const results: any[] = [];
+
+      if (searchModules.includes("vouchers")) {
+        const vrows = await db
+          .select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber, voucherType: vouchers.voucherType, voucherDate: vouchers.voucherDate, description: vouchers.description, totalAmount: vouchers.totalAmount })
+          .from(vouchers)
+          .where(and(eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), or(ilike(vouchers.description, `%${q}%`), ilike(vouchers.voucherNumber, `%${q}%`))))
+          .orderBy(desc(vouchers.voucherDate)).limit(5);
+        vrows.forEach(r => results.push({ module: "Voucher", id: r.id, title: r.voucherNumber, subtitle: r.description || "", meta: `${r.voucherType} · ${r.voucherDate} · ${r.totalAmount}`, path: `/vouchers` }));
+      }
+      if (searchModules.includes("customers")) {
+        const crows = await db
+          .select({ id: customers.id, name: customers.name, phone: customers.phone })
+          .from(customers)
+          .where(and(eq(customers.companyId, companyId), isNull(customers.deletedAt), ilike(customers.name, `%${q}%`)))
+          .limit(5);
+        crows.forEach(r => results.push({ module: "Customer", id: r.id, title: r.name, subtitle: r.phone || "", meta: "Customer", path: `/customers` }));
+      }
+      if (searchModules.includes("suppliers")) {
+        const srows = await db
+          .select({ id: suppliers.id, legalName: suppliers.legalName, code: suppliers.code })
+          .from(suppliers)
+          .where(and(eq(suppliers.companyId, companyId), isNull(suppliers.deletedAt), ilike(suppliers.legalName, `%${q}%`)))
+          .limit(5);
+        srows.forEach(r => results.push({ module: "Supplier", id: r.id, title: r.legalName, subtitle: r.code || "", meta: "Supplier", path: `/suppliers` }));
+      }
+      if (searchModules.includes("items")) {
+        const irows = await db
+          .select({ id: stockItems.id, name: stockItems.name, code: stockItems.code })
+          .from(stockItems)
+          .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt), or(ilike(stockItems.name, `%${q}%`), ilike(stockItems.code, `%${q}%`))))
+          .limit(5);
+        irows.forEach(r => results.push({ module: "Stock Item", id: r.id, title: r.name, subtitle: r.code || "", meta: "Item", path: `/stock-items` }));
+      }
+
+      res.json({ results });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
