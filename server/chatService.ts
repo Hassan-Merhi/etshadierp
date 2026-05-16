@@ -1787,7 +1787,7 @@ If intent is not about an account query, respond with exactly: null`;
 
     // ── Phase 1: Data Query Handler ───────────────────────────────────────────
     // Handles read-only ERP data queries: P&L, cash position, statements, etc.
-    const PHASE1_KEYWORDS = /profit.{0,15}loss|p&l\b|pl\b.{0,10}report|balance.{0,8}sheet|cash.{0,12}(balance|position|account)|who.{0,20}owe[ds]?|overdue|outstanding.{0,15}(balance|amount|supplier)|customer.{0,15}statement|supplier.{0,15}statement|top.{0,10}(customer|buyer)s?|worker.{0,12}attend|how many.{0,20}(absent|present|worker)|bale.{0,12}(produc|today|week|this|last)|produc.{0,12}bale|how many bale|container.{0,12}status|where.{0,12}(is.{0,5})?container|pending.{0,10}offload|not.{0,10}offload|how much.{0,20}(stock|do we have|in stock)|stock.{0,10}(level|balance|position)|inventory.{0,10}(level|check|status)|low.{0,10}stock|below.{0,10}reorder|reorder.{0,10}level|stock.{0,10}movement|stock.{0,10}histor|movement.{0,10}(for|of).{0,20}\w|open.{0,10}(purchase order|po\b|p\.o\.)|pending.{0,10}(po\b|purchase)|aging|age.{0,10}(report|analysis)|receivable|payable.{0,10}(aging|due)|container.{0,10}list|all container|month.{0,10}(comparison|vs|versus|compare)|last month vs|rental.{0,10}(summary|report|occupan)|occupan|tenant|rent.{0,10}(due|overdue|collect)|payroll.{0,10}(summary|total|report)|total.{0,10}payroll|salary.{0,10}(total|summary)|sales.{0,10}(analys|by item|report|revenue)|how much.{0,15}(did we sell|sold)|top.{0,10}(sell|item|product)|best.{0,10}(sell|item)|container.{0,10}profit|profit.{0,10}per container|how much.{0,15}profit.{0,15}container|stock.{0,10}valuat|inventory.{0,10}value|total.{0,10}inventory.{0,10}(value|worth)|expense.{0,10}(break|categ|by type)|top.{0,10}expense|where.{0,20}money.{0,10}(going|spent)|customer.{0,10}order.{0,10}status|order.{0,10}(pending|draft|verified|finalized|loading)|credit.{0,10}note|recent.{0,10}credit|bank.{0,10}(transaction|movement|histor)|cash.{0,10}(transaction|movement|histor)|recent.{0,10}(payment|receipt|bank)|fixed.{0,10}asset|asset.{0,10}(list|register|summar)|kpi|factory.{0,10}(kpi|performance|daily)|daily.{0,10}(production|output)|efficiency|pos.{0,10}(sale|revenue|summary)|point.{0,10}of.{0,10}sale|shop.{0,10}sale|intercompany|inter.{0,10}company.{0,10}transfer|money.{0,10}(moved|transferred).{0,15}between|offload.{0,10}detail|what.{0,15}(was|were).{0,10}offload|what.{0,10}(arrive|came).{0,15}(in|container)|worker.{0,10}(product|rank|top|best)|top.{0,10}worker|best.{0,10}worker|supplier.{0,10}(spend|history|bought|purchase.{0,10}from)|how much.{0,15}(bought|spend).{0,10}(from|supplier)|upcoming.{0,10}(arrival|container|shipment)|container.{0,10}(arriving|due|expected)|waste.{0,10}(analys|report|trend|summary)|factory.{0,10}waste|customer.{0,10}(payment.{0,10}histor|paid|receipt)|when.{0,10}did.{0,15}pay|voucher.{0,10}(summary|count|by type|breakdown)|how many.{0,10}voucher|stock.{0,10}by.{0,10}location|per.{0,10}location.{0,10}stock|location.{0,10}stock|trial.{0,5}balance|all.{0,10}account.{0,10}balance|balance.{0,10}(of all|per account)|po.{0,10}(detail|line|item)|purchase.{0,10}order.{0,10}(detail|items|break)|what.{0,10}(is|was).{0,10}in.{0,10}(the.{0,5})?po|container.{0,10}(cost|charge|break)|cost.{0,10}break.{0,10}(of|for).{0,10}container|document.{0,10}expir|visa.{0,10}expir|permit.{0,10}expir|worker.{0,10}(doc|expir)|stock.{0,10}transfer|transfer.{0,10}(between|from.{0,10}to).{0,10}(location|warehouse)|move.{0,10}stock|cash.{0,10}flow|money.{0,10}(in|out).{0,10}(this|last|for)|inflow.{0,10}outflow|account.{0,10}(movement|ledger|balance.{0,10}for)|ledger.{0,10}(balance|statement|for)|transaction.{0,10}(of|for).{0,10}account|day.{0,10}(summary|report|sales)|today.{0,10}(sales|voucher)|sale.{0,10}today|profit.{0,10}(by|per).{0,10}location|location.{0,10}profit|which.{0,10}location.{0,10}(most|best)|debit.{0,10}note|supplier.{0,10}debit|customer.{0,10}list|list.{0,10}(of.{0,5})?customer|all.{0,10}customer|supplier.{0,10}list|list.{0,10}(of.{0,5})?supplier|all.{0,10}supplier|stock.{0,10}item.{0,10}(detail|info|profile)|item.{0,10}(detail|info|profile).{0,10}(for|of)|what.{0,10}(is|are).{0,5}(the.{0,5})?details.{0,10}(of|for).{0,10}item|mix.{0,10}batch|batch.{0,10}(list|status|summary)|material.{0,10}batch|customer.{0,10}proforma|price.{0,10}list.{0,10}(for.{0,5})?customer|proforma.{0,10}(for|customer)|supplier.{0,10}proforma|price.{0,10}(list|sheet).{0,10}(from|supplier)|weekly.{0,10}(sale|revenue|breakdown)|sale.{0,10}(by week|per week|week.{0,5}by.{0,5}week)|container.{0,10}(items|content|loaded|what.{0,10}inside)|what.{0,10}(is|are|was).{0,10}(in|inside|loaded).{0,5}container|employee.{0,10}(list|roster|staff)|all.{0,10}(employee|staff)|staff.{0,10}list|journal.{0,10}(entry|entries|voucher)|recent.{0,10}journal|journal.{0,10}posting/i;
+    const PHASE1_KEYWORDS = /profit.{0,15}loss|p&l\b|pl\b.{0,10}report|balance.{0,8}sheet|cash.{0,12}(balance|position|account)|who.{0,20}owe[ds]?|overdue|outstanding.{0,15}(balance|amount|supplier)|customer.{0,15}statement|supplier.{0,15}statement|top.{0,10}(customer|buyer)s?|worker.{0,12}attend|how many.{0,20}(absent|present|worker)|bale.{0,12}(produc|today|week|this|last)|produc.{0,12}bale|how many bale|container.{0,12}status|where.{0,12}(is.{0,5})?container|pending.{0,10}offload|not.{0,10}offload|how much.{0,20}(stock|do we have|in stock)|stock.{0,10}(level|balance|position)|inventory.{0,10}(level|check|status)|low.{0,10}stock|below.{0,10}reorder|reorder.{0,10}level|stock.{0,10}movement|stock.{0,10}histor|movement.{0,10}(for|of).{0,20}\w|open.{0,10}(purchase order|po\b|p\.o\.)|pending.{0,10}(po\b|purchase)|aging|age.{0,10}(report|analysis)|receivable|payable.{0,10}(aging|due)|container.{0,10}list|all container|month.{0,10}(comparison|vs|versus|compare)|last month vs|rental.{0,10}(summary|report|occupan)|occupan|tenant|rent.{0,10}(due|overdue|collect)|payroll.{0,10}(summary|total|report)|total.{0,10}payroll|salary.{0,10}(total|summary)|sales.{0,10}(analys|by item|report|revenue)|how much.{0,15}(did we sell|sold)|top.{0,10}(sell|item|product)|best.{0,10}(sell|item)|container.{0,10}profit|profit.{0,10}per container|how much.{0,15}profit.{0,15}container|stock.{0,10}valuat|inventory.{0,10}value|total.{0,10}inventory.{0,10}(value|worth)|expense.{0,10}(break|categ|by type)|top.{0,10}expense|where.{0,20}money.{0,10}(going|spent)|customer.{0,10}order.{0,10}status|order.{0,10}(pending|draft|verified|finalized|loading)|credit.{0,10}note|recent.{0,10}credit|bank.{0,10}(transaction|movement|histor)|cash.{0,10}(transaction|movement|histor)|recent.{0,10}(payment|receipt|bank)|fixed.{0,10}asset|asset.{0,10}(list|register|summar)|kpi|factory.{0,10}(kpi|performance|daily)|daily.{0,10}(production|output)|efficiency|pos.{0,10}(sale|revenue|summary)|point.{0,10}of.{0,10}sale|shop.{0,10}sale|intercompany|inter.{0,10}company.{0,10}transfer|money.{0,10}(moved|transferred).{0,15}between|offload.{0,10}detail|what.{0,15}(was|were).{0,10}offload|what.{0,10}(arrive|came).{0,15}(in|container)|worker.{0,10}(product|rank|top|best)|top.{0,10}worker|best.{0,10}worker|supplier.{0,10}(spend|history|bought|purchase.{0,10}from)|how much.{0,15}(bought|spend).{0,10}(from|supplier)|upcoming.{0,10}(arrival|container|shipment)|container.{0,10}(arriving|due|expected)|waste.{0,10}(analys|report|trend|summary)|factory.{0,10}waste|customer.{0,10}(payment.{0,10}histor|paid|receipt)|when.{0,10}did.{0,15}pay|voucher.{0,10}(summary|count|by type|breakdown)|how many.{0,10}voucher|stock.{0,10}by.{0,10}location|per.{0,10}location.{0,10}stock|location.{0,10}stock|trial.{0,5}balance|all.{0,10}account.{0,10}balance|balance.{0,10}(of all|per account)|po.{0,10}(detail|line|item)|purchase.{0,10}order.{0,10}(detail|items|break)|what.{0,10}(is|was).{0,10}in.{0,10}(the.{0,5})?po|container.{0,10}(cost|charge|break)|cost.{0,10}break.{0,10}(of|for).{0,10}container|document.{0,10}expir|visa.{0,10}expir|permit.{0,10}expir|worker.{0,10}(doc|expir)|stock.{0,10}transfer|transfer.{0,10}(between|from.{0,10}to).{0,10}(location|warehouse)|move.{0,10}stock|cash.{0,10}flow|money.{0,10}(in|out).{0,10}(this|last|for)|inflow.{0,10}outflow|account.{0,10}(movement|ledger|balance.{0,10}for)|ledger.{0,10}(balance|statement|for)|transaction.{0,10}(of|for).{0,10}account|day.{0,10}(summary|report|sales)|today.{0,10}(sales|voucher)|sale.{0,10}today|profit.{0,10}(by|per).{0,10}location|location.{0,10}profit|which.{0,10}location.{0,10}(most|best)|debit.{0,10}note|supplier.{0,10}debit|customer.{0,10}list|list.{0,10}(of.{0,5})?customer|all.{0,10}customer|supplier.{0,10}list|list.{0,10}(of.{0,5})?supplier|all.{0,10}supplier|stock.{0,10}item.{0,10}(detail|info|profile)|item.{0,10}(detail|info|profile).{0,10}(for|of)|what.{0,10}(is|are).{0,5}(the.{0,5})?details.{0,10}(of|for).{0,10}item|mix.{0,10}batch|batch.{0,10}(list|status|summary)|material.{0,10}batch|customer.{0,10}proforma|price.{0,10}list.{0,10}(for.{0,5})?customer|proforma.{0,10}(for|customer)|supplier.{0,10}proforma|price.{0,10}(list|sheet).{0,10}(from|supplier)|weekly.{0,10}(sale|revenue|breakdown)|sale.{0,10}(by week|per week|week.{0,5}by.{0,5}week)|container.{0,10}(items|content|loaded|what.{0,10}inside)|what.{0,10}(is|are|was).{0,10}(in|inside|loaded).{0,5}container|employee.{0,10}(list|roster|staff)|all.{0,10}(employee|staff)|staff.{0,10}list|journal.{0,10}(entry|entries|voucher)|recent.{0,10}journal|journal.{0,10}posting|audit.{0,10}(log|trail|history)|who.{0,10}(created|deleted|changed|modified|updated)|recent.{0,10}change|bank.{0,10}account.{0,10}(list|balance|all)|all.{0,10}bank|list.{0,10}(of.{0,5})?bank|stock.{0,10}adjust|production.{0,10}(stock|entry|voucher)|consumption.{0,10}(stock|entry)|tracking.{0,10}(event|update|histor)|container.{0,10}tracking|where.{0,10}(is|was).{0,15}container|shipment.{0,10}update|pending.{0,10}(container.{0,10}sale|payment.{0,10}container)|unpaid.{0,10}container|outstanding.{0,10}container|container.{0,10}(unpaid|pending.{0,10}payment)|supplier.{0,10}container|containers.{0,10}(from|by).{0,10}supplier|how many.{0,10}container.{0,10}(from|supplier)|income.{0,10}(break|categ|by type)|revenue.{0,10}(break|by account)|top.{0,10}income.{0,10}account|worker.{0,10}(profile|detail|info)|info.{0,10}(about|for|on).{0,15}worker|who.{0,10}is.{0,10}worker|location.{0,10}(list|all)|all.{0,10}(location|warehouse)|list.{0,10}(of.{0,5})?location|quarterly|quarter.{0,10}(comparison|breakdown|vs)|q[1-4].{0,10}(vs|comparison|revenue)/i;
     let dataQueryResult: any = undefined;
 
     if (PHASE1_KEYWORDS.test(userMessage) && !voucherDraft && !stockAdjustmentDraft) {
@@ -1874,6 +1874,16 @@ weekly_sales = sales revenue and profit broken down by calendar week for a perio
 container_items_list = stock items loaded in a specific container (from PO line items)
 employee_list = ERP employee roster with salary, balance and department info
 journal_entries = recent journal vouchers posted with their account debit/credit entries
+audit_trail = recent audit log showing who created, updated, or deleted records
+bank_account_list = all registered bank and cash accounts with current balances
+stock_adjustments = recent production or consumption stock adjustment vouchers
+container_tracking = tracking events and location history for a specific container
+pending_container_sales = container sales that are unpaid or partially paid
+supplier_container_history = all containers received from a specific named supplier
+income_breakdown = top income/revenue accounts ranked by net amount earned
+factory_worker_profile = full profile details for a specific named factory worker
+location_list = all registered warehouse/location details with stock item counts
+quarterly_comparison = revenue, cost, and profit broken down by quarter for the year
 
 Output this JSON shape:
 {"queryType":"<one of the above>","entityName":<string or null>,"containerNumber":<string or null>,"locationName":<string or null>,"containerStatus":<string or null>,"dateFrom":<YYYY-MM-DD or null>,"dateTo":"${todayStr}","limit":10}
@@ -4363,6 +4373,445 @@ If the intent does not match any type, output: null`;
                   subtitle: `${dateFrom} → ${dateTo} · ${rows.rows.length} journal(s)`,
                   table: { headers: ["Date", "Voucher #", "Description", "Account", "Dr", "Cr", "Currency"], rows: tableRows6 },
                   noData: tableRows6.length === 0,
+                };
+                break;
+              }
+
+              // ── Phase 7 Cases ────────────────────────────────────────────────
+
+              case "audit_trail": {
+                const tableFilter7 = params.entityName;
+                const rows = await db.execute(sql`
+                  SELECT al.username, al.action, al.table_name, al.record_identifier,
+                    al.created_at
+                  FROM audit_log al
+                  WHERE al.company_id = ${companyId}
+                    AND al.created_at >= ${dateFrom}
+                    ${tableFilter7 ? sql`AND (al.table_name ILIKE ${'%' + tableFilter7 + '%'} OR al.record_identifier ILIKE ${'%' + tableFilter7 + '%'})` : sql``}
+                  ORDER BY al.created_at DESC
+                  LIMIT ${rowLimit}
+                `);
+                const actionMap: Record<string, number> = {};
+                const tableRows7 = (rows.rows as any[]).map(r => {
+                  actionMap[r.action] = (actionMap[r.action] || 0) + 1;
+                  return [String(r.created_at).slice(0, 16), r.username, r.action, r.table_name, r.record_identifier || "—"];
+                });
+                const stats7 = [
+                  { label: "Total Events", value: String(tableRows7.length) },
+                  ...Object.entries(actionMap).map(([a, c]) => ({ label: a.charAt(0).toUpperCase() + a.slice(1) + "s", value: String(c) })),
+                ];
+                dataQueryResult = {
+                  queryType: "audit_trail",
+                  title: tableFilter7 ? `Audit Trail: ${tableFilter7}` : "Audit Trail",
+                  subtitle: `Since ${dateFrom} · most recent first`,
+                  stats: stats7,
+                  table: { headers: ["Timestamp", "User", "Action", "Table", "Record"], rows: tableRows7 },
+                  noData: tableRows7.length === 0,
+                };
+                break;
+              }
+
+              case "bank_account_list": {
+                const rows = await db.execute(sql`
+                  SELECT ba.code, ba.name, ba.bank_name, ba.account_number,
+                    CAST(ba.opening_balance AS numeric) AS opening_balance,
+                    ba.opening_balance_side, ba.active,
+                    COALESCE(SUM(CAST(ve.debit_amount AS numeric)), 0) AS total_dr,
+                    COALESCE(SUM(CAST(ve.credit_amount AS numeric)), 0) AS total_cr
+                  FROM bank_accounts ba
+                  LEFT JOIN voucher_entries ve ON ve.bank_account_id = ba.id
+                  LEFT JOIN vouchers v ON v.id = ve.voucher_id
+                    AND v.deleted_at IS NULL AND v.optional = false
+                  WHERE ba.company_id = ${companyId}
+                    AND ba.deleted_at IS NULL AND ba.active = true
+                  GROUP BY ba.id, ba.code, ba.name, ba.bank_name, ba.account_number,
+                    ba.opening_balance, ba.opening_balance_side, ba.active
+                  ORDER BY ba.name
+                `);
+                let grandBalance = 0;
+                const tableRows7 = (rows.rows as any[]).map(r => {
+                  const ob = parseFloat(r.opening_balance || "0") * (r.opening_balance_side === "Cr" ? -1 : 1);
+                  const dr = parseFloat(r.total_dr || "0");
+                  const cr = parseFloat(r.total_cr || "0");
+                  const balance = ob + dr - cr;
+                  grandBalance += balance;
+                  const balLabel = balance >= 0 ? fmt(balance) + " Dr" : fmt(Math.abs(balance)) + " Cr";
+                  return [r.code, r.name, r.bank_name, r.account_number, balLabel];
+                });
+                tableRows7.push(["", "TOTAL BALANCE", "", "", grandBalance >= 0 ? fmt(grandBalance) + " Dr" : fmt(Math.abs(grandBalance)) + " Cr"]);
+                const stats7 = [
+                  { label: "Bank Accounts", value: String(tableRows7.length - 1) },
+                  { label: "Net Balance", value: grandBalance >= 0 ? fmt(grandBalance) + " Dr" : fmt(Math.abs(grandBalance)) + " Cr", highlight: grandBalance >= 0 ? "positive" : "negative" },
+                ];
+                dataQueryResult = {
+                  queryType: "bank_account_list",
+                  title: "Bank Account Balances",
+                  subtitle: `As of ${todayStr}`,
+                  stats: stats7,
+                  table: { headers: ["Code", "Account Name", "Bank", "Account No.", "Balance"], rows: tableRows7 },
+                  noData: tableRows7.length <= 1,
+                };
+                break;
+              }
+
+              case "stock_adjustments": {
+                const adjTypeFilter = params.entityName?.toLowerCase().includes("consum") ? "Consumption" : params.entityName?.toLowerCase().includes("prod") ? "Production" : null;
+                const rows = await db.execute(sql`
+                  SELECT v.voucher_date, v.voucher_number, sav.adjustment_type,
+                    l.name AS location, si.name AS item_name, si.code, si.uom,
+                    CAST(sai.quantity AS numeric) AS qty,
+                    CAST(sai.rate AS numeric) AS rate,
+                    CAST(sai.total_amount AS numeric) AS total_amount
+                  FROM stock_adjustment_items sai
+                  JOIN stock_adjustment_vouchers sav ON sav.id = sai.adjustment_id
+                  JOIN vouchers v ON v.id = sav.voucher_id AND v.deleted_at IS NULL
+                  JOIN stock_items si ON si.id = sai.stock_item_id
+                  JOIN locations l ON l.id = sav.location_id
+                  WHERE v.company_id = ${companyId}
+                    AND CAST(v.voucher_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
+                    ${adjTypeFilter ? sql`AND sav.adjustment_type = ${adjTypeFilter}` : sql``}
+                  ORDER BY v.voucher_date DESC
+                  LIMIT ${rowLimit}
+                `);
+                let totalProd = 0, totalCons = 0;
+                const tableRows7 = (rows.rows as any[]).map(r => {
+                  const qty = parseFloat(r.qty || "0");
+                  const amt = parseFloat(r.total_amount || "0");
+                  if (r.adjustment_type === "Production") totalProd += amt;
+                  else totalCons += amt;
+                  return [String(r.voucher_date).slice(0, 10), r.voucher_number, r.adjustment_type, r.location, r.item_name, `${fmtDec(Math.abs(qty))} ${r.uom}`, fmt(Math.abs(amt))];
+                });
+                const stats7 = [
+                  { label: "Total Entries", value: String(tableRows7.length) },
+                  { label: "Production Value", value: fmt(totalProd), highlight: "positive" },
+                  { label: "Consumption Value", value: fmt(totalCons) },
+                ];
+                dataQueryResult = {
+                  queryType: "stock_adjustments",
+                  title: adjTypeFilter ? `Stock Adjustments — ${adjTypeFilter}` : "Stock Adjustments",
+                  subtitle: `${dateFrom} → ${dateTo}`,
+                  stats: stats7,
+                  table: { headers: ["Date", "Voucher #", "Type", "Location", "Item", "Qty", "Amount"], rows: tableRows7 },
+                  noData: tableRows7.length === 0,
+                };
+                break;
+              }
+
+              case "container_tracking": {
+                const cn7 = params.containerNumber || params.entityName;
+                if (!cn7) {
+                  dataQueryResult = { queryType: "container_tracking", title: "Container Tracking", summary: "Please specify a container number." };
+                  break;
+                }
+                const containerRow7 = await db.execute(sql`
+                  SELECT c.id, c.container_number, c.status, c.eta, c.transporter,
+                    c.tracking_last_location, c.tracking_last_description, c.tracking_changed_at
+                  FROM containers c
+                  WHERE c.company_id = ${companyId}
+                    AND c.container_number ILIKE ${'%' + cn7 + '%'}
+                  LIMIT 1
+                `);
+                if (!containerRow7.rows.length) {
+                  dataQueryResult = { queryType: "container_tracking", title: "Container Tracking", summary: `No container found matching "${cn7}".` };
+                  break;
+                }
+                const ctr7 = containerRow7.rows[0] as any;
+                const evtRows = await db.execute(sql`
+                  SELECT cte.event_time, cte.event_status, cte.event_location, cte.event_description, cte.provider
+                  FROM container_tracking_events cte
+                  WHERE cte.container_id = ${ctr7.id}
+                  ORDER BY cte.event_time DESC
+                  LIMIT ${rowLimit}
+                `);
+                const tableRows7 = (evtRows.rows as any[]).map(r => [
+                  r.event_time ? String(r.event_time).slice(0, 16) : "—",
+                  r.event_status || "—",
+                  r.event_location || "—",
+                  (r.event_description || "").slice(0, 50),
+                  r.provider,
+                ]);
+                const stats7 = [
+                  { label: "Container #", value: ctr7.container_number },
+                  { label: "Status", value: ctr7.status },
+                  { label: "ETA", value: ctr7.eta ? String(ctr7.eta).slice(0, 10) : "—" },
+                  { label: "Transporter", value: ctr7.transporter || "—" },
+                  { label: "Last Location", value: ctr7.tracking_last_location || "—" },
+                ];
+                dataQueryResult = {
+                  queryType: "container_tracking",
+                  title: `Tracking: ${ctr7.container_number}`,
+                  subtitle: ctr7.tracking_last_description ? `Latest: ${(ctr7.tracking_last_description as string).slice(0, 60)}` : `${tableRows7.length} event(s)`,
+                  stats: stats7,
+                  table: { headers: ["Time", "Status", "Location", "Description", "Provider"], rows: tableRows7 },
+                  noData: tableRows7.length === 0,
+                };
+                break;
+              }
+
+              case "pending_container_sales": {
+                const rows = await db.execute(sql`
+                  SELECT cs.sale_date, cs.invoice_number, c.container_number,
+                    cu.legal_name AS customer, cs.currency,
+                    CAST(cs.total_amount AS numeric) AS total_amount,
+                    CAST(cs.paid_amount AS numeric) AS paid_amount,
+                    CAST(cs.total_amount AS numeric) - CAST(cs.paid_amount AS numeric) AS outstanding,
+                    cs.payment_status
+                  FROM container_sales cs
+                  JOIN containers c ON c.id = cs.container_id
+                  JOIN customers cu ON cu.id = cs.customer_id
+                  WHERE cs.company_id = ${companyId}
+                    AND cs.payment_status != 'PAID'
+                  ORDER BY cs.sale_date ASC
+                  LIMIT ${rowLimit}
+                `);
+                let totalOutstanding = 0;
+                const tableRows7 = (rows.rows as any[]).map(r => {
+                  const outstanding = parseFloat(r.outstanding || "0");
+                  totalOutstanding += outstanding;
+                  return [String(r.sale_date).slice(0, 10), r.invoice_number || "—", r.container_number, r.customer, fmt(parseFloat(r.total_amount)), fmt(parseFloat(r.paid_amount)), fmt(outstanding), r.payment_status, r.currency];
+                });
+                const stats7 = [
+                  { label: "Pending Sales", value: String(tableRows7.length) },
+                  { label: "Total Outstanding", value: fmt(totalOutstanding), highlight: "negative" },
+                ];
+                dataQueryResult = {
+                  queryType: "pending_container_sales",
+                  title: "Pending Container Sales",
+                  subtitle: `${tableRows7.length} unpaid/partial container sale(s)`,
+                  stats: stats7,
+                  table: { headers: ["Sale Date", "Invoice #", "Container", "Customer", "Total", "Paid", "Outstanding", "Status", "Currency"], rows: tableRows7 },
+                  noData: tableRows7.length === 0,
+                };
+                break;
+              }
+
+              case "supplier_container_history": {
+                const suppName7 = params.entityName;
+                if (!suppName7) {
+                  dataQueryResult = { queryType: "supplier_container_history", title: "Supplier Container History", summary: "Please specify a supplier name." };
+                  break;
+                }
+                const rows = await db.execute(sql`
+                  SELECT c.container_number, c.status, c.import_date, c.eta,
+                    CAST(c.grand_total AS numeric) AS grand_total, c.currency,
+                    c.total_kg, c.rate_per_kg, c.item_name, s.legal_name AS supplier
+                  FROM containers c
+                  JOIN suppliers s ON s.id = c.supplier_id
+                  WHERE c.company_id = ${companyId}
+                    AND s.legal_name ILIKE ${'%' + suppName7 + '%'}
+                  ORDER BY c.import_date DESC
+                  LIMIT ${rowLimit}
+                `);
+                let totalValue = 0, totalKg = 0;
+                const statusCounts: Record<string, number> = {};
+                const tableRows7 = (rows.rows as any[]).map(r => {
+                  const val = parseFloat(r.grand_total || "0");
+                  const kg = parseFloat(r.total_kg || "0");
+                  totalValue += val; totalKg += kg;
+                  statusCounts[r.status] = (statusCounts[r.status] || 0) + 1;
+                  return [r.container_number, r.status, String(r.import_date).slice(0, 10), r.eta ? String(r.eta).slice(0, 10) : "—", fmtDec(kg), fmt(val), r.currency, (r.item_name || "—").slice(0, 25)];
+                });
+                const supplier7 = (rows.rows[0] as any)?.supplier || suppName7;
+                const stats7 = [
+                  { label: "Supplier", value: supplier7 },
+                  { label: "Total Containers", value: String(tableRows7.length) },
+                  { label: "Total Kg", value: fmtDec(totalKg) },
+                  { label: "Total Value", value: fmt(totalValue), highlight: "positive" },
+                  ...Object.entries(statusCounts).map(([s, c]) => ({ label: s, value: String(c) })),
+                ];
+                dataQueryResult = {
+                  queryType: "supplier_container_history",
+                  title: `Containers from: ${supplier7}`,
+                  subtitle: `${tableRows7.length} container(s) · most recent first`,
+                  stats: stats7,
+                  table: { headers: ["Container #", "Status", "Import Date", "ETA", "Total Kg", "Value", "Currency", "Item"], rows: tableRows7 },
+                  noData: tableRows7.length === 0,
+                };
+                break;
+              }
+
+              case "income_breakdown": {
+                const rows = await db.execute(sql`
+                  SELECT la.name, la.account_type,
+                    COALESCE(SUM(CAST(ve.credit_amount AS numeric) - CAST(ve.debit_amount AS numeric)), 0) AS net_income
+                  FROM ledger_accounts la
+                  JOIN voucher_entries ve ON ve.ledger_account_id = la.id
+                  JOIN vouchers v ON v.id = ve.voucher_id
+                    AND v.deleted_at IS NULL AND v.optional = false
+                    AND CAST(v.voucher_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
+                  WHERE la.company_id = ${companyId}
+                    AND la.account_type IN ('Income')
+                    AND la.deleted_at IS NULL
+                  GROUP BY la.id, la.name, la.account_type
+                  HAVING COALESCE(SUM(CAST(ve.credit_amount AS numeric) - CAST(ve.debit_amount AS numeric)), 0) > 0
+                  ORDER BY net_income DESC
+                  LIMIT ${rowLimit}
+                `);
+                let grandIncome = 0;
+                const tableRows7 = (rows.rows as any[]).map(r => {
+                  const income = parseFloat(r.net_income || "0");
+                  grandIncome += income;
+                  return [r.name, r.account_type, fmt(income)];
+                });
+                if (tableRows7.length) tableRows7.push(["TOTAL", "", fmt(grandIncome)]);
+                dataQueryResult = {
+                  queryType: "income_breakdown",
+                  title: "Income Breakdown by Account",
+                  subtitle: `${dateFrom} → ${dateTo} · Total: ${fmt(grandIncome)}`,
+                  table: { headers: ["Account", "Type", "Net Income"], rows: tableRows7 },
+                  noData: tableRows7.length === 0,
+                };
+                break;
+              }
+
+              case "factory_worker_profile": {
+                const workerName7 = params.entityName;
+                if (!workerName7) {
+                  dataQueryResult = { queryType: "factory_worker_profile", title: "Factory Worker Profile", summary: "Please specify a worker name." };
+                  break;
+                }
+                const wRow = await db.execute(sql`
+                  SELECT fw.full_name, fw.employee_code, fw.position, fw.department,
+                    fw.gender, fw.nationality, fw.date_of_birth, fw.date_joined,
+                    fw.salary_type, fw.base_salary, fw.per_bale_rate, fw.per_kg_rate,
+                    fw.phone1, fw.phone2, fw.active, fw.bank_name, fw.payment_method,
+                    fw.visa_expiry, fw.work_permit_expiry, fw.shift_type,
+                    fw.transport_allowance
+                  FROM factory_workers fw
+                  WHERE fw.company_id = ${companyId}
+                    AND fw.full_name ILIKE ${'%' + workerName7 + '%'}
+                  ORDER BY fw.full_name LIMIT 1
+                `);
+                if (!wRow.rows.length) {
+                  dataQueryResult = { queryType: "factory_worker_profile", title: "Factory Worker Profile", summary: `No worker found matching "${workerName7}".` };
+                  break;
+                }
+                const w7 = wRow.rows[0] as any;
+                const baleStats7 = await db.execute(sql`
+                  SELECT COUNT(id) AS total_bales,
+                    COALESCE(SUM(CAST(weight_kg AS numeric)), 0) AS total_kg
+                  FROM factory_bales
+                  WHERE company_id = ${companyId}
+                    AND status = 'Pressed'
+                    AND CAST(pressed_at AS text) BETWEEN ${dateFrom} AND ${dateTo}
+                    AND worker_id = (SELECT id FROM factory_workers WHERE company_id = ${companyId} AND full_name ILIKE ${'%' + workerName7 + '%'} LIMIT 1)
+                `);
+                const bs7 = baleStats7.rows[0] as any;
+                const stats7 = [
+                  { label: "Name", value: w7.full_name },
+                  { label: "Code", value: w7.employee_code || "—" },
+                  { label: "Position", value: w7.position || "—" },
+                  { label: "Department", value: w7.department || "—" },
+                  { label: "Status", value: w7.active ? "Active" : "Inactive" },
+                  { label: "Salary Type", value: w7.salary_type },
+                  { label: "Base Salary", value: fmt(parseFloat(w7.base_salary || "0")) },
+                  { label: "Per Bale Rate", value: fmtDec(parseFloat(w7.per_bale_rate || "0")) },
+                  { label: "Bales This Period", value: String(bs7?.total_bales || 0) },
+                  { label: "Kg This Period", value: fmtDec(parseFloat(bs7?.total_kg || "0")) },
+                ];
+                const profileRows = [
+                  ["Phone", w7.phone1 || "—"],
+                  ["Nationality", w7.nationality || "—"],
+                  ["Gender", w7.gender || "—"],
+                  ["Date of Birth", w7.date_of_birth ? String(w7.date_of_birth).slice(0, 10) : "—"],
+                  ["Date Joined", w7.date_joined ? String(w7.date_joined).slice(0, 10) : "—"],
+                  ["Shift Type", w7.shift_type || "—"],
+                  ["Bank", w7.bank_name || "—"],
+                  ["Payment Method", w7.payment_method || "—"],
+                  ["Visa Expiry", w7.visa_expiry ? String(w7.visa_expiry).slice(0, 10) : "—"],
+                  ["Work Permit Expiry", w7.work_permit_expiry ? String(w7.work_permit_expiry).slice(0, 10) : "—"],
+                  ["Transport Allowance", fmt(parseFloat(w7.transport_allowance || "0"))],
+                ];
+                dataQueryResult = {
+                  queryType: "factory_worker_profile",
+                  title: `Worker Profile: ${w7.full_name}`,
+                  subtitle: `${dateFrom} → ${dateTo} performance`,
+                  stats: stats7,
+                  table: { headers: ["Field", "Value"], rows: profileRows },
+                  noData: false,
+                };
+                break;
+              }
+
+              case "location_list": {
+                const rows = await db.execute(sql`
+                  SELECT l.code, l.name, l.city, l.country, l.active,
+                    COUNT(DISTINCT inv.stock_item_id) AS item_count,
+                    COALESCE(SUM(CAST(inv.total_value AS numeric)), 0) AS total_value
+                  FROM locations l
+                  LEFT JOIN inventory inv ON inv.location_id = l.id AND inv.quantity > 0
+                  WHERE l.company_id = ${companyId}
+                    AND l.deleted_at IS NULL
+                  GROUP BY l.id, l.code, l.name, l.city, l.country, l.active
+                  ORDER BY l.name
+                `);
+                let grandValue = 0, grandItems = 0;
+                const tableRows7 = (rows.rows as any[]).map(r => {
+                  const val = parseFloat(r.total_value || "0");
+                  const items = parseInt(r.item_count || "0");
+                  grandValue += val; grandItems += items;
+                  return [r.code || "—", r.name, r.city || "—", r.country || "—", String(items), fmt(val), r.active ? "Active" : "Inactive"];
+                });
+                const stats7 = [
+                  { label: "Total Locations", value: String(tableRows7.length) },
+                  { label: "Total Stock Items", value: String(grandItems) },
+                  { label: "Total Inventory Value", value: fmt(grandValue), highlight: "positive" },
+                ];
+                dataQueryResult = {
+                  queryType: "location_list",
+                  title: "Warehouse / Location List",
+                  subtitle: `${tableRows7.length} location(s)`,
+                  stats: stats7,
+                  table: { headers: ["Code", "Name", "City", "Country", "Items", "Inv. Value", "Status"], rows: tableRows7 },
+                  noData: tableRows7.length === 0,
+                };
+                break;
+              }
+
+              case "quarterly_comparison": {
+                const yearStr = params.dateFrom ? params.dateFrom.slice(0, 4) : todayStr.slice(0, 4);
+                const rows = await db.execute(sql`
+                  SELECT EXTRACT(QUARTER FROM CAST(v.voucher_date AS date)) AS quarter,
+                    SUM(CAST(sal.total_sales AS numeric)) AS revenue,
+                    SUM(CAST(sal.total_cost AS numeric)) AS cost,
+                    SUM(CAST(sal.profit AS numeric)) AS profit,
+                    COUNT(DISTINCT v.id) AS sales_count
+                  FROM sales_items sal
+                  JOIN vouchers v ON v.id = sal.voucher_id AND v.deleted_at IS NULL
+                  WHERE v.company_id = ${companyId}
+                    AND EXTRACT(YEAR FROM CAST(v.voucher_date AS date)) = ${parseInt(yearStr)}
+                  GROUP BY quarter
+                  ORDER BY quarter
+                `);
+                let totRev = 0, totCost = 0, totProfit = 0;
+                const qLabels = ["Q1 (Jan-Mar)", "Q2 (Apr-Jun)", "Q3 (Jul-Sep)", "Q4 (Oct-Dec)"];
+                const tableRows7 = (rows.rows as any[]).map(r => {
+                  const q = parseInt(r.quarter || "1");
+                  const rev = parseFloat(r.revenue || "0");
+                  const cost = parseFloat(r.cost || "0");
+                  const profit7 = parseFloat(r.profit || "0");
+                  const margin = rev > 0 ? ((profit7 / rev) * 100).toFixed(1) + "%" : "—";
+                  totRev += rev; totCost += cost; totProfit += profit7;
+                  return [qLabels[q - 1] || `Q${q}`, String(r.sales_count), fmt(rev), fmt(cost), fmt(profit7), margin];
+                });
+                if (tableRows7.length) {
+                  const totMargin = totRev > 0 ? ((totProfit / totRev) * 100).toFixed(1) + "%" : "—";
+                  tableRows7.push(["FULL YEAR", "", fmt(totRev), fmt(totCost), fmt(totProfit), totMargin]);
+                }
+                const stats7 = [
+                  { label: "Year", value: yearStr },
+                  { label: "Total Revenue", value: fmt(totRev) },
+                  { label: "Total Cost", value: fmt(totCost) },
+                  { label: "Total Profit", value: fmt(totProfit), highlight: "positive" },
+                  { label: "Overall Margin", value: totRev > 0 ? ((totProfit / totRev) * 100).toFixed(1) + "%" : "—" },
+                ];
+                dataQueryResult = {
+                  queryType: "quarterly_comparison",
+                  title: `Quarterly Comparison — ${yearStr}`,
+                  subtitle: `Sales revenue and profit by quarter`,
+                  stats: stats7,
+                  table: { headers: ["Quarter", "Invoices", "Revenue", "Cost", "Profit", "Margin"], rows: tableRows7 },
+                  noData: tableRows7.length === 0,
                 };
                 break;
               }
