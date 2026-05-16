@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import { db } from "./db";
 import * as schema from "@shared/schema";
-import { eq, and, desc, sql, lt, gt, isNull, asc, ilike, or, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, lt, gt, gte, isNull, asc, ilike, or, inArray } from "drizzle-orm";
 
 // AI Provider types
 type AIProvider = "gemini" | "chatgpt" | "grok";
@@ -184,6 +184,8 @@ interface ERPContext {
   recentVouchers: any[];
   salesSummary: any;
   profitAnalysis: any;
+  todaysSales: any;
+  thisMonthSales: any;
   lowStockAlerts: any[];
   supplierBalances: any[];
   customerBalances: any[];
@@ -202,6 +204,10 @@ interface ERPContext {
   // Full searchable data
   stockItemsWithInventory: any[];
   recentSalesHistory: any[];
+  // Profit/loss per item
+  itemProfitabilityReport: any[];
+  // Price vs cost for items currently in stock
+  pricingHealthReport: any[];
 }
 
 interface UserPreferences {
@@ -381,8 +387,141 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
       isNull(schema.vouchers.deletedAt)
     ));
 
-  const lowStockAlerts: any[] = [];
-  const inventoryMap = new Map(inventory.map(i => [i.stockItemId, parseFloat(i.quantity || '0')]));
+  // ── Today's sales ──────────────────────────────────────────────────
+  const todayStr = new Date().toISOString().split("T")[0];
+  const monthStartStr = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
+
+  const [todaysSalesRaw, thisMonthSalesRaw, itemProfitabilityRaw] = await Promise.all([
+    db
+      .select({
+        revenue:          sql<string>`COALESCE(SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC)), 0)`,
+        cost:             sql<string>`COALESCE(SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC)), 0)`,
+        profit:           sql<string>`COALESCE(SUM(CAST(${schema.salesItems.profit} AS NUMERIC)), 0)`,
+        transactionCount: sql<number>`COUNT(DISTINCT ${schema.salesItems.voucherId})`,
+        unitsSold:        sql<string>`COALESCE(SUM(CAST(${schema.salesItems.quantity} AS NUMERIC)), 0)`,
+      })
+      .from(schema.salesItems)
+      .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
+      .where(and(
+        eq(schema.vouchers.companyId, companyId),
+        eq(schema.vouchers.voucherDate, todayStr),
+        isNull(schema.vouchers.deletedAt)
+      )),
+
+    db
+      .select({
+        revenue:          sql<string>`COALESCE(SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC)), 0)`,
+        cost:             sql<string>`COALESCE(SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC)), 0)`,
+        profit:           sql<string>`COALESCE(SUM(CAST(${schema.salesItems.profit} AS NUMERIC)), 0)`,
+        transactionCount: sql<number>`COUNT(DISTINCT ${schema.salesItems.voucherId})`,
+        unitsSold:        sql<string>`COALESCE(SUM(CAST(${schema.salesItems.quantity} AS NUMERIC)), 0)`,
+      })
+      .from(schema.salesItems)
+      .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
+      .where(and(
+        eq(schema.vouchers.companyId, companyId),
+        gte(schema.vouchers.voucherDate, monthStartStr),
+        isNull(schema.vouchers.deletedAt)
+      )),
+
+    // Per-item profitability: every stock item that has ever been sold
+    db
+      .select({
+        stockItemId:         schema.salesItems.stockItemId,
+        totalQty:            sql<string>`SUM(CAST(${schema.salesItems.quantity} AS NUMERIC))`,
+        totalRevenue:        sql<string>`SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC))`,
+        totalCost:           sql<string>`SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC))`,
+        totalProfit:         sql<string>`SUM(CAST(${schema.salesItems.profit} AS NUMERIC))`,
+        avgSellingPrice:     sql<string>`AVG(CAST(${schema.salesItems.sellingPrice} AS NUMERIC))`,
+        avgConfiguredPrice:  sql<string>`AVG(CAST(COALESCE(${schema.salesItems.configuredPrice}, ${schema.salesItems.sellingPrice}) AS NUMERIC))`,
+        avgCostPrice:        sql<string>`AVG(CAST(${schema.salesItems.costPrice} AS NUMERIC))`,
+      })
+      .from(schema.salesItems)
+      .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
+      .where(and(
+        eq(schema.vouchers.companyId, companyId),
+        isNull(schema.vouchers.deletedAt)
+      ))
+      .groupBy(schema.salesItems.stockItemId),
+  ]);
+
+  const todaysSales = {
+    date:             todayStr,
+    revenue:          parseFloat(todaysSalesRaw[0]?.revenue || "0"),
+    cost:             parseFloat(todaysSalesRaw[0]?.cost || "0"),
+    profit:           parseFloat(todaysSalesRaw[0]?.profit || "0"),
+    transactionCount: todaysSalesRaw[0]?.transactionCount || 0,
+    unitsSold:        parseFloat(todaysSalesRaw[0]?.unitsSold || "0"),
+    margin:           parseFloat(todaysSalesRaw[0]?.revenue || "0") > 0
+                        ? ((parseFloat(todaysSalesRaw[0]?.profit || "0") / parseFloat(todaysSalesRaw[0]?.revenue || "1")) * 100).toFixed(1)
+                        : "0",
+  };
+
+  const thisMonthSales = {
+    monthStart:       monthStartStr,
+    revenue:          parseFloat(thisMonthSalesRaw[0]?.revenue || "0"),
+    cost:             parseFloat(thisMonthSalesRaw[0]?.cost || "0"),
+    profit:           parseFloat(thisMonthSalesRaw[0]?.profit || "0"),
+    transactionCount: thisMonthSalesRaw[0]?.transactionCount || 0,
+    unitsSold:        parseFloat(thisMonthSalesRaw[0]?.unitsSold || "0"),
+    margin:           parseFloat(thisMonthSalesRaw[0]?.revenue || "0") > 0
+                        ? ((parseFloat(thisMonthSalesRaw[0]?.profit || "0") / parseFloat(thisMonthSalesRaw[0]?.revenue || "1")) * 100).toFixed(1)
+                        : "0",
+  };
+
+  // Enrich per-item data with stock item name and classify as winner/loser
+  const itemProfitabilityReport = itemProfitabilityRaw.map(row => {
+    const si = stockItems.find(s => s.id === row.stockItemId);
+    const qty        = parseFloat(row.totalQty || "0");
+    const revenue    = parseFloat(row.totalRevenue || "0");
+    const cost       = parseFloat(row.totalCost || "0");
+    const profit     = parseFloat(row.totalProfit || "0");
+    const avgCfg     = parseFloat(row.avgConfiguredPrice || "0");
+    const avgCost    = parseFloat(row.avgCostPrice || "0");
+    const margin     = revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : "0";
+    const profitPerUnit = qty > 0 ? (profit / qty).toFixed(2) : "0";
+    return {
+      itemId:            row.stockItemId,
+      itemName:          si?.name || "Unknown",
+      itemCode:          si?.code || "",
+      totalQty:          qty.toFixed(2),
+      totalRevenue:      revenue.toFixed(2),
+      totalCost:         cost.toFixed(2),
+      totalProfit:       profit.toFixed(2),
+      profitPerUnit,
+      profitMargin:      margin + "%",
+      avgConfiguredPrice: avgCfg.toFixed(2),
+      avgCostPrice:      avgCost.toFixed(2),
+      // If configured price < cost price OR total profit < 0 → losing money
+      isLosing:          profit < 0 || avgCfg < avgCost,
+      lossAmount:        profit < 0 ? Math.abs(profit).toFixed(2) : "0",
+    };
+  }).sort((a, b) => parseFloat(a.totalProfit) - parseFloat(b.totalProfit)); // most losing first
+
+  // Pricing health: current stock items where selling price < average cost (selling below cost)
+  const inventoryMap = new Map(inventory.map(i => [i.stockItemId, i]));
+  const pricingHealthReport = stockItems
+    .map(item => {
+      const inv = inventoryMap.get(item.id);
+      const avgCost     = parseFloat(inv?.averageRate || "0");
+      const sellPrice   = parseFloat(item.sellingPrice || "0");
+      const qty         = parseFloat(inv?.quantity || "0");
+      const gap         = sellPrice - avgCost;
+      return {
+        itemId:       item.id,
+        itemName:     item.name,
+        itemCode:     item.code || "",
+        sellingPrice: sellPrice.toFixed(2),
+        avgCostPrice: avgCost.toFixed(2),
+        priceGap:     gap.toFixed(2),
+        stockQty:     qty.toFixed(2),
+        status:       gap < 0 ? "LOSING" : gap === 0 ? "BREAK_EVEN" : "PROFITABLE",
+        potentialLoss: qty > 0 && gap < 0 ? (Math.abs(gap) * qty).toFixed(2) : "0",
+      };
+    })
+    .filter(item => parseFloat(item.avgCostPrice) > 0) // only items with known cost
+    .sort((a, b) => parseFloat(a.priceGap) - parseFloat(b.priceGap)); // most losing first
+
   
   for (const item of stockItems) {
     const qty = inventoryMap.get(item.id) || 0;
@@ -729,6 +868,8 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
     recentVouchers,
     salesSummary: salesSummary[0] || { totalSales: "0", count: 0 },
     profitAnalysis: profitAnalysis[0] || { totalSales: "0", totalCost: "0", totalProfit: "0", itemsSold: 0 },
+    todaysSales,
+    thisMonthSales,
     lowStockAlerts,
     supplierBalances: filteredSupplierBalances,
     customerBalances: customerBalancesList,
@@ -747,6 +888,9 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
     // Full searchable data
     stockItemsWithInventory,
     recentSalesHistory,
+    // Profit/loss per item
+    itemProfitabilityReport,
+    pricingHealthReport,
   };
 }
 
@@ -792,7 +936,19 @@ All data below is LIVE from the database - not cached. These numbers reflect the
 - Active Suppliers: ${context.suppliers.length}
 - Active Customers: ${context.customers.length}
 
-### 💰 FINANCIAL OVERVIEW:
+### 📅 SALES TODAY (${context.todaysSales.date}):
+- Revenue: $${context.todaysSales.revenue.toLocaleString()}
+- Cost: $${context.todaysSales.cost.toLocaleString()}
+- Profit: $${context.todaysSales.profit.toLocaleString()} (${context.todaysSales.margin}% margin)
+- Transactions: ${context.todaysSales.transactionCount} | Units Sold: ${context.todaysSales.unitsSold}
+
+### 📆 SALES THIS MONTH (since ${context.thisMonthSales.monthStart}):
+- Revenue: $${context.thisMonthSales.revenue.toLocaleString()}
+- Cost: $${context.thisMonthSales.cost.toLocaleString()}
+- Profit: $${context.thisMonthSales.profit.toLocaleString()} (${context.thisMonthSales.margin}% margin)
+- Transactions: ${context.thisMonthSales.transactionCount} | Units Sold: ${context.thisMonthSales.unitsSold}
+
+### 💰 ALL-TIME FINANCIAL OVERVIEW:
 - Total Sales Revenue: $${parseFloat(context.profitAnalysis.totalSales).toLocaleString()}
 - Total Cost of Goods: $${parseFloat(context.profitAnalysis.totalCost).toLocaleString()}
 - Gross Profit: $${parseFloat(context.profitAnalysis.totalProfit).toLocaleString()}
@@ -842,10 +998,36 @@ ${context.employeeBalances.map(e => `- ${e.employeeName} (${e.employeeCode}): $$
 Total Employee Deposits: $${context.employeeBalances.reduce((sum, e) => sum + e.balance, 0).toLocaleString()}
 ` : ''}
 
-### 📈 TOP SELLING ITEMS:
+### 📈 TOP SELLING ITEMS (by revenue, all-time):
 ${context.topSellingItems.length > 0 ? context.topSellingItems.slice(0, 5).map((item, i) => 
   `${i+1}. ${item.itemName} - Revenue: $${parseFloat(item.totalRevenue).toLocaleString()}, Profit: $${parseFloat(item.totalProfit).toLocaleString()} (${item.profitMargin} margin)`
 ).join('\n') : 'No sales data available yet.'}
+
+### 📊 ITEM PROFITABILITY REPORT (all items ever sold, sorted MOST LOSING first):
+Format: ITEM | QTY_SOLD | REVENUE | COST | PROFIT | MARGIN | AVG_CONFIG_PRICE | AVG_COST_PRICE | STATUS
+${context.itemProfitabilityReport.length > 0
+  ? context.itemProfitabilityReport.map(item =>
+      `${item.itemCode}|${item.itemName}|${item.totalQty}|$${item.totalRevenue}|$${item.totalCost}|$${item.totalProfit}|${item.profitMargin}|cfg:$${item.avgConfiguredPrice}|cost:$${item.avgCostPrice}|${item.isLosing ? "LOSING" : "PROFITABLE"}`
+    ).join('\n')
+  : 'No sales history yet.'}
+
+SUMMARY:
+- Items making profit: ${context.itemProfitabilityReport.filter(i => !i.isLosing).length}
+- Items losing money: ${context.itemProfitabilityReport.filter(i => i.isLosing).length}
+- Biggest loser: ${context.itemProfitabilityReport.find(i => i.isLosing)?.itemName || 'None'} (${context.itemProfitabilityReport.find(i => i.isLosing) ? '$' + context.itemProfitabilityReport.find(i => i.isLosing)!.totalProfit : 'N/A'} profit)
+- Biggest winner: ${[...context.itemProfitabilityReport].reverse().find(i => !i.isLosing)?.itemName || 'None'} (${[...context.itemProfitabilityReport].reverse().find(i => !i.isLosing) ? '$' + [...context.itemProfitabilityReport].reverse().find(i => !i.isLosing)!.totalProfit : 'N/A'} profit)
+
+### 🏷️ PRICING HEALTH — CURRENT SELLING PRICE vs AVG COST (items where cost is known):
+Format: CODE | NAME | SELL_PRICE | AVG_COST | GAP | QTY_IN_STOCK | STATUS | POTENTIAL_LOSS
+${context.pricingHealthReport.slice(0, 100).map(item =>
+  `${item.itemCode}|${item.itemName}|$${item.sellingPrice}|$${item.avgCostPrice}|$${item.priceGap}|${item.stockQty}|${item.status}${item.status === 'LOSING' ? '|loss:$' + item.potentialLoss : ''}`
+).join('\n') || 'No pricing data available.'}
+
+PRICING SUMMARY:
+- Items priced ABOVE cost (profitable): ${context.pricingHealthReport.filter(i => i.status === 'PROFITABLE').length}
+- Items priced BELOW cost (selling at loss): ${context.pricingHealthReport.filter(i => i.status === 'LOSING').length}
+- Items at break-even: ${context.pricingHealthReport.filter(i => i.status === 'BREAK_EVEN').length}
+${context.pricingHealthReport.filter(i => i.status === 'LOSING').length > 0 ? `- Top losing items by current price gap:\n${context.pricingHealthReport.filter(i => i.status === 'LOSING').slice(0, 5).map(i => `  * ${i.itemName}: selling $${i.sellingPrice} vs cost $${i.avgCostPrice} (losing $${Math.abs(parseFloat(i.priceGap)).toFixed(2)}/unit, $${i.potentialLoss} total at current stock)`).join('\n')}` : ''}
 
 ### 📍 INVENTORY BY LOCATION:
 ${context.inventoryValueByLocation.map(l => 
