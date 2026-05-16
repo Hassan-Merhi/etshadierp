@@ -4308,6 +4308,7 @@ If the intent does not match any type, output: null`;
                   FROM employees e
                   WHERE e.company_id = ${companyId}
                     AND e.active = true
+                    AND e.deleted_at IS NULL
                     ${deptFilter6 ? sql`AND e.department ILIKE ${'%' + deptFilter6 + '%'}` : sql``}
                   ORDER BY e.department, e.first_name, e.last_name
                   LIMIT ${rowLimit}
@@ -4419,11 +4420,11 @@ If the intent does not match any type, output: null`;
                     COALESCE(SUM(CAST(ve.debit_amount AS numeric)), 0) AS total_dr,
                     COALESCE(SUM(CAST(ve.credit_amount AS numeric)), 0) AS total_cr
                   FROM bank_accounts ba
-                  LEFT JOIN voucher_entries ve ON ve.bank_account_id = ba.id
+                  LEFT JOIN voucher_entries ve ON ve.ledger_account_id = ba.linked_ledger_id
                   LEFT JOIN vouchers v ON v.id = ve.voucher_id
                     AND v.deleted_at IS NULL AND v.optional = false
                   WHERE ba.company_id = ${companyId}
-                    AND ba.deleted_at IS NULL AND ba.active = true
+                    AND ba.deleted_at IS NULL
                   GROUP BY ba.id, ba.code, ba.name, ba.bank_name, ba.account_number,
                     ba.opening_balance, ba.opening_balance_side, ba.active
                   ORDER BY ba.name
@@ -4692,9 +4693,9 @@ If the intent does not match any type, output: null`;
                     COALESCE(SUM(CAST(weight_kg AS numeric)), 0) AS total_kg
                   FROM factory_bales
                   WHERE company_id = ${companyId}
-                    AND status = 'Pressed'
+                    AND pressed_at IS NOT NULL
                     AND CAST(pressed_at AS text) BETWEEN ${dateFrom} AND ${dateTo}
-                    AND worker_id = (SELECT id FROM factory_workers WHERE company_id = ${companyId} AND full_name ILIKE ${'%' + workerName7 + '%'} LIMIT 1)
+                    AND worker_name ILIKE ${'%' + workerName7 + '%'}
                 `);
                 const bs7 = baleStats7.rows[0] as any;
                 const stats7 = [
