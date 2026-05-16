@@ -574,22 +574,6 @@ export function StockItemDetailsDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="barcode">Barcode</Label>
-                  {isEditingDetails ? (
-                    <Input
-                      id="barcode"
-                      value={editedBarcode}
-                      onChange={(e) => setEditedBarcode(e.target.value)}
-                      data-testid="input-barcode"
-                    />
-                  ) : (
-                    <p className="text-sm font-mono p-2 bg-muted rounded" data-testid="text-barcode">
-                      {stockItem.barcode || "-"}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
                   <Label htmlFor="uom">Unit of Measure</Label>
                   {isEditingDetails ? (
                     <Input
@@ -630,33 +614,6 @@ export function StockItemDetailsDialog({
                   )}
                 </div>
 
-                {stockGrades.length > 0 && (
-                  <div className="space-y-2">
-                    <Label htmlFor="grade">Grade</Label>
-                    {isEditingDetails ? (
-                      <Select
-                        value={editedGradeId?.toString() || "none"}
-                        onValueChange={(value) => setEditedGradeId(value === "none" ? null : parseInt(value))}
-                      >
-                        <SelectTrigger data-testid="select-grade">
-                          <SelectValue placeholder="Select grade" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">— No Grade —</SelectItem>
-                          {stockGrades.map((grade) => (
-                            <SelectItem key={grade.id} value={grade.id.toString()}>
-                              {grade.name}{!grade.active ? " (inactive)" : ""}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <p className="text-sm p-2 bg-muted rounded" data-testid="text-grade">
-                        {stockGrades.find((g) => g.id === stockItem.gradeId)?.name || "—"}
-                      </p>
-                    )}
-                  </div>
-                )}
 
                 {stockCategories.length > 0 && (
                   <div className="space-y-2">
@@ -686,23 +643,6 @@ export function StockItemDetailsDialog({
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="sellingPrice">Selling Price</Label>
-                  {isEditingDetails ? (
-                    <Input
-                      id="sellingPrice"
-                      type="number"
-                      step="0.01"
-                      value={editedSellingPrice}
-                      onChange={(e) => setEditedSellingPrice(e.target.value)}
-                      data-testid="input-selling-price"
-                    />
-                  ) : (
-                    <p className="text-sm p-2 bg-muted rounded" data-testid="text-selling-price">
-                      {stockItem.sellingPrice || "0.00"}
-                    </p>
-                  )}
-                </div>
               </div>
             ) : null}
             </div>
