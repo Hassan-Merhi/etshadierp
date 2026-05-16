@@ -203,6 +203,24 @@ interface VerifyContainerDraft {
   proformas: { id: number; reference: string }[];
 }
 
+interface DataQueryResult {
+  queryType: string;
+  title: string;
+  subtitle?: string;
+  stats?: Array<{
+    label: string;
+    value: string;
+    subtext?: string;
+    highlight?: "positive" | "negative" | "muted" | "neutral";
+  }>;
+  table?: {
+    headers: string[];
+    rows: string[][];
+  };
+  summary?: string;
+  noData?: boolean;
+}
+
 interface ChatResponse {
   response: string;
   suggestions: string[];
@@ -213,6 +231,7 @@ interface ChatResponse {
   priceUpdateDraft?: PriceUpdateDraft | null;
   accountQueryResult?: AccountQueryResult | null;
   verifyContainerDraft?: VerifyContainerDraft | null;
+  dataQueryResult?: DataQueryResult | null;
 }
 
 interface VoucherDraft {
@@ -1387,6 +1406,77 @@ function VerifyContainerCard({
   );
 }
 
+// ── Phase 1: Data Query Result Card ──────────────────────────────────
+function DataQueryResultCard({ result, onDismiss }: { result: DataQueryResult; onDismiss: () => void }) {
+  const highlightClass = (h?: string) => {
+    if (h === "positive") return "text-green-600 dark:text-green-400";
+    if (h === "negative") return "text-red-600 dark:text-red-400";
+    if (h === "muted") return "text-muted-foreground";
+    return "";
+  };
+
+  return (
+    <div className="mt-2 rounded-md border border-border bg-muted/20 overflow-hidden" data-testid="data-query-result-card">
+      <div className="px-3 py-2 bg-muted/30 flex items-start justify-between gap-2 flex-wrap">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold leading-tight">{result.title}</p>
+          {result.subtitle && <p className="text-xs text-muted-foreground mt-0.5">{result.subtitle}</p>}
+        </div>
+        <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={onDismiss} data-testid="button-dismiss-data-query">
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+      <div className="px-3 py-3 space-y-3">
+        {result.summary && (
+          <p className="text-sm text-muted-foreground">{result.summary}</p>
+        )}
+        {result.noData && !result.summary && (
+          <p className="text-sm text-muted-foreground">No data found for this period.</p>
+        )}
+        {result.stats && result.stats.length > 0 && (
+          <div className="grid grid-cols-2 gap-2">
+            {result.stats.map((stat, i) => (
+              <div
+                key={i}
+                className={`rounded-md p-2 bg-background/60 border border-border/50 ${i === result.stats!.length - 1 && result.stats!.length % 2 !== 0 ? "col-span-2" : ""}`}
+              >
+                <p className="text-xs text-muted-foreground leading-tight">{stat.label}</p>
+                <p className={`text-sm font-semibold mt-0.5 ${highlightClass(stat.highlight)}`}>{stat.value}</p>
+                {stat.subtext && <p className="text-xs text-muted-foreground mt-0.5">{stat.subtext}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+        {result.table && result.table.rows.length > 0 && (
+          <div className="overflow-auto max-h-52 rounded-md border border-border/50">
+            <table className="w-full text-xs min-w-max">
+              <thead>
+                <tr className="bg-muted/40 border-b border-border">
+                  {result.table.headers.map((h, i) => (
+                    <th key={i} className="text-left py-1.5 px-2 font-medium text-muted-foreground whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {result.table.rows.map((row, i) => (
+                  <tr key={i} className="border-b border-border/40 last:border-0 hover-elevate">
+                    {row.map((cell, j) => (
+                      <td key={j} className="py-1.5 px-2 whitespace-nowrap">{cell}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {result.table && result.table.rows.length === 0 && !result.noData && !result.summary && (
+          <p className="text-sm text-muted-foreground">No records found.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main ChatWidget ──────────────────────────────────────────────────
 export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -1413,6 +1503,7 @@ export function ChatWidget() {
   const [poDraftSubmitting, setPoDraftSubmitting] = useState(false);
   const [poDraftResult, setPoDraftResult] = useState<POImportResult | null>(null);
   const [verifyContainerDraft, setVerifyContainerDraft] = useState<VerifyContainerDraft | null>(null);
+  const [dataQueryResult, setDataQueryResult] = useState<DataQueryResult | null>(null);
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -1473,6 +1564,11 @@ export function ChatWidget() {
         setVerifyContainerDraft(data.verifyContainerDraft);
       } else {
         setVerifyContainerDraft(null);
+      }
+      if (data.dataQueryResult) {
+        setDataQueryResult(data.dataQueryResult);
+      } else {
+        setDataQueryResult(null);
       }
     },
   });
@@ -2012,6 +2108,14 @@ export function ChatWidget() {
                     <VerifyContainerCard
                       draft={verifyContainerDraft}
                       onDismiss={() => setVerifyContainerDraft(null)}
+                    />
+                  )}
+
+                  {/* ── Phase 1: Data Query Result Card ── */}
+                  {dataQueryResult && !sendMutation.isPending && (
+                    <DataQueryResultCard
+                      result={dataQueryResult}
+                      onDismiss={() => setDataQueryResult(null)}
                     />
                   )}
                 </div>

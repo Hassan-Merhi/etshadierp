@@ -1258,7 +1258,7 @@ export async function chat(
   companyId: number,
   conversationHistory: { role: string; content: string }[] = [],
   userPreferences?: UserPreferences
-): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any; voucherSearchResults?: any[]; stockItemDraft?: any; priceUpdateDraft?: any; accountQueryResult?: any; verifyContainerDraft?: any }> {
+): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any; voucherSearchResults?: any[]; stockItemDraft?: any; priceUpdateDraft?: any; accountQueryResult?: any; verifyContainerDraft?: any; dataQueryResult?: any }> {
   const available = getAvailableProviders();
   
   if (available.length === 0) {
@@ -1785,6 +1785,466 @@ If intent is not about an account query, respond with exactly: null`;
       }
     }
 
+    // ── Phase 1: Data Query Handler ───────────────────────────────────────────
+    // Handles read-only ERP data queries: P&L, cash position, statements, etc.
+    const PHASE1_KEYWORDS = /profit.{0,15}loss|p&l\b|pl\b.{0,10}report|balance.{0,8}sheet|cash.{0,12}(balance|position|account)|who.{0,20}owe[ds]?|overdue|outstanding.{0,15}(balance|amount|supplier)|customer.{0,15}statement|supplier.{0,15}statement|top.{0,10}(customer|buyer)s?|worker.{0,12}attend|how many.{0,20}(absent|present|worker)|bale.{0,12}(produc|today|week|this|last)|produc.{0,12}bale|how many bale|container.{0,12}status|where.{0,12}(is.{0,5})?container|pending.{0,10}offload|not.{0,10}offload/i;
+    let dataQueryResult: any = undefined;
+
+    if (PHASE1_KEYWORDS.test(userMessage) && !voucherDraft && !stockAdjustmentDraft) {
+      try {
+        const todayDate = new Date();
+        const todayStr = todayDate.toISOString().slice(0, 10);
+        const yesterdayStr = new Date(todayDate.getTime() - 86400000).toISOString().slice(0, 10);
+        const thisMonthStart = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1).toISOString().slice(0, 10);
+        const lastMonthStart = new Date(todayDate.getFullYear(), todayDate.getMonth() - 1, 1).toISOString().slice(0, 10);
+        const lastMonthEnd = new Date(todayDate.getFullYear(), todayDate.getMonth(), 0).toISOString().slice(0, 10);
+        const last30Days = new Date(todayDate.getTime() - 30 * 86400000).toISOString().slice(0, 10);
+        const dayOfWeek = todayDate.getDay();
+        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const thisWeekStart = new Date(todayDate.getTime() + mondayOffset * 86400000).toISOString().slice(0, 10);
+        const lastWeekStart = new Date(todayDate.getTime() + (mondayOffset - 7) * 86400000).toISOString().slice(0, 10);
+        const lastWeekEnd = new Date(todayDate.getTime() + (mondayOffset - 1) * 86400000).toISOString().slice(0, 10);
+
+        const phase1Prompt = `ERP data query classifier. Classify the user's intent and extract parameters. Output ONLY valid JSON, no markdown.
+User message: "${userMessage}"
+Today: ${todayStr} | Yesterday: ${yesterdayStr}
+This week: ${thisWeekStart} to ${todayStr} | Last week: ${lastWeekStart} to ${lastWeekEnd}
+This month: ${thisMonthStart} to ${todayStr} | Last month: ${lastMonthStart} to ${lastMonthEnd}
+Last 30 days: ${last30Days} to ${todayStr}
+
+Query types:
+pl_summary = P&L / profit & loss / income statement for a period
+cash_position = current cash and bank account balances
+overdue_payments = customers/accounts that owe money (outstanding receivables)
+customer_statement = recent transactions for a specific named customer
+supplier_statement = recent transactions for a specific named supplier
+top_customers = top customers by revenue/receipts for a period
+outstanding_suppliers = suppliers with the largest balances owed to them
+worker_attendance = worker attendance summary (present/absent) for a date range
+bale_production = factory bale production stats for a date range
+container_status = status of a specific container by its number
+containers_pending_offload = containers that have arrived but not been offloaded yet
+
+Output this JSON shape:
+{"queryType":"<one of the above>","entityName":<string or null>,"containerNumber":<string or null>,"dateFrom":<YYYY-MM-DD or null>,"dateTo":"${todayStr}","limit":10}
+
+Date rules: use provided ranges above. Default to last 30 days for financial, today for attendance/production if no date given.
+If the intent does not match any type, output: null`;
+
+        const phase1Res = await callAIWithFallback(selectedProvider, phase1Prompt, [], "Classify Phase1 query");
+        const rawP1 = phase1Res.response.trim().replace(/```json\n?|```/g, "").trim();
+
+        if (rawP1 !== "null" && rawP1.startsWith("{")) {
+          const params = JSON.parse(rawP1);
+          if (params && params.queryType) {
+            const dateFrom: string = params.dateFrom || last30Days;
+            const dateTo: string = params.dateTo || todayStr;
+            const rowLimit: number = Math.min(params.limit || 10, 50);
+            const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            const fmtDec = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+            switch (params.queryType) {
+
+              case "pl_summary": {
+                const rows = await db.execute(sql`
+                  SELECT la.account_type,
+                    COALESCE(SUM(CAST(ve.debit_amount AS numeric)), 0) AS total_debit,
+                    COALESCE(SUM(CAST(ve.credit_amount AS numeric)), 0) AS total_credit
+                  FROM voucher_entries ve
+                  JOIN vouchers v ON v.id = ve.voucher_id AND v.optional = false AND v.deleted_at IS NULL
+                  JOIN ledger_accounts la ON la.id = ve.ledger_account_id AND la.company_id = ${companyId}
+                  WHERE v.voucher_date BETWEEN ${dateFrom} AND ${dateTo}
+                    AND la.account_type IN ('Income','Expense','Direct Expense','Indirect Expense','Profit')
+                  GROUP BY la.account_type
+                `);
+                let revenue = 0, cogs = 0, opex = 0;
+                for (const row of rows.rows as any[]) {
+                  const dr = parseFloat(row.total_debit || "0");
+                  const cr = parseFloat(row.total_credit || "0");
+                  if (row.account_type === "Income") revenue += cr - dr;
+                  else if (row.account_type === "Direct Expense") cogs += dr - cr;
+                  else opex += dr - cr;
+                }
+                const gross = revenue - cogs;
+                const net = gross - opex;
+                dataQueryResult = {
+                  queryType: "pl_summary",
+                  title: "Profit & Loss Summary",
+                  subtitle: `${dateFrom} to ${dateTo}`,
+                  stats: [
+                    { label: "Revenue", value: fmt(revenue), highlight: revenue >= 0 ? "positive" : "negative" },
+                    { label: "Cost of Goods Sold", value: fmt(cogs), highlight: "muted" },
+                    { label: "Gross Profit", value: fmt(gross), highlight: gross >= 0 ? "positive" : "negative" },
+                    { label: "Operating Expenses", value: fmt(opex), highlight: "muted" },
+                    { label: "Net Profit / (Loss)", value: fmt(net), highlight: net >= 0 ? "positive" : "negative" },
+                  ],
+                };
+                break;
+              }
+
+              case "cash_position": {
+                const rows = await db.execute(sql`
+                  SELECT la.name, la.account_type, la.opening_balance, la.opening_balance_side,
+                    COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.debit_amount AS numeric) ELSE 0 END), 0) AS total_debit,
+                    COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.credit_amount AS numeric) ELSE 0 END), 0) AS total_credit
+                  FROM ledger_accounts la
+                  LEFT JOIN voucher_entries ve ON ve.ledger_account_id = la.id
+                  LEFT JOIN vouchers v ON v.id = ve.voucher_id
+                  WHERE la.company_id = ${companyId} AND la.account_type IN ('Cash','Bank') AND la.active = true AND la.deleted_at IS NULL
+                  GROUP BY la.id, la.name, la.account_type, la.opening_balance, la.opening_balance_side
+                  ORDER BY la.account_type, la.name
+                `);
+                let grandTotal = 0;
+                const stats: any[] = (rows.rows as any[]).map(row => {
+                  const ob = parseFloat(row.opening_balance || "0");
+                  const obAdj = row.opening_balance_side === "Cr" ? -ob : ob;
+                  const bal = obAdj + parseFloat(row.total_debit || "0") - parseFloat(row.total_credit || "0");
+                  grandTotal += bal;
+                  return { label: `${row.name} (${row.account_type})`, value: fmt(bal), highlight: bal >= 0 ? "positive" : "negative" };
+                });
+                stats.push({ label: "TOTAL CASH & BANK", value: fmt(grandTotal), highlight: grandTotal >= 0 ? "positive" : "negative" });
+                dataQueryResult = { queryType: "cash_position", title: "Cash & Bank Positions", subtitle: `As of ${todayStr}`, stats };
+                break;
+              }
+
+              case "overdue_payments": {
+                const rows = await db.execute(sql`
+                  SELECT la.name, la.opening_balance, la.opening_balance_side,
+                    COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.debit_amount AS numeric) ELSE 0 END), 0) AS total_debit,
+                    COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.credit_amount AS numeric) ELSE 0 END), 0) AS total_credit,
+                    MAX(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN v.voucher_date END) AS last_tx
+                  FROM ledger_accounts la
+                  LEFT JOIN voucher_entries ve ON ve.ledger_account_id = la.id
+                  LEFT JOIN vouchers v ON v.id = ve.voucher_id
+                  WHERE la.company_id = ${companyId} AND la.active = true AND la.deleted_at IS NULL
+                    AND la.account_type NOT IN ('Cash','Bank','Income','Expense','Direct Expense','Indirect Expense','Equity','Profit','Government Taxes')
+                  GROUP BY la.id, la.name, la.opening_balance, la.opening_balance_side
+                  HAVING (
+                    CASE WHEN la.opening_balance_side = 'Cr' THEN -CAST(la.opening_balance AS numeric) ELSE CAST(la.opening_balance AS numeric) END
+                    + COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.debit_amount AS numeric) ELSE 0 END), 0)
+                    - COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.credit_amount AS numeric) ELSE 0 END), 0)
+                  ) > 100
+                  ORDER BY (
+                    CASE WHEN la.opening_balance_side = 'Cr' THEN -CAST(la.opening_balance AS numeric) ELSE CAST(la.opening_balance AS numeric) END
+                    + COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.debit_amount AS numeric) ELSE 0 END), 0)
+                    - COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.credit_amount AS numeric) ELSE 0 END), 0)
+                  ) DESC
+                  LIMIT ${rowLimit}
+                `);
+                const tableRows = (rows.rows as any[]).map(row => {
+                  const ob = parseFloat(row.opening_balance || "0");
+                  const obAdj = row.opening_balance_side === "Cr" ? -ob : ob;
+                  const bal = obAdj + parseFloat(row.total_debit || "0") - parseFloat(row.total_credit || "0");
+                  const lastTx = row.last_tx ? String(row.last_tx).slice(0, 10) : "—";
+                  return [row.name, fmt(bal), lastTx];
+                });
+                dataQueryResult = {
+                  queryType: "overdue_payments",
+                  title: "Outstanding Receivables",
+                  subtitle: "Accounts with debit balance (they owe you)",
+                  table: { headers: ["Account", "Balance Owed", "Last Transaction"], rows: tableRows },
+                  noData: tableRows.length === 0,
+                };
+                break;
+              }
+
+              case "customer_statement": {
+                const name = params.entityName;
+                if (!name) {
+                  dataQueryResult = { queryType: "customer_statement", title: "Customer Statement", summary: "Please specify a customer name." };
+                  break;
+                }
+                const accts = await db.select({ id: schema.ledgerAccounts.id, name: schema.ledgerAccounts.name })
+                  .from(schema.ledgerAccounts)
+                  .where(and(eq(schema.ledgerAccounts.companyId, companyId), ilike(schema.ledgerAccounts.name, `%${name}%`), isNull(schema.ledgerAccounts.deletedAt)))
+                  .limit(3);
+                if (!accts.length) {
+                  dataQueryResult = { queryType: "customer_statement", title: `Customer: ${name}`, summary: "No account found matching that name." };
+                  break;
+                }
+                const acct = accts[0];
+                const txRows = await db.select({
+                  voucherDate: schema.vouchers.voucherDate,
+                  voucherType: schema.vouchers.voucherType,
+                  description: schema.vouchers.description,
+                  debitAmount: schema.voucherEntries.debitAmount,
+                  creditAmount: schema.voucherEntries.creditAmount,
+                })
+                  .from(schema.voucherEntries)
+                  .innerJoin(schema.vouchers, and(eq(schema.voucherEntries.voucherId, schema.vouchers.id), eq(schema.vouchers.optional, false), isNull(schema.vouchers.deletedAt)))
+                  .where(eq(schema.voucherEntries.ledgerAccountId, acct.id))
+                  .orderBy(desc(schema.vouchers.voucherDate))
+                  .limit(rowLimit);
+                const tableRows = txRows.map(r => [
+                  r.voucherDate || "—",
+                  r.voucherType || "—",
+                  (r.description || "").slice(0, 40),
+                  parseFloat(r.debitAmount || "0") > 0 ? fmtDec(parseFloat(r.debitAmount!)) : "—",
+                  parseFloat(r.creditAmount || "0") > 0 ? fmtDec(parseFloat(r.creditAmount!)) : "—",
+                ]);
+                dataQueryResult = {
+                  queryType: "customer_statement",
+                  title: `Statement: ${acct.name}`,
+                  subtitle: `Last ${txRows.length} transaction(s)`,
+                  table: { headers: ["Date", "Type", "Description", "Debit", "Credit"], rows: tableRows },
+                  noData: tableRows.length === 0,
+                };
+                break;
+              }
+
+              case "supplier_statement": {
+                const name = params.entityName;
+                if (!name) {
+                  dataQueryResult = { queryType: "supplier_statement", title: "Supplier Statement", summary: "Please specify a supplier name." };
+                  break;
+                }
+                const accts = await db.select({ id: schema.ledgerAccounts.id, name: schema.ledgerAccounts.name })
+                  .from(schema.ledgerAccounts)
+                  .where(and(eq(schema.ledgerAccounts.companyId, companyId), ilike(schema.ledgerAccounts.name, `%${name}%`), isNull(schema.ledgerAccounts.deletedAt)))
+                  .limit(3);
+                if (!accts.length) {
+                  dataQueryResult = { queryType: "supplier_statement", title: `Supplier: ${name}`, summary: "No account found matching that name." };
+                  break;
+                }
+                const acct = accts[0];
+                const txRows = await db.select({
+                  voucherDate: schema.vouchers.voucherDate,
+                  voucherType: schema.vouchers.voucherType,
+                  description: schema.vouchers.description,
+                  debitAmount: schema.voucherEntries.debitAmount,
+                  creditAmount: schema.voucherEntries.creditAmount,
+                })
+                  .from(schema.voucherEntries)
+                  .innerJoin(schema.vouchers, and(eq(schema.voucherEntries.voucherId, schema.vouchers.id), eq(schema.vouchers.optional, false), isNull(schema.vouchers.deletedAt)))
+                  .where(eq(schema.voucherEntries.ledgerAccountId, acct.id))
+                  .orderBy(desc(schema.vouchers.voucherDate))
+                  .limit(rowLimit);
+                const tableRows = txRows.map(r => [
+                  r.voucherDate || "—",
+                  r.voucherType || "—",
+                  (r.description || "").slice(0, 40),
+                  parseFloat(r.debitAmount || "0") > 0 ? fmtDec(parseFloat(r.debitAmount!)) : "—",
+                  parseFloat(r.creditAmount || "0") > 0 ? fmtDec(parseFloat(r.creditAmount!)) : "—",
+                ]);
+                dataQueryResult = {
+                  queryType: "supplier_statement",
+                  title: `Supplier: ${acct.name}`,
+                  subtitle: `Last ${txRows.length} transaction(s)`,
+                  table: { headers: ["Date", "Type", "Description", "Debit", "Credit"], rows: tableRows },
+                  noData: tableRows.length === 0,
+                };
+                break;
+              }
+
+              case "top_customers": {
+                const rows = await db.execute(sql`
+                  SELECT la.name,
+                    COUNT(DISTINCT v.id) AS tx_count,
+                    COALESCE(SUM(CAST(ve.credit_amount AS numeric)), 0) AS total_received
+                  FROM ledger_accounts la
+                  JOIN voucher_entries ve ON ve.ledger_account_id = la.id
+                  JOIN vouchers v ON v.id = ve.voucher_id AND v.optional = false AND v.deleted_at IS NULL AND v.voucher_type = 'Receipt'
+                  WHERE la.company_id = ${companyId} AND la.active = true
+                    AND v.voucher_date BETWEEN ${dateFrom} AND ${dateTo}
+                    AND la.account_type NOT IN ('Cash','Bank','Income','Expense','Direct Expense','Indirect Expense','Equity','Government Taxes')
+                    AND CAST(ve.credit_amount AS numeric) > 0
+                  GROUP BY la.id, la.name
+                  ORDER BY total_received DESC
+                  LIMIT ${rowLimit}
+                `);
+                const tableRows = (rows.rows as any[]).map((r, i) => [
+                  String(i + 1),
+                  r.name,
+                  String(r.tx_count),
+                  fmt(parseFloat(r.total_received || "0")),
+                ]);
+                dataQueryResult = {
+                  queryType: "top_customers",
+                  title: `Top ${tableRows.length} Customers by Revenue`,
+                  subtitle: `${dateFrom} to ${dateTo}`,
+                  table: { headers: ["#", "Customer", "Transactions", "Amount Received"], rows: tableRows },
+                  noData: tableRows.length === 0,
+                };
+                break;
+              }
+
+              case "outstanding_suppliers": {
+                const rows = await db.execute(sql`
+                  SELECT la.name, la.opening_balance, la.opening_balance_side,
+                    COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.debit_amount AS numeric) ELSE 0 END), 0) AS total_debit,
+                    COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.credit_amount AS numeric) ELSE 0 END), 0) AS total_credit
+                  FROM ledger_accounts la
+                  LEFT JOIN voucher_entries ve ON ve.ledger_account_id = la.id
+                  LEFT JOIN vouchers v ON v.id = ve.voucher_id
+                  WHERE la.company_id = ${companyId} AND la.active = true AND la.deleted_at IS NULL
+                    AND la.account_type NOT IN ('Cash','Bank','Income','Expense','Direct Expense','Indirect Expense','Equity','Profit','Government Taxes')
+                  GROUP BY la.id, la.name, la.opening_balance, la.opening_balance_side
+                  HAVING (
+                    CASE WHEN la.opening_balance_side = 'Cr' THEN -CAST(la.opening_balance AS numeric) ELSE CAST(la.opening_balance AS numeric) END
+                    + COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.debit_amount AS numeric) ELSE 0 END), 0)
+                    - COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.credit_amount AS numeric) ELSE 0 END), 0)
+                  ) < -100
+                  ORDER BY (
+                    CASE WHEN la.opening_balance_side = 'Cr' THEN -CAST(la.opening_balance AS numeric) ELSE CAST(la.opening_balance AS numeric) END
+                    + COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.debit_amount AS numeric) ELSE 0 END), 0)
+                    - COALESCE(SUM(CASE WHEN v.deleted_at IS NULL AND v.optional = false THEN CAST(ve.credit_amount AS numeric) ELSE 0 END), 0)
+                  ) ASC
+                  LIMIT ${rowLimit}
+                `);
+                const tableRows = (rows.rows as any[]).map(row => {
+                  const ob = parseFloat(row.opening_balance || "0");
+                  const obAdj = row.opening_balance_side === "Cr" ? -ob : ob;
+                  const bal = obAdj + parseFloat(row.total_debit || "0") - parseFloat(row.total_credit || "0");
+                  return [row.name, fmt(Math.abs(bal))];
+                });
+                dataQueryResult = {
+                  queryType: "outstanding_suppliers",
+                  title: "Outstanding Supplier Balances",
+                  subtitle: "Largest amounts owed to suppliers",
+                  table: { headers: ["Supplier / Account", "Amount Owed"], rows: tableRows },
+                  noData: tableRows.length === 0,
+                };
+                break;
+              }
+
+              case "worker_attendance": {
+                const rows = await db.execute(sql`
+                  SELECT fa.status, COUNT(*) AS count, COUNT(DISTINCT fa.worker_id) AS workers
+                  FROM factory_attendance fa
+                  WHERE fa.company_id = ${companyId}
+                    AND fa.attendance_date BETWEEN ${dateFrom} AND ${dateTo}
+                  GROUP BY fa.status ORDER BY fa.status
+                `);
+                const totalRecords = (rows.rows as any[]).reduce((s: number, r: any) => s + parseInt(r.count || "0"), 0);
+                const stats: any[] = (rows.rows as any[]).map(r => ({
+                  label: r.status,
+                  value: `${r.count} records · ${r.workers} worker(s)`,
+                  highlight: r.status === "Present" ? "positive" : r.status === "Absent" ? "negative" : "muted",
+                }));
+                if (!stats.length) stats.push({ label: "No Data", value: "No attendance records for this period.", highlight: "muted" });
+                dataQueryResult = {
+                  queryType: "worker_attendance",
+                  title: "Worker Attendance",
+                  subtitle: `${dateFrom} to ${dateTo} — ${totalRecords} record(s)`,
+                  stats,
+                };
+                break;
+              }
+
+              case "bale_production": {
+                const rows = await db.execute(sql`
+                  SELECT fb.status, COUNT(*) AS count,
+                    COALESCE(SUM(CAST(fb.weight_kg AS numeric)), 0) AS total_weight
+                  FROM factory_bales fb
+                  WHERE fb.company_id = ${companyId} AND fb.deleted_at IS NULL
+                    AND fb.created_at::date BETWEEN ${dateFrom} AND ${dateTo}
+                  GROUP BY fb.status ORDER BY count DESC
+                `);
+                const totalBales = (rows.rows as any[]).reduce((s: number, r: any) => s + parseInt(r.count || "0"), 0);
+                const totalWeight = (rows.rows as any[]).reduce((s: number, r: any) => s + parseFloat(r.total_weight || "0"), 0);
+                const tableRows = (rows.rows as any[]).map(r => [
+                  String(r.status).replace(/_/g, " "),
+                  String(r.count),
+                  fmtDec(parseFloat(r.total_weight || "0")) + " kg",
+                ]);
+                dataQueryResult = {
+                  queryType: "bale_production",
+                  title: "Bale Production Summary",
+                  subtitle: `${dateFrom} to ${dateTo}`,
+                  stats: [
+                    { label: "Total Bales", value: fmt(totalBales), highlight: "positive" },
+                    { label: "Total Weight", value: fmtDec(totalWeight) + " kg", highlight: "positive" },
+                  ],
+                  table: tableRows.length > 0 ? { headers: ["Status", "Bales", "Weight"], rows: tableRows } : undefined,
+                  noData: totalBales === 0,
+                };
+                break;
+              }
+
+              case "container_status": {
+                const num = params.containerNumber || (userMessage.match(/\b([A-Z]{4}\d{6,7})\b/)?.[1]);
+                if (!num) {
+                  dataQueryResult = { queryType: "container_status", title: "Container Status", summary: "Please specify a container number (e.g. ABCU1234567)." };
+                  break;
+                }
+                const [container] = await db.select({
+                  containerNumber: schema.containers.containerNumber,
+                  status: schema.containers.status,
+                  importDate: schema.containers.importDate,
+                  eta: schema.containers.eta,
+                  offloadDate: schema.containers.offloadDate,
+                  transporter: schema.containers.transporter,
+                  trackingLocation: schema.containers.trackingLocation,
+                  trackingLastStatus: schema.containers.trackingLastStatus,
+                  trackingLastDescription: schema.containers.trackingLastDescription,
+                  trackingLastLocation: schema.containers.trackingLastLocation,
+                  borderDate: schema.containers.borderDate,
+                  grandTotal: schema.containers.grandTotal,
+                })
+                  .from(schema.containers)
+                  .where(and(eq(schema.containers.companyId, companyId), ilike(schema.containers.containerNumber, `%${num}%`)))
+                  .limit(1);
+                if (!container) {
+                  dataQueryResult = { queryType: "container_status", title: `Container: ${num}`, summary: "Container not found." };
+                  break;
+                }
+                const stats: any[] = [
+                  { label: "Container #", value: container.containerNumber, highlight: "neutral" },
+                  { label: "Status", value: container.status, highlight: container.status === "OFFLOADED" ? "positive" : "neutral" },
+                  { label: "Import Date", value: container.importDate || "—", highlight: "muted" },
+                  { label: "ETA", value: container.eta || "—", highlight: "muted" },
+                  { label: "Offload Date", value: container.offloadDate || "Not yet offloaded", highlight: container.offloadDate ? "positive" : "muted" },
+                  { label: "Transporter", value: container.transporter || "—", highlight: "muted" },
+                ];
+                if (container.trackingLastStatus) stats.push({ label: "Tracking Status", value: container.trackingLastStatus, highlight: "neutral" });
+                if (container.trackingLastLocation) stats.push({ label: "Last Location", value: container.trackingLastLocation, highlight: "neutral" });
+                if (container.trackingLastDescription) stats.push({ label: "Last Update", value: container.trackingLastDescription, highlight: "muted" });
+                dataQueryResult = {
+                  queryType: "container_status",
+                  title: `Container: ${container.containerNumber}`,
+                  subtitle: `Status: ${container.status}`,
+                  stats,
+                };
+                break;
+              }
+
+              case "containers_pending_offload": {
+                const pending = await db.select({
+                  containerNumber: schema.containers.containerNumber,
+                  status: schema.containers.status,
+                  eta: schema.containers.eta,
+                  transporter: schema.containers.transporter,
+                })
+                  .from(schema.containers)
+                  .where(and(
+                    eq(schema.containers.companyId, companyId),
+                    isNull(schema.containers.offloadDate),
+                  ))
+                  .orderBy(asc(schema.containers.eta))
+                  .limit(rowLimit);
+                const tableRows = pending.map(c => [
+                  c.containerNumber,
+                  c.status,
+                  c.eta || "—",
+                  c.transporter || "—",
+                ]);
+                dataQueryResult = {
+                  queryType: "containers_pending_offload",
+                  title: "Containers Pending Offload",
+                  subtitle: `${pending.length} container(s) not yet offloaded`,
+                  table: { headers: ["Container #", "Status", "ETA", "Transporter"], rows: tableRows },
+                  noData: pending.length === 0,
+                };
+                break;
+              }
+            }
+          }
+        }
+      } catch (_p1err) {
+        // Phase 1 query failed silently — chat text response still returned
+      }
+    }
+
     return {
       response,
       suggestions,
@@ -1796,6 +2256,7 @@ If intent is not about an account query, respond with exactly: null`;
       priceUpdateDraft,
       accountQueryResult,
       verifyContainerDraft,
+      dataQueryResult,
     };
   } catch (error: any) {
     console.error("[ChatService] ERROR:", error.message);
