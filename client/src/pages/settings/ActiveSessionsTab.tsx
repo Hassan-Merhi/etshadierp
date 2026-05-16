@@ -4,9 +4,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Monitor, Smartphone, Globe, LogOut, ShieldAlert, RefreshCw } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { Card, CardContent } from "@/components/ui/card";
+import { Monitor, Smartphone, Globe, LogOut, ShieldAlert, RefreshCw, MapPin, Clock } from "lucide-react";
+import { formatDistanceToNow, format } from "date-fns";
 
 interface ActiveSession {
   sid: string;
@@ -17,6 +17,9 @@ interface ActiveSession {
   expires: string;
   userAgent: string | null;
   ip: string | null;
+  loginAt: string | null;
+  city: string | null;
+  country: string | null;
 }
 
 function getDeviceIcon(ua: string | null) {
@@ -26,13 +29,24 @@ function getDeviceIcon(ua: string | null) {
   return Monitor;
 }
 
-function parseUserAgent(ua: string | null) {
-  if (!ua) return "Unknown device";
-  if (ua.includes("Chrome")) return "Chrome";
-  if (ua.includes("Firefox")) return "Firefox";
-  if (ua.includes("Safari") && !ua.includes("Chrome")) return "Safari";
-  if (ua.includes("Edge")) return "Edge";
+function parseBrowser(ua: string | null) {
+  if (!ua) return "Unknown browser";
+  if (ua.includes("Edg/") || ua.includes("Edge/")) return "Edge";
+  if (ua.includes("Chrome/") && !ua.includes("Chromium")) return "Chrome";
+  if (ua.includes("Firefox/")) return "Firefox";
+  if (ua.includes("Safari/") && !ua.includes("Chrome")) return "Safari";
+  if (ua.includes("OPR/") || ua.includes("Opera/")) return "Opera";
   return ua.slice(0, 40);
+}
+
+function parseOS(ua: string | null) {
+  if (!ua) return null;
+  if (ua.includes("Windows NT")) return "Windows";
+  if (ua.includes("Mac OS X")) return "macOS";
+  if (ua.includes("Linux") && !ua.includes("Android")) return "Linux";
+  if (ua.includes("Android")) return "Android";
+  if (ua.includes("iPhone") || ua.includes("iPad")) return "iOS";
+  return null;
 }
 
 export function ActiveSessionsTab({ isAdmin }: { isAdmin: boolean }) {
@@ -168,35 +182,59 @@ function SessionRow({
   isRevoking: boolean;
 }) {
   const DeviceIcon = getDeviceIcon(session.userAgent);
-  const browser = parseUserAgent(session.userAgent);
+  const browser = parseBrowser(session.userAgent);
+  const os = parseOS(session.userAgent);
   const expiresIn = session.expires
     ? formatDistanceToNow(new Date(session.expires), { addSuffix: true })
     : "unknown";
+  const loginAtFormatted = session.loginAt
+    ? format(new Date(session.loginAt), "MMM d, yyyy 'at' h:mm a")
+    : null;
+
+  const location = [session.city, session.country].filter(Boolean).join(", ");
 
   return (
     <Card data-testid={`session-row-${session.sid.slice(0, 8)}`}>
       <CardContent className="py-3 px-4 flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0">
-            <DeviceIcon className="h-4 w-4 text-muted-foreground" />
+          <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+            <DeviceIcon className="h-5 w-5 text-muted-foreground" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 space-y-0.5">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-medium truncate">{browser}</span>
+              <span className="text-sm font-medium">
+                {browser}{os ? ` on ${os}` : ""}
+              </span>
               {session.isCurrent && (
                 <Badge variant="secondary" data-testid="badge-current-session">
                   This device
                 </Badge>
               )}
+              {session.role && (
+                <Badge variant="outline" className="text-xs capitalize">
+                  {session.role}
+                </Badge>
+              )}
             </div>
-            <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
               {session.ip && (
-                <span className="text-xs text-muted-foreground">{session.ip}</span>
+                <span className="text-xs text-muted-foreground font-mono">{session.ip}</span>
+              )}
+              {location && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  {location}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              {loginAtFormatted && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  Signed in {loginAtFormatted}
+                </span>
               )}
               <span className="text-xs text-muted-foreground">Expires {expiresIn}</span>
-              {session.role && (
-                <span className="text-xs text-muted-foreground capitalize">{session.role}</span>
-              )}
             </div>
           </div>
         </div>

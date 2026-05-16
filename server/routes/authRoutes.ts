@@ -77,6 +77,13 @@ export function registerAuthRoutes(app: Express) {
       req.session.userId = user.id;
       req.session.username = user.username;
 
+      // Store device fingerprint on the session so /api/sessions can surface it
+      const clientIpForSession = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || null;
+      const userAgentForSession = req.headers['user-agent'] || null;
+      (req.session as any).ip = clientIpForSession;
+      (req.session as any).userAgent = userAgentForSession;
+      (req.session as any).loginAt = new Date().toISOString();
+
       // Phase 2 CSRF hardening: issue a synchronizer-token at login so the
       // server-side CSRF middleware always has an `expected` token to compare
       // against for an authenticated session. Without this, the very first
@@ -188,8 +195,28 @@ export function registerAuthRoutes(app: Express) {
 
       const currentSid = (req as any).sessionID;
 
+      // Cross-reference login_history to get city/country for each session ip
+      const uniqueIps = [...new Set(rows.map((r: any) => r.sess?.ip).filter(Boolean))];
+      let ipGeoMap: Record<string, { city: string | null; country: string | null }> = {};
+      if (uniqueIps.length > 0) {
+        try {
+          const geoRows = await db
+            .select({ ipAddress: loginHistory.ipAddress, city: loginHistory.city, country: loginHistory.country })
+            .from(loginHistory)
+            .where(inArray(loginHistory.ipAddress, uniqueIps))
+            .orderBy(desc(loginHistory.loginAt))
+            .limit(100);
+          for (const g of geoRows) {
+            if (g.ipAddress && !ipGeoMap[g.ipAddress]) {
+              ipGeoMap[g.ipAddress] = { city: g.city || null, country: g.country || null };
+            }
+          }
+        } catch (_) {}
+      }
+
       const sessions = rows.map((row: any) => {
         const s = row.sess;
+        const geo = s.ip ? (ipGeoMap[s.ip] || { city: null, country: null }) : { city: null, country: null };
         return {
           sid: row.sid,
           isCurrent: row.sid === currentSid,
@@ -199,6 +226,9 @@ export function registerAuthRoutes(app: Express) {
           expires: row.expire,
           userAgent: s.userAgent || null,
           ip: s.ip || null,
+          loginAt: s.loginAt || null,
+          city: geo.city,
+          country: geo.country,
         };
       });
 
