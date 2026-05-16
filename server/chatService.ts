@@ -1075,15 +1075,17 @@ Locations (id:name): ${locs.map(l => `${l.id}:${l.name}`).join(" | ")}
 
 RULES:
 1. Extract a stock adjustment (Production/Consumption voucher) only if the user clearly intends to produce or consume items.
-2. Match item names and location names FUZZILY — partial names are fine.
+2. Match item names and location names FUZZILY — partial names, abbreviations, and codes are fine.
 3. Each entry has a type of "PRODUCE" (adding stock) or "CONSUME" (removing stock). "Production" = PRODUCE, "Consumption" = CONSUME.
 4. Rate is the unit cost/value of the item. If the user doesn't specify a rate, use 0.
 5. Use the user's description/notes if provided.
 6. If the user says "optional", set optional: true.
 7. Date defaults to today (${today}) if not specified.
+8. For each item, pick the best match as stockItemId/stockItemName. ALSO include a "candidates" array of up to 3 items from the list that could plausibly match the user's text (include the best match as the first candidate). If there is only one plausible match, candidates should have just that one entry. Each candidate: {"id":NUMBER,"name":"...","code":"..."}.
+9. For location, also return up to 3 location candidates: {"id":NUMBER,"name":"..."}.
 
 Respond with ONLY valid JSON (no markdown):
-{"date":"YYYY-MM-DD","locationId":NUMBER,"locationName":"...","notes":"...","optional":false,"items":[{"type":"PRODUCE"|"CONSUME","stockItemId":NUMBER,"stockItemName":"...","quantity":NUMBER,"rate":NUMBER}]}
+{"date":"YYYY-MM-DD","locationId":NUMBER,"locationName":"...","locationCandidates":[{"id":NUMBER,"name":"..."}],"notes":"...","optional":false,"items":[{"type":"PRODUCE"|"CONSUME","stockItemId":NUMBER,"stockItemName":"...","quantity":NUMBER,"rate":NUMBER,"candidates":[{"id":NUMBER,"name":"...","code":"..."}]}]}
 
 If intent is unclear, respond with exactly: null`;
 

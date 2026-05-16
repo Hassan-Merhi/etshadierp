@@ -46,10 +46,22 @@ interface ChatStatus {
   isAdminOrOwner: boolean;
 }
 
+interface StockCandidate {
+  id: number;
+  name: string;
+  code?: string;
+}
+
+interface LocationCandidate {
+  id: number;
+  name: string;
+}
+
 interface StockAdjustmentDraft {
   date: string;
   locationId: number;
   locationName: string;
+  locationCandidates?: LocationCandidate[];
   notes: string;
   optional?: boolean;
   items: {
@@ -58,6 +70,7 @@ interface StockAdjustmentDraft {
     stockItemName: string;
     quantity: number;
     rate: number;
+    candidates?: StockCandidate[];
   }[];
 }
 
@@ -213,13 +226,36 @@ function StockAdjustmentConfirmCard({
   isSubmitting,
 }: {
   draft: StockAdjustmentDraft;
-  onConfirm: () => void;
+  onConfirm: (resolved: StockAdjustmentDraft) => void;
   onDismiss: () => void;
   isSubmitting: boolean;
 }) {
+  const [selectedItems, setSelectedItems] = useState<{ id: number; name: string }[]>(
+    () => draft.items.map(i => ({ id: i.stockItemId, name: i.stockItemName }))
+  );
+  const [selectedLocationId, setSelectedLocationId] = useState(draft.locationId);
+  const [selectedLocationName, setSelectedLocationName] = useState(draft.locationName);
+
   const produces = draft.items.filter(i => i.type === "PRODUCE");
   const consumes = draft.items.filter(i => i.type === "CONSUME");
   const adjType = produces.length > 0 && consumes.length > 0 ? "Mixed" : produces.length > 0 ? "Production" : "Consumption";
+
+  const locCandidates = draft.locationCandidates ?? [];
+  const hasLocChoice = locCandidates.length > 1;
+
+  const handleConfirm = () => {
+    const resolved: StockAdjustmentDraft = {
+      ...draft,
+      locationId: selectedLocationId,
+      locationName: selectedLocationName,
+      items: draft.items.map((item, i) => ({
+        ...item,
+        stockItemId: selectedItems[i].id,
+        stockItemName: selectedItems[i].name,
+      })),
+    };
+    onConfirm(resolved);
+  };
 
   return (
     <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 overflow-hidden" data-testid="stock-adj-confirm-card">
@@ -229,13 +265,34 @@ function StockAdjustmentConfirmCard({
           Create {adjType} Voucher?
         </span>
       </div>
-      <div className="px-3 py-2 space-y-1.5 text-xs">
-        <div className="flex justify-between gap-2 text-muted-foreground">
-          <span>Date</span><span className="font-medium text-foreground">{draft.date}</span>
+      <div className="px-3 py-2 space-y-2 text-xs">
+        <div className="flex justify-between gap-2 text-muted-foreground items-center">
+          <span className="shrink-0">Date</span>
+          <span className="font-medium text-foreground">{draft.date}</span>
         </div>
-        <div className="flex justify-between gap-2 text-muted-foreground">
-          <span>Location</span><span className="font-medium text-foreground">{draft.locationName}</span>
+
+        {/* Location — dropdown if multiple candidates */}
+        <div className="flex justify-between gap-2 text-muted-foreground items-center">
+          <span className="shrink-0">Location</span>
+          {hasLocChoice ? (
+            <select
+              className="text-xs font-medium text-foreground bg-background border rounded px-1.5 py-0.5 max-w-[180px]"
+              value={selectedLocationId}
+              onChange={e => {
+                const id = Number(e.target.value);
+                const loc = locCandidates.find(l => l.id === id);
+                if (loc) { setSelectedLocationId(id); setSelectedLocationName(loc.name); }
+              }}
+            >
+              {locCandidates.map(l => (
+                <option key={l.id} value={l.id}>{l.name}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="font-medium text-foreground">{selectedLocationName}</span>
+          )}
         </div>
+
         {draft.notes && (
           <div className="flex justify-between gap-2 text-muted-foreground">
             <span>Notes</span><span className="font-medium text-foreground truncate max-w-[180px]">{draft.notes}</span>
@@ -246,26 +303,50 @@ function StockAdjustmentConfirmCard({
             <span>Status</span><span className="font-medium text-amber-600 dark:text-amber-400">Optional</span>
           </div>
         )}
-        <div className="border-t pt-1.5 mt-1.5 space-y-1">
-          <div className="grid grid-cols-4 gap-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-            <span className="col-span-2">Item</span><span className="text-center">Type</span><span className="text-right">Qty</span>
+
+        {/* Items table */}
+        <div className="border-t pt-1.5 mt-0.5 space-y-1.5">
+          <div className="grid grid-cols-[1fr_56px_40px] gap-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+            <span>Item</span><span className="text-center">Type</span><span className="text-right">Qty</span>
           </div>
-          {draft.items.map((item, i) => (
-            <div key={i} className="grid grid-cols-4 gap-1 items-center">
-              <span className="col-span-2 truncate text-foreground">{item.stockItemName}</span>
-              <span className={`text-center text-[10px] font-semibold ${item.type === "PRODUCE" ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
-                {item.type === "PRODUCE" ? "Produce" : "Consume"}
-              </span>
-              <span className="text-right text-foreground">{item.quantity.toLocaleString()}</span>
-            </div>
-          ))}
+          {draft.items.map((item, i) => {
+            const candidates = item.candidates ?? [];
+            const hasChoice = candidates.length > 1;
+            return (
+              <div key={i} className="grid grid-cols-[1fr_56px_40px] gap-1 items-center">
+                {hasChoice ? (
+                  <select
+                    className="text-xs font-medium text-foreground bg-background border rounded px-1.5 py-0.5 w-full"
+                    value={selectedItems[i].id}
+                    onChange={e => {
+                      const id = Number(e.target.value);
+                      const c = candidates.find(c => c.id === id);
+                      if (c) {
+                        setSelectedItems(prev => prev.map((s, idx) => idx === i ? { id: c.id, name: c.name } : s));
+                      }
+                    }}
+                  >
+                    {candidates.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}{c.code ? ` (${c.code})` : ""}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="truncate text-foreground">{selectedItems[i].name}</span>
+                )}
+                <span className={`text-center text-[10px] font-semibold ${item.type === "PRODUCE" ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
+                  {item.type === "PRODUCE" ? "Produce" : "Consume"}
+                </span>
+                <span className="text-right text-foreground">{item.quantity.toLocaleString()}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
       <div className="px-3 py-2 border-t flex gap-2 justify-end">
         <Button variant="outline" size="sm" onClick={onDismiss} disabled={isSubmitting} data-testid="button-dismiss-stock-adj">
           <XCircle className="h-3.5 w-3.5 mr-1" /> Dismiss
         </Button>
-        <Button size="sm" onClick={onConfirm} disabled={isSubmitting} data-testid="button-confirm-stock-adj">
+        <Button size="sm" onClick={handleConfirm} disabled={isSubmitting} data-testid="button-confirm-stock-adj">
           {isSubmitting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Check className="h-3.5 w-3.5 mr-1" />}
           Confirm & Create
         </Button>
@@ -435,40 +516,37 @@ export function ChatWidget() {
     }
   };
 
-  const handleConfirmStockAdj = async () => {
-    if (!pendingStockAdj) return;
+  const handleConfirmStockAdj = async (resolved: StockAdjustmentDraft) => {
     setStockAdjSubmitting(true);
     try {
-      const adjType = (() => {
-        const hasP = pendingStockAdj.items.some(i => i.type === "PRODUCE");
-        const hasC = pendingStockAdj.items.some(i => i.type === "CONSUME");
-        return hasP && hasC ? "Mixed" : hasP ? "Production" : "Consumption";
-      })();
-      const totalAmount = pendingStockAdj.items.reduce((sum, i) => sum + i.quantity * i.rate, 0);
+      const hasP = resolved.items.some(i => i.type === "PRODUCE");
+      const hasC = resolved.items.some(i => i.type === "CONSUME");
+      const adjType = hasP && hasC ? "Mixed" : hasP ? "Production" : "Consumption";
+      const totalAmount = resolved.items.reduce((sum, i) => sum + i.quantity * i.rate, 0);
       const voucherNumber = `AI-${Date.now()}`;
       const voucherRes = await apiRequest("POST", "/api/vouchers", {
         voucherNumber,
         voucherType: adjType,
-        voucherDate: pendingStockAdj.date,
-        description: pendingStockAdj.notes || `${adjType} voucher`,
+        voucherDate: resolved.date,
+        description: resolved.notes || `${adjType} voucher`,
         totalAmount: String(totalAmount),
-        optional: pendingStockAdj.optional ?? false,
+        optional: resolved.optional ?? false,
       });
       const voucherData = await voucherRes.json();
       const voucherId = voucherData.id;
       await apiRequest("POST", "/api/stock-adjustments", {
         voucherId,
-        locationId: pendingStockAdj.locationId,
+        locationId: resolved.locationId,
         adjustmentType: adjType,
-        notes: pendingStockAdj.notes || "",
-        items: pendingStockAdj.items.map(i => ({
+        notes: resolved.notes || "",
+        items: resolved.items.map(i => ({
           stockItemId: i.stockItemId,
           quantity: i.type === "CONSUME" ? -Math.abs(i.quantity) : Math.abs(i.quantity),
           rate: i.rate,
         })),
       });
       setPendingStockAdj(null);
-      sendMutation.mutate(`Stock adjustment created: ${adjType} voucher on ${pendingStockAdj.date} at ${pendingStockAdj.locationName}`);
+      sendMutation.mutate(`Stock adjustment created: ${adjType} voucher on ${resolved.date} at ${resolved.locationName}`);
     } catch (err: any) {
       sendMutation.mutate(`Stock adjustment failed: ${err.message}`);
     } finally {
