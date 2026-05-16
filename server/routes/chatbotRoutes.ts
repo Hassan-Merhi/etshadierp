@@ -345,6 +345,247 @@ export function registerChatbotRoutes(app: Express) {
     }
   });
 
+  // ── PO File Parse (AI-powered) ────────────────────────────────────
+  app.post("/api/chatbot/parse-po-file", requireAuth, upload.single("file"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+      const fileExt = (req.file.originalname || "").toLowerCase().split(".").pop();
+      let rows: Record<string, any>[] = [];
+
+      if (fileExt === "csv") {
+        const text = req.file.buffer.toString("utf-8");
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        if (lines.length < 2) return res.status(400).json({ message: "CSV file has no data rows" });
+        const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
+        for (let i = 1; i < lines.length; i++) {
+          const vals = lines[i].split(",").map(v => v.trim().replace(/^"|"$/g, ""));
+          if (vals.every(v => !v)) continue;
+          const row: Record<string, any> = {};
+          headers.forEach((h, idx) => { row[h] = vals[idx] ?? ""; });
+          rows.push(row);
+        }
+      } else {
+        const wb = await readExcel(req.file.buffer);
+        const sheetName = wb.SheetNames[0];
+        if (!sheetName) return res.status(400).json({ message: "Excel file is empty" });
+        rows = sheetToJson(wb.Sheets[sheetName]) as Record<string, any>[];
+      }
+
+      if (!rows.length) return res.status(400).json({ message: "File has no data rows" });
+
+      // Flexible column lookup – case-insensitive, ignores spaces/underscores
+      function col(row: Record<string, any>, ...keys: string[]): string {
+        for (const key of keys) {
+          const norm = key.toLowerCase().replace(/[\s_]+/g, "");
+          const found = Object.keys(row).find(
+            k => k.toLowerCase().replace(/[\s_]+/g, "") === norm
+          );
+          if (found !== undefined && row[found] != null && row[found] !== "")
+            return String(row[found]).trim();
+        }
+        return "";
+      }
+
+      const first = rows[0];
+      const poNumber       = col(first, "PO_Number", "PONumber", "PO Number", "PO#", "po_number", "PONo", "PO No");
+      const containerNumber= col(first, "Container_Number", "ContainerNumber", "Container Number", "Container", "CONT", "Container#");
+      const supplierCode   = col(first, "Supplier_Code", "SupplierCode", "Supplier Code", "Vendor Code", "VendorCode");
+      const supplierName   = col(first, "Supplier_Name", "SupplierName", "Supplier", "Vendor", "Vendor Name");
+      const currency       = col(first, "Currency", "currency") || "USD";
+      const importDateRaw  = col(first, "Import_Date", "ImportDate", "Import Date", "Date", "PO_Date", "PODate", "Invoice Date");
+      const importDate     = importDateRaw || new Date().toISOString().split("T")[0];
+
+      const freight          = parseFloat(col(first, "Freight", "freight") || "0") || 0;
+      const surcharge        = parseFloat(col(first, "Surcharge", "surcharge") || "0") || 0;
+      const fumigation       = parseFloat(col(first, "Fumigation", "fumigation") || "0") || 0;
+      const documentCharges  = parseFloat(col(first, "Document_Charges", "DocumentCharges", "Doc Charges", "DocCharges", "Document Charges") || "0") || 0;
+      const discount         = parseFloat(col(first, "Discount", "discount") || "0") || 0;
+      const otherCharges     = parseFloat(col(first, "Other_Charges", "OtherCharges", "Other Charges") || "0") || 0;
+
+      const allSuppliers  = await storage.getAllSuppliers();
+      const allStockItems = await storage.getAllStockItems(companyId);
+
+      // Match supplier
+      let resolvedSupplierId: number | null = null;
+      let resolvedSupplierName = "";
+      const tryMatchSupplier = (raw: string) => {
+        if (!raw) return;
+        const lo = raw.toLowerCase();
+        const byCode = allSuppliers.find(s => s.code?.toLowerCase() === lo);
+        if (byCode) { resolvedSupplierId = byCode.id; resolvedSupplierName = byCode.legalName; return; }
+        const byName = allSuppliers.find(s =>
+          s.legalName.toLowerCase().includes(lo) || lo.includes(s.legalName.toLowerCase())
+        );
+        if (byName) { resolvedSupplierId = byName.id; resolvedSupplierName = byName.legalName; }
+      };
+      tryMatchSupplier(supplierCode);
+      if (!resolvedSupplierId) tryMatchSupplier(supplierName);
+
+      // Parse line items
+      const lines: any[] = [];
+      for (const row of rows) {
+        const itemCode = col(row, "Item_Barcode", "ItemBarcode", "Barcode", "barcode", "Item_Code", "ItemCode", "Code", "SKU", "Item Code");
+        const itemName = col(row, "Item_Name", "ItemName", "Name", "Description", "Item", "Product");
+        const qty  = parseFloat(col(row, "Quantity", "Qty", "quantity", "qty") || "0");
+        const rate = parseFloat(col(row, "Rate", "Price", "Unit_Price", "UnitPrice", "Unit Price", "rate", "price") || "0");
+
+        if (!itemName && !itemCode) continue;
+        if (qty <= 0) continue;
+
+        let stockItemId: number | null = null;
+        let stockItemName = "";
+        if (itemCode) {
+          const si = await storage.getStockItemByCodeOrAlias(itemCode, companyId);
+          if (si) { stockItemId = si.id; stockItemName = si.name; }
+        }
+        if (!stockItemId && itemName) {
+          const lo = itemName.toLowerCase();
+          const si = allStockItems.find(s =>
+            s.name.toLowerCase() === lo || s.code?.toLowerCase() === lo
+          );
+          if (si) { stockItemId = si.id; stockItemName = si.name; }
+        }
+
+        lines.push({
+          rawName: itemName || itemCode,
+          rawCode: itemCode || "",
+          stockItemId,
+          stockItemName: stockItemName || (stockItemId ? itemName : ""),
+          qty: qty.toString(),
+          rate: rate.toFixed(2),
+          lineTotal: (qty * rate).toFixed(2),
+        });
+      }
+
+      // AI fallback if we couldn't extract structured data
+      if (!lines.length) {
+        return res.status(400).json({
+          message: "Could not find item rows in the file. Please make sure the file has columns like Item_Name, Quantity, Rate (or similar).",
+          rowCount: rows.length,
+          sampleColumns: Object.keys(rows[0] || {}),
+        });
+      }
+
+      const itemsTotal = lines.reduce((s, l) => s + parseFloat(l.lineTotal), 0);
+      const grandTotal = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
+
+      const unresolvedItems = lines
+        .map((l, i) => l.stockItemId ? null : { index: i, rawName: l.rawName, rawCode: l.rawCode })
+        .filter(Boolean);
+
+      res.json({
+        poNumber:          poNumber || "",
+        containerNumber:   containerNumber || "",
+        importDate,
+        currency,
+        supplierId:        resolvedSupplierId,
+        supplierName:      resolvedSupplierName || supplierCode || supplierName || "",
+        supplierRaw:       supplierCode || supplierName || "",
+        lines,
+        charges:           { freight, surcharge, fumigation, documentCharges, discount, otherCharges },
+        itemsTotal:        itemsTotal.toFixed(2),
+        grandTotal:        grandTotal.toFixed(2),
+        unresolvedSupplier: !resolvedSupplierId,
+        unresolvedItems,
+        allSuppliers:      allSuppliers.map(s => ({ id: s.id, name: s.legalName, code: s.code || "" })),
+        allStockItems:     allStockItems.map(s => ({ id: s.id, name: s.name, code: s.code || "" })),
+      });
+    } catch (error: any) {
+      console.error("PO file parse error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── PO Import Confirm ─────────────────────────────────────────────
+  app.post("/api/chatbot/confirm-po-import", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { poNumber, containerNumber, importDate, currency, supplierId, lines, charges } = req.body;
+
+      if (!poNumber)        return res.status(400).json({ message: "PO number is required" });
+      if (!containerNumber) return res.status(400).json({ message: "Container number is required" });
+      if (!supplierId)      return res.status(400).json({ message: "Supplier is required" });
+      if (!lines?.length)   return res.status(400).json({ message: "At least one line item is required" });
+
+      const unresolved = lines.filter((l: any) => !l.stockItemId);
+      if (unresolved.length > 0) {
+        return res.status(400).json({
+          message: `${unresolved.length} item(s) still unresolved: ${unresolved.map((l: any) => l.rawName || l.itemName).join(", ")}`,
+        });
+      }
+
+      // Get or create container
+      let container = await storage.getContainerByNumber(containerNumber);
+      if (!container) {
+        container = await storage.createContainer({
+          companyId,
+          containerNumber,
+          supplierId: Number(supplierId),
+          status: "OTW",
+          importDate: importDate || new Date().toISOString().split("T")[0],
+        });
+      }
+
+      const itemsTotal      = lines.reduce((s: number, l: any) => s + parseFloat(l.qty) * parseFloat(l.rate), 0);
+      const freightAmt      = parseFloat(charges?.freight       || "0") || 0;
+      const surchargeAmt    = parseFloat(charges?.surcharge     || "0") || 0;
+      const fumigationAmt   = parseFloat(charges?.fumigation    || "0") || 0;
+      const docChargesAmt   = parseFloat(charges?.documentCharges || "0") || 0;
+      const discountAmt     = parseFloat(charges?.discount      || "0") || 0;
+      const otherChargesAmt = parseFloat(charges?.otherCharges  || "0") || 0;
+      const grandTotal      = itemsTotal + freightAmt + surchargeAmt + fumigationAmt + docChargesAmt - discountAmt + otherChargesAmt;
+
+      const po = await storage.createPurchaseOrder({
+        companyId,
+        poNumber,
+        containerId:      container.id,
+        supplierId:       Number(supplierId),
+        currency:         currency || "USD",
+        itemsTotal:       itemsTotal.toFixed(2),
+        freight:          freightAmt.toFixed(2),
+        surcharge:        surchargeAmt.toFixed(2),
+        fumigation:       fumigationAmt.toFixed(2),
+        documentCharges:  docChargesAmt.toFixed(2),
+        discount:         discountAmt.toFixed(2),
+        otherCharges:     otherChargesAmt.toFixed(2),
+        status:           "Open",
+        chargesEdited:    freightAmt > 0 || surchargeAmt > 0 || fumigationAmt > 0 || docChargesAmt > 0 || discountAmt > 0 || otherChargesAmt > 0,
+      }, importDate);
+
+      for (const line of lines) {
+        const q = parseFloat(line.qty);
+        const r = parseFloat(line.rate);
+        await db.insert(poLineItems).values({
+          poId:        po.id,
+          stockItemId: Number(line.stockItemId),
+          itemName:    line.itemName || line.rawName || "Unknown Item",
+          quantity:    q.toFixed(3),
+          rate:        r.toFixed(2),
+          lineTotal:   (q * r).toFixed(2),
+        });
+      }
+
+      res.json({
+        success:         true,
+        poId:            po.id,
+        poNumber:        po.poNumber,
+        containerNumber,
+        lineCount:       lines.length,
+        itemsTotal:      itemsTotal.toFixed(2),
+        grandTotal:      grandTotal.toFixed(2),
+        crossCompany:    !!(await storage.getParentCompanyId()),
+      });
+    } catch (error: any) {
+      console.error("PO import confirm error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ============================================================
   // EMPLOYEE SALARY ACCOUNT CLEANUP
   // Migrate legacy EMP-* ledger accounts to use employeeId directly
