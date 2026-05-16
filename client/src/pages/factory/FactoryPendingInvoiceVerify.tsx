@@ -694,8 +694,8 @@ export default function FactoryPendingInvoiceVerify() {
                           <TableHead className="text-right">Expected</TableHead>
                           <TableHead className="text-right">Loaded</TableHead>
                           <TableHead className="text-right">Remaining</TableHead>
-                          <TableHead className="text-right">Stock</TableHead>
                           <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Stock</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -720,6 +720,7 @@ export default function FactoryPendingInvoiceVerify() {
                                   <span className="text-muted-foreground">0</span>
                                 )}
                               </TableCell>
+                              <TableCell>{cmp ? getStatusBadge(cmp.status) : null}</TableCell>
                               <TableCell className="text-right font-mono" data-testid={`text-stock-${line.articleCode}`}>
                                 {(line.stockQty ?? 0) > 0 ? (
                                   <button
@@ -740,7 +741,6 @@ export default function FactoryPendingInvoiceVerify() {
                                   <span className="text-muted-foreground">0</span>
                                 )}
                               </TableCell>
-                              <TableCell>{cmp ? getStatusBadge(cmp.status) : null}</TableCell>
                             </TableRow>
                           );
                         })}
