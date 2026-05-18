@@ -4438,4 +4438,32 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  // ── Fix orphaned RESERVED_FOR_ORDER bales ────────────────────────────────
+  // Returns any bale stuck in RESERVED_FOR_ORDER that has no active customer
+  // order (non-deleted, status LOADING / PENDING_VERIFICATION / VERIFIED)
+  // referencing it back to IN_STOCK. Safe to run multiple times.
+  app.post("/api/admin/fix-orphaned-bales", requireAuth, requireRole("Admin", "Owner"), async (_req, res) => {
+    try {
+      const result = await db.execute(sql`
+        UPDATE factory_bales
+        SET status = 'IN_STOCK', updated_at = NOW()
+        WHERE status = 'RESERVED_FOR_ORDER'
+          AND deleted_at IS NULL
+          AND id NOT IN (
+            SELECT cob.bale_id
+            FROM customer_order_bales cob
+            INNER JOIN customer_orders co ON co.id = cob.order_id
+            WHERE co.deleted_at IS NULL
+              AND co.status IN ('LOADING', 'PENDING_VERIFICATION', 'VERIFIED')
+          )
+        RETURNING id
+      `);
+      const fixed = (result as any).rows?.length ?? 0;
+      res.json({ fixed, message: fixed > 0 ? `Restored ${fixed} bale(s) to IN_STOCK` : "No orphaned bales found" });
+    } catch (error: any) {
+      console.error("[BaleOrphanFix] Error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
 }

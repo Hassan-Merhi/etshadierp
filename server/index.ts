@@ -3354,6 +3354,32 @@ let migrationsDone = false;
         console.error("[RentalFix] Migration error:", e.message);
       }
 
+      // ── Auto-fix orphaned RESERVED_FOR_ORDER bales ───────────────────────────
+      // Bales stuck in RESERVED_FOR_ORDER with no active customer order referencing
+      // them (order deleted / container row deleted) are returned to IN_STOCK.
+      try {
+        const orphanResult = await migrationClient.query(`
+          UPDATE factory_bales
+          SET status = 'IN_STOCK', updated_at = NOW()
+          WHERE status = 'RESERVED_FOR_ORDER'
+            AND deleted_at IS NULL
+            AND id NOT IN (
+              SELECT cob.bale_id
+              FROM customer_order_bales cob
+              INNER JOIN customer_orders co ON co.id = cob.order_id
+              WHERE co.deleted_at IS NULL
+                AND co.status IN ('LOADING', 'PENDING_VERIFICATION', 'VERIFIED')
+            )
+          RETURNING id
+        `);
+        const fixed = orphanResult.rows.length;
+        if (fixed > 0) {
+          console.log(`[BaleOrphanFix] Restored ${fixed} orphaned RESERVED_FOR_ORDER bale(s) → IN_STOCK`);
+        }
+      } catch (e: any) {
+        console.error("[BaleOrphanFix] Error:", e.message);
+      }
+
       // Auto-fix sequence desyncs (can happen after data restores / bulk imports with explicit IDs)
       const seqFixes: Array<[string, string]> = [
         ["ledger_accounts", "ledger_accounts_id_seq"],
