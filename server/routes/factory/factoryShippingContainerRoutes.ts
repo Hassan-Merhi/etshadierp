@@ -5,6 +5,7 @@ import {
   customerOrders, customers,
   factoryShippingContainerRows, factoryShippingContainerDocuments,
   factoryShippingAvailability, insertFactoryShippingAvailabilitySchema,
+  customerOrderBales, factoryBales,
 } from "@shared/schema";
 import { eq, and, desc, inArray, isNull, sql } from "drizzle-orm";
 import multer from "multer";
@@ -407,28 +408,61 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
 
-      const [existing] = await db
-        .select({ id: factoryShippingContainerRows.id })
-        .from(factoryShippingContainerRows)
-        .where(and(
-          eq(factoryShippingContainerRows.id, id),
-          eq(factoryShippingContainerRows.companyId, companyId),
-        ));
-      if (!existing) return res.status(404).json({ message: "Row not found" });
+      await db.transaction(async (tx: any) => {
+        const [existing] = await tx
+          .select({ id: factoryShippingContainerRows.id, customerOrderId: factoryShippingContainerRows.customerOrderId })
+          .from(factoryShippingContainerRows)
+          .where(and(
+            eq(factoryShippingContainerRows.id, id),
+            eq(factoryShippingContainerRows.companyId, companyId),
+          ));
+        if (!existing) throw new Error("Row not found");
 
-      // Remove attached documents first (FK constraint)
-      await db
-        .delete(factoryShippingContainerDocuments)
-        .where(eq(factoryShippingContainerDocuments.scrId, id));
+        // If the linked customer order is in LOADING state, restore bales to stock
+        // and move the order back to DRAFT so they are no longer counted as loading.
+        const [order] = await tx
+          .select({ id: customerOrders.id, status: customerOrders.status, proformaIdUsed: customerOrders.proformaIdUsed })
+          .from(customerOrders)
+          .where(eq(customerOrders.id, existing.customerOrderId));
 
-      await db
-        .delete(factoryShippingContainerRows)
-        .where(eq(factoryShippingContainerRows.id, id));
+        if (order && order.status === "LOADING") {
+          const bales = await tx
+            .select({ baleId: customerOrderBales.baleId })
+            .from(customerOrderBales)
+            .where(eq(customerOrderBales.orderId, order.id));
+
+          // Legacy orders mark bales RESERVED_FOR_ORDER; V5 keeps them IN_STOCK already.
+          if (!order.proformaIdUsed && bales.length > 0) {
+            for (const b of bales) {
+              await tx
+                .update(factoryBales)
+                .set({ status: "IN_STOCK", updatedAt: new Date() })
+                .where(and(eq(factoryBales.id, b.baleId), eq(factoryBales.status, "RESERVED_FOR_ORDER")));
+            }
+          }
+
+          // Move the order back to DRAFT so it no longer contributes to the
+          // "loading" deduction in stock availability calculations.
+          await tx
+            .update(customerOrders)
+            .set({ status: "DRAFT", updatedAt: new Date() })
+            .where(eq(customerOrders.id, order.id));
+        }
+
+        // Remove attached documents first (FK constraint), then the row itself.
+        await tx
+          .delete(factoryShippingContainerDocuments)
+          .where(eq(factoryShippingContainerDocuments.scrId, id));
+
+        await tx
+          .delete(factoryShippingContainerRows)
+          .where(eq(factoryShippingContainerRows.id, id));
+      });
 
       res.json({ ok: true });
     } catch (error: any) {
       console.error("Error deleting shipping container row:", error);
-      res.status(400).json({ message: error.message });
+      res.status(error.message === "Row not found" ? 404 : 400).json({ message: error.message });
     }
   });
 
