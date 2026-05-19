@@ -609,23 +609,18 @@ export default function GroundScan() {
           </span>
         </div>
         {scannedBales.length > 0 && (() => {
-          const articleGroups = new Map<string, { qty: number; weight: number }>();
+          const articleGroups = new Map<string, number>();
           for (const b of scannedBales) {
             const key = b.articleCode || "—";
-            const g = articleGroups.get(key) ?? { qty: 0, weight: 0 };
-            g.qty++;
-            g.weight += b.weightKg;
-            articleGroups.set(key, g);
+            articleGroups.set(key, (articleGroups.get(key) ?? 0) + 1);
           }
+          const sorted = [...articleGroups.entries()].sort((a, b) => b[1] - a[1]);
           return (
-            <div className="flex flex-wrap gap-2" data-testid="div-ground-scan-article-summary">
-              {[...articleGroups.entries()].map(([code, g]) => (
-                <div key={code} className="flex items-center gap-1.5 text-xs bg-muted/50 rounded-md px-2 py-1">
+            <div className="grid gap-x-6 gap-y-0.5 text-xs" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }} data-testid="div-ground-scan-article-summary">
+              {sorted.map(([code, qty]) => (
+                <div key={code} className="flex items-center justify-between py-0.5 border-b border-border/40">
                   <span className="font-mono font-semibold text-foreground">{code}</span>
-                  <span className="text-muted-foreground">·</span>
-                  <span className="text-foreground">{g.qty} bale{g.qty !== 1 ? "s" : ""}</span>
-                  <span className="text-muted-foreground">·</span>
-                  <span className="text-foreground">{formatNumber(g.weight, 2)} kg</span>
+                  <span className="text-muted-foreground tabular-nums">{qty} bale{qty !== 1 ? "s" : ""}</span>
                 </div>
               ))}
             </div>
