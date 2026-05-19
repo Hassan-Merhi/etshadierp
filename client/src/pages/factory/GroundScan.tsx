@@ -16,11 +16,14 @@ interface ScannedBale {
   productName: string;
   weightKg: number;
   status: string;
+  isInLoadingOrder?: boolean;
   scannedAt: Date;
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, isInLoadingOrder }: { status: string; isInLoadingOrder?: boolean }) {
   const s = (status || "").toUpperCase();
+  if ((s === "IN_STOCK" || s === "LOADING" || s === "LOADED") && isInLoadingOrder)
+    return <Badge className="bg-amber-500 text-white border-0">Loading</Badge>;
   if (s === "IN_STOCK") return <Badge className="bg-green-600 text-white border-0">In Stock</Badge>;
   if (s === "LOADING" || s === "LOADED") return <Badge className="bg-amber-500 text-white border-0">Loading</Badge>;
   if (s === "SOLD") return <Badge className="bg-red-600 text-white border-0">Sold</Badge>;
@@ -102,6 +105,7 @@ export default function GroundScan() {
 
       const weightKg = parseFloat(baleInfo?.weightKg || labelPrint?.approxWeightKg || "0");
       const status = baleInfo?.status || "";
+      const isInLoadingOrder = baleInfo?.isInLoadingOrder === true;
 
       const entry: ScannedBale = {
         refCode: value,
@@ -109,6 +113,7 @@ export default function GroundScan() {
         productName,
         weightKg,
         status,
+        isInLoadingOrder,
         scannedAt: new Date(),
       };
 
@@ -357,7 +362,7 @@ export default function GroundScan() {
                     {formatNumber(bale.weightKg, 2)}
                   </TableCell>
                   <TableCell data-testid={`text-ground-scan-status-${bale.refCode}`}>
-                    <StatusBadge status={bale.status} />
+                    <StatusBadge status={bale.status} isInLoadingOrder={bale.isInLoadingOrder} />
                   </TableCell>
                   <TableCell>
                     <Button

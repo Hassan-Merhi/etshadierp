@@ -939,6 +939,24 @@ export function registerBaleRoutes(app: Express) {
           if (wk) directWorkerName = wk.fullName;
         }
 
+        // Check if this bale is in an active LOADING order
+        const [directOrderBale] = await db
+          .select({ orderId: customerOrderBales.orderId })
+          .from(customerOrderBales)
+          .where(eq(customerOrderBales.baleReference, referenceNumber))
+          .limit(1);
+        let directLoadedOnOrder: any = null;
+        let directIsInLoadingOrder = false;
+        if (directOrderBale) {
+          const [directOrder] = await db
+            .select({ status: customerOrders.status })
+            .from(customerOrders)
+            .where(eq(customerOrders.id, directOrderBale.orderId))
+            .limit(1);
+          if (directOrder?.status === "LOADING") directIsInLoadingOrder = true;
+          directLoadedOnOrder = directOrder || null;
+        }
+
         return res.json({
           labelPrint: null,
           product: product || null,
@@ -947,6 +965,7 @@ export function registerBaleRoutes(app: Express) {
             baleCode: directBale.baleCode,
             productName: directBale.productName,
             status: directBale.status,
+            isInLoadingOrder: directIsInLoadingOrder,
             weightKg: directBale.weightKg,
             costPerKg: directBale.costPerKg,
             totalCost: directBale.totalCost,
@@ -960,7 +979,7 @@ export function registerBaleRoutes(app: Express) {
           pressingBatch: null,
           mixBatch: null,
           containers_used: [],
-          loadedOnOrder: null,
+          loadedOnOrder: directLoadedOnOrder,
         });
       }
 
@@ -1142,6 +1161,11 @@ export function registerBaleRoutes(app: Express) {
             scannedBy: orderBaleRow.scannedBy || null,
           };
         }
+      }
+
+      // Mark isInLoadingOrder on baleInfo so callers (e.g. Ground Scan) can show the right status
+      if (baleInfo && loadedOnOrder?.status === "LOADING") {
+        baleInfo.isInLoadingOrder = true;
       }
 
       res.json({
