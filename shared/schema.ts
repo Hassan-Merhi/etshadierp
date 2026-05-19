@@ -5575,9 +5575,10 @@ export type SpOffloadCharge = typeof spOffloadCharges.$inferSelect;
 export const spStockMovements = pgTable("sp_stock_movements", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  containerId: integer("container_id").notNull(),
-  offloadId: integer("offload_id").notNull(),
-  containerLineId: integer("container_line_id").notNull(),
+  containerId: integer("container_id"),
+  offloadId: integer("offload_id"),
+  containerLineId: integer("container_line_id"),
+  sourceType: varchar("source_type", { length: 20 }).default("offload"),
   articleCode: varchar("article_code", { length: 100 }).notNull(),
   description: text("description"),
   stockItemId: integer("stock_item_id"),

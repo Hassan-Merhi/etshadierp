@@ -3197,6 +3197,12 @@ let migrationsDone = false;
     `CREATE INDEX IF NOT EXISTS sp_stock_movements_company_idx ON sp_stock_movements (company_id)`,
     `CREATE INDEX IF NOT EXISTS sp_stock_movements_container_idx ON sp_stock_movements (container_id)`,
 
+    // Phase 2: make FK columns nullable (opening stock has no container/offload)
+    `ALTER TABLE sp_stock_movements ALTER COLUMN container_id DROP NOT NULL`,
+    `ALTER TABLE sp_stock_movements ALTER COLUMN offload_id DROP NOT NULL`,
+    `ALTER TABLE sp_stock_movements ALTER COLUMN container_line_id DROP NOT NULL`,
+    `ALTER TABLE sp_stock_movements ADD COLUMN IF NOT EXISTS source_type VARCHAR(20) DEFAULT 'offload'`,
+
     `CREATE TABLE IF NOT EXISTS sp_sales (
       id SERIAL PRIMARY KEY,
       company_id INTEGER NOT NULL,

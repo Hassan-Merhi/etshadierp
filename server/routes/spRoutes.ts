@@ -6,6 +6,7 @@ import {
   ledgerAccounts, vouchers, voucherEntries, locations, bankAccounts,
   spContainers, spContainerLines, spPrepaidCharges, spOffloads,
   spOffloadCharges, spStockMovements, spSales, spSaleLines, spProfitSplits,
+  stockItemCodeAliases, stockItems,
 } from "@shared/schema";
 import { adjustInventory } from "../inventoryHelper";
 import { getClientDate } from "../lib/dateUtils";
@@ -62,6 +63,7 @@ const SP_ACCOUNTS = [
   { code: "SP-SALES",   name: "Sales",                         accountType: "Income",         subType: "sp_sales",          isHidden: false },
   { code: "SP-COGS",    name: "Cost of Goods Sold",            accountType: "Direct Expense", subType: "sp_cogs",           isHidden: false },
   { code: "SP-SHARED",  name: "Shared Charges",                accountType: "Direct Expense", subType: "sp_shared_charges", isHidden: false },
+  { code: "SP-OPNBAL",  name: "Opening Balance Clearing",      accountType: "Equity",         subType: "sp_opnbal",         isHidden: true  },
 ];
 
 // ── Route Registration ────────────────────────────────────────────────────────
@@ -725,7 +727,7 @@ export function registerSpRoutes(app: Express) {
 
       const { saleDate, customerName, saleLines, bankAccountId, notes } = req.body;
 
-      if (!saleDate || !customerName || !saleLines || saleLines.length === 0) {
+      if (!saleDate || !customerName || !Array.isArray(saleLines) || saleLines.length === 0) {
         return res.status(400).json({ message: "saleDate, customerName, saleLines required" });
       }
 
@@ -736,7 +738,7 @@ export function registerSpRoutes(app: Express) {
       const payableAcct = await getSpAccount(companyId, "sp_payable");
 
       if (!salesAcct || !cogsAcct || !stockAcct || !costClrAcct || !payableAcct) {
-        return res.status(400).json({ message: "SP accounts not configured" });
+        return res.status(400).json({ message: "SP accounts not configured. Run Setup first." });
       }
 
       const result = await db.transaction(async (tx) => {
@@ -746,172 +748,173 @@ export function registerSpRoutes(app: Express) {
         const postedLines: any[] = [];
 
         for (const sl of saleLines) {
-          const movementId = parseInt(sl.movementId);
-          const qtySold    = parseNum(sl.qtySold);
-          const salePrice  = parseNum(sl.salePricePerUnit);
-
+          const qtySold   = parseNum(sl.qtySold);
+          const salePrice = parseNum(sl.salePricePerUnit);
           if (qtySold <= 0) continue;
 
-          // Lock and read the movement
-          const mvRows = await tx.execute(
-            sql`SELECT * FROM sp_stock_movements WHERE id = ${movementId} AND company_id = ${companyId} FOR UPDATE`
-          );
-          const mv = (mvRows as any).rows?.[0] ?? (mvRows as any)[0];
-          if (!mv) throw new Error(`Stock movement #${movementId} not found`);
+          const articleCode = sl.articleCode ? String(sl.articleCode).trim() : null;
+          let stockItemId   = sl.stockItemId ? parseInt(sl.stockItemId) : null;
 
-          const qtyRemaining = parseNum(mv.qty_remaining);
-          if (qtySold > qtyRemaining) {
-            throw new Error(`Insufficient stock in movement #${movementId}: have ${qtyRemaining}, selling ${qtySold}`);
+          if (!articleCode && !stockItemId) throw new Error("Each sale line needs articleCode or stockItemId");
+
+          // ── Alias resolution: articleCode → stockItemId ───────────────────
+          if (!stockItemId && articleCode) {
+            const aliasRows = await db
+              .select()
+              .from(stockItemCodeAliases)
+              .where(and(eq(stockItemCodeAliases.companyId, companyId), eq(stockItemCodeAliases.aliasCode, articleCode)));
+            if (aliasRows.length > 0) stockItemId = aliasRows[0].stockItemId;
           }
 
-          const baseUnitCost   = parseNum(mv.base_unit_cost_usd);
-          const landedUnitCost = parseNum(mv.landed_unit_cost_usd);
-          const finalUnitCost  = parseNum(mv.final_unit_cost_usd);
+          // ── FIFO lot selection (server-side) ──────────────────────────────
+          let lotsQuery: any;
+          if (stockItemId) {
+            lotsQuery = await tx.execute(
+              sql`SELECT * FROM sp_stock_movements
+                  WHERE company_id = ${companyId} AND stock_item_id = ${stockItemId} AND qty_remaining > 0
+                  ORDER BY created_at ASC, id ASC FOR UPDATE`
+            );
+          } else {
+            lotsQuery = await tx.execute(
+              sql`SELECT * FROM sp_stock_movements
+                  WHERE company_id = ${companyId} AND article_code = ${articleCode} AND qty_remaining > 0
+                  ORDER BY created_at ASC, id ASC FOR UPDATE`
+            );
+          }
 
-          const saleTotal = qtySold * salePrice;
-          const baseTotal = qtySold * baseUnitCost;
-          const finalTotal = qtySold * finalUnitCost;
+          const lots = (lotsQuery as any).rows ?? (lotsQuery as any);
+          const totalAvail = lots.reduce((s: number, l: any) => s + parseNum(l.qty_remaining), 0);
+          if (qtySold > totalAvail + 0.0001) {
+            throw new Error(
+              `Insufficient stock for ${articleCode || `item #${stockItemId}`}: available ${totalAvail.toFixed(4)}, requested ${qtySold}`
+            );
+          }
 
-          totalSalePrice += saleTotal;
-          totalBaseCost  += baseTotal;
-          totalFinalCost += finalTotal;
+          let qtyLeft = qtySold;
+          for (const lot of lots) {
+            if (qtyLeft <= 0.0001) break;
+            const qtyFromLot    = Math.min(qtyLeft, parseNum(lot.qty_remaining));
+            qtyLeft            -= qtyFromLot;
+            const baseUC        = parseNum(lot.base_unit_cost_usd);
+            const landedUC      = parseNum(lot.landed_unit_cost_usd);
+            const finalUC       = parseNum(lot.final_unit_cost_usd);
+            const saleTotal     = qtyFromLot * salePrice;
+            const baseTotal     = qtyFromLot * baseUC;
+            const finalTotal    = qtyFromLot * finalUC;
 
-          // Deduct from stock movement
-          await tx.execute(
-            sql`UPDATE sp_stock_movements SET qty_remaining = ${String(qtyRemaining - qtySold)} WHERE id = ${movementId}`
-          );
+            totalSalePrice += saleTotal;
+            totalBaseCost  += baseTotal;
+            totalFinalCost += finalTotal;
 
-          // Deduct from inventory if linked
-          if (mv.stock_item_id && mv.location_id) {
-            try {
-              await adjustInventory(tx, parseInt(mv.location_id), parseInt(mv.stock_item_id), -qtySold, companyId);
-            } catch {
-              // Non-blocking
+            await tx.execute(
+              sql`UPDATE sp_stock_movements SET qty_remaining = ${String(parseNum(lot.qty_remaining) - qtyFromLot)} WHERE id = ${lot.id}`
+            );
+
+            if (lot.stock_item_id && lot.location_id) {
+              try {
+                await adjustInventory(tx, parseInt(lot.location_id), parseInt(lot.stock_item_id), -qtyFromLot, companyId);
+              } catch { /* non-blocking */ }
             }
-          }
 
-          postedLines.push({
-            movementId,
-            articleCode: mv.article_code,
-            description: mv.description,
-            stockItemId: mv.stock_item_id || null,
-            qtySold,
-            salePricePerUnit: salePrice,
-            baseUnitCostUsd: baseUnitCost,
-            landedUnitCostUsd: landedUnitCost,
-            finalUnitCostUsd: finalUnitCost,
-            saleTotal,
-            baseTotal,
-            finalTotal,
-          });
+            postedLines.push({
+              movementId:       lot.id,
+              articleCode:      lot.article_code,
+              description:      lot.description || null,
+              stockItemId:      lot.stock_item_id || null,
+              qtySold:          qtyFromLot,
+              salePricePerUnit: salePrice,
+              baseUnitCostUsd:  baseUC,
+              landedUnitCostUsd: landedUC,
+              finalUnitCostUsd: finalUC,
+              saleTotal,
+              baseTotal,
+              finalTotal,
+            });
+          }
         }
 
         if (postedLines.length === 0) throw new Error("No valid sale lines");
 
         const grossProfit = totalSalePrice - totalFinalCost;
 
-        // ── Voucher A: Revenue ────────────────────────────────────────────────
         const [sale] = await tx.insert(spSales).values({
           companyId,
           saleDate,
           customerName,
           totalSalePriceUsd: String(totalSalePrice),
-          totalBaseCostUsd: String(totalBaseCost),
+          totalBaseCostUsd:  String(totalBaseCost),
           totalFinalCostUsd: String(totalFinalCost),
-          grossProfitUsd: String(grossProfit),
+          grossProfitUsd:    String(grossProfit),
           status: "posted",
           notes: notes || null,
         }).returning();
 
         const voucherNum = `SP-SALE-${sale.id}-${Date.now()}`;
-
         const [voucher] = await tx.insert(vouchers).values({
           companyId,
-          voucherType: "Journal",
+          voucherType:  "Journal",
           voucherNumber: voucherNum,
-          voucherDate: saleDate,
-          description: `Sale — ${customerName}`,
-          totalAmount: String(totalSalePrice),
-          currency: "USD",
+          voucherDate:  saleDate,
+          description:  `Sale — ${customerName}`,
+          totalAmount:  String(totalSalePrice),
+          currency:     "USD",
           exchangeRate: "1",
           sourceModule: "SP",
         }).returning();
 
-        // Dr Cash/Bank (or leave debit side open for now; use bank if provided)
         if (bankAccountId) {
           await tx.insert(voucherEntries).values({
             voucherId: voucher.id,
             bankAccountId: parseInt(bankAccountId),
-            debitAmount: String(totalSalePrice),
+            debitAmount:  String(totalSalePrice),
             creditAmount: "0",
             narration: `Sale receipts — ${customerName}`,
           });
         }
 
-        // Cr Sales
         await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: salesAcct.id,
-          debitAmount: "0",
-          creditAmount: String(totalSalePrice),
+          voucherId: voucher.id, ledgerAccountId: salesAcct.id,
+          debitAmount: "0", creditAmount: String(totalSalePrice),
           narration: `Sales — ${customerName}`,
         });
-
-        // ── Voucher B: COGS (Dr COGS / Cr Stock) ─────────────────────────────
         await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: cogsAcct.id,
-          debitAmount: String(totalFinalCost),
-          creditAmount: "0",
+          voucherId: voucher.id, ledgerAccountId: cogsAcct.id,
+          debitAmount: String(totalFinalCost), creditAmount: "0",
           narration: `COGS — ${customerName}`,
         });
-
         await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: stockAcct.id,
-          debitAmount: "0",
-          creditAmount: String(totalFinalCost),
+          voucherId: voucher.id, ledgerAccountId: stockAcct.id,
+          debitAmount: "0", creditAmount: String(totalFinalCost),
           narration: `Stock reduction — ${customerName}`,
         });
-
-        // ── Voucher C: Transfer base cost → Supplier Cash Payable ─────────────
         await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: costClrAcct.id,
-          debitAmount: String(totalBaseCost),
-          creditAmount: "0",
+          voucherId: voucher.id, ledgerAccountId: costClrAcct.id,
+          debitAmount: String(totalBaseCost), creditAmount: "0",
           narration: `Cost clearing — base cost to payable — ${customerName}`,
         });
-
         await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: payableAcct.id,
-          debitAmount: "0",
-          creditAmount: String(totalBaseCost),
+          voucherId: voucher.id, ledgerAccountId: payableAcct.id,
+          debitAmount: "0", creditAmount: String(totalBaseCost),
           narration: `Supplier Cash Payable — ${customerName}`,
         });
 
-        // ── Sale lines ────────────────────────────────────────────────────────
         await tx.insert(spSaleLines).values(
           postedLines.map((pl: any) => ({
-            saleId: sale.id,
+            saleId:           sale.id,
             companyId,
-            movementId: pl.movementId,
-            articleCode: pl.articleCode,
-            description: pl.description || null,
-            stockItemId: pl.stockItemId || null,
-            qtySold: String(pl.qtySold),
+            movementId:       pl.movementId,
+            articleCode:      pl.articleCode,
+            description:      pl.description || null,
+            stockItemId:      pl.stockItemId || null,
+            qtySold:          String(pl.qtySold),
             salePricePerUnit: String(pl.salePricePerUnit),
-            baseUnitCostUsd: String(pl.baseUnitCostUsd),
+            baseUnitCostUsd:  String(pl.baseUnitCostUsd),
             landedUnitCostUsd: String(pl.landedUnitCostUsd),
             finalUnitCostUsd: String(pl.finalUnitCostUsd),
           }))
         );
 
-        await tx.update(spSales)
-          .set({ voucherId: voucher.id })
-          .where(eq(spSales.id, sale.id));
-
+        await tx.update(spSales).set({ voucherId: voucher.id }).where(eq(spSales.id, sale.id));
         return { ...sale, voucherId: voucher.id, lines: postedLines };
       });
 
@@ -952,6 +955,173 @@ export function registerSpRoutes(app: Express) {
         .orderBy(asc(spStockMovements.createdAt));
 
       res.json(movements);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Opening Stock ─────────────────────────────────────────────────────────
+
+  app.get("/api/sp/opening-stock", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = await requireSpCompany(req, res);
+      if (!companyId) return;
+      const rows = await db.execute(
+        sql`SELECT * FROM sp_stock_movements WHERE company_id = ${companyId} AND source_type = 'opening' ORDER BY created_at DESC`
+      );
+      res.json((rows as any).rows ?? (rows as any));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/sp/opening-stock", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = await requireSpCompany(req, res);
+      if (!companyId) return;
+
+      const { articleCode, stockItemId, qty, baseUnitCostUsd, landedUnitCostUsd, finalUnitCostUsd, locationId, notes } = req.body;
+
+      if (!articleCode) return res.status(400).json({ message: "articleCode required" });
+      const qtyNum  = parseNum(qty);
+      if (qtyNum <= 0) return res.status(400).json({ message: "qty must be > 0" });
+      const baseUC  = parseNum(baseUnitCostUsd);
+      const landUC  = parseNum(landedUnitCostUsd);
+      const finalUC = parseNum(finalUnitCostUsd);
+      if (finalUC <= 0) return res.status(400).json({ message: "finalUnitCostUsd must be > 0" });
+
+      const stockAcct   = await getSpAccount(companyId, "sp_stock");
+      const costClrAcct = await getSpAccount(companyId, "sp_cost_clearing");
+      const opnBalAcct  = await getSpAccount(companyId, "sp_opnbal");
+      if (!stockAcct || !costClrAcct || !opnBalAcct) {
+        return res.status(400).json({ message: "SP accounts not configured. Run Setup first." });
+      }
+
+      let locId: number | null = locationId ? parseInt(locationId) : null;
+      if (!locId) {
+        const locs = await db.select().from(locations).where(and(eq(locations.companyId, companyId), isNull(locations.deletedAt)));
+        if (locs.length > 0) locId = locs[0].id;
+      }
+
+      const finalTotal = qtyNum * finalUC;
+      const baseTotal  = qtyNum * baseUC;
+      const landTotal  = qtyNum * landUC;
+
+      const result = await db.transaction(async (tx) => {
+        const [movement] = await tx.insert(spStockMovements).values({
+          companyId,
+          sourceType:       "opening",
+          articleCode,
+          description:      notes || null,
+          stockItemId:      stockItemId ? parseInt(stockItemId) : null,
+          locationId:       locId,
+          qtyIn:            String(qtyNum),
+          qtyRemaining:     String(qtyNum),
+          baseUnitCostUsd:  String(baseUC),
+          landedUnitCostUsd: String(landUC),
+          finalUnitCostUsd: String(finalUC),
+        }).returning();
+
+        if (stockItemId && locId) {
+          try { await adjustInventory(tx, locId, parseInt(stockItemId), qtyNum, companyId); } catch { /* non-blocking */ }
+        }
+
+        const [voucher] = await tx.insert(vouchers).values({
+          companyId,
+          voucherType:  "Journal",
+          voucherNumber: `SP-OPNSTK-${movement.id}-${Date.now()}`,
+          voucherDate:  new Date().toISOString().slice(0, 10),
+          description:  `Opening stock — ${articleCode} (${qtyNum} units)`,
+          totalAmount:  String(finalTotal),
+          currency:     "USD",
+          exchangeRate: "1",
+          sourceModule: "SP",
+        }).returning();
+
+        // Dr SP-STOCK = finalTotal
+        await tx.insert(voucherEntries).values({
+          voucherId: voucher.id, ledgerAccountId: stockAcct.id,
+          debitAmount: String(finalTotal), creditAmount: "0",
+          narration: `Opening stock — ${articleCode} — ${qtyNum} units @ $${finalUC} (final)`,
+        });
+        // Cr SP-COSTCLR = baseTotal (cleared to supplier payable when sold)
+        await tx.insert(voucherEntries).values({
+          voucherId: voucher.id, ledgerAccountId: costClrAcct.id,
+          debitAmount: "0", creditAmount: String(baseTotal),
+          narration: `Opening stock base cost clearing — ${articleCode}`,
+        });
+        // Cr SP-OPNBAL = landTotal (opening equity source for landed portion)
+        if (landTotal > 0.00001) {
+          await tx.insert(voucherEntries).values({
+            voucherId: voucher.id, ledgerAccountId: opnBalAcct.id,
+            debitAmount: "0", creditAmount: String(landTotal),
+            narration: `Opening stock landed clearing — ${articleCode}`,
+          });
+        } else if (Math.abs(finalTotal - baseTotal) > 0.00001) {
+          // finalUC was set manually different from base+landed=0, route difference to opnbal
+          const diff = finalTotal - baseTotal;
+          await tx.insert(voucherEntries).values({
+            voucherId: voucher.id, ledgerAccountId: opnBalAcct.id,
+            debitAmount: diff < 0 ? String(Math.abs(diff)) : "0",
+            creditAmount: diff >= 0 ? String(diff) : "0",
+            narration: `Opening stock cost adjustment — ${articleCode}`,
+          });
+        }
+
+        return { movement, voucherId: voucher.id };
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Aliases (article code → stock item mapping) ───────────────────────────
+
+  app.get("/api/sp/aliases", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = await requireSpCompany(req, res);
+      if (!companyId) return;
+      const rows = await db.execute(sql`
+        SELECT a.id, a.alias_code, a.description, a.stock_item_id,
+               si.name AS stock_item_name, si.code AS stock_item_code
+        FROM stock_item_code_aliases a
+        LEFT JOIN stock_items si ON a.stock_item_id = si.id
+        WHERE a.company_id = ${companyId}
+        ORDER BY a.alias_code ASC
+      `);
+      res.json((rows as any).rows ?? (rows as any));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/sp/aliases", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = await requireSpCompany(req, res);
+      if (!companyId) return;
+      const { aliasCode, stockItemId, description } = req.body;
+      if (!aliasCode || !stockItemId) return res.status(400).json({ message: "aliasCode and stockItemId required" });
+      const [row] = await db.insert(stockItemCodeAliases).values({
+        companyId,
+        stockItemId: parseInt(stockItemId),
+        aliasCode: String(aliasCode).trim(),
+        description: description || null,
+      }).returning();
+      res.json(row);
+    } catch (error: any) {
+      if (error.code === "23505") return res.status(400).json({ message: "Alias code already exists for this company" });
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/sp/aliases/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = await requireSpCompany(req, res);
+      if (!companyId) return;
+      await db.execute(sql`DELETE FROM stock_item_code_aliases WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId}`);
+      res.json({ ok: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1100,6 +1270,97 @@ export function registerSpRoutes(app: Express) {
       }));
 
       res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Sales Detail Report ───────────────────────────────────────────────────
+
+  app.get("/api/sp/report/sales-detail", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = await requireSpCompany(req, res);
+      if (!companyId) return;
+
+      const { startDate, endDate } = req.query;
+      const dateFilter = `
+        ${startDate ? `AND s.sale_date >= '${startDate}'` : ""}
+        ${endDate   ? `AND s.sale_date <= '${endDate}'`   : ""}
+      `;
+
+      // Per-article sales aggregation
+      const salesRows = await db.execute(sql`
+        SELECT
+          sl.article_code,
+          MAX(sl.description) AS description,
+          SUM(CAST(sl.qty_sold AS DECIMAL))                                          AS sold_qty,
+          SUM(CAST(sl.qty_sold AS DECIMAL) * CAST(sl.sale_price_per_unit AS DECIMAL)) AS sales_total,
+          SUM(CAST(sl.qty_sold AS DECIMAL) * CAST(sl.final_unit_cost_usd AS DECIMAL)) AS total_final_cost,
+          SUM(CAST(sl.qty_sold AS DECIMAL) * CAST(sl.base_unit_cost_usd AS DECIMAL))  AS base_payable,
+          AVG(CAST(sl.final_unit_cost_usd AS DECIMAL))                               AS avg_final_cost,
+          AVG(CAST(sl.sale_price_per_unit AS DECIMAL))                               AS avg_sale_price
+        FROM sp_sale_lines sl
+        JOIN sp_sales s ON sl.sale_id = s.id
+        WHERE sl.company_id = ${companyId} AND s.status = 'posted'
+        ${sql.raw(dateFilter)}
+        GROUP BY sl.article_code
+        ORDER BY sl.article_code ASC
+      `);
+
+      // Current stock remaining per article
+      const stockRows = await db.execute(sql`
+        SELECT article_code,
+               SUM(CAST(qty_in AS DECIMAL))        AS total_qty_in,
+               SUM(CAST(qty_remaining AS DECIMAL))  AS qty_remaining
+        FROM sp_stock_movements
+        WHERE company_id = ${companyId}
+        GROUP BY article_code
+      `);
+
+      // Total supplier payments (debit on SP-PAY = payment made)
+      const payableAcct = await getSpAccount(companyId, "sp_payable");
+      let paymentsTotal = 0;
+      let payableBalance = 0;
+      if (payableAcct) {
+        const payRows = await db.execute(sql`
+          SELECT COALESCE(SUM(CAST(debit_amount AS DECIMAL)), 0)  AS total_payments,
+                 COALESCE(SUM(CAST(credit_amount AS DECIMAL)), 0) AS total_credits
+          FROM voucher_entries ve
+          JOIN vouchers v ON ve.voucher_id = v.id
+          WHERE ve.ledger_account_id = ${payableAcct.id} AND v.company_id = ${companyId}
+        `);
+        const pr = ((payRows as any).rows ?? payRows)[0];
+        paymentsTotal  = parseNum(pr?.total_payments);
+        payableBalance = parseNum(pr?.total_credits) - paymentsTotal;
+      }
+
+      const salesArr  = (salesRows  as any).rows ?? (salesRows  as any);
+      const stockArr  = (stockRows  as any).rows ?? (stockRows  as any);
+      const stockMap  = new Map<string, any>();
+      for (const s of stockArr) stockMap.set(s.article_code, s);
+
+      const rows = salesArr.map((r: any) => {
+        const stk = stockMap.get(r.article_code) || {};
+        const soldQty    = parseNum(r.sold_qty);
+        const salesTotal = parseNum(r.sales_total);
+        const finalCost  = parseNum(r.total_final_cost);
+        const basePay    = parseNum(r.base_payable);
+        return {
+          articleCode:      r.article_code,
+          description:      r.description,
+          totalQtyIn:       parseNum(stk.total_qty_in),
+          currentQtyRemaining: parseNum(stk.qty_remaining),
+          soldQty,
+          salesTotal,
+          avgSalePrice:     parseNum(r.avg_sale_price),
+          totalFinalCost:   finalCost,
+          avgFinalCost:     parseNum(r.avg_final_cost),
+          grossProfit:      salesTotal - finalCost,
+          basePayable:      basePay,
+        };
+      });
+
+      res.json({ rows, paymentsTotal, remainingPayable: payableBalance });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

@@ -12,7 +12,12 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Loader2, Plus, Trash2, Package, ChevronRight } from "lucide-react";
+import { Loader2, Plus, Trash2, Package, ChevronRight, ClipboardPaste } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 const lineSchema = z.object({
   articleCode: z.string().min(1, "Required"),
@@ -62,6 +67,25 @@ export default function SpContainers() {
   });
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "lines" });
+
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+
+  function parsePasteLines() {
+    const parsed = pasteText.trim().split("\n").map(row => {
+      const cols = row.split(/[\t,]/).map(c => c.trim());
+      return {
+        articleCode: cols[0] ?? "",
+        description: cols[1] ?? "",
+        qty: cols[2] ?? "",
+        unitRateUsd: cols[3] ?? "",
+      };
+    }).filter(l => l.articleCode);
+    if (parsed.length === 0) return;
+    parsed.forEach(l => append(l));
+    setPasteText("");
+    setPasteOpen(false);
+  }
 
   const createMutation = useMutation({
     mutationFn: (data: ContainerForm) => apiRequest("POST", "/api/sp/containers", data),
@@ -193,9 +217,14 @@ export default function SpContainers() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Line Items</span>
-                  <Button type="button" variant="outline" size="sm" onClick={() => append({ articleCode: "", description: "", qty: "", unitRateUsd: "" })} data-testid="button-sp-add-line">
-                    <Plus className="h-3.5 w-3.5 mr-1" /> Add Line
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setPasteOpen(true)} data-testid="button-sp-paste-lines">
+                      <ClipboardPaste className="h-3.5 w-3.5 mr-1" /> Paste Lines
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => append({ articleCode: "", description: "", qty: "", unitRateUsd: "" })} data-testid="button-sp-add-line">
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Add Line
+                    </Button>
+                  </div>
                 </div>
                 {fields.map((field, idx) => (
                   <div key={field.id} className="grid grid-cols-12 gap-1.5 items-end border border-border rounded-md p-2">
@@ -246,6 +275,32 @@ export default function SpContainers() {
                   <p className="text-xs text-destructive">{form.formState.errors.lines.root.message}</p>
                 )}
               </div>
+
+              <Dialog open={pasteOpen} onOpenChange={setPasteOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Paste Lines</DialogTitle>
+                    <DialogDescription>
+                      Paste tab-separated or comma-separated data. Format per row:
+                      <br /><strong>ArticleCode, Description, Qty, UnitRate</strong>
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Textarea
+                    rows={8}
+                    className="font-mono text-xs"
+                    placeholder={"RICE-25KG\tPremium Rice 25kg bag\t100\t12.50\nWHEAT-50KG\tWheat flour 50kg\t60\t18.00"}
+                    value={pasteText}
+                    onChange={e => setPasteText(e.target.value)}
+                    data-testid="textarea-sp-paste"
+                  />
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setPasteOpen(false)}>Cancel</Button>
+                    <Button onClick={parsePasteLines} disabled={!pasteText.trim()} data-testid="button-sp-paste-confirm">
+                      Import Lines
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>Cancel</Button>

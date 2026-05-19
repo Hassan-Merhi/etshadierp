@@ -6,11 +6,28 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, BarChart3, Package2, CreditCard, CheckCircle2 } from "lucide-react";
+import { Loader2, BarChart3, Package2, CreditCard, CheckCircle2, TableProperties, Download } from "lucide-react";
 
-function fmt(v: any) {
+function fmt(v: any, dec = 2) {
   const n = parseFloat(String(v ?? "0"));
-  return isNaN(n) ? "$0.00" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return isNaN(n) ? `$0.${"0".repeat(dec)}` : `$${n.toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec })}`;
+}
+
+function downloadCsv(rows: any[], filename: string) {
+  if (!rows.length) return;
+  const headers = Object.keys(rows[0]);
+  const lines = [
+    headers.join(","),
+    ...rows.map(r => headers.map(h => {
+      const v = r[h] ?? "";
+      return typeof v === "string" && v.includes(",") ? `"${v}"` : v;
+    }).join(",")),
+  ];
+  const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function SpReports() {
@@ -20,16 +37,20 @@ export default function SpReports() {
   const [endDate, setEndDate] = useState("");
   const [splitPeriod, setSplitPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [customSplitPct, setCustomSplitPct] = useState("50");
+  const [detailStart, setDetailStart] = useState("");
+  const [detailEnd, setDetailEnd] = useState("");
 
   const payableUrl = "/api/sp/report/payable";
   const profitUrl = `/api/sp/report/profit${startDate || endDate ? `?${new URLSearchParams({ ...(startDate && { startDate }), ...(endDate && { endDate }) })}` : ""}`;
   const stockUrl = "/api/sp/report/stock";
   const splitsUrl = "/api/sp/profit-splits";
+  const detailUrl = `/api/sp/report/sales-detail${detailStart || detailEnd ? `?${new URLSearchParams({ ...(detailStart && { startDate: detailStart }), ...(detailEnd && { endDate: detailEnd }) })}` : ""}`;
 
   const { data: payable, isLoading: payableLoading } = useQuery<any>({ queryKey: [payableUrl] });
   const { data: profit, isLoading: profitLoading } = useQuery<any>({ queryKey: [profitUrl] });
   const { data: stock, isLoading: stockLoading } = useQuery<any[]>({ queryKey: [stockUrl] });
   const { data: splits = [], isLoading: splitsLoading } = useQuery<any[]>({ queryKey: [splitsUrl] });
+  const { data: detail, isLoading: detailLoading } = useQuery<any>({ queryKey: [detailUrl] });
 
   const finalizeMutation = useMutation({
     mutationFn: (body: any) => apiRequest("POST", "/api/sp/profit-splits", body),
@@ -51,20 +72,41 @@ export default function SpReports() {
     });
   };
 
+  const handleDetailCsv = () => {
+    if (!detail?.rows?.length) return;
+    const rows = detail.rows.map((r: any) => ({
+      Article: r.articleCode,
+      Description: r.description || "",
+      "Total Qty In": r.totalQtyIn,
+      "Current Remaining": r.currentQtyRemaining,
+      "Sold Qty": r.soldQty,
+      "Sales Total $": r.salesTotal,
+      "Avg Sale Price": r.avgSalePrice,
+      "Unit Final Cost": r.avgFinalCost,
+      "Total COGS $": r.totalFinalCost,
+      "Gross Profit $": r.grossProfit,
+      "Base Payable Generated $": r.basePayable,
+    }));
+    downloadCsv(rows, `sp-sales-detail-${detailStart || "all"}-${detailEnd || "all"}.csv`);
+  };
+
   return (
-    <div className="space-y-4 max-w-3xl">
+    <div className="space-y-4 max-w-4xl">
       <div>
         <h1 className="text-xl font-semibold">Reports</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Payable statement, P&L, and stock inventory</p>
+        <p className="text-sm text-muted-foreground mt-0.5">Payable statement, P&L, stock inventory, and sales detail</p>
       </div>
 
       <Tabs defaultValue="payable">
-        <TabsList data-testid="tabs-sp-reports">
+        <TabsList data-testid="tabs-sp-reports" className="flex-wrap gap-1">
           <TabsTrigger value="payable" data-testid="tab-sp-payable">
             <CreditCard className="h-3.5 w-3.5 mr-1.5" /> Supplier Payable
           </TabsTrigger>
           <TabsTrigger value="profit" data-testid="tab-sp-profit">
             <BarChart3 className="h-3.5 w-3.5 mr-1.5" /> Profit & Loss
+          </TabsTrigger>
+          <TabsTrigger value="sales-detail" data-testid="tab-sp-sales-detail">
+            <TableProperties className="h-3.5 w-3.5 mr-1.5" /> Sales Detail
           </TabsTrigger>
           <TabsTrigger value="stock" data-testid="tab-sp-stock">
             <Package2 className="h-3.5 w-3.5 mr-1.5" /> Stock Inventory
@@ -188,7 +230,6 @@ export default function SpReports() {
             </>
           ) : null}
 
-          {/* Finalized splits */}
           {!splitsLoading && splits.length > 0 && (
             <div className="space-y-1">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Finalized Splits</h3>
@@ -201,6 +242,114 @@ export default function SpReports() {
                 </div>
               ))}
             </div>
+          )}
+        </TabsContent>
+
+        {/* Sales Detail */}
+        <TabsContent value="sales-detail" className="mt-4 space-y-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div>
+              <label className="text-xs text-muted-foreground">From</label>
+              <Input type="date" value={detailStart} onChange={e => setDetailStart(e.target.value)} className="mt-1 w-36" data-testid="input-sp-detail-start" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">To</label>
+              <Input type="date" value={detailEnd} onChange={e => setDetailEnd(e.target.value)} className="mt-1 w-36" data-testid="input-sp-detail-end" />
+            </div>
+            {detail?.rows?.length > 0 && (
+              <Button variant="outline" size="sm" onClick={handleDetailCsv} className="mt-5" data-testid="button-sp-detail-csv">
+                <Download className="h-3.5 w-3.5 mr-1" /> Export CSV
+              </Button>
+            )}
+          </div>
+
+          {detailLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading...
+            </div>
+          ) : !detail || !detail.rows || detail.rows.length === 0 ? (
+            <Card>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">No sales in this period.</CardContent>
+            </Card>
+          ) : (
+            <>
+              <Card>
+                <CardContent className="py-3 overflow-x-auto">
+                  <table className="w-full text-xs" data-testid="table-sp-sales-detail">
+                    <thead>
+                      <tr className="border-b border-border/40">
+                        <th className="text-left font-medium text-muted-foreground py-1.5 pr-3">Article</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-2">Total In</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-2">Remaining</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-2">Sold</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-2">Avg Price</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-2">Sales $</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-2">Avg Cost</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-2">COGS $</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-2">Gross Profit</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-2">Base Payable</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detail.rows.map((r: any, i: number) => (
+                        <tr key={i} className="border-b border-border/20 last:border-0" data-testid={`row-sp-detail-${i}`}>
+                          <td className="py-1.5 pr-3">
+                            <p className="font-mono font-semibold">{r.articleCode}</p>
+                            {r.description && <p className="text-muted-foreground">{r.description}</p>}
+                          </td>
+                          <td className="text-right tabular-nums text-muted-foreground px-2">{parseFloat(r.totalQtyIn || "0").toFixed(2)}</td>
+                          <td className="text-right tabular-nums text-green-600 px-2">{parseFloat(r.currentQtyRemaining || "0").toFixed(2)}</td>
+                          <td className="text-right tabular-nums font-semibold px-2">{parseFloat(r.soldQty || "0").toFixed(2)}</td>
+                          <td className="text-right tabular-nums px-2">{fmt(r.avgSalePrice, 4)}</td>
+                          <td className="text-right tabular-nums font-semibold px-2">{fmt(r.salesTotal)}</td>
+                          <td className="text-right tabular-nums px-2">{fmt(r.avgFinalCost, 4)}</td>
+                          <td className="text-right tabular-nums text-destructive px-2">{fmt(r.totalFinalCost)}</td>
+                          <td className={`text-right tabular-nums font-semibold px-2 ${parseFloat(r.grossProfit || "0") >= 0 ? "text-green-600" : "text-destructive"}`}>
+                            {fmt(r.grossProfit)}
+                          </td>
+                          <td className="text-right tabular-nums text-orange-600 px-2">{fmt(r.basePayable)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-border/60 font-semibold">
+                        <td className="py-1.5 pr-3">Total</td>
+                        <td className="text-right tabular-nums text-muted-foreground px-2">{detail.rows.reduce((s: number, r: any) => s + parseFloat(r.totalQtyIn || "0"), 0).toFixed(2)}</td>
+                        <td className="text-right tabular-nums text-green-600 px-2">{detail.rows.reduce((s: number, r: any) => s + parseFloat(r.currentQtyRemaining || "0"), 0).toFixed(2)}</td>
+                        <td className="text-right tabular-nums px-2">{detail.rows.reduce((s: number, r: any) => s + parseFloat(r.soldQty || "0"), 0).toFixed(2)}</td>
+                        <td></td>
+                        <td className="text-right tabular-nums px-2">{fmt(detail.rows.reduce((s: number, r: any) => s + parseFloat(r.salesTotal || "0"), 0))}</td>
+                        <td></td>
+                        <td className="text-right tabular-nums text-destructive px-2">{fmt(detail.rows.reduce((s: number, r: any) => s + parseFloat(r.totalFinalCost || "0"), 0))}</td>
+                        <td className="text-right tabular-nums text-green-600 px-2">{fmt(detail.rows.reduce((s: number, r: any) => s + parseFloat(r.grossProfit || "0"), 0))}</td>
+                        <td className="text-right tabular-nums text-orange-600 px-2">{fmt(detail.rows.reduce((s: number, r: any) => s + parseFloat(r.basePayable || "0"), 0))}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="py-3">
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total Base Payable Generated</p>
+                      <p className="font-semibold text-orange-600">{fmt(detail.rows.reduce((s: number, r: any) => s + parseFloat(r.basePayable || "0"), 0))}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">(in selected period)</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Payments Made (all time)</p>
+                      <p className="font-semibold">{fmt(detail.paymentsTotal)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Remaining Supplier Payable</p>
+                      <p className="font-semibold text-orange-600">{fmt(detail.remainingPayable)}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">(current balance)</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
           )}
         </TabsContent>
 
