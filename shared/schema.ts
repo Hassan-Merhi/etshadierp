@@ -3205,6 +3205,7 @@ export const customerProformas = pgTable("customer_proformas", {
   customerId: integer("customer_id").notNull().references(() => customers.id, { onDelete: "restrict" }),
   name: text("name").notNull(),
   isActive: boolean("is_active").notNull().default(false),
+  status: text("status").notNull().default("ACTIVE"),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -3223,6 +3224,7 @@ export const insertCustomerProformaSchema = createInsertSchema(customerProformas
   customerId: z.number().min(1, "Customer is required"),
   name: z.string().min(1, "Proforma name is required"),
   isActive: z.boolean().optional(),
+  status: z.enum(["ACTIVE", "PARTIALLY_DISPATCHED", "FULLY_INVOICED", "CANCELLED"]).optional(),
 });
 
 export type InsertCustomerProforma = z.infer<typeof insertCustomerProformaSchema>;
@@ -3278,6 +3280,7 @@ export const customerOrders = pgTable("customer_orders", {
   loadingStartedAt: timestamp("loading_started_at"),
   loadingFinalizedAt: timestamp("loading_finalized_at"),
   locationId: integer("location_id").references(() => locations.id, { onDelete: "restrict" }),
+  dispatchBatchId: integer("dispatch_batch_id"),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -5363,3 +5366,111 @@ export const insertFactoryShippingAvailabilitySchema = createInsertSchema(factor
 });
 export type InsertFactoryShippingAvailability = z.infer<typeof insertFactoryShippingAvailabilitySchema>;
 export type FactoryShippingAvailability = typeof factoryShippingAvailability.$inferSelect;
+
+// ─── Local Customer Bale Truck Dispatch Workflow (May 2026) ──────────────────
+
+export const customerDispatchBatchSequences = pgTable("customer_dispatch_batch_sequences", {
+  companyId: integer("company_id").primaryKey(),
+  nextNumber: integer("next_number").notNull().default(1),
+});
+
+export const customerDispatchBatches = pgTable("customer_dispatch_batches", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  customerId: integer("customer_id").notNull().references(() => customers.id, { onDelete: "restrict" }),
+  proformaId: integer("proforma_id").references(() => customerProformas.id, { onDelete: "restrict" }),
+  batchNumber: varchar("batch_number", { length: 50 }).notNull(),
+  batchDate: date("batch_date").notNull(),
+  status: text("status").notNull().default("DRAFT"),
+  currency: varchar("currency", { length: 3 }).notNull().default("USD"),
+  priceMode: text("price_mode").notNull().default("PER_BALE"),
+  destination: text("destination"),
+  notes: text("notes"),
+  finalOrderId: integer("final_order_id"),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  cancelledAt: timestamp("cancelled_at"),
+}, (t) => ({
+  companyIdx: index("cdb_company_idx").on(t.companyId),
+  customerIdx: index("cdb_customer_idx").on(t.customerId),
+  statusIdx: index("cdb_status_idx").on(t.status),
+}));
+
+export const insertCustomerDispatchBatchSchema = createInsertSchema(customerDispatchBatches).omit({
+  id: true, createdAt: true, updatedAt: true, cancelledAt: true,
+}).extend({
+  companyId: z.number().min(1),
+  customerId: z.number().min(1),
+  proformaId: z.number().optional().nullable(),
+  batchDate: z.string().min(1),
+  status: z.enum(["DRAFT", "LOADING", "READY_TO_INVOICE", "INVOICED", "CANCELLED"]).optional(),
+  currency: z.string().optional(),
+  priceMode: z.enum(["PER_BALE", "PER_KG"]).optional(),
+  destination: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  createdBy: z.string().optional().nullable(),
+});
+export type InsertCustomerDispatchBatch = z.infer<typeof insertCustomerDispatchBatchSchema>;
+export type CustomerDispatchBatch = typeof customerDispatchBatches.$inferSelect;
+
+export const customerDispatchTruckRides = pgTable("customer_dispatch_truck_rides", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  batchId: integer("batch_id").notNull().references(() => customerDispatchBatches.id, { onDelete: "restrict" }),
+  rideNumber: integer("ride_number").notNull(),
+  truckPlate: varchar("truck_plate", { length: 50 }),
+  driverName: text("driver_name"),
+  destination: text("destination"),
+  notes: text("notes"),
+  status: text("status").notNull().default("DRAFT"),
+  loadedAt: timestamp("loaded_at"),
+  dispatchedAt: timestamp("dispatched_at"),
+  reopenedAt: timestamp("reopened_at"),
+  reopenReason: text("reopen_reason"),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  batchIdx: index("cdtr_batch_idx").on(t.batchId),
+  companyIdx: index("cdtr_company_idx").on(t.companyId),
+}));
+
+export const insertCustomerDispatchTruckRideSchema = createInsertSchema(customerDispatchTruckRides).omit({
+  id: true, createdAt: true, updatedAt: true, loadedAt: true, dispatchedAt: true, reopenedAt: true,
+}).extend({
+  companyId: z.number().min(1),
+  batchId: z.number().min(1),
+  rideNumber: z.number().int().min(1),
+  truckPlate: z.string().optional().nullable(),
+  driverName: z.string().optional().nullable(),
+  destination: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  createdBy: z.string().optional().nullable(),
+});
+export type InsertCustomerDispatchTruckRide = z.infer<typeof insertCustomerDispatchTruckRideSchema>;
+export type CustomerDispatchTruckRide = typeof customerDispatchTruckRides.$inferSelect;
+
+export const customerDispatchBaleScans = pgTable("customer_dispatch_bale_scans", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  batchId: integer("batch_id").notNull(),
+  truckRideId: integer("truck_ride_id").notNull(),
+  baleId: integer("bale_id").notNull(),
+  baleReference: varchar("bale_reference", { length: 100 }).notNull(),
+  articleCode: varchar("article_code", { length: 50 }),
+  productName: text("product_name"),
+  weightKg: decimal("weight_kg", { precision: 15, scale: 3 }).notNull().default("0"),
+  priceUsed: decimal("price_used", { precision: 20, scale: 2 }).notNull().default("0"),
+  amount: decimal("amount", { precision: 20, scale: 2 }).notNull().default("0"),
+  scannedBy: text("scanned_by"),
+  scannedAt: timestamp("scanned_at").notNull().defaultNow(),
+  removedAt: timestamp("removed_at"),
+  removalReason: text("removal_reason"),
+}, (t) => ({
+  batchIdx: index("cdbs_batch_idx").on(t.batchId),
+  rideIdx: index("cdbs_ride_idx").on(t.truckRideId),
+  baleIdx: index("cdbs_bale_idx").on(t.baleId),
+}));
+
+export type CustomerDispatchBaleScan = typeof customerDispatchBaleScans.$inferSelect;

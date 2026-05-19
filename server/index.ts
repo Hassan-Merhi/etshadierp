@@ -3026,6 +3026,85 @@ let migrationsDone = false;
     )`,
     `CREATE INDEX IF NOT EXISTS ai_action_log_company_idx ON ai_action_log(company_id)`,
     `CREATE INDEX IF NOT EXISTS ai_action_log_user_idx ON ai_action_log(user_id)`,
+
+    // ── Local Customer Bale Truck Dispatch Workflow (May 2026) ────────────────
+    // customerProformas: add status column (ACTIVE / PARTIALLY_DISPATCHED / FULLY_INVOICED / CANCELLED)
+    `ALTER TABLE customer_proformas ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ACTIVE'`,
+    // Backfill: inactive proformas → CANCELLED, active ones stay ACTIVE
+    `UPDATE customer_proformas SET status = 'CANCELLED' WHERE is_active = false AND status = 'ACTIVE'`,
+    // customerOrders: back-link to the dispatch batch that generated this invoice
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS dispatch_batch_id INTEGER`,
+    // Batch number sequences (one row per company)
+    `CREATE TABLE IF NOT EXISTS customer_dispatch_batch_sequences (
+      company_id INTEGER PRIMARY KEY,
+      next_number INTEGER NOT NULL DEFAULT 1
+    )`,
+    // Dispatch batches
+    `CREATE TABLE IF NOT EXISTS customer_dispatch_batches (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL,
+      customer_id INTEGER NOT NULL,
+      proforma_id INTEGER,
+      batch_number VARCHAR(50) NOT NULL,
+      batch_date DATE NOT NULL,
+      status TEXT NOT NULL DEFAULT 'DRAFT',
+      currency VARCHAR(3) NOT NULL DEFAULT 'USD',
+      price_mode TEXT NOT NULL DEFAULT 'PER_BALE',
+      destination TEXT,
+      notes TEXT,
+      final_order_id INTEGER,
+      created_by TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT now(),
+      updated_at TIMESTAMP NOT NULL DEFAULT now(),
+      cancelled_at TIMESTAMP
+    )`,
+    `CREATE INDEX IF NOT EXISTS cdb_company_idx ON customer_dispatch_batches (company_id)`,
+    `CREATE INDEX IF NOT EXISTS cdb_customer_idx ON customer_dispatch_batches (customer_id)`,
+    `CREATE INDEX IF NOT EXISTS cdb_status_idx ON customer_dispatch_batches (status)`,
+    // Truck rides
+    `CREATE TABLE IF NOT EXISTS customer_dispatch_truck_rides (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL,
+      batch_id INTEGER NOT NULL,
+      ride_number INTEGER NOT NULL,
+      truck_plate VARCHAR(50),
+      driver_name TEXT,
+      destination TEXT,
+      notes TEXT,
+      status TEXT NOT NULL DEFAULT 'DRAFT',
+      loaded_at TIMESTAMP,
+      dispatched_at TIMESTAMP,
+      reopened_at TIMESTAMP,
+      reopen_reason TEXT,
+      created_by TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT now(),
+      updated_at TIMESTAMP NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS cdtr_batch_idx ON customer_dispatch_truck_rides (batch_id)`,
+    `CREATE INDEX IF NOT EXISTS cdtr_company_idx ON customer_dispatch_truck_rides (company_id)`,
+    // Bale scans per truck ride
+    `CREATE TABLE IF NOT EXISTS customer_dispatch_bale_scans (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL,
+      batch_id INTEGER NOT NULL,
+      truck_ride_id INTEGER NOT NULL,
+      bale_id INTEGER NOT NULL,
+      bale_reference VARCHAR(100) NOT NULL,
+      article_code VARCHAR(50),
+      product_name TEXT,
+      weight_kg DECIMAL(15,3) NOT NULL DEFAULT 0,
+      price_used DECIMAL(20,2) NOT NULL DEFAULT 0,
+      amount DECIMAL(20,2) NOT NULL DEFAULT 0,
+      scanned_by TEXT,
+      scanned_at TIMESTAMP NOT NULL DEFAULT now(),
+      removed_at TIMESTAMP,
+      removal_reason TEXT
+    )`,
+    `CREATE INDEX IF NOT EXISTS cdbs_batch_idx ON customer_dispatch_bale_scans (batch_id)`,
+    `CREATE INDEX IF NOT EXISTS cdbs_ride_idx ON customer_dispatch_bale_scans (truck_ride_id)`,
+    `CREATE INDEX IF NOT EXISTS cdbs_bale_idx ON customer_dispatch_bale_scans (bale_id)`,
+    // Partial unique index: one active (non-removed) scan per bale across all batches
+    `CREATE UNIQUE INDEX IF NOT EXISTS cdbs_bale_active_unique ON customer_dispatch_bale_scans (company_id, bale_id) WHERE removed_at IS NULL`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
