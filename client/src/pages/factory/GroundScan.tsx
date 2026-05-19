@@ -608,24 +608,6 @@ export default function GroundScan() {
             <span className="font-semibold text-foreground">{formatNumber(totalWeight, 2)} kg</span> total weight
           </span>
         </div>
-        {scannedBales.length > 0 && (() => {
-          const articleGroups = new Map<string, number>();
-          for (const b of scannedBales) {
-            const key = b.articleCode || "—";
-            articleGroups.set(key, (articleGroups.get(key) ?? 0) + 1);
-          }
-          const sorted = [...articleGroups.entries()].sort((a, b) => b[1] - a[1]);
-          return (
-            <div className="grid gap-x-6 gap-y-0.5 text-xs" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }} data-testid="div-ground-scan-article-summary">
-              {sorted.map(([code, qty]) => (
-                <div key={code} className="flex items-center justify-between py-0.5 border-b border-border/40">
-                  <span className="font-mono font-semibold text-foreground">{code}</span>
-                  <span className="text-muted-foreground tabular-nums">{qty} bale{qty !== 1 ? "s" : ""}</span>
-                </div>
-              ))}
-            </div>
-          );
-        })()}
       </div>
 
       {scannedBales.length === 0 ? (
