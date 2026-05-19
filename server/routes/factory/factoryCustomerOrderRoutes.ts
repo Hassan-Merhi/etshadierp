@@ -404,6 +404,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         updatedAt:          r.updated_at           ?? r.created_at,
         customerName:       r.customer_name        ?? null,
         customerCode:       r.customer_code        ?? null,
+        dispatchBatchId:    r.dispatch_batch_id    ?? null,
       };
 
       // customer_order_lines has no known schema drift — Drizzle is fine here

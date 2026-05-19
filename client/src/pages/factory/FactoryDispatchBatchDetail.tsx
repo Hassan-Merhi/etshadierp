@@ -17,7 +17,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
 import {
   Plus, Truck, Package, Scale, DollarSign, Eye, FileText, ScanLine,
-  AlertTriangle, RotateCcw, ArrowLeft, ExternalLink,
+  AlertTriangle, RotateCcw, ArrowLeft, ExternalLink, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 
@@ -128,6 +128,7 @@ export default function FactoryDispatchBatchDetail() {
   const [generateOpen, setGenerateOpen] = useState(false);
   const [reopenRideId, setReopenRideId] = useState<number | null>(null);
   const [reopenReason, setReopenReason] = useState("");
+  const [showBales, setShowBales] = useState(false);
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split("T")[0]);
 
   const [rideForm, setRideForm] = useState({
@@ -157,6 +158,23 @@ export default function FactoryDispatchBatchDetail() {
     },
     enabled: !!batchId && previewOpen,
     staleTime: 0,
+  });
+
+  interface AuditScan {
+    id: number; truckRideId: number; rideNumber: number; baleId: number;
+    baleReference: string; articleCode: string | null; productName: string | null;
+    weightKg: string; priceUsed: string; amount: string;
+    scannedBy: string | null; scannedAt: string;
+    removedAt: string | null; removalReason: string | null;
+  }
+  const { data: auditScans = [] } = useQuery<AuditScan[]>({
+    queryKey: [`/api/factory/dispatch-batches/${batchId}/audit`],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/dispatch-batches/${batchId}/audit`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!batchId && showBales,
   });
 
   const addRideMutation = useMutation({
@@ -542,6 +560,69 @@ export default function FactoryDispatchBatchDetail() {
           </div>
         </div>
       </div>
+
+      {/* ── Scanned Bales Section ─────────────────────────────────────────── */}
+      <Card className="mx-4 mb-4">
+        <CardContent className="pt-3 pb-3">
+          <button
+            className="flex items-center gap-2 w-full text-sm font-medium text-left"
+            onClick={() => setShowBales((v) => !v)}
+            data-testid="button-toggle-bales"
+          >
+            <Package className="w-4 h-4 text-muted-foreground" />
+            Scanned Bales
+            {data && (() => {
+              const tb = (data.articleTotals || []).reduce((s, a) => s + parseInt(String(a.scannedQty || 0)), 0);
+              const tw = (data.articleTotals || []).reduce((s, a) => s + parseFloat(a.scannedWeightKg || "0"), 0);
+              return (
+                <span className="text-xs text-muted-foreground font-normal ml-1">
+                  ({tb} bales · {fmt(tw)} kg)
+                </span>
+              );
+            })()}
+            <span className="ml-auto text-muted-foreground">
+              {showBales ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </span>
+          </button>
+
+          {showBales && (
+            <div className="mt-3 border-t pt-3">
+              {auditScans.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">No active bale scans found.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Ride #</TableHead>
+                        <TableHead className="text-xs">Reference</TableHead>
+                        <TableHead className="text-xs">Article</TableHead>
+                        <TableHead className="text-xs">Product</TableHead>
+                        <TableHead className="text-xs text-right">Weight (kg)</TableHead>
+                        <TableHead className="text-xs text-right">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {auditScans
+                        .filter((s) => !s.removedAt)
+                        .map((s) => (
+                          <TableRow key={s.id} data-testid={`row-scan-${s.id}`}>
+                            <TableCell className="text-xs font-mono">#{s.rideNumber}</TableCell>
+                            <TableCell className="text-xs font-mono font-medium">{s.baleReference}</TableCell>
+                            <TableCell className="text-xs">{s.articleCode || "—"}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{s.productName || "—"}</TableCell>
+                            <TableCell className="text-xs text-right font-mono">{fmt(s.weightKg, 3)}</TableCell>
+                            <TableCell className="text-xs text-right font-mono">{fmt(s.amount)}</TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Dialog open={addRideOpen} onOpenChange={setAddRideOpen}>
         <DialogContent>

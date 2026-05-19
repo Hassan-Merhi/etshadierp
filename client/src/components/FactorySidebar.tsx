@@ -42,6 +42,7 @@ import {
   Truck,
   Building2,
   CreditCard,
+  QrCode,
 } from "lucide-react";
 import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
 import { useQuery } from "@tanstack/react-query";
@@ -104,6 +105,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
       { title: "Invoicing",             url: "/factory/invoicing",              icon: FileText     },
       { title: "Stock Allocation",      url: "/factory/stock-allocation-v5",    icon: LayoutGrid   },
       { title: "Dispatch Batches",       url: "/factory/dispatch-batches",       icon: Truck        },
+      { title: "Bale Tracking",          url: "/factory/bale-tracking",          icon: QrCode       },
       { title: "Loadings",              url: "/factory/sales/loadings",         icon: Container    },
       { title: "Price List",            url: "/factory/price-list",             icon: List,        developerOnly: true },
     ],

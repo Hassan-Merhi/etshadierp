@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAppMode } from "@/contexts/AppModeContext";
@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation, useRoute } from "wouter";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
-import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw, Container, Pencil, RotateCcw, Hammer, ChevronDown, GitCompare, DollarSign, ScanLine, ArrowLeftRight } from "lucide-react";
+import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw, Container, Pencil, RotateCcw, Hammer, ChevronDown, GitCompare, DollarSign, ScanLine, ArrowLeftRight, Truck, ExternalLink } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -87,6 +87,7 @@ interface OrderDetail {
   lines: OrderLine[];
   bales: OrderBale[];
   charges: OrderCharge[];
+  dispatchBatchId?: number | null;
 }
 
 export default function FactoryInvoiceDetail() {
@@ -190,6 +191,24 @@ export default function FactoryInvoiceDetail() {
     },
     enabled: !!order?.customerId,
   });
+
+  interface DispatchBatchSummary {
+    batch: { id: number; batchNumber: string; batchDate: string; status: string; currency: string };
+    customerName: string | null;
+    proforma: { id: number; name: string } | null;
+    rides: { id: number; rideNumber: number; status: string; baleCount: number | string; totalWeightKg: string }[];
+    totals: { totalBales: number; totalWeightKg: string; grandTotal: string };
+  }
+  const { data: dispatchBatch } = useQuery<DispatchBatchSummary>({
+    queryKey: [`/api/factory/dispatch-batches/${order?.dispatchBatchId}`],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/dispatch-batches/${order!.dispatchBatchId}`, { credentials: "include" });
+      if (!res.ok) return null as any;
+      return res.json();
+    },
+    enabled: !!order?.dispatchBatchId,
+  });
+
   const hideExportSelling = (myAccess?.hiddenCostFields ?? []).includes("hide_export_selling_price");
   const isAdmin = myAccess?.fullAccess === true;
 
@@ -716,6 +735,62 @@ export default function FactoryInvoiceDetail() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
+
+      {/* ── Dispatch Batch Info Card ─────────────────────────────────────── */}
+      {order.dispatchBatchId && (
+        <Card className="mb-4 border-blue-200 dark:border-blue-800">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2">
+                <Truck className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-semibold">Dispatch Batch</span>
+                {dispatchBatch?.batch && (
+                  <span className="font-mono font-bold">{dispatchBatch.batch.batchNumber}</span>
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate(`/factory/dispatch-batches/${order.dispatchBatchId}`)}
+                data-testid="button-view-dispatch-batch"
+              >
+                <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+                View Batch
+              </Button>
+            </div>
+            {dispatchBatch ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 text-sm">
+                {dispatchBatch.proforma && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Proforma</p>
+                    <p>{dispatchBatch.proforma.name}</p>
+                  </div>
+                )}
+                {dispatchBatch.customerName && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Customer</p>
+                    <p>{dispatchBatch.customerName}</p>
+                  </div>
+                )}
+                {dispatchBatch.totals && (
+                  <>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total Bales</p>
+                      <p className="font-mono font-medium">{dispatchBatch.totals.totalBales}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Rides</p>
+                      <p>{dispatchBatch.rides?.length || 0} truck{dispatchBatch.rides?.length !== 1 ? "s" : ""}</p>
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">Loading batch info…</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="mb-6">
         <Table wrapperClassName="max-h-[calc(100vh-260px)] overflow-auto">

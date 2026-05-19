@@ -16,7 +16,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
 import {
   Plus, Truck, Package,
-  Filter, ChevronRight, Search,
+  Filter, ChevronRight, Search, BarChart2,
 } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 
@@ -71,6 +71,7 @@ export default function FactoryDispatchBatches() {
   const [filterStatus, setFilterStatus] = useState("");
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"list" | "reports">("list");
   const searchStr = useSearch();
 
   const [form, setForm] = useState({
@@ -118,6 +119,21 @@ export default function FactoryDispatchBatches() {
       return res.json();
     },
     enabled: !!form.customerId && createOpen,
+  });
+
+  interface ReportsSummary {
+    uninvoicedCount: number; dispatchedCount: number; invoicedCount: number;
+    loadingCount: number; reservedBalesCount: number; dispatchedRidesNotInvoiced: number;
+  }
+  const { data: reportsSummary, isLoading: reportsLoading } = useQuery<ReportsSummary>({
+    queryKey: ["/api/factory/dispatch-reports/summary"],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/dispatch-reports/summary", { credentials: "include" });
+      if (!res.ok) throw new Error((await res.json()).message);
+      return res.json();
+    },
+    enabled: activeTab === "reports",
+    refetchInterval: 30_000,
   });
 
   const activeProformas = proformas.filter((p) => p.isActive);
@@ -179,13 +195,108 @@ export default function FactoryDispatchBatches() {
         title="Dispatch Batches"
         subtitle="Manage local truck dispatch batches for bale sales"
       >
-        <Button onClick={() => setCreateOpen(true)} data-testid="button-new-dispatch-batch">
-          <Plus className="w-4 h-4 mr-2" />
-          New Dispatch Batch
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant={activeTab === "list" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveTab("list")}
+            data-testid="button-tab-list"
+          >
+            <Truck className="w-3.5 h-3.5 mr-1.5" />
+            Batches
+          </Button>
+          <Button
+            variant={activeTab === "reports" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveTab("reports")}
+            data-testid="button-tab-reports"
+          >
+            <BarChart2 className="w-3.5 h-3.5 mr-1.5" />
+            Reports
+          </Button>
+          <Button onClick={() => setCreateOpen(true)} data-testid="button-new-dispatch-batch">
+            <Plus className="w-4 h-4 mr-2" />
+            New Dispatch Batch
+          </Button>
+        </div>
       </PageHeader>
 
       <div className="flex-1 overflow-auto p-4 space-y-4">
+
+        {/* ── Reports tab ─────────────────────────────────────────────────────── */}
+        {activeTab === "reports" && (
+          reportsLoading ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24" />)}
+            </div>
+          ) : reportsSummary ? (
+            <div className="space-y-5">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <Card
+                  className="cursor-pointer hover-elevate"
+                  onClick={() => { setActiveTab("list"); setFilterStatus(""); }}
+                  data-testid="card-report-uninvoiced"
+                >
+                  <CardContent className="pt-4 pb-4">
+                    <p className="text-xs text-muted-foreground mb-1">Uninvoiced Batches</p>
+                    <p className="text-3xl font-bold" data-testid="text-uninvoiced-count">{reportsSummary.uninvoicedCount}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Draft + Loading + Dispatched</p>
+                  </CardContent>
+                </Card>
+                <Card
+                  className="cursor-pointer hover-elevate"
+                  onClick={() => { setActiveTab("list"); setFilterStatus("LOADING"); }}
+                  data-testid="card-report-loading"
+                >
+                  <CardContent className="pt-4 pb-4">
+                    <p className="text-xs text-muted-foreground mb-1">Loading</p>
+                    <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{reportsSummary.loadingCount}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Batches currently being loaded</p>
+                  </CardContent>
+                </Card>
+                <Card
+                  className="cursor-pointer hover-elevate"
+                  onClick={() => { setActiveTab("list"); setFilterStatus("DISPATCHED"); }}
+                  data-testid="card-report-dispatched"
+                >
+                  <CardContent className="pt-4 pb-4">
+                    <p className="text-xs text-muted-foreground mb-1">Dispatched — Pending Invoice</p>
+                    <p className="text-3xl font-bold text-amber-600 dark:text-amber-400">{reportsSummary.dispatchedCount}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Trucks dispatched, no invoice yet</p>
+                  </CardContent>
+                </Card>
+                <Card
+                  className="cursor-pointer hover-elevate"
+                  onClick={() => { setActiveTab("list"); setFilterStatus("INVOICED"); }}
+                  data-testid="card-report-invoiced"
+                >
+                  <CardContent className="pt-4 pb-4">
+                    <p className="text-xs text-muted-foreground mb-1">Invoiced Batches</p>
+                    <p className="text-3xl font-bold text-green-600 dark:text-green-400">{reportsSummary.invoicedCount}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Completed &amp; invoiced</p>
+                  </CardContent>
+                </Card>
+                <Card data-testid="card-report-reserved-bales">
+                  <CardContent className="pt-4 pb-4">
+                    <p className="text-xs text-muted-foreground mb-1">Reserved Bales</p>
+                    <p className="text-3xl font-bold">{reportsSummary.reservedBalesCount}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Bales scanned, not yet invoiced</p>
+                  </CardContent>
+                </Card>
+                <Card data-testid="card-report-dispatched-rides">
+                  <CardContent className="pt-4 pb-4">
+                    <p className="text-xs text-muted-foreground mb-1">Dispatched Rides</p>
+                    <p className="text-3xl font-bold">{reportsSummary.dispatchedRidesNotInvoiced}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Rides dispatched, batch not invoiced</p>
+                  </CardContent>
+                </Card>
+              </div>
+              <p className="text-xs text-muted-foreground">Click a card to filter the batch list.</p>
+            </div>
+          ) : null
+        )}
+
+        {activeTab === "list" && <>
         <Card>
           <CardContent className="pt-4">
             <div className="flex flex-wrap gap-3 items-end">
@@ -308,6 +419,7 @@ export default function FactoryDispatchBatches() {
             )}
           </CardContent>
         </Card>
+        </>}
       </div>
 
       <Dialog open={createOpen} onOpenChange={(o) => { if (!o) resetForm(); setCreateOpen(o); }}>
