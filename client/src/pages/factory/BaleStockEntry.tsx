@@ -43,6 +43,7 @@ import { PageHeader } from "@/components/PageHeader";
   import { Label } from "@/components/ui/label";
   import * as XLSX from "@/lib/excelHelper";
   import StockEntryHistory from "../StockEntryHistory";
+import GroundScan from "./GroundScan";
   import { AdminAuthDialog } from "@/components/AdminAuthDialog";
   import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
   import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, formatLabelNum, A4_DESIGN_OPTIONS, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
@@ -2392,6 +2393,10 @@ import { PageHeader } from "@/components/PageHeader";
                 Stock Entry History
               </TabsTrigger>
             )}
+            <TabsTrigger value="ground-scan" data-testid="tab-ground-scan">
+              <ScanLine className="h-4 w-4 mr-1" />
+              Ground Scan
+            </TabsTrigger>
           </TabsList>
           {showEntry && (
             <TabsContent value="entry" className="mt-4">
@@ -2405,6 +2410,9 @@ import { PageHeader } from "@/components/PageHeader";
               />
             </TabsContent>
           )}
+          <TabsContent value="ground-scan" className="mt-0 p-0">
+            <GroundScan />
+          </TabsContent>
         </Tabs>
       </div>
     );
