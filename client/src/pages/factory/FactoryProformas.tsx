@@ -594,6 +594,15 @@ export default function FactoryProformas() {
                       >
                         <Star className={proforma.isActive ? "h-4 w-4 fill-yellow-400 text-yellow-500" : "h-4 w-4"} />
                       </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => navigate(`/factory/dispatch-batches?customerId=${customerId}&proformaId=${proforma.id}&openCreate=1`)}
+                        data-testid={`button-create-dispatch-batch-${proforma.id}`}
+                        title="Create dispatch batch from this proforma"
+                      >
+                        <Truck className="h-4 w-4" />
+                      </Button>
                       {canEdit && (
                         <>
                           <Button

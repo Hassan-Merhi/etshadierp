@@ -172,6 +172,9 @@ const FactoryInvoices = lazy(() => import("@/pages/factory/FactoryInvoices"));
 const FactoryInvoiceCreate = lazy(() => import("@/pages/factory/FactoryInvoiceCreate"));
 const FactoryInvoiceDetail = lazy(() => import("@/pages/factory/FactoryInvoiceDetail"));
 const FactoryProformas = lazy(() => import("@/pages/factory/FactoryProformas"));
+const FactoryDispatchBatches = lazy(() => import("@/pages/factory/FactoryDispatchBatches"));
+const FactoryDispatchBatchDetail = lazy(() => import("@/pages/factory/FactoryDispatchBatchDetail"));
+const FactoryDispatchBatchScan = lazy(() => import("@/pages/factory/FactoryDispatchBatchScan"));
 const FactoryStockAllocation = lazy(() => import("@/pages/factory/FactoryStockAllocationV2"));
 const FactoryStockAllocationV3 = lazy(() => import("@/pages/factory/FactoryStockAllocationV3"));
 const FactoryStockAllocationV5 = lazy(() => import("@/pages/factory/FactoryStockAllocationV5"));
@@ -1024,6 +1027,9 @@ function AuthenticatedApp() {
                     <Route path="/factory/sales/invoices/:id" component={FactoryInvoiceDetail} />
                     <Route path="/factory/price-list" component={FactoryPriceList} />
                     <Route path="/factory/sales/proformas/:proformaId/add-line" component={ProformaAddLine} />
+                    <Route path="/factory/dispatch-batches/:batchId/rides/:rideId/scan" component={FactoryDispatchBatchScan} />
+                    <Route path="/factory/dispatch-batches/:id" component={FactoryDispatchBatchDetail} />
+                    <Route path="/factory/dispatch-batches" component={FactoryDispatchBatches} />
                     <Route path="/factory/invoicing" component={FactoryInvoicing} />
                     <Route path="/factory/stock-allocation" component={FactoryStockAllocation} />
                     <Route path="/factory/stock-allocation-v3" component={FactoryStockAllocationV3} />
