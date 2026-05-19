@@ -15,7 +15,18 @@ interface ScannedBale {
   articleCode: string;
   productName: string;
   weightKg: number;
+  status: string;
   scannedAt: Date;
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const s = (status || "").toUpperCase();
+  if (s === "IN_STOCK") return <Badge className="bg-green-600 text-white border-0">In Stock</Badge>;
+  if (s === "LOADING" || s === "LOADED") return <Badge className="bg-amber-500 text-white border-0">Loading</Badge>;
+  if (s === "SOLD") return <Badge className="bg-red-600 text-white border-0">Sold</Badge>;
+  if (s === "RESERVED_FOR_ORDER") return <Badge className="bg-blue-600 text-white border-0">Reserved</Badge>;
+  if (s === "LABEL_PRINTED") return <Badge variant="outline">Label Printed</Badge>;
+  return <Badge variant="outline">{status}</Badge>;
 }
 
 export default function GroundScan() {
@@ -27,16 +38,14 @@ export default function GroundScan() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      scanRef.current?.focus();
-    }, 100);
+    const timeout = setTimeout(() => scanRef.current?.focus(), 100);
     return () => clearTimeout(timeout);
   }, []);
 
   const totalWeight = scannedBales.reduce((sum, b) => sum + b.weightKg, 0);
 
   async function handleScan() {
-    const value = scanInput.trim();
+    const value = scanInput.trim().toUpperCase();
     if (!value) return;
 
     const duplicate = scannedBales.find((b) => b.refCode === value);
@@ -55,7 +64,7 @@ export default function GroundScan() {
     setScanning(true);
 
     try {
-      const res = await fetch(`/api/production-bales/lookup/${encodeURIComponent(value)}`, {
+      const res = await fetch(`/api/lookup/reference/${encodeURIComponent(value)}`, {
         credentials: "include",
       });
 
@@ -75,14 +84,30 @@ export default function GroundScan() {
       }
 
       const data = await res.json();
-      const bale = data.bale;
+      const baleInfo = data.baleInfo;
       const product = data.product;
+      const labelPrint = data.labelPrint;
+
+      const articleCode =
+        product?.articleCode ||
+        labelPrint?.articleCode ||
+        baleInfo?.articleCode ||
+        "";
+
+      const productName =
+        baleInfo?.productName ||
+        product?.name ||
+        "Unknown";
+
+      const weightKg = parseFloat(baleInfo?.weightKg || labelPrint?.approxWeightKg || "0");
+      const status = baleInfo?.status || "";
 
       const entry: ScannedBale = {
-        refCode: bale.barcodeValue || bale.baleCode || value,
-        articleCode: product?.articleCode || "",
-        productName: product?.name || "Unknown",
-        weightKg: parseFloat(bale.weightKg || "0"),
+        refCode: value,
+        articleCode,
+        productName,
+        weightKg,
+        status,
         scannedAt: new Date(),
       };
 
@@ -92,7 +117,7 @@ export default function GroundScan() {
 
       toast({
         title: "Bale scanned",
-        description: `${entry.productName} — ${entry.weightKg.toFixed(2)} kg`,
+        description: `${productName} — ${status}`,
       });
     } catch {
       setScanError("Network error — try again");
@@ -125,6 +150,7 @@ export default function GroundScan() {
       "Article Code": b.articleCode,
       "Product Name": b.productName,
       "Weight (kg)": b.weightKg,
+      "Status": b.status,
     }));
 
     const totalsRow = {
@@ -132,17 +158,17 @@ export default function GroundScan() {
       "Article Code": "",
       "Product Name": "",
       "Weight (kg)": totalWeight,
+      "Status": "",
     };
 
     const ws = XLSX.utils.json_to_sheet([...rows, {}, totalsRow]);
-
-    const colWidths = [
-      { wch: 22 },
+    ws["!cols"] = [
       { wch: 18 },
+      { wch: 16 },
       { wch: 30 },
       { wch: 14 },
+      { wch: 20 },
     ];
-    ws["!cols"] = colWidths;
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Ground Scan");
@@ -209,7 +235,8 @@ export default function GroundScan() {
 
       <div className="flex items-center gap-4 text-sm text-muted-foreground">
         <span data-testid="text-ground-scan-count">
-          <span className="font-semibold text-foreground">{scannedBales.length}</span> bale{scannedBales.length !== 1 ? "s" : ""} scanned
+          <span className="font-semibold text-foreground">{scannedBales.length}</span>{" "}
+          bale{scannedBales.length !== 1 ? "s" : ""} scanned
         </span>
         <span data-testid="text-ground-scan-weight">
           <span className="font-semibold text-foreground">{formatNumber(totalWeight, 2)} kg</span> total weight
@@ -231,6 +258,7 @@ export default function GroundScan() {
                 <TableHead>Article Code</TableHead>
                 <TableHead>Product Name</TableHead>
                 <TableHead className="text-right">Weight (kg)</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="w-8" />
               </TableRow>
             </TableHeader>
@@ -255,6 +283,9 @@ export default function GroundScan() {
                   </TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-ground-scan-weight-${bale.refCode}`}>
                     {formatNumber(bale.weightKg, 2)}
+                  </TableCell>
+                  <TableCell data-testid={`text-ground-scan-status-${bale.refCode}`}>
+                    <StatusBadge status={bale.status} />
                   </TableCell>
                   <TableCell>
                     <Button
