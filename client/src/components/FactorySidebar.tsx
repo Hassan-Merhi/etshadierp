@@ -104,7 +104,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
       { title: "Parties",               url: "/factory/parties",                icon: Users        },
       { title: "Invoicing",             url: "/factory/invoicing",              icon: FileText     },
       { title: "Stock Allocation",      url: "/factory/stock-allocation-v5",    icon: LayoutGrid   },
-      { title: "Dispatch Batches",       url: "/factory/dispatch-batches",       icon: Truck        },
+      { title: "Dispatch Batches",       url: "/factory/dispatch-batches",       icon: Truck,       developerOnly: true },
       { title: "Bale Tracking",          url: "/factory/bale-tracking",          icon: QrCode,      developerOnly: true },
       { title: "Loadings",              url: "/factory/sales/loadings",         icon: Container    },
       { title: "Price List",            url: "/factory/price-list",             icon: List,        developerOnly: true },

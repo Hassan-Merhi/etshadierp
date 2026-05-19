@@ -255,6 +255,14 @@ export default function FactoryDispatchBatchDetail() {
 
   if (!batchId) return null;
 
+  if (me && !isDeveloper) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
+        <p className="text-sm">Dispatch Batches is only available in Developer mode.</p>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-4">

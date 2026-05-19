@@ -192,6 +192,15 @@ export default function FactoryDispatchBatches() {
     );
   });
 
+  if (me && !isDeveloper) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
+        <Truck className="w-10 h-10 opacity-30" />
+        <p className="text-sm">Dispatch Batches is only available in Developer mode.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       <PageHeader
