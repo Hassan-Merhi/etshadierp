@@ -243,6 +243,14 @@ export function registerContainerRoutes(app: Express) {
       if (existing && existing.id !== id) {
         return res.status(409).json({ message: `Container number "${newNumber}" is already in use` });
       }
+      // Capture old number before updating so we can rewrite voucher descriptions
+      const [currentRow] = await db
+        .select({ containerNumber: containers.containerNumber })
+        .from(containers)
+        .where(and(eq(containers.id, id), eq(containers.companyId, companyId)))
+        .limit(1);
+      const oldNumber = currentRow?.containerNumber;
+
       const [updated] = await db
         .update(containers)
         .set({ containerNumber: newNumber })
@@ -250,52 +258,184 @@ export function registerContainerRoutes(app: Express) {
         .returning();
       if (!updated) return res.status(404).json({ message: "Container not found" });
 
-      // ── Inter-company sync: update the description of INTERCO-PARENT vouchers in the parent
-      //    company so the new container number is reflected there too ──
-      try {
-        const parentCompanyId = await storage.getParentCompanyId();
-        if (parentCompanyId) {
-          const containerPOs = await db
-            .select({ poNumber: purchaseOrders.poNumber })
-            .from(purchaseOrders)
-            .where(and(eq(purchaseOrders.containerId, id), eq(purchaseOrders.companyId, companyId)));
-
-          for (const po of containerPOs) {
-            const [parentVoucher] = await db
-              .select({ id: vouchers.id, description: vouchers.description })
-              .from(vouchers)
-              .where(
-                and(
-                  eq(vouchers.companyId, parentCompanyId),
-                  like(vouchers.voucherNumber, `INTERCO-PARENT-${po.poNumber}-%`),
-                ),
-              )
-              .limit(1);
-
-            if (!parentVoucher) continue;
-
-            // The admin-created description format is "{oldContainerNumber} {supplierName}"
-            // Update only if the description starts with a container-number-like token
-            if (parentVoucher.description) {
-              const parts = parentVoucher.description.split(" ");
-              // Heuristic: if the first word looks like a container number (alphanumeric, may contain dashes)
-              // and is NOT "Inter-company", replace it with the new container number
-              if (parts[0] && parts[0] !== "Inter-company") {
-                parts[0] = newNumber;
-                const newDesc = parts.join(" ");
-                await db
-                  .update(vouchers)
-                  .set({ description: newDesc })
-                  .where(eq(vouchers.id, parentVoucher.id));
-              }
-            }
-          }
+      // ── Rewrite all voucher descriptions and narrations that mention the old container number ──
+      // This ensures the supplier ledger regex picks up the new number and builds correct links.
+      if (oldNumber && oldNumber !== newNumber) {
+        try {
+          await db.execute(
+            sql`UPDATE vouchers SET description = REPLACE(description, ${oldNumber}, ${newNumber}) WHERE description LIKE ${'%' + oldNumber + '%'}`
+          );
+          await db.execute(
+            sql`UPDATE voucher_entries SET narration = REPLACE(narration, ${oldNumber}, ${newNumber}) WHERE narration LIKE ${'%' + oldNumber + '%'}`
+          );
+        } catch (syncErr) {
+          console.error("[container number sync] Error updating voucher descriptions:", syncErr);
         }
-      } catch (syncErr) {
-        console.error("[container number sync] Error updating INTERCO-PARENT voucher descriptions:", syncErr);
       }
 
       res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Sync purchase voucher amounts for a container's POs (fixes cases where voucher
+  // was created before line items were imported, resulting in $0 amounts)
+  app.post("/api/containers/:id/sync-voucher", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+
+      const [container] = await db
+        .select({ id: containers.id, containerNumber: containers.containerNumber, companyId: containers.companyId })
+        .from(containers)
+        .where(and(eq(containers.id, id), eq(containers.companyId, companyId)))
+        .limit(1);
+      if (!container) return res.status(404).json({ message: "Container not found" });
+
+      const pos = await db
+        .select()
+        .from(purchaseOrders)
+        .where(eq(purchaseOrders.containerId, id));
+
+      const parentCompanyId = await storage.getParentCompanyId();
+      let updatedVouchers = 0;
+
+      for (const po of pos) {
+        const poItemsTotal = parseFloat(po.itemsTotal || "0");
+        const poFreight = parseFloat(po.freight || "0");
+        const poSurcharge = parseFloat(po.surcharge || "0");
+        const poFumigation = parseFloat(po.fumigation || "0");
+        const poDocumentCharges = parseFloat(po.documentCharges || "0");
+        const poDiscount = parseFloat(po.discount || "0");
+        const poOtherCharges = parseFloat(po.otherCharges || "0");
+        const poTotal =
+          poItemsTotal + poFreight + poSurcharge + poFumigation + poDocumentCharges - poDiscount + poOtherCharges;
+
+        if (poTotal <= 0) continue;
+
+        // Fix the purchase voucher linked directly to the PO
+        if (po.voucherId) {
+          await db
+            .update(vouchers)
+            .set({ totalAmount: poTotal.toFixed(2) })
+            .where(eq(vouchers.id, po.voucherId));
+
+          // Also update the description to use the current container number
+          const [voucherRow] = await db
+            .select({ id: vouchers.id, description: vouchers.description })
+            .from(vouchers)
+            .where(eq(vouchers.id, po.voucherId))
+            .limit(1);
+          if (voucherRow && po.supplierId) {
+            const [sup] = await db
+              .select({ legalName: suppliers.legalName })
+              .from(suppliers)
+              .where(eq(suppliers.id, po.supplierId))
+              .limit(1);
+            const expectedDesc = [container.containerNumber, sup?.legalName].filter(Boolean).join(" ");
+            // Only rewrite if description doesn't already contain the current container number
+            if (voucherRow.description && !voucherRow.description.includes(container.containerNumber)) {
+              await db
+                .update(vouchers)
+                .set({ description: expectedDesc })
+                .where(eq(vouchers.id, voucherRow.id));
+            }
+          }
+
+          const entries = await db
+            .select()
+            .from(voucherEntries)
+            .where(eq(voucherEntries.voucherId, po.voucherId));
+
+          for (const entry of entries) {
+            const origDebit = parseFloat(entry.debitAmount || "0");
+            const origCredit = parseFloat(entry.creditAmount || "0");
+
+            let isDebitEntry: boolean;
+            if (origDebit > 0 && origCredit === 0) {
+              isDebitEntry = true;
+            } else if (origCredit > 0 && origDebit === 0) {
+              isDebitEntry = false;
+            } else {
+              // Both zero (bug case): use narration/supplierId to determine direction
+              const nar = (entry.narration || "").toLowerCase();
+              isDebitEntry =
+                !entry.supplierId && (nar.includes("purchases") || nar.includes("owes us"));
+            }
+
+            if (isDebitEntry) {
+              await db
+                .update(voucherEntries)
+                .set({ debitAmount: poTotal.toFixed(2), creditAmount: "0" })
+                .where(eq(voucherEntries.id, entry.id));
+            } else {
+              await db
+                .update(voucherEntries)
+                .set({ creditAmount: poTotal.toFixed(2), debitAmount: "0" })
+                .where(eq(voucherEntries.id, entry.id));
+            }
+          }
+          updatedVouchers++;
+        }
+
+        // Fix the INTERCO-PARENT voucher in the parent company (inter-company setup)
+        if (parentCompanyId && po.companyId !== parentCompanyId) {
+          const [parentVoucher] = await db
+            .select({ id: vouchers.id })
+            .from(vouchers)
+            .where(
+              and(
+                eq(vouchers.companyId, parentCompanyId),
+                like(vouchers.voucherNumber, `INTERCO-PARENT-${po.poNumber}-%`),
+              ),
+            )
+            .limit(1);
+
+          if (parentVoucher) {
+            await db
+              .update(vouchers)
+              .set({ totalAmount: poTotal.toFixed(2) })
+              .where(eq(vouchers.id, parentVoucher.id));
+
+            const parentEntries = await db
+              .select()
+              .from(voucherEntries)
+              .where(eq(voucherEntries.voucherId, parentVoucher.id));
+
+            for (const entry of parentEntries) {
+              const origDebit = parseFloat(entry.debitAmount || "0");
+              const origCredit = parseFloat(entry.creditAmount || "0");
+
+              let isDebitEntry: boolean;
+              if (origDebit > 0 && origCredit === 0) {
+                isDebitEntry = true;
+              } else if (origCredit > 0 && origDebit === 0) {
+                isDebitEntry = false;
+              } else {
+                isDebitEntry = !entry.supplierId;
+              }
+
+              if (isDebitEntry) {
+                await db
+                  .update(voucherEntries)
+                  .set({ debitAmount: poTotal.toFixed(2), creditAmount: "0" })
+                  .where(eq(voucherEntries.id, entry.id));
+              } else {
+                await db
+                  .update(voucherEntries)
+                  .set({ creditAmount: poTotal.toFixed(2), debitAmount: "0" })
+                  .where(eq(voucherEntries.id, entry.id));
+              }
+            }
+            updatedVouchers++;
+          }
+        }
+      }
+
+      res.json({ message: `Synced ${updatedVouchers} purchase voucher(s)`, updatedVouchers });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

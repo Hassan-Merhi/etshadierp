@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Package, DollarSign, FileText, Truck, Trash2, HandCoins, Calendar, User, RotateCcw, Edit, Download, Printer, Upload, CheckCircle2, Circle, XCircle, Plus, CreditCard, Ship, ChevronDown } from "lucide-react";
+import { ArrowLeft, Package, DollarSign, FileText, Truck, Trash2, HandCoins, Calendar, User, RotateCcw, Edit, Download, Printer, Upload, CheckCircle2, Circle, XCircle, Plus, CreditCard, Ship, ChevronDown, RefreshCw } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OffloadDialog } from "@/components/OffloadDialog";
@@ -434,6 +434,29 @@ export default function ContainerDetail() {
     },
   });
 
+  // Sync purchase voucher amounts (fixes $0 balance when items were imported after PO creation)
+  const syncVoucherMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/containers/${containerId}/sync-voucher`);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+      toast({
+        title: "Voucher Synced",
+        description: data.message || "Purchase voucher amounts updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      if (error?._handledGlobally) return;
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync voucher amounts",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Reverse Offload mutation
   const reverseOffloadMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -586,6 +609,15 @@ export default function ContainerDetail() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
+            <DropdownMenuItem
+              onClick={() => syncVoucherMutation.mutate()}
+              disabled={syncVoucherMutation.isPending}
+              data-testid="button-sync-voucher"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              {syncVoucherMutation.isPending ? "Syncing..." : "Sync Supplier Balance"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => setLocation(`/containers/${containerId}/verification`)}
               data-testid="button-verify-container"
