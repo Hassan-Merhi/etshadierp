@@ -714,11 +714,10 @@ export default function FactoryStockAllocationV5() {
 
                     {/* Expandable proforma/container detail */}
                     {isExpanded && row.proformaDetails.map(proforma => {
-                      // Ready to close: has containers and all are FINALIZED or CANCELLED
-                      const isReadyToClose =
-                        proforma.containerCount > 0 &&
-                        proforma.containers.length > 0 &&
-                        proforma.containers.every(c => c.status === "FINALIZED" || c.status === "CANCELLED");
+                      // Only show active (non-finalized, non-cancelled) containers
+                      const activeContainers = proforma.containers.filter(
+                        c => c.status !== "FINALIZED" && c.status !== "CANCELLED"
+                      );
 
                       const isFocused = focusProformaId === proforma.proformaId;
                       const isFirstFocused = isFocused && !firstMatchRef.current;
@@ -742,26 +741,15 @@ export default function FactoryStockAllocationV5() {
                                 {proforma.lineQty} × {proforma.containerCount} =
                                 <span className="font-semibold text-amber-600 dark:text-amber-400 ml-1">{proforma.totalExpected} expected</span>
                               </span>
-                              {isReadyToClose && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] h-4 px-1.5 gap-0.5 text-green-700 dark:text-green-400 border-green-600/40"
-                                  data-testid={`badge-v5-ready-to-close-${proforma.proformaId}`}
-                                >
-                                  <CheckCircle2 className="h-2.5 w-2.5" />Ready to Close
-                                </Badge>
-                              )}
-                              {!isReadyToClose && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-5 px-2 text-[10px]"
-                                  data-testid={`button-v5-add-containers-${proforma.proformaId}`}
-                                  onClick={() => openAddContainers(proforma.proformaId, proforma.proformaName, proforma.containerCount)}
-                                >
-                                  <Plus className="h-2.5 w-2.5 mr-1" />Add Containers
-                                </Button>
-                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-5 px-2 text-[10px]"
+                                data-testid={`button-v5-add-containers-${proforma.proformaId}`}
+                                onClick={() => openAddContainers(proforma.proformaId, proforma.proformaName, proforma.containerCount)}
+                              >
+                                <Plus className="h-2.5 w-2.5 mr-1" />Add Containers
+                              </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -789,7 +777,7 @@ export default function FactoryStockAllocationV5() {
                                 <Pencil className="h-2.5 w-2.5 mr-1" />Edit Proforma
                               </Button>
                               {/* Edit Draft Quantities — only when at least one DRAFT container has 0 loaded bales */}
-                              {!isReadyToClose && proforma.containers.some(c => c.status === "DRAFT" && c.loadedQty === 0) && (
+                              {activeContainers.some(c => c.status === "DRAFT" && c.loadedQty === 0) && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -800,22 +788,11 @@ export default function FactoryStockAllocationV5() {
                                   <Pencil className="h-2.5 w-2.5 mr-1" />Edit Draft Qty
                                 </Button>
                               )}
-                              {isReadyToClose && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-5 px-2 text-[10px]"
-                                  data-testid={`button-v5-close-proforma-${proforma.proformaId}`}
-                                  onClick={() => setCloseDialog({ proformaId: proforma.proformaId, proformaName: proforma.proformaName })}
-                                >
-                                  <Lock className="h-2.5 w-2.5 mr-1" />Close Proforma
-                                </Button>
-                              )}
                             </div>
 
-                            {proforma.containers.length > 0 ? (
+                            {activeContainers.length > 0 ? (
                               <div className="flex flex-wrap gap-2">
-                                {proforma.containers.map(c => (
+                                {activeContainers.map(c => (
                                   <div
                                     key={c.orderId}
                                     className="flex items-center gap-1.5 bg-background border rounded-md px-2 py-1 text-xs"
