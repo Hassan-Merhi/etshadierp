@@ -101,7 +101,7 @@ export default function FactoryDispatchBatchScan() {
     refetchInterval: 15_000,
   });
 
-  const { data: auditScans = [], refetch: refetchAudit } = useQuery<AuditScan[]>({
+  const { data: auditScans = [] } = useQuery<AuditScan[]>({
     queryKey: [`/api/factory/dispatch-batches/${batchId}/audit`],
     queryFn: async () => {
       const res = await fetch(`/api/factory/dispatch-batches/${batchId}/audit`, { credentials: "include" });

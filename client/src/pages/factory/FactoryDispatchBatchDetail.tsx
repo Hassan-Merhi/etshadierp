@@ -17,7 +17,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
 import {
   Plus, Truck, Package, Scale, DollarSign, Eye, FileText, ScanLine,
-  AlertTriangle, CheckCircle, XCircle, RotateCcw, ArrowLeft, ExternalLink,
+  AlertTriangle, RotateCcw, ArrowLeft, ExternalLink,
 } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 
@@ -172,10 +172,10 @@ export default function FactoryDispatchBatchDetail() {
     },
     onSuccess: (d) => {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/dispatch-batches/${batchId}`] });
-      toast({ title: "Truck ride added", description: `Ride #${d.ride?.rideNumber} added.` });
+      toast({ title: "Truck ride added", description: `Ride #${d.rideNumber} added.` });
       setAddRideOpen(false);
       setRideForm({ truckPlate: "", driverName: "", destination: "", notes: "" });
-      if (d.ride?.id) navigate(`/factory/dispatch-batches/${batchId}/rides/${d.ride.id}/scan`);
+      if (d.id) navigate(`/factory/dispatch-batches/${batchId}/rides/${d.id}/scan`);
     },
     onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });

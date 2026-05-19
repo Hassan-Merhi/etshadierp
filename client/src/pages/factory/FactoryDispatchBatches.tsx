@@ -15,14 +15,14 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
 import {
-  Plus, Truck, Package, TrendingUp, Eye, AlertTriangle,
+  Plus, Truck, Package,
   Filter, ChevronRight, Search,
 } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 
 interface Customer { id: number; legalName: string; }
 interface ProformaLine { articleCode: string; productName: string; quantity: number; pricePerBale: string; }
-interface Proforma { id: number; name: string; customerId: number; status: string; lines?: ProformaLine[]; }
+interface Proforma { id: number; name: string; customerId: number; isActive: boolean; lines?: ProformaLine[]; }
 
 interface BatchRow {
   id: number;
@@ -120,7 +120,7 @@ export default function FactoryDispatchBatches() {
     enabled: !!form.customerId && createOpen,
   });
 
-  const activeProformas = proformas.filter((p) => ["ACTIVE", "PARTIALLY_DISPATCHED"].includes(p.status));
+  const activeProformas = proformas.filter((p) => p.isActive);
 
   const selectedProforma = proformas.find((p) => p.id === parseInt(form.proformaId));
 
@@ -349,7 +349,7 @@ export default function FactoryDispatchBatches() {
                       <SelectItem value="">No proforma</SelectItem>
                       {activeProformas.map((p) => (
                         <SelectItem key={p.id} value={String(p.id)}>
-                          {p.name} ({p.status})
+                          {p.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
