@@ -32,13 +32,13 @@ function getUsername(req: any): string {
 
 async function isAdmin(req: any, companyId: number): Promise<boolean> {
   try {
-    const userId = (req.session as any).userId || (req.session as any).user?.id;
+    const userId = (req.session as any).userId;
     if (!userId) return false;
     const rows = await db.execute(
-      sql`SELECT full_access FROM factory_user_profiles WHERE company_id = ${companyId} AND user_id = ${String(userId)} LIMIT 1`,
+      sql`SELECT role FROM user_company_roles WHERE company_id = ${companyId} AND user_id = ${String(userId)} LIMIT 1`,
     );
     const row = (rows as any).rows?.[0];
-    return row?.full_access === true;
+    return row?.role === "Admin";
   } catch {
     return false;
   }
@@ -556,8 +556,8 @@ export function registerDispatchBatchRoutes(app: Express) {
           }
         }
 
-        // 8. Calculate amount
-        const amount = bale.priceMode === "PER_KG"
+        // 8. Calculate amount (priceMode is on the batch, not the bale)
+        const amount = batch.priceMode === "PER_KG"
           ? (parseFloat(priceUsed) * parseFloat(bale.weightKg || "0")).toFixed(2)
           : priceUsed;
 
