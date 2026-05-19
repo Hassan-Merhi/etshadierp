@@ -216,7 +216,10 @@ export default function GroundScan() {
       const locParam = selectedLocationId && selectedLocationId !== "all" ? `?locationId=${selectedLocationId}` : "";
       const res = await fetch(`/api/factory/stock-entry/in-stock${locParam}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch system stock");
-      const systemBales: { referenceNumber: string; articleCode: string; productName?: string; weightKg: string }[] = await res.json();
+      const allFetched: { referenceNumber: string; articleCode: string; productName?: string; weightKg: string; isInLoadingOrder?: boolean }[] = await res.json();
+      // Exclude bales currently assigned to a LOADING container order — this matches
+      // the Location Inventory "available" count (baleCount − loadingCount).
+      const systemBales = allFetched.filter((b) => !b.isInLoadingOrder);
 
       const scannedRefs = new Set(scannedBales.map((b) => b.refCode.toUpperCase()));
       const systemRefs  = new Set(systemBales.map((b) => (b.referenceNumber || "").toUpperCase()));
