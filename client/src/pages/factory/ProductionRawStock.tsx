@@ -1944,12 +1944,12 @@ export default function ProductionRawStock() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Batch Code</TableHead>
+                  <TableHead className="min-w-40">Batch Code</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Total (kg)</TableHead>
-                  <TableHead className="text-right">Blended Cost</TableHead>
-                  <TableHead className="w-12"></TableHead>
+                  <TableHead className="min-w-32 whitespace-nowrap">Date</TableHead>
+                  <TableHead className="min-w-32 text-right whitespace-nowrap">Total (kg)</TableHead>
+                  <TableHead className="min-w-36 text-right whitespace-nowrap">Blended Cost</TableHead>
+                  <TableHead className="min-w-20"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
