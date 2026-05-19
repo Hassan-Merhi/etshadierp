@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search, Tag, Building2, ClipboardList, KeyRound } from "lucide-react";
 import { FactorySidebar, FACTORY_NAV_SECTIONS, FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
+import { SpSidebar } from "@/components/SpSidebar";
 import { PropertiesSidebar } from "@/components/PropertiesSidebar";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { DateJumpDialog } from "@/components/DateJumpDialog";
@@ -225,6 +226,15 @@ const FactoryRentalShops = lazy(() => import("@/pages/factory/FactoryRentalShops
 const FactoryRentalPayments = lazy(() => import("@/pages/factory/FactoryRentalPayments"));
 const PropertiesRentalPayments = lazy(() => import("@/pages/properties/PropertiesRentalPayments"));
 const MySettings = lazy(() => import("@/pages/MySettings"));
+
+// ── Supplier Partner pages ────────────────────────────────────────────────────
+const SpSetup           = lazy(() => import("@/pages/sp/SpSetup"));
+const SpContainers      = lazy(() => import("@/pages/sp/SpContainers"));
+const SpContainerDetail = lazy(() => import("@/pages/sp/SpContainerDetail"));
+const SpOffload         = lazy(() => import("@/pages/sp/SpOffload"));
+const SpSales           = lazy(() => import("@/pages/sp/SpSales"));
+const SpReports         = lazy(() => import("@/pages/sp/SpReports"));
+
 import { CommandPalette } from "@/components/CommandPalette";
 import { AppTopBar } from "@/components/AppTopBar";
 import { UserNotesPanel } from "@/components/UserNotesPanel";
@@ -791,6 +801,64 @@ function AuthenticatedApp() {
       </AppModeProvider>
     );
   }
+
+  // ── Supplier Partner routing block ───────────────────────────────────────
+  const isSpCompany = selectedCompany?.companyType === "supplier_partner";
+  const isSpRoute = currentLocation.startsWith("/sp/");
+
+  if (isSpCompany && !isSpRoute && currentLocation !== "/my-settings") {
+    return <Redirect to="/sp/containers" />;
+  }
+
+  if (isSpCompany && isSpRoute) {
+    return (
+      <AppModeProvider mode="erp">
+        <SidebarProvider style={style as React.CSSProperties}>
+          <div className="flex h-screen w-full">
+            <SpSidebar user={user} onLogout={handleLogout} />
+            <div className="flex flex-col flex-1 overflow-hidden">
+              <AppTopBar
+                accentColor="#9333ea"
+                user={user}
+                onLogout={handleLogout}
+                onSearchOpen={() => setPaletteOpen(true)}
+                showSearch={false}
+                leftContent={
+                  <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-purple-600/10 border border-purple-600/20">
+                    <span className="text-xs font-semibold text-purple-600 uppercase tracking-wider">Supplier Partner</span>
+                    {selectedCompany?.name && (
+                      <span className="hidden sm:inline text-xs text-purple-600/70 font-normal normal-case tracking-normal border-l border-purple-600/20 pl-2">{selectedCompany.name}</span>
+                    )}
+                  </div>
+                }
+              />
+              <OfflineBanner />
+              <main className="flex-1 overflow-y-auto p-3 sm:p-6">
+                <div className="w-full">
+                  <ErrorBoundary resetKey={currentLocation}>
+                    <Suspense fallback={<div className="flex items-center justify-center h-48 text-muted-foreground text-sm">Loading...</div>}>
+                      <Switch>
+                        <Route path="/sp/containers/:id" component={SpContainerDetail} />
+                        <Route path="/sp/containers" component={SpContainers} />
+                        <Route path="/sp/offload/:containerId" component={SpOffload} />
+                        <Route path="/sp/sales" component={SpSales} />
+                        <Route path="/sp/reports" component={SpReports} />
+                        <Route path="/sp/setup" component={SpSetup} />
+                        <Route path="/my-settings" component={MySettings} />
+                        <Route><Redirect to="/sp/containers" /></Route>
+                      </Switch>
+                    </Suspense>
+                  </ErrorBoundary>
+                </div>
+              </main>
+            </div>
+          </div>
+        </SidebarProvider>
+        {leaveConfirmDialog}
+      </AppModeProvider>
+    );
+  }
+  // ── End Supplier Partner routing block ────────────────────────────────────
 
   const isFactoryCompany = selectedCompany?.companyType === "factory" || selectedCompany?.companyType === "factory_v2";
   const isFactoryRoute = currentLocation.startsWith("/factory/");

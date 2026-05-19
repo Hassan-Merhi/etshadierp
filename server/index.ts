@@ -3105,6 +3105,145 @@ let migrationsDone = false;
     `CREATE INDEX IF NOT EXISTS cdbs_bale_idx ON customer_dispatch_bale_scans (bale_id)`,
     // Partial unique index: one active (non-removed) scan per bale across all batches
     `CREATE UNIQUE INDEX IF NOT EXISTS cdbs_bale_active_unique ON customer_dispatch_bale_scans (company_id, bale_id) WHERE removed_at IS NULL`,
+
+    // ── Supplier Partner (SP) Tables ──────────────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS sp_containers (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL,
+      supplier_name TEXT NOT NULL,
+      invoice_number VARCHAR(100) NOT NULL,
+      invoice_date DATE NOT NULL,
+      invoice_total_usd DECIMAL(20,4) NOT NULL DEFAULT 0,
+      discount_pct DECIMAL(8,4) DEFAULT 0,
+      status VARCHAR(20) NOT NULL DEFAULT 'open',
+      goods_otw_voucher_id INTEGER,
+      notes TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS sp_containers_company_idx ON sp_containers (company_id)`,
+
+    `CREATE TABLE IF NOT EXISTS sp_container_lines (
+      id SERIAL PRIMARY KEY,
+      container_id INTEGER NOT NULL,
+      company_id INTEGER NOT NULL,
+      article_code VARCHAR(100) NOT NULL,
+      description TEXT,
+      qty DECIMAL(15,4) NOT NULL DEFAULT 0,
+      unit_rate_usd DECIMAL(20,4) NOT NULL DEFAULT 0,
+      stock_item_id INTEGER
+    )`,
+    `CREATE INDEX IF NOT EXISTS sp_container_lines_container_idx ON sp_container_lines (container_id)`,
+
+    `CREATE TABLE IF NOT EXISTS sp_prepaid_charges (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL,
+      container_id INTEGER NOT NULL,
+      charge_type VARCHAR(50) NOT NULL,
+      agent_name TEXT,
+      amount_paid_usd DECIMAL(20,4) NOT NULL DEFAULT 0,
+      amount_used_usd DECIMAL(20,4) NOT NULL DEFAULT 0,
+      voucher_id INTEGER,
+      notes TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS sp_prepaid_charges_container_idx ON sp_prepaid_charges (container_id)`,
+
+    `CREATE TABLE IF NOT EXISTS sp_offloads (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL,
+      container_id INTEGER NOT NULL,
+      offload_date DATE NOT NULL,
+      total_qty DECIMAL(15,4) NOT NULL DEFAULT 0,
+      total_base_cost_usd DECIMAL(20,4) NOT NULL DEFAULT 0,
+      total_landed_cost_usd DECIMAL(20,4) NOT NULL DEFAULT 0,
+      total_final_cost_usd DECIMAL(20,4) NOT NULL DEFAULT 0,
+      voucher_id_reversal INTEGER,
+      voucher_id_stock INTEGER,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS sp_offloads_container_idx ON sp_offloads (container_id)`,
+    `CREATE INDEX IF NOT EXISTS sp_offloads_company_idx ON sp_offloads (company_id)`,
+
+    `CREATE TABLE IF NOT EXISTS sp_offload_charges (
+      id SERIAL PRIMARY KEY,
+      offload_id INTEGER NOT NULL,
+      company_id INTEGER NOT NULL,
+      charge_type VARCHAR(50) NOT NULL,
+      description TEXT,
+      amount_usd DECIMAL(20,4) NOT NULL DEFAULT 0,
+      prepaid_charge_id INTEGER,
+      credit_ledger_account_id INTEGER,
+      credit_bank_account_id INTEGER
+    )`,
+    `CREATE INDEX IF NOT EXISTS sp_offload_charges_offload_idx ON sp_offload_charges (offload_id)`,
+
+    `CREATE TABLE IF NOT EXISTS sp_stock_movements (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL,
+      container_id INTEGER NOT NULL,
+      offload_id INTEGER NOT NULL,
+      container_line_id INTEGER NOT NULL,
+      article_code VARCHAR(100) NOT NULL,
+      description TEXT,
+      stock_item_id INTEGER,
+      location_id INTEGER,
+      qty_in DECIMAL(15,4) NOT NULL DEFAULT 0,
+      qty_remaining DECIMAL(15,4) NOT NULL DEFAULT 0,
+      base_unit_cost_usd DECIMAL(20,6) NOT NULL DEFAULT 0,
+      landed_unit_cost_usd DECIMAL(20,6) NOT NULL DEFAULT 0,
+      final_unit_cost_usd DECIMAL(20,6) NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS sp_stock_movements_company_idx ON sp_stock_movements (company_id)`,
+    `CREATE INDEX IF NOT EXISTS sp_stock_movements_container_idx ON sp_stock_movements (container_id)`,
+
+    `CREATE TABLE IF NOT EXISTS sp_sales (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL,
+      sale_date DATE NOT NULL,
+      customer_name TEXT NOT NULL,
+      total_sale_price_usd DECIMAL(20,4) NOT NULL DEFAULT 0,
+      total_base_cost_usd DECIMAL(20,4) NOT NULL DEFAULT 0,
+      total_final_cost_usd DECIMAL(20,4) NOT NULL DEFAULT 0,
+      gross_profit_usd DECIMAL(20,4) NOT NULL DEFAULT 0,
+      voucher_id INTEGER,
+      status VARCHAR(20) NOT NULL DEFAULT 'posted',
+      notes TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS sp_sales_company_idx ON sp_sales (company_id)`,
+
+    `CREATE TABLE IF NOT EXISTS sp_sale_lines (
+      id SERIAL PRIMARY KEY,
+      sale_id INTEGER NOT NULL,
+      company_id INTEGER NOT NULL,
+      movement_id INTEGER NOT NULL,
+      article_code VARCHAR(100) NOT NULL,
+      description TEXT,
+      stock_item_id INTEGER,
+      qty_sold DECIMAL(15,4) NOT NULL DEFAULT 0,
+      sale_price_per_unit DECIMAL(20,4) NOT NULL DEFAULT 0,
+      base_unit_cost_usd DECIMAL(20,6) NOT NULL DEFAULT 0,
+      landed_unit_cost_usd DECIMAL(20,6) NOT NULL DEFAULT 0,
+      final_unit_cost_usd DECIMAL(20,6) NOT NULL DEFAULT 0
+    )`,
+    `CREATE INDEX IF NOT EXISTS sp_sale_lines_sale_idx ON sp_sale_lines (sale_id)`,
+
+    `CREATE TABLE IF NOT EXISTS sp_profit_splits (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL,
+      period_month VARCHAR(7) NOT NULL,
+      total_revenue DECIMAL(20,4) NOT NULL DEFAULT 0,
+      total_cogs DECIMAL(20,4) NOT NULL DEFAULT 0,
+      total_shared_charges DECIMAL(20,4) NOT NULL DEFAULT 0,
+      gross_profit DECIMAL(20,4) NOT NULL DEFAULT 0,
+      split_pct DECIMAL(8,4) NOT NULL DEFAULT 50,
+      our_share DECIMAL(20,4) NOT NULL DEFAULT 0,
+      supplier_share DECIMAL(20,4) NOT NULL DEFAULT 0,
+      finalized_at TIMESTAMP,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS sp_profit_splits_company_month_unique ON sp_profit_splits (company_id, period_month)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
