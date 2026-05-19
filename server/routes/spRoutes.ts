@@ -554,6 +554,21 @@ export function registerSpRoutes(app: Express) {
           if (chargeAmt <= 0) continue;
 
           if (charge.chargeType === "prepaid_used" && charge.prepaidChargeId) {
+            // Validate: cannot use more than remaining prepaid balance
+            const prepaidRows = await tx.execute(
+              sql`SELECT amount_paid_usd, amount_used_usd FROM sp_prepaid_charges WHERE id = ${parseInt(charge.prepaidChargeId)} FOR UPDATE`
+            );
+            const prepaidRow = (prepaidRows as any).rows?.[0] ?? (prepaidRows as any)[0];
+            if (!prepaidRow) throw new Error(`Prepaid charge #${charge.prepaidChargeId} not found`);
+            const alreadyUsed = parseNum(prepaidRow.amount_used_usd);
+            const totalPaid   = parseNum(prepaidRow.amount_paid_usd);
+            const remaining   = totalPaid - alreadyUsed;
+            if (chargeAmt > remaining + 0.0001) {
+              throw new Error(
+                `Prepaid charge #${charge.prepaidChargeId} has only ${remaining.toFixed(4)} remaining (paid ${totalPaid}, used ${alreadyUsed}), cannot use ${chargeAmt}`
+              );
+            }
+
             // Cr Prepaid Charges (asset reduces)
             if (prepaidAcct) {
               await tx.insert(voucherEntries).values({
@@ -564,10 +579,10 @@ export function registerSpRoutes(app: Express) {
                 narration: `Prepaid used — ${charge.description || "charge"} for container #${container.id}`,
               });
             }
-            // Update prepaid charge used amount
-            await tx.update(spPrepaidCharges)
-              .set({ amountUsedUsd: String(chargeAmt) })
-              .where(eq(spPrepaidCharges.id, parseInt(charge.prepaidChargeId)));
+            // Accumulate used amount (add, not overwrite)
+            await tx.execute(
+              sql`UPDATE sp_prepaid_charges SET amount_used_usd = amount_used_usd + ${chargeAmt} WHERE id = ${parseInt(charge.prepaidChargeId)}`
+            );
 
           } else if (charge.chargeType === "paid_now" && charge.creditBankAccountId) {
             await tx.insert(voucherEntries).values({

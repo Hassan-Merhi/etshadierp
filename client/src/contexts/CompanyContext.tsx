@@ -7,7 +7,7 @@ interface Company {
   code: string;
   name: string;
   active: boolean;
-  companyType: "erp" | "factory";
+  companyType: "erp" | "factory" | "factory_v2" | "properties" | "supplier_partner";
   displayCurrency?: string | null;
 }
 
