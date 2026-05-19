@@ -527,8 +527,7 @@ export function FactoryBaleProductMonthDetail() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   const filteredData = (data || []).filter((bale) => {
-    const effectiveStatus = bale.status === "IN_STOCK" && bale.isInLoadingOrder ? "LOADING" : bale.status;
-    if (statusFilter !== "all" && effectiveStatus !== statusFilter) return false;
+    if (statusFilter !== "all" && bale.status !== statusFilter) return false;
     if (searchTerm) {
       const t = searchTerm.toLowerCase();
       if (
@@ -630,7 +629,6 @@ export function FactoryBaleProductMonthDetail() {
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="IN_STOCK">In Stock</SelectItem>
-                <SelectItem value="LOADING">Loading</SelectItem>
                 <SelectItem value="SOLD">Sold</SelectItem>
                 <SelectItem value="DISPATCHED">Dispatched</SelectItem>
                 <SelectItem value="DELETED">Deleted</SelectItem>
@@ -660,7 +658,6 @@ export function FactoryBaleProductMonthDetail() {
               </TableHeader>
               <TableBody>
                 {filteredData.map((bale) => {
-                  const isLoading = bale.status === "IN_STOCK" && bale.isInLoadingOrder;
                   return (
                   <TableRow key={bale.id} data-testid={`row-bale-${bale.id}`}>
                     <TableCell
@@ -709,11 +706,7 @@ export function FactoryBaleProductMonthDetail() {
                       </TableCell>
                     )}
                     <TableCell data-testid={`text-status-${bale.id}`}>
-                      {isLoading ? (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 no-default-active-elevate">
-                          Loading
-                        </Badge>
-                      ) : bale.status === "DELETED" || bale.status === "REMOVED" ? (
+                      {bale.status === "DELETED" || bale.status === "REMOVED" ? (
                         <Badge variant="destructive">Deleted</Badge>
                       ) : bale.status === "DISPATCHED" ? (
                         <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">Dispatched</Badge>
@@ -744,7 +737,6 @@ export function FactoryBaleProductMonthDetail() {
 
           <div className="md:hidden space-y-2">
             {filteredData.map((bale) => {
-              const isLoading = bale.status === "IN_STOCK" && bale.isInLoadingOrder;
               return (
               <div
                 key={bale.id}
@@ -758,15 +750,9 @@ export function FactoryBaleProductMonthDetail() {
                   >
                     {bale.baleCode}
                   </span>
-                  {isLoading ? (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 no-default-active-elevate" data-testid={`text-mobile-status-${bale.id}`}>
-                      Loading
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary" data-testid={`text-mobile-status-${bale.id}`}>
-                      {bale.status}
-                    </Badge>
-                  )}
+                  <Badge variant="secondary" data-testid={`text-mobile-status-${bale.id}`}>
+                    {bale.status}
+                  </Badge>
                 </div>
                 <div className="text-xs mb-2">
                   <button
@@ -858,8 +844,7 @@ export function FactoryBaleProductAllMonths() {
   const sellingPricePerBale = parseFloat(responseData?.sellingPrice || "0");
 
   const filteredData = (data ?? []).filter((bale) => {
-    const effectiveStatus = bale.status === "IN_STOCK" && bale.isInLoadingOrder ? "LOADING" : bale.status;
-    if (statusFilter !== "all" && effectiveStatus !== statusFilter) return false;
+    if (statusFilter !== "all" && bale.status !== statusFilter) return false;
     return true;
   });
 
@@ -918,7 +903,6 @@ export function FactoryBaleProductAllMonths() {
               <SelectContent>
                 <SelectItem value="all">All statuses</SelectItem>
                 <SelectItem value="IN_STOCK">In Stock</SelectItem>
-                <SelectItem value="LOADING">Loading</SelectItem>
                 <SelectItem value="SOLD">Sold</SelectItem>
                 <SelectItem value="DISPATCHED">Dispatched</SelectItem>
                 <SelectItem value="DELETED">Deleted</SelectItem>
@@ -975,11 +959,7 @@ export function FactoryBaleProductAllMonths() {
                       </TableCell>
                     )}
                     <TableCell data-testid={`text-status-${bale.id}`}>
-                      {bale.status === "IN_STOCK" && bale.isInLoadingOrder ? (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 no-default-active-elevate">
-                          Loading
-                        </Badge>
-                      ) : bale.status === "DELETED" || bale.status === "REMOVED" ? (
+                      {bale.status === "DELETED" || bale.status === "REMOVED" ? (
                         <Badge variant="destructive">Deleted</Badge>
                       ) : bale.status === "DISPATCHED" ? (
                         <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">Dispatched</Badge>
