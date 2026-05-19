@@ -235,7 +235,8 @@ const SpOffload         = lazy(() => import("@/pages/sp/SpOffload"));
 const SpSales           = lazy(() => import("@/pages/sp/SpSales"));
 const SpReports         = lazy(() => import("@/pages/sp/SpReports"));
 const SpOpeningStock    = lazy(() => import("@/pages/sp/SpOpeningStock"));
-const SpAliases         = lazy(() => import("@/pages/sp/SpAliases"));
+const SpAliases             = lazy(() => import("@/pages/sp/SpAliases"));
+const SpMigrationRehearsal  = lazy(() => import("@/pages/sp/SpMigrationRehearsal"));
 
 import { CommandPalette } from "@/components/CommandPalette";
 import { AppTopBar } from "@/components/AppTopBar";
@@ -847,6 +848,7 @@ function AuthenticatedApp() {
                         <Route path="/sp/sales" component={SpSales} />
                         <Route path="/sp/reports" component={SpReports} />
                         <Route path="/sp/aliases" component={SpAliases} />
+                        <Route path="/sp/migration" component={SpMigrationRehearsal} />
                         <Route path="/sp/setup" component={SpSetup} />
                         <Route path="/my-settings" component={MySettings} />
                         <Route><Redirect to="/sp/containers" /></Route>

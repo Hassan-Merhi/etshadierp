@@ -3250,6 +3250,28 @@ let migrationsDone = false;
       created_at TIMESTAMP NOT NULL DEFAULT now()
     )`,
     `CREATE UNIQUE INDEX IF NOT EXISTS sp_profit_splits_company_month_unique ON sp_profit_splits (company_id, period_month)`,
+
+    // Phase 4: Migration rehearsal tooling
+    `CREATE TABLE IF NOT EXISTS sp_migration_rehearsal_runs (
+      id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+      source_company_id integer NOT NULL,
+      target_company_id integer NOT NULL,
+      action varchar(20) NOT NULL,
+      status varchar(20) NOT NULL DEFAULT 'pending',
+      created_at timestamp NOT NULL DEFAULT now(),
+      completed_at timestamp,
+      rows_created integer DEFAULT 0,
+      error_message text,
+      notes text
+    )`,
+    `CREATE INDEX IF NOT EXISTS sp_migration_runs_target_idx ON sp_migration_rehearsal_runs (target_company_id)`,
+    `CREATE TABLE IF NOT EXISTS sp_migration_run_rows (
+      id serial PRIMARY KEY,
+      run_id uuid NOT NULL,
+      table_name varchar(100) NOT NULL,
+      row_id integer NOT NULL
+    )`,
+    `CREATE INDEX IF NOT EXISTS sp_migration_run_rows_run_idx ON sp_migration_run_rows (run_id)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

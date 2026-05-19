@@ -66,6 +66,7 @@ import { registerFactoryStatusBuilderRoutes } from "./routes/factory/factoryStat
 import { registerFactoryStatusBuilderSheetsRoutes } from "./routes/factory/factoryStatusBuilderSheetsRoutes";
 import { registerDispatchBatchRoutes } from "./routes/factory/factoryDispatchBatchRoutes";
 import { registerSpRoutes } from "./routes/spRoutes";
+import { registerSpMigrationRoutes } from "./routes/spMigrationRoutes";
 import {
   requireAuth,
   requireRole,
@@ -1780,6 +1781,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerUserNotesRoutes(app);
 
   registerSpRoutes(app);
+  registerSpMigrationRoutes(app);
 
   const httpServer = createServer(app);
 

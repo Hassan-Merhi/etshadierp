@@ -3,16 +3,17 @@ import {
   Sidebar, SidebarContent, SidebarHeader, SidebarFooter,
   SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
 } from "@/components/ui/sidebar";
-import { Package, ShoppingBag, BarChart3, Settings2, LogOut, Handshake, Layers, Link2 } from "lucide-react";
+import { Package, ShoppingBag, BarChart3, Settings2, LogOut, Handshake, Layers, Link2, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const NAV_ITEMS = [
-  { href: "/sp/containers",    label: "Containers",    icon: Package,     testId: "link-sp-containers" },
-  { href: "/sp/opening-stock", label: "Opening Stock", icon: Layers,      testId: "link-sp-opening-stock" },
-  { href: "/sp/sales",         label: "Sales",         icon: ShoppingBag, testId: "link-sp-sales" },
-  { href: "/sp/reports",       label: "Reports",       icon: BarChart3,   testId: "link-sp-reports" },
-  { href: "/sp/aliases",       label: "Aliases",       icon: Link2,       testId: "link-sp-aliases" },
-  { href: "/sp/setup",         label: "Setup",         icon: Settings2,   testId: "link-sp-setup" },
+  { href: "/sp/containers",    label: "Containers",    icon: Package,      testId: "link-sp-containers" },
+  { href: "/sp/opening-stock", label: "Opening Stock", icon: Layers,       testId: "link-sp-opening-stock" },
+  { href: "/sp/sales",         label: "Sales",         icon: ShoppingBag,  testId: "link-sp-sales" },
+  { href: "/sp/reports",       label: "Reports",       icon: BarChart3,    testId: "link-sp-reports" },
+  { href: "/sp/aliases",       label: "Aliases",       icon: Link2,        testId: "link-sp-aliases" },
+  { href: "/sp/migration",     label: "Migration",     icon: FlaskConical, testId: "link-sp-migration" },
+  { href: "/sp/setup",         label: "Setup",         icon: Settings2,    testId: "link-sp-setup" },
 ];
 
 export function SpSidebar({ user, onLogout }: { user?: any; onLogout?: () => void }) {
