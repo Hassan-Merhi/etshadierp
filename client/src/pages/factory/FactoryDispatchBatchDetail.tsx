@@ -128,6 +128,9 @@ export default function FactoryDispatchBatchDetail() {
   const [generateOpen, setGenerateOpen] = useState(false);
   const [reopenRideId, setReopenRideId] = useState<number | null>(null);
   const [reopenReason, setReopenReason] = useState("");
+  const { data: me } = useQuery<{ role: string }>({ queryKey: ["/api/auth/me"] });
+  const isDeveloper = me?.role === "Developer";
+
   const [showBales, setShowBales] = useState(false);
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split("T")[0]);
 
@@ -561,8 +564,8 @@ export default function FactoryDispatchBatchDetail() {
         </div>
       </div>
 
-      {/* ── Scanned Bales Section ─────────────────────────────────────────── */}
-      <Card className="mx-4 mb-4">
+      {/* ── Scanned Bales Section (Developer only) ───────────────────────── */}
+      {isDeveloper && <Card className="mx-4 mb-4">
         <CardContent className="pt-3 pb-3">
           <button
             className="flex items-center gap-2 w-full text-sm font-medium text-left"
@@ -622,7 +625,7 @@ export default function FactoryDispatchBatchDetail() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
       <Dialog open={addRideOpen} onOpenChange={setAddRideOpen}>
         <DialogContent>

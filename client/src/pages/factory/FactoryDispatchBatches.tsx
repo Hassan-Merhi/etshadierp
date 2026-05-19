@@ -98,6 +98,9 @@ export default function FactoryDispatchBatches() {
   if (filterCustomer) qParams.set("customerId", filterCustomer);
   if (filterStatus)   qParams.set("status", filterStatus);
 
+  const { data: me } = useQuery<{ role: string }>({ queryKey: ["/api/auth/me"] });
+  const isDeveloper = me?.role === "Developer";
+
   const { data: batches = [], isLoading } = useQuery<BatchRow[]>({
     queryKey: [`/api/factory/dispatch-batches`, filterCustomer, filterStatus],
     queryFn: async () => {
@@ -205,15 +208,17 @@ export default function FactoryDispatchBatches() {
             <Truck className="w-3.5 h-3.5 mr-1.5" />
             Batches
           </Button>
-          <Button
-            variant={activeTab === "reports" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setActiveTab("reports")}
-            data-testid="button-tab-reports"
-          >
-            <BarChart2 className="w-3.5 h-3.5 mr-1.5" />
-            Reports
-          </Button>
+          {isDeveloper && (
+            <Button
+              variant={activeTab === "reports" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveTab("reports")}
+              data-testid="button-tab-reports"
+            >
+              <BarChart2 className="w-3.5 h-3.5 mr-1.5" />
+              Reports
+            </Button>
+          )}
           <Button onClick={() => setCreateOpen(true)} data-testid="button-new-dispatch-batch">
             <Plus className="w-4 h-4 mr-2" />
             New Dispatch Batch
@@ -224,7 +229,7 @@ export default function FactoryDispatchBatches() {
       <div className="flex-1 overflow-auto p-4 space-y-4">
 
         {/* ── Reports tab ─────────────────────────────────────────────────────── */}
-        {activeTab === "reports" && (
+        {isDeveloper && activeTab === "reports" && (
           reportsLoading ? (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24" />)}

@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,6 +56,9 @@ function fmtNum(n: number | string) {
 
 export default function FactoryBaleTracking() {
   const [, navigate] = useLocation();
+  const { data: me } = useQuery<{ role: string }>({ queryKey: ["/api/auth/me"] });
+  const isDeveloper = me?.role === "Developer";
+
   const [query, setQuery]         = useState("");
   const [submitted, setSubmitted] = useState("");
   const [loading, setLoading]     = useState(false);
@@ -95,6 +99,19 @@ export default function FactoryBaleTracking() {
     weightKg:        result.dispatch.weightKg,
     status:          result.status,
   } : null);
+
+  if (me && !isDeveloper) {
+    return (
+      <div className="p-4 max-w-2xl mx-auto space-y-5">
+        <PageHeader title="Bale Tracking" />
+        <Card>
+          <CardContent className="pt-6 pb-6 text-center text-muted-foreground">
+            You do not have access to this page.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 max-w-2xl mx-auto space-y-5">

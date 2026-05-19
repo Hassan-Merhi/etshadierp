@@ -180,6 +180,8 @@ export default function FactoryInvoiceDetail() {
   const { data: myAccess } = useQuery<{ hiddenCostFields: string[] }>({
     queryKey: ["/api/factory/my-access"],
   });
+  const { data: me } = useQuery<{ role: string }>({ queryKey: ["/api/auth/me"] });
+  const isDeveloper = me?.role === "Developer";
 
   const { data: proformas = [] } = useQuery<{ id: number; name: string; lines: { articleCode: string; pricePerBale: string }[] }[]>({
     queryKey: ["/api/factory/customer-proformas", order?.customerId],
@@ -736,8 +738,8 @@ export default function FactoryInvoiceDetail() {
         </AlertDialog>
       </div>
 
-      {/* ── Dispatch Batch Info Card ─────────────────────────────────────── */}
-      {order.dispatchBatchId && (
+      {/* ── Dispatch Batch Info Card (Developer only) ───────────────────── */}
+      {isDeveloper && order.dispatchBatchId && (
         <Card className="mb-4 border-blue-200 dark:border-blue-800">
           <CardContent className="pt-4 pb-3">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
