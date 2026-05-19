@@ -1,14 +1,19 @@
 import { useState, useRef, useEffect } from "react";
-import { ScanLine, Trash2, Download, AlertCircle, X, Package, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ScanLine, Trash2, Download, AlertCircle, X, Package, Loader2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "@/lib/excelHelper";
 import { formatNumber } from "@/lib/formatNumber";
+import type { Location } from "@shared/schema";
 
 interface ScannedBale {
   refCode: string;
@@ -33,6 +38,7 @@ function StatusBadge({ status, isInLoadingOrder }: { status: string; isInLoading
 }
 
 const STORAGE_KEY = "ground_scan_bales";
+const LOCATION_KEY = "ground_scan_locationId";
 
 function loadPersistedBales(): ScannedBale[] {
   try {
@@ -51,8 +57,16 @@ export default function GroundScan() {
   const [exporting, setExporting] = useState(false);
   const [scanError, setScanError] = useState("");
   const [scannedBales, setScannedBales] = useState<ScannedBale[]>(loadPersistedBales);
+  const [selectedLocationId, setSelectedLocationId] = useState<string>(
+    () => localStorage.getItem(LOCATION_KEY) ?? "all",
+  );
   const scanRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const { data: locations } = useQuery<Location[]>({
+    queryKey: ["/api/locations"],
+    staleTime: 60000,
+  });
 
   useEffect(() => {
     const timeout = setTimeout(() => scanRef.current?.focus(), 100);
@@ -66,6 +80,10 @@ export default function GroundScan() {
       // storage quota exceeded — silently ignore
     }
   }, [scannedBales]);
+
+  useEffect(() => {
+    localStorage.setItem(LOCATION_KEY, selectedLocationId);
+  }, [selectedLocationId]);
 
   const totalWeight = scannedBales.reduce((sum, b) => sum + b.weightKg, 0);
 
@@ -173,8 +191,9 @@ export default function GroundScan() {
     if (scannedBales.length === 0) return;
     setExporting(true);
     try {
-      // ── 1. Fetch system IN_STOCK bales ────────────────────────────────────
-      const res = await fetch("/api/factory/stock-entry/in-stock", { credentials: "include" });
+      // ── 1. Fetch system IN_STOCK bales (scoped to selected location) ──────
+      const locParam = selectedLocationId && selectedLocationId !== "all" ? `?locationId=${selectedLocationId}` : "";
+      const res = await fetch(`/api/factory/stock-entry/in-stock${locParam}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch system stock");
       const systemBales: { referenceNumber: string; articleCode: string; productName?: string; weightKg: string }[] = await res.json();
 
@@ -464,6 +483,28 @@ export default function GroundScan() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
+      {/* Location selector */}
+      <div className="flex items-center gap-2 text-sm">
+        <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+        <span className="text-muted-foreground shrink-0">Scanning location:</span>
+        <Select value={selectedLocationId} onValueChange={setSelectedLocationId} data-testid="select-ground-scan-location">
+          <SelectTrigger className="w-56" data-testid="trigger-ground-scan-location">
+            <SelectValue placeholder="All locations" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All locations</SelectItem>
+            {(locations ?? []).map((loc) => (
+              <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {selectedLocationId !== "all" && (
+          <span className="text-xs text-muted-foreground">
+            — Export Verification will compare against this location only
+          </span>
+        )}
+      </div>
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="flex-1 flex flex-col gap-2">
           <div className="relative">
