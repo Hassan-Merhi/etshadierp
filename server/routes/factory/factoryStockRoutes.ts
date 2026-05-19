@@ -1709,6 +1709,36 @@ export function registerFactoryStockRoutes(app: Express) {
     }
   });
 
+  // GET /api/factory/stock-entry/in-stock-locations
+  // Returns distinct locations that have at least one IN_STOCK factory bale,
+  // including the bale count per location. Used by Ground Scan to auto-scope verification.
+  app.get("/api/factory/stock-entry/in-stock-locations", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const rows = await db.execute(
+        sql`SELECT l.id, l.name, COUNT(fb.id)::int AS count
+            FROM factory_bales fb
+            JOIN locations l ON l.id = fb.erp_location_id
+            WHERE fb.company_id = ${companyId}
+              AND fb.status = 'IN_STOCK'
+              AND fb.erp_location_id IS NOT NULL
+            GROUP BY l.id, l.name
+            ORDER BY count DESC`,
+      );
+      const result = ((rows as any).rows ?? (rows as unknown as any[])).map((r: any) => ({
+        id: Number(r.id),
+        name: r.name as string,
+        count: Number(r.count),
+      }));
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching in-stock locations:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // GET /api/factory/bale-stock-list?articleCode=HMD123&locationId=3
   // Returns array of IN_STOCK bales with referenceNumber, weightKg, etc. for a single articleCode.
   app.get("/api/factory/bale-stock-list", requireAuth, async (req: any, res: any) => {

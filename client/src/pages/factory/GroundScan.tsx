@@ -13,7 +13,11 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "@/lib/excelHelper";
 import { formatNumber } from "@/lib/formatNumber";
-import type { Location } from "@shared/schema";
+interface StockLocation {
+  id: number;
+  name: string;
+  count: number;
+}
 
 interface ScannedBale {
   refCode: string;
@@ -63,8 +67,10 @@ export default function GroundScan() {
   const scanRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const { data: locations } = useQuery<Location[]>({
-    queryKey: ["/api/locations"],
+  // Use the factory-specific endpoint so we only see locations that actually
+  // have IN_STOCK bales — avoids confusion with ERP-only locations.
+  const { data: stockLocations } = useQuery<StockLocation[]>({
+    queryKey: ["/api/factory/stock-entry/in-stock-locations"],
     staleTime: 60000,
   });
 
@@ -85,12 +91,20 @@ export default function GroundScan() {
     localStorage.setItem(LOCATION_KEY, selectedLocationId);
   }, [selectedLocationId]);
 
-  // Auto-select the only location when there is exactly one
+  // Auto-select whenever the loaded locations resolve — not just when "all" is
+  // the stored value.  If there is exactly one location with IN_STOCK bales we
+  // always lock to it so the export is properly scoped.
   useEffect(() => {
-    if (locations && locations.length === 1 && selectedLocationId === "all") {
-      setSelectedLocationId(String(locations[0].id));
+    if (!stockLocations) return;
+    if (stockLocations.length === 1) {
+      // Single location: always force-select it regardless of what localStorage had.
+      setSelectedLocationId(String(stockLocations[0].id));
+    } else if (stockLocations.length > 1 && selectedLocationId !== "all") {
+      // Multiple locations: validate that the stored id is still valid.
+      const valid = stockLocations.some((l) => String(l.id) === selectedLocationId);
+      if (!valid) setSelectedLocationId("all");
     }
-  }, [locations]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [stockLocations]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalWeight = scannedBales.reduce((sum, b) => sum + b.weightKg, 0);
 
@@ -284,8 +298,12 @@ export default function GroundScan() {
         { key: "g", width: 14 }, { key: "h", width: 17 },
       ];
 
+      const locationLabel = selectedLocationId !== "all"
+        ? (stockLocations?.find((l) => String(l.id) === selectedLocationId)?.name ?? `Location ${selectedLocationId}`)
+        : "All Locations";
+
       // Title row
-      ws1.addRow([`Ground Stock Verification Report`]);
+      ws1.addRow([`Ground Stock Verification Report — ${locationLabel}`]);
       const titleRow = ws1.lastRow!;
       titleRow.height = 30;
       titleRow.getCell(1).font = { bold: true, size: 16, name: "Calibri", color: { argb: NAVY } };
@@ -293,7 +311,7 @@ export default function GroundScan() {
       ws1.mergeCells(`A1:H1`);
 
       // Subtitle
-      ws1.addRow([`Date: ${dateStr}   Time: ${timeStr}`]);
+      ws1.addRow([`Date: ${dateStr}   Time: ${timeStr}   |   Location: ${locationLabel}`]);
       const subRow = ws1.lastRow!;
       subRow.height = 16;
       subRow.getCell(1).font = { size: 10, name: "Calibri", color: { argb: GRAY } };
@@ -491,25 +509,32 @@ export default function GroundScan() {
   return (
     <div className="flex flex-col gap-4 p-4">
       {/* Location selector */}
-      <div className="flex items-center gap-2 text-sm">
+      <div className="flex items-center gap-2 text-sm flex-wrap">
         <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
         <span className="text-muted-foreground shrink-0">Scanning location:</span>
         <Select value={selectedLocationId} onValueChange={setSelectedLocationId} data-testid="select-ground-scan-location">
-          <SelectTrigger className="w-56" data-testid="trigger-ground-scan-location">
+          <SelectTrigger className="w-60" data-testid="trigger-ground-scan-location">
             <SelectValue placeholder="All locations" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All locations</SelectItem>
-            {(locations ?? []).map((loc) => (
-              <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+            {(stockLocations ?? []).length > 1 && (
+              <SelectItem value="all">All locations</SelectItem>
+            )}
+            {(stockLocations ?? []).map((loc) => (
+              <SelectItem key={loc.id} value={String(loc.id)}>
+                {loc.name} ({loc.count} bales)
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        {selectedLocationId !== "all" && (
-          <span className="text-xs text-muted-foreground">
-            — Export Verification will compare against this location only
-          </span>
-        )}
+        {selectedLocationId !== "all" && stockLocations && (() => {
+          const loc = stockLocations.find((l) => String(l.id) === selectedLocationId);
+          return loc ? (
+            <span className="text-xs text-muted-foreground">
+              — verifying against <strong>{loc.name}</strong> ({loc.count} system bales)
+            </span>
+          ) : null;
+        })()}
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
