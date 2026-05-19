@@ -465,7 +465,15 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         filtered = filtered.filter(r => r.proformaDetails.some(d => d.containers.some(c => c.status === q)));
       }
       if (hideZero === "true") {
-        filtered = filtered.filter(r => r.expectedToLoad > 0 || r.stockAvailable > 0 || r.totalLoaded > 0);
+        // Keep rows that have non-zero counts OR that still have at least one non-cancelled
+        // container in any linked proforma (e.g. a FINALIZED order whose bales are already SOLD
+        // and therefore no longer contribute to stockAvailable / totalLoaded / expectedToLoad).
+        filtered = filtered.filter(r =>
+          r.expectedToLoad > 0 ||
+          r.stockAvailable > 0 ||
+          r.totalLoaded > 0 ||
+          r.proformaDetails.some(d => d.containers.some(c => c.status !== "CANCELLED")),
+        );
       }
 
       const totals = {
