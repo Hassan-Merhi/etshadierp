@@ -1948,9 +1948,7 @@ export default function ProductionRawStock() {
                   <TableHead>Name</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead className="text-right">Total (kg)</TableHead>
-                  <TableHead className="text-right">Remaining (kg)</TableHead>
                   <TableHead className="text-right">Blended Cost</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -1982,14 +1980,8 @@ export default function ProductionRawStock() {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{batch.batchDate ? formatDisplayDate(batch.batchDate) : formatDisplayDate(batch.createdAt)}</TableCell>
                       <TableCell className="text-right font-mono text-sm">{formatNumber(total)}</TableCell>
-                      <TableCell className="text-right font-mono font-medium text-sm">{formatNumber(remaining)}</TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         ${parseFloat(batch.costPerKg || "0").toFixed(4)}/kg
-                      </TableCell>
-                      <TableCell>
-                        <span className={`text-xs font-medium px-2 py-1 rounded-md ${statusColors[batch.status] || "bg-muted text-muted-foreground"}`}>
-                          {batch.status === "CARRY_FORWARD" ? "Carry Fwd" : batch.status}
-                        </span>
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
