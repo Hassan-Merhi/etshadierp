@@ -501,14 +501,39 @@ export default function GroundScan() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-        <span data-testid="text-ground-scan-count">
-          <span className="font-semibold text-foreground">{scannedBales.length}</span>{" "}
-          bale{scannedBales.length !== 1 ? "s" : ""} scanned
-        </span>
-        <span data-testid="text-ground-scan-weight">
-          <span className="font-semibold text-foreground">{formatNumber(totalWeight, 2)} kg</span> total weight
-        </span>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <span data-testid="text-ground-scan-count">
+            <span className="font-semibold text-foreground">{scannedBales.length}</span>{" "}
+            bale{scannedBales.length !== 1 ? "s" : ""} scanned
+          </span>
+          <span data-testid="text-ground-scan-weight">
+            <span className="font-semibold text-foreground">{formatNumber(totalWeight, 2)} kg</span> total weight
+          </span>
+        </div>
+        {scannedBales.length > 0 && (() => {
+          const articleGroups = new Map<string, { qty: number; weight: number }>();
+          for (const b of scannedBales) {
+            const key = b.articleCode || "—";
+            const g = articleGroups.get(key) ?? { qty: 0, weight: 0 };
+            g.qty++;
+            g.weight += b.weightKg;
+            articleGroups.set(key, g);
+          }
+          return (
+            <div className="flex flex-wrap gap-2" data-testid="div-ground-scan-article-summary">
+              {[...articleGroups.entries()].map(([code, g]) => (
+                <div key={code} className="flex items-center gap-1.5 text-xs bg-muted/50 rounded-md px-2 py-1">
+                  <span className="font-mono font-semibold text-foreground">{code}</span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="text-foreground">{g.qty} bale{g.qty !== 1 ? "s" : ""}</span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="text-foreground">{formatNumber(g.weight, 2)} kg</span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
       {scannedBales.length === 0 ? (
