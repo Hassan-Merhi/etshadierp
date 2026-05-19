@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ScanLine, Trash2, Download, AlertCircle, X, Package } from "lucide-react";
+import { ScanLine, Trash2, Download, AlertCircle, X, Package, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,7 @@ function StatusBadge({ status }: { status: string }) {
 export default function GroundScan() {
   const [scanInput, setScanInput] = useState("");
   const [scanning, setScanning] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [scanError, setScanError] = useState("");
   const [scannedBales, setScannedBales] = useState<ScannedBale[]>([]);
   const scanRef = useRef<HTMLInputElement>(null);
@@ -142,39 +143,106 @@ export default function GroundScan() {
     setTimeout(() => scanRef.current?.focus(), 50);
   }
 
-  function exportExcel() {
+  async function exportExcel() {
     if (scannedBales.length === 0) return;
+    setExporting(true);
+    try {
+      // 1. Fetch all system IN_STOCK bales
+      const res = await fetch("/api/factory/stock-entry/in-stock", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch system stock");
+      const systemBales: { referenceNumber: string; articleCode: string; productName?: string; weightKg: string }[] = await res.json();
 
-    const rows = scannedBales.map((b) => ({
-      "Ref Code": b.refCode,
-      "Article Code": b.articleCode,
-      "Product Name": b.productName,
-      "Weight (kg)": b.weightKg,
-      "Status": b.status,
-    }));
+      const scannedRefs = new Set(scannedBales.map((b) => b.refCode.toUpperCase()));
+      const systemRefs = new Set(systemBales.map((b) => (b.referenceNumber || "").toUpperCase()));
 
-    const totalsRow = {
-      "Ref Code": `Total: ${scannedBales.length} bales`,
-      "Article Code": "",
-      "Product Name": "",
-      "Weight (kg)": totalWeight,
-      "Status": "",
-    };
+      // 2. Per-article summary
+      type ArticleRow = { articleCode: string; productName: string; systemQty: number; systemWeightKg: number; scannedQty: number; scannedWeightKg: number };
+      const articleMap = new Map<string, ArticleRow>();
 
-    const ws = XLSX.utils.json_to_sheet([...rows, {}, totalsRow]);
-    ws["!cols"] = [
-      { wch: 18 },
-      { wch: 16 },
-      { wch: 30 },
-      { wch: 14 },
-      { wch: 20 },
-    ];
+      for (const b of systemBales) {
+        const key = b.articleCode || "UNKNOWN";
+        if (!articleMap.has(key)) articleMap.set(key, { articleCode: key, productName: b.productName || "", systemQty: 0, systemWeightKg: 0, scannedQty: 0, scannedWeightKg: 0 });
+        const row = articleMap.get(key)!;
+        row.systemQty++;
+        row.systemWeightKg += parseFloat(b.weightKg || "0");
+      }
+      for (const b of scannedBales) {
+        const key = b.articleCode || "UNKNOWN";
+        if (!articleMap.has(key)) articleMap.set(key, { articleCode: key, productName: b.productName || "", systemQty: 0, systemWeightKg: 0, scannedQty: 0, scannedWeightKg: 0 });
+        const row = articleMap.get(key)!;
+        row.scannedQty++;
+        row.scannedWeightKg += b.weightKg;
+      }
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Ground Scan");
+      // 3. Missing bales = in system but NOT scanned
+      const missingBales = systemBales.filter((b) => !scannedRefs.has((b.referenceNumber || "").toUpperCase()));
+      // Extra bales = scanned but NOT in system
+      const extraBales = scannedBales.filter((b) => !systemRefs.has(b.refCode.toUpperCase()));
 
-    const dateStr = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(wb, `ground-scan-${dateStr}.xlsx`);
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const timeStr = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+
+      const wb = XLSX.utils.book_new();
+
+      // ── Sheet 1: Summary ──────────────────────────────────────────────────
+      const summaryAoa: any[][] = [];
+      summaryAoa.push([`Ground Stock Verification — ${dateStr} ${timeStr}`]);
+      summaryAoa.push([]);
+      summaryAoa.push([`System IN_STOCK bales`, systemBales.length, "", `Scanned on ground`, scannedBales.length]);
+      summaryAoa.push([`Missing (system not scanned)`, missingBales.length, "", `Extra (scanned not in system)`, extraBales.length]);
+      summaryAoa.push([]);
+      summaryAoa.push(["Article Code", "Product Name", "System Qty", "System Wt (kg)", "Scanned Qty", "Scanned Wt (kg)", "Missing Qty", "Missing Wt (kg)"]);
+      const summaryArticles = [...articleMap.values()].sort((a, b) => a.articleCode.localeCompare(b.articleCode));
+      for (const r of summaryArticles) {
+        const missingQty = Math.max(0, r.systemQty - r.scannedQty);
+        const missingWt = missingBales.filter((b) => (b.articleCode || "UNKNOWN") === r.articleCode).reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0);
+        summaryAoa.push([r.articleCode, r.productName, r.systemQty, +r.systemWeightKg.toFixed(3), r.scannedQty, +r.scannedWeightKg.toFixed(3), missingQty, +missingWt.toFixed(3)]);
+      }
+      summaryAoa.push([]);
+      const totalSystemWt = systemBales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0);
+      const totalMissingWt = missingBales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0);
+      summaryAoa.push(["TOTAL", "", systemBales.length, +totalSystemWt.toFixed(3), scannedBales.length, +totalWeight.toFixed(3), missingBales.length, +totalMissingWt.toFixed(3)]);
+
+      const ws1 = XLSX.utils.aoa_to_sheet(summaryAoa);
+      ws1["!cols"] = [{ wch: 16 }, { wch: 32 }, { wch: 13 }, { wch: 16 }, { wch: 13 }, { wch: 16 }, { wch: 13 }, { wch: 16 }];
+      XLSX.utils.book_append_sheet(wb, ws1, "Summary");
+
+      // ── Sheet 2: Missing Bales ────────────────────────────────────────────
+      const missingAoa: any[][] = [];
+      missingAoa.push(["Missing Bales — in system (IN_STOCK) but NOT scanned on ground"]);
+      missingAoa.push([]);
+      missingAoa.push(["Ref Number", "Article Code", "Product Name", "Weight (kg)"]);
+      for (const b of missingBales) {
+        missingAoa.push([b.referenceNumber, b.articleCode || "", b.productName || "", +parseFloat(b.weightKg || "0").toFixed(3)]);
+      }
+      if (missingBales.length === 0) missingAoa.push(["— No missing bales —", "", "", ""]);
+      missingAoa.push([]);
+      missingAoa.push([`Total missing: ${missingBales.length} bales`, "", "", +totalMissingWt.toFixed(3)]);
+
+      const ws2 = XLSX.utils.aoa_to_sheet(missingAoa);
+      ws2["!cols"] = [{ wch: 18 }, { wch: 16 }, { wch: 32 }, { wch: 14 }];
+      XLSX.utils.book_append_sheet(wb, ws2, "Missing Bales");
+
+      // ── Sheet 3: Extra Bales (scanned but not in system) ──────────────────
+      if (extraBales.length > 0) {
+        const extraAoa: any[][] = [];
+        extraAoa.push(["Extra Bales — scanned on ground but NOT found in system (IN_STOCK)"]);
+        extraAoa.push([]);
+        extraAoa.push(["Ref Code", "Article Code", "Product Name", "Weight (kg)", "Status"]);
+        for (const b of extraBales) {
+          extraAoa.push([b.refCode, b.articleCode || "", b.productName || "", +b.weightKg.toFixed(3), b.status]);
+        }
+        const ws3 = XLSX.utils.aoa_to_sheet(extraAoa);
+        ws3["!cols"] = [{ wch: 18 }, { wch: 16 }, { wch: 32 }, { wch: 14 }, { wch: 20 }];
+        XLSX.utils.book_append_sheet(wb, ws3, "Extra Bales");
+      }
+
+      await XLSX.writeFile(wb, `ground-verification-${dateStr}.xlsx`);
+    } catch (err: any) {
+      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -214,11 +282,15 @@ export default function GroundScan() {
           <Button
             variant="outline"
             onClick={exportExcel}
-            disabled={scannedBales.length === 0}
+            disabled={scannedBales.length === 0 || exporting}
             data-testid="button-ground-scan-export"
           >
-            <Download className="h-4 w-4 mr-1.5" />
-            Export
+            {exporting ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-1.5" />
+            )}
+            {exporting ? "Exporting..." : "Export Verification"}
           </Button>
           {scannedBales.length > 0 && (
             <Button
