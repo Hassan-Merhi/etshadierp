@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Loader2, Plus, Trash2, Package, ChevronRight, ClipboardPaste } from "lucide-react";
+import { Loader2, Plus, Trash2, Package, ChevronRight, ClipboardPaste, AlertTriangle, CheckCircle2 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
   DialogFooter,
@@ -70,6 +70,16 @@ export default function SpContainers() {
 
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
+  const [freightEstimate, setFreightEstimate] = useState("0");
+
+  const { data: aliases = [] } = useQuery<any[]>({ queryKey: ["/api/sp/aliases"] });
+  const aliasMap = new Map((aliases as any[]).map((a: any) => [a.alias_code, a]));
+  const watchLines = form.watch("lines");
+  const watchDiscountPct = form.watch("discountPct");
+  const previewDiscountFactor = 1 - parseFloat(watchDiscountPct || "0") / 100;
+  const previewTotalQty = watchLines.reduce((s: number, l: any) => s + parseFloat(l.qty || "0"), 0);
+  const previewFreightEst = parseFloat(freightEstimate || "0");
+  const previewFreightPerUnit = previewTotalQty > 0 ? previewFreightEst / previewTotalQty : 0;
 
   function parsePasteLines() {
     const parsed = pasteText.trim().split("\n").map(row => {
@@ -275,6 +285,65 @@ export default function SpContainers() {
                   <p className="text-xs text-destructive">{form.formState.errors.lines.root.message}</p>
                 )}
               </div>
+
+              {/* Live Cost Preview Panel */}
+              {watchLines.some((l: any) => l.articleCode) && (
+                <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cost Preview</span>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-muted-foreground whitespace-nowrap">Freight Estimate $</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={freightEstimate}
+                        onChange={e => setFreightEstimate(e.target.value)}
+                        className="h-7 w-28 text-xs"
+                        data-testid="input-sp-freight-estimate"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-0.5">
+                    <div className="grid grid-cols-6 text-xs font-medium text-muted-foreground pb-1 border-b border-border/40">
+                      <span className="col-span-2">Article</span>
+                      <span className="text-right">Base/u</span>
+                      <span className="text-right">Freight/u</span>
+                      <span className="text-right">Final/u</span>
+                      <span className="text-center">Alias</span>
+                    </div>
+                    {watchLines.filter((l: any) => l.articleCode).map((l: any, idx: number) => {
+                      const unitRate = parseFloat(l.unitRateUsd || "0");
+                      const baseU = unitRate * previewDiscountFactor;
+                      const finalU = baseU + previewFreightPerUnit;
+                      const mapped = aliasMap.has(l.articleCode);
+                      return (
+                        <div key={idx} className="grid grid-cols-6 text-xs py-1 border-b border-border/20 last:border-0">
+                          <span className="col-span-2 font-mono truncate">{l.articleCode}</span>
+                          <span className="text-right tabular-nums">${baseU.toFixed(4)}</span>
+                          <span className="text-right tabular-nums text-orange-600">${previewFreightPerUnit.toFixed(4)}</span>
+                          <span className="text-right tabular-nums font-semibold">${finalU.toFixed(4)}</span>
+                          <span className="flex justify-center">
+                            {mapped
+                              ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                              : <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {(aliases as any[]).length > 0 && watchLines.some((l: any) => l.articleCode && !aliasMap.has(l.articleCode)) && (
+                    <p className="text-xs text-amber-600 flex items-center gap-1.5">
+                      <AlertTriangle className="h-3 w-3 shrink-0" />
+                      Some articles have no alias mapping — FIFO will track by article code only.
+                    </p>
+                  )}
+                  <div className="text-xs text-muted-foreground pt-1 border-t border-border/30 flex justify-between">
+                    <span>Total qty: <strong>{previewTotalQty.toFixed(2)}</strong></span>
+                    <span>Discount: <strong>{parseFloat(watchDiscountPct || "0").toFixed(1)}%</strong></span>
+                    <span>Freight/unit: <strong>${previewFreightPerUnit.toFixed(4)}</strong></span>
+                  </div>
+                </div>
+              )}
 
               <Dialog open={pasteOpen} onOpenChange={setPasteOpen}>
                 <DialogContent>

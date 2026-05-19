@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ArrowLeft, Plus, Trash2, AlertCircle } from "lucide-react";
+import { Loader2, ArrowLeft, Plus, Trash2, AlertCircle, CheckCircle2, AlertTriangle } from "lucide-react";
 
 function formatUsd(v: any) {
   const n = parseFloat(String(v ?? "0"));
@@ -58,6 +58,9 @@ export default function SpOffload() {
   const { data: ledgerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/accounts"],
   });
+
+  const { data: aliases = [] } = useQuery<any[]>({ queryKey: ["/api/sp/aliases"] });
+  const aliasMap = new Map((aliases as any[]).map((a: any) => [a.alias_code, a]));
 
   const offloadMutation = useMutation({
     mutationFn: (body: any) => apiRequest("POST", "/api/sp/offload", body),
@@ -149,16 +152,22 @@ export default function SpOffload() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-0.5">
-            <div className="grid grid-cols-5 text-xs font-medium text-muted-foreground pb-1 border-b border-border/40">
-              <span>Article</span><span className="text-right">Qty</span>
+            <div className="grid grid-cols-6 text-xs font-medium text-muted-foreground pb-1 border-b border-border/40">
+              <span className="col-span-2">Article</span><span className="text-right">Qty</span>
               <span className="text-right">Base/u</span><span className="text-right">Landed/u</span><span className="text-right">Final/u</span>
             </div>
             {(container.lines || []).map((l: any) => {
               const baseU = parseFloat(l.unitRateUsd || "0") * discountFactor;
               const finalU = baseU + landedPerUnit;
+              const mapped = aliasMap.has(l.articleCode);
               return (
-                <div key={l.id} className="grid grid-cols-5 text-xs py-1 border-b border-border/30 last:border-0">
-                  <span className="font-mono">{l.articleCode}</span>
+                <div key={l.id} className="grid grid-cols-6 text-xs py-1 border-b border-border/30 last:border-0">
+                  <div className="col-span-2 flex items-center gap-1.5 min-w-0">
+                    <span className="font-mono truncate">{l.articleCode}</span>
+                    {mapped
+                      ? <CheckCircle2 className="h-3 w-3 text-green-600 shrink-0" />
+                      : <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />}
+                  </div>
                   <span className="text-right tabular-nums">{parseFloat(l.qty || "0").toFixed(2)}</span>
                   <span className="text-right tabular-nums">{formatUsd(baseU)}</span>
                   <span className="text-right tabular-nums text-orange-600">{formatUsd(landedPerUnit)}</span>
@@ -167,6 +176,12 @@ export default function SpOffload() {
               );
             })}
           </div>
+          {(container.lines || []).some((l: any) => !aliasMap.has(l.articleCode)) && (
+            <p className="text-xs text-amber-600 flex items-center gap-1.5 pt-1">
+              <AlertTriangle className="h-3 w-3 shrink-0" />
+              Lines without alias mapping will have FIFO tracked by article code only.
+            </p>
+          )}
         </CardContent>
       </Card>
 

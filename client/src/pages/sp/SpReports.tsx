@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, BarChart3, Package2, CreditCard, CheckCircle2, TableProperties, Download } from "lucide-react";
+import { Loader2, BarChart3, Package2, CreditCard, CheckCircle2, TableProperties, Download, Scale, Plus, Trash2 } from "lucide-react";
 
 function fmt(v: any, dec = 2) {
   const n = parseFloat(String(v ?? "0"));
@@ -39,6 +39,12 @@ export default function SpReports() {
   const [customSplitPct, setCustomSplitPct] = useState("50");
   const [detailStart, setDetailStart] = useState("");
   const [detailEnd, setDetailEnd] = useState("");
+
+  interface ReconRow { articleCode: string; expectedQty: string; expectedSales: string; expectedCOGS: string; expectedProfit: string; expectedBasePayable: string; }
+  const [reconRows, setReconRows] = useState<ReconRow[]>([]);
+  const addReconRow = () => setReconRows(prev => [...prev, { articleCode: "", expectedQty: "", expectedSales: "", expectedCOGS: "", expectedProfit: "", expectedBasePayable: "" }]);
+  const removeReconRow = (i: number) => setReconRows(prev => prev.filter((_, idx) => idx !== i));
+  const updateReconRow = (i: number, key: keyof ReconRow, value: string) => setReconRows(prev => prev.map((r, idx) => idx === i ? { ...r, [key]: value } : r));
 
   const payableUrl = "/api/sp/report/payable";
   const profitUrl = `/api/sp/report/profit${startDate || endDate ? `?${new URLSearchParams({ ...(startDate && { startDate }), ...(endDate && { endDate }) })}` : ""}`;
@@ -110,6 +116,9 @@ export default function SpReports() {
           </TabsTrigger>
           <TabsTrigger value="stock" data-testid="tab-sp-stock">
             <Package2 className="h-3.5 w-3.5 mr-1.5" /> Stock Inventory
+          </TabsTrigger>
+          <TabsTrigger value="reconciliation" data-testid="tab-sp-reconciliation">
+            <Scale className="h-3.5 w-3.5 mr-1.5" /> Reconciliation
           </TabsTrigger>
         </TabsList>
 
@@ -351,6 +360,192 @@ export default function SpReports() {
               </Card>
             </>
           )}
+        </TabsContent>
+
+        {/* Reconciliation */}
+        <TabsContent value="reconciliation" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle className="text-sm">Reconciliation — Expected vs Actual</CardTitle>
+                  <CardDescription className="text-xs">
+                    Enter expected values from your Excel sheet to compare against SP actual data.
+                    Use the Sales Detail tab date filters above to match your period.
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={addReconRow} data-testid="button-sp-recon-add-row">
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Add Article
+                  </Button>
+                  {reconRows.length > 0 && detail?.rows?.length > 0 && (
+                    <Button variant="outline" size="sm" onClick={() => {
+                      const rows = reconRows.map(r => {
+                        const actual = (detail.rows as any[]).find((d: any) => d.articleCode === r.articleCode) || {};
+                        const pn = (v: string) => parseFloat(v || "0");
+                        return {
+                          Article: r.articleCode,
+                          "Exp Qty": r.expectedQty,
+                          "Act Qty": actual.soldQty ?? "",
+                          "Qty Var": (pn(actual.soldQty) - pn(r.expectedQty)).toFixed(2),
+                          "Exp Sales $": r.expectedSales,
+                          "Act Sales $": actual.salesTotal ?? "",
+                          "Sales Var $": (pn(actual.salesTotal) - pn(r.expectedSales)).toFixed(2),
+                          "Exp COGS $": r.expectedCOGS,
+                          "Act COGS $": actual.totalFinalCost ?? "",
+                          "COGS Var $": (pn(actual.totalFinalCost) - pn(r.expectedCOGS)).toFixed(2),
+                          "Exp Profit $": r.expectedProfit,
+                          "Act Profit $": actual.grossProfit ?? "",
+                          "Profit Var $": (pn(actual.grossProfit) - pn(r.expectedProfit)).toFixed(2),
+                          "Exp BasePayable $": r.expectedBasePayable,
+                          "Act BasePayable $": actual.basePayable ?? "",
+                          "BasePayable Var $": (pn(actual.basePayable) - pn(r.expectedBasePayable)).toFixed(2),
+                        };
+                      });
+                      downloadCsv(rows, "sp-reconciliation.csv");
+                    }} data-testid="button-sp-recon-csv">
+                      <Download className="h-3.5 w-3.5 mr-1" /> Export CSV
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {reconRows.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  No rows yet. Add articles and enter expected values from your Excel file.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs" data-testid="table-sp-reconciliation">
+                    <thead>
+                      <tr className="border-b border-border/40">
+                        <th className="text-left font-medium text-muted-foreground py-1.5 pr-2 whitespace-nowrap">Article</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-1 whitespace-nowrap">Exp Qty</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-1 whitespace-nowrap">Act Qty</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-1 whitespace-nowrap">Var</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-1 whitespace-nowrap">Exp Sales</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-1 whitespace-nowrap">Act Sales</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-1 whitespace-nowrap">Var</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-1 whitespace-nowrap">Exp COGS</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-1 whitespace-nowrap">Act COGS</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-1 whitespace-nowrap">Var</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-1 whitespace-nowrap">Exp Profit</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-1 whitespace-nowrap">Act Profit</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-1 whitespace-nowrap">Var</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-1 whitespace-nowrap">Exp Payable</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-1 whitespace-nowrap">Act Payable</th>
+                        <th className="text-right font-medium text-muted-foreground py-1.5 px-1 whitespace-nowrap">Var</th>
+                        <th className="py-1.5 px-1"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reconRows.map((row, i) => {
+                        const actual = detail?.rows
+                          ? (detail.rows as any[]).find((d: any) => d.articleCode === row.articleCode)
+                          : null;
+                        const pn = (v: string | undefined) => parseFloat(v || "0");
+                        const varClass = (exp: string, act: string | undefined) => {
+                          const diff = pn(act) - pn(exp);
+                          if (Math.abs(diff) < 0.005) return "text-muted-foreground";
+                          return diff > 0 ? "text-green-600" : "text-destructive";
+                        };
+                        const fmtVar = (exp: string, act: string | undefined, isQty = false) => {
+                          const diff = pn(act) - pn(exp);
+                          return isQty ? diff.toFixed(2) : fmt(Math.abs(diff)) + (diff < 0 ? " ▼" : diff > 0 ? " ▲" : "");
+                        };
+                        return (
+                          <tr key={i} className="border-b border-border/20 last:border-0" data-testid={`row-sp-recon-${i}`}>
+                            <td className="py-1.5 pr-2">
+                              <Input
+                                className="h-6 w-24 text-xs font-mono px-1"
+                                value={row.articleCode}
+                                onChange={e => updateReconRow(i, "articleCode", e.target.value)}
+                                placeholder="Code"
+                                data-testid={`input-sp-recon-article-${i}`}
+                              />
+                            </td>
+                            <td className="text-right px-1">
+                              <Input className="h-6 w-16 text-xs text-right px-1" value={row.expectedQty} onChange={e => updateReconRow(i, "expectedQty", e.target.value)} data-testid={`input-sp-recon-qty-${i}`} />
+                            </td>
+                            <td className="text-right tabular-nums px-1 font-medium">{actual ? parseFloat(actual.soldQty || "0").toFixed(2) : <span className="text-muted-foreground">—</span>}</td>
+                            <td className={`text-right tabular-nums px-1 font-medium ${varClass(row.expectedQty, actual?.soldQty)}`}>
+                              {actual ? fmtVar(row.expectedQty, actual.soldQty, true) : "—"}
+                            </td>
+                            <td className="text-right px-1">
+                              <Input className="h-6 w-16 text-xs text-right px-1" value={row.expectedSales} onChange={e => updateReconRow(i, "expectedSales", e.target.value)} data-testid={`input-sp-recon-sales-${i}`} />
+                            </td>
+                            <td className="text-right tabular-nums px-1">{actual ? fmt(actual.salesTotal) : <span className="text-muted-foreground">—</span>}</td>
+                            <td className={`text-right tabular-nums px-1 font-medium ${varClass(row.expectedSales, actual?.salesTotal)}`}>
+                              {actual ? fmtVar(row.expectedSales, actual.salesTotal) : "—"}
+                            </td>
+                            <td className="text-right px-1">
+                              <Input className="h-6 w-16 text-xs text-right px-1" value={row.expectedCOGS} onChange={e => updateReconRow(i, "expectedCOGS", e.target.value)} data-testid={`input-sp-recon-cogs-${i}`} />
+                            </td>
+                            <td className="text-right tabular-nums px-1 text-destructive">{actual ? fmt(actual.totalFinalCost) : <span className="text-muted-foreground">—</span>}</td>
+                            <td className={`text-right tabular-nums px-1 font-medium ${varClass(row.expectedCOGS, actual?.totalFinalCost)}`}>
+                              {actual ? fmtVar(row.expectedCOGS, actual.totalFinalCost) : "—"}
+                            </td>
+                            <td className="text-right px-1">
+                              <Input className="h-6 w-16 text-xs text-right px-1" value={row.expectedProfit} onChange={e => updateReconRow(i, "expectedProfit", e.target.value)} data-testid={`input-sp-recon-profit-${i}`} />
+                            </td>
+                            <td className={`text-right tabular-nums px-1 ${pn(actual?.grossProfit) >= 0 ? "text-green-600" : "text-destructive"}`}>{actual ? fmt(actual.grossProfit) : <span className="text-muted-foreground">—</span>}</td>
+                            <td className={`text-right tabular-nums px-1 font-medium ${varClass(row.expectedProfit, actual?.grossProfit)}`}>
+                              {actual ? fmtVar(row.expectedProfit, actual.grossProfit) : "—"}
+                            </td>
+                            <td className="text-right px-1">
+                              <Input className="h-6 w-16 text-xs text-right px-1" value={row.expectedBasePayable} onChange={e => updateReconRow(i, "expectedBasePayable", e.target.value)} data-testid={`input-sp-recon-payable-${i}`} />
+                            </td>
+                            <td className="text-right tabular-nums px-1 text-orange-600">{actual ? fmt(actual.basePayable) : <span className="text-muted-foreground">—</span>}</td>
+                            <td className={`text-right tabular-nums px-1 font-medium ${varClass(row.expectedBasePayable, actual?.basePayable)}`}>
+                              {actual ? fmtVar(row.expectedBasePayable, actual.basePayable) : "—"}
+                            </td>
+                            <td className="px-1">
+                              <Button type="button" variant="ghost" size="icon" onClick={() => removeReconRow(i)} data-testid={`button-sp-recon-remove-${i}`}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    {reconRows.length > 1 && (
+                      <tfoot>
+                        <tr className="border-t border-border/60 font-semibold">
+                          <td className="py-1.5 pr-2">Total</td>
+                          <td className="text-right tabular-nums px-1">{reconRows.reduce((s, r) => s + parseFloat(r.expectedQty || "0"), 0).toFixed(2)}</td>
+                          <td className="text-right tabular-nums px-1">{detail?.rows ? (detail.rows as any[]).filter((d: any) => reconRows.some(r => r.articleCode === d.articleCode)).reduce((s: number, d: any) => s + parseFloat(d.soldQty || "0"), 0).toFixed(2) : "—"}</td>
+                          <td></td>
+                          <td className="text-right tabular-nums px-1">{fmt(reconRows.reduce((s, r) => s + parseFloat(r.expectedSales || "0"), 0))}</td>
+                          <td className="text-right tabular-nums px-1">{detail?.rows ? fmt((detail.rows as any[]).filter((d: any) => reconRows.some(r => r.articleCode === d.articleCode)).reduce((s: number, d: any) => s + parseFloat(d.salesTotal || "0"), 0)) : "—"}</td>
+                          <td></td>
+                          <td className="text-right tabular-nums px-1">{fmt(reconRows.reduce((s, r) => s + parseFloat(r.expectedCOGS || "0"), 0))}</td>
+                          <td className="text-right tabular-nums px-1">{detail?.rows ? fmt((detail.rows as any[]).filter((d: any) => reconRows.some(r => r.articleCode === d.articleCode)).reduce((s: number, d: any) => s + parseFloat(d.totalFinalCost || "0"), 0)) : "—"}</td>
+                          <td></td>
+                          <td className="text-right tabular-nums px-1">{fmt(reconRows.reduce((s, r) => s + parseFloat(r.expectedProfit || "0"), 0))}</td>
+                          <td className="text-right tabular-nums px-1">{detail?.rows ? fmt((detail.rows as any[]).filter((d: any) => reconRows.some(r => r.articleCode === d.articleCode)).reduce((s: number, d: any) => s + parseFloat(d.grossProfit || "0"), 0)) : "—"}</td>
+                          <td></td>
+                          <td className="text-right tabular-nums px-1">{fmt(reconRows.reduce((s, r) => s + parseFloat(r.expectedBasePayable || "0"), 0))}</td>
+                          <td className="text-right tabular-nums px-1">{detail?.rows ? fmt((detail.rows as any[]).filter((d: any) => reconRows.some(r => r.articleCode === d.articleCode)).reduce((s: number, d: any) => s + parseFloat(d.basePayable || "0"), 0)) : "—"}</td>
+                          <td colSpan={2}></td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="py-4">
+              <p className="text-xs text-muted-foreground">
+                <strong>How to use:</strong> Set the Sales Detail date range to match your Excel period, then add article rows here and fill in
+                expected values. Actual figures load automatically. Variance columns highlight differences — green means actual exceeds expected,
+                red means actual is below. Export to CSV for a permanent audit trail.
+              </p>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Stock */}

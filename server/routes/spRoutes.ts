@@ -321,6 +321,75 @@ export function registerSpRoutes(app: Express) {
     }
   });
 
+  // GET /api/sp/containers/:id/line-preview — enriched per-line preview with alias resolution
+  app.get("/api/sp/containers/:id/line-preview", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = await requireSpCompany(req, res);
+      if (!companyId) return;
+
+      const id = parseInt(req.params.id);
+      if (!id) return res.status(400).json({ message: "Invalid id" });
+
+      const [container] = await db
+        .select()
+        .from(spContainers)
+        .where(and(eq(spContainers.id, id), eq(spContainers.companyId, companyId)));
+
+      if (!container) return res.status(404).json({ message: "Container not found" });
+
+      const lines = await db
+        .select()
+        .from(spContainerLines)
+        .where(eq(spContainerLines.containerId, id))
+        .orderBy(asc(spContainerLines.id));
+
+      const aliasResult = await db.execute(sql`
+        SELECT a.alias_code, a.stock_item_id, si.code AS item_code, si.name AS item_name
+        FROM stock_item_code_aliases a
+        JOIN stock_items si ON si.id = a.stock_item_id
+        WHERE a.company_id = ${companyId}
+      `);
+      const aliasMap = new Map<string, { stockItemId: number; itemCode: string; itemName: string }>();
+      for (const row of aliasResult.rows as any[]) {
+        aliasMap.set(row.alias_code, { stockItemId: row.stock_item_id, itemCode: row.item_code, itemName: row.item_name });
+      }
+
+      const discountFactor = 1 - parseFloat(container.discountPct as any || "0") / 100;
+      const totalQty = lines.reduce((s, l) => s + parseFloat(l.qty as any || "0"), 0);
+
+      const enriched = lines.map(l => {
+        const alias = aliasMap.get(l.articleCode);
+        const qty = parseFloat(l.qty as any || "0");
+        const unitRate = parseFloat(l.unitRateUsd as any || "0");
+        const discountedBaseRate = unitRate * discountFactor;
+        return {
+          id: l.id,
+          articleCode: l.articleCode,
+          description: l.description,
+          qty,
+          unitRateUsd: unitRate,
+          discountedBaseRate,
+          totalBaseUsd: discountedBaseRate * qty,
+          lineProportion: totalQty > 0 ? qty / totalQty : 0,
+          aliasResolved: !!alias,
+          stockItemId: alias?.stockItemId ?? null,
+          stockItemCode: alias?.itemCode ?? null,
+          stockItemName: alias?.itemName ?? null,
+        };
+      });
+
+      res.json({
+        lines: enriched,
+        totalQty,
+        discountFactor,
+        discountPct: container.discountPct,
+        unmappedCount: enriched.filter(l => !l.aliasResolved).length,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ── Prepaid Charges ───────────────────────────────────────────────────────
 
   app.get("/api/sp/prepaid", requireAuth, async (req: any, res: any) => {
