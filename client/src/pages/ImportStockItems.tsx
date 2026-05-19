@@ -1,16 +1,20 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Upload, Download, CheckCircle2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Upload, Download, CheckCircle2, AlertCircle, Barcode, Package } from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader } from "@/components/PageHeader";
+import { Badge } from "@/components/ui/badge";
+
+// ─── New Items tab types ──────────────────────────────────────────────────────
 
 interface ImportRow {
   code: string;
@@ -25,8 +29,19 @@ interface ValidationError {
   message: string;
 }
 
-export default function ImportStockItems() {
-  const [_location, navigate] = useLocation();
+// ─── Barcodes tab types ───────────────────────────────────────────────────────
+
+interface BarcodeRow {
+  itemCode: string;
+  barcode: string;
+  status: "ok" | "duplicate" | "empty";
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// New Items tab
+// ═════════════════════════════════════════════════════════════════════════════
+
+function NewItemsTab() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [file, setFile] = useState<File | null>(null);
@@ -40,268 +55,109 @@ export default function ImportStockItems() {
       { code: "ITEM001", name: "Cotton Bale Grade A", unit: "Bale", stockGroupCode: "GRP001" },
       { code: "ITEM002", name: "Cotton Bale Grade B", unit: "Bale", stockGroupCode: "GRP001" },
     ];
-
     const ws = utils.json_to_sheet(template);
     const wb = utils.book_new();
     utils.book_append_sheet(wb, ws, "Stock Items");
     await writeFile(wb, "stock_items_template.xlsx");
-
-    toast({
-      title: "Template Downloaded",
-      description: "Use this template to prepare your stock items data",
-    });
+    toast({ title: "Template Downloaded", description: "Use this template to prepare your stock items data" });
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
-
     setFile(selectedFile);
     setErrors([]);
     setPreviewData([]);
     setImportComplete(false);
-
     try {
       const data = await selectedFile.arrayBuffer();
       const workbook = await read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = utils.sheet_to_json<any>(worksheet);
-
-      // Validate file has data
       if (jsonData.length === 0) {
-        toast({
-          title: "Empty File",
-          description: "The Excel file is empty. Please add data rows and try again.",
-          variant: "destructive",
-        });
+        toast({ title: "Empty File", description: "The Excel file is empty.", variant: "destructive" });
         return;
       }
-
-      // Read header row explicitly to get all column names (avoids issues with blank first-row cells)
       const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
       const columns = headerRow.map((h: any) => String(h || "").trim());
-      const requiredCols = ["code", "name"];
-      const missingCols = requiredCols.filter(col => !columns.includes(col));
-      
+      const missingCols = ["code", "name"].filter((c) => !columns.includes(c));
       if (missingCols.length > 0) {
-        toast({
-          title: "Missing Required Columns",
-          description: `Expected columns: ${requiredCols.join(", ")}. Found: ${columns.slice(0, 5).join(", ")}${columns.length > 5 ? "..." : ""}. Download the template to see expected format.`,
-          variant: "destructive",
-        });
+        toast({ title: "Missing Required Columns", description: `Expected: code, name. Found: ${columns.slice(0, 5).join(", ")}. Download the template.`, variant: "destructive" });
         return;
       }
-
       const validationErrors: ValidationError[] = [];
       const rows: ImportRow[] = [];
-
       jsonData.forEach((row, index) => {
-        const rowNumber = index + 2; // +2 because Excel is 1-indexed and has header row
-
-        if (!row.code || String(row.code).trim() === "") {
-          validationErrors.push({
-            row: rowNumber,
-            field: "code",
-            message: "Code is required",
-          });
-        }
-
-        if (!row.name || String(row.name).trim() === "") {
-          validationErrors.push({
-            row: rowNumber,
-            field: "name",
-            message: "Name is required",
-          });
-        }
-
-        rows.push({
-          code: String(row.code || "").trim(),
-          name: String(row.name || "").trim(),
-          unit: row.unit ? String(row.unit).trim() : "Bale",
-          stockGroupCode: row.stockGroupCode ? String(row.stockGroupCode).trim() : undefined,
-        });
+        const rowNumber = index + 2;
+        if (!row.code || String(row.code).trim() === "") validationErrors.push({ row: rowNumber, field: "code", message: "Code is required" });
+        if (!row.name || String(row.name).trim() === "") validationErrors.push({ row: rowNumber, field: "name", message: "Name is required" });
+        rows.push({ code: String(row.code || "").trim(), name: String(row.name || "").trim(), unit: row.unit ? String(row.unit).trim() : "Bale", stockGroupCode: row.stockGroupCode ? String(row.stockGroupCode).trim() : undefined });
       });
-
       setPreviewData(rows);
       setErrors(validationErrors);
-
-      if (validationErrors.length === 0) {
-        toast({
-          title: "File Validated",
-          description: `${rows.length} stock items ready to import`,
-        });
-      } else {
-        toast({
-          title: "Validation Errors Found",
-          description: `Found ${validationErrors.length} errors. Please fix them before importing.`,
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error Reading File",
-        description: "Please ensure the file is a valid Excel file (.xlsx)",
-        variant: "destructive",
-      });
+      if (validationErrors.length === 0) toast({ title: "File Validated", description: `${rows.length} stock items ready to import` });
+      else toast({ title: "Validation Errors Found", description: `${validationErrors.length} errors found. Please fix them.`, variant: "destructive" });
+    } catch {
+      toast({ title: "Error Reading File", description: "Please ensure the file is a valid Excel file (.xlsx)", variant: "destructive" });
     }
   };
 
   const handleImport = async () => {
-    if (!selectedCompany) {
-      toast({
-        title: "No Company Selected",
-        description: "Please select a company first",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (errors.length > 0) {
-      toast({
-        title: "Cannot Import",
-        description: "Please fix validation errors first",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    if (!selectedCompany) { toast({ title: "No Company Selected", variant: "destructive" }); return; }
+    if (errors.length > 0) { toast({ title: "Cannot Import", description: "Fix validation errors first", variant: "destructive" }); return; }
     setIsProcessing(true);
-
     try {
-      // Fetch stock groups to map codes to IDs
-      const stockGroupsData: any[] = await fetch("/api/stock-groups", {
-        credentials: "include",
-      }).then(res => res.json());
-      
-      const stockGroupMap = new Map(
-        stockGroupsData.map((sg: any) => [sg.code, sg.id])
-      );
-
-      const itemsToImport = previewData.map(row => {
-        const item: any = {
-          companyId: selectedCompany.id,
-          code: row.code,
-          name: row.name,
-          uom: row.unit || "Bale",
-          active: true,
-        };
-
-        // Add optional fields only if they have values
-        if (row.stockGroupCode && stockGroupMap.has(row.stockGroupCode)) {
-          item.stockGroupId = stockGroupMap.get(row.stockGroupCode);
-        }
-
+      const stockGroupsData: any[] = await fetch("/api/stock-groups", { credentials: "include" }).then((r) => r.json());
+      const stockGroupMap = new Map(stockGroupsData.map((sg: any) => [sg.code, sg.id]));
+      const itemsToImport = previewData.map((row) => {
+        const item: any = { companyId: selectedCompany.id, code: row.code, name: row.name, uom: row.unit || "Bale", active: true };
+        if (row.stockGroupCode && stockGroupMap.has(row.stockGroupCode)) item.stockGroupId = stockGroupMap.get(row.stockGroupCode);
         return item;
       });
-
       await apiRequest("POST", "/api/stock-items/import", { items: itemsToImport });
-
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-
       setImportComplete(true);
-      toast({
-        title: "Import Successful",
-        description: `Successfully imported ${itemsToImport.length} stock items`,
-      });
+      toast({ title: "Import Successful", description: `Successfully imported ${itemsToImport.length} stock items` });
     } catch (error: any) {
-      toast({
-        title: "Import Failed",
-        description: error.message || "Failed to import stock items",
-        variant: "destructive",
-      });
+      toast({ title: "Import Failed", description: error.message || "Failed to import stock items", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleReset = async () => {
-    setFile(null);
-    setPreviewData([]);
-    setErrors([]);
-    setImportComplete(false);
-  };
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate("/accounting-create")}
-          data-testid="button-back"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <PageHeader title="Import Stock Items" subtitle="Bulk import stock items from Excel spreadsheet" />
-        </div>
-      </div>
-
+    <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle>Upload Excel File</CardTitle>
-          <CardDescription>
-            Download the template, fill in your stock items data, and upload it here
-          </CardDescription>
+          <CardDescription>Download the template, fill in your stock items data, and upload it here</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-4">
-            <Button
-              variant="outline"
-              onClick={downloadTemplate}
-              data-testid="button-download-template"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Download Template
-            </Button>
-          </div>
-
+          <Button variant="outline" onClick={downloadTemplate} data-testid="button-download-template">
+            <Download className="h-4 w-4 mr-2" />
+            Download Template
+          </Button>
           <div className="space-y-2">
             <Label htmlFor="file-upload">Select Excel File</Label>
-            <Input
-              id="file-upload"
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFileChange}
-              disabled={isProcessing || importComplete}
-              data-testid="input-file-upload"
-            />
-            {file && (
-              <p className="text-sm text-muted-foreground">
-                Selected: {file.name}
-              </p>
-            )}
+            <Input id="file-upload" type="file" accept=".xlsx,.xls" onChange={handleFileChange} disabled={isProcessing || importComplete} data-testid="input-file-upload" />
+            {file && <p className="text-sm text-muted-foreground">Selected: {file.name}</p>}
           </div>
-
           {errors.length > 0 && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                <div className="font-semibold mb-2">
-                  {errors.length} validation error{errors.length > 1 ? "s" : ""} found:
-                </div>
+                <div className="font-semibold mb-2">{errors.length} validation error{errors.length > 1 ? "s" : ""} found:</div>
                 <ul className="list-disc list-inside space-y-1">
-                  {errors.slice(0, 10).map((error, index) => (
-                    <li key={index} className="text-sm">
-                      Row {error.row}, {error.field}: {error.message}
-                    </li>
-                  ))}
-                  {errors.length > 10 && (
-                    <li className="text-sm">
-                      ... and {errors.length - 10} more errors
-                    </li>
-                  )}
+                  {errors.slice(0, 10).map((e, i) => <li key={i} className="text-sm">Row {e.row}, {e.field}: {e.message}</li>)}
+                  {errors.length > 10 && <li className="text-sm">... and {errors.length - 10} more</li>}
                 </ul>
               </AlertDescription>
             </Alert>
           )}
-
           {importComplete && (
             <Alert>
               <CheckCircle2 className="h-4 w-4" />
-              <AlertDescription>
-                Import completed successfully! {previewData.length} stock items have been created.
-              </AlertDescription>
+              <AlertDescription>Import completed successfully! {previewData.length} stock items created.</AlertDescription>
             </Alert>
           )}
         </CardContent>
@@ -311,15 +167,13 @@ export default function ImportStockItems() {
         <Card>
           <CardHeader>
             <CardTitle>Preview ({previewData.length} items)</CardTitle>
-            <CardDescription>
-              Review the data before importing
-            </CardDescription>
+            <CardDescription>Review the data before importing</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="border rounded-md overflow-auto max-h-96">
               <table className="w-full">
                 <thead className="sticky top-0 z-30 bg-muted/50">
-                  <tr className="border-b bg-muted/50">
+                  <tr className="border-b">
                     <th className="text-left p-2 text-sm font-medium">Code</th>
                     <th className="text-left p-2 text-sm font-medium">Name</th>
                     <th className="text-left p-2 text-sm font-medium">Unit</th>
@@ -327,21 +181,243 @@ export default function ImportStockItems() {
                   </tr>
                 </thead>
                 <tbody>
-                  {previewData.slice(0, 50).map((item, index) => (
-                    <tr key={index} className="border-b last:border-b-0">
+                  {previewData.slice(0, 50).map((item, i) => (
+                    <tr key={i} className="border-b last:border-b-0">
                       <td className="p-2 text-sm">{item.code}</td>
                       <td className="p-2 text-sm">{item.name}</td>
                       <td className="p-2 text-sm">{item.unit}</td>
-                      <td className="p-2 text-sm text-muted-foreground">
-                        {item.stockGroupCode || "-"}
+                      <td className="p-2 text-sm text-muted-foreground">{item.stockGroupCode || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {previewData.length > 50 && <div className="p-2 text-center text-sm text-muted-foreground border-t">... and {previewData.length - 50} more items</div>}
+            </div>
+            <div className="flex gap-4 mt-4">
+              <Button onClick={handleImport} disabled={isProcessing || errors.length > 0 || importComplete} data-testid="button-import">
+                <Upload className="h-4 w-4 mr-2" />
+                {isProcessing ? "Importing..." : "Import Stock Items"}
+              </Button>
+              {importComplete && (
+                <Button variant="outline" onClick={() => { setFile(null); setPreviewData([]); setErrors([]); setImportComplete(false); }} data-testid="button-import-another">
+                  Import Another File
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Barcodes tab
+// ═════════════════════════════════════════════════════════════════════════════
+
+function BarcodesTab() {
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [rows, setRows] = useState<BarcodeRow[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [result, setResult] = useState<{ imported: number; skipped: number; notFound: number; notFoundCodes: string[] } | null>(null);
+
+  const downloadTemplate = async () => {
+    const wb = new (ExcelJS as any).Workbook();
+    const ws = wb.addWorksheet("Barcodes");
+    ws.columns = [
+      { header: "Item Code", key: "itemCode", width: 20 },
+      { header: "Barcode",   key: "barcode",  width: 30 },
+    ];
+    ws.getRow(1).font = { bold: true };
+    ws.addRow({ itemCode: "ITEM001", barcode: "6291041500213" });
+    ws.addRow({ itemCode: "ITEM001", barcode: "6291041500220" });
+    ws.addRow({ itemCode: "ITEM002", barcode: "5000112637922" });
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "barcode_import_template.xlsx"; a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Template Downloaded", description: "Fill in Item Code and Barcode columns, then upload" });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setFile(f);
+    setResult(null);
+    try {
+      const data = await f.arrayBuffer();
+      const workbook = await read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = utils.sheet_to_json<any>(worksheet);
+
+      if (jsonData.length === 0) {
+        toast({ title: "Empty File", description: "The file has no data rows.", variant: "destructive" });
+        return;
+      }
+
+      // Detect columns (case-insensitive)
+      const firstRow = jsonData[0];
+      const keys = Object.keys(firstRow);
+      const itemCodeKey = keys.find((k) => k.toLowerCase().replace(/[\s_]/g, "") === "itemcode") ?? keys[0];
+      const barcodeKey  = keys.find((k) => k.toLowerCase() === "barcode") ?? keys[1];
+
+      if (!itemCodeKey || !barcodeKey) {
+        toast({ title: "Column Not Found", description: `Expected "Item Code" and "Barcode" columns. Download the template for the correct format.`, variant: "destructive" });
+        return;
+      }
+
+      const seen = new Set<string>();
+      const parsed: BarcodeRow[] = jsonData.map((row) => {
+        const itemCode = String(row[itemCodeKey] || "").trim();
+        const barcode  = String(row[barcodeKey]  || "").trim();
+        const key = `${itemCode.toLowerCase()}|${barcode.toLowerCase()}`;
+        let status: BarcodeRow["status"] = "ok";
+        if (!itemCode || !barcode) status = "empty";
+        else if (seen.has(key)) status = "duplicate";
+        else seen.add(key);
+        return { itemCode, barcode, status };
+      });
+
+      setRows(parsed);
+      const valid = parsed.filter((r) => r.status === "ok").length;
+      const dups  = parsed.filter((r) => r.status === "duplicate").length;
+      const empty = parsed.filter((r) => r.status === "empty").length;
+      toast({
+        title: "File Loaded",
+        description: `${valid} valid rows${dups ? `, ${dups} duplicate${dups > 1 ? "s" : ""}` : ""}${empty ? `, ${empty} empty` : ""}`,
+      });
+    } catch {
+      toast({ title: "Error Reading File", description: "Please ensure the file is a valid Excel file (.xlsx)", variant: "destructive" });
+    }
+  };
+
+  const handleImport = async () => {
+    const validRows = rows.filter((r) => r.status === "ok");
+    if (validRows.length === 0) { toast({ title: "Nothing to Import", description: "No valid rows found.", variant: "destructive" }); return; }
+    setIsProcessing(true);
+    try {
+      const res = await apiRequest("POST", "/api/stock-items/import-barcodes", { rows: validRows.map((r) => ({ itemCode: r.itemCode, barcode: r.barcode })) }) as any;
+      setResult(res);
+      toast({
+        title: "Import Complete",
+        description: `${res.imported} barcodes added${res.skipped ? `, ${res.skipped} skipped (already exist)` : ""}${res.notFound ? `, ${res.notFound} item code(s) not found` : ""}`,
+        variant: res.notFound > 0 ? "destructive" : "default",
+      });
+    } catch (error: any) {
+      toast({ title: "Import Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const validCount = rows.filter((r) => r.status === "ok").length;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Upload Barcode File</CardTitle>
+          <CardDescription>
+            Match barcodes to existing items using their Item Code. Each row assigns one barcode to one item — you can have multiple rows for the same item.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-md border bg-muted/40 p-4 text-sm space-y-1">
+            <p className="font-medium">Required columns</p>
+            <p className="text-muted-foreground"><span className="font-mono bg-background px-1 rounded">Item Code</span> — must match the primary code of an existing item exactly</p>
+            <p className="text-muted-foreground"><span className="font-mono bg-background px-1 rounded">Barcode</span> — the barcode/alias to register (e.g. EAN-13, UPC)</p>
+            <p className="text-muted-foreground">One item can have many barcodes — just add multiple rows with the same Item Code.</p>
+          </div>
+
+          <Button variant="outline" onClick={downloadTemplate} data-testid="button-download-barcode-template">
+            <Download className="h-4 w-4 mr-2" />
+            Download Template
+          </Button>
+
+          <div className="space-y-2">
+            <Label htmlFor="barcode-file-upload">Select Excel File</Label>
+            <Input
+              id="barcode-file-upload"
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleFileChange}
+              disabled={isProcessing}
+              data-testid="input-barcode-file-upload"
+            />
+            {file && <p className="text-sm text-muted-foreground">Selected: {file.name}</p>}
+          </div>
+
+          {result && (
+            <Alert variant={result.notFound > 0 ? "destructive" : "default"}>
+              <CheckCircle2 className="h-4 w-4" />
+              <AlertDescription className="space-y-1">
+                <p><strong>{result.imported}</strong> barcodes imported successfully</p>
+                {result.skipped > 0 && <p className="text-muted-foreground">{result.skipped} skipped (already assigned)</p>}
+                {result.notFound > 0 && (
+                  <div>
+                    <p>{result.notFound} item code(s) not found:</p>
+                    <p className="font-mono text-xs mt-1">{result.notFoundCodes.slice(0, 10).join(", ")}{result.notFoundCodes.length > 10 ? ` +${result.notFoundCodes.length - 10} more` : ""}</p>
+                  </div>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      {rows.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 flex-wrap">
+              Preview
+              <Badge variant="secondary">{validCount} valid</Badge>
+              {rows.filter((r) => r.status === "duplicate").length > 0 && (
+                <Badge variant="outline">{rows.filter((r) => r.status === "duplicate").length} duplicate</Badge>
+              )}
+              {rows.filter((r) => r.status === "empty").length > 0 && (
+                <Badge variant="outline">{rows.filter((r) => r.status === "empty").length} empty</Badge>
+              )}
+            </CardTitle>
+            <CardDescription>Only "valid" rows will be imported. Duplicates and empty rows are skipped.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="border rounded-md overflow-auto max-h-96">
+              <table className="w-full">
+                <thead className="sticky top-0 z-30 bg-muted/50">
+                  <tr className="border-b">
+                    <th className="text-left p-2 text-sm font-medium w-8">#</th>
+                    <th className="text-left p-2 text-sm font-medium">Item Code</th>
+                    <th className="text-left p-2 text-sm font-medium">Barcode</th>
+                    <th className="text-left p-2 text-sm font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.slice(0, 200).map((row, i) => (
+                    <tr
+                      key={i}
+                      className={`border-b last:border-b-0 ${row.status !== "ok" ? "opacity-50" : ""}`}
+                      data-testid={`row-barcode-preview-${i}`}
+                    >
+                      <td className="p-2 text-sm text-muted-foreground">{i + 2}</td>
+                      <td className="p-2 text-sm font-mono">{row.itemCode || <span className="text-muted-foreground italic">empty</span>}</td>
+                      <td className="p-2 text-sm font-mono">{row.barcode || <span className="text-muted-foreground italic">empty</span>}</td>
+                      <td className="p-2">
+                        {row.status === "ok"        && <Badge className="bg-green-600 text-white border-0">Valid</Badge>}
+                        {row.status === "duplicate" && <Badge variant="outline">Duplicate</Badge>}
+                        {row.status === "empty"     && <Badge variant="outline">Empty</Badge>}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {previewData.length > 50 && (
+              {rows.length > 200 && (
                 <div className="p-2 text-center text-sm text-muted-foreground border-t">
-                  ... and {previewData.length - 50} more items
+                  Showing first 200 of {rows.length} rows
                 </div>
               )}
             </div>
@@ -349,17 +425,17 @@ export default function ImportStockItems() {
             <div className="flex gap-4 mt-4">
               <Button
                 onClick={handleImport}
-                disabled={isProcessing || errors.length > 0 || importComplete}
-                data-testid="button-import"
+                disabled={isProcessing || validCount === 0 || !!result}
+                data-testid="button-import-barcodes"
               >
                 <Upload className="h-4 w-4 mr-2" />
-                {isProcessing ? "Importing..." : "Import Stock Items"}
+                {isProcessing ? "Importing..." : `Import ${validCount} Barcode${validCount !== 1 ? "s" : ""}`}
               </Button>
-              {importComplete && (
+              {result && (
                 <Button
                   variant="outline"
-                  onClick={handleReset}
-                  data-testid="button-import-another"
+                  onClick={() => { setFile(null); setRows([]); setResult(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                  data-testid="button-import-barcodes-reset"
                 >
                   Import Another File
                 </Button>
@@ -368,6 +444,46 @@ export default function ImportStockItems() {
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Page shell
+// ═════════════════════════════════════════════════════════════════════════════
+
+export default function ImportStockItems() {
+  const [_location, navigate] = useLocation();
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/accounting-create")} data-testid="button-back">
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <PageHeader title="Import Stock Items" subtitle="Bulk import items or assign barcodes from Excel" />
+      </div>
+
+      <Tabs defaultValue="items">
+        <TabsList>
+          <TabsTrigger value="items" data-testid="tab-new-items">
+            <Package className="h-4 w-4 mr-2" />
+            New Items
+          </TabsTrigger>
+          <TabsTrigger value="barcodes" data-testid="tab-barcodes">
+            <Barcode className="h-4 w-4 mr-2" />
+            Barcodes
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="items" className="mt-4">
+          <NewItemsTab />
+        </TabsContent>
+
+        <TabsContent value="barcodes" className="mt-4">
+          <BarcodesTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

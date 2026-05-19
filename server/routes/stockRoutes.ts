@@ -1412,6 +1412,72 @@ export function registerStockRoutes(app: Express) {
     },
   );
 
+  // ── Bulk barcode import (assigns alias codes to existing stock items) ──────────
+  app.post("/api/stock-items/import-barcodes", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { rows } = req.body as { rows: { itemCode: string; barcode: string }[] };
+      if (!Array.isArray(rows) || rows.length === 0)
+        return res.status(400).json({ message: "rows must be a non-empty array" });
+
+      // Build a lookup map: primary code (lower) → stockItem
+      const allItems = await db
+        .select({ id: stockItems.id, code: stockItems.code })
+        .from(stockItems)
+        .where(eq(stockItems.companyId, companyId));
+      const itemByCode = new Map(allItems.map((i) => [i.code.trim().toLowerCase(), i.id]));
+
+      // Also build alias → stockItemId map so we can detect barcodes already assigned
+      const allAliases = await db
+        .select({ aliasCode: stockItemCodeAliases.aliasCode, stockItemId: stockItemCodeAliases.stockItemId })
+        .from(stockItemCodeAliases)
+        .where(eq(stockItemCodeAliases.companyId, companyId));
+      const aliasByCode = new Map(allAliases.map((a) => [a.aliasCode.trim().toLowerCase(), a.stockItemId]));
+
+      let imported = 0;
+      let skipped = 0;
+      const notFoundCodes: string[] = [];
+
+      for (const row of rows) {
+        const itemCodeKey = (row.itemCode || "").trim().toLowerCase();
+        const barcodeKey  = (row.barcode  || "").trim().toLowerCase();
+        const barcodeRaw  = (row.barcode  || "").trim();
+
+        if (!itemCodeKey || !barcodeKey) { skipped++; continue; }
+
+        const stockItemId = itemByCode.get(itemCodeKey);
+        if (!stockItemId) {
+          notFoundCodes.push(row.itemCode);
+          continue;
+        }
+
+        // Skip if barcode is already the primary code of this item
+        if (itemCodeKey === barcodeKey) { skipped++; continue; }
+
+        // Skip if already an alias (anywhere in the company)
+        if (aliasByCode.has(barcodeKey)) { skipped++; continue; }
+
+        try {
+          await db.insert(stockItemCodeAliases).values({
+            companyId,
+            stockItemId,
+            aliasCode: barcodeRaw,
+          }).onConflictDoNothing();
+          aliasByCode.set(barcodeKey, stockItemId); // prevent re-insert in same batch
+          imported++;
+        } catch {
+          skipped++;
+        }
+      }
+
+      res.json({ imported, skipped, notFound: notFoundCodes.length, notFoundCodes });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ── Grade/Category Template Import ────────────────────────────────────────────
 
   app.post("/api/stock-items/import-grade-category-template", requireAuth, requireNonPOS, upload.single("file"), async (req: any, res) => {
