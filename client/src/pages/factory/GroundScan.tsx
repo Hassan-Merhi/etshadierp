@@ -85,6 +85,13 @@ export default function GroundScan() {
     localStorage.setItem(LOCATION_KEY, selectedLocationId);
   }, [selectedLocationId]);
 
+  // Auto-select the only location when there is exactly one
+  useEffect(() => {
+    if (locations && locations.length === 1 && selectedLocationId === "all") {
+      setSelectedLocationId(String(locations[0].id));
+    }
+  }, [locations]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const totalWeight = scannedBales.reduce((sum, b) => sum + b.weightKg, 0);
 
   async function handleScan() {
