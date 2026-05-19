@@ -666,23 +666,21 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           return { ok: false, httpStatus: 400, body: { message: "Bale already added to this order" } };
         }
 
-        // V5 guard: proformaIdUsed IS NOT NULL
-        // V5 bales remain IN_STOCK during loading so the RESERVED_FOR_ORDER check above cannot
-        // catch cross-order duplicates. Explicitly verify this bale is not already linked to
-        // any other active (non-CANCELLED) order.
-        if (order.proformaIdUsed) {
-          const v5DupCheck = await tx.execute(
-            sql`SELECT cob.order_id FROM customer_order_bales cob
-                JOIN customer_orders co ON co.id = cob.order_id
-                WHERE cob.bale_id = ${bale.id}
-                  AND co.status != 'CANCELLED'
-                  AND cob.order_id != ${orderId}
-                LIMIT 1`,
-          );
-          const v5DupRow = (v5DupCheck as any).rows?.[0];
-          if (v5DupRow) {
-            return { ok: false, httpStatus: 400, body: { message: `Bale ${bale.referenceNumber || scanCode} is already loaded in another active order` } };
-          }
+        // Universal cross-order duplicate check: block if this bale is already in any other
+        // active (non-CANCELLED) order. This covers both V5 orders (bales stay IN_STOCK so the
+        // RESERVED_FOR_ORDER status check above cannot catch them) and non-V5 mixed scenarios
+        // where a V5 order's IN_STOCK bale could otherwise slip through onto a non-V5 order.
+        const crossOrderDupCheck = await tx.execute(
+          sql`SELECT cob.order_id FROM customer_order_bales cob
+              JOIN customer_orders co ON co.id = cob.order_id
+              WHERE cob.bale_id = ${bale.id}
+                AND co.status != 'CANCELLED'
+                AND cob.order_id != ${orderId}
+              LIMIT 1`,
+        );
+        const crossOrderDupRow = (crossOrderDupCheck as any).rows?.[0];
+        if (crossOrderDupRow) {
+          return { ok: false, httpStatus: 400, body: { message: `Bale ${bale.referenceNumber || scanCode} is already loaded in another active order` } };
         }
 
         let priceUsed = "0";
@@ -850,21 +848,18 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
             if (!bale) return { kind: "notFound" as const };
             if (alreadyAddedBaleIds.has(bale.id)) return { kind: "skipDuplicate" as const };
 
-            // V5 guard: proformaIdUsed IS NOT NULL
-            // V5 bales stay IN_STOCK, so the same bale could appear as available in multiple orders.
-            // Reject if this bale is already linked to any other active (non-CANCELLED) order.
-            if (order.proformaIdUsed) {
-              const v5DupCheck = await tx.execute(
-                sql`SELECT cob.order_id FROM customer_order_bales cob
-                    JOIN customer_orders co ON co.id = cob.order_id
-                    WHERE cob.bale_id = ${bale.id}
-                      AND co.status != 'CANCELLED'
-                      AND cob.order_id != ${orderId}
-                    LIMIT 1`,
-              );
-              const v5DupRow = (v5DupCheck as any).rows?.[0];
-              if (v5DupRow) return { kind: "notFound" as const };
-            }
+            // Universal cross-order duplicate check: block if this bale is already in any other
+            // active (non-CANCELLED) order regardless of V5/non-V5 type.
+            const bulkCrossOrderCheck = await tx.execute(
+              sql`SELECT cob.order_id FROM customer_order_bales cob
+                  JOIN customer_orders co ON co.id = cob.order_id
+                  WHERE cob.bale_id = ${bale.id}
+                    AND co.status != 'CANCELLED'
+                    AND cob.order_id != ${orderId}
+                  LIMIT 1`,
+            );
+            const bulkCrossOrderRow = (bulkCrossOrderCheck as any).rows?.[0];
+            if (bulkCrossOrderRow) return { kind: "notFound" as const };
 
             let priceUsed = "0";
             if (order.proformaIdUsed) {
