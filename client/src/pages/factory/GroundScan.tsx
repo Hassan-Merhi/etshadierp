@@ -32,12 +32,25 @@ function StatusBadge({ status, isInLoadingOrder }: { status: string; isInLoading
   return <Badge variant="outline">{status}</Badge>;
 }
 
+const STORAGE_KEY = "ground_scan_bales";
+
+function loadPersistedBales(): ScannedBale[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as (Omit<ScannedBale, "scannedAt"> & { scannedAt: string })[];
+    return parsed.map((b) => ({ ...b, scannedAt: new Date(b.scannedAt) }));
+  } catch {
+    return [];
+  }
+}
+
 export default function GroundScan() {
   const [scanInput, setScanInput] = useState("");
   const [scanning, setScanning] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [scanError, setScanError] = useState("");
-  const [scannedBales, setScannedBales] = useState<ScannedBale[]>([]);
+  const [scannedBales, setScannedBales] = useState<ScannedBale[]>(loadPersistedBales);
   const scanRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -45,6 +58,14 @@ export default function GroundScan() {
     const timeout = setTimeout(() => scanRef.current?.focus(), 100);
     return () => clearTimeout(timeout);
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(scannedBales));
+    } catch {
+      // storage quota exceeded — silently ignore
+    }
+  }, [scannedBales]);
 
   const totalWeight = scannedBales.reduce((sum, b) => sum + b.weightKg, 0);
 
