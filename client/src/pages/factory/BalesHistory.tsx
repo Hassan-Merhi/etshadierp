@@ -774,15 +774,19 @@ export default function BalesHistory() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
-                                <Button size="icon" variant="ghost" onClick={() => setRepackConfirm(row)} disabled={bale.status === "REPACKED" || bale.status === "SOLD"} title="Repack bale" data-testid={`button-repack-${bale.id}`}>
-                                  <RefreshCw className="h-4 w-4" />
-                                </Button>
+                                {myAccess?.fullAccess && (
+                                  <Button size="icon" variant="ghost" onClick={() => setRepackConfirm(row)} disabled={bale.status === "REPACKED" || bale.status === "SOLD"} title="Repack bale" data-testid={`button-repack-${bale.id}`}>
+                                    <RefreshCw className="h-4 w-4" />
+                                  </Button>
+                                )}
                                 <Button size="icon" variant="ghost" onClick={() => handleReprint(row)} data-testid={`button-reprint-${bale.id}`}>
                                   <Printer className="h-4 w-4" />
                                 </Button>
-                                <Button size="icon" variant="ghost" onClick={() => setDeleteConfirm(bale.id)} data-testid={`button-delete-${bale.id}`}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                {myAccess?.fullAccess && (
+                                  <Button size="icon" variant="ghost" onClick={() => setDeleteConfirm(bale.id)} data-testid={`button-delete-${bale.id}`}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>
