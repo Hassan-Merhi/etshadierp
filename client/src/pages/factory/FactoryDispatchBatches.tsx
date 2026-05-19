@@ -67,8 +67,8 @@ export default function FactoryDispatchBatches() {
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
 
-  const [filterCustomer, setFilterCustomer] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
+  const [filterCustomer, setFilterCustomer] = useState("_all");
+  const [filterStatus, setFilterStatus] = useState("_all");
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"list" | "reports">("list");
@@ -76,7 +76,7 @@ export default function FactoryDispatchBatches() {
 
   const [form, setForm] = useState({
     customerId: "",
-    proformaId: "",
+    proformaId: "_none",
     batchDate: new Date().toISOString().split("T")[0],
     currency: "USD",
     priceMode: "PER_BALE",
@@ -88,15 +88,15 @@ export default function FactoryDispatchBatches() {
     const params = new URLSearchParams(searchStr);
     if (params.get("openCreate") === "1") {
       const cid = params.get("customerId") || "";
-      const pid = params.get("proformaId") || "";
+      const pid = params.get("proformaId") || "_none";
       setForm((f) => ({ ...f, customerId: cid, proformaId: pid }));
       setCreateOpen(true);
     }
   }, [searchStr]);
 
   const qParams = new URLSearchParams();
-  if (filterCustomer) qParams.set("customerId", filterCustomer);
-  if (filterStatus)   qParams.set("status", filterStatus);
+  if (filterCustomer && filterCustomer !== "_all") qParams.set("customerId", filterCustomer);
+  if (filterStatus && filterStatus !== "_all")     qParams.set("status", filterStatus);
 
   const { data: me } = useQuery<{ role: string }>({ queryKey: ["/api/auth/me"] });
   const isDeveloper = me?.role === "Developer";
@@ -153,7 +153,7 @@ export default function FactoryDispatchBatches() {
         destination: form.destination || undefined,
         notes: form.notes || undefined,
       };
-      if (form.proformaId) payload.proformaId = parseInt(form.proformaId);
+      if (form.proformaId && form.proformaId !== "_none") payload.proformaId = parseInt(form.proformaId);
       const res = await apiRequest("POST", "/api/factory/dispatch-batches", payload);
       if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
@@ -173,7 +173,7 @@ export default function FactoryDispatchBatches() {
   function resetForm() {
     setForm({
       customerId: "",
-      proformaId: "",
+      proformaId: "_none",
       batchDate: new Date().toISOString().split("T")[0],
       currency: "USD",
       priceMode: "PER_BALE",
@@ -325,7 +325,7 @@ export default function FactoryDispatchBatches() {
                     <SelectValue placeholder="All customers" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All customers</SelectItem>
+                    <SelectItem value="_all">All customers</SelectItem>
                     {customers.map((c) => (
                       <SelectItem key={c.id} value={String(c.id)}>{c.legalName}</SelectItem>
                     ))}
@@ -339,7 +339,7 @@ export default function FactoryDispatchBatches() {
                     <SelectValue placeholder="All statuses" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All statuses</SelectItem>
+                    <SelectItem value="_all">All statuses</SelectItem>
                     <SelectItem value="DRAFT">Draft</SelectItem>
                     <SelectItem value="LOADING">Loading</SelectItem>
                     <SelectItem value="DISPATCHED">Dispatched</SelectItem>
@@ -361,8 +361,8 @@ export default function FactoryDispatchBatches() {
                   />
                 </div>
               </div>
-              {(filterCustomer || filterStatus || search) && (
-                <Button variant="ghost" size="sm" onClick={() => { setFilterCustomer(""); setFilterStatus(""); setSearch(""); }}>
+              {(filterCustomer !== "_all" || filterStatus !== "_all" || search) && (
+                <Button variant="ghost" size="sm" onClick={() => { setFilterCustomer("_all"); setFilterStatus("_all"); setSearch(""); }}>
                   Clear
                 </Button>
               )}
@@ -448,7 +448,7 @@ export default function FactoryDispatchBatches() {
                 <Label>Customer <span className="text-destructive">*</span></Label>
                 <Select
                   value={form.customerId}
-                  onValueChange={(v) => setForm((f) => ({ ...f, customerId: v, proformaId: "" }))}
+                  onValueChange={(v) => setForm((f) => ({ ...f, customerId: v, proformaId: "_none" }))}
                 >
                   <SelectTrigger data-testid="select-create-customer">
                     <SelectValue placeholder="Select customer..." />
@@ -472,7 +472,7 @@ export default function FactoryDispatchBatches() {
                       <SelectValue placeholder="No proforma" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No proforma</SelectItem>
+                      <SelectItem value="_none">No proforma</SelectItem>
                       {activeProformas.map((p) => (
                         <SelectItem key={p.id} value={String(p.id)}>
                           {p.name}
