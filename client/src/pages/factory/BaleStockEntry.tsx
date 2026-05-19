@@ -1816,7 +1816,13 @@ import GroundScan from "./GroundScan";
                           <TableCell>{bale.productName || "-"}</TableCell>
                           <TableCell className="text-right font-mono tabular-nums">{formatNumber(parseFloat(bale.weightKg || "0"))}</TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="text-xs">{bale.status}</Badge>
+                            {bale.isInLoadingOrder ? (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 no-default-active-elevate">
+                                Loading
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs">{bale.status}</Badge>
+                            )}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {bale.finalizedAt ? formatDisplayDate(bale.finalizedAt) : "-"}

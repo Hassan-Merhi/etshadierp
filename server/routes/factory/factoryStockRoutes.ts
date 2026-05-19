@@ -1687,7 +1687,22 @@ export function registerFactoryStockRoutes(app: Express) {
         .where(and(...conditions))
         .orderBy(desc(factoryBales.finalizedAt));
 
-      res.json(results);
+      // Mark bales currently scanned into an active LOADING container order
+      const allIds = results.map((b) => b.id);
+      const loadingBaleIds = new Set<number>();
+      if (allIds.length > 0) {
+        const loadingRows = await db
+          .select({ baleId: customerOrderBales.baleId })
+          .from(customerOrderBales)
+          .innerJoin(customerOrders, eq(customerOrderBales.orderId, customerOrders.id))
+          .where(and(
+            eq(customerOrders.status, "LOADING"),
+            inArray(customerOrderBales.baleId, allIds),
+          ));
+        for (const r of loadingRows) loadingBaleIds.add(r.baleId);
+      }
+
+      res.json(results.map((b) => ({ ...b, isInLoadingOrder: loadingBaleIds.has(b.id) })));
     } catch (error: any) {
       console.error("Error fetching in-stock bales:", error);
       res.status(500).json({ message: error.message });
