@@ -2,12 +2,14 @@ import { useEffect, useRef } from "react";
 import html2canvas from "html2canvas";
 
 // How often to check if a Developer is watching us (cheap GET, no canvas)
-const POLL_INTERVAL_MS    = 3000;
+const POLL_INTERVAL_MS    = 4000;
 // How often to capture + upload a frame while being watched
-const CAPTURE_INTERVAL_MS = 2000;
-// Max time to wait for html2canvas before giving up
-const CAPTURE_TIMEOUT_MS  = 8000;
+const CAPTURE_INTERVAL_MS = 4000;
+// Max time to wait for html2canvas before giving up on a frame
+const CAPTURE_TIMEOUT_MS  = 6000;
 const CLICK_RETAIN_MS     = 8000;
+// Max dataUrl size we'll bother uploading (~1.2 MB as a base64 string)
+const MAX_DATA_URL_LEN    = 1_300_000;
 
 export interface ClickEvent {
   x:     number;
@@ -41,64 +43,108 @@ if (typeof window !== "undefined") {
   }, { capture: true });
 }
 
-async function captureAndUpload() {
-  try {
-    const canvas = await Promise.race([
-      html2canvas(document.body, {
-        scale:                  0.35,
-        useCORS:                true,
-        logging:                false,
-        allowTaint:             true,
-        foreignObjectRendering: true,
-        x:           window.scrollX,
-        y:           window.scrollY,
-        width:       window.innerWidth,
-        height:      window.innerHeight,
-        scrollX:    -window.scrollX,
-        scrollY:    -window.scrollY,
-        windowWidth:  window.innerWidth,
-        windowHeight: window.innerHeight,
-        imageTimeout: 500,
-        ignoreElements: (el) =>
-          el.getAttribute("data-screenfeed-ignore") === "true",
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("timeout")), CAPTURE_TIMEOUT_MS)
-      ),
-    ]);
-
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.45);
-    const cutoff  = Date.now() - CLICK_RETAIN_MS;
-    const clicks  = clickBuffer.filter(c => c.ts >= cutoff);
-
-    fetch("/api/screen-feed", {
-      method:      "POST",
-      headers:     { "Content-Type": "application/json" },
-      credentials: "include",
-      body:        JSON.stringify({ dataUrl, clicks }),
-    }).catch(() => {});
-  } catch {
-    // html2canvas timed out or failed — silently skip
+function runWhenIdle(fn: () => void): void {
+  if (typeof (window as any).requestIdleCallback === "function") {
+    (window as any).requestIdleCallback(fn, { timeout: 2000 });
+  } else {
+    setTimeout(fn, 0);
   }
 }
 
+const html2canvasBaseOpts = {
+  scale:                  0.3,
+  useCORS:                true,
+  logging:                false,
+  allowTaint:             true,
+  foreignObjectRendering: false,
+  imageTimeout:           500,
+  ignoreElements: (el: Element) =>
+    el.getAttribute("data-screenfeed-ignore") === "true",
+} as const;
+
+async function tryCapture(opts: Record<string, any>): Promise<HTMLCanvasElement> {
+  return Promise.race([
+    html2canvas(document.body, {
+      ...opts,
+      x:           window.scrollX,
+      y:           window.scrollY,
+      width:       window.innerWidth,
+      height:      window.innerHeight,
+      scrollX:    -window.scrollX,
+      scrollY:    -window.scrollY,
+      windowWidth:  window.innerWidth,
+      windowHeight: window.innerHeight,
+    }),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), CAPTURE_TIMEOUT_MS)
+    ),
+  ]);
+}
+
+async function captureAndUpload() {
+  // Skip if page is hidden (background tab / minimised)
+  if (document.hidden) return;
+
+  let canvas: HTMLCanvasElement;
+  try {
+    canvas = await tryCapture(html2canvasBaseOpts);
+  } catch {
+    // Retry once with the most conservative settings possible
+    try {
+      canvas = await tryCapture({
+        ...html2canvasBaseOpts,
+        scale:       0.2,
+        imageTimeout: 200,
+      });
+    } catch {
+      // Both attempts failed — silently skip this frame
+      return;
+    }
+  }
+
+  let dataUrl: string;
+  try {
+    dataUrl = canvas.toDataURL("image/jpeg", 0.4);
+  } catch {
+    return;
+  }
+
+  if (!dataUrl.startsWith("data:image/") || dataUrl.length > MAX_DATA_URL_LEN) return;
+
+  const cutoff  = Date.now() - CLICK_RETAIN_MS;
+  const clicks  = clickBuffer.filter(c => c.ts >= cutoff);
+
+  fetch("/api/screen-feed", {
+    method:      "POST",
+    headers:     { "Content-Type": "application/json" },
+    credentials: "include",
+    body:        JSON.stringify({ dataUrl, clicks }),
+  }).catch(() => {});
+}
+
 export function useScreenFeed() {
-  const busyRef    = useRef(false);
-  const watchedRef = useRef(false);
-  const captureRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const busyRef      = useRef(false);
+  const watchedRef   = useRef(false);
+  const captureRef   = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const startCapturing = () => {
       if (captureRef.current) return; // already running
-      // Capture immediately, then on interval
+
+      // Trigger one immediate capture via idle callback
       if (!busyRef.current) {
         busyRef.current = true;
-        captureAndUpload().finally(() => { busyRef.current = false; });
+        runWhenIdle(() => {
+          captureAndUpload().finally(() => { busyRef.current = false; });
+        });
       }
-      captureRef.current = setInterval(async () => {
-        if (busyRef.current) return;
+
+      captureRef.current = setInterval(() => {
+        if (busyRef.current || document.hidden) return;
         busyRef.current = true;
-        await captureAndUpload().finally(() => { busyRef.current = false; });
+        runWhenIdle(() => {
+          captureAndUpload().finally(() => { busyRef.current = false; });
+        });
       }, CAPTURE_INTERVAL_MS);
     };
 
@@ -112,6 +158,7 @@ export function useScreenFeed() {
     const pollWatcherStatus = async () => {
       try {
         const res  = await fetch("/api/screen-feed/being-watched", { credentials: "include" });
+        if (!res.ok) return;
         const data = await res.json();
         const nowWatched = Boolean(data?.watched);
 
@@ -131,13 +178,25 @@ export function useScreenFeed() {
       }
     };
 
-    // Check immediately, then every POLL_INTERVAL_MS
+    // Handle tab visibility: resume capture if we come back to foreground while watched
+    const onVisibilityChange = () => {
+      if (!document.hidden && watchedRef.current && !captureRef.current) {
+        startCapturing();
+      } else if (document.hidden && captureRef.current) {
+        // Pause the capture interval while hidden (poll still runs)
+        stopCapturing();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    // Check immediately, then on interval
     pollWatcherStatus();
     const pollId = setInterval(pollWatcherStatus, POLL_INTERVAL_MS);
 
     return () => {
       clearInterval(pollId);
       stopCapturing();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 }

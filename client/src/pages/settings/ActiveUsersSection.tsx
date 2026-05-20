@@ -147,10 +147,11 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
       queryFn: () => apiRequest("GET", `/api/user-presence/${userId}/activity`),
       refetchInterval: 5000,
     });
+    const watchStartRef = useRef(Date.now());
     const { data: screenFrameRaw } = useQuery<any>({
       queryKey: ["/api/screen-feed", userId],
       queryFn: () => apiRequest("GET", `/api/screen-feed/${userId}`),
-      refetchInterval: 3000,
+      refetchInterval: 4000,
     });
 
     // Guard against unexpected non-array / non-object responses
@@ -265,7 +266,12 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                   <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
                     <Clock className="h-8 w-8 opacity-30" />
                     <p className="text-sm">Waiting for first frame…</p>
-                    <p className="text-xs">Updates every 1.5 seconds</p>
+                    <p className="text-xs">Updates every 3–5 seconds while watched</p>
+                    {(Date.now() - watchStartRef.current) > 10000 && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 text-center max-w-xs">
+                        Still waiting — user may be on a background tab or screen capture is blocked by their browser.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

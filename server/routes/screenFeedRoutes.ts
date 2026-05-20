@@ -2,8 +2,13 @@ import type { Express } from "express";
 import { requireAuth } from "../auth";
 import { screenFeedStore, watcherPollStore } from "../screenFeedStore";
 
-// How long (ms) after a watcher's last GET we still consider the user "being watched"
-const WATCHER_TIMEOUT_MS = 5000;
+// How long (ms) after a watcher's last GET we still consider the user "being watched".
+// Must be comfortably larger than the watcher's poll interval (~3–5 s) to avoid
+// the watched user flipping back to "not watched" between watcher polls.
+const WATCHER_TIMEOUT_MS = 12000;
+
+// Reject frames larger than 1.5 MB (base64 string length)
+const MAX_FRAME_SIZE = 1_500_000;
 
 export function registerScreenFeedRoutes(app: Express) {
   // GET: watched user asks "is anyone watching me right now?"
@@ -18,9 +23,15 @@ export function registerScreenFeedRoutes(app: Express) {
   // POST: watched user uploads their screenshot frame + recent clicks
   app.post("/api/screen-feed", requireAuth, (req, res) => {
     const { dataUrl, clicks } = req.body ?? {};
+
     if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
       return res.status(400).end();
     }
+    if (dataUrl.length > MAX_FRAME_SIZE) {
+      // Frame too large — silently discard rather than 400 so client keeps running
+      return res.status(204).end();
+    }
+
     const userId   = req.user!.id;
     const username = req.user!.username;
     const now      = Date.now();
