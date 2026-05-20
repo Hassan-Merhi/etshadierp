@@ -12,14 +12,16 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Loader2, ArrowLeft, Truck, Plus } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Loader2, ArrowLeft, Truck, Plus, FileText, CreditCard } from "lucide-react";
 
-function formatUsd(v: any) {
+function fmt2(v: any) {
   const n = parseFloat(String(v ?? "0"));
   return isNaN(n) ? "$0.00" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 const prepaidSchema = z.object({
+  prepaidDate: z.string().min(1, "Required"),
   chargeType: z.string().min(1, "Required"),
   agentName: z.string().optional(),
   amountPaidUsd: z.string().min(1, "Required"),
@@ -48,16 +50,23 @@ export default function SpContainerDetail() {
 
   const prepaidForm = useForm<PrepaidForm>({
     resolver: zodResolver(prepaidSchema),
-    defaultValues: { chargeType: "", agentName: "", amountPaidUsd: "", bankAccountId: "", notes: "" },
+    defaultValues: {
+      prepaidDate: new Date().toISOString().slice(0, 10),
+      chargeType: "",
+      agentName: "",
+      amountPaidUsd: "",
+      bankAccountId: "",
+      notes: "",
+    },
   });
 
   const prepaidMutation = useMutation({
     mutationFn: (data: PrepaidForm & { containerId: string }) => apiRequest("POST", "/api/sp/prepaid", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sp/containers", id] });
-      toast({ title: "Prepaid charge recorded" });
+      toast({ title: "Prepaid charge recorded", description: "Dr Prepaid / Cr Bank voucher posted." });
       setShowPrepaidForm(false);
-      prepaidForm.reset();
+      prepaidForm.reset({ prepaidDate: new Date().toISOString().slice(0, 10), chargeType: "", agentName: "", amountPaidUsd: "", bankAccountId: "", notes: "" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -82,6 +91,13 @@ export default function SpContainerDetail() {
     0
   );
 
+  // Voucher preview for prepaid form
+  const watchAmount = prepaidForm.watch("amountPaidUsd");
+  const watchBank = prepaidForm.watch("bankAccountId");
+  const previewAmount = parseFloat(watchAmount || "0");
+  const prepaidAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_prepaid");
+  const selectedBank = (statusData?.bankAccounts || []).find((b: any) => String(b.id) === watchBank);
+
   return (
     <div className="space-y-5 max-w-3xl">
       <div className="flex items-center gap-3">
@@ -91,6 +107,9 @@ export default function SpContainerDetail() {
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl font-semibold">{container.supplierName}</h1>
+            {container.containerNumber && (
+              <span className="text-sm font-mono bg-muted px-1.5 py-0.5 rounded">{container.containerNumber}</span>
+            )}
             <span className="text-sm text-muted-foreground font-mono">{container.invoiceNumber}</span>
             <Badge
               variant="outline"
@@ -102,7 +121,7 @@ export default function SpContainerDetail() {
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {container.invoiceDate} · {formatUsd(container.invoiceTotalUsd)}
+            {container.invoiceDate} · {fmt2(container.invoiceTotalUsd)}
             {parseFloat(container.discountPct || "0") > 0 && (
               <span className="ml-2 text-green-600">−{parseFloat(container.discountPct).toFixed(1)}% discount</span>
             )}
@@ -120,7 +139,7 @@ export default function SpContainerDetail() {
         <CardHeader>
           <CardTitle className="text-sm">Line Items</CardTitle>
           <CardDescription className="text-xs">
-            Discounted base cost: {formatUsd(totalBaseCost)}
+            Discounted base cost: {fmt2(totalBaseCost)}
             {parseFloat(container.discountPct || "0") > 0 && ` (after ${parseFloat(container.discountPct).toFixed(1)}% discount)`}
           </CardDescription>
         </CardHeader>
@@ -141,9 +160,9 @@ export default function SpContainerDetail() {
                     <span className="text-muted-foreground truncate text-xs">{l.description || "—"}</span>
                     <span className="text-right tabular-nums">{parseFloat(l.qty || "0").toFixed(2)}</span>
                     <span className="text-right tabular-nums text-xs">
-                      {formatUsd(discountedRate)}
+                      {fmt2(discountedRate)}
                       {parseFloat(container.discountPct || "0") > 0 && (
-                        <span className="text-muted-foreground ml-1">(was {formatUsd(l.unitRateUsd)})</span>
+                        <span className="text-muted-foreground ml-1">(was {fmt2(l.unitRateUsd)})</span>
                       )}
                     </span>
                   </div>
@@ -160,73 +179,124 @@ export default function SpContainerDetail() {
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <CardTitle className="text-sm">Prepaid Charges</CardTitle>
-              <CardDescription className="text-xs">Total paid: {formatUsd(totalPrepaid)}</CardDescription>
+              <CardDescription className="text-xs">
+                Total prepaid: {fmt2(totalPrepaid)} · Posts Dr Prepaid / Cr Bank
+              </CardDescription>
             </div>
             {container.status === "open" && (
               <Button variant="outline" size="sm" onClick={() => setShowPrepaidForm(!showPrepaidForm)} data-testid="button-sp-add-prepaid">
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add Prepaid
+                <Plus className="h-3.5 w-3.5 mr-1" /> {showPrepaidForm ? "Cancel" : "Add Prepaid"}
               </Button>
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4">
           {showPrepaidForm && (
             <Form {...prepaidForm}>
-              <form onSubmit={prepaidForm.handleSubmit(d => prepaidMutation.mutate({ ...d, containerId: id! }))}
-                className="grid grid-cols-2 gap-3 p-3 border border-border rounded-md bg-muted/30">
-                <FormField control={prepaidForm.control} name="chargeType" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Charge Type</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-sp-prepaid-type">
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {CHARGE_TYPES.map(t => <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={prepaidForm.control} name="agentName" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Agent / Payee</FormLabel>
-                    <FormControl><Input className="h-8 text-xs" {...field} data-testid="input-sp-prepaid-agent" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={prepaidForm.control} name="amountPaidUsd" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Amount (USD)</FormLabel>
-                    <FormControl><Input type="number" step="0.01" className="h-8 text-xs" {...field} data-testid="input-sp-prepaid-amount" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={prepaidForm.control} name="bankAccountId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Bank Account</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-sp-prepaid-bank">
-                          <SelectValue placeholder="Select bank" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {(statusData?.bankAccounts || []).map((b: any) => (
-                          <SelectItem key={b.id} value={String(b.id)}>{b.bankName}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <div className="col-span-2 flex justify-end gap-2">
+              <form
+                onSubmit={prepaidForm.handleSubmit(d => prepaidMutation.mutate({ ...d, containerId: id! }))}
+                className="space-y-4 p-4 border border-border rounded-md bg-muted/20"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">New Prepaid Entry</p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField control={prepaidForm.control} name="prepaidDate" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Payment Date</FormLabel>
+                      <FormControl><Input type="date" className="h-8 text-xs" {...field} data-testid="input-sp-prepaid-date" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={prepaidForm.control} name="chargeType" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Charge Type</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="h-8 text-xs" data-testid="select-sp-prepaid-type">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {CHARGE_TYPES.map(t => <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={prepaidForm.control} name="agentName" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Agent / Payee</FormLabel>
+                      <FormControl><Input className="h-8 text-xs" placeholder="Name of payee" {...field} data-testid="input-sp-prepaid-agent" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={prepaidForm.control} name="amountPaidUsd" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Amount (USD)</FormLabel>
+                      <FormControl><Input type="number" step="0.01" placeholder="0.00" className="h-8 text-xs" {...field} data-testid="input-sp-prepaid-amount" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={prepaidForm.control} name="bankAccountId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Credit Bank Account</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="h-8 text-xs" data-testid="select-sp-prepaid-bank">
+                            <SelectValue placeholder="Select bank" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {(statusData?.bankAccounts || []).map((b: any) => (
+                            <SelectItem key={b.id} value={String(b.id)}>{b.bankName}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={prepaidForm.control} name="notes" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Notes</FormLabel>
+                      <FormControl><Input className="h-8 text-xs" {...field} data-testid="input-sp-prepaid-notes" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+
+                {/* Voucher Preview */}
+                {previewAmount > 0 && (
+                  <div className="rounded-md border border-border bg-background p-3 space-y-1.5">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Journal Preview</p>
+                    </div>
+                    <div className="grid grid-cols-3 text-xs text-muted-foreground font-medium pb-1 border-b border-border/40">
+                      <span className="col-span-2">Account</span>
+                      <span className="text-right">Dr / Cr</span>
+                    </div>
+                    <div className="grid grid-cols-3 text-xs py-0.5">
+                      <span className="col-span-2 font-medium flex items-center gap-1.5">
+                        <CreditCard className="h-3 w-3 text-muted-foreground" />
+                        {prepaidAcct?.name ?? "SP Prepaid Charges"} <Badge variant="secondary" className="text-xs ml-1">Dr</Badge>
+                      </span>
+                      <span className="text-right tabular-nums font-semibold">{fmt2(previewAmount)}</span>
+                    </div>
+                    <div className="grid grid-cols-3 text-xs py-0.5 text-muted-foreground">
+                      <span className="col-span-2 pl-4">
+                        {selectedBank ? selectedBank.bankName : (watchBank ? "Selected Bank" : "Bank Account (Cr)")}
+                      </span>
+                      <span className="text-right tabular-nums">{fmt2(previewAmount)}</span>
+                    </div>
+                  </div>
+                )}
+
+                <Separator />
+                <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={() => setShowPrepaidForm(false)}>Cancel</Button>
                   <Button type="submit" size="sm" disabled={prepaidMutation.isPending} data-testid="button-sp-save-prepaid">
                     {prepaidMutation.isPending && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}
-                    Save
+                    Save Prepaid
                   </Button>
                 </div>
               </form>
@@ -237,16 +307,23 @@ export default function SpContainerDetail() {
             <p className="text-sm text-muted-foreground">No prepaid charges yet.</p>
           ) : (
             <div className="grid gap-0.5">
+              <div className="grid grid-cols-5 text-xs font-medium text-muted-foreground pb-1 border-b border-border/40">
+                <span>Date</span>
+                <span>Type</span>
+                <span className="col-span-2">Agent / Payee</span>
+                <span className="text-right">Amount</span>
+              </div>
               {(container.prepaid || []).map((p: any) => (
-                <div key={p.id} className="flex items-center justify-between text-sm py-1 border-b border-border/30 last:border-0" data-testid={`row-sp-prepaid-${p.id}`}>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="secondary" className="text-xs">{p.chargeType}</Badge>
-                    <span className="text-xs text-muted-foreground">{p.agentName || "—"}</span>
+                <div key={p.id} className="grid grid-cols-5 text-xs py-1.5 border-b border-border/30 last:border-0 items-center" data-testid={`row-sp-prepaid-${p.id}`}>
+                  <span className="text-muted-foreground">{p.prepaidDate || p.createdAt?.slice(0, 10) || "—"}</span>
+                  <Badge variant="secondary" className="text-xs w-fit">{p.chargeType}</Badge>
+                  <span className="col-span-2 text-muted-foreground truncate">{p.agentName || "—"}</span>
+                  <div className="text-right">
+                    <span className="font-semibold tabular-nums">{fmt2(p.amountPaidUsd)}</span>
                     {parseFloat(p.amountUsedUsd || "0") > 0 && (
-                      <Badge variant="outline" className="text-xs text-green-600 border-green-600/40">used {formatUsd(p.amountUsedUsd)}</Badge>
+                      <div className="text-xs text-green-600">{fmt2(p.amountUsedUsd)} used</div>
                     )}
                   </div>
-                  <span className="font-semibold tabular-nums">{formatUsd(p.amountPaidUsd)}</span>
                 </div>
               ))}
             </div>
@@ -264,9 +341,9 @@ export default function SpContainerDetail() {
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
               <div><p className="text-muted-foreground text-xs">Total Qty</p><p className="font-semibold">{parseFloat(container.offload.totalQty || "0").toFixed(2)}</p></div>
-              <div><p className="text-muted-foreground text-xs">Base Cost</p><p className="font-semibold">{formatUsd(container.offload.totalBaseCostUsd)}</p></div>
-              <div><p className="text-muted-foreground text-xs">Landed Cost</p><p className="font-semibold">{formatUsd(container.offload.totalLandedCostUsd)}</p></div>
-              <div><p className="text-muted-foreground text-xs">Final Cost</p><p className="font-semibold">{formatUsd(container.offload.totalFinalCostUsd)}</p></div>
+              <div><p className="text-muted-foreground text-xs">Base Cost</p><p className="font-semibold">{fmt2(container.offload.totalBaseCostUsd)}</p></div>
+              <div><p className="text-muted-foreground text-xs">Landed Cost</p><p className="font-semibold">{fmt2(container.offload.totalLandedCostUsd)}</p></div>
+              <div><p className="text-muted-foreground text-xs">Final Cost</p><p className="font-semibold">{fmt2(container.offload.totalFinalCostUsd)}</p></div>
             </div>
 
             {(container.movements || []).length > 0 && (
@@ -280,8 +357,8 @@ export default function SpContainerDetail() {
                     <span className="font-mono">{m.articleCode}</span>
                     <span className="text-right tabular-nums">{parseFloat(m.qtyIn || "0").toFixed(2)}</span>
                     <span className="text-right tabular-nums text-green-600">{parseFloat(m.qtyRemaining || "0").toFixed(2)}</span>
-                    <span className="text-right tabular-nums">{formatUsd(m.baseUnitCostUsd)}</span>
-                    <span className="text-right tabular-nums">{formatUsd(m.finalUnitCostUsd)}</span>
+                    <span className="text-right tabular-nums">{fmt2(m.baseUnitCostUsd)}</span>
+                    <span className="text-right tabular-nums">{fmt2(m.finalUnitCostUsd)}</span>
                   </div>
                 ))}
               </div>

@@ -3209,6 +3209,12 @@ let migrationsDone = false;
     `ALTER TABLE sp_stock_movements ALTER COLUMN container_line_id DROP NOT NULL`,
     `ALTER TABLE sp_stock_movements ADD COLUMN IF NOT EXISTS source_type VARCHAR(20) DEFAULT 'offload'`,
 
+    // P5-C/D: Add container_number + freight_estimate to sp_containers; prepaid_date + optional container to sp_prepaid_charges
+    `ALTER TABLE sp_containers ADD COLUMN IF NOT EXISTS container_number VARCHAR(100)`,
+    `ALTER TABLE sp_containers ADD COLUMN IF NOT EXISTS freight_estimate_usd DECIMAL(20,4) DEFAULT 0`,
+    `ALTER TABLE sp_prepaid_charges ADD COLUMN IF NOT EXISTS prepaid_date DATE`,
+    `DO $$ BEGIN ALTER TABLE sp_prepaid_charges ALTER COLUMN container_id DROP NOT NULL; EXCEPTION WHEN others THEN NULL; END $$`,
+
     `CREATE TABLE IF NOT EXISTS sp_sales (
       id SERIAL PRIMARY KEY,
       company_id INTEGER NOT NULL,

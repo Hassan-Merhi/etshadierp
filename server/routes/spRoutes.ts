@@ -184,7 +184,7 @@ export function registerSpRoutes(app: Express) {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
 
-      const { supplierName, invoiceNumber, invoiceDate, invoiceTotalUsd, discountPct, notes, lines } = req.body;
+      const { supplierName, containerNumber, invoiceNumber, invoiceDate, invoiceTotalUsd, discountPct, freightEstimateUsd, notes, lines } = req.body;
 
       if (!supplierName || !invoiceNumber || !invoiceDate) {
         return res.status(400).json({ message: "supplierName, invoiceNumber, invoiceDate are required" });
@@ -202,10 +202,12 @@ export function registerSpRoutes(app: Express) {
         const [container] = await tx.insert(spContainers).values({
           companyId,
           supplierName,
+          containerNumber: containerNumber || null,
           invoiceNumber,
           invoiceDate,
           invoiceTotalUsd: String(totalUsd),
           discountPct: String(parseNum(discountPct)),
+          freightEstimateUsd: String(parseNum(freightEstimateUsd)),
           notes: notes || null,
           status: "open",
         }).returning();
@@ -419,22 +421,23 @@ export function registerSpRoutes(app: Express) {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
 
-      const { containerId, chargeType, agentName, amountPaidUsd, bankAccountId, notes } = req.body;
+      const { containerId, prepaidDate, chargeType, agentName, amountPaidUsd, bankAccountId, notes } = req.body;
 
-      if (!containerId || !chargeType || !amountPaidUsd) {
-        return res.status(400).json({ message: "containerId, chargeType, amountPaidUsd required" });
+      if (!chargeType || !amountPaidUsd) {
+        return res.status(400).json({ message: "chargeType, amountPaidUsd required" });
       }
 
       const prepaidAcct = await getSpAccount(companyId, "sp_prepaid");
       if (!prepaidAcct) return res.status(400).json({ message: "SP accounts not set up" });
 
       const amount = parseNum(amountPaidUsd);
-      const date = getClientDate(req);
+      const date = prepaidDate || getClientDate(req);
 
       const result = await db.transaction(async (tx) => {
         const [charge] = await tx.insert(spPrepaidCharges).values({
           companyId,
-          containerId: parseInt(containerId),
+          containerId: containerId ? parseInt(containerId) : null,
+          prepaidDate: date,
           chargeType,
           agentName: agentName || null,
           amountPaidUsd: String(amount),
