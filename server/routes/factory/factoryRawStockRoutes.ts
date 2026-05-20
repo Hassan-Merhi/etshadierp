@@ -1471,9 +1471,9 @@ export function registerFactoryRawStockRoutes(app: Express) {
             txType: "FREIGHT",
             referenceId: containerId,
             description: `Freight on container ${container.containerNumber}`,
-            currencyCode,
+            currencyCode: freightCcy,
             amountCurrency: freightVal,
-            fxRateToUsd: fxRate,
+            fxRateToUsd: freightCcy === "USD" ? 1 : freightFxRateVal,
           });
         }
         if (otherChargesVal > 0) {

@@ -2412,12 +2412,20 @@ export default function ProductionRawStock() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-muted-foreground text-xs">Declared Rate/kg</Label>
+                    <Label className="text-xs font-medium">
+                      Cost/kg{selectedContainer.ratePerKg && parseFloat(selectedContainer.ratePerKg) > 0 && (
+                        <span className="text-muted-foreground font-normal ml-1">(pre-filled from declaration)</span>
+                      )}
+                    </Label>
                     <Input
-                      value={selectedContainer.ratePerKg ? parseFloat(selectedContainer.ratePerKg).toFixed(4) : "N/A"}
-                      disabled
-                      className="font-mono bg-muted"
-                      data-testid="input-declared-rate"
+                      type="number"
+                      step="0.0001"
+                      min="0"
+                      placeholder="Enter cost per kg"
+                      value={costPerKg}
+                      onChange={(e) => setCostPerKg(e.target.value)}
+                      className="font-mono"
+                      data-testid="input-cost-per-kg"
                     />
                   </div>
                 </div>
