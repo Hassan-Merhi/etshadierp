@@ -1311,10 +1311,12 @@ export function registerFactorySuppliersRoutes(app: Express) {
         // Per-currency balances (original currency, not converted).
         // Use kg * ratePerKg + freight + commission from own containers.
         // Freight is tracked in its own currency (freightCurrencyCode) which may differ from the container currency.
+        // Always use totalKg (declared/agreed weight) — same as computeBalance — weight differences at offload
+        // affect inventory only, not what is owed to the supplier.
         const byCurrency: Record<string, number> = {};
         for (const c of supplierContainers) {
           const cc = c.currencyCode || "USD";
-          const baseVal = parseFloat(c.actualReceivedKg || c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
+          const baseVal = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
           const freightAmt = parseFloat(c.freight || "0");
           const freightCc = c.freightCurrencyCode || cc;
           byCurrency[cc] = (byCurrency[cc] || 0) + baseVal;
@@ -2349,10 +2351,12 @@ export function registerFactorySuppliersRoutes(app: Express) {
     };
 
     // Container rows
+    // Always use totalKg (declared/agreed weight) — weight differences at offload affect inventory
+    // only, not what is owed to the supplier. This matches computeBalance and computeStats.
     for (const c of allContainers as any[]) {
       const supplierName = supplierNameMap[c.supplierId] || "Unknown";
       const cc = c.currencyCode || "USD";
-      const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+      const kg = parseFloat(c.totalKg || "0");
       const rate = parseFloat(c.ratePerKg || "0");
       const freight = parseFloat(c.freight || "0");
       // Use freightCurrencyCode directly (DB default is "USD", so AUD containers correctly separate USD freight)
@@ -2398,9 +2402,12 @@ export function registerFactorySuppliersRoutes(app: Express) {
           commissionCurrency: null,
         });
       }
-      // USD commission from linked (child) suppliers goes directly to the broker's USD ledger.
+      // USD commission from linked (child) suppliers goes directly to the broker's USD ledger,
+      // but only when this broker is actually the designated commission recipient.
       // Commission from the broker's own containers and any non-USD commission stay excluded.
-      if (commAmt > 0 && commCc === "USD" && c.supplierId !== brokerId) {
+      const commSupplierId = c.commissionSupplierId ?? null;
+      const commForBroker = commSupplierId === brokerId || commSupplierId === null;
+      if (commAmt > 0 && commCc === "USD" && c.supplierId !== brokerId && commForBroker) {
         addRow("USD", {
           date: dateVal,
           type: "commission",
