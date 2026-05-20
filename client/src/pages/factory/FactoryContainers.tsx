@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAdminOverride } from "@/hooks/use-admin-override";
-import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search, ArrowDown, AlertTriangle, RotateCcw, CheckSquare, ChevronDown, ChevronRight, Ship, Building2, StickyNote, Boxes, Package, LayoutList, GripHorizontal, Minus } from "lucide-react";
+import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search, ArrowDown, AlertTriangle, RotateCcw, CheckSquare, ChevronDown, ChevronRight, Ship, Building2, StickyNote, Boxes, Package, LayoutList, GripHorizontal, Minus, PlusCircle, X, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -530,11 +530,38 @@ export default function FactoryContainers() {
     },
   });
 
+  const postOffloadMutation = useMutation({
+    mutationFn: async ({ containerId, charges, txDate }: { containerId: number; charges: any[]; txDate: string }) => {
+      const res = await factoryApiRequest("POST", `/api/factory/containers/${containerId}/post-offload-charges`, { charges, txDate });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to save charges");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/by-container"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      setPostOffloadResult(data);
+      setPostOffloadCharges([]);
+    },
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const [importOpen, setImportOpen] = useState(false);
   const [importPreview, setImportPreview] = useState<any[]>([]);
   const [importResult, setImportResult] = useState<{ imported: number; errors: string[]; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [reversingContainer, setReversingContainer] = useState<ContainerWithSupplier | null>(null);
+  const [postOffloadContainer, setPostOffloadContainer] = useState<ContainerWithSupplier | null>(null);
+  const [postOffloadCharges, setPostOffloadCharges] = useState<{ id: string; description: string; amount: string; currencyCode: string; ledgerAccountId: string; supplierId: string }[]>([]);
+  const [postOffloadDate, setPostOffloadDate] = useState<string>("");
+  const [postOffloadResult, setPostOffloadResult] = useState<{ affectedBatches: { batchId: number; batchCode: string; oldCostPerKg: number; newCostPerKg: number; weightKg: number }[] } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
@@ -1304,14 +1331,24 @@ export default function FactoryContainers() {
                                   </Tooltip>
                                 )}
                                 {(c.status === "OFFLOADED" || c.status === "PARTIALLY_RECEIVED") && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button variant="ghost" size="icon" onClick={() => setReversingContainer(c)} data-testid={`button-reverse-offload-${c.id}`}>
-                                        <RotateCcw className="h-4 w-4 text-amber-500" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Reverse Offload</TooltipContent>
-                                  </Tooltip>
+                                  <>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" onClick={() => { setPostOffloadContainer(c); setPostOffloadCharges([]); setPostOffloadDate(new Date().toLocaleDateString("en-CA")); setPostOffloadResult(null); }} data-testid={`button-post-offload-charges-${c.id}`}>
+                                          <PlusCircle className="h-4 w-4 text-blue-500" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Add Post-Offload Charges</TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" onClick={() => setReversingContainer(c)} data-testid={`button-reverse-offload-${c.id}`}>
+                                          <RotateCcw className="h-4 w-4 text-amber-500" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Reverse Offload</TooltipContent>
+                                    </Tooltip>
+                                  </>
                                 )}
                                 <Button variant="ghost" size="icon" onClick={() => openEdit(c)} data-testid={`button-edit-container-${c.id}`}>
                                   <Pencil className="h-4 w-4" />
@@ -2174,6 +2211,197 @@ export default function FactoryContainers() {
               </>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Post-Offload Charges Dialog */}
+      <Dialog open={!!postOffloadContainer} onOpenChange={(open) => { if (!open) { setPostOffloadContainer(null); setPostOffloadResult(null); setPostOffloadCharges([]); } }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PlusCircle className="h-5 w-5 text-blue-500" />
+              Add Post-Offload Charges
+            </DialogTitle>
+            <DialogDescription>
+              Container <strong>{postOffloadContainer?.containerNumber}</strong> — charges added here will update the cost per kg and retroactively adjust all mix batches made from this container.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto space-y-5 py-2">
+            {postOffloadResult ? (
+              /* ── Results view ── */
+              <div className="space-y-4">
+                <div className="flex items-start gap-3 p-3 rounded-md bg-green-50 dark:bg-green-950/20 text-green-800 dark:text-green-300 text-sm">
+                  <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-semibold">Charges saved successfully</p>
+                    <p className="text-xs mt-0.5 opacity-80">The container cost per kg and all related mix batch costs have been updated.</p>
+                  </div>
+                </div>
+                {postOffloadResult.affectedBatches.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold">Affected Mix Batches</p>
+                    <div className="border rounded-md divide-y text-sm">
+                      <div className="grid grid-cols-4 gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium">
+                        <span>Batch</span>
+                        <span className="text-right">Old Cost/kg</span>
+                        <span className="text-right">New Cost/kg</span>
+                        <span className="text-right">Weight from this container</span>
+                      </div>
+                      {postOffloadResult.affectedBatches.map((b) => (
+                        <div key={b.batchId} className="grid grid-cols-4 gap-2 px-3 py-2 items-center">
+                          <span className="font-mono font-medium">{b.batchCode}</span>
+                          <span className="text-right font-mono text-muted-foreground">${b.oldCostPerKg.toFixed(4)}</span>
+                          <span className="text-right font-mono font-semibold">${b.newCostPerKg.toFixed(4)}</span>
+                          <span className="text-right font-mono text-muted-foreground">{formatNumber(b.weightKg)} kg</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground p-3 bg-muted/40 rounded-md">
+                    <Info className="h-4 w-4 shrink-0" />
+                    No mix batches were linked to this container — only the container and raw stock costs were updated.
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* ── Entry form ── */
+              <div className="space-y-5">
+                <div className="flex items-start gap-3 p-3 rounded-md bg-blue-50 dark:bg-blue-950/20 text-blue-800 dark:text-blue-300 text-sm">
+                  <Info className="h-4 w-4 mt-0.5 shrink-0" />
+                  <p>Enter any charges that arrived after the original offload — port fees, duties, handling, etc. Each charge will be added to the container's cost and will cascade into any mix batches already made from it.</p>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Date</label>
+                  <Input
+                    type="date"
+                    value={postOffloadDate}
+                    onChange={(e) => setPostOffloadDate(e.target.value)}
+                    className="w-48"
+                    data-testid="input-post-offload-date"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-1">
+                    <label className="text-sm font-medium">Charges</label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPostOffloadCharges(prev => [...prev, { id: Date.now().toString(), description: "", amount: "", currencyCode: (postOffloadContainer as any)?.currencyCode || "USD", ledgerAccountId: "", supplierId: "" }])}
+                      data-testid="button-add-post-offload-charge-row"
+                    >
+                      <Plus className="h-3 w-3 mr-1" /> Add Row
+                    </Button>
+                  </div>
+
+                  {postOffloadCharges.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center border rounded-md">No charges added yet — click "Add Row" to begin.</p>
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="grid grid-cols-[2fr_1fr_auto_2fr_auto] gap-x-2 gap-y-1 items-center">
+                        <div className="text-xs text-muted-foreground font-medium">Description</div>
+                        <div className="text-xs text-muted-foreground font-medium">Amount</div>
+                        <div className="text-xs text-muted-foreground font-medium">CCY</div>
+                        <div className="text-xs text-muted-foreground font-medium">Account / Broker</div>
+                        <div />
+                        {postOffloadCharges.map((charge, idx) => (
+                          <>
+                            <Input
+                              key={`desc-${charge.id}`}
+                              value={charge.description}
+                              onChange={(e) => setPostOffloadCharges(prev => prev.map(c => c.id === charge.id ? { ...c, description: e.target.value } : c))}
+                              placeholder="e.g. Port duty"
+                              data-testid={`input-poc-description-${idx}`}
+                            />
+                            <Input
+                              key={`amt-${charge.id}`}
+                              type="number"
+                              value={charge.amount}
+                              onChange={(e) => setPostOffloadCharges(prev => prev.map(c => c.id === charge.id ? { ...c, amount: e.target.value } : c))}
+                              placeholder="0.00"
+                              step="0.01"
+                              data-testid={`input-poc-amount-${idx}`}
+                            />
+                            <Select
+                              key={`ccy-${charge.id}`}
+                              value={charge.currencyCode || "USD"}
+                              onValueChange={(v) => setPostOffloadCharges(prev => prev.map(c => c.id === charge.id ? { ...c, currencyCode: v } : c))}
+                            >
+                              <SelectTrigger className="w-20" data-testid={`select-poc-currency-${idx}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {["USD","EUR","GBP","AUD","LBP"].map(ccy => <SelectItem key={ccy} value={ccy}>{ccy}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                            <Select
+                              key={`acc-${charge.id}`}
+                              value={charge.ledgerAccountId || ""}
+                              onValueChange={(v) => setPostOffloadCharges(prev => prev.map(c => c.id === charge.id ? { ...c, ledgerAccountId: v, supplierId: "" } : c))}
+                            >
+                              <SelectTrigger data-testid={`select-poc-account-${idx}`}>
+                                <SelectValue placeholder="Select account (optional)" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ledgerAccounts.map((a: any) => (
+                                  <SelectItem key={a.id} value={String(a.id)}>{a.code ? `${a.code} - ${a.name}` : a.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              key={`del-${charge.id}`}
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setPostOffloadCharges(prev => prev.filter(c => c.id !== charge.id))}
+                              data-testid={`button-remove-poc-${idx}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 pt-2 border-t">
+            <Button variant="outline" onClick={() => { setPostOffloadContainer(null); setPostOffloadResult(null); setPostOffloadCharges([]); }}>
+              {postOffloadResult ? "Close" : "Cancel"}
+            </Button>
+            {!postOffloadResult && (
+              <Button
+                onClick={() => {
+                  if (!postOffloadContainer) return;
+                  const valid = postOffloadCharges.filter(c => parseFloat(c.amount || "0") > 0);
+                  if (valid.length === 0) {
+                    toast({ title: "No charges", description: "Add at least one charge with an amount.", variant: "destructive" });
+                    return;
+                  }
+                  wrapAdminAction(() => postOffloadMutation.mutate({
+                    containerId: postOffloadContainer.id,
+                    txDate: postOffloadDate || new Date().toLocaleDateString("en-CA"),
+                    charges: valid.map(c => ({
+                      description: c.description || "Post-offload charge",
+                      amount: c.amount,
+                      currencyCode: c.currencyCode || "USD",
+                      ledgerAccountId: c.ledgerAccountId ? parseInt(c.ledgerAccountId) : null,
+                      supplierId: c.supplierId ? parseInt(c.supplierId) : null,
+                    })),
+                  }), "Add Post-Offload Charges");
+                }}
+                disabled={postOffloadMutation.isPending || postOffloadCharges.every(c => parseFloat(c.amount || "0") <= 0)}
+                data-testid="button-confirm-post-offload-charges"
+              >
+                {postOffloadMutation.isPending ? "Saving..." : "Save Charges"}
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

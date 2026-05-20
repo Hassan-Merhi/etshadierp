@@ -2088,6 +2088,224 @@ export function registerFactoryRawStockRoutes(app: Express) {
     }
   });
 
+  // ── Post-offload charges: add duties/charges after a container has been offloaded ──
+  app.post("/api/factory/containers/:id/post-offload-charges", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const containerId = parseId(req.params.id);
+      if (containerId === null) return res.status(400).json({ message: "Invalid id" });
+
+      const { charges, txDate: reqTxDate } = req.body;
+      if (!Array.isArray(charges) || charges.length === 0) {
+        return res.status(400).json({ message: "At least one charge is required" });
+      }
+
+      const validCharges = charges.filter((c: any) => parseFloat(c.amount || "0") > 0);
+      if (validCharges.length === 0) {
+        return res.status(400).json({ message: "All charge amounts are zero" });
+      }
+
+      const [container] = await db
+        .select()
+        .from(factoryContainers)
+        .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
+      if (!container) return res.status(404).json({ message: "Container not found" });
+      if (container.status !== "OFFLOADED" && container.status !== "PARTIALLY_RECEIVED") {
+        return res.status(400).json({ message: "Can only add post-offload charges to offloaded containers" });
+      }
+
+      const txDate = reqTxDate || getClientDate(req);
+      const containerCcy = container.currencyCode || "USD";
+      const fxRate = parseFloat(container.fxRateToUsd || "1");
+      const actualKg = parseFloat(container.actualReceivedKg || "0");
+      if (actualKg <= 0) return res.status(400).json({ message: "Container has no received weight" });
+
+      // Pre-fetch ledger account IDs outside transaction
+      const chargesPayableAcctId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+
+      // Fetch existing additional charges to include in full recalculation
+      const existingCharges = await db
+        .select()
+        .from(factoryOffloadAdditionalCharges)
+        .where(and(eq(factoryOffloadAdditionalCharges.containerId, containerId), eq(factoryOffloadAdditionalCharges.companyId, companyId)));
+
+      let newRawStock: any;
+      let affectedBatches: { batchId: number; batchCode: string; oldCostPerKg: number; newCostPerKg: number; weightKg: number }[] = [];
+
+      await db.transaction(async (tx) => {
+        // 1. Insert new additional charge rows
+        const insertedCharges: any[] = [];
+        for (const charge of validCharges) {
+          const chargeCcy = charge.currencyCode || "USD";
+          const chargeFx = parseFloat(charge.fxRateToUsd || (chargeCcy === "USD" ? "1" : String(fxRate)));
+          const [inserted] = await tx
+            .insert(factoryOffloadAdditionalCharges)
+            .values({
+              companyId,
+              containerId,
+              description: charge.description || "Post-offload charge",
+              amount: String(parseFloat(charge.amount)),
+              currencyCode: chargeCcy,
+              fxRateToUsd: String(chargeFx),
+              ledgerAccountId: charge.ledgerAccountId ? parseInt(charge.ledgerAccountId) : null,
+              supplierId: charge.supplierId ? parseInt(charge.supplierId) : null,
+            })
+            .returning();
+          insertedCharges.push(inserted);
+        }
+
+        // 2. Recompute inclusive cost per kg using ALL charges (existing + new)
+        const allCharges = [...existingCharges, ...insertedCharges];
+        const baseRate = parseFloat(container.ratePerKg || "0");
+        const basePayable = actualKg * baseRate;
+        const freightVal = parseFloat(container.freight || "0");
+        const freightCcy = (container as any).freightCurrencyCode || containerCcy;
+        const freightFxVal = parseFloat((container as any).fxRateToUsdOffload || String(fxRate));
+        const freightUsd = freightCcy === "USD" ? freightVal : freightVal * freightFxVal;
+        const freightInContainerCcy = freightCcy === containerCcy ? freightVal : (fxRate > 0 ? freightUsd / fxRate : freightVal);
+        const ocVal = parseFloat(container.otherCharges || "0");
+        const commissionVal = parseFloat(container.commissionAmount || "0");
+        const dutyVal = container.dutyStatus === "CONFIRMED" ? parseFloat(container.dutyAmount || "0") : 0;
+
+        const additionalTotal = allCharges.reduce((sum: number, c: any) => {
+          const amt = parseFloat(c.amount || "0");
+          const ccy = c.currencyCode || containerCcy;
+          const cfx = parseFloat(c.fxRateToUsd || String(fxRate));
+          if (ccy === containerCcy) return sum + amt;
+          const amtUsd = ccy === "USD" ? amt : amt * cfx;
+          return sum + (containerCcy === "USD" ? amtUsd : (fxRate > 0 ? amtUsd / fxRate : amtUsd));
+        }, 0);
+
+        const totalCost = basePayable + freightInContainerCcy + ocVal + commissionVal + dutyVal + additionalTotal;
+        const newInclusiveCostPerKg = totalCost / actualKg;
+        const newCostPerKgUsd = containerCcy === "USD" ? newInclusiveCostPerKg : newInclusiveCostPerKg * fxRate;
+        const newFinalPayableAmountUsd = String(actualKg * newCostPerKgUsd);
+
+        // 3. Update container financials
+        await tx
+          .update(factoryContainers)
+          .set({
+            finalPayableAmount: String(totalCost),
+            ratePerKgUsd: String(newCostPerKgUsd),
+            finalPayableAmountUsd: newFinalPayableAmountUsd,
+            updatedAt: new Date(),
+          })
+          .where(eq(factoryContainers.id, containerId));
+
+        // 4. Update raw stock cost
+        const [rawStockRow] = await tx
+          .select()
+          .from(factoryRawStock)
+          .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId)));
+        if (rawStockRow) {
+          await tx
+            .update(factoryRawStock)
+            .set({ costPerKg: String(newInclusiveCostPerKg), costPerKgUsd: String(newCostPerKgUsd) })
+            .where(eq(factoryRawStock.id, rawStockRow.id));
+          newRawStock = { ...rawStockRow, costPerKg: String(newInclusiveCostPerKg), costPerKgUsd: String(newCostPerKgUsd) };
+        }
+
+        // 5. Cascade to mix batch sources → recalculate affected batch weighted averages
+        const mixSources = await tx
+          .select()
+          .from(factoryMixBatchSources)
+          .where(eq(factoryMixBatchSources.containerId, containerId));
+
+        if (mixSources.length > 0) {
+          for (const src of mixSources) {
+            const newSourceTotalCost = parseFloat(src.weightKg) * newInclusiveCostPerKg;
+            await tx
+              .update(factoryMixBatchSources)
+              .set({ costPerKg: String(newInclusiveCostPerKg), totalCost: String(newSourceTotalCost.toFixed(2)) })
+              .where(eq(factoryMixBatchSources.id, src.id));
+          }
+
+          const affectedBatchIds = [...new Set(mixSources.map((s: any) => s.mixBatchId))];
+          for (const batchId of affectedBatchIds) {
+            const [batch] = await tx.select().from(factoryMixBatches).where(eq(factoryMixBatches.id, batchId));
+            const oldCostPerKg = batch ? parseFloat(batch.costPerKg || "0") : 0;
+            const allSources = await tx.select().from(factoryMixBatchSources).where(eq(factoryMixBatchSources.mixBatchId, batchId));
+            const batchTotalCost = allSources.reduce((sum: number, s: any) => sum + parseFloat(s.totalCost || "0"), 0);
+            const batchTotalWeight = allSources.reduce((sum: number, s: any) => sum + parseFloat(s.weightKg || "0"), 0);
+            const batchCostPerKg = batchTotalWeight > 0 ? batchTotalCost / batchTotalWeight : 0;
+            await tx
+              .update(factoryMixBatches)
+              .set({ costPerKg: String(batchCostPerKg.toFixed(4)), totalCost: String(batchTotalCost.toFixed(2)), updatedAt: new Date() })
+              .where(eq(factoryMixBatches.id, batchId));
+            const srcWeight = mixSources.filter((s: any) => s.mixBatchId === batchId).reduce((sum: number, s: any) => sum + parseFloat(s.weightKg || "0"), 0);
+            affectedBatches.push({ batchId, batchCode: batch?.batchCode || `#${batchId}`, oldCostPerKg, newCostPerKg: batchCostPerKg, weightKg: srcWeight });
+          }
+        }
+
+        // 6. Daybook entries + vouchers for each new charge
+        for (const charge of insertedCharges) {
+          const chargeAmt = parseFloat(charge.amount || "0");
+          if (chargeAmt <= 0) continue;
+          const chargeCcy = charge.currencyCode || "USD";
+          const chargeFx = parseFloat(charge.fxRateToUsd || "1");
+          await writeDaybookEntry(tx, {
+            companyId,
+            txDate,
+            txType: "OTHER_CHARGE",
+            referenceId: containerId,
+            description: `${charge.description} (post-offload) — container ${container.containerNumber}`,
+            currencyCode: chargeCcy,
+            amountCurrency: chargeAmt,
+            fxRateToUsd: chargeCcy === "USD" ? 1 : chargeFx,
+          });
+          if (charge.ledgerAccountId || charge.supplierId) {
+            const voucherNum = `FACTORY-POC-${containerId}-${charge.id}-${Date.now()}`;
+            const [voucher] = await tx.insert(vouchers).values({
+              companyId,
+              voucherType: "Journal",
+              voucherNumber: voucherNum,
+              voucherDate: txDate,
+              description: `${charge.description} (post-offload) — container ${container.containerNumber}`,
+              totalAmount: String(chargeAmt),
+              currency: chargeCcy,
+              exchangeRate: String(chargeFx),
+              sourceModule: "FACTORY",
+            }).returning();
+            await tx.insert(voucherEntries).values({
+              voucherId: voucher.id,
+              ledgerAccountId: chargesPayableAcctId,
+              debitAmount: String(chargeAmt),
+              creditAmount: "0",
+              narration: `${charge.description} payable — container ${container.containerNumber}`,
+            });
+            if (charge.ledgerAccountId) {
+              await tx.insert(voucherEntries).values({
+                voucherId: voucher.id,
+                ledgerAccountId: charge.ledgerAccountId,
+                debitAmount: "0",
+                creditAmount: String(chargeAmt),
+                narration: `${charge.description} — container ${container.containerNumber}`,
+              });
+            } else if (charge.supplierId) {
+              await tx.insert(voucherEntries).values({
+                voucherId: voucher.id,
+                factorySupplierId: charge.supplierId,
+                debitAmount: "0",
+                creditAmount: String(chargeAmt),
+                narration: `${charge.description} — container ${container.containerNumber}`,
+              });
+            }
+          }
+        }
+      });
+
+      res.json({
+        message: "Post-offload charges added and costs recalculated",
+        affectedBatches,
+        rawStock: newRawStock,
+      });
+    } catch (error: any) {
+      console.error("Error adding post-offload charges:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/factory/containers/:id/duty-audit-log", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
