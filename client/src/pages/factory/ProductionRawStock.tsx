@@ -2307,585 +2307,432 @@ export default function ProductionRawStock() {
 
       {offloadDialogOpen && (
         <div className="fixed inset-0 z-50 bg-background flex flex-col">
-          {/* Full-page header */}
-          <div className="sticky top-0 z-30 border-b bg-background px-6 py-3 flex items-center justify-between shrink-0">
+          {/* Header */}
+          <div className="sticky top-0 z-30 border-b bg-background px-6 py-4 flex items-center justify-between shrink-0">
             <div>
               <h2 className="text-lg font-semibold">Offload Container to Production</h2>
-              <p className="text-sm text-muted-foreground">Enter the actual received weight and verify cost details</p>
+              <p className="text-sm text-muted-foreground">Enter actual received weight and verify all costs</p>
             </div>
             <Button variant="ghost" size="icon" onClick={handleCloseDialog} data-testid="button-close-offload-page">
               <X className="h-5 w-5" />
             </Button>
           </div>
 
-          {/* Scrollable body */}
+          {/* Two-column body */}
           <div className="flex-1 overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2 col-span-3">
-                <Label>Container</Label>
-                <Select value={selectedContainerId} onValueChange={handleContainerSelect}>
-                  <SelectTrigger data-testid="select-offload-container">
-                    <SelectValue placeholder="Select container to offload" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableContainers?.map((c) => (
-                      <SelectItem key={c.id} value={c.id.toString()}>
-                        {c.containerNumber} {c.totalKg ? `(${parseFloat(c.totalKg).toLocaleString()} kg)` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label>Offload Date</Label>
-                <Input
-                  type="date"
-                  value={offloadDate}
-                  onChange={(e) => setOffloadDate(e.target.value)}
-                  data-testid="input-offload-date"
-                />
-              </div>
-              <div className="space-y-1 col-span-2">
-                <Label>Destination <span className="text-muted-foreground text-xs font-normal">(optional — e.g. Beirut Factory, Cyprus Warehouse)</span></Label>
-                <Input
-                  value={offloadDestination}
-                  onChange={(e) => setOffloadDestination(e.target.value)}
-                  placeholder="e.g. Beirut Factory"
-                  data-testid="input-offload-destination"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-muted-foreground text-xs">Container Currency</Label>
-                <Select value={currencyCode} onValueChange={setCurrencyCode}>
-                  <SelectTrigger data-testid="select-currency">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="EUR">EUR</SelectItem>
-                    <SelectItem value="AUD">AUD</SelectItem>
-                    <SelectItem value="LBP">LBP</SelectItem>
-                    <SelectItem value="GBP">GBP</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-muted-foreground text-xs">
-                  {currencyCode !== "USD" ? `FX Rate (1 ${currencyCode} = ? USD)` : "FX Rate"}
-                </Label>
-                <Input
-                  type="number"
-                  value={fxRateToUsd}
-                  onChange={(e) => setFxRateToUsd(e.target.value)}
-                  placeholder="1.0"
-                  step="0.0001"
-                  disabled={currencyCode === "USD"}
-                  data-testid="input-fx-rate"
-                />
-              </div>
-            </div>
+            <div className="max-w-5xl mx-auto px-6 py-6">
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_288px] gap-6 items-start">
 
-            {selectedContainer && (
-              <>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-muted-foreground text-xs">Declared Weight (kg)</Label>
-                    <Input
-                      value={selectedContainer.totalKg ? formatNumber(parseFloat(selectedContainer.totalKg)) : "N/A"}
-                      disabled
-                      className="font-mono bg-muted"
-                      data-testid="input-declared-kg"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-medium">Actual Received (kg)</Label>
-                    <Input
-                      type="number"
-                      step="0.001"
-                      min="0"
-                      placeholder="Enter actual kg received"
-                      value={actualReceivedKg}
-                      onChange={(e) => setActualReceivedKg(e.target.value)}
-                      className="font-mono"
-                      data-testid="input-actual-received-kg"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-medium">
-                      Cost/kg{selectedContainer.ratePerKg && parseFloat(selectedContainer.ratePerKg) > 0 && (
-                        <span className="text-muted-foreground font-normal ml-1">(pre-filled from declaration)</span>
-                      )}
-                    </Label>
-                    <Input
-                      type="number"
-                      step="0.0001"
-                      min="0"
-                      placeholder="Enter cost per kg"
-                      value={costPerKg}
-                      onChange={(e) => setCostPerKg(e.target.value)}
-                      className="font-mono"
-                      data-testid="input-cost-per-kg"
-                    />
-                  </div>
-                </div>
+                {/* ── LEFT: Form ─────────────────────────────────────────── */}
+                <div className="space-y-4">
 
-                {currencyCode !== "USD" && rate > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Base rate in USD: <span className="font-mono font-medium">${rateUsd.toFixed(4)}/kg</span>
-                    {actualKg > 0 && <> · Base payable: <span className="font-mono font-medium">${formatNumber(totalPayableUsd)}</span></>}
-                  </p>
-                )}
-
-                {hasWeightDiff && (
-                  <div className={`flex items-center gap-2 text-sm p-2 rounded-md ${differenceKg > 0 ? "text-amber-600 bg-amber-50 dark:bg-amber-950/20" : "text-blue-600 bg-blue-50 dark:bg-blue-950/20"}`} data-testid="text-weight-difference">
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    <span>
-                      Weight difference: <strong className="font-mono">{differenceKg > 0 ? "-" : "+"}{formatNumber(Math.abs(differenceKg))} kg</strong>
-                      {rate > 0 && (
-                        <> (cost difference: <strong className="font-mono">${formatNumber(Math.abs(costDifference))}</strong>)</>
-                      )}
-                    </span>
-                  </div>
-                )}
-
-                <Separator />
-
-                <div>
-                  <Label className="text-sm font-semibold">Offload Charges</Label>
-                  <div className="space-y-3 mt-2">
-                    {/* Freight is fixed from the container import — shown read-only */}
-                    {freightVal > 0 && (
-                      <div className="flex items-center justify-between text-sm px-3 py-2 bg-muted/50 rounded-md">
-                        <span className="text-muted-foreground">Freight (from container)</span>
-                        <span className="font-mono font-medium">{freightCurrencyCode} {formatNumber(freightVal)}</span>
+                  {/* Section 1: Container + Basics */}
+                  <Card>
+                    <CardContent className="pt-5 space-y-4">
+                      <div className="space-y-1.5">
+                        <Label className="font-medium">Container</Label>
+                        <Select value={selectedContainerId} onValueChange={handleContainerSelect}>
+                          <SelectTrigger data-testid="select-offload-container">
+                            <SelectValue placeholder="Select container to offload" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableContainers?.map((c) => (
+                              <SelectItem key={c.id} value={c.id.toString()}>
+                                {c.containerNumber} {c.totalKg ? `(${parseFloat(c.totalKg).toLocaleString()} kg)` : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                    )}
-                    {otherChargesFromContainer ? (
-                      parseFloat(otherCharges || "0") > 0 && (
-                        <div className="flex items-center justify-between text-sm px-3 py-2 bg-muted/50 rounded-md">
-                          <span className="text-muted-foreground">Other Charges (from container)</span>
-                          <span className="font-mono font-medium">{otherChargesCurrencyCode} {formatNumber(parseFloat(otherCharges))}</span>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="font-medium">Offload Date</Label>
+                          <Input type="date" value={offloadDate} onChange={(e) => setOffloadDate(e.target.value)} data-testid="input-offload-date" />
                         </div>
-                      )
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-muted-foreground text-xs">Other Charges (USD)</Label>
-                            <Input type="number" value={otherCharges} onChange={(e) => setOtherCharges(e.target.value)} placeholder="0.00" step="0.01" data-testid="input-other-charges" />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-muted-foreground text-xs">Other Charges Account / Broker</Label>
-                            <AccountCombobox
-                              value={otherChargesAccountId}
-                              onValueChange={v => { setOtherChargesAccountId(v); if (!v.startsWith("SUP:")) { setOtherChargesCurrencyCode("USD"); setOtherChargesFxRate("1"); } }}
-                              accounts={ledgerAccounts || []}
-                              suppliers={factorySuppliers || []}
-                              placeholder="Select account or broker"
-                              testId="select-other-charges-account"
-                            />
-                          </div>
+                        <div className="space-y-1.5">
+                          <Label className="font-medium">Destination <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                          <Input value={offloadDestination} onChange={(e) => setOffloadDestination(e.target.value)} placeholder="e.g. Beirut Factory" data-testid="input-offload-destination" />
                         </div>
-                        {parseAccountValue(otherChargesAccountId)?.type === "supplier" && (
-                          <div className="grid grid-cols-2 gap-3 pl-2 border-l-2 border-muted">
-                            <div className="space-y-1">
-                              <Label className="text-muted-foreground text-xs">Balance Currency</Label>
-                              <Select value={otherChargesCurrencyCode} onValueChange={v => { setOtherChargesCurrencyCode(v); setOtherChargesFxRate(v === "USD" ? "1" : ""); }}>
-                                <SelectTrigger data-testid="select-oc-currency"><SelectValue /></SelectTrigger>
-                                <SelectContent>{["USD","EUR","GBP","AUD","LBP"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-muted-foreground text-xs">FX Rate to USD</Label>
-                              <Input type="number" value={otherChargesFxRate} onChange={(e) => setOtherChargesFxRate(e.target.value)} placeholder="1.0" step="0.0001" disabled={otherChargesCurrencyCode === "USD"} data-testid="input-oc-fx-rate" />
-                            </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-muted-foreground text-sm">Currency</Label>
+                          <Select value={currencyCode} onValueChange={setCurrencyCode}>
+                            <SelectTrigger data-testid="select-currency"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {["USD","EUR","AUD","LBP","GBP"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {currencyCode !== "USD" && (
+                          <div className="space-y-1.5">
+                            <Label className="text-muted-foreground text-sm">FX Rate (1 {currencyCode} = ? USD)</Label>
+                            <Input type="number" value={fxRateToUsd} onChange={(e) => setFxRateToUsd(e.target.value)} placeholder="1.0" step="0.0001" data-testid="input-fx-rate" />
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                </div>
+                    </CardContent>
+                  </Card>
 
-                <Separator />
-
-                <div>
-                  <div className="flex items-center justify-between flex-wrap gap-1">
-                    <Label className="text-sm font-semibold">Additional Charges</Label>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setAdditionalCharges(prev => [...prev, { id: Date.now().toString(), description: "", amount: "", currencyCode: currencyCode || "USD", ledgerAccountId: "", supplierId: "" }])}
-                      data-testid="button-add-additional-charge"
-                    >
-                      <Plus className="h-3 w-3 mr-1" /> Add Row
-                    </Button>
-                  </div>
-                  {additionalCharges.length > 0 && (
-                    <div className="mt-2">
-                      <div className="grid grid-cols-[2fr_1fr_auto_2fr_auto] gap-x-2 gap-y-1 items-center">
-                        <div className="text-xs text-muted-foreground font-medium">Description</div>
-                        <div className="text-xs text-muted-foreground font-medium">Amount</div>
-                        <div className="text-xs text-muted-foreground font-medium">CCY</div>
-                        <div className="text-xs text-muted-foreground font-medium">Account / Broker</div>
-                        <div />
-                        {additionalCharges.map((charge, idx) => (
-                          <>
-                            <Input
-                              key={`desc-${charge.id}`}
-                              type="text"
-                              value={charge.description}
-                              onChange={(e) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, description: e.target.value } : c))}
-                              placeholder="e.g. Port fees"
-                              data-testid={`input-addl-description-${idx}`}
-                            />
-                            <Input
-                              key={`amt-${charge.id}`}
-                              type="number"
-                              value={charge.amount}
-                              onChange={(e) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, amount: e.target.value } : c))}
-                              placeholder="0.00"
-                              step="0.01"
-                              data-testid={`input-addl-amount-${idx}`}
-                            />
-                            <Select
-                              key={`ccy-${charge.id}`}
-                              value={charge.currencyCode || "USD"}
-                              onValueChange={(v) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, currencyCode: v } : c))}
-                            >
-                              <SelectTrigger className="w-20" data-testid={`select-addl-currency-${idx}`}>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="USD">USD</SelectItem>
-                                <SelectItem value="EUR">EUR</SelectItem>
-                                <SelectItem value="AUD">AUD</SelectItem>
-                                <SelectItem value="LBP">LBP</SelectItem>
-                                <SelectItem value="GBP">GBP</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <AccountCombobox
-                              key={`acc-${charge.id}`}
-                              value={charge.ledgerAccountId}
-                              onValueChange={(v) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, ledgerAccountId: v } : c))}
-                              accounts={ledgerAccounts || []}
-                              suppliers={factorySuppliers || []}
-                              placeholder="Select account or broker"
-                              testId={`select-addl-account-${idx}`}
-                            />
-                            <Button
-                              key={`del-${charge.id}`}
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setAdditionalCharges(prev => prev.filter(c => c.id !== charge.id))}
-                              data-testid={`button-remove-addl-${idx}`}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <Separator />
-
-                <div>
-                  <Label className="text-sm font-semibold">Commission {commissionFromContainer ? "(from container)" : "(optional)"}</Label>
-                  <div className="space-y-3 mt-2">
-                    {commissionFromContainer ? (
-                      commRateNum > 0 && (
-                        <div className="flex items-center justify-between text-sm px-3 py-2 bg-muted/50 rounded-md">
-                          <span className="text-muted-foreground">
-                            {commissionPersonName || "Commission"} — fixed from import
-                          </span>
-                          <span className="font-mono font-medium">{containerCommissionCcy} {formatNumber(commRateNum)}</span>
-                        </div>
-                      )
-                    ) : (
-                      <>
-                        <div className="space-y-1">
-                          <Label className="text-muted-foreground text-xs">Commission Person</Label>
-                          <Input
-                            value={commissionPersonName}
-                            onChange={(e) => setCommissionPersonName(e.target.value)}
-                            placeholder="Person name"
-                            data-testid="input-commission-person"
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-muted-foreground text-xs">Commission Type</Label>
-                            <Select value={commissionType} onValueChange={(v) => setCommissionType(v as "PER_KG" | "FIXED")}>
-                              <SelectTrigger data-testid="select-commission-type">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="PER_KG">Per KG</SelectItem>
-                                <SelectItem value="FIXED">Fixed Amount</SelectItem>
-                              </SelectContent>
-                            </Select>
+                  {/* Section 2: Weight & Base Cost — only when container selected */}
+                  {selectedContainer && (
+                    <Card>
+                      <CardContent className="pt-5 space-y-4">
+                        <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide text-xs">Weight & Base Cost</p>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-muted-foreground text-sm">Declared (kg)</Label>
+                            <Input value={selectedContainer.totalKg ? formatNumber(parseFloat(selectedContainer.totalKg)) : "N/A"} disabled className="font-mono bg-muted" data-testid="input-declared-kg" />
                           </div>
-                          <div className="space-y-1">
-                            <Label className="text-muted-foreground text-xs">
-                              {commissionType === "PER_KG" ? "Rate per KG (USD)" : "Fixed Amount (USD)"}
-                            </Label>
-                            <Input
-                              type="number"
-                              value={commissionRate}
-                              onChange={(e) => setCommissionRate(e.target.value)}
-                              placeholder={commissionType === "PER_KG" ? "e.g. 0.05" : "e.g. 500"}
-                              step="0.01"
-                              data-testid="input-commission-rate"
-                            />
+                          <div className="space-y-1.5">
+                            <Label className="font-medium text-sm">Actual Received (kg) *</Label>
+                            <Input type="number" step="0.001" min="0" placeholder="0.000" value={actualReceivedKg} onChange={(e) => setActualReceivedKg(e.target.value)} className="font-mono" data-testid="input-actual-received-kg" />
                           </div>
-                        </div>
-                        {commissionPersonName && commRateNum > 0 && (
-                          <>
-                            <div className="text-sm text-muted-foreground">
-                              Commission Total: <span className="font-mono font-medium text-foreground">$ {formatNumber(commissionTotalUsd)}</span>
-                              {currencyCode !== "USD" && (
-                                <span className="ml-2 text-xs">≈ {currencyCode} {formatNumber(commissionInContainerCcy)}</span>
+                          <div className="space-y-1.5">
+                            <Label className="font-medium text-sm">
+                              Cost/kg
+                              {selectedContainer.ratePerKg && parseFloat(selectedContainer.ratePerKg) > 0 && (
+                                <span className="text-muted-foreground font-normal ml-1 text-xs">(pre-filled)</span>
                               )}
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-muted-foreground text-xs">Commission Account</Label>
-                              <AccountCombobox
-                                value={commissionLedgerAccountId}
-                                onValueChange={setCommissionLedgerAccountId}
-                                accounts={ledgerAccounts || []}
-                                placeholder="Select account"
-                                testId="select-commission-account"
-                              />
-                            </div>
-                          </>
+                            </Label>
+                            <Input type="number" step="0.0001" min="0" placeholder="0.0000" value={costPerKg} onChange={(e) => setCostPerKg(e.target.value)} className="font-mono" data-testid="input-cost-per-kg" />
+                          </div>
+                        </div>
+                        {hasWeightDiff && (
+                          <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-md ${differenceKg > 0 ? "text-amber-700 bg-amber-50 dark:bg-amber-950/20" : "text-blue-700 bg-blue-50 dark:bg-blue-950/20"}`} data-testid="text-weight-difference">
+                            <AlertTriangle className="h-4 w-4 shrink-0" />
+                            <span>
+                              {differenceKg > 0 ? "-" : "+"}{formatNumber(Math.abs(differenceKg))} kg difference
+                              {rate > 0 && <> · cost impact: <strong className="font-mono">${formatNumber(Math.abs(costDifference))}</strong></>}
+                            </span>
+                          </div>
                         )}
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div>
-                  <Label className="text-sm font-semibold">Duty</Label>
-                  <div className="space-y-3 mt-2">
-                    <div className="grid grid-cols-2 gap-4 items-end">
-                      <div className="space-y-1">
-                        <Label className="text-muted-foreground text-xs">Duty Amount ($)</Label>
-                        <Input
-                          type="number"
-                          value={dutyAmount}
-                          onChange={(e) => setDutyAmount(e.target.value)}
-                          placeholder="0.00"
-                          step="0.01"
-                          data-testid="input-duty-amount"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2 pb-1">
-                        <Switch
-                          checked={dutyPending}
-                          onCheckedChange={setDutyPending}
-                          data-testid="switch-duty-pending"
-                        />
-                        <Label className="text-xs text-muted-foreground">Pending (confirm later)</Label>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-muted-foreground text-xs">Duty Account</Label>
-                      <AccountCombobox
-                        value={dutyAccountId}
-                        onValueChange={setDutyAccountId}
-                        accounts={ledgerAccounts || []}
-                        placeholder="Select account"
-                        testId="select-duty-account"
-                      />
-                    </div>
-                    {dutyPending && (
-                      <div className="space-y-1">
-                        <Label className="text-muted-foreground text-xs">Duty Notes</Label>
-                        <Textarea
-                          value={dutyNotes}
-                          onChange={(e) => setDutyNotes(e.target.value)}
-                          placeholder="Notes about pending duty..."
-                          className="text-sm"
-                          data-testid="input-duty-notes"
-                        />
-                        <p className="text-xs text-amber-600">Duty will not be included in cost until confirmed</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="rounded-md border p-3 space-y-1.5 text-sm" data-testid="section-offload-summary">
-                  <p className="font-semibold text-base mb-2">Offload Summary</p>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Declared</span>
-                    <span className="font-mono">{formatNumber(declaredKg)} kg</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Actual</span>
-                    <span className={`font-mono font-medium ${hasWeightDiff ? "text-amber-600" : ""}`}>
-                      {formatNumber(actualKg)} kg
-                    </span>
-                  </div>
-                  {hasWeightDiff && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Difference</span>
-                      <span className="font-mono text-amber-600">
-                        {differenceKg > 0 ? "-" : "+"}{formatNumber(Math.abs(differenceKg))} kg
-                      </span>
-                    </div>
+                      </CardContent>
+                    </Card>
                   )}
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Base Rate</span>
-                    <span className="font-mono">{currencyCode === "USD" ? "$" : currencyCode + " "}{rate.toFixed(4)}/kg</span>
-                  </div>
-                  <Separator className="my-1" />
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      Base Payable ({actualKg} kg × {currencyCode !== "USD" ? `${currencyCode} ` : "$"}{rate.toFixed(4)}{currencyCode !== "USD" && fxRate !== 1 ? ` @ ${fxRate}` : ""})
-                    </span>
-                    <span className="font-mono">$ {formatNumber(totalPayableUsd)}</span>
-                  </div>
-                  {freightVal > 0 && (
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>Freight (from container)</span>
-                      <span className="font-mono">{freightCurrencyCode} {formatNumber(freightVal)}</span>
-                    </div>
-                  )}
-                  {otherChargesVal > 0 && (
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>Other Charges {otherChargesFromContainer ? "(from container)" : ""}</span>
-                      <span className="font-mono">
-                        {otherChargesFromContainer
-                          ? `${otherChargesCurrencyCode} ${formatNumber(otherChargesVal)}`
-                          : `$ ${formatNumber(otherChargesUsd)}`}
-                      </span>
-                    </div>
-                  )}
-                  {additionalCharges.filter(c => parseFloat(c.amount || "0") > 0).map((c, i) => (
-                    <div key={c.id} className="flex justify-between text-muted-foreground">
-                      <span>Additional #{i + 1}</span>
-                      <span className="font-mono">{c.currencyCode || "USD"} {formatNumber(parseFloat(c.amount))}</span>
-                    </div>
-                  ))}
-                  {commissionPersonName && commRateNum > 0 && (
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>Commission ({commissionPersonName})</span>
-                      <span className="font-mono">
-                        {commissionFromContainer
-                          ? `${containerCommissionCcy} ${formatNumber(commRateNum)}`
-                          : `$ ${formatNumber(commissionTotalUsd)}`}
-                      </span>
-                    </div>
-                  )}
-                  {dutyUsd > 0 && !dutyPending && (
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>Duty</span>
-                      <span className="font-mono">$ {formatNumber(dutyUsd)}</span>
-                    </div>
-                  )}
-                  {dutyPending && parseFloat(dutyAmount || "0") > 0 && (
-                    <div className="flex justify-between text-amber-600">
-                      <span>Duty (Pending)</span>
-                      <span className="font-mono">$ {formatNumber(parseFloat(dutyAmount))}</span>
-                    </div>
-                  )}
-                  <Separator className="my-1" />
-                  <div className="flex justify-between font-medium">
-                    <span>Grand Total (USD)</span>
-                    <span className="font-mono text-base">$ {formatNumber(grandTotalUsd)}</span>
-                  </div>
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Inclusive Cost/KG (USD)</span>
-                    <span className="font-mono">$ {(grandTotalUsd / (actualKg || 1)).toFixed(4)}/kg</span>
-                  </div>
-                </div>
 
-                <Separator />
+                  {/* Section 3: Charges — only when container selected */}
+                  {selectedContainer && (
+                    <Card>
+                      <CardContent className="pt-5 space-y-4">
+                        <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide text-xs">Charges</p>
 
-                <div>
-                  <div className="flex items-center justify-between flex-wrap gap-1">
-                    <Label className="text-sm font-semibold">Mix Batch Allocations (optional)</Label>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setMixBatchAllocations(prev => [...prev, { id: Date.now().toString(), mixBatchId: "", weightKg: "" }])}
-                      data-testid="button-add-mix-batch-allocation"
-                    >
-                      <Plus className="h-3 w-3 mr-1" /> Add Batch
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Record which open mix batches this container's material was allocated to.</p>
-                  {mixBatchAllocations.length > 0 && (
-                    <div className="space-y-2 mt-2">
-                      {(() => {
-                        const openBatches = (mixBatches || []).filter(b => b.status === "OPEN" || b.status === "ACTIVE" || b.status === "CARRY_FORWARD");
-                        const totalAllocated = mixBatchAllocations.reduce((sum, a) => sum + parseFloat(a.weightKg || "0"), 0);
-                        return (
-                          <>
-                            {mixBatchAllocations.map((alloc, idx) => (
-                              <div key={alloc.id} className="grid grid-cols-[1fr_120px_auto] gap-2 items-end">
-                                <div className="space-y-1">
-                                  <Label className="text-muted-foreground text-xs">Mix Batch</Label>
-                                  <Select value={alloc.mixBatchId} onValueChange={(v) => setMixBatchAllocations(prev => prev.map(a => a.id === alloc.id ? { ...a, mixBatchId: v } : a))}>
-                                    <SelectTrigger data-testid={`select-mix-batch-alloc-${idx}`}>
-                                      <SelectValue placeholder="Select batch" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {openBatches.map(b => (
-                                        <SelectItem key={b.id} value={b.id.toString()}>
-                                          {b.batchCode}{b.name ? ` — ${b.name}` : ""}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
+                        {/* Freight — read-only if from container */}
+                        {freightVal > 0 && (
+                          <div className="flex items-center justify-between text-sm px-3 py-2.5 bg-muted/40 rounded-md">
+                            <span className="text-muted-foreground">Freight</span>
+                            <span className="font-mono font-medium">{freightCurrencyCode} {formatNumber(freightVal)}</span>
+                          </div>
+                        )}
+
+                        {/* Other Charges */}
+                        {otherChargesFromContainer ? (
+                          parseFloat(otherCharges || "0") > 0 && (
+                            <div className="flex items-center justify-between text-sm px-3 py-2.5 bg-muted/40 rounded-md">
+                              <span className="text-muted-foreground">Other Charges</span>
+                              <span className="font-mono font-medium">{otherChargesCurrencyCode} {formatNumber(parseFloat(otherCharges))}</span>
+                            </div>
+                          )
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1.5">
+                                <Label className="text-muted-foreground text-sm">Other Charges (USD)</Label>
+                                <Input type="number" value={otherCharges} onChange={(e) => setOtherCharges(e.target.value)} placeholder="0.00" step="0.01" data-testid="input-other-charges" />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-muted-foreground text-sm">Account / Broker</Label>
+                                <AccountCombobox
+                                  value={otherChargesAccountId}
+                                  onValueChange={v => { setOtherChargesAccountId(v); if (!v.startsWith("SUP:")) { setOtherChargesCurrencyCode("USD"); setOtherChargesFxRate("1"); } }}
+                                  accounts={ledgerAccounts || []}
+                                  suppliers={factorySuppliers || []}
+                                  placeholder="Select account or broker"
+                                  testId="select-other-charges-account"
+                                />
+                              </div>
+                            </div>
+                            {parseAccountValue(otherChargesAccountId)?.type === "supplier" && (
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                  <Label className="text-muted-foreground text-sm">Balance Currency</Label>
+                                  <Select value={otherChargesCurrencyCode} onValueChange={v => { setOtherChargesCurrencyCode(v); setOtherChargesFxRate(v === "USD" ? "1" : ""); }}>
+                                    <SelectTrigger data-testid="select-oc-currency"><SelectValue /></SelectTrigger>
+                                    <SelectContent>{["USD","EUR","GBP","AUD","LBP"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                                   </Select>
                                 </div>
-                                <div className="space-y-1">
-                                  <Label className="text-muted-foreground text-xs">KG</Label>
-                                  <Input
-                                    type="number"
-                                    value={alloc.weightKg}
-                                    onChange={(e) => setMixBatchAllocations(prev => prev.map(a => a.id === alloc.id ? { ...a, weightKg: e.target.value } : a))}
-                                    placeholder="0.000"
-                                    step="0.001"
-                                    data-testid={`input-mix-batch-kg-${idx}`}
-                                  />
+                                <div className="space-y-1.5">
+                                  <Label className="text-muted-foreground text-sm">FX Rate to USD</Label>
+                                  <Input type="number" value={otherChargesFxRate} onChange={(e) => setOtherChargesFxRate(e.target.value)} placeholder="1.0" step="0.0001" disabled={otherChargesCurrencyCode === "USD"} data-testid="input-oc-fx-rate" />
                                 </div>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setMixBatchAllocations(prev => prev.filter(a => a.id !== alloc.id))}
-                                  data-testid={`button-remove-mix-batch-${idx}`}
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
                               </div>
-                            ))}
-                            {actualKg > 0 && (
-                              <div className={`text-xs mt-1 ${totalAllocated > actualKg ? "text-amber-600" : "text-muted-foreground"}`}>
-                                Total allocated: <span className="font-mono font-medium">{formatNumber(totalAllocated)} kg</span>
-                                {" / "}{formatNumber(actualKg)} kg received
-                                {totalAllocated > actualKg && " — exceeds received weight"}
+                            )}
+                          </div>
+                        )}
+
+                        {/* Additional Charges */}
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-muted-foreground">Additional Charges</span>
+                            <Button variant="outline" size="sm" onClick={() => setAdditionalCharges(prev => [...prev, { id: Date.now().toString(), description: "", amount: "", currencyCode: currencyCode || "USD", ledgerAccountId: "", supplierId: "" }])} data-testid="button-add-additional-charge">
+                              <Plus className="h-3 w-3 mr-1" /> Add Row
+                            </Button>
+                          </div>
+                          {additionalCharges.length > 0 && (
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-[2fr_1fr_auto_2fr_auto] gap-2 px-1">
+                                <span className="text-xs text-muted-foreground">Description</span>
+                                <span className="text-xs text-muted-foreground">Amount</span>
+                                <span className="text-xs text-muted-foreground">CCY</span>
+                                <span className="text-xs text-muted-foreground">Account</span>
+                                <span />
+                              </div>
+                              {additionalCharges.map((charge, idx) => (
+                                <div key={charge.id} className="grid grid-cols-[2fr_1fr_auto_2fr_auto] gap-2 items-center">
+                                  <Input type="text" value={charge.description} onChange={(e) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, description: e.target.value } : c))} placeholder="e.g. Port fees" data-testid={`input-addl-description-${idx}`} />
+                                  <Input type="number" value={charge.amount} onChange={(e) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, amount: e.target.value } : c))} placeholder="0.00" step="0.01" data-testid={`input-addl-amount-${idx}`} />
+                                  <Select value={charge.currencyCode || "USD"} onValueChange={(v) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, currencyCode: v } : c))}>
+                                    <SelectTrigger className="w-[70px]" data-testid={`select-addl-currency-${idx}`}><SelectValue /></SelectTrigger>
+                                    <SelectContent>{["USD","EUR","AUD","LBP","GBP"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                                  </Select>
+                                  <AccountCombobox value={charge.ledgerAccountId} onValueChange={(v) => setAdditionalCharges(prev => prev.map(c => c.id === charge.id ? { ...c, ledgerAccountId: v } : c))} accounts={ledgerAccounts || []} suppliers={factorySuppliers || []} placeholder="Select account" testId={`select-addl-account-${idx}`} />
+                                  <Button variant="ghost" size="icon" onClick={() => setAdditionalCharges(prev => prev.filter(c => c.id !== charge.id))} data-testid={`button-remove-addl-${idx}`}><X className="h-4 w-4" /></Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Section 4: Commission */}
+                  {selectedContainer && (
+                    <Card>
+                      <CardContent className="pt-5 space-y-3">
+                        <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide text-xs">Commission {commissionFromContainer ? "(from container)" : "(optional)"}</p>
+                        {commissionFromContainer ? (
+                          commRateNum > 0 && (
+                            <div className="flex items-center justify-between text-sm px-3 py-2.5 bg-muted/40 rounded-md">
+                              <span className="text-muted-foreground">{commissionPersonName || "Commission"} — fixed from import</span>
+                              <span className="font-mono font-medium">{containerCommissionCcy} {formatNumber(commRateNum)}</span>
+                            </div>
+                          )
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-3 gap-3">
+                              <div className="space-y-1.5 col-span-3 sm:col-span-1">
+                                <Label className="text-muted-foreground text-sm">Person Name</Label>
+                                <Input value={commissionPersonName} onChange={(e) => setCommissionPersonName(e.target.value)} placeholder="e.g. Agent name" data-testid="input-commission-person" />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-muted-foreground text-sm">Type</Label>
+                                <Select value={commissionType} onValueChange={(v) => setCommissionType(v as "PER_KG" | "FIXED")}>
+                                  <SelectTrigger data-testid="select-commission-type"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="PER_KG">Per KG</SelectItem>
+                                    <SelectItem value="FIXED">Fixed</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-muted-foreground text-sm">{commissionType === "PER_KG" ? "Rate/KG (USD)" : "Amount (USD)"}</Label>
+                                <Input type="number" value={commissionRate} onChange={(e) => setCommissionRate(e.target.value)} placeholder={commissionType === "PER_KG" ? "0.05" : "500"} step="0.01" data-testid="input-commission-rate" />
+                              </div>
+                            </div>
+                            {commissionPersonName && commRateNum > 0 && (
+                              <div className="space-y-1.5">
+                                <Label className="text-muted-foreground text-sm">Commission Account</Label>
+                                <AccountCombobox value={commissionLedgerAccountId} onValueChange={setCommissionLedgerAccountId} accounts={ledgerAccounts || []} placeholder="Select account" testId="select-commission-account" />
                               </div>
                             )}
                           </>
-                        );
-                      })()}
-                    </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Section 5: Duty */}
+                  {selectedContainer && (
+                    <Card>
+                      <CardContent className="pt-5 space-y-3">
+                        <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide text-xs">Duty <span className="text-muted-foreground font-normal normal-case">(optional)</span></p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-muted-foreground text-sm">Amount (USD)</Label>
+                            <Input type="number" value={dutyAmount} onChange={(e) => setDutyAmount(e.target.value)} placeholder="0.00" step="0.01" data-testid="input-duty-amount" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-muted-foreground text-sm">Account</Label>
+                            <AccountCombobox value={dutyAccountId} onValueChange={setDutyAccountId} accounts={ledgerAccounts || []} placeholder="Select account" testId="select-duty-account" />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch checked={dutyPending} onCheckedChange={setDutyPending} data-testid="switch-duty-pending" />
+                          <Label className="text-sm text-muted-foreground">Mark as pending — confirm duty amount later</Label>
+                        </div>
+                        {dutyPending && (
+                          <div className="space-y-1.5">
+                            <Textarea value={dutyNotes} onChange={(e) => setDutyNotes(e.target.value)} placeholder="Notes about pending duty..." className="text-sm" data-testid="input-duty-notes" />
+                            <p className="text-xs text-amber-600">Pending duty will not be included in cost calculations until confirmed</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Section 6: Mix Batch Allocations */}
+                  {selectedContainer && (
+                    <Card>
+                      <CardContent className="pt-5 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Mix Batch Allocations <span className="font-normal normal-case">(optional)</span></p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Link this container's material to open mix batches</p>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => setMixBatchAllocations(prev => [...prev, { id: Date.now().toString(), mixBatchId: "", weightKg: "" }])} data-testid="button-add-mix-batch-allocation">
+                            <Plus className="h-3 w-3 mr-1" /> Add Batch
+                          </Button>
+                        </div>
+                        {mixBatchAllocations.length > 0 && (() => {
+                          const openBatches = (mixBatches || []).filter(b => b.status === "OPEN" || b.status === "ACTIVE" || b.status === "CARRY_FORWARD");
+                          const totalAllocated = mixBatchAllocations.reduce((sum, a) => sum + parseFloat(a.weightKg || "0"), 0);
+                          return (
+                            <div className="space-y-2">
+                              {mixBatchAllocations.map((alloc, idx) => (
+                                <div key={alloc.id} className="grid grid-cols-[1fr_130px_auto] gap-2 items-end">
+                                  <div className="space-y-1">
+                                    <Label className="text-muted-foreground text-xs">Mix Batch</Label>
+                                    <Select value={alloc.mixBatchId} onValueChange={(v) => setMixBatchAllocations(prev => prev.map(a => a.id === alloc.id ? { ...a, mixBatchId: v } : a))}>
+                                      <SelectTrigger data-testid={`select-mix-batch-alloc-${idx}`}><SelectValue placeholder="Select batch" /></SelectTrigger>
+                                      <SelectContent>{openBatches.map(b => <SelectItem key={b.id} value={b.id.toString()}>{b.batchCode}{b.name ? ` — ${b.name}` : ""}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-muted-foreground text-xs">KG</Label>
+                                    <Input type="number" value={alloc.weightKg} onChange={(e) => setMixBatchAllocations(prev => prev.map(a => a.id === alloc.id ? { ...a, weightKg: e.target.value } : a))} placeholder="0.000" step="0.001" data-testid={`input-mix-batch-kg-${idx}`} />
+                                  </div>
+                                  <Button variant="ghost" size="icon" onClick={() => setMixBatchAllocations(prev => prev.filter(a => a.id !== alloc.id))} data-testid={`button-remove-mix-batch-${idx}`}><X className="h-4 w-4" /></Button>
+                                </div>
+                              ))}
+                              {actualKg > 0 && (
+                                <p className={`text-xs ${totalAllocated > actualKg ? "text-amber-600" : "text-muted-foreground"}`}>
+                                  Allocated: <span className="font-mono font-medium">{formatNumber(totalAllocated)} / {formatNumber(actualKg)} kg</span>
+                                  {totalAllocated > actualKg && " — exceeds received weight"}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </CardContent>
+                    </Card>
                   )}
                 </div>
-              </>
-            )}
 
+                {/* ── RIGHT: Live Summary (sticky) ───────────────────────── */}
+                <div className="lg:sticky lg:top-[73px]" data-testid="section-offload-summary">
+                  <Card>
+                    <CardContent className="pt-5 space-y-3 text-sm">
+                      <p className="font-semibold">Cost Preview</p>
+
+                      {!selectedContainer ? (
+                        <p className="text-muted-foreground text-xs py-4 text-center">Select a container to see the cost breakdown</p>
+                      ) : (
+                        <>
+                          {/* Weight */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-muted-foreground">
+                              <span>Declared</span>
+                              <span className="font-mono">{formatNumber(declaredKg)} kg</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className={hasWeightDiff ? "text-amber-600" : "text-muted-foreground"}>Actual</span>
+                              <span className={`font-mono font-medium ${hasWeightDiff ? "text-amber-600" : ""}`}>{formatNumber(actualKg)} kg</span>
+                            </div>
+                            {hasWeightDiff && (
+                              <div className="flex justify-between text-amber-600 text-xs">
+                                <span>Difference</span>
+                                <span className="font-mono">{differenceKg > 0 ? "-" : "+"}{formatNumber(Math.abs(differenceKg))} kg</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <Separator />
+
+                          {/* Cost lines */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-muted-foreground">
+                              <span>Base ({currencyCode !== "USD" ? `${currencyCode} ` : "$"}{rate.toFixed(4)}/kg)</span>
+                              <span className="font-mono">$ {formatNumber(totalPayableUsd)}</span>
+                            </div>
+                            {freightVal > 0 && (
+                              <div className="flex justify-between text-muted-foreground">
+                                <span>Freight</span>
+                                <span className="font-mono">{freightCurrencyCode} {formatNumber(freightVal)}</span>
+                              </div>
+                            )}
+                            {otherChargesVal > 0 && (
+                              <div className="flex justify-between text-muted-foreground">
+                                <span>Other charges</span>
+                                <span className="font-mono">
+                                  {otherChargesFromContainer ? `${otherChargesCurrencyCode} ${formatNumber(otherChargesVal)}` : `$ ${formatNumber(otherChargesUsd)}`}
+                                </span>
+                              </div>
+                            )}
+                            {additionalCharges.filter(c => parseFloat(c.amount || "0") > 0).map((c, i) => (
+                              <div key={c.id} className="flex justify-between text-muted-foreground">
+                                <span className="truncate mr-2">{c.description || `Additional #${i + 1}`}</span>
+                                <span className="font-mono shrink-0">{c.currencyCode || "USD"} {formatNumber(parseFloat(c.amount))}</span>
+                              </div>
+                            ))}
+                            {commissionPersonName && commRateNum > 0 && (
+                              <div className="flex justify-between text-muted-foreground">
+                                <span className="truncate mr-2">Commission</span>
+                                <span className="font-mono shrink-0">
+                                  {commissionFromContainer ? `${containerCommissionCcy} ${formatNumber(commRateNum)}` : `$ ${formatNumber(commissionTotalUsd)}`}
+                                </span>
+                              </div>
+                            )}
+                            {dutyUsd > 0 && !dutyPending && (
+                              <div className="flex justify-between text-muted-foreground">
+                                <span>Duty</span>
+                                <span className="font-mono">$ {formatNumber(dutyUsd)}</span>
+                              </div>
+                            )}
+                            {dutyPending && parseFloat(dutyAmount || "0") > 0 && (
+                              <div className="flex justify-between text-amber-600">
+                                <span>Duty (pending)</span>
+                                <span className="font-mono">$ {formatNumber(parseFloat(dutyAmount))}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <Separator />
+
+                          {/* Totals */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between font-semibold">
+                              <span>Grand Total</span>
+                              <span className="font-mono">$ {formatNumber(grandTotalUsd)}</span>
+                            </div>
+                            <div className="flex justify-between text-muted-foreground text-xs">
+                              <span>Inclusive cost/kg</span>
+                              <span className="font-mono">$ {(grandTotalUsd / (actualKg || 1)).toFixed(4)}/kg</span>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+              </div>
             </div>
           </div>
 
-          {/* Sticky footer with action buttons */}
+          {/* Sticky footer */}
           <div className="shrink-0 border-t bg-background px-6 py-4 flex justify-end gap-3">
             <Button variant="outline" onClick={handleCloseDialog} data-testid="button-cancel-offload">
               Cancel
