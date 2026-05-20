@@ -2,7 +2,7 @@ import { useState, useRef, useMemo, useEffect } from "react";
 import { addDays, format } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAdminOverride } from "@/hooks/use-admin-override";
-import { Printer, Trash2, Search, Package, Filter, CheckSquare, RefreshCw, Pencil, Check, X, Download, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { Printer, Trash2, Search, Package, Filter, CheckSquare, RefreshCw, Pencil, Check, X, Download, ChevronLeft, ChevronRight, ChevronDown, Undo2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -73,6 +73,7 @@ export default function BalesHistory() {
   const [designPickerOpen, setDesignPickerOpen] = useState(false);
   const [pendingReprintLabels, setPendingReprintLabels] = useState<LabelData[] | null>(null);
   const [repackConfirm, setRepackConfirm] = useState<any>(null);
+  const [returnToStockBale, setReturnToStockBale] = useState<any>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const nameInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -197,6 +198,41 @@ export default function BalesHistory() {
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;
       toast({ title: "Error updating name", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const { data: returnToStockOrderInfo, isLoading: orderInfoLoading } = useQuery<any>({
+    queryKey: ["/api/factory/bales", returnToStockBale?.bale?.id, "order-info"],
+    queryFn: async () => {
+      if (!returnToStockBale) return null;
+      const res = await modeApiRequest("GET", `/api/factory/bales/${returnToStockBale.bale.id}/order-info`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!returnToStockBale,
+  });
+
+  const returnToStockMutation = useMutation({
+    mutationFn: async (baleId: number) => {
+      const res = await modeApiRequest("POST", `/api/factory/bales/${baleId}/return-to-stock`, {});
+      if (!res.ok) {
+        const err = await res.json();
+        throw Object.assign(new Error(err.message || "Failed to return bale to stock"), { isLastBale: err.isLastBale });
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-balances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
+      setReturnToStockBale(null);
+      const invoiceMsg = data.invoiceNumber ? ` Invoice ${data.invoiceNumber} updated to $${parseFloat(data.newGrandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.` : "";
+      toast({ title: "Bale returned to stock", description: `Bale removed from order.${invoiceMsg}` });
+    },
+    onError: (err: any) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
@@ -774,6 +810,17 @@ export default function BalesHistory() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
+                                {(bale.status === "RESERVED_FOR_ORDER" || bale.status === "RESERVED" || bale.status === "SOLD") && (
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => setReturnToStockBale(row)}
+                                    title="Return bale to stock"
+                                    data-testid={`button-return-to-stock-${bale.id}`}
+                                  >
+                                    <Undo2 className="h-4 w-4 text-blue-500" />
+                                  </Button>
+                                )}
                                 {myAccess?.fullAccess && (
                                   <Button size="icon" variant="ghost" onClick={() => setRepackConfirm(row)} disabled={bale.status === "REPACKED" || bale.status === "SOLD"} title="Repack bale" data-testid={`button-repack-${bale.id}`}>
                                     <RefreshCw className="h-4 w-4" />
@@ -950,6 +997,108 @@ export default function BalesHistory() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Return to Stock Dialog */}
+      <Dialog open={!!returnToStockBale} onOpenChange={(open) => { if (!open) setReturnToStockBale(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Undo2 className="h-5 w-5 text-blue-500" />
+              Return Bale to Stock
+            </DialogTitle>
+            <DialogDescription>
+              Bale <span className="font-mono font-semibold">{returnToStockBale?.bale?.referenceNumber}</span>
+              {returnToStockBale?.product?.name || returnToStockBale?.bale?.productName ? ` — ${returnToStockBale?.product?.name || returnToStockBale?.bale?.productName}` : ""}
+              {" "}({returnToStockBale?.bale?.weightKg} kg)
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-1">
+            {orderInfoLoading ? (
+              <div className="text-sm text-muted-foreground py-2">Loading order details...</div>
+            ) : returnToStockOrderInfo ? (
+              <>
+                <div className="rounded-md border p-3 space-y-1.5 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Order status</span>
+                    <Badge variant="secondary" className="text-xs">{returnToStockOrderInfo.status}</Badge>
+                  </div>
+                  {returnToStockOrderInfo.invoiceNumber && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Invoice</span>
+                      <span className="font-mono font-semibold">{returnToStockOrderInfo.invoiceNumber}</span>
+                    </div>
+                  )}
+                  {returnToStockOrderInfo.customerName && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Customer</span>
+                      <span>{returnToStockOrderInfo.customerName}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Current total</span>
+                    <span className="font-mono">${parseFloat(returnToStockOrderInfo.grandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Bales in order</span>
+                    <span>{returnToStockOrderInfo.totalBalesInOrder}</span>
+                  </div>
+                </div>
+
+                {returnToStockOrderInfo.totalBalesInOrder <= 1 && (
+                  <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <p>This is the last bale in the order. You must cancel the entire order instead.</p>
+                  </div>
+                )}
+
+                {returnToStockOrderInfo.status === "FINALIZED" && returnToStockOrderInfo.totalBalesInOrder > 1 && (
+                  <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 text-sm">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <p>
+                      This order is <strong>finalized</strong>. Removing this bale will reduce invoice <strong>{returnToStockOrderInfo.invoiceNumber}</strong> and update the customer's balance. The invoice number will not change. Admin authorisation required.
+                    </p>
+                  </div>
+                )}
+
+                {!["FINALIZED"].includes(returnToStockOrderInfo.status) && returnToStockOrderInfo.totalBalesInOrder > 1 && (
+                  <p className="text-sm text-muted-foreground">
+                    The bale will be removed from this order and returned to stock. Order totals will be recalculated.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">No order linked to this bale — it will simply be returned to stock.</p>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setReturnToStockBale(null)} data-testid="button-cancel-return-to-stock">
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                returnToStockMutation.isPending ||
+                orderInfoLoading ||
+                (returnToStockOrderInfo?.totalBalesInOrder <= 1)
+              }
+              onClick={() => {
+                if (!returnToStockBale) return;
+                const isFinalized = returnToStockOrderInfo?.status === "FINALIZED";
+                const doIt = () => returnToStockMutation.mutate(returnToStockBale.bale.id);
+                if (isFinalized) {
+                  wrapAdminAction(doIt, "Return Bale to Stock (Finalized Order)");
+                } else {
+                  doIt();
+                }
+              }}
+              data-testid="button-confirm-return-to-stock"
+            >
+              {returnToStockMutation.isPending ? "Processing..." : "Return to Stock"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {AdminDialog}
     </div>
   );
