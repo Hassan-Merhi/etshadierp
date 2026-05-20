@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Plus, Trash2, TrendingUp, ShoppingBag, Info } from "lucide-react";
+import { Loader2, Plus, Trash2, TrendingUp, ShoppingBag, AlertTriangle, Info } from "lucide-react";
 
 function fmt(v: any, dec = 2) {
   const n = parseFloat(String(v ?? "0"));
@@ -17,6 +18,28 @@ interface SaleLine {
   articleCode: string;
   qtySold: string;
   salePricePerUnit: string;
+}
+
+function simulateFifo(movements: any[], qty: number) {
+  const sorted = [...movements]
+    .filter(m => parseFloat(m.qtyRemaining ?? m.qty_remaining ?? "0") > 0.0001)
+    .sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
+  let qtyLeft = qty;
+  let estBaseCost = 0;
+  let estFinalCost = 0;
+  const lots: { qty: number; base: number; final: number }[] = [];
+  for (const m of sorted) {
+    if (qtyLeft <= 0.0001) break;
+    const avail = parseFloat(m.qtyRemaining ?? m.qty_remaining ?? "0");
+    const take = Math.min(qtyLeft, avail);
+    qtyLeft -= take;
+    const baseUC = parseFloat(m.baseUnitCostUsd ?? m.base_unit_cost_usd ?? "0");
+    const finalUC = parseFloat(m.finalUnitCostUsd ?? m.final_unit_cost_usd ?? "0");
+    estBaseCost += take * baseUC;
+    estFinalCost += take * finalUC;
+    lots.push({ qty: take, base: baseUC, final: finalUC });
+  }
+  return { estBaseCost, estFinalCost, sufficient: qtyLeft <= 0.0001, lots };
 }
 
 export default function SpSales() {
@@ -50,7 +73,7 @@ export default function SpSales() {
       queryClient.invalidateQueries({ queryKey: ["/api/sp/report/stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sp/report/profit"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sp/report/sales-detail"] });
-      toast({ title: "Sale posted", description: "FIFO lots consumed automatically. COGS and payable entries created." });
+      toast({ title: "Sale posted", description: "FIFO lots consumed. COGS, stock, and supplier payable entries created." });
       setSaleLines([{ articleCode: "", qtySold: "", salePricePerUnit: "" }]);
       setCustomerName("");
       setNotes("");
@@ -69,17 +92,21 @@ export default function SpSales() {
     const g = getStockGroup(sl.articleCode);
     const qty = parseFloat(sl.qtySold || "0");
     const price = parseFloat(sl.salePricePerUnit || "0");
-    const avgFinal = g ? parseFloat(g.avgFinalCost || "0") : 0;
+    const fifo = g && qty > 0 ? simulateFifo(g.movements || [], qty) : { estBaseCost: 0, estFinalCost: 0, sufficient: true, lots: [] };
     return {
       saleTotal: qty * price,
-      estCogs: qty * avgFinal,
-      estProfit: qty * (price - avgFinal),
+      estCogs: fifo.estFinalCost,
+      estPayable: fifo.estBaseCost,
+      estProfit: qty * price - fifo.estFinalCost,
       available: g ? parseFloat(g.totalQtyRemaining || "0") : 0,
+      fifoSufficient: fifo.sufficient,
+      fifoLots: fifo.lots,
     };
   });
 
   const totalSale = previewLines.reduce((s, l) => s + l.saleTotal, 0);
   const totalCogs = previewLines.reduce((s, l) => s + l.estCogs, 0);
+  const totalPayable = previewLines.reduce((s, l) => s + l.estPayable, 0);
   const grossProfit = totalSale - totalCogs;
 
   const handleSubmit = () => {
@@ -94,8 +121,20 @@ export default function SpSales() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-xl font-semibold">Sales</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Record sales — lots consumed FIFO automatically</p>
+        <h1 className="text-xl font-semibold">SP Sales / POS</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Record sales — FIFO lot consumption applied server-side</p>
+      </div>
+
+      <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-3 flex items-start gap-3">
+        <AlertTriangle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+        <div className="space-y-0.5">
+          <p className="text-sm font-medium text-blue-800 dark:text-blue-200">SP Sales use FIFO with base-cost supplier payable</p>
+          <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-0.5 list-disc list-inside">
+            <li>COGS is calculated from <strong>final unit cost</strong> (base + landed charges)</li>
+            <li>Supplier Cash Payable is generated from <strong>base unit cost only</strong> — no landed cost, no profit share</li>
+            <li>Stock lots are consumed in FIFO order (oldest first) automatically by the server</li>
+          </ul>
+        </div>
       </div>
 
       <Card>
@@ -113,10 +152,10 @@ export default function SpSales() {
               <Input value={customerName} onChange={e => setCustomerName(e.target.value)} className="mt-1" placeholder="Customer name" data-testid="input-sp-customer" />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Bank Account (for receipt)</label>
+              <label className="text-xs text-muted-foreground">Cash / Bank Account (receipt)</label>
               <Select value={bankAccountId} onValueChange={setBankAccountId}>
                 <SelectTrigger className="mt-1" data-testid="select-sp-sale-bank">
-                  <SelectValue placeholder="Select bank (optional)" />
+                  <SelectValue placeholder="Select account (optional)" />
                 </SelectTrigger>
                 <SelectContent>
                   {(statusData?.bankAccounts || []).map((b: any) => (
@@ -136,7 +175,7 @@ export default function SpSales() {
               <span className="text-sm font-medium">Items to Sell</span>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Info className="h-3 w-3" /> Server applies FIFO automatically
+                  <Info className="h-3 w-3" /> FIFO applied server-side
                 </span>
                 <Button type="button" variant="outline" size="sm" onClick={addLine} data-testid="button-sp-add-sale-line">
                   <Plus className="h-3.5 w-3.5 mr-1" /> Add Item
@@ -157,12 +196,11 @@ export default function SpSales() {
                 const g = getStockGroup(sl.articleCode);
                 const qty = parseFloat(sl.qtySold || "0");
                 const price = parseFloat(sl.salePricePerUnit || "0");
-                const avgFinal = g ? parseFloat(g.avgFinalCost || "0") : 0;
-                const avail = g ? parseFloat(g.totalQtyRemaining || "0") : 0;
-                const estProfit = price - avgFinal;
+                const pl = previewLines[idx];
+                const avail = pl?.available ?? 0;
                 const insufficientQty = qty > 0 && avail > 0 && qty > avail;
                 return (
-                  <div key={idx} className="border border-border rounded-md p-2 space-y-2" data-testid={`row-sp-sale-line-${idx}`}>
+                  <div key={idx} className="border border-border rounded-md p-3 space-y-2" data-testid={`row-sp-sale-line-${idx}`}>
                     <div className="grid grid-cols-12 gap-2 items-end">
                       <div className="col-span-5">
                         <label className="text-xs text-muted-foreground">Article</label>
@@ -173,7 +211,7 @@ export default function SpSales() {
                           <SelectContent>
                             {availableArticles.map((g: any) => (
                               <SelectItem key={g.articleCode} value={g.articleCode}>
-                                {g.articleCode} — {parseFloat(g.totalQtyRemaining || "0").toFixed(2)} avail
+                                {g.articleCode}{g.description ? ` — ${g.description}` : ""} ({parseFloat(g.totalQtyRemaining || "0").toFixed(2)} avail)
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -204,12 +242,25 @@ export default function SpSales() {
                         </Button>
                       </div>
                     </div>
-                    {g && qty > 0 && price > 0 && (
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground px-1">
-                        <span>Avg final cost: {fmt(avgFinal, 4)}/u (est.)</span>
-                        <span className={estProfit >= 0 ? "text-green-600" : "text-destructive"}>
-                          Est. profit: {fmt(estProfit, 4)}/u ({estProfit >= 0 ? "+" : ""}{fmt(qty * estProfit)})
-                        </span>
+                    {g && qty > 0 && price > 0 && pl && (
+                      <div className="space-y-1 px-1">
+                        <div className="flex items-center flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+                          <span>COGS (final cost): <strong>{fmt(pl.estCogs)}</strong></span>
+                          <span>Supplier payable (base): <strong>{fmt(pl.estPayable)}</strong></span>
+                          <span className={pl.estProfit >= 0 ? "text-green-600" : "text-destructive"}>
+                            Est. profit: {pl.estProfit >= 0 ? "+" : ""}{fmt(pl.estProfit)}
+                          </span>
+                        </div>
+                        {pl.fifoLots.length > 1 && (
+                          <div className="text-xs text-muted-foreground/70">
+                            FIFO lots: {pl.fifoLots.map((l, i) => `${l.qty.toFixed(2)} @ final ${fmt(l.final, 4)}/u`).join(", ")}
+                          </div>
+                        )}
+                        {pl.fifoLots.length === 1 && (
+                          <div className="text-xs text-muted-foreground/70">
+                            1 lot: {pl.fifoLots[0].qty.toFixed(2)} units @ final {fmt(pl.fifoLots[0].final, 4)}/u, base {fmt(pl.fifoLots[0].base, 4)}/u
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -219,10 +270,23 @@ export default function SpSales() {
           </div>
 
           {totalSale > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-muted/30 rounded-md text-sm">
-              <div><p className="text-xs text-muted-foreground">Sale Total</p><p className="font-semibold">{fmt(totalSale)}</p></div>
-              <div><p className="text-xs text-muted-foreground">Est. COGS (avg)</p><p className="font-semibold">{fmt(totalCogs)}</p></div>
-              <div><p className="text-xs text-muted-foreground">Est. Gross Profit</p><p className={`font-semibold ${grossProfit >= 0 ? "text-green-600" : "text-destructive"}`}>{fmt(grossProfit)}</p></div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-muted/30 rounded-md text-sm">
+              <div>
+                <p className="text-xs text-muted-foreground">Sale Total</p>
+                <p className="font-semibold" data-testid="text-sp-sale-total">{fmt(totalSale)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">COGS (final cost)</p>
+                <p className="font-semibold" data-testid="text-sp-sale-cogs">{fmt(totalCogs)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Gross Profit</p>
+                <p className={`font-semibold ${grossProfit >= 0 ? "text-green-600" : "text-destructive"}`} data-testid="text-sp-sale-profit">{fmt(grossProfit)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Supplier Payable (base)</p>
+                <p className="font-semibold text-amber-600 dark:text-amber-400" data-testid="text-sp-sale-payable">{fmt(totalPayable)}</p>
+              </div>
             </div>
           )}
 

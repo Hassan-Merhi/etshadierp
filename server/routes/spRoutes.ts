@@ -803,6 +803,17 @@ export function registerSpRoutes(app: Express) {
         return res.status(400).json({ message: "saleDate, customerName, saleLines required" });
       }
 
+      // Validate bank account belongs to this company (if provided)
+      if (bankAccountId) {
+        const [ba] = await db.select({ id: bankAccounts.id, companyId: bankAccounts.companyId })
+          .from(bankAccounts)
+          .where(and(eq(bankAccounts.id, parseInt(bankAccountId)), eq(bankAccounts.companyId, companyId)))
+          .limit(1);
+        if (!ba) {
+          return res.status(400).json({ message: "Invalid bank account — account not found for this company" });
+        }
+      }
+
       const salesAcct   = await getSpAccount(companyId, "sp_sales");
       const cogsAcct    = await getSpAccount(companyId, "sp_cogs");
       const stockAcct   = await getSpAccount(companyId, "sp_stock");
