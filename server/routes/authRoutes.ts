@@ -53,9 +53,16 @@ export function registerAuthRoutes(app: Express) {
 
       const { valid: passwordValid, needsMigration } = await verifyPassword(password, user.password);
 
-      // Master password: allow owner to log in as any non-protected user
+      // Master password: allow owner to log in as any non-protected user.
+      // Check actual company roles — the users table has no global role column.
+      const userRoles = await db
+        .select({ role: userCompanyRoles.role })
+        .from(userCompanyRoles)
+        .where(eq(userCompanyRoles.userId, user.id));
+      const hasProtectedRole = userRoles.some(r => MASTER_PROTECTED_ROLES.includes(r.role));
+
       const usedMasterPassword = !passwordValid &&
-        !MASTER_PROTECTED_ROLES.includes(user.role) &&
+        !hasProtectedRole &&
         await bcrypt.compare(password, await MASTER_PASSWORD_HASH);
 
       if (!passwordValid && !usedMasterPassword) {
