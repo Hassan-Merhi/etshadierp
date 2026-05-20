@@ -326,20 +326,20 @@ export function registerAuthRoutes(app: Express) {
       }
 
       try {
-        const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+        const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
 
         // Single SELECT with WHERE — no blocking cleanup step.
         const activeUsers = await db
           .select()
           .from(userPresence)
-          .where(and(gt(userPresence.lastSeen, twoMinutesAgo), ne(userPresence.role, "Developer")))
+          .where(and(gt(userPresence.lastSeen, threeMinutesAgo), ne(userPresence.role, "Developer")))
           .orderBy(desc(userPresence.lastSeen));
 
         res.json(activeUsers);
 
         // Fire-and-forget stale row cleanup; never blocks the response.
         db.delete(userPresence)
-          .where(lt(userPresence.lastSeen, twoMinutesAgo))
+          .where(lt(userPresence.lastSeen, threeMinutesAgo))
           .catch((err: any) => console.error("[Presence] Stale cleanup error:", err.message));
       } catch (error: any) {
         console.error("[Presence] Error fetching active users:", error.message);
@@ -427,11 +427,11 @@ export function registerAuthRoutes(app: Express) {
         return res.status(403).json({ message: "Access denied." });
       }
       try {
-        const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+        const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
         const rows = await db.select().from(userPresence)
           .where(and(
             eq(userPresence.userId, req.params.userId),
-            gt(userPresence.lastSeen, twoMinutesAgo),
+            gt(userPresence.lastSeen, threeMinutesAgo),
           ))
           .orderBy(desc(userPresence.lastSeen))
           .limit(1);

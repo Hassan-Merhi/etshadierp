@@ -71,6 +71,8 @@ export function registerGlobalTransactionRoutes(
         eq(companies.companyType, "erp"),
         eq(companies.companyType, "properties"),
         eq(companies.companyType, "factory"),
+        eq(companies.companyType, "factory_v2"),
+        eq(companies.companyType, "supplier_partner"),
       );
 
       if (isAdmin) {
@@ -104,14 +106,18 @@ export function registerGlobalTransactionRoutes(
         return res.json({ vouchers: [], total: 0, page, totalPages: 0, summary: [] });
       }
 
-      // 1b. Optionally exclude factory companies
+      // 1b. Optionally exclude factory companies (supplier_partner is ERP-like, always kept)
       if (!includeFactoryBool) {
         const nonFactoryCompanies = await db
           .select({ id: companies.id })
           .from(companies)
           .where(and(
             inArray(companies.id, allowedCompanyIds),
-            or(eq(companies.companyType, "erp"), eq(companies.companyType, "properties"))
+            or(
+              eq(companies.companyType, "erp"),
+              eq(companies.companyType, "properties"),
+              eq(companies.companyType, "supplier_partner"),
+            )
           ));
         allowedCompanyIds = nonFactoryCompanies.map((c) => c.id);
         if (allowedCompanyIds.length === 0) {
@@ -255,6 +261,8 @@ export function registerGlobalTransactionRoutes(
         eq(companies.companyType, "erp"),
         eq(companies.companyType, "properties"),
         eq(companies.companyType, "factory"),
+        eq(companies.companyType, "factory_v2"),
+        eq(companies.companyType, "supplier_partner"),
       );
       if (isAdmin) {
         const all = await db.select({ id: companies.id }).from(companies).where(typeFilter);
