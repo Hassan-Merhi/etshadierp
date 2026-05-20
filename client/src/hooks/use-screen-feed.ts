@@ -158,7 +158,14 @@ export function useScreenFeed() {
     const pollWatcherStatus = async () => {
       try {
         const res  = await fetch("/api/screen-feed/being-watched", { credentials: "include" });
-        if (!res.ok) return;
+        if (!res.ok) {
+          // Session expired or other auth error — stop capturing to avoid ghost uploads
+          if (watchedRef.current) {
+            watchedRef.current = false;
+            stopCapturing();
+          }
+          return;
+        }
         const data = await res.json();
         const nowWatched = Boolean(data?.watched);
 
