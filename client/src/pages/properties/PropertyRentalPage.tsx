@@ -47,12 +47,31 @@ type Contract = {
   statementNote: string | null;
   guaranteePostedToStatement: boolean;
   isInternal: boolean;
+  currency: string;
 };
 type CashAccount = { id: number; name: string; code: string; accountType: string };
 type LedgerRow = { id: number; year: number; month: number; expectedAmount: string; paidAmount: string; notes?: string | null };
 type Payment = { id: number; amount: string; paymentDate: string; forYear: number; forMonth: number; cashAccountId: number | null; notes: string | null };
 
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const CURRENCIES = ["USD", "EUR", "CFA"] as const;
+
+function currencySymbol(currency: string): string {
+  if (currency === "EUR") return "€";
+  if (currency === "CFA" || currency === "XAF" || currency === "XOF") return "FC ";
+  return "$";
+}
+
+function fmtMoneyCurrency(v: string | number | null | undefined, currency = "USD"): string {
+  if (v === null || v === undefined || v === "") return "—";
+  const n = Number(v);
+  const isCFA = currency === "CFA" || currency === "XAF" || currency === "XOF";
+  const formatted = n.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: isCFA ? 0 : 2,
+  });
+  return `${currencySymbol(currency)}${formatted}`;
+}
 
 function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
@@ -424,7 +443,7 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                                 : <span className="text-xs text-muted-foreground">—</span>}
                             </td>
                             <td className="px-3 py-2 text-right tabular-nums">
-                              {u.contract ? `$${fmtMoney(u.contract.rentalAmount)}` : "—"}
+                              {u.contract ? fmtMoneyCurrency(u.contract.rentalAmount, u.contract.currency) : "—"}
                             </td>
                             <td className={`px-3 py-2 text-right tabular-nums font-semibold ${
                               u.contract && Number(u.contract.guaranteeAmount) > 0
@@ -433,10 +452,10 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                                   : "text-red-600 dark:text-red-400"
                                 : "text-muted-foreground"
                             }`}>
-                              {u.contract ? `$${fmtMoney(u.contract.guaranteeAmount)}` : "—"}
+                              {u.contract ? fmtMoneyCurrency(u.contract.guaranteeAmount, u.contract.currency) : "—"}
                             </td>
                             <td className={`px-3 py-2 text-right tabular-nums font-semibold ${(u.outstanding ?? 0) > 0 ? "text-red-600 dark:text-red-400" : (u.outstanding ?? 0) < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
-                              {u.outstanding !== null ? `$${fmtMoney(Math.abs(u.outstanding))}` : "—"}
+                              {u.outstanding !== null ? fmtMoneyCurrency(Math.abs(u.outstanding), u.contract?.currency) : "—"}
                             </td>
                             <td className="px-3 py-2 text-xs text-muted-foreground">
                               {u.contract ? format(new Date(u.contract.startDate), "dd MMM yyyy") : "—"}
@@ -668,6 +687,7 @@ function StartContractForm({ unitId, testIdPrefix, onClose, unitType }: { unitId
   const [form, setForm] = useState({
     tenantName: "", rentalAmount: "", guaranteeAmount: "",
     guaranteePeriod: "", startDate: new Date().toISOString().slice(0, 10), notes: "",
+    currency: "USD",
   });
   const [isInternal, setIsInternal] = useState(false);
 
@@ -698,6 +718,17 @@ function StartContractForm({ unitId, testIdPrefix, onClose, unitType }: { unitId
               Charges on the {billingDayLabel(form.startDate)}
             </p>
           )}
+        </div>
+        <div>
+          <Label>Currency</Label>
+          <select
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            value={form.currency}
+            onChange={e => setForm(f => ({ ...f, currency: e.target.value }))}
+            data-testid={`select-${testIdPrefix}-contract-currency`}
+          >
+            {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
         </div>
         <div>
           <Label>Monthly Rental Amount *</Label>
@@ -902,14 +933,14 @@ function BulkPaymentDialog({
                     <td className="px-3 py-2 font-mono text-xs font-bold">{u.unitNumber}</td>
                     <td className="px-3 py-2">{u.contract!.tenantName}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                      ${fmtMoney(u.contract!.rentalAmount)}
+                      {fmtMoneyCurrency(u.contract!.rentalAmount, u.contract!.currency)}
                     </td>
                     <td className={`px-3 py-2 text-right tabular-nums font-semibold ${
                       outstanding > 0 ? "text-red-600 dark:text-red-400" :
                       outstanding < 0 ? "text-green-600 dark:text-green-400" :
                       "text-muted-foreground"
                     }`}>
-                      {outstanding !== null ? `$${fmtMoney(Math.abs(outstanding))}` : "—"}
+                      {outstanding !== null ? fmtMoneyCurrency(Math.abs(outstanding), u.contract?.currency) : "—"}
                     </td>
                     <td className="px-3 py-2 text-right">
                       <Input
@@ -983,6 +1014,8 @@ function PaymentForm({ contract, cashAccounts, testIdPrefix, unitId }: { contrac
     amount: "",
     paymentDate: new Date().toISOString().slice(0, 10),
     notes: "",
+    currency: contract.currency || "USD",
+    exchangeRate: "1",
   });
 
   const pay = useMutation({
@@ -992,6 +1025,8 @@ function PaymentForm({ contract, cashAccounts, testIdPrefix, unitId }: { contrac
       amount: form.amount,
       paymentDate: form.paymentDate,
       notes: form.notes,
+      currency: form.currency,
+      exchangeRate: form.exchangeRate,
     }),
     onSuccess: () => {
       toast({ title: "Payment recorded" });
@@ -1029,9 +1064,26 @@ function PaymentForm({ contract, cashAccounts, testIdPrefix, unitId }: { contrac
           <Input type="date" value={form.paymentDate} onChange={e => setForm(f => ({ ...f, paymentDate: e.target.value }))} data-testid={`input-${testIdPrefix}-payment-date`} />
         </div>
         <div>
-          <Label>Amount Received ($)</Label>
-          <Input type="number" step="0.01" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} data-testid={`input-${testIdPrefix}-payment-amount`} />
+          <Label>Currency</Label>
+          <select
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            value={form.currency}
+            onChange={e => setForm(f => ({ ...f, currency: e.target.value, exchangeRate: e.target.value === "USD" ? "1" : f.exchangeRate }))}
+            data-testid={`select-${testIdPrefix}-payment-currency`}
+          >
+            {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
         </div>
+        <div>
+          <Label>Amount Received ({form.currency})</Label>
+          <Input type="number" step={form.currency === "CFA" ? "1" : "0.01"} value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} data-testid={`input-${testIdPrefix}-payment-amount`} />
+        </div>
+        {form.currency !== "USD" && (
+          <div>
+            <Label>Exchange Rate (1 USD = ? {form.currency})</Label>
+            <Input type="number" step="0.000001" min="0" value={form.exchangeRate} onChange={e => setForm(f => ({ ...f, exchangeRate: e.target.value }))} data-testid={`input-${testIdPrefix}-exchange-rate`} />
+          </div>
+        )}
         <div className="col-span-2">
           <Label>Notes</Label>
           <Textarea rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} data-testid={`input-${testIdPrefix}-payment-notes`} />
@@ -1047,7 +1099,7 @@ function PaymentForm({ contract, cashAccounts, testIdPrefix, unitId }: { contrac
             {allocations.map((a, i) => (
               <div key={i} className="flex items-center justify-between text-xs text-blue-800 dark:text-blue-200">
                 <span>{MONTH_NAMES[a.month]} {a.year}</span>
-                <span className="font-medium">${a.chunk.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className="font-medium">{fmtMoneyCurrency(a.chunk, form.currency)}</span>
               </div>
             ))}
           </div>
@@ -1087,11 +1139,11 @@ function ModifyRentForm({ contract, testIdPrefix, unitId }: { contract: Contract
     <div className="space-y-3 pt-3">
       <div className="bg-muted/40 rounded-md p-3 text-sm">
         <span className="text-muted-foreground">Current Rental Amount: </span>
-        <span className="font-bold">${fmtMoney(contract.rentalAmount)}</span>
+        <span className="font-bold">{fmtMoneyCurrency(contract.rentalAmount, contract.currency)}</span>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label>New Rental Amount ($) *</Label>
+          <Label>New Rental Amount ({contract.currency || "USD"}) *</Label>
           <Input type="number" step="0.01" value={newAmount} onChange={e => setNewAmount(e.target.value)} data-testid={`input-${testIdPrefix}-new-rent`} />
         </div>
         <div>
@@ -1462,20 +1514,24 @@ function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onN
       const isFutureRow = r.year > nowYear || (r.year === nowYear && r.month > nowMonth);
       const out = isFutureRow ? 0 - Number(r.paidAmount) : Number(r.expectedAmount) - Number(r.paidAmount);
       const outColor = out > 0 ? "#cc0000" : out < 0 ? "#006600" : "#888888";
-      const expDisplay = isFutureRow ? "—" : `$${fmtMoney(r.expectedAmount)}`;
+      const sym = contract.currency === "EUR" ? "€" : contract.currency === "CFA" ? "FC " : "$";
+      const fmtPdf = (v: number) => sym + v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: contract.currency === "CFA" ? 0 : 2 });
+      const expDisplay = isFutureRow ? "—" : fmtPdf(Number(r.expectedAmount));
       return `<tr>
         <td>${MONTH_NAMES[r.month]} ${r.year}${isFutureRow ? " <em style='color:#888;font-size:9px'>prepaid</em>" : ""}</td>
         <td class="num">${expDisplay}</td>
-        <td class="num">$${fmtMoney(r.paidAmount)}</td>
-        <td class="num" style="color:${outColor};font-weight:600">$${fmtMoney(Math.abs(out))}${out < 0 ? " CR" : ""}</td>
+        <td class="num">${fmtPdf(Number(r.paidAmount))}</td>
+        <td class="num" style="color:${outColor};font-weight:600">${fmtPdf(Math.abs(out))}${out < 0 ? " CR" : ""}</td>
         <td class="note">${r.notes || ""}</td>
       </tr>`;
     }).join("");
 
+    const sym2 = contract.currency === "EUR" ? "€" : contract.currency === "CFA" ? "FC " : "$";
+    const fmtPdf2 = (v: number) => sym2 + v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: contract.currency === "CFA" ? 0 : 2 });
     const buildPayRows = (rows: Payment[]) => rows.map(p => `<tr>
       <td>${format(new Date(p.paymentDate), "dd MMM yyyy")}</td>
       <td>${MONTH_NAMES[p.forMonth]} ${p.forYear}</td>
-      <td class="num">$${fmtMoney(p.amount)}</td>
+      <td class="num">${fmtPdf2(Number(p.amount))}</td>
       <td class="note">${p.notes || ""}</td>
     </tr>`).join("");
     const payRows = buildPayRows(payments);
@@ -1507,8 +1563,8 @@ function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onN
     <div class="info-grid">
       <div><div class="lbl">Tenant</div><div class="val">${contract.tenantName}</div></div>
       <div><div class="lbl">Start Date</div><div class="val">${startStr}</div></div>
-      <div><div class="lbl">Monthly Rent</div><div class="val">$${fmtMoney(contract.rentalAmount)}</div></div>
-      ${contract.guaranteeAmount && Number(contract.guaranteeAmount) > 0 ? `<div><div class="lbl">Guarantee</div><div class="val">$${fmtMoney(contract.guaranteeAmount)}</div></div>` : ""}
+      <div><div class="lbl">Monthly Rent</div><div class="val">${fmtMoneyCurrency(contract.rentalAmount, contract.currency)}</div></div>
+      ${contract.guaranteeAmount && Number(contract.guaranteeAmount) > 0 ? `<div><div class="lbl">Guarantee</div><div class="val">${fmtMoneyCurrency(contract.guaranteeAmount, contract.currency)}</div></div>` : ""}
     </div>
     <table>
       <thead><tr>
@@ -1516,9 +1572,9 @@ function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onN
       </tr></thead>
       <tbody>${rows}<tr class="total">
         <td>TOTALS</td>
-        <td class="num">$${fmtMoney(totalExpected)}</td>
-        <td class="num">$${fmtMoney(totalPaid)}</td>
-        <td class="num" style="color:${balColor}">$${fmtMoney(balance)}</td>
+        <td class="num">${fmtMoneyCurrency(totalExpected, contract.currency)}</td>
+        <td class="num">${fmtMoneyCurrency(totalPaid, contract.currency)}</td>
+        <td class="num" style="color:${balColor}">${fmtMoneyCurrency(Math.abs(balance), contract.currency)}${balance < 0 ? " CR" : ""}</td>
         <td></td>
       </tr></tbody>
     </table>
@@ -1552,7 +1608,7 @@ function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onN
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="grid grid-cols-4 gap-3 text-sm flex-1 min-w-0">
           <div className="bg-muted/40 rounded p-2"><div className="text-xs text-muted-foreground">Tenant</div><div className="font-semibold truncate">{contract.tenantName}</div></div>
-          <div className="bg-muted/40 rounded p-2"><div className="text-xs text-muted-foreground">Monthly Rent</div><div className="font-semibold">${fmtMoney(contract.rentalAmount)}</div></div>
+          <div className="bg-muted/40 rounded p-2"><div className="text-xs text-muted-foreground">Monthly Rent</div><div className="font-semibold">{fmtMoneyCurrency(contract.rentalAmount, contract.currency)}</div></div>
           <div className="bg-muted/40 rounded p-2">
             <div className="text-xs text-muted-foreground">Billing Day</div>
             <div className="font-semibold flex items-center gap-1">
@@ -1563,7 +1619,7 @@ function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onN
           <div className="bg-muted/40 rounded p-2">
             <div className="text-xs text-muted-foreground">Balance</div>
             <div className={`font-bold ${balance > 0 ? "text-red-600 dark:text-red-400" : balance < 0 ? "text-green-600 dark:text-green-400" : ""}`}>
-              {balance < 0 ? `$${fmtMoney(Math.abs(balance))} CR` : `$${fmtMoney(balance)}`}
+              {balance < 0 ? `${fmtMoneyCurrency(Math.abs(balance), contract.currency)} CR` : fmtMoneyCurrency(balance, contract.currency)}
             </div>
           </div>
         </div>
@@ -1601,11 +1657,11 @@ function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onN
                     {isFutureRow && <span className="ml-1.5 text-[10px] text-muted-foreground italic">prepaid</span>}
                   </td>
                   <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-                    {isFutureRow ? "—" : `$${fmtMoney(r.expectedAmount)}`}
+                    {isFutureRow ? "—" : fmtMoneyCurrency(r.expectedAmount, contract.currency)}
                   </td>
-                  <td className="px-3 py-1.5 text-right tabular-nums">${fmtMoney(r.paidAmount)}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{fmtMoneyCurrency(r.paidAmount, contract.currency)}</td>
                   <td className={`px-3 py-1.5 text-right tabular-nums font-semibold ${out > 0 ? "text-red-600 dark:text-red-400" : out < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
-                    {out < 0 ? `$${fmtMoney(Math.abs(out))} CR` : `$${fmtMoney(out)}`}
+                    {out < 0 ? `${fmtMoneyCurrency(Math.abs(out), contract.currency)} CR` : fmtMoneyCurrency(out, contract.currency)}
                   </td>
                   <td className="px-3 py-1.5 text-xs text-muted-foreground">{r.notes || ""}</td>
                 </tr>
@@ -1613,10 +1669,10 @@ function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onN
             })}
             <tr className="border-t-2 bg-muted/30 font-semibold">
               <td className="px-3 py-2">TOTALS <span className="font-normal text-[10px] text-muted-foreground">(as of today)</span></td>
-              <td className="px-3 py-2 text-right tabular-nums">${fmtMoney(totalExpected)}</td>
-              <td className="px-3 py-2 text-right tabular-nums">${fmtMoney(totalPaid)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{fmtMoneyCurrency(totalExpected, contract.currency)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{fmtMoneyCurrency(totalPaid, contract.currency)}</td>
               <td className={`px-3 py-2 text-right tabular-nums ${balance > 0 ? "text-red-600 dark:text-red-400" : balance < 0 ? "text-green-600 dark:text-green-400" : ""}`}>
-                {balance < 0 ? `$${fmtMoney(Math.abs(balance))} CR` : `$${fmtMoney(balance)}`}
+                {balance < 0 ? `${fmtMoneyCurrency(Math.abs(balance), contract.currency)} CR` : fmtMoneyCurrency(balance, contract.currency)}
               </td>
               <td></td>
             </tr>

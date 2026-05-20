@@ -28,6 +28,23 @@ const fmtMoney = (v: string | number | null | undefined) => {
   return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 };
 
+function currencySymbol(currency: string): string {
+  if (currency === "EUR") return "€";
+  if (currency === "CFA" || currency === "XAF" || currency === "XOF") return "FC ";
+  return "$";
+}
+
+function fmtMoneyWithCurrency(v: string | number | null | undefined, currency = "USD"): string {
+  if (v === null || v === undefined || v === "") return "—";
+  const n = Number(v);
+  const isCFA = currency === "CFA" || currency === "XAF" || currency === "XOF";
+  const formatted = n.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: isCFA ? 0 : 2,
+  });
+  return `${currencySymbol(currency)}${formatted}`;
+}
+
 type PaymentRow = {
   id: number;
   paymentDate: string;
@@ -37,6 +54,7 @@ type PaymentRow = {
   notes: string | null;
   contractId: number;
   unitId: number;
+  currency?: string;
   tenantName: string | null;
   unitNumber: string | null;
   locationGroup: string | null;
@@ -127,7 +145,7 @@ export default function RentalPaymentsLog({
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL AMOUNT RECEIVED</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid={`stat-${testIdPrefix}-total-amount`}>${fmtMoney(total)}</div></CardContent>
+          <CardContent><div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid={`stat-${testIdPrefix}-total-amount`}>{fmtMoney(total)}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">UNIQUE TENANTS</CardTitle></CardHeader>
@@ -176,7 +194,7 @@ export default function RentalPaymentsLog({
                         )}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums font-semibold text-green-700 dark:text-green-400">
-                        ${fmtMoney(p.amount)}
+                        {fmtMoneyWithCurrency(p.amount, p.currency)}
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">
                         {MONTH_NAMES[p.forMonth]} {p.forYear}
@@ -199,7 +217,7 @@ export default function RentalPaymentsLog({
                   <tr>
                     <td className="px-3 py-2 font-semibold" colSpan={3}>TOTAL</td>
                     <td className="px-3 py-2 text-right tabular-nums font-bold text-green-700 dark:text-green-400">
-                      ${fmtMoney(total)}
+                      {fmtMoney(total)}
                     </td>
                     <td colSpan={3}></td>
                   </tr>
@@ -218,7 +236,7 @@ export default function RentalPaymentsLog({
             <AlertDialogDescription>
               {deleteTarget && (
                 <>
-                  This will permanently remove the <strong>${fmtMoney(deleteTarget.amount)}</strong> payment
+                  This will permanently remove the <strong>{fmtMoneyWithCurrency(deleteTarget.amount, deleteTarget.currency)}</strong> payment
                   from <strong>{deleteTarget.tenantName ?? "—"}</strong>{" "}
                   ({MONTH_NAMES[deleteTarget.forMonth]} {deleteTarget.forYear}).
                   The accounting entry will be reversed, and any inter-company transfer that was automatically

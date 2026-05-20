@@ -4749,6 +4749,7 @@ export const propertyContracts = pgTable("property_contracts", {
   guaranteePostedToStatement: boolean("guarantee_posted_to_statement").notNull().default(false),
   guaranteePostedAmount: decimal("guarantee_posted_amount", { precision: 20, scale: 2 }).default("0"),
   isInternal: boolean("is_internal").notNull().default(false),
+  currency: text("currency").notNull().default("USD"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   byUnit: index("property_contracts_unit_idx").on(t.unitId, t.status),
@@ -4763,6 +4764,7 @@ export const insertPropertyContractSchema = createInsertSchema(propertyContracts
   rentalAmount: z.union([z.string(), z.number()]).transform(v => String(v)),
   guaranteeAmount: z.union([z.string(), z.number()]).transform(v => String(v)).optional(),
   startDate: z.string().min(1, "Start date required"),
+  currency: z.string().optional(),
 });
 export type InsertPropertyContract = z.infer<typeof insertPropertyContractSchema>;
 export type PropertyContract = typeof propertyContracts.$inferSelect;
@@ -4808,6 +4810,8 @@ export const propertyPayments = pgTable("property_payments", {
   forYear: integer("for_year").notNull(),
   forMonth: integer("for_month").notNull(),
   notes: text("notes"),
+  currency: text("currency").notNull().default("USD"),
+  exchangeRate: decimal("exchange_rate", { precision: 20, scale: 6 }).notNull().default("1"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   byContract: index("property_payments_contract_idx").on(t.contractId),
@@ -4820,6 +4824,8 @@ export const insertPropertyPaymentSchema = createInsertSchema(propertyPayments).
 }).extend({
   amount: z.union([z.string(), z.number()]).transform(v => String(v)),
   paymentDate: z.string().min(1, "Payment date required"),
+  currency: z.string().optional(),
+  exchangeRate: z.union([z.string(), z.number()]).transform(v => String(v)).optional(),
 });
 export type InsertPropertyPayment = z.infer<typeof insertPropertyPaymentSchema>;
 export type PropertyPayment = typeof propertyPayments.$inferSelect;

@@ -1069,6 +1069,8 @@ export function registerRentalRoutes(
         amount: z.union([z.string(), z.number()]).transform(v => String(v)),
         paymentDate: z.string().min(1),
         notes: z.string().optional(),
+        currency: z.string().optional().default("USD"),
+        exchangeRate: z.union([z.string(), z.number()]).transform(v => String(v)).optional().default("1"),
       }).parse(req.body);
 
       const [contract] = await db.select().from(propertyContracts).where(and(
@@ -1114,13 +1116,14 @@ export function registerRentalRoutes(
             ? `${String(allocations[0].month).padStart(2,"0")}/${allocations[0].year} – ${String(allocations[allocations.length-1].month).padStart(2,"0")}/${allocations[allocations.length-1].year}`
             : `${String(m).padStart(2,"0")}/${y}`;
 
+          const voucherCurrency = data.currency || "USD";
           if (isShop) {
             const expenseAccountId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
             const narration = `Rent paid - ${unitLabel} - ${monthSpan}`;
             const [v] = await tx.insert(vouchers).values({
               companyId, voucherNumber: `RENT-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`,
               voucherType: "Payment", voucherDate: data.paymentDate as any,
-              description: narration, totalAmount: data.amount, currency: "USD", sourceModule: "ERP",
+              description: narration, totalAmount: data.amount, currency: voucherCurrency, sourceModule: "ERP",
             }).returning();
             voucherId = v.id;
             await tx.insert(voucherEntries).values([
@@ -1133,7 +1136,7 @@ export function registerRentalRoutes(
             const [v] = await tx.insert(vouchers).values({
               companyId, voucherNumber: `RENT-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`,
               voucherType: "Receipt", voucherDate: data.paymentDate as any,
-              description: narration, totalAmount: data.amount, currency: "USD", sourceModule: "ERP",
+              description: narration, totalAmount: data.amount, currency: voucherCurrency, sourceModule: "ERP",
             }).returning();
             voucherId = v.id;
             await tx.insert(voucherEntries).values([
@@ -1161,8 +1164,10 @@ export function registerRentalRoutes(
             amount: alloc.chunk,
             paymentDate: data.paymentDate as any,
             forYear: alloc.year, forMonth: alloc.month,
+            currency: data.currency || "USD",
+            exchangeRate: data.exchangeRate || "1",
             notes: allocations.length > 1
-              ? `${data.notes ? data.notes + " | " : ""}Split from $${totalAmountNum.toFixed(2)} payment`
+              ? `${data.notes ? data.notes + " | " : ""}Split from ${data.amount} payment`
               : (data.notes ?? null),
           }).returning();
           created.push(p);
@@ -1200,6 +1205,8 @@ export function registerRentalRoutes(
         amount: z.union([z.string(), z.number()]).transform(v => String(v)),
         paymentDate: z.string().min(1),
         notes: z.string().optional(),
+        currency: z.string().optional().default("USD"),
+        exchangeRate: z.union([z.string(), z.number()]).transform(v => String(v)).optional().default("1"),
       })).min(1).parse(req.body);
 
       const results: any[] = [];
@@ -1240,13 +1247,14 @@ export function registerRentalRoutes(
               ? `${String(allocations[0].month).padStart(2,"0")}/${allocations[0].year} – ${String(allocations[allocations.length-1].month).padStart(2,"0")}/${allocations[allocations.length-1].year}`
               : `${String(m).padStart(2,"0")}/${y}`;
 
+            const voucherCurrency = data.currency || "USD";
             if (isShop) {
               const expenseAccountId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
               const narration = `Rent paid - ${unitLabel} - ${monthSpan}`;
               const [v] = await tx.insert(vouchers).values({
                 companyId, voucherNumber: `RENT-${Date.now()}-${Math.random().toString(36).slice(2,7)}-${contract.id}`,
                 voucherType: "Payment", voucherDate: data.paymentDate as any,
-                description: narration, totalAmount: data.amount, currency: "USD", sourceModule: "ERP",
+                description: narration, totalAmount: data.amount, currency: voucherCurrency, sourceModule: "ERP",
               }).returning();
               voucherId = v.id;
               await tx.insert(voucherEntries).values([
@@ -1259,7 +1267,7 @@ export function registerRentalRoutes(
               const [v] = await tx.insert(vouchers).values({
                 companyId, voucherNumber: `RENT-${Date.now()}-${Math.random().toString(36).slice(2,7)}-${contract.id}`,
                 voucherType: "Receipt", voucherDate: data.paymentDate as any,
-                description: narration, totalAmount: data.amount, currency: "USD", sourceModule: "ERP",
+                description: narration, totalAmount: data.amount, currency: voucherCurrency, sourceModule: "ERP",
               }).returning();
               voucherId = v.id;
               await tx.insert(voucherEntries).values([
@@ -1282,8 +1290,10 @@ export function registerRentalRoutes(
               voucherId: voucherId ?? null, amount: alloc.chunk,
               paymentDate: data.paymentDate as any,
               forYear: alloc.year, forMonth: alloc.month,
+              currency: data.currency || "USD",
+              exchangeRate: data.exchangeRate || "1",
               notes: allocations.length > 1
-                ? `${data.notes ? data.notes + " | " : ""}Split from $${totalAmountNum.toFixed(2)} payment`
+                ? `${data.notes ? data.notes + " | " : ""}Split from ${data.amount} payment`
                 : (data.notes ?? null),
             }).returning();
             created.push(p);
@@ -1481,6 +1491,8 @@ export function registerRentalRoutes(
           notes: propertyPayments.notes,
           contractId: propertyPayments.contractId,
           unitId: propertyPayments.unitId,
+          currency: propertyPayments.currency,
+          exchangeRate: propertyPayments.exchangeRate,
           tenantName: propertyContracts.tenantName,
           unitNumber: propertyUnits.unitNumber,
           locationGroup: propertyUnits.locationGroup,

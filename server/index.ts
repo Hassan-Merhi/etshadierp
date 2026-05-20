@@ -3284,6 +3284,11 @@ let migrationsDone = false;
       row_id integer NOT NULL
     )`,
     `CREATE INDEX IF NOT EXISTS sp_migration_run_rows_run_idx ON sp_migration_run_rows (run_id)`,
+
+    // ── Property Contracts/Payments: currency + exchange rate columns (May 2026) ──
+    `ALTER TABLE property_contracts ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'USD'`,
+    `ALTER TABLE property_payments ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'USD'`,
+    `ALTER TABLE property_payments ADD COLUMN IF NOT EXISTS exchange_rate NUMERIC(20,6) NOT NULL DEFAULT 1`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
