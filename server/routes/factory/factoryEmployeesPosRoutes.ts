@@ -3425,12 +3425,13 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       // All active workers for this company
       const workers = await db
         .select({
-          id:           factoryWorkers.id,
-          employeeCode: factoryWorkers.employeeCode,
-          fullName:     factoryWorkers.fullName,
-          active:       factoryWorkers.active,
-          baseSalary:   factoryWorkers.baseSalary,
-          salaryType:   factoryWorkers.salaryType,
+          id:                 factoryWorkers.id,
+          employeeCode:       factoryWorkers.employeeCode,
+          fullName:           factoryWorkers.fullName,
+          active:             factoryWorkers.active,
+          baseSalary:         factoryWorkers.baseSalary,
+          salaryType:         factoryWorkers.salaryType,
+          transportAllowance: factoryWorkers.transportAllowance,
         })
         .from(factoryWorkers)
         .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)))
@@ -3521,17 +3522,18 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         const attendancePct = recordedCount > 0 ? Math.round((presentCount / recordedCount) * 100) : null;
 
         return {
-          id:           w.id,
-          employeeCode: w.employeeCode,
-          fullName:     w.fullName,
+          id:                 w.id,
+          employeeCode:       w.employeeCode,
+          fullName:           w.fullName,
           attendance,
           presentCount,
           absentCount,
           recordedCount,
           attendancePct,
-          baseSalary:   w.baseSalary ?? "0",
-          salaryType:   w.salaryType ?? "Monthly",
-          paidSalary:   (paidSalaryMap.get(w.id) || 0).toFixed(2),
+          baseSalary:         w.baseSalary ?? "0",
+          salaryType:         w.salaryType ?? "Monthly",
+          transportAllowance: w.transportAllowance ?? "0",
+          paidSalary:         (paidSalaryMap.get(w.id) || 0).toFixed(2),
         };
       });
 

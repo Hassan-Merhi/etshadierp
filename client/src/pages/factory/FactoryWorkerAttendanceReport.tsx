@@ -29,6 +29,7 @@ interface WorkerReportRow {
   attendancePct: number | null;
   baseSalary: string;
   salaryType: string;
+  transportAllowance: string;
   paidSalary: string;
 }
 interface AttendanceReportData {
@@ -86,7 +87,9 @@ function computeWorkerExpectedSalary(
 ): number {
   if (worker.salaryType !== "Monthly") return 0;
   const monthly = parseFloat(worker.baseSalary || "0");
-  if (!monthly || !dates.length) return 0;
+  const transport = parseFloat(worker.transportAllowance || "0");
+  const total = monthly + transport;
+  if (!total || !dates.length) return 0;
   let earned = 0;
   for (const d of dates) {
     const dailyRate = monthly / daysInCalendarMonth(d.date);
@@ -99,6 +102,8 @@ function computeWorkerExpectedSalary(
       else if (status === "Leave") earned += dailyRate;
     }
   }
+  // Add full monthly transport allowance (not prorated — it's a flat monthly benefit)
+  earned += transport;
   return earned;
 }
 

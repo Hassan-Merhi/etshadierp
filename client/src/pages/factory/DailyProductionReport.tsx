@@ -80,12 +80,14 @@ function daysInCalendarMonth(isoDate: string): number {
   return new Date(yr, mo, 0).getDate();
 }
 function computeWorkerExpectedSalary(
-  worker: { baseSalary: string; salaryType: string; attendance: Record<string, string> },
+  worker: { baseSalary: string; salaryType: string; transportAllowance: string; attendance: Record<string, string> },
   dates: { date: string; isWeekend: boolean }[],
 ): number {
   if (worker.salaryType !== "Monthly") return 0;
   const monthly = parseFloat(worker.baseSalary || "0");
-  if (!monthly || !dates.length) return 0;
+  const transport = parseFloat(worker.transportAllowance || "0");
+  const total = monthly + transport;
+  if (!total || !dates.length) return 0;
   let earned = 0;
   for (const d of dates) {
     const dailyRate = monthly / daysInCalendarMonth(d.date);
@@ -98,6 +100,8 @@ function computeWorkerExpectedSalary(
       else if (status === "Leave") earned += dailyRate;
     }
   }
+  // Add full monthly transport allowance (not prorated — it's a flat monthly benefit)
+  earned += transport;
   return earned;
 }
 
@@ -869,7 +873,7 @@ export default function DailyProductionReport() {
 
   const { data: attendanceData } = useQuery<{
     dates: { date: string; isWeekend: boolean }[];
-    workers: { baseSalary: string; salaryType: string; attendance: Record<string, string>; paidSalary: string }[];
+    workers: { baseSalary: string; salaryType: string; transportAllowance: string; attendance: Record<string, string>; paidSalary: string }[];
   }>({
     queryKey: ["/api/factory/workers/attendance-report", from, to],
     queryFn: async () => {
