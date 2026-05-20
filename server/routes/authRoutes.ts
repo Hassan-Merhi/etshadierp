@@ -522,9 +522,12 @@ export function registerAuthRoutes(app: Express) {
         const companyId = req.session.currentCompanyId;
         const { limit = "200", offset = "0", tableName, userId, action, dateFrom, dateTo, search } = req.query;
 
-        // Build query conditions — always exclude actions performed by Developer-role users
+        // Build query conditions — always exclude actions performed by Developer-role users.
+        // Roles live in userCompanyRoles, not on the users table itself.
         let conditions: any[] = [
-          or(isNull(users.role), ne(users.role, "Developer")),
+          sql`${auditLog.userId} NOT IN (
+            SELECT user_id FROM user_company_roles WHERE role = 'Developer'
+          )`,
           ...(companyId ? [eq(auditLog.companyId, companyId)] : []),
         ];
         if (tableName && typeof tableName === "string") {
