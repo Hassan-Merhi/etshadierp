@@ -2308,16 +2308,14 @@ export default function FactoryContainers() {
                         <div className="text-xs text-muted-foreground font-medium">Account / Broker</div>
                         <div />
                         {postOffloadCharges.map((charge, idx) => (
-                          <>
+                          <Fragment key={charge.id}>
                             <Input
-                              key={`desc-${charge.id}`}
                               value={charge.description}
                               onChange={(e) => setPostOffloadCharges(prev => prev.map(c => c.id === charge.id ? { ...c, description: e.target.value } : c))}
                               placeholder="e.g. Port duty"
                               data-testid={`input-poc-description-${idx}`}
                             />
                             <Input
-                              key={`amt-${charge.id}`}
                               type="number"
                               value={charge.amount}
                               onChange={(e) => setPostOffloadCharges(prev => prev.map(c => c.id === charge.id ? { ...c, amount: e.target.value } : c))}
@@ -2326,7 +2324,6 @@ export default function FactoryContainers() {
                               data-testid={`input-poc-amount-${idx}`}
                             />
                             <Select
-                              key={`ccy-${charge.id}`}
                               value={charge.currencyCode || "USD"}
                               onValueChange={(v) => setPostOffloadCharges(prev => prev.map(c => c.id === charge.id ? { ...c, currencyCode: v } : c))}
                             >
@@ -2338,7 +2335,6 @@ export default function FactoryContainers() {
                               </SelectContent>
                             </Select>
                             <Select
-                              key={`acc-${charge.id}`}
                               value={charge.ledgerAccountId || ""}
                               onValueChange={(v) => setPostOffloadCharges(prev => prev.map(c => c.id === charge.id ? { ...c, ledgerAccountId: v, supplierId: "" } : c))}
                             >
@@ -2352,7 +2348,6 @@ export default function FactoryContainers() {
                               </SelectContent>
                             </Select>
                             <Button
-                              key={`del-${charge.id}`}
                               variant="ghost"
                               size="icon"
                               onClick={() => setPostOffloadCharges(prev => prev.filter(c => c.id !== charge.id))}
@@ -2360,7 +2355,7 @@ export default function FactoryContainers() {
                             >
                               <X className="h-4 w-4" />
                             </Button>
-                          </>
+                          </Fragment>
                         ))}
                       </div>
                     </div>
