@@ -1109,6 +1109,7 @@ export default function ProductionRawStock() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/available-containers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/by-container"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
       toast({ title: "Success", description: "Container offloaded to production raw stock" });
       handleCloseDialog();
@@ -1143,7 +1144,11 @@ export default function ProductionRawStock() {
     const storedFreightCcy = container?.freightCurrencyCode;
     const effectiveFreightCcy = storedFreightCcy || ccy;
     setFreightCurrencyCode(effectiveFreightCcy);
-    setFreightFxRate("1");
+    // Use the container's FX rate when freight is in the same (non-USD) currency as the container.
+    // Sending "1" here causes the backend to use rate 1 instead of the real exchange rate,
+    // resulting in an incorrect freight-to-USD conversion and wrong costPerKgUsd.
+    const containerFxRate = container?.fxRateToUsd || "1";
+    setFreightFxRate(effectiveFreightCcy === "USD" ? "1" : containerFxRate);
     if (container?.freightSupplierId) {
       setFreightAccountId(`SUP:${container.freightSupplierId}`);
     } else if (container?.freightAccountId) {
@@ -1157,7 +1162,8 @@ export default function ProductionRawStock() {
     setOtherCharges(ocVal > 0 ? String(ocVal) : "");
     setOtherChargesFromContainer(ocVal > 0);
     setOtherChargesCurrencyCode(ccy);
-    setOtherChargesFxRate("1");
+    // Same fix as freight: use container FX rate so the backend converts to USD correctly.
+    setOtherChargesFxRate(ccy === "USD" ? "1" : containerFxRate);
     if (container?.otherChargesSupplierId) {
       setOtherChargesAccountId(`SUP:${container.otherChargesSupplierId}`);
     } else if (container?.otherChargesAccountId) {
@@ -1177,6 +1183,9 @@ export default function ProductionRawStock() {
       const commSupplierId = container?.commissionSupplierId;
       const broker = commSupplierId ? factorySuppliers?.find((s: any) => s.id === commSupplierId) : null;
       setCommissionPersonName(broker?.name || "Commission");
+      // Clear any ledger account that may have been set by a previous manual commission entry
+      // so it doesn't accidentally get attached to this container-originated commission.
+      setCommissionLedgerAccountId("");
     } else {
       setCommissionFromContainer(false);
       setContainerCommissionCcy("USD");
@@ -1211,7 +1220,11 @@ export default function ProductionRawStock() {
       currencyCode,
       fxRateToUsd,
       freight: freight || "0",
-      ...((() => { const p = parseAccountValue(freightAccountId); return p?.type === "supplier" ? { freightSupplierId: p.id, freightCurrencyCode, freightFxRate } : { freightAccountId: p?.id ?? null }; })()),
+      // Always include currency metadata for freight so the backend can convert to USD correctly
+      // regardless of whether the account is a supplier or a ledger account.
+      freightCurrencyCode,
+      freightFxRate,
+      ...((() => { const p = parseAccountValue(freightAccountId); return p?.type === "supplier" ? { freightSupplierId: p.id } : { freightAccountId: p?.id ?? null }; })()),
       ...((() => {
         const p = parseAccountValue(otherChargesAccountId);
         if (p?.type === "supplier") {
@@ -1281,10 +1294,14 @@ export default function ProductionRawStock() {
     setFreightAccountId("");
     setFreightCurrencyCode("USD");
     setFreightFxRate("1");
+    setFreightFromContainer(false);
     setOtherCharges("");
     setOtherChargesAccountId("");
     setOtherChargesCurrencyCode("USD");
     setOtherChargesFxRate("1");
+    setOtherChargesFromContainer(false);
+    setCommissionFromContainer(false);
+    setContainerCommissionCcy("USD");
     setDutyAmount("");
     setDutyAccountId("");
     setDutyPending(false);
