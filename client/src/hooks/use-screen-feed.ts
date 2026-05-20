@@ -4,9 +4,10 @@ import html2canvas from "html2canvas";
 // How often to check if a Developer is watching us (cheap GET, no canvas)
 const POLL_INTERVAL_MS    = 2000;
 // How often to capture + upload a frame while being watched
-const CAPTURE_INTERVAL_MS = 4000;
-// Max time to wait for html2canvas before giving up on a frame
-const CAPTURE_TIMEOUT_MS  = 6000;
+const CAPTURE_INTERVAL_MS = 3000;
+// Max time to wait for html2canvas before giving up on a frame.
+// Two attempts × 2.5 s each = 5 s max, well inside the 12 s watcher window.
+const CAPTURE_TIMEOUT_MS  = 2500;
 const CLICK_RETAIN_MS     = 8000;
 // Max dataUrl size we'll bother uploading (~1.2 MB as a base64 string)
 const MAX_DATA_URL_LEN    = 1_300_000;
@@ -47,20 +48,28 @@ if (typeof window !== "undefined") {
 
 function runWhenIdle(fn: () => void): void {
   if (typeof (window as any).requestIdleCallback === "function") {
-    (window as any).requestIdleCallback(fn, { timeout: 2000 });
+    (window as any).requestIdleCallback(fn, { timeout: 500 });
   } else {
     setTimeout(fn, 0);
   }
 }
 
+// GET-based trace: bypasses CSRF and Origin checks entirely.
+// Gives us server-side visibility into what the watched user's browser is doing.
+function trace(event: string, extra?: string) {
+  if (!isDev) return;
+  const url = `/api/screen-feed/trace/${encodeURIComponent(event)}${extra ? `?d=${encodeURIComponent(extra)}` : ""}`;
+  fetch(url, { credentials: "include" }).catch(() => {});
+}
+
 const html2canvasBaseOpts = {
-  scale:                  0.3,
+  scale:                  0.25,
   useCORS:                true,
   logging:                false,
-  // allowTaint is intentionally NOT set (defaults to false).
-  // Setting it to true taints the canvas when any cross-origin image loads,
-  // causing toDataURL() to throw a SecurityError and silently drop every frame.
+  // allowTaint intentionally NOT set (defaults false) — setting true taints the
+  // canvas on cross-origin images, causing toDataURL() to throw SecurityError.
   foreignObjectRendering: false,
+  // Don't wait more than 500 ms per image; skip it and move on.
   imageTimeout:           500,
   ignoreElements: (el: Element) =>
     el.getAttribute("data-screenfeed-ignore") === "true",
@@ -70,38 +79,43 @@ async function tryCapture(opts: Record<string, any>): Promise<HTMLCanvasElement>
   return Promise.race([
     html2canvas(document.body, {
       ...opts,
-      x:           window.scrollX,
-      y:           window.scrollY,
-      width:       window.innerWidth,
-      height:      window.innerHeight,
-      scrollX:    -window.scrollX,
-      scrollY:    -window.scrollY,
+      x:            window.scrollX,
+      y:            window.scrollY,
+      width:        window.innerWidth,
+      height:       window.innerHeight,
+      scrollX:     -window.scrollX,
+      scrollY:     -window.scrollY,
       windowWidth:  window.innerWidth,
       windowHeight: window.innerHeight,
     }),
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("timeout")), CAPTURE_TIMEOUT_MS)
+      setTimeout(() => reject(new Error(`timeout-${CAPTURE_TIMEOUT_MS}ms`)), CAPTURE_TIMEOUT_MS)
     ),
   ]);
 }
 
 async function captureAndUpload() {
-  // Skip if page is hidden (background tab / minimised)
-  if (document.hidden) return;
+  // Note: we intentionally do NOT skip on document.hidden.
+  // html2canvas renders from the DOM (not the visual screen), so it works
+  // even when the tab is in the background.
+  trace("capture-start");
 
   let canvas: HTMLCanvasElement;
   try {
     canvas = await tryCapture(html2canvasBaseOpts);
+    trace("capture-ok");
   } catch (err) {
-    // Retry once with the most conservative settings possible
+    trace("capture-fail-p1", String(err).slice(0, 80));
+    // Retry with even more conservative settings
     try {
       canvas = await tryCapture({
         ...html2canvasBaseOpts,
-        scale:       0.2,
+        scale:       0.15,
         imageTimeout: 200,
       });
+      trace("capture-ok-retry");
     } catch (err2) {
-      if (isDev) console.warn("[ScreenFeed] Both capture attempts failed:", err, err2);
+      trace("capture-fail-p2", String(err2).slice(0, 80));
       return;
     }
   }
@@ -110,18 +124,20 @@ async function captureAndUpload() {
   try {
     dataUrl = canvas.toDataURL("image/jpeg", 0.4);
   } catch (err) {
-    if (isDev) console.warn("[ScreenFeed] toDataURL failed (tainted canvas?):", err);
+    trace("to-data-url-failed", String(err).slice(0, 80));
     return;
   }
 
   if (!dataUrl.startsWith("data:image/")) {
-    if (isDev) console.warn("[ScreenFeed] Unexpected dataUrl prefix, skipping");
+    trace("bad-prefix");
     return;
   }
   if (dataUrl.length > MAX_DATA_URL_LEN) {
-    if (isDev) console.warn(`[ScreenFeed] Frame too large (${dataUrl.length} chars), skipping upload`);
+    trace("too-large", String(dataUrl.length));
     return;
   }
+
+  trace("uploading", String(dataUrl.length));
 
   const cutoff  = Date.now() - CLICK_RETAIN_MS;
   const clicks  = clickBuffer.filter(c => c.ts >= cutoff);
@@ -133,11 +149,9 @@ async function captureAndUpload() {
       credentials: "include",
       body:        JSON.stringify({ dataUrl, clicks }),
     });
-    if (isDev && res.status !== 204) {
-      console.warn(`[ScreenFeed] POST /api/screen-feed returned unexpected status ${res.status}`);
-    }
+    trace("upload-done", String(res.status));
   } catch (err) {
-    if (isDev) console.warn("[ScreenFeed] POST /api/screen-feed network error:", err);
+    trace("upload-error", String(err).slice(0, 80));
   }
 }
 
@@ -147,11 +161,14 @@ export function useScreenFeed() {
   const captureRef   = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    const startCapturing = () => {
-      if (captureRef.current) return; // already running
-      if (isDev) console.log("[ScreenFeed] Starting capture loop");
+    // Reset busyRef in case HMR fired mid-capture and left it stuck at true.
+    busyRef.current = false;
+    trace("hook-mounted");
 
-      // Trigger one immediate capture via idle callback
+    const startCapturing = () => {
+      if (captureRef.current) return;
+      trace("start-capturing");
+
       if (!busyRef.current) {
         busyRef.current = true;
         runWhenIdle(() => {
@@ -160,7 +177,7 @@ export function useScreenFeed() {
       }
 
       captureRef.current = setInterval(() => {
-        if (busyRef.current || document.hidden) return;
+        if (busyRef.current) return;
         busyRef.current = true;
         runWhenIdle(() => {
           captureAndUpload().finally(() => { busyRef.current = false; });
@@ -170,7 +187,6 @@ export function useScreenFeed() {
 
     const stopCapturing = () => {
       if (captureRef.current) {
-        if (isDev) console.log("[ScreenFeed] Stopping capture loop");
         clearInterval(captureRef.current);
         captureRef.current = null;
       }
@@ -180,8 +196,6 @@ export function useScreenFeed() {
       try {
         const res  = await fetch("/api/screen-feed/being-watched", { credentials: "include" });
         if (!res.ok) {
-          if (isDev) console.warn(`[ScreenFeed] being-watched returned non-OK status ${res.status} — stopping capture`);
-          // Session expired or other auth error — stop capturing to avoid ghost uploads
           if (watchedRef.current) {
             watchedRef.current = false;
             stopCapturing();
@@ -190,20 +204,19 @@ export function useScreenFeed() {
         }
         const data = await res.json();
         const nowWatched = Boolean(data?.watched);
-        if (isDev) console.log(`[ScreenFeed] being-watched: watched=${nowWatched}`, data);
 
-        if (nowWatched && !watchedRef.current) {
-          if (isDev) console.log("[ScreenFeed] Watcher detected — starting capture");
+        if (nowWatched) {
+          // Always attempt startCapturing — it's a no-op if already running.
+          // This handles the case where watchedRef is true (e.g. after HMR) but
+          // captureRef was cleared by the effect cleanup, causing the capture
+          // loop to be silently stopped while still being watched.
           watchedRef.current = true;
           startCapturing();
-        } else if (!nowWatched && watchedRef.current) {
-          if (isDev) console.log("[ScreenFeed] Watcher gone — stopping capture");
+        } else if (watchedRef.current) {
           watchedRef.current = false;
           stopCapturing();
         }
-      } catch (err) {
-        if (isDev) console.warn("[ScreenFeed] pollWatcherStatus network error:", err);
-        // Network error — stop capturing if was running
+      } catch {
         if (watchedRef.current) {
           watchedRef.current = false;
           stopCapturing();
@@ -211,25 +224,12 @@ export function useScreenFeed() {
       }
     };
 
-    // Handle tab visibility: resume capture if we come back to foreground while watched
-    const onVisibilityChange = () => {
-      if (!document.hidden && watchedRef.current && !captureRef.current) {
-        startCapturing();
-      } else if (document.hidden && captureRef.current) {
-        // Pause the capture interval while hidden (poll still runs)
-        stopCapturing();
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    // Check immediately, then on interval
     pollWatcherStatus();
     const pollId = setInterval(pollWatcherStatus, POLL_INTERVAL_MS);
 
     return () => {
       clearInterval(pollId);
       stopCapturing();
-      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 }

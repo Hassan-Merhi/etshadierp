@@ -14,13 +14,8 @@ const isDev = process.env.NODE_ENV !== "production";
 
 export function registerScreenFeedRoutes(app: Express) {
   // GET: watched user asks "is anyone watching me right now?"
-  // Uses requireLogin (not requireAuth) so it works even before a company
-  // is selected — the check only needs to know who the user is.
   // Must be registered BEFORE /:userId to avoid route conflict.
   app.get("/api/screen-feed/being-watched", requireLogin, (req, res) => {
-    // IMPORTANT: session.userId is a number (serial PK from users table) at runtime,
-    // but watcherPollStore keys are always strings (from req.params.userId URL strings).
-    // Normalize to string so Map lookups match.
     const userId   = String(req.session.userId!);
     const lastPoll = watcherPollStore.get(userId) ?? 0;
     const ageMs    = Date.now() - lastPoll;
@@ -33,22 +28,33 @@ export function registerScreenFeedRoutes(app: Express) {
     res.json({ watched, ...(isDev ? { userId, lastWatcherPollAgeMs: lastPoll > 0 ? ageMs : null } : {}) });
   });
 
+  // POST: client sends a trace event so we can see browser-side diagnostics in server logs.
+  // No auth required beyond login — best-effort diagnostic only.
+  app.post("/api/screen-feed/trace", requireLogin, (req, res) => {
+    if (!isDev) return res.status(204).end();
+    const { event, data } = req.body ?? {};
+    const userId = String(req.session.userId!);
+    console.log(`[ScreenFeed][TRACE] userId=${userId} event=${event}`, data ?? "");
+    res.status(204).end();
+  });
+
   // POST: watched user uploads their screenshot frame + recent clicks.
-  // Uses requireLogin so frame uploads work even when session has no company.
   app.post("/api/screen-feed", requireLogin, (req, res) => {
+    if (isDev) {
+      console.log(`[ScreenFeed] POST /api/screen-feed received from userId=${String(req.session.userId!)} body_keys=${Object.keys(req.body ?? {}).join(",")}`);
+    }
+
     const { dataUrl, clicks } = req.body ?? {};
 
     if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
-      if (isDev) console.warn("[ScreenFeed] POST rejected: missing or invalid dataUrl");
+      if (isDev) console.warn(`[ScreenFeed] POST rejected: missing or invalid dataUrl (type=${typeof dataUrl} starts=${typeof dataUrl === "string" ? dataUrl.slice(0, 30) : "N/A"})`);
       return res.status(400).end();
     }
     if (dataUrl.length > MAX_FRAME_SIZE) {
-      // Frame too large — silently discard rather than 400 so client keeps running
       if (isDev) console.warn(`[ScreenFeed] POST rejected: frame too large (${dataUrl.length} bytes)`);
       return res.status(204).end();
     }
 
-    // IMPORTANT: normalize to string — session.userId is a runtime number (serial PK).
     const userId   = String(req.session.userId!);
     const username = (req.session as any).username as string || userId;
     const now      = Date.now();
@@ -67,17 +73,13 @@ export function registerScreenFeedRoutes(app: Express) {
   });
 
   // GET: Developer polls the latest frame + clicks for a specific watched user.
-  // Recording this poll is what signals "a watcher is active".
   app.get("/api/screen-feed/:userId", requireAuth, (req, res) => {
     const role = req.session.currentRole;
     if (role !== "Developer") {
       return res.status(403).json({ message: "Access denied." });
     }
 
-    // req.params.userId is always a string from the URL — use it directly as the Map key.
     const watchedUserId = req.params.userId;
-
-    // Record that someone is watching this user right now
     watcherPollStore.set(watchedUserId, Date.now());
 
     const frame = screenFeedStore.get(watchedUserId);
