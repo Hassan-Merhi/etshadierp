@@ -515,8 +515,11 @@ export function registerAuthRoutes(app: Express) {
         const companyId = req.session.currentCompanyId;
         const { limit = "200", offset = "0", tableName, userId, action, dateFrom, dateTo, search } = req.query;
 
-        // Build query conditions
-        let conditions = companyId ? [eq(auditLog.companyId, companyId)] : [];
+        // Build query conditions — always exclude actions performed by Developer-role users
+        let conditions: any[] = [
+          or(isNull(users.role), ne(users.role, "Developer")),
+          ...(companyId ? [eq(auditLog.companyId, companyId)] : []),
+        ];
         if (tableName && typeof tableName === "string") {
           conditions.push(eq(auditLog.tableName, tableName));
         }
