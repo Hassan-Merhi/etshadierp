@@ -135,11 +135,28 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
     });
   }, [productsQuery.data, articleRows, productMap]);
 
+  function resetForm() {
+    setCustomerId("");
+    setProformaName("");
+    setIsActive(true);
+    setQuantities({});
+    setSellingPrices({});
+    setSendToLoading(false);
+    setContainerCount("1");
+    setContainerNames(["Container 1"]);
+    setAppliedPrice(null);
+    setErrors({});
+    setShowZeroItems(false);
+    setHideNonPositive(false);
+    setShowNegativeOnly(false);
+  }
+
   const createMutation = useMutation({
     mutationFn: async (payload: object) =>
       apiRequest("POST", "/api/factory/v5/proforma-with-loading", payload),
     onSuccess: () => {
       clearDraft();
+      resetForm();
       qc.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
       toast({ title: "Proforma created", description: sendToLoading ? `Proforma + ${containerNames.length} loading container(s) created.` : "Stock allocation has been refreshed." });
       onClose();
