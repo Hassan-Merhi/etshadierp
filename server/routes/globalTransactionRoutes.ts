@@ -42,7 +42,7 @@ export function registerGlobalTransactionRoutes(
   app.get("/api/global/transactions", requireAuth, async (req, res) => {
     try {
       const userId = (req.session as any).userId as string;
-      const userRole = (req.session as any).role as string;
+      const userRole = (req.session as any).currentRole as string;
       const isAdmin = userRole === "Admin" || userRole === "Developer";
 
       const {
@@ -247,7 +247,7 @@ export function registerGlobalTransactionRoutes(
   app.get("/api/global/transactions/voucher-types", requireAuth, async (req, res) => {
     try {
       const userId = (req.session as any).userId as string;
-      const userRole = (req.session as any).role as string;
+      const userRole = (req.session as any).currentRole as string;
       const isAdmin = userRole === "Admin" || userRole === "Developer";
 
       let allowedCompanyIds: number[];
