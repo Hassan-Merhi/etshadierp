@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
@@ -36,6 +37,8 @@ const containerSchema = z.object({
   discountPct: z.string().optional(),
   freightEstimateUsd: z.string().optional(),
   notes: z.string().optional(),
+  otwAccountId: z.string().optional(),
+  otwClearingAccountId: z.string().optional(),
   lines: z.array(lineSchema).min(1, "Add at least one line item"),
 });
 
@@ -67,6 +70,10 @@ export default function SpContainers() {
     queryKey: ["/api/sp/setup/status"],
   });
 
+  const { data: allAccounts = [] } = useQuery<any[]>({
+    queryKey: ["/api/accounts"],
+  });
+
   const { data: aliases = [] } = useQuery<any[]>({ queryKey: ["/api/sp/aliases"] });
   const aliasMap = new Map((aliases as any[]).map((a: any) => [a.alias_code, a]));
 
@@ -81,6 +88,8 @@ export default function SpContainers() {
       discountPct: "0",
       freightEstimateUsd: "0",
       notes: "",
+      otwAccountId: "",
+      otwClearingAccountId: "",
       lines: [{ articleCode: "", description: "", qty: "", unitRateUsd: "" }],
     },
   });
@@ -91,6 +100,8 @@ export default function SpContainers() {
   const watchDiscountPct = form.watch("discountPct");
   const watchInvoiceTotal = form.watch("invoiceTotalUsd");
   const watchFreight = form.watch("freightEstimateUsd");
+  const watchOtwAccountId = form.watch("otwAccountId");
+  const watchOtwClearingAccountId = form.watch("otwClearingAccountId");
 
   const previewDiscountFactor = 1 - parseFloat(watchDiscountPct || "0") / 100;
   const previewTotalQty = watchLines.reduce((s: number, l: any) => s + parseFloat(l.qty || "0"), 0);
@@ -98,9 +109,19 @@ export default function SpContainers() {
   const previewFreightPerUnit = previewTotalQty > 0 ? previewFreightEst / previewTotalQty : 0;
   const previewInvoiceTotal = parseFloat(watchInvoiceTotal || "0");
 
-  // OTW / OTW-CLR account names from setup
-  const otwAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_goods_otw");
-  const otwClrAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_otw_clearing");
+  // Default OTW / OTW-CLR account names from setup
+  const defaultOtwAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_goods_otw");
+  const defaultOtwClrAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_otw_clearing");
+
+  // Resolve selected accounts for voucher preview
+  const selectedOtwAcct = watchOtwAccountId
+    ? (allAccounts as any[]).find((a: any) => String(a.id) === watchOtwAccountId)
+    : null;
+  const selectedOtwClrAcct = watchOtwClearingAccountId
+    ? (allAccounts as any[]).find((a: any) => String(a.id) === watchOtwClearingAccountId)
+    : null;
+  const previewOtwName = selectedOtwAcct?.name ?? defaultOtwAcct?.name ?? "Goods OTW";
+  const previewOtwClrName = selectedOtwClrAcct?.name ?? defaultOtwClrAcct?.name ?? "Goods OTW Clearing";
 
   function parsePasteLines() {
     const parsed = pasteText.trim().split("\n").map(row => {
@@ -272,6 +293,55 @@ export default function SpContainers() {
                 </div>
               </div>
 
+              {/* ── Voucher Accounts ── */}
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Voucher Accounts <span className="text-muted-foreground font-normal normal-case">(optional — defaults to SP setup accounts)</span></p>
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField control={form.control} name="otwAccountId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Goods OTW Account <Badge variant="secondary" className="ml-1 text-xs">Dr</Badge></FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="text-xs" data-testid="select-sp-otw-account">
+                            <SelectValue placeholder={defaultOtwAcct?.name ?? "Default (SP Goods OTW)"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">Default ({defaultOtwAcct?.name ?? "SP Goods OTW"})</SelectItem>
+                          {(allAccounts as any[]).map((a: any) => (
+                            <SelectItem key={a.id} value={String(a.id)}>
+                              {a.code} — {a.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="otwClearingAccountId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">OTW Clearing Account <Badge variant="secondary" className="ml-1 text-xs">Cr</Badge></FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="text-xs" data-testid="select-sp-otw-clearing-account">
+                            <SelectValue placeholder={defaultOtwClrAcct?.name ?? "Default (SP OTW Clearing)"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">Default ({defaultOtwClrAcct?.name ?? "SP OTW Clearing"})</SelectItem>
+                          {(allAccounts as any[]).map((a: any) => (
+                            <SelectItem key={a.id} value={String(a.id)}>
+                              {a.code} — {a.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+              </div>
+
               <Separator />
 
               {/* ── Line Items ── */}
@@ -404,14 +474,17 @@ export default function SpContainers() {
                     <div className="rounded-md border border-border bg-muted/20 p-3 space-y-1.5">
                       <div className="grid grid-cols-3 text-xs text-muted-foreground font-medium pb-1 border-b border-border/40">
                         <span className="col-span-2">Account</span>
-                        <span className="text-right">Dr</span>
+                        <span className="text-right">Dr / Cr</span>
                       </div>
                       <div className="grid grid-cols-3 text-xs py-0.5">
-                        <span className="col-span-2 font-medium">{otwAcct?.name ?? "Goods OTW"}</span>
+                        <span className="col-span-2 font-medium flex items-center gap-1.5">
+                          {previewOtwName}
+                          <Badge variant="secondary" className="text-xs">Dr</Badge>
+                        </span>
                         <span className="text-right tabular-nums font-semibold">{fmt2(previewInvoiceTotal)}</span>
                       </div>
                       <div className="grid grid-cols-3 text-xs text-muted-foreground py-0.5">
-                        <span className="col-span-2 pl-4">{otwClrAcct?.name ?? "Goods OTW Clearing"} (Cr)</span>
+                        <span className="col-span-2 pl-4">{previewOtwClrName} (Cr)</span>
                         <span className="text-right tabular-nums">{fmt2(previewInvoiceTotal)}</span>
                       </div>
                     </div>

@@ -23,8 +23,9 @@ function fmt4(v: any) {
 const CHARGE_TYPES = [
   { value: "prepaid_used",    label: "Prepaid Used" },
   { value: "paid_now",        label: "Paid Now (Cash/Bank)" },
-  { value: "unpaid_payable",  label: "Unpaid Payable" },
-  { value: "invoice_freight", label: "Invoice Freight" },
+  { value: "unpaid_payable",  label: "Unpaid Payable (Accrual)" },
+  { value: "invoice_freight", label: "Invoice Freight (Cost Clearing)" },
+  { value: "other",           label: "Other (Any Ledger Account)" },
 ];
 
 interface ChargeLine {
@@ -289,11 +290,22 @@ export default function SpOffload() {
                 ) : charge.chargeType === "unpaid_payable" ? (
                   <Select value={charge.creditLedgerAccountId} onValueChange={v => updateCharge(idx, "creditLedgerAccountId", v)}>
                     <SelectTrigger className="h-8 text-xs" data-testid={`select-sp-charge-ledger-${idx}`}>
-                      <SelectValue placeholder="Select account" />
+                      <SelectValue placeholder="Select payable account" />
                     </SelectTrigger>
                     <SelectContent>
                       {(ledgerAccounts as any[]).filter((a: any) => a.accountType === "Liability" || a.accountType === "Accounts Payable").map((a: any) => (
                         <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : charge.chargeType === "other" ? (
+                  <Select value={charge.creditLedgerAccountId} onValueChange={v => updateCharge(idx, "creditLedgerAccountId", v)}>
+                    <SelectTrigger className="h-8 text-xs" data-testid={`select-sp-charge-other-ledger-${idx}`}>
+                      <SelectValue placeholder="Select any account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(ledgerAccounts as any[]).map((a: any) => (
+                        <SelectItem key={a.id} value={String(a.id)}>{a.code} — {a.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -401,7 +413,10 @@ export default function SpOffload() {
                   creditLabel = b ? b.bankName : "Bank Account";
                 } else if (c.chargeType === "unpaid_payable") {
                   const a = (ledgerAccounts as any[]).find((x: any) => String(x.id) === c.creditLedgerAccountId);
-                  creditLabel = a ? a.name : "Payable Account";
+                  creditLabel = a ? `${a.name} — payable` : "Payable Account";
+                } else if (c.chargeType === "other") {
+                  const a = (ledgerAccounts as any[]).find((x: any) => String(x.id) === c.creditLedgerAccountId);
+                  creditLabel = a ? a.name : "Ledger Account (other)";
                 } else {
                   creditLabel = `${costClrAcct?.name ?? "Cost Clearing"} — freight`;
                 }

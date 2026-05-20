@@ -184,16 +184,32 @@ export function registerSpRoutes(app: Express) {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
 
-      const { supplierName, containerNumber, invoiceNumber, invoiceDate, invoiceTotalUsd, discountPct, freightEstimateUsd, notes, lines } = req.body;
+      const { supplierName, containerNumber, invoiceNumber, invoiceDate, invoiceTotalUsd, discountPct, freightEstimateUsd, notes, lines, otwAccountId, otwClearingAccountId } = req.body;
 
       if (!supplierName || !invoiceNumber || !invoiceDate) {
         return res.status(400).json({ message: "supplierName, invoiceNumber, invoiceDate are required" });
       }
 
-      const otwAcct = await getSpAccount(companyId, "sp_goods_otw");
-      const otwClrAcct = await getSpAccount(companyId, "sp_otw_clearing");
+      let otwAcct = await getSpAccount(companyId, "sp_goods_otw");
+      let otwClrAcct = await getSpAccount(companyId, "sp_otw_clearing");
       if (!otwAcct || !otwClrAcct) {
         return res.status(400).json({ message: "Chart of accounts not set up. Run /api/sp/setup first." });
+      }
+
+      // Allow optional override accounts — validate they belong to this company
+      if (otwAccountId) {
+        const [customOtw] = await db.select().from(ledgerAccounts).where(
+          and(eq(ledgerAccounts.id, parseInt(otwAccountId)), eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt))
+        );
+        if (!customOtw) return res.status(400).json({ message: "Goods OTW account not found for this company" });
+        otwAcct = customOtw;
+      }
+      if (otwClearingAccountId) {
+        const [customOtwClr] = await db.select().from(ledgerAccounts).where(
+          and(eq(ledgerAccounts.id, parseInt(otwClearingAccountId)), eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt))
+        );
+        if (!customOtwClr) return res.status(400).json({ message: "OTW Clearing account not found for this company" });
+        otwClrAcct = customOtwClr;
       }
 
       const totalUsd = parseNum(invoiceTotalUsd);
@@ -421,14 +437,31 @@ export function registerSpRoutes(app: Express) {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
 
-      const { containerId, prepaidDate, chargeType, agentName, amountPaidUsd, bankAccountId, notes } = req.body;
+      const { containerId, prepaidDate, chargeType, agentName, amountPaidUsd, bankAccountId, debitAccountId, notes } = req.body;
 
       if (!chargeType || !amountPaidUsd) {
         return res.status(400).json({ message: "chargeType, amountPaidUsd required" });
       }
 
-      const prepaidAcct = await getSpAccount(companyId, "sp_prepaid");
+      let prepaidAcct = await getSpAccount(companyId, "sp_prepaid");
       if (!prepaidAcct) return res.status(400).json({ message: "SP accounts not set up" });
+
+      // Allow optional debit account override — validate it belongs to this company
+      if (debitAccountId) {
+        const [customDebit] = await db.select().from(ledgerAccounts).where(
+          and(eq(ledgerAccounts.id, parseInt(debitAccountId)), eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt))
+        );
+        if (!customDebit) return res.status(400).json({ message: "Debit account not found for this company" });
+        prepaidAcct = customDebit;
+      }
+
+      // Validate bank account belongs to this company
+      if (bankAccountId) {
+        const [bank] = await db.select().from(bankAccounts).where(
+          and(eq(bankAccounts.id, parseInt(bankAccountId)), eq(bankAccounts.companyId, companyId))
+        );
+        if (!bank) return res.status(400).json({ message: "Bank account not found for this company" });
+      }
 
       const amount = parseNum(amountPaidUsd);
       const date = prepaidDate || getClientDate(req);
@@ -659,6 +692,12 @@ export function registerSpRoutes(app: Express) {
             );
 
           } else if (charge.chargeType === "paid_now" && charge.creditBankAccountId) {
+            // Validate bank account belongs to company
+            const [bankRow] = await db.select().from(bankAccounts).where(
+              and(eq(bankAccounts.id, parseInt(charge.creditBankAccountId)), eq(bankAccounts.companyId, companyId))
+            );
+            if (!bankRow) throw new Error(`Bank account #${charge.creditBankAccountId} not found for this company`);
+
             await tx.insert(voucherEntries).values({
               voucherId: voucherB.id,
               bankAccountId: parseInt(charge.creditBankAccountId),
@@ -668,12 +707,33 @@ export function registerSpRoutes(app: Express) {
             });
 
           } else if (charge.chargeType === "unpaid_payable" && charge.creditLedgerAccountId) {
+            // Validate ledger account belongs to company
+            const [ledgerRow] = await db.select().from(ledgerAccounts).where(
+              and(eq(ledgerAccounts.id, parseInt(charge.creditLedgerAccountId)), eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt))
+            );
+            if (!ledgerRow) throw new Error(`Ledger account #${charge.creditLedgerAccountId} not found for this company`);
+
             await tx.insert(voucherEntries).values({
               voucherId: voucherB.id,
               ledgerAccountId: parseInt(charge.creditLedgerAccountId),
               debitAmount: "0",
               creditAmount: String(chargeAmt),
               narration: `Payable — ${charge.description || "charge"}`,
+            });
+
+          } else if (charge.chargeType === "other" && charge.creditLedgerAccountId) {
+            // Validate ledger account belongs to company
+            const [otherRow] = await db.select().from(ledgerAccounts).where(
+              and(eq(ledgerAccounts.id, parseInt(charge.creditLedgerAccountId)), eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt))
+            );
+            if (!otherRow) throw new Error(`Ledger account #${charge.creditLedgerAccountId} not found for this company`);
+
+            await tx.insert(voucherEntries).values({
+              voucherId: voucherB.id,
+              ledgerAccountId: parseInt(charge.creditLedgerAccountId),
+              debitAmount: "0",
+              creditAmount: String(chargeAmt),
+              narration: `Other charge — ${charge.description || "charge"}`,
             });
 
           } else {

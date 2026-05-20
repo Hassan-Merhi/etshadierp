@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,12 +26,20 @@ const prepaidSchema = z.object({
   chargeType: z.string().min(1, "Required"),
   agentName: z.string().optional(),
   amountPaidUsd: z.string().min(1, "Required"),
+  debitAccountId: z.string().optional(),
   bankAccountId: z.string().optional(),
   notes: z.string().optional(),
 });
 type PrepaidForm = z.infer<typeof prepaidSchema>;
 
-const CHARGE_TYPES = ["duty", "freight", "agent", "transporter", "other"];
+const CHARGE_TYPES = [
+  { value: "duty",          label: "Duty" },
+  { value: "freight",       label: "Freight" },
+  { value: "port_handling", label: "Port Handling" },
+  { value: "agent",         label: "Agent Fee" },
+  { value: "transporter",   label: "Transporter" },
+  { value: "other",         label: "Other" },
+];
 
 export default function SpContainerDetail() {
   const { id } = useParams<{ id: string }>();
@@ -48,6 +57,10 @@ export default function SpContainerDetail() {
     queryKey: ["/api/sp/setup/status"],
   });
 
+  const { data: allAccounts = [] } = useQuery<any[]>({
+    queryKey: ["/api/accounts"],
+  });
+
   const prepaidForm = useForm<PrepaidForm>({
     resolver: zodResolver(prepaidSchema),
     defaultValues: {
@@ -55,6 +68,7 @@ export default function SpContainerDetail() {
       chargeType: "",
       agentName: "",
       amountPaidUsd: "",
+      debitAccountId: "",
       bankAccountId: "",
       notes: "",
     },
@@ -66,7 +80,7 @@ export default function SpContainerDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/sp/containers", id] });
       toast({ title: "Prepaid charge recorded", description: "Dr Prepaid / Cr Bank voucher posted." });
       setShowPrepaidForm(false);
-      prepaidForm.reset({ prepaidDate: new Date().toISOString().slice(0, 10), chargeType: "", agentName: "", amountPaidUsd: "", bankAccountId: "", notes: "" });
+      prepaidForm.reset({ prepaidDate: new Date().toISOString().slice(0, 10), chargeType: "", agentName: "", amountPaidUsd: "", debitAccountId: "", bankAccountId: "", notes: "" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -94,8 +108,13 @@ export default function SpContainerDetail() {
   // Voucher preview for prepaid form
   const watchAmount = prepaidForm.watch("amountPaidUsd");
   const watchBank = prepaidForm.watch("bankAccountId");
+  const watchDebitAccountId = prepaidForm.watch("debitAccountId");
   const previewAmount = parseFloat(watchAmount || "0");
-  const prepaidAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_prepaid");
+  const defaultPrepaidAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_prepaid");
+  const selectedDebitAcct = watchDebitAccountId
+    ? (allAccounts as any[]).find((a: any) => String(a.id) === watchDebitAccountId)
+    : null;
+  const previewDebitName = selectedDebitAcct?.name ?? defaultPrepaidAcct?.name ?? "SP Prepaid Charges";
   const selectedBank = (statusData?.bankAccounts || []).find((b: any) => String(b.id) === watchBank);
 
   return (
@@ -217,7 +236,7 @@ export default function SpContainerDetail() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {CHARGE_TYPES.map(t => <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>)}
+                          {CHARGE_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -237,9 +256,28 @@ export default function SpContainerDetail() {
                       <FormMessage />
                     </FormItem>
                   )} />
+                  <FormField control={prepaidForm.control} name="debitAccountId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Debit Account <Badge variant="secondary" className="ml-1 text-xs">Dr</Badge></FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="h-8 text-xs" data-testid="select-sp-prepaid-debit">
+                            <SelectValue placeholder={defaultPrepaidAcct?.name ?? "Default (SP Prepaid)"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">Default ({defaultPrepaidAcct?.name ?? "SP Prepaid"})</SelectItem>
+                          {(allAccounts as any[]).map((a: any) => (
+                            <SelectItem key={a.id} value={String(a.id)}>{a.code} — {a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
                   <FormField control={prepaidForm.control} name="bankAccountId" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs">Credit Bank Account</FormLabel>
+                      <FormLabel className="text-xs">Credit Bank Account <Badge variant="secondary" className="ml-1 text-xs">Cr</Badge></FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger className="h-8 text-xs" data-testid="select-sp-prepaid-bank">
@@ -278,7 +316,7 @@ export default function SpContainerDetail() {
                     <div className="grid grid-cols-3 text-xs py-0.5">
                       <span className="col-span-2 font-medium flex items-center gap-1.5">
                         <CreditCard className="h-3 w-3 text-muted-foreground" />
-                        {prepaidAcct?.name ?? "SP Prepaid Charges"} <Badge variant="secondary" className="text-xs ml-1">Dr</Badge>
+                        {previewDebitName} <Badge variant="secondary" className="text-xs ml-1">Dr</Badge>
                       </span>
                       <span className="text-right tabular-nums font-semibold">{fmt2(previewAmount)}</span>
                     </div>
