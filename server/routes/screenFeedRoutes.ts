@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { requireAuth } from "../auth";
+import { requireAuth, requireLogin } from "../auth";
 import { screenFeedStore, watcherPollStore } from "../screenFeedStore";
 
 // How long (ms) after a watcher's last GET we still consider the user "being watched".
@@ -12,16 +12,19 @@ const MAX_FRAME_SIZE = 1_500_000;
 
 export function registerScreenFeedRoutes(app: Express) {
   // GET: watched user asks "is anyone watching me right now?"
+  // Uses requireLogin (not requireAuth) so it works even before a company
+  // is selected — the check only needs to know who the user is.
   // Must be registered BEFORE /:userId to avoid route conflict.
-  app.get("/api/screen-feed/being-watched", requireAuth, (req, res) => {
-    const userId   = req.user!.id;
+  app.get("/api/screen-feed/being-watched", requireLogin, (req, res) => {
+    const userId   = req.session.userId!;
     const lastPoll = watcherPollStore.get(userId) ?? 0;
     const watched  = (Date.now() - lastPoll) < WATCHER_TIMEOUT_MS;
     res.json({ watched });
   });
 
-  // POST: watched user uploads their screenshot frame + recent clicks
-  app.post("/api/screen-feed", requireAuth, (req, res) => {
+  // POST: watched user uploads their screenshot frame + recent clicks.
+  // Uses requireLogin so frame uploads work even when session has no company.
+  app.post("/api/screen-feed", requireLogin, (req, res) => {
     const { dataUrl, clicks } = req.body ?? {};
 
     if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
@@ -32,8 +35,8 @@ export function registerScreenFeedRoutes(app: Express) {
       return res.status(204).end();
     }
 
-    const userId   = req.user!.id;
-    const username = req.user!.username;
+    const userId   = req.session.userId!;
+    const username = (req.session as any).username as string || userId;
     const now      = Date.now();
     const safeClicks = Array.isArray(clicks)
       ? clicks

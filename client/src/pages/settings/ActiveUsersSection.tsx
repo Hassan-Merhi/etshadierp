@@ -267,9 +267,9 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                     <Clock className="h-8 w-8 opacity-30" />
                     <p className="text-sm">Waiting for first frame…</p>
                     <p className="text-xs">Updates every 3–5 seconds while watched</p>
-                    {(Date.now() - watchStartRef.current) > 10000 && (
+                    {(Date.now() - watchStartRef.current) > 20000 && (
                       <p className="text-xs text-amber-600 dark:text-amber-400 text-center max-w-xs">
-                        Still waiting — user may be on a background tab or screen capture is blocked by their browser.
+                        Still waiting — user may be on a background tab or their browser may be blocking screen capture.
                       </p>
                     )}
                   </div>

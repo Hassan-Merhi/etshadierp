@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import html2canvas from "html2canvas";
 
 // How often to check if a Developer is watching us (cheap GET, no canvas)
-const POLL_INTERVAL_MS    = 4000;
+const POLL_INTERVAL_MS    = 2000;
 // How often to capture + upload a frame while being watched
 const CAPTURE_INTERVAL_MS = 4000;
 // Max time to wait for html2canvas before giving up on a frame
