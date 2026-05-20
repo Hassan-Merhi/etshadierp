@@ -108,7 +108,27 @@ async function main() {
     } as any).returning();
   }
   const bankId = bank.id;
-  console.log(`✓ Bank account id=${bankId}\n`);
+  console.log(`✓ Bank account id=${bankId}`);
+
+  // ── 0b. Clean up all SP transactional data for this company (idempotent run) ─
+  console.log("── STEP 0b: Cleanup previous run data ───────────────");
+  await db.execute(sql`DELETE FROM sp_sale_lines WHERE company_id = ${companyId}`);
+  await db.execute(sql`DELETE FROM sp_sales WHERE company_id = ${companyId}`);
+  await db.execute(sql`DELETE FROM sp_stock_movements WHERE company_id = ${companyId}`);
+  await db.execute(sql`
+    DELETE FROM sp_offload_charges
+    WHERE offload_id IN (SELECT id FROM sp_offloads WHERE company_id = ${companyId})
+  `);
+  await db.execute(sql`DELETE FROM sp_offloads WHERE company_id = ${companyId}`);
+  await db.execute(sql`DELETE FROM sp_prepaid_charges WHERE company_id = ${companyId}`);
+  await db.execute(sql`DELETE FROM sp_container_lines WHERE company_id = ${companyId}`);
+  await db.execute(sql`DELETE FROM sp_containers WHERE company_id = ${companyId}`);
+  await db.execute(sql`
+    DELETE FROM voucher_entries
+    WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = ${companyId} AND source_module = 'SP')
+  `);
+  await db.execute(sql`DELETE FROM vouchers WHERE company_id = ${companyId} AND source_module = 'SP'`);
+  console.log("✓ Cleanup complete — starting with a clean slate\n");
 
   // Load accounts
   const otwAcct    = await getSpAccount(companyId, "sp_goods_otw");
