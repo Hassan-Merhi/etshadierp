@@ -500,7 +500,7 @@ export default function FactoryContainers() {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       setReversingContainer(null);
-      toast({ title: "Offload Reversed", description: "Container is back to RECEIVED status. Raw stock, accounting vouchers, and daybook entries have all been removed." });
+      toast({ title: "Offload Reversed", description: "Container is back to its previous status. Raw stock, accounting vouchers, and daybook entries have all been removed." });
     },
     onError: (err: Error) => {
       if (err?._handledGlobally) return;
@@ -2198,7 +2198,7 @@ export default function FactoryContainers() {
               <li>All related daybook entries (OFFLOAD_RAW_STOCK, FREIGHT, OTHER_CHARGE, DUTY, COMMISSION)</li>
             </ul>
             <p className="text-foreground font-medium pt-1">
-              The container returns to <strong>RECEIVED</strong> status. Supplier import voucher and any payments made are <em>not</em> removed.
+              The container returns to its previous status. Commission, supplier import voucher, and any payments made are <em>not</em> removed.
             </p>
           </div>
           <DialogFooter className="gap-2">

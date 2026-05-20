@@ -1407,6 +1407,12 @@ export function registerFactoryRawStockRoutes(app: Express) {
             preOffloadOtherCharges: container.otherCharges || "0",
             preOffloadOtherChargesAccountId: (container as any).otherChargesAccountId || null,
             preOffloadOtherChargesSupplierId: (container as any).otherChargesSupplierId || null,
+            preOffloadStatus: container.status,
+            preOffloadCommissionAmount: container.commissionAmount || "0",
+            preOffloadCommissionCurrencyCode: (container as any).commissionCurrencyCode || "USD",
+            preOffloadCommissionAccountId: (container as any).commissionAccountId || null,
+            preOffloadCommissionSupplierId: (container as any).commissionSupplierId || null,
+            preOffloadCommissionNotes: (container as any).commissionNotes || null,
             destination: reqDestination ? String(reqDestination).trim() : (container.destination || null),
             updatedAt: new Date(),
           })
@@ -1869,8 +1875,20 @@ export function registerFactoryRawStockRoutes(app: Express) {
           }
         }
 
+        // Restore pre-offload commission snapshot (if one was saved)
+        const preCommAmt = (container as any).preOffloadCommissionAmount;
+        const hasCommSnapshot = preCommAmt !== null && preCommAmt !== undefined;
+        const restoredCommissionAmount = hasCommSnapshot ? String(preCommAmt || "0") : "0";
+        const restoredCommissionCurrencyCode = hasCommSnapshot ? ((container as any).preOffloadCommissionCurrencyCode || "USD") : "USD";
+        const restoredCommissionAccountId = hasCommSnapshot ? ((container as any).preOffloadCommissionAccountId || null) : null;
+        const restoredCommissionSupplierId = hasCommSnapshot ? ((container as any).preOffloadCommissionSupplierId || null) : null;
+        const restoredCommissionNotes = hasCommSnapshot ? ((container as any).preOffloadCommissionNotes || null) : null;
+
+        // Restore pre-offload status (fallback to "ARRIVED" for legacy containers without snapshot)
+        const restoredStatus = (container as any).preOffloadStatus || "ARRIVED";
+
         await tx.update(factoryContainers).set({
-          status: "RECEIVED",
+          status: restoredStatus,
           actualReceivedKg: null,
           differenceKg: null,
           declaredKg: null,
@@ -1883,6 +1901,12 @@ export function registerFactoryRawStockRoutes(app: Express) {
           otherCharges: restoredOtherCharges,
           otherChargesAccountId: restoredOtherChargesAccountId,
           otherChargesSupplierId: restoredOtherChargesSupplierId,
+          // Restore pre-offload commission
+          commissionAmount: restoredCommissionAmount,
+          commissionCurrencyCode: restoredCommissionCurrencyCode,
+          commissionAccountId: restoredCommissionAccountId,
+          commissionSupplierId: restoredCommissionSupplierId,
+          commissionNotes: restoredCommissionNotes,
           // Clear duty (always offload-specific)
           dutyAmount: null,
           dutyAccountId: null,
@@ -1902,13 +1926,17 @@ export function registerFactoryRawStockRoutes(app: Express) {
           preOffloadOtherCharges: null,
           preOffloadOtherChargesAccountId: null,
           preOffloadOtherChargesSupplierId: null,
-          // Reset commission amount if it was created from offload dialog
-          ...(hadOffloadCommission ? { commissionAmount: "0" } : {}),
+          preOffloadStatus: null,
+          preOffloadCommissionAmount: null,
+          preOffloadCommissionCurrencyCode: null,
+          preOffloadCommissionAccountId: null,
+          preOffloadCommissionSupplierId: null,
+          preOffloadCommissionNotes: null,
           updatedAt: new Date(),
         }).where(eq(factoryContainers.id, containerId));
       });
 
-      res.json({ message: "Offload reversed successfully. Container is back to RECEIVED status." });
+      res.json({ message: "Offload reversed successfully. Container is back to its previous status." });
     } catch (error: any) {
       console.error("Error reversing offload:", error);
       res.status(500).json({ message: error.message });

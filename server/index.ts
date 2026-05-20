@@ -800,6 +800,12 @@ let migrationsDone = false;
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS pre_offload_other_charges decimal(20,2)`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS pre_offload_other_charges_account_id integer`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS pre_offload_other_charges_supplier_id integer`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS pre_offload_status text`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS pre_offload_commission_amount decimal(20,2)`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS pre_offload_commission_currency_code varchar(10)`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS pre_offload_commission_account_id integer`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS pre_offload_commission_supplier_id integer`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS pre_offload_commission_notes text`,
     `CREATE TABLE IF NOT EXISTS factory_pos_sales (
       id serial PRIMARY KEY,
       company_id integer NOT NULL,
