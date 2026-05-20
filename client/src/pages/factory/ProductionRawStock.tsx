@@ -2308,7 +2308,7 @@ export default function ProductionRawStock() {
       {offloadDialogOpen && (
         <div className="fixed inset-0 z-50 bg-background flex flex-col">
           {/* Header */}
-          <div className="sticky top-0 z-30 border-b bg-background px-6 py-4 flex items-center justify-between shrink-0">
+          <div className="shrink-0 border-b bg-background px-6 py-4 flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold">Offload Container to Production</h2>
               <p className="text-sm text-muted-foreground">Enter actual received weight and verify all costs</p>
@@ -2319,8 +2319,8 @@ export default function ProductionRawStock() {
           </div>
 
           {/* Two-column body */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="max-w-5xl mx-auto px-6 py-6">
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="max-w-5xl mx-auto px-6 py-5">
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_288px] gap-6 items-start">
 
                 {/* ── LEFT: Form ─────────────────────────────────────────── */}
