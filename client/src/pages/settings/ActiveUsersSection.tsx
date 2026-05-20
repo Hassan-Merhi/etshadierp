@@ -161,7 +161,10 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
     const clicks: Array<{ x: number; y: number; label: string; ts: number }> =
       Array.isArray(screenFrame?.clicks) ? screenFrame.clicks : [];
 
-    const isOnline = !!presence;
+    // A user is considered "online" only if we have a recent presence row
+    // with a lastSeen within the last 3 minutes and a valid userId.
+    const isOnline = !!presence && !!presence.userId && !!presence.lastSeen &&
+      (Date.now() - new Date(presence.lastSeen).getTime()) < 3 * 60 * 1000;
     const hasScreen = !!screenFrame?.dataUrl;
 
     // Only show clicks from the last 4 seconds so stale dots fade naturally
@@ -342,7 +345,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
 
     const { data: presenceData, isLoading } = useQuery<any[]>({
       queryKey: ["/api/user-presence"],
-      refetchInterval: 30000,
+      refetchInterval: 10000,
     });
 
     const { data: companies } = useQuery<any[]>({
@@ -445,7 +448,8 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                               size="sm"
                               variant="ghost"
                               data-testid={`button-watch-${presence.userId}`}
-                              onClick={() => setWatchingUser({ userId: presence.userId, username: presence.username })}
+                              disabled={!presence.userId}
+                              onClick={() => presence.userId && setWatchingUser({ userId: String(presence.userId), username: presence.username })}
                             >
                               <Eye className="h-3.5 w-3.5 mr-1" />
                               Watch
@@ -470,7 +474,8 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                               size="sm"
                               variant="ghost"
                               data-testid={`button-watch-mobile-${presence.userId}`}
-                              onClick={() => setWatchingUser({ userId: presence.userId, username: presence.username })}
+                              disabled={!presence.userId}
+                              onClick={() => presence.userId && setWatchingUser({ userId: String(presence.userId), username: presence.username })}
                             >
                               <Eye className="h-3.5 w-3.5 mr-1" />
                               Watch

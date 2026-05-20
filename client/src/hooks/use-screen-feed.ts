@@ -11,6 +11,8 @@ const CLICK_RETAIN_MS     = 8000;
 // Max dataUrl size we'll bother uploading (~1.2 MB as a base64 string)
 const MAX_DATA_URL_LEN    = 1_300_000;
 
+const isDev = import.meta.env.DEV;
+
 export interface ClickEvent {
   x:     number;
   y:     number;
@@ -90,7 +92,7 @@ async function captureAndUpload() {
   let canvas: HTMLCanvasElement;
   try {
     canvas = await tryCapture(html2canvasBaseOpts);
-  } catch {
+  } catch (err) {
     // Retry once with the most conservative settings possible
     try {
       canvas = await tryCapture({
@@ -98,8 +100,8 @@ async function captureAndUpload() {
         scale:       0.2,
         imageTimeout: 200,
       });
-    } catch {
-      // Both attempts failed — silently skip this frame
+    } catch (err2) {
+      if (isDev) console.warn("[ScreenFeed] Both capture attempts failed:", err, err2);
       return;
     }
   }
@@ -107,21 +109,36 @@ async function captureAndUpload() {
   let dataUrl: string;
   try {
     dataUrl = canvas.toDataURL("image/jpeg", 0.4);
-  } catch {
+  } catch (err) {
+    if (isDev) console.warn("[ScreenFeed] toDataURL failed (tainted canvas?):", err);
     return;
   }
 
-  if (!dataUrl.startsWith("data:image/") || dataUrl.length > MAX_DATA_URL_LEN) return;
+  if (!dataUrl.startsWith("data:image/")) {
+    if (isDev) console.warn("[ScreenFeed] Unexpected dataUrl prefix, skipping");
+    return;
+  }
+  if (dataUrl.length > MAX_DATA_URL_LEN) {
+    if (isDev) console.warn(`[ScreenFeed] Frame too large (${dataUrl.length} chars), skipping upload`);
+    return;
+  }
 
   const cutoff  = Date.now() - CLICK_RETAIN_MS;
   const clicks  = clickBuffer.filter(c => c.ts >= cutoff);
 
-  fetch("/api/screen-feed", {
-    method:      "POST",
-    headers:     { "Content-Type": "application/json" },
-    credentials: "include",
-    body:        JSON.stringify({ dataUrl, clicks }),
-  }).catch(() => {});
+  try {
+    const res = await fetch("/api/screen-feed", {
+      method:      "POST",
+      headers:     { "Content-Type": "application/json" },
+      credentials: "include",
+      body:        JSON.stringify({ dataUrl, clicks }),
+    });
+    if (isDev && res.status !== 204) {
+      console.warn(`[ScreenFeed] POST /api/screen-feed returned unexpected status ${res.status}`);
+    }
+  } catch (err) {
+    if (isDev) console.warn("[ScreenFeed] POST /api/screen-feed network error:", err);
+  }
 }
 
 export function useScreenFeed() {
@@ -132,6 +149,7 @@ export function useScreenFeed() {
   useEffect(() => {
     const startCapturing = () => {
       if (captureRef.current) return; // already running
+      if (isDev) console.log("[ScreenFeed] Starting capture loop");
 
       // Trigger one immediate capture via idle callback
       if (!busyRef.current) {
@@ -152,6 +170,7 @@ export function useScreenFeed() {
 
     const stopCapturing = () => {
       if (captureRef.current) {
+        if (isDev) console.log("[ScreenFeed] Stopping capture loop");
         clearInterval(captureRef.current);
         captureRef.current = null;
       }
@@ -161,6 +180,7 @@ export function useScreenFeed() {
       try {
         const res  = await fetch("/api/screen-feed/being-watched", { credentials: "include" });
         if (!res.ok) {
+          if (isDev) console.warn(`[ScreenFeed] being-watched returned non-OK status ${res.status} — stopping capture`);
           // Session expired or other auth error — stop capturing to avoid ghost uploads
           if (watchedRef.current) {
             watchedRef.current = false;
@@ -170,15 +190,19 @@ export function useScreenFeed() {
         }
         const data = await res.json();
         const nowWatched = Boolean(data?.watched);
+        if (isDev) console.log(`[ScreenFeed] being-watched: watched=${nowWatched}`, data);
 
         if (nowWatched && !watchedRef.current) {
+          if (isDev) console.log("[ScreenFeed] Watcher detected — starting capture");
           watchedRef.current = true;
           startCapturing();
         } else if (!nowWatched && watchedRef.current) {
+          if (isDev) console.log("[ScreenFeed] Watcher gone — stopping capture");
           watchedRef.current = false;
           stopCapturing();
         }
-      } catch {
+      } catch (err) {
+        if (isDev) console.warn("[ScreenFeed] pollWatcherStatus network error:", err);
         // Network error — stop capturing if was running
         if (watchedRef.current) {
           watchedRef.current = false;
