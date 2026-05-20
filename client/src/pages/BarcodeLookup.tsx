@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Search, Package, Clock, User, Scale, Hash, Layers, Container, Truck, FlaskConical, Box, CheckCircle2, AlertCircle, XCircle, ArchiveX, Ship, FileText, User2, Trash2, Pencil, ArchiveRestore } from "lucide-react";
+import { Search, Package, Clock, User, Scale, Hash, Layers, Container, Truck, FlaskConical, Box, CheckCircle2, AlertCircle, XCircle, ArchiveX, Ship, FileText, User2, Trash2, Pencil, ArchiveRestore, Undo2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
+import { useAdminOverride } from "@/hooks/use-admin-override";
 import type { BaleProduct, BaleLabelPrint } from "@shared/schema";
 
 function BaleStatusBadge({ status }: { status: string }) {
@@ -70,11 +71,14 @@ export default function BarcodeLookup() {
     labelPrints: BaleLabelPrint[];
   } | null>(null);
 
+  const { wrapAdminAction, AdminDialog } = useAdminOverride();
+
   // Admin dialog state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showChangeProductDialog, setShowChangeProductDialog] = useState(false);
   const [changeProductSearch, setChangeProductSearch] = useState("");
   const [selectedNewProductId, setSelectedNewProductId] = useState<number | null>(null);
+  const [showReturnToStockDialog, setShowReturnToStockDialog] = useState(false);
 
   const [referenceResult, setReferenceResult] = useState<{
     labelPrint: BaleLabelPrint | null;
@@ -261,7 +265,8 @@ export default function BarcodeLookup() {
     },
   });
 
-  const returnToStockMutation = useMutation({
+  // Simple restore for DELETED/REMOVED bales (just a status patch)
+  const restoreDeletedMutation = useMutation({
     mutationFn: async (baleId: number) => {
       const response = await modeApiRequest("PATCH", `/api/factory/bales/${baleId}/status`, { status: "IN_STOCK" });
       if (!response.ok) {
@@ -277,6 +282,50 @@ export default function BarcodeLookup() {
       toast({ title: "Returned to Stock", description: "Bale status set back to In Stock." });
     },
     onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Order info for the return-to-stock confirmation dialog
+  const returnableBaleId = (() => {
+    const s = referenceResult?.baleInfo?.status;
+    return (s === "RESERVED_FOR_ORDER" || s === "RESERVED" || s === "SOLD") && showReturnToStockDialog
+      ? referenceResult?.baleInfo?.id
+      : null;
+  })();
+
+  const { data: returnToStockOrderInfo, isLoading: orderInfoLoading } = useQuery<any>({
+    queryKey: ["/api/factory/bales", returnableBaleId, "order-info"],
+    queryFn: async () => {
+      const res = await modeApiRequest("GET", `/api/factory/bales/${returnableBaleId}/order-info`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!returnableBaleId,
+  });
+
+  // Full return-to-stock for RESERVED_FOR_ORDER/RESERVED/SOLD (removes from order, cascades invoice)
+  const returnToStockMutation = useMutation({
+    mutationFn: async (baleId: number) => {
+      const response = await modeApiRequest("POST", `/api/factory/bales/${baleId}/return-to-stock`, {});
+      if (!response.ok) {
+        const err = await response.json();
+        throw Object.assign(new Error(err.message || "Failed to return bale to stock"), { isLastBale: err.isLastBale });
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setShowReturnToStockDialog(false);
+      if (referenceResult?.labelPrint?.referenceNumber) {
+        referenceLookup.mutate(referenceResult.labelPrint.referenceNumber);
+      }
+      const invoiceMsg = data.invoiceNumber
+        ? ` Invoice ${data.invoiceNumber} updated to $${parseFloat(data.newGrandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`
+        : "";
+      toast({ title: "Bale returned to stock", description: `Bale removed from order.${invoiceMsg}` });
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -490,12 +539,23 @@ export default function BarcodeLookup() {
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={returnToStockMutation.isPending}
-                            onClick={() => referenceResult.baleInfo && returnToStockMutation.mutate(referenceResult.baleInfo.id)}
-                            data-testid="button-return-to-stock"
+                            disabled={restoreDeletedMutation.isPending}
+                            onClick={() => referenceResult.baleInfo && restoreDeletedMutation.mutate(referenceResult.baleInfo.id)}
+                            data-testid="button-restore-deleted"
                           >
                             <ArchiveRestore className="h-3.5 w-3.5 mr-1" />
-                            {returnToStockMutation.isPending ? "Restoring…" : "Return to Stock"}
+                            {restoreDeletedMutation.isPending ? "Restoring…" : "Restore to Stock"}
+                          </Button>
+                        )}
+                        {(referenceResult.baleInfo?.status === "RESERVED_FOR_ORDER" || referenceResult.baleInfo?.status === "RESERVED" || referenceResult.baleInfo?.status === "SOLD") && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setShowReturnToStockDialog(true)}
+                            data-testid="button-return-to-stock"
+                          >
+                            <Undo2 className="h-3.5 w-3.5 mr-1 text-blue-500" />
+                            Return to Stock
                           </Button>
                         )}
                         <Button
@@ -892,6 +952,111 @@ export default function BarcodeLookup() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Return to Stock Dialog */}
+      <Dialog open={showReturnToStockDialog} onOpenChange={(open) => { if (!open) setShowReturnToStockDialog(false); }}>
+        <DialogContent className="max-w-md" data-testid="dialog-return-to-stock">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Undo2 className="h-5 w-5 text-blue-500" />
+              Return Bale to Stock
+            </DialogTitle>
+            <DialogDescription>
+              Bale <span className="font-mono font-semibold">{referenceResult?.labelPrint?.referenceNumber}</span>
+              {referenceResult?.baleInfo?.productName ? ` — ${referenceResult.baleInfo.productName}` : ""}
+              {referenceResult?.baleInfo?.weightKg ? ` (${referenceResult.baleInfo.weightKg} kg)` : ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-1">
+            {orderInfoLoading ? (
+              <div className="text-sm text-muted-foreground py-2">Loading order details...</div>
+            ) : returnToStockOrderInfo ? (
+              <>
+                <div className="rounded-md border p-3 space-y-1.5 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Order status</span>
+                    <Badge variant="secondary" className="text-xs">{returnToStockOrderInfo.status}</Badge>
+                  </div>
+                  {returnToStockOrderInfo.invoiceNumber && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Invoice</span>
+                      <span className="font-mono font-semibold">{returnToStockOrderInfo.invoiceNumber}</span>
+                    </div>
+                  )}
+                  {returnToStockOrderInfo.customerName && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Customer</span>
+                      <span>{returnToStockOrderInfo.customerName}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Current total</span>
+                    <span className="font-mono">${parseFloat(returnToStockOrderInfo.grandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Bales in order</span>
+                    <span>{returnToStockOrderInfo.totalBalesInOrder}</span>
+                  </div>
+                </div>
+
+                {returnToStockOrderInfo.totalBalesInOrder <= 1 && (
+                  <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <p>This is the last bale in the order. You must cancel the entire order instead.</p>
+                  </div>
+                )}
+
+                {returnToStockOrderInfo.status === "FINALIZED" && returnToStockOrderInfo.totalBalesInOrder > 1 && (
+                  <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 text-sm">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <p>
+                      This order is <strong>finalized</strong>. Removing this bale will reduce invoice <strong>{returnToStockOrderInfo.invoiceNumber}</strong> and update the customer's balance. Admin authorisation required.
+                    </p>
+                  </div>
+                )}
+
+                {!["FINALIZED"].includes(returnToStockOrderInfo.status) && returnToStockOrderInfo.totalBalesInOrder > 1 && (
+                  <p className="text-sm text-muted-foreground">
+                    The bale will be removed from this order and returned to stock. Order totals will be recalculated.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">No order linked to this bale — it will simply be returned to stock.</p>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowReturnToStockDialog(false)} data-testid="button-cancel-return-to-stock">
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                returnToStockMutation.isPending ||
+                orderInfoLoading ||
+                (returnToStockOrderInfo?.totalBalesInOrder <= 1)
+              }
+              onClick={() => {
+                if (!referenceResult?.baleInfo?.id) return;
+                const baleId = referenceResult.baleInfo.id;
+                const isFinalized = returnToStockOrderInfo?.status === "FINALIZED";
+                const doIt = () => returnToStockMutation.mutate(baleId);
+                if (isFinalized) {
+                  wrapAdminAction(doIt, "Return Bale to Stock (Finalized Order)");
+                } else {
+                  doIt();
+                }
+              }}
+              data-testid="button-confirm-return-to-stock"
+            >
+              {returnToStockMutation.isPending ? "Processing..." : "Return to Stock"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {AdminDialog}
     </div>
   );
 }
