@@ -114,6 +114,7 @@ export function registerAuthRoutes(app: Express) {
         req.session.daybookEditDays = firstCompany.daybookEditDays;
         req.session.canAccessCustomers = firstCompany.canAccessCustomers;
         req.session.canDeleteRecords = firstCompany.canDeleteRecords;
+        (req.session as any).currentCompanyName = (firstCompany as any).companyName || null;
       }
 
       console.log("✅ Login successful, session saved");
@@ -1809,6 +1810,11 @@ export function registerAuthRoutes(app: Express) {
       req.session.daybookEditDays = userRole.daybookEditDays;
       req.session.canAccessCustomers = userRole.canAccessCustomers;
       req.session.canDeleteRecords = userRole.canDeleteRecords;
+
+      // Look up and cache company name in session so presence heartbeats can show it
+      db.select({ name: companies.name }).from(companies).where(eq(companies.id, companyId)).limit(1)
+        .then(rows => { (req.session as any).currentCompanyName = rows[0]?.name || null; })
+        .catch(() => {});
 
       // Explicitly save session to ensure it's persisted before responding
       req.session.save((err) => {

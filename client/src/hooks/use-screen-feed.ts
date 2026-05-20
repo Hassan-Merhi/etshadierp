@@ -55,7 +55,9 @@ const html2canvasBaseOpts = {
   scale:                  0.3,
   useCORS:                true,
   logging:                false,
-  allowTaint:             true,
+  // allowTaint is intentionally NOT set (defaults to false).
+  // Setting it to true taints the canvas when any cross-origin image loads,
+  // causing toDataURL() to throw a SecurityError and silently drop every frame.
   foreignObjectRendering: false,
   imageTimeout:           500,
   ignoreElements: (el: Element) =>
