@@ -32,6 +32,10 @@ import {
   LayoutGrid,
   Handshake,
   Globe,
+  Boxes,
+  PackagePlus,
+  Tags,
+  Wrench,
 } from "lucide-react";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
@@ -273,6 +277,27 @@ export function AppSidebar({ user }: { user?: any }) {
               trailingFor={trailingFor}
             />
           ))}
+          {selectedCompany?.companyType === "supplier_partner" && (
+            <SidebarSectionGroup
+              section={{
+                label: "Supplier Partner",
+                color: NAV_COLOR.operations,
+                items: [
+                  { title: "SP Containers",  url: "/sp/containers",    icon: Boxes       },
+                  { title: "Opening Stock",  url: "/sp/opening-stock", icon: PackagePlus },
+                  { title: "Aliases",        url: "/sp/aliases",       icon: Tags        },
+                  { title: "SP Reports",     url: "/sp/reports",       icon: BarChart3   },
+                  { title: "Migration",      url: "/sp/migration",     icon: ArrowLeftRight },
+                  { title: "Setup",          url: "/sp/setup",         icon: Wrench      },
+                ],
+              }}
+              isOpen={openSections.has("Supplier Partner")}
+              onToggle={() => toggleSection("Supplier Partner")}
+              sectionTestId="button-section-supplier-partner"
+              testIdFor={(i) => `link-${i.url}`}
+              trailingFor={() => null}
+            />
+          )}
         </div>
 
         {recentItems.length > 0 && (

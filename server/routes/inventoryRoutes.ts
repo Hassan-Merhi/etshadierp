@@ -114,6 +114,14 @@ export function registerInventoryRoutes(app: Express) {
       }
 
       const companyId = req.session.currentCompanyId;
+      // Block quick-adjust for supplier_partner companies (bypasses sp_stock_movements)
+      {
+        const [spCo] = await db.select({ companyType: companies.companyType })
+          .from(companies).where(eq(companies.id, companyId)).limit(1);
+        if (spCo?.companyType === "supplier_partner") {
+          return res.status(403).json({ message: "Supplier Partner companies must use SP Sales / SP Containers for this action." });
+        }
+      }
       const qty = parseFloat(quantity);
       
       if (isNaN(qty) || qty <= 0) {

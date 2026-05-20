@@ -305,6 +305,14 @@ export function registerPosRoutes(app: Express) {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
+      // Block normal POS sales for supplier_partner companies (must use /api/sp/sales)
+      {
+        const [spCo] = await db.select({ companyType: companies.companyType })
+          .from(companies).where(eq(companies.id, req.session.currentCompanyId)).limit(1);
+        if (spCo?.companyType === "supplier_partner") {
+          return res.status(403).json({ message: "Supplier Partner companies must use SP Sales / SP Containers for this action." });
+        }
+      }
 
       const isPOSUser = req.user?.role === "POS";
 
