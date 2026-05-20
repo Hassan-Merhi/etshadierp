@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/PageHeader";
 import {
   BookOpen, Eye, EyeOff, ExternalLink, List, AlignJustify, Package,
   Trash2, ChevronDown, ChevronRight, X, FileDown, Plus,
-  LayoutList, Layers,
+  LayoutList, Layers, Pencil, AlertTriangle,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -1244,6 +1244,9 @@ export default function FactoryDaybook() {
   const [editAmountUsd, setEditAmountUsd] = useState("");
   const [editTxDate, setEditTxDate] = useState("");
   const [editReason, setEditReason] = useState("");
+  const [costEditEntry, setCostEditEntry] = useState<DaybookEntry | null>(null);
+  const [costEditAmount, setCostEditAmount] = useState("");
+  const [costEditReason, setCostEditReason] = useState("");
   const [viewEntry, setViewEntry] = useState<DaybookEntry | null>(null);
   const [voidEntry, setVoidEntry] = useState<DaybookEntry | null>(null);
   const [deleteEntry, setDeleteEntry] = useState<DaybookEntry | null>(null);
@@ -1714,6 +1717,41 @@ export default function FactoryDaybook() {
     },
   });
 
+  const CONTAINER_COST_TX_TYPES = new Set(["OFFLOAD_RAW_STOCK", "FREIGHT", "COMMISSION", "DUTY", "OTHER_CHARGE"]);
+
+  const isCostEditable = (entry: DaybookEntry) => {
+    if (!isAdminOrOwner) return false;
+    if (!CONTAINER_COST_TX_TYPES.has(entry.txType)) return false;
+    if (entry.id < 0) return false; // synthetic/voucher rows
+    if (entry.referenceTable === "vouchers") return false;
+    return true;
+  };
+
+  const costEditMutation = useMutation({
+    mutationFn: async ({ entryId, newAmount, reason }: { entryId: number; newAmount: string; reason: string }) => {
+      const res = await factoryApiRequest("PATCH", `/api/factory/daybook/${entryId}/cost-edit`, { newAmount, reason });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to update cost");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      setCostEditEntry(null);
+      setCostEditAmount("");
+      setCostEditReason("");
+      toast({ title: "Cost updated", description: data.message || "Container costs recalculated and cascaded." });
+    },
+    onError: (e: any) => {
+      if (e?._handledGlobally) return;
+      toast({ title: "Cost edit failed", description: e.message, variant: "destructive" });
+    },
+  });
+
   const openEditDialog = (entry: DaybookEntry) => {
     setEditEntry(entry);
     setEditDescription(entry.description);
@@ -1774,6 +1812,12 @@ export default function FactoryDaybook() {
             onClick={(e) => { e.stopPropagation(); editSourceRecord(entry); }}
             data-testid={`button-edit-source-${entry.id}`}
           ><ExternalLink className="h-3 w-3" /></Button>
+        )}
+        {isCostEditable(entry) && (
+          <Button size={size} variant="ghost" title="Edit cost (cascades to raw stock & mix batches)"
+            onClick={(e) => { e.stopPropagation(); setCostEditEntry(entry); setCostEditAmount(entry.amountCurrency); setCostEditReason(""); }}
+            data-testid={`button-cost-edit-${entry.id}`}
+          ><Pencil className="h-3 w-3 text-amber-500" /></Button>
         )}
         <Button size={size} variant="ghost"
           title={isHidden ? "Unhide row" : "Hide row"}
@@ -2464,6 +2508,95 @@ export default function FactoryDaybook() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Cost Edit Dialog */}
+      <Dialog open={costEditEntry !== null} onOpenChange={(open) => { if (!open) setCostEditEntry(null); }}>
+        <DialogContent className="max-w-md" data-testid="dialog-cost-edit-daybook">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-4 w-4 text-amber-500" />
+              Edit Container Cost
+            </DialogTitle>
+            <DialogDescription>
+              {costEditEntry && (() => {
+                const txLabels: Record<string, string> = {
+                  OFFLOAD_RAW_STOCK: "Total inclusive cost (base material)",
+                  FREIGHT: "Freight charge",
+                  COMMISSION: "Commission",
+                  DUTY: "Duty",
+                  OTHER_CHARGE: "Other charge / additional charge",
+                };
+                return `${txLabels[costEditEntry.txType] || costEditEntry.txType} — ${costEditEntry.description}`;
+              })()}
+            </DialogDescription>
+          </DialogHeader>
+          {costEditEntry && (() => {
+            const isDuty = costEditEntry.txType === "DUTY";
+            const isBaseMaterial = costEditEntry.txType === "OFFLOAD_RAW_STOCK";
+            return (
+              <div className="space-y-4 py-1">
+                <div className="rounded-md border bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 p-3 text-sm space-y-1">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <div className="space-y-1">
+                      <p className="font-medium">This will cascade to inventory costs.</p>
+                      <p>Saving updates the raw stock cost per kg and recalculates the weighted-average cost of all mix batches that used this container.</p>
+                      {isBaseMaterial && <p>Editing the total cost will back-calculate a new base rate per kg.</p>}
+                      {isDuty && <p>Only confirmed duty can be edited here. A duty audit log entry will be written.</p>}
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Current amount ({costEditEntry.currencyCode})</Label>
+                  <div className="text-sm text-muted-foreground font-mono mt-0.5">
+                    {formatNumber(parseFloat(costEditEntry.amountCurrency || "0"), 2)} {costEditEntry.currencyCode}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">New amount ({costEditEntry.currencyCode}) *</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={costEditAmount}
+                    onChange={(e) => setCostEditAmount(e.target.value)}
+                    placeholder="Enter corrected amount"
+                    data-testid="input-cost-edit-amount"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Reason for edit *</Label>
+                  <Textarea
+                    value={costEditReason}
+                    onChange={(e) => setCostEditReason(e.target.value)}
+                    placeholder="Why is this correction needed?"
+                    data-testid="input-cost-edit-reason"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setCostEditEntry(null)} data-testid="button-cancel-cost-edit">
+                    Cancel
+                  </Button>
+                  <Button
+                    disabled={!costEditReason.trim() || !costEditAmount || costEditMutation.isPending}
+                    onClick={() => {
+                      if (!costEditEntry) return;
+                      costEditMutation.mutate({
+                        entryId: costEditEntry.id,
+                        newAmount: costEditAmount,
+                        reason: costEditReason.trim(),
+                      });
+                    }}
+                    data-testid="button-submit-cost-edit"
+                  >
+                    {costEditMutation.isPending ? "Saving..." : "Save & Recalculate"}
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
 
       {AdminDialog}
     </div>

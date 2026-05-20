@@ -9,6 +9,12 @@ import {
   customerOrderCharges,
   customerOrders,
   factoryUserProfiles,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatchSources,
+  factoryMixBatches,
+  factoryContainerCommissions,
+  factoryOffloadAdditionalCharges,
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -173,6 +179,140 @@ export async function recalculateOrderTotals(dbConn: any, orderId: number) {
     totalQtyBales: bales.length,
     updatedAt: new Date(),
   }).where(eq(customerOrders.id, orderId));
+}
+
+/**
+ * Recomputes all cost fields for an offloaded container and cascades the new
+ * inclusive cost/kg down to rawStock → mixBatchSources → mixBatches.
+ *
+ * Call this inside a db.transaction() after mutating any single cost component
+ * (freight, duty, commission, otherCharges, ratePerKg, or an additional charge).
+ *
+ * Returns the new { totalCost, inclusiveCostPerKg, costPerKgUsd, rawStockId }.
+ */
+export async function recalculateContainerCosts(
+  tx: any,
+  companyId: number,
+  containerId: number,
+): Promise<{ totalCost: number; inclusiveCostPerKg: number; costPerKgUsd: number; rawStockId: number | null }> {
+  const [container] = await tx
+    .select()
+    .from(factoryContainers)
+    .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
+  if (!container) throw new Error(`Container ${containerId} not found`);
+
+  const actualKg = parseFloat(container.actualReceivedKg || "0");
+  if (actualKg <= 0) throw new Error("Container has no received weight");
+
+  const containerCcy = container.currencyCode || "USD";
+  const fxRate = parseFloat(container.fxRateToUsd || "1");
+
+  // Base material cost
+  const baseRate = parseFloat(container.ratePerKg || "0");
+  const basePayable = actualKg * baseRate;
+
+  // Freight — may be in a different currency; normalise to container currency
+  const freightVal = parseFloat(container.freight || "0");
+  const freightCcy = (container as any).freightCurrencyCode || containerCcy;
+  const freightFx = parseFloat((container as any).fxRateToUsdOffload || (container as any).freightFxRate || String(fxRate));
+  const freightUsd = freightCcy === "USD" ? freightVal : freightVal * freightFx;
+  const freightInCcy = freightCcy === containerCcy ? freightVal : (fxRate > 0 ? freightUsd / fxRate : freightVal);
+
+  // Other charges (bulk field)
+  const ocVal = parseFloat(container.otherCharges || "0");
+  const ocCcy = (container as any).otherChargesCurrencyCode || containerCcy;
+  const ocFx = parseFloat((container as any).otherChargesFxRate || String(fxRate));
+  const ocUsd = ocCcy === "USD" ? ocVal : ocVal * ocFx;
+  const ocInCcy = ocCcy === containerCcy ? ocVal : (fxRate > 0 ? ocUsd / fxRate : ocVal);
+
+  // Commission
+  const [commission] = await tx
+    .select()
+    .from(factoryContainerCommissions)
+    .where(eq(factoryContainerCommissions.containerId, containerId));
+  const commVal = commission ? parseFloat(commission.commissionTotal || "0") : parseFloat(container.commissionAmount || "0");
+  const commCcy = commission ? (commission.currencyCode || "USD") : containerCcy;
+  const commFx = commission ? parseFloat(commission.fxRateToUsd || "1") : fxRate;
+  const commUsdAmt = commCcy === "USD" ? commVal : commVal * commFx;
+  const commInCcy = commCcy === containerCcy ? commVal : (fxRate > 0 ? commUsdAmt / fxRate : commVal);
+
+  // Duty (only included when CONFIRMED)
+  const dutyVal = container.dutyStatus === "CONFIRMED" ? parseFloat(container.dutyAmount || "0") : 0;
+
+  // Additional offload charges
+  const additionalCharges = await tx
+    .select()
+    .from(factoryOffloadAdditionalCharges)
+    .where(and(eq(factoryOffloadAdditionalCharges.containerId, containerId), eq(factoryOffloadAdditionalCharges.companyId, companyId)));
+  const additionalTotal = additionalCharges.reduce((sum: number, c: any) => {
+    const amt = parseFloat(c.amount || "0");
+    const ccy = c.currencyCode || containerCcy;
+    const cfx = parseFloat(c.fxRateToUsd || String(fxRate));
+    const amtUsd = ccy === "USD" ? amt : amt * cfx;
+    return sum + (ccy === containerCcy ? amt : (fxRate > 0 ? amtUsd / fxRate : amtUsd));
+  }, 0);
+
+  const totalCost = basePayable + freightInCcy + ocInCcy + commInCcy + dutyVal + additionalTotal;
+  const inclusiveCostPerKg = totalCost / actualKg;
+  const costPerKgUsd = containerCcy === "USD" ? inclusiveCostPerKg : inclusiveCostPerKg * fxRate;
+  const finalPayableAmountUsd = actualKg * costPerKgUsd;
+
+  // 1. Update container summary fields
+  await tx
+    .update(factoryContainers)
+    .set({
+      finalPayableAmount: String(totalCost.toFixed(4)),
+      ratePerKgUsd: String(costPerKgUsd.toFixed(6)),
+      finalPayableAmountUsd: String(finalPayableAmountUsd.toFixed(4)),
+      updatedAt: new Date(),
+    })
+    .where(eq(factoryContainers.id, containerId));
+
+  // 2. Update rawStock
+  const [rawStockRow] = await tx
+    .select()
+    .from(factoryRawStock)
+    .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId)));
+
+  let rawStockId: number | null = null;
+  if (rawStockRow) {
+    rawStockId = rawStockRow.id;
+    await tx
+      .update(factoryRawStock)
+      .set({ costPerKg: String(inclusiveCostPerKg), costPerKgUsd: String(costPerKgUsd) })
+      .where(eq(factoryRawStock.id, rawStockRow.id));
+  }
+
+  // 3. Update mix batch sources from this container
+  const mixSources = await tx
+    .select()
+    .from(factoryMixBatchSources)
+    .where(eq(factoryMixBatchSources.containerId, containerId));
+
+  if (mixSources.length > 0) {
+    for (const src of mixSources) {
+      const newSrcCost = parseFloat(src.weightKg) * inclusiveCostPerKg;
+      await tx
+        .update(factoryMixBatchSources)
+        .set({ costPerKg: String(inclusiveCostPerKg), totalCost: String(newSrcCost.toFixed(2)) })
+        .where(eq(factoryMixBatchSources.id, src.id));
+    }
+
+    // 4. Recalculate weighted-average costPerKg on affected mix batches
+    const affectedBatchIds = [...new Set(mixSources.map((s: any) => s.mixBatchId as number))];
+    for (const batchId of affectedBatchIds) {
+      const allSrc = await tx.select().from(factoryMixBatchSources).where(eq(factoryMixBatchSources.mixBatchId, batchId));
+      const batchTotalCost = allSrc.reduce((s: number, r: any) => s + parseFloat(r.totalCost || "0"), 0);
+      const batchTotalWeight = allSrc.reduce((s: number, r: any) => s + parseFloat(r.weightKg || "0"), 0);
+      const batchCostPerKg = batchTotalWeight > 0 ? batchTotalCost / batchTotalWeight : 0;
+      await tx
+        .update(factoryMixBatches)
+        .set({ costPerKg: String(batchCostPerKg.toFixed(4)), totalCost: String(batchTotalCost.toFixed(2)), updatedAt: new Date() })
+        .where(eq(factoryMixBatches.id, batchId));
+    }
+  }
+
+  return { totalCost, inclusiveCostPerKg, costPerKgUsd, rawStockId };
 }
 
 /**

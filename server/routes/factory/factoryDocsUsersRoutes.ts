@@ -6,7 +6,7 @@ import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
 import {
   writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword,
+  isLegacySHA256Hash, verifySupervisorPassword, recalculateContainerCosts,
 } from "./_helpers";
 import {
   factorySuppliers, factoryCategories, factoryBaleProducts,
@@ -719,6 +719,216 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         .orderBy(desc(factoryDaybookEntryEdits.editedAt));
       res.json(edits);
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PATCH /api/factory/daybook/:entryId/cost-edit — Edit a container cost entry and cascade changes
+  // Supports: OFFLOAD_RAW_STOCK, FREIGHT, COMMISSION, DUTY, OTHER_CHARGE
+  // Restricted to admin/owner/developer. Triggers full container cost recalculation.
+  app.patch("/api/factory/daybook/:entryId/cost-edit", requireAuth, async (req: any, res: any) => {
+    try {
+      const session = req.session as any;
+      const companyId = session.factoryCompanyId || session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const userId = session.userId || null;
+
+      const currentRole = (session.currentRole || session.role || "").toLowerCase();
+      if (!["admin", "owner", "developer"].includes(currentRole)) {
+        return res.status(403).json({ message: "Only Admin/Owner/Developer can edit container cost entries" });
+      }
+
+      const entryId = Number(req.params.entryId);
+      if (isNaN(entryId) || entryId <= 0) return res.status(400).json({ message: "Invalid entry ID" });
+
+      const { newAmount, reason, newCurrencyCode, newFxRate } = req.body;
+      if (!reason || typeof reason !== "string" || reason.trim().length === 0) {
+        return res.status(400).json({ message: "Edit reason is required" });
+      }
+      const parsedAmount = parseFloat(newAmount);
+      if (isNaN(parsedAmount) || parsedAmount < 0) {
+        return res.status(400).json({ message: "newAmount must be a non-negative number" });
+      }
+
+      const COST_TX_TYPES = ["OFFLOAD_RAW_STOCK", "FREIGHT", "COMMISSION", "DUTY", "OTHER_CHARGE"];
+
+      const [entry] = await db.select().from(factoryDaybookEntries)
+        .where(and(eq(factoryDaybookEntries.id, entryId), eq(factoryDaybookEntries.companyId, companyId)));
+      if (!entry) return res.status(404).json({ message: "Daybook entry not found" });
+      if (!COST_TX_TYPES.includes(entry.txType)) {
+        return res.status(400).json({ message: `txType '${entry.txType}' is not a cost entry — use the standard edit endpoint` });
+      }
+
+      // Parse metaJson to determine exact source
+      let meta: any = {};
+      try { meta = JSON.parse(entry.metaJson || "{}"); } catch {}
+
+      // Resolve containerId from metaJson or txType + referenceId fallback
+      let containerId: number | null = meta.containerId ?? null;
+      if (!containerId) {
+        if (entry.txType === "FREIGHT" || entry.txType === "DUTY" || entry.txType === "OTHER_CHARGE") {
+          containerId = entry.referenceId;
+        } else if (entry.txType === "OFFLOAD_RAW_STOCK") {
+          // referenceId = rawStock.id; look up containerId from rawStock
+          const [rs] = await db.select({ containerId: factoryRawStock.containerId })
+            .from(factoryRawStock).where(eq(factoryRawStock.id, entry.referenceId!));
+          containerId = rs?.containerId ?? null;
+        } else if (entry.txType === "COMMISSION") {
+          // referenceId = commissionRecord.id; look up containerId from commission
+          const [comm] = await db.select({ containerId: factoryContainerCommissions.containerId })
+            .from(factoryContainerCommissions).where(eq(factoryContainerCommissions.id, entry.referenceId!));
+          containerId = comm?.containerId ?? null;
+        }
+      }
+      if (!containerId) return res.status(400).json({ message: "Cannot resolve container from this daybook entry" });
+
+      const [container] = await db.select().from(factoryContainers)
+        .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
+      if (!container) return res.status(404).json({ message: "Container not found" });
+
+      const beforeJson = JSON.stringify(entry);
+      const sourceType: string = meta.sourceType || entry.txType;
+
+      await db.transaction(async (tx: any) => {
+        // ── 1. Update the specific source record ────────────────────────────────
+        if (sourceType === "BASE_MATERIAL" || entry.txType === "OFFLOAD_RAW_STOCK") {
+          // Editing base material cost: derive new ratePerKg from amount / actualKg
+          const actualKg = parseFloat(container.actualReceivedKg || "0");
+          if (actualKg <= 0) throw new Error("Container has no received weight");
+          const newRate = parsedAmount / actualKg;
+          const ccy = newCurrencyCode || container.currencyCode || "USD";
+          await tx.update(factoryContainers)
+            .set({ ratePerKg: String(newRate.toFixed(6)), currencyCode: ccy, updatedAt: new Date() })
+            .where(eq(factoryContainers.id, containerId!));
+
+        } else if (sourceType === "FREIGHT" || entry.txType === "FREIGHT") {
+          const ccy = newCurrencyCode || (container as any).freightCurrencyCode || container.currencyCode || "USD";
+          const fx = newFxRate ? String(newFxRate) : (container as any).fxRateToUsdOffload || container.fxRateToUsd || "1";
+          await tx.update(factoryContainers)
+            .set({ freight: String(parsedAmount), updatedAt: new Date() })
+            .where(eq(factoryContainers.id, containerId!));
+          // Also update the daybook entry currency if it changed
+          if (newCurrencyCode) {
+            await tx.update(factoryDaybookEntries)
+              .set({ currencyCode: ccy, fxRateToUsd: fx })
+              .where(eq(factoryDaybookEntries.id, entryId));
+          }
+
+        } else if (sourceType === "COMMISSION" || entry.txType === "COMMISSION") {
+          const commId = meta.commissionId || entry.referenceId;
+          if (commId) {
+            await tx.update(factoryContainerCommissions)
+              .set({ commissionTotal: String(parsedAmount) })
+              .where(eq(factoryContainerCommissions.id, commId));
+          }
+          // Also sync the commissionAmount summary on the container
+          await tx.update(factoryContainers)
+            .set({ commissionAmount: String(parsedAmount), updatedAt: new Date() })
+            .where(eq(factoryContainers.id, containerId!));
+
+        } else if (sourceType === "DUTY" || entry.txType === "DUTY") {
+          if (container.dutyStatus !== "CONFIRMED") {
+            throw new Error("Duty can only be edited when its status is CONFIRMED. Use the confirm-duty flow for PENDING duty.");
+          }
+          const oldDuty = container.dutyAmount;
+          await tx.update(factoryContainers)
+            .set({ dutyAmount: String(parsedAmount), updatedAt: new Date() })
+            .where(eq(factoryContainers.id, containerId!));
+          // Write duty audit log
+          await tx.insert(factoryDutyAuditLog).values({
+            companyId,
+            containerId,
+            oldDutyAmount: oldDuty || "0",
+            newDutyAmount: String(parsedAmount),
+            oldDutyStatus: "CONFIRMED",
+            newDutyStatus: "CONFIRMED",
+            notes: `Edited via daybook cost-edit. Reason: ${reason.trim()}`,
+            updatedByUserId: String(userId || "system"),
+          });
+
+        } else if (sourceType === "CONTAINER_OC") {
+          await tx.update(factoryContainers)
+            .set({ otherCharges: String(parsedAmount), updatedAt: new Date() })
+            .where(eq(factoryContainers.id, containerId!));
+
+        } else if (sourceType === "OFFLOAD_ADDITIONAL" || sourceType === "POST_OFFLOAD_ADDITIONAL") {
+          const chargeId = meta.chargeId;
+          if (!chargeId) throw new Error("Missing chargeId in metaJson — cannot update individual additional charge");
+          await tx.update(factoryOffloadAdditionalCharges)
+            .set({ amount: String(parsedAmount) })
+            .where(and(eq(factoryOffloadAdditionalCharges.id, chargeId), eq(factoryOffloadAdditionalCharges.companyId, companyId)));
+
+        } else {
+          // Legacy fallback for entries with no metaJson — infer from txType
+          if (entry.txType === "OTHER_CHARGE") {
+            await tx.update(factoryContainers)
+              .set({ otherCharges: String(parsedAmount), updatedAt: new Date() })
+              .where(eq(factoryContainers.id, containerId!));
+          }
+        }
+
+        // ── 2. Cascade recalculation ─────────────────────────────────────────────
+        const { totalCost, inclusiveCostPerKg } = await recalculateContainerCosts(tx, companyId, containerId!);
+
+        // ── 3. Update THIS daybook entry amount ──────────────────────────────────
+        const fx = parseFloat(newFxRate || entry.fxRateToUsd || "1");
+        const entryCcy = newCurrencyCode || entry.currencyCode || "USD";
+        const amtUsd = entryCcy === "USD" ? parsedAmount : parsedAmount * fx;
+        const updatedMetaJson = JSON.stringify({ ...meta, containerId, sourceType });
+        await tx.update(factoryDaybookEntries)
+          .set({ amountCurrency: String(parsedAmount), amountUsd: String(amtUsd), metaJson: updatedMetaJson })
+          .where(eq(factoryDaybookEntries.id, entryId));
+
+        // ── 4. Sync OFFLOAD_RAW_STOCK daybook entry (total inclusive cost) ────────
+        // This entry always shows the total cost of the container
+        if (entry.txType !== "OFFLOAD_RAW_STOCK") {
+          const [rawStockRow] = await tx.select({ id: factoryRawStock.id })
+            .from(factoryRawStock)
+            .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId!)));
+          if (rawStockRow) {
+            const containerCcy = container.currencyCode || "USD";
+            const containerFx = parseFloat(container.fxRateToUsd || "1");
+            const totalUsd = containerCcy === "USD" ? totalCost : totalCost * containerFx;
+            await tx.update(factoryDaybookEntries)
+              .set({
+                amountCurrency: String(totalCost.toFixed(4)),
+                amountUsd: String(totalUsd.toFixed(4)),
+                description: `Offloaded container ${container.containerNumber}: ${container.actualReceivedKg} kg at ${inclusiveCostPerKg.toFixed(4)}/kg (inclusive) [edited]`,
+              })
+              .where(and(
+                eq(factoryDaybookEntries.companyId, companyId),
+                eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
+                eq(factoryDaybookEntries.referenceId, rawStockRow.id)
+              ));
+          }
+        }
+
+        // ── 5. Audit record ───────────────────────────────────────────────────────
+        await tx.insert(factoryDaybookEntryEdits).values({
+          daybookEntryId: entryId,
+          editedBy: userId,
+          beforeJson,
+          afterJson: JSON.stringify({ ...entry, amountCurrency: String(parsedAmount) }),
+          reason: reason.trim(),
+        });
+      });
+
+      // Return updated entry
+      const [updated] = await db.select().from(factoryDaybookEntries).where(eq(factoryDaybookEntries.id, entryId));
+      const [updatedContainer] = await db.select({
+        id: factoryContainers.id,
+        containerNumber: factoryContainers.containerNumber,
+        finalPayableAmount: factoryContainers.finalPayableAmount,
+        ratePerKgUsd: factoryContainers.ratePerKgUsd,
+      }).from(factoryContainers).where(eq(factoryContainers.id, containerId));
+
+      res.json({
+        entry: updated,
+        container: updatedContainer,
+        message: `Cost updated. New inclusive cost: ${updatedContainer?.ratePerKgUsd ?? "?"}/kg`,
+      });
+    } catch (error: any) {
+      console.error("Error in daybook cost-edit:", error);
       res.status(500).json({ message: error.message });
     }
   });

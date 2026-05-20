@@ -1451,6 +1451,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
           currencyCode,
           amountCurrency: totalCost,
           fxRateToUsd: fxRate,
+          metaJson: JSON.stringify({ containerId, sourceType: "BASE_MATERIAL" }),
         });
         if (commissionRecord) {
           await writeDaybookEntry(tx, {
@@ -1462,6 +1463,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
             currencyCode: commissionRecord.currencyCode || "USD",
             amountCurrency: parseFloat(commissionRecord.commissionTotal),
             fxRateToUsd: parseFloat(commissionRecord.fxRateToUsd || "1"),
+            metaJson: JSON.stringify({ containerId, sourceType: "COMMISSION", commissionId: commissionRecord.id }),
           });
         }
         if (freightVal > 0) {
@@ -1474,6 +1476,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
             currencyCode: freightCcy,
             amountCurrency: freightVal,
             fxRateToUsd: freightCcy === "USD" ? 1 : freightFxRateVal,
+            metaJson: JSON.stringify({ containerId, sourceType: "FREIGHT" }),
           });
         }
         if (otherChargesVal > 0) {
@@ -1486,6 +1489,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
             currencyCode: ocCcy,
             amountCurrency: otherChargesVal,
             fxRateToUsd: ocCcy === "USD" ? 1 : ocFxRateVal,
+            metaJson: JSON.stringify({ containerId, sourceType: "CONTAINER_OC" }),
           });
         }
         if (dutyVal > 0) {
@@ -1498,20 +1502,22 @@ export function registerFactoryRawStockRoutes(app: Express) {
             currencyCode,
             amountCurrency: dutyVal,
             fxRateToUsd: fxRate,
+            metaJson: JSON.stringify({ containerId, sourceType: "DUTY" }),
           });
         }
-        for (const charge of additionalChargesArr) {
-          const chargeAmount = parseFloat(charge.amount || "0");
-          if (charge.description && chargeAmount > 0) {
+        for (const insertedCharge of insertedAdditionalCharges) {
+          const chargeAmount = parseFloat(insertedCharge.amount || "0");
+          if (chargeAmount > 0) {
             await writeDaybookEntry(tx, {
               companyId,
               txDate: offloadDate,
               txType: "OTHER_CHARGE",
               referenceId: containerId,
-              description: `${charge.description} on container ${container.containerNumber}`,
-              currencyCode: charge.currencyCode || currencyCode,
+              description: `${insertedCharge.description} on container ${container.containerNumber}`,
+              currencyCode: insertedCharge.currencyCode || currencyCode,
               amountCurrency: chargeAmount,
-              fxRateToUsd: parseFloat(charge.fxRateToUsd || String(fxRate)),
+              fxRateToUsd: parseFloat(insertedCharge.fxRateToUsd || String(fxRate)),
+              metaJson: JSON.stringify({ containerId, sourceType: "OFFLOAD_ADDITIONAL", chargeId: insertedCharge.id }),
             });
           }
         }
@@ -2253,6 +2259,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
             currencyCode: chargeCcy,
             amountCurrency: chargeAmt,
             fxRateToUsd: chargeCcy === "USD" ? 1 : chargeFx,
+            metaJson: JSON.stringify({ containerId, sourceType: "POST_OFFLOAD_ADDITIONAL", chargeId: charge.id }),
           });
           if (charge.ledgerAccountId || charge.supplierId) {
             const voucherNum = `FACTORY-POC-${containerId}-${charge.id}-${Date.now()}`;
