@@ -4,6 +4,27 @@ import { requireAuth } from "../../auth";
 
 export function registerFactoryDailyScanRoutes(app: Express) {
 
+  // All bales produced on a given date (for verification UI)
+  app.get("/api/factory/daily-bale-scans/produced", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const date = req.query.date as string;
+      if (!date) return res.status(400).json({ message: "date query param required (YYYY-MM-DD)" });
+      const result = await pool.query(
+        `SELECT id, reference_number, article_code, product_name, weight_kg::text, status
+         FROM factory_bales
+         WHERE company_id = $1 AND stock_entry_date = $2 AND deleted_at IS NULL
+         ORDER BY id ASC`,
+        [companyId, date],
+      );
+      return res.json(result.rows);
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
+  // Summary of scan dates (for calendar view etc.)
   app.get("/api/factory/daily-bale-scans/dates", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -22,6 +43,7 @@ export function registerFactoryDailyScanRoutes(app: Express) {
     }
   });
 
+  // Get scans for a date
   app.get("/api/factory/daily-bale-scans", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -42,6 +64,7 @@ export function registerFactoryDailyScanRoutes(app: Express) {
     }
   });
 
+  // Record a scan — only allowed if bale was produced on that day
   app.post("/api/factory/daily-bale-scans", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -52,6 +75,18 @@ export function registerFactoryDailyScanRoutes(app: Express) {
         return res.status(400).json({ message: "scanDate and referenceNumber are required" });
       }
       const ref = String(referenceNumber).trim().toUpperCase();
+
+      // Validate that this bale was produced on the given date
+      const baleCheck = await pool.query(
+        `SELECT id FROM factory_bales
+         WHERE company_id = $1 AND stock_entry_date = $2 AND reference_number = $3 AND deleted_at IS NULL`,
+        [companyId, scanDate, ref],
+      );
+      if (!baleCheck.rowCount || baleCheck.rowCount === 0) {
+        return res.status(422).json({ message: `Bale ${ref} was not produced on ${scanDate}` });
+      }
+
+      // Check for duplicate scan
       const existing = await pool.query(
         `SELECT id FROM factory_daily_bale_scans WHERE company_id = $1 AND scan_date = $2 AND reference_number = $3`,
         [companyId, scanDate, ref],
@@ -59,6 +94,7 @@ export function registerFactoryDailyScanRoutes(app: Express) {
       if (existing.rowCount && existing.rowCount > 0) {
         return res.status(409).json({ message: "This bale has already been scanned for this day" });
       }
+
       const result = await pool.query(
         `INSERT INTO factory_daily_bale_scans
            (company_id, scan_date, reference_number, article_code, product_name, weight_kg, scanned_by_user_id)
@@ -73,6 +109,7 @@ export function registerFactoryDailyScanRoutes(app: Express) {
     }
   });
 
+  // Remove a scan (un-verify a bale)
   app.delete("/api/factory/daily-bale-scans/:id", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;

@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  ChevronLeft, ChevronRight, ScanLine, X, Download, Loader2, CalendarDays,
+  ChevronLeft, ChevronRight, ScanLine, X, Download, Loader2,
+  CalendarDays, ChevronDown, ChevronUp, CheckCircle2, AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,15 @@ function formatDisplay(dateStr: string): string {
   return `${day}/${m}/${y}`;
 }
 
+interface DayBale {
+  id: number;
+  reference_number: string;
+  article_code: string | null;
+  product_name: string | null;
+  weight_kg: string | null;
+  status: string;
+}
+
 interface DailyScanRow {
   id: number;
   scan_date: string;
@@ -43,6 +53,7 @@ export default function DailyScan() {
   const [selectedDate, setSelectedDate] = useState(today);
   const [scanInput, setScanInput] = useState("");
   const [scanning, setScanning] = useState(false);
+  const [showScanned, setShowScanned] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -51,7 +62,15 @@ export default function DailyScan() {
     return () => clearTimeout(t);
   }, [selectedDate]);
 
-  const { data: scans = [], isLoading } = useQuery<DailyScanRow[]>({
+  const { data: dayBales = [], isLoading: loadingBales } = useQuery<DayBale[]>({
+    queryKey: ["/api/factory/daily-bale-scans/produced", selectedDate],
+    queryFn: () =>
+      fetch(`/api/factory/daily-bale-scans/produced?date=${selectedDate}`, { credentials: "include" })
+        .then((r) => r.json()),
+    refetchInterval: 4000,
+  });
+
+  const { data: scans = [], isLoading: loadingScans } = useQuery<DailyScanRow[]>({
     queryKey: ["/api/factory/daily-bale-scans", selectedDate],
     queryFn: () =>
       fetch(`/api/factory/daily-bale-scans?date=${selectedDate}`, { credentials: "include" })
@@ -59,37 +78,60 @@ export default function DailyScan() {
     refetchInterval: 4000,
   });
 
-  const totalBales = scans.length;
-  const totalKg = scans.reduce((s, b) => s + parseFloat(b.weight_kg || "0"), 0);
+  const isLoading = loadingBales || loadingScans;
   const isToday = selectedDate === today;
+
+  // Build lookup structures
+  const scannedRefMap = new Map<string, DailyScanRow>(
+    scans.map((s) => [s.reference_number, s]),
+  );
+  const unscanned = dayBales.filter((b) => !scannedRefMap.has(b.reference_number));
+  const scanned = dayBales.filter((b) => scannedRefMap.has(b.reference_number));
+
+  const totalBales = dayBales.length;
+  const totalKg = dayBales.reduce((s, b) => s + parseFloat(b.weight_kg || "0"), 0);
+  const scannedKg = scanned.reduce((s, b) => s + parseFloat(b.weight_kg || "0"), 0);
+  const allDone = totalBales > 0 && unscanned.length === 0;
 
   const handleScan = async () => {
     const ref = scanInput.trim().toUpperCase();
     if (!ref) return;
+
+    // Client-side validation: must be from this day's production
+    const bale = dayBales.find((b) => b.reference_number === ref);
+    if (!bale) {
+      toast({
+        title: "Not produced on this day",
+        description: `Bale ${ref} was not produced on ${formatDisplay(selectedDate)}.`,
+        variant: "destructive",
+      });
+      setScanInput("");
+      setTimeout(() => scanRef.current?.focus(), 50);
+      return;
+    }
+
+    // Already scanned?
+    if (scannedRefMap.has(ref)) {
+      toast({
+        title: "Already scanned",
+        description: `Bale ${ref} has already been verified today.`,
+        variant: "destructive",
+      });
+      setScanInput("");
+      setTimeout(() => scanRef.current?.focus(), 50);
+      return;
+    }
+
     setScanning(true);
     setScanInput("");
 
     try {
-      let articleCode: string | null = null;
-      let productName: string | null = null;
-      let weightKg: number | null = null;
-
-      const lookupRes = await fetch(`/api/lookup/reference/${encodeURIComponent(ref)}`, {
-        credentials: "include",
-      });
-      if (lookupRes.ok) {
-        const d = await lookupRes.json();
-        articleCode = d.articleCode ?? d.article_code ?? null;
-        productName = d.productName ?? d.product_name ?? null;
-        weightKg   = d.weightKg   ?? d.weight_kg   ?? null;
-      }
-
       const saveRes = await apiRequest("POST", "/api/factory/daily-bale-scans", {
         scanDate: selectedDate,
         referenceNumber: ref,
-        articleCode,
-        productName,
-        weightKg,
+        articleCode: bale.article_code,
+        productName: bale.product_name,
+        weightKg: bale.weight_kg ? parseFloat(bale.weight_kg) : null,
       });
 
       if (!saveRes.ok) {
@@ -123,8 +165,8 @@ export default function DailyScan() {
   });
 
   const handleExport = async () => {
-    if (scans.length === 0) {
-      toast({ title: "Nothing to export", description: "No scans for this day." });
+    if (dayBales.length === 0) {
+      toast({ title: "Nothing to export", description: "No bales produced on this day." });
       return;
     }
 
@@ -135,24 +177,25 @@ export default function DailyScan() {
 
     const ws = wb.addWorksheet(formatDisplay(selectedDate));
 
-    const NAVY  = "FF1B2A4A";
-    const WHITE = "FFFFFFFF";
-    const LGRAY = "FFF5F7FA";
+    const NAVY   = "FF1B2A4A";
+    const WHITE  = "FFFFFFFF";
+    const LGRAY  = "FFF5F7FA";
+    const GREEN  = "FFD6F5D6";
     const thinBorder = { style: "thin" as const, color: { argb: "FFD0D7E0" } };
     const allBorders = { top: thinBorder, left: thinBorder, bottom: thinBorder, right: thinBorder };
     const solidFill  = (argb: string) => ({ type: "pattern" as const, pattern: "solid" as const, fgColor: { argb } });
 
     ws.columns = [
-      { key: "num",    width: 6  },
-      { key: "date",   width: 14 },
-      { key: "ref",    width: 18 },
-      { key: "art",    width: 16 },
-      { key: "name",   width: 32 },
-      { key: "wt",     width: 14 },
-      { key: "time",   width: 12 },
+      { key: "num",     width: 6  },
+      { key: "ref",     width: 18 },
+      { key: "art",     width: 16 },
+      { key: "name",    width: 32 },
+      { key: "wt",      width: 14 },
+      { key: "status",  width: 12 },
+      { key: "time",    width: 14 },
     ];
 
-    const headers = ["#", "Date", "Ref Code", "Article Code", "Product Name", "Weight (kg)", "Scanned At"];
+    const headers = ["#", "Ref Code", "Article Code", "Product Name", "Weight (kg)", "Status", "Scanned At"];
     const hRow = ws.addRow(headers);
     hRow.eachCell((cell) => {
       cell.fill = solidFill(NAVY);
@@ -162,32 +205,35 @@ export default function DailyScan() {
     });
     hRow.height = 22;
 
-    scans.forEach((s, i) => {
+    // All bales — scanned first, then unscanned
+    const ordered = [...scanned, ...unscanned];
+    ordered.forEach((b, i) => {
+      const scan = scannedRefMap.get(b.reference_number);
+      const isScanned = !!scan;
       const row = ws.addRow([
         i + 1,
-        formatDisplay(s.scan_date),
-        s.reference_number,
-        s.article_code || "",
-        s.product_name || "",
-        s.weight_kg ? parseFloat(s.weight_kg) : "",
-        new Date(s.scanned_at).toLocaleTimeString("en-GB"),
+        b.reference_number,
+        b.article_code || "",
+        b.product_name || "",
+        b.weight_kg ? parseFloat(b.weight_kg) : "",
+        isScanned ? "Scanned" : "Missing",
+        scan ? new Date(scan.scanned_at).toLocaleTimeString("en-GB") : "",
       ]);
       row.eachCell((cell) => {
         cell.border = allBorders;
-        cell.fill = solidFill(i % 2 === 0 ? WHITE : LGRAY);
+        cell.fill = solidFill(isScanned ? GREEN : (i % 2 === 0 ? WHITE : LGRAY));
         cell.alignment = { vertical: "middle" };
       });
-      row.getCell(1).alignment  = { horizontal: "center", vertical: "middle" };
-      row.getCell(6).alignment  = { horizontal: "right",  vertical: "middle" };
-      row.getCell(7).alignment  = { horizontal: "right",  vertical: "middle" };
+      row.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+      row.getCell(5).alignment = { horizontal: "right",  vertical: "middle" };
     });
 
-    const totalRow = ws.addRow(["", "TOTAL", "", "", "", totalKg, ""]);
+    const totalRow = ws.addRow(["", "TOTAL", "", "", totalKg, `${scanned.length}/${totalBales} scanned`, ""]);
     totalRow.eachCell((cell, col) => {
       cell.border  = allBorders;
       cell.font    = { bold: true };
       cell.fill    = solidFill("FFE8F0F8");
-      if (col === 6) cell.alignment = { horizontal: "right", vertical: "middle" };
+      if (col === 5) cell.alignment = { horizontal: "right", vertical: "middle" };
     });
 
     await XLSX.writeFile(wb, `daily-scan-${selectedDate}.xlsx`);
@@ -239,10 +285,12 @@ export default function DailyScan() {
           </Button>
         )}
 
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-sm text-muted-foreground" data-testid="text-daily-scan-summary">
-            {totalBales} bale{totalBales !== 1 ? "s" : ""} · {formatNumber(totalKg)} kg
-          </span>
+        <div className="ml-auto flex items-center gap-3 flex-wrap">
+          {!isLoading && totalBales > 0 && (
+            <span className="text-sm text-muted-foreground" data-testid="text-daily-scan-summary">
+              {scanned.length}/{totalBales} verified · {formatNumber(scannedKg)}/{formatNumber(totalKg)} kg
+            </span>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -250,7 +298,7 @@ export default function DailyScan() {
             data-testid="button-daily-scan-export"
           >
             <Download className="h-4 w-4 mr-1" />
-            Export Excel
+            Export
           </Button>
         </div>
       </div>
@@ -262,7 +310,7 @@ export default function DailyScan() {
           value={scanInput}
           onChange={(e) => setScanInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleScan()}
-          placeholder="Scan ref code / barcode..."
+          placeholder="Scan bale ref code / barcode…"
           className="font-mono"
           data-testid="input-daily-scan-ref"
           disabled={scanning}
@@ -283,61 +331,139 @@ export default function DailyScan() {
         </Button>
       </div>
 
-      {/* ── Table ── */}
+      {/* ── Body ── */}
       {isLoading ? (
         <div className="py-10 text-center text-sm text-muted-foreground">Loading…</div>
-      ) : scans.length === 0 ? (
+      ) : totalBales === 0 ? (
         <div className="py-14 text-center text-sm text-muted-foreground">
-          No bales scanned for {formatDisplay(selectedDate)}
+          No bales produced on {formatDisplay(selectedDate)}
         </div>
       ) : (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10">#</TableHead>
-                <TableHead>Ref Code</TableHead>
-                <TableHead>Article Code</TableHead>
-                <TableHead>Product Name</TableHead>
-                <TableHead className="text-right">Weight (kg)</TableHead>
-                <TableHead className="text-right">Scanned At</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {scans.map((s, i) => (
-                <TableRow key={s.id} data-testid={`row-daily-scan-${s.id}`}>
-                  <TableCell className="text-muted-foreground text-sm">{i + 1}</TableCell>
-                  <TableCell className="font-mono font-medium">{s.reference_number}</TableCell>
-                  <TableCell className="text-sm">
-                    {s.article_code ?? <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {s.product_name ?? <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
-                    {s.weight_kg
-                      ? formatNumber(parseFloat(s.weight_kg))
-                      : <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell className="text-right text-sm text-muted-foreground">
-                    {new Date(s.scanned_at).toLocaleTimeString("en-GB")}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeMutation.mutate(s.id)}
-                      disabled={removeMutation.isPending}
-                      data-testid={`button-remove-daily-scan-${s.id}`}
-                    >
-                      <X className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div className="space-y-4">
+
+          {/* ── All-done banner ── */}
+          {allDone && (
+            <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/40 px-4 py-3 text-sm text-green-800 dark:text-green-300">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              All {totalBales} bales verified for {formatDisplay(selectedDate)}
+            </div>
+          )}
+
+          {/* ── Unscanned section (top) ── */}
+          {unscanned.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
+                <span className="text-sm font-medium">
+                  Unverified — {unscanned.length} bale{unscanned.length !== 1 ? "s" : ""} remaining
+                </span>
+              </div>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10">#</TableHead>
+                      <TableHead>Ref Code</TableHead>
+                      <TableHead>Article Code</TableHead>
+                      <TableHead>Product Name</TableHead>
+                      <TableHead className="text-right">Weight (kg)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {unscanned.map((b, i) => (
+                      <TableRow key={b.id} data-testid={`row-unscanned-bale-${b.id}`}>
+                        <TableCell className="text-muted-foreground text-sm">{i + 1}</TableCell>
+                        <TableCell className="font-mono font-medium">{b.reference_number}</TableCell>
+                        <TableCell className="text-sm">
+                          {b.article_code ?? <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {b.product_name ?? <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          {b.weight_kg
+                            ? formatNumber(parseFloat(b.weight_kg))
+                            : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+
+          {/* ── Scanned section (bottom, collapsible) ── */}
+          {scanned.length > 0 && (
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => setShowScanned((v) => !v)}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                data-testid="button-toggle-scanned-section"
+              >
+                {showScanned ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                Scanned — {scanned.length} bale{scanned.length !== 1 ? "s" : ""} · {formatNumber(scannedKg)} kg
+              </button>
+
+              {showScanned && (
+                <div className="rounded-md border opacity-80">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10">#</TableHead>
+                        <TableHead>Ref Code</TableHead>
+                        <TableHead>Article Code</TableHead>
+                        <TableHead>Product Name</TableHead>
+                        <TableHead className="text-right">Weight (kg)</TableHead>
+                        <TableHead className="text-right">Scanned At</TableHead>
+                        <TableHead className="w-10" />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {scanned.map((b, i) => {
+                        const scanRow = scannedRefMap.get(b.reference_number)!;
+                        return (
+                          <TableRow key={b.id} data-testid={`row-scanned-bale-${b.id}`}>
+                            <TableCell className="text-muted-foreground text-sm">{i + 1}</TableCell>
+                            <TableCell className="font-mono font-medium text-muted-foreground">{b.reference_number}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {b.article_code ?? "—"}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {b.product_name ?? "—"}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                              {b.weight_kg ? formatNumber(parseFloat(b.weight_kg)) : "—"}
+                            </TableCell>
+                            <TableCell className="text-right text-sm text-muted-foreground">
+                              {new Date(scanRow.scanned_at).toLocaleTimeString("en-GB")}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeMutation.mutate(scanRow.id)}
+                                disabled={removeMutation.isPending}
+                                data-testid={`button-remove-scan-${scanRow.id}`}
+                              >
+                                <X className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
