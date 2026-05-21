@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   Users, Building2, Settings2, Wrench, ShoppingCart, Download,
   MessageCircle, Database, Shield, ChevronRight, Search,
-  TrendingUp, AlertTriangle, Zap, Factory,
+  TrendingUp, AlertTriangle, Zap, Factory, Activity,
 } from "lucide-react";
 
 interface HubCategory {
@@ -131,6 +131,18 @@ const HUB_CATEGORIES: HubCategory[] = [
     keywords: ["system", "tools", "repair", "diagnostics", "maintenance", "developer", "reset", "orphaned", "fix"],
     firstSection: "system",
     badge: "Admin",
+    group: "controls",
+  },
+  {
+    key: "active-users",
+    title: "Active Users (Watch)",
+    description: "Monitor live user sessions and watch any user's screen in real-time",
+    icon: Activity,
+    colorClass: "bg-cyan-500/10",
+    iconColorClass: "text-cyan-500",
+    devOnly: true,
+    keywords: ["active", "users", "watch", "screen", "live", "session", "presence", "monitor", "factory", "erp"],
+    firstSection: "active-users",
     group: "controls",
   },
 ];

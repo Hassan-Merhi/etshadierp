@@ -64,7 +64,7 @@
   import { useAppMode } from "@/contexts/AppModeContext";
   import { getApiRequest } from "@/lib/factoryApi";
   import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, Zap, Eraser, ArrowLeft, Info, Search } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, Zap, Eraser, ArrowLeft, Info, Search, Activity } from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -696,6 +696,7 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
         label: "Users & Access",
         items: [
           { key: "users-permissions", label: "Users & Permissions", icon: Users },
+          { key: "active-users", label: "Active Users (Watch)", icon: Activity, devOnly: true },
           { key: "active-sessions", label: "Active Sessions", icon: Shield },
           { key: "users", label: "Users (legacy)", icon: Users, devOnly: true },
         ],
