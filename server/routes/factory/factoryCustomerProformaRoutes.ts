@@ -1444,9 +1444,12 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
       // Upsert each line into customer_price_lists
       let saved = 0;
+      let backfilled = 0;
       for (const row of linesRes.rows) {
         const price = parseFloat(row.price_per_bale);
         if (isNaN(price) || price <= 0) continue;
+
+        // 1. Save / update the agreed price list entry
         await pool.query(
           `INSERT INTO customer_price_lists (company_id, customer_id, article_code, price_per_bale, updated_at)
            VALUES ($1, $2, $3, $4, now())
@@ -1455,8 +1458,22 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           [companyId, customerId, row.article_code, price],
         );
         saved++;
+
+        // 2. Backfill ALL existing proforma lines for this customer + article_code
+        //    (active and inactive, including the source proforma itself)
+        const backfillRes = await pool.query(
+          `UPDATE customer_proforma_lines cpl
+           SET price_per_bale = $1
+           FROM customer_proformas cp
+           WHERE cpl.proforma_id = cp.id
+             AND cp.company_id   = $2
+             AND cp.customer_id  = $3
+             AND cpl.article_code = $4`,
+          [price, companyId, customerId, row.article_code],
+        );
+        backfilled += backfillRes.rowCount ?? 0;
       }
-      return res.json({ saved });
+      return res.json({ saved, backfilled });
     } catch (e: any) {
       return res.status(500).json({ message: e.message });
     }

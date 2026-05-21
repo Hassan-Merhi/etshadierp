@@ -421,9 +421,13 @@ export default function FactoryProformas() {
       return res.json();
     },
     onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      const backfillNote = result.backfilled > 0
+        ? ` Updated ${result.backfilled} line${result.backfilled !== 1 ? "s" : ""} across all existing proformas.`
+        : "";
       toast({
         title: "Agreed prices saved",
-        description: `${result.saved} price${result.saved !== 1 ? "s" : ""} saved as agreed prices for this customer. Future proformas will auto-fill these.`,
+        description: `${result.saved} price${result.saved !== 1 ? "s" : ""} saved.${backfillNote}`,
       });
     },
     onError: (error: Error) => {
