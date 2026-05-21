@@ -698,8 +698,57 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
         sources = sourcesResult.rows;
       }
 
+      // Apply the same fallback cost enrichment as /api/factory/mix-batches/:id/sources
+      // When costPerKg is 0 in the DB, look up the weighted-average from factoryRawStock.
+      const enrichedSources = await Promise.all(sources.map(async (s: any) => {
+        const storedCost = parseFloat(s.cost_per_kg) || 0;
+        if (storedCost > 0) return s;
+
+        let fallbackCost = 0;
+        if (s.container_id) {
+          const rsRows = await pool.query(
+            `SELECT cost_per_kg_usd, cost_per_kg, received_kg
+             FROM factory_raw_stock
+             WHERE container_id = $1 AND company_id = $2`,
+            [s.container_id, companyId]
+          );
+          let wSum = 0, wWeight = 0;
+          for (const r of rsRows.rows) {
+            const kg = parseFloat(r.received_kg) || 0;
+            const c = parseFloat(r.cost_per_kg_usd) || parseFloat(r.cost_per_kg) || 0;
+            wSum += kg * c;
+            wWeight += kg;
+          }
+          fallbackCost = wWeight > 0 ? wSum / wWeight : 0;
+        } else if (s.supplier_id) {
+          const rsRows = await pool.query(
+            `SELECT rs.cost_per_kg_usd, rs.cost_per_kg, rs.received_kg
+             FROM factory_raw_stock rs
+             INNER JOIN factory_containers c ON c.id = rs.container_id
+             WHERE c.supplier_id = $1 AND rs.company_id = $2`,
+            [s.supplier_id, companyId]
+          );
+          let wSum = 0, wWeight = 0;
+          for (const r of rsRows.rows) {
+            const kg = parseFloat(r.received_kg) || 0;
+            const c = parseFloat(r.cost_per_kg_usd) || parseFloat(r.cost_per_kg) || 0;
+            wSum += kg * c;
+            wWeight += kg;
+          }
+          fallbackCost = wWeight > 0 ? wSum / wWeight : 0;
+        }
+
+        if (fallbackCost <= 0) return s;
+        const weightKg = parseFloat(s.weight_kg) || 0;
+        return {
+          ...s,
+          cost_per_kg: String(fallbackCost),
+          total_cost: String(weightKg * fallbackCost),
+        };
+      }));
+
       const enriched = batches.map((b: any) => {
-        const batchSources = sources.filter((s: any) => s.mix_batch_id === b.id);
+        const batchSources = enrichedSources.filter((s: any) => s.mix_batch_id === b.id);
         const totalWeight = parseFloat(b.total_weight_kg) || 0;
         const totalCost = batchSources.reduce((sum: number, s: any) => sum + (parseFloat(s.total_cost) || 0), 0);
         const costPerKg = totalWeight > 0 ? totalCost / totalWeight : 0;
