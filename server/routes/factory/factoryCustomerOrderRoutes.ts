@@ -672,7 +672,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         // RESERVED_FOR_ORDER status check above cannot catch them) and non-V5 mixed scenarios
         // where a V5 order's IN_STOCK bale could otherwise slip through onto a non-V5 order.
         const crossOrderDupCheck = await tx.execute(
-          sql`SELECT cob.order_id FROM customer_order_bales cob
+          sql`SELECT cob.order_id, co.status, co.invoice_number FROM customer_order_bales cob
               JOIN customer_orders co ON co.id = cob.order_id
               WHERE cob.bale_id = ${bale.id}
                 AND co.status != 'CANCELLED'
@@ -681,7 +681,10 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         );
         const crossOrderDupRow = (crossOrderDupCheck as any).rows?.[0];
         if (crossOrderDupRow) {
-          return { ok: false, httpStatus: 400, body: { message: `Bale ${bale.referenceNumber || scanCode} is already loaded in another active order` } };
+          const orderRef = crossOrderDupRow.invoice_number
+            ? `invoice ${crossOrderDupRow.invoice_number}`
+            : `loading #${crossOrderDupRow.order_id}`;
+          return { ok: false, httpStatus: 400, body: { message: `Bale ${bale.referenceNumber || scanCode} is already in ${orderRef} (${crossOrderDupRow.status}). Remove it from that order first.` } };
         }
 
         let priceUsed = "0";
