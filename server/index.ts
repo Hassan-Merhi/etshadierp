@@ -3333,6 +3333,31 @@ let migrationsDone = false;
       UNIQUE (company_id, customer_id, article_code)
     )`,
     `CREATE INDEX IF NOT EXISTS customer_price_lists_customer_idx ON customer_price_lists (company_id, customer_id)`,
+
+    // ── Fix factory container FK constraints (May 2026) ──────────────────────
+    // All factory_* tables had container_id wrongly pointing at the ERP
+    // "containers" table.  Factory containers are an independent entity stored
+    // in "factory_containers".  Drop each wrong FK and replace it with the
+    // correct one.  All statements are idempotent (DROP IF EXISTS, ADD with a
+    // named constraint that won't duplicate because the old name is gone).
+    `ALTER TABLE factory_container_commissions DROP CONSTRAINT IF EXISTS factory_container_commissions_container_id_fkey`,
+    `ALTER TABLE factory_container_commissions ADD CONSTRAINT factory_container_commissions_container_id_fkey FOREIGN KEY (container_id) REFERENCES factory_containers(id) ON DELETE RESTRICT`,
+    `ALTER TABLE factory_container_other_charges DROP CONSTRAINT IF EXISTS factory_container_other_charges_container_id_fkey`,
+    `ALTER TABLE factory_container_other_charges ADD CONSTRAINT factory_container_other_charges_container_id_fkey FOREIGN KEY (container_id) REFERENCES factory_containers(id) ON DELETE CASCADE`,
+    `ALTER TABLE factory_container_profit_snapshots DROP CONSTRAINT IF EXISTS factory_container_profit_snapshots_container_id_fkey`,
+    `ALTER TABLE factory_container_profit_snapshots ADD CONSTRAINT factory_container_profit_snapshots_container_id_fkey FOREIGN KEY (container_id) REFERENCES factory_containers(id) ON DELETE CASCADE`,
+    `ALTER TABLE factory_duty_audit_log DROP CONSTRAINT IF EXISTS factory_duty_audit_log_container_id_fkey`,
+    `ALTER TABLE factory_duty_audit_log ADD CONSTRAINT factory_duty_audit_log_container_id_fkey FOREIGN KEY (container_id) REFERENCES factory_containers(id) ON DELETE RESTRICT`,
+    `ALTER TABLE factory_fx_allocations DROP CONSTRAINT IF EXISTS factory_fx_allocations_container_id_fkey`,
+    `ALTER TABLE factory_fx_allocations ADD CONSTRAINT factory_fx_allocations_container_id_fkey FOREIGN KEY (container_id) REFERENCES factory_containers(id) ON DELETE RESTRICT`,
+    `ALTER TABLE factory_mix_batch_sources DROP CONSTRAINT IF EXISTS factory_mix_batch_sources_container_id_fkey`,
+    `ALTER TABLE factory_mix_batch_sources ADD CONSTRAINT factory_mix_batch_sources_container_id_fkey FOREIGN KEY (container_id) REFERENCES factory_containers(id) ON DELETE RESTRICT`,
+    `ALTER TABLE factory_offload_additional_charges DROP CONSTRAINT IF EXISTS factory_offload_additional_charges_container_id_fkey`,
+    `ALTER TABLE factory_offload_additional_charges ADD CONSTRAINT factory_offload_additional_charges_container_id_fkey FOREIGN KEY (container_id) REFERENCES factory_containers(id) ON DELETE CASCADE`,
+    `ALTER TABLE factory_raw_stock DROP CONSTRAINT IF EXISTS factory_raw_stock_container_id_fkey`,
+    `ALTER TABLE factory_raw_stock ADD CONSTRAINT factory_raw_stock_container_id_fkey FOREIGN KEY (container_id) REFERENCES factory_containers(id) ON DELETE RESTRICT`,
+    `ALTER TABLE factory_waste_entries DROP CONSTRAINT IF EXISTS factory_waste_entries_container_id_fkey`,
+    `ALTER TABLE factory_waste_entries ADD CONSTRAINT factory_waste_entries_container_id_fkey FOREIGN KEY (container_id) REFERENCES factory_containers(id) ON DELETE RESTRICT`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

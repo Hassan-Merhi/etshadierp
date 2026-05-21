@@ -2779,7 +2779,7 @@ export type FactoryContainer = typeof factoryContainers.$inferSelect;
 export const factoryOffloadAdditionalCharges = pgTable("factory_offload_additional_charges", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  containerId: integer("container_id").notNull().references(() => containers.id, { onDelete: "cascade" }),
+  containerId: integer("container_id").notNull().references(() => factoryContainers.id, { onDelete: "cascade" }),
   description: text("description").notNull(),
   amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
   currencyCode: text("currency_code").default("USD"),
@@ -2797,7 +2797,7 @@ export type FactoryOffloadAdditionalCharge = typeof factoryOffloadAdditionalChar
 export const factoryContainerOtherCharges = pgTable("factory_container_other_charges", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  containerId: integer("container_id").notNull().references(() => containers.id, { onDelete: "cascade" }),
+  containerId: integer("container_id").notNull().references(() => factoryContainers.id, { onDelete: "cascade" }),
   description: text("description").notNull(),
   amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
   currencyCode: text("currency_code").default("USD"),
@@ -2813,7 +2813,7 @@ export type FactoryContainerOtherCharge = typeof factoryContainerOtherCharges.$i
 export const factoryRawStock = pgTable("factory_raw_stock", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  containerId: integer("container_id").notNull().references(() => containers.id, { onDelete: "restrict" }),
+  containerId: integer("container_id").notNull().references(() => factoryContainers.id, { onDelete: "restrict" }),
   receivedKg: decimal("received_kg", { precision: 15, scale: 3 }).notNull(),
   usedKg: decimal("used_kg", { precision: 15, scale: 3 }).notNull().default("0"),
   costPerKg: decimal("cost_per_kg", { precision: 20, scale: 4 }).notNull(),
@@ -2930,7 +2930,7 @@ export const factoryFxAllocations = pgTable("factory_fx_allocations", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
   fxTransferId: integer("fx_transfer_id").notNull(),
-  containerId: integer("container_id").notNull().references(() => containers.id, { onDelete: "restrict" }),
+  containerId: integer("container_id").notNull().references(() => factoryContainers.id, { onDelete: "restrict" }),
   sourceType: varchar("source_type", { length: 20 }).notNull().default("supplier"),
   allocatedAmount: decimal("allocated_amount", { precision: 20, scale: 4 }).notNull(),
   currencyCode: varchar("currency_code", { length: 10 }).notNull(),
@@ -2990,7 +2990,7 @@ export type FactoryMixBatch = typeof factoryMixBatches.$inferSelect;
 export const factoryMixBatchSources = pgTable("factory_mix_batch_sources", {
   id: serial("id").primaryKey(),
   mixBatchId: integer("mix_batch_id").notNull(),
-  containerId: integer("container_id").references(() => containers.id, { onDelete: "restrict" }),
+  containerId: integer("container_id").references(() => factoryContainers.id, { onDelete: "restrict" }),
   supplierId: integer("supplier_id").references(() => factorySuppliers.id, { onDelete: "restrict" }),
   sourceBatchId: integer("source_batch_id"),
   sourceType: text("source_type"),
@@ -3171,7 +3171,7 @@ export type FactoryBaleImportBatch = typeof factoryBaleImportBatches.$inferSelec
 export const factoryContainerCommissions = pgTable("factory_container_commissions", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  containerId: integer("container_id").notNull().references(() => containers.id, { onDelete: "restrict" }),
+  containerId: integer("container_id").notNull().references(() => factoryContainers.id, { onDelete: "restrict" }),
   personName: text("person_name").notNull(),
   commissionType: text("commission_type").notNull().default("PER_KG"),
   commissionRate: decimal("commission_rate", { precision: 20, scale: 4 }).notNull(),
@@ -3191,7 +3191,7 @@ export type FactoryContainerCommission = typeof factoryContainerCommissions.$inf
 export const factoryDutyAuditLog = pgTable("factory_duty_audit_log", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  containerId: integer("container_id").notNull().references(() => containers.id, { onDelete: "restrict" }),
+  containerId: integer("container_id").notNull().references(() => factoryContainers.id, { onDelete: "restrict" }),
   oldDutyAmount: decimal("old_duty_amount", { precision: 20, scale: 2 }),
   newDutyAmount: decimal("new_duty_amount", { precision: 20, scale: 2 }).notNull(),
   oldDutyStatus: text("old_duty_status"),
@@ -3997,7 +3997,7 @@ export const factoryWasteEntries = pgTable("factory_waste_entries", {
   date: date("date").notNull(),
   mixBatchId: integer("mix_batch_id"),
   supplierId: integer("supplier_id").references(() => factorySuppliers.id, { onDelete: "restrict" }),
-  containerId: integer("container_id").references(() => containers.id, { onDelete: "restrict" }),
+  containerId: integer("container_id").references(() => factoryContainers.id, { onDelete: "restrict" }),
   wasteType: varchar("waste_type", { length: 50 }),
   kgWaste: decimal("kg_waste", { precision: 15, scale: 3 }).notNull(),
   reason: text("reason"),
@@ -4129,7 +4129,7 @@ export type FactoryBaleCostSnapshot = typeof factoryBaleCostSnapshots.$inferSele
 export const factoryContainerProfitSnapshots = pgTable("factory_container_profit_snapshots", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  containerId: integer("container_id").notNull().references(() => containers.id, { onDelete: "cascade" }),
+  containerId: integer("container_id").notNull().references(() => factoryContainers.id, { onDelete: "cascade" }),
   totalRevenue: decimal("total_revenue", { precision: 20, scale: 4 }).default("0"),
   totalCost: decimal("total_cost", { precision: 20, scale: 4 }).default("0"),
   profit: decimal("profit", { precision: 20, scale: 4 }).default("0"),
