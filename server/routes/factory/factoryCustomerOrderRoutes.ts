@@ -1610,6 +1610,87 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
     }
   });
 
+  // Retroactively create missing ledger vouchers for charges that were saved without one
+  app.post("/api/factory/customer-orders/:id/charges/relink-vouchers", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const orderId = parseId(req.params.id);
+      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
+
+      const [order] = await db.select().from(customerOrders)
+        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      if (order.status !== "FINALIZED") return res.status(400).json({ message: "Order is not finalized" });
+
+      const [customer] = await db.select({ ledgerAccountId: customers.ledgerAccountId })
+        .from(customers).where(eq(customers.id, order.customerId));
+      if (!customer?.ledgerAccountId) {
+        return res.status(400).json({ message: "Customer does not have a linked ledger account. Set one in the customer record first." });
+      }
+
+      // Find all charges missing a voucher that have a ledger account linked
+      const unlinkedCharges = await db.select().from(customerOrderCharges)
+        .where(and(
+          eq(customerOrderCharges.orderId, orderId),
+          isNull(customerOrderCharges.voucherId),
+        ));
+
+      const chargesWithLedger = unlinkedCharges.filter(c => c.ledgerAccountId && parseFloat(c.amount || "0") > 0);
+      if (chargesWithLedger.length === 0) {
+        return res.json({ linked: 0, message: "All charges already have ledger entries — nothing to relink." });
+      }
+
+      const voucherRef = order.invoiceNumber || `ORD-${orderId}`;
+      let linked = 0;
+
+      for (const charge of chargesWithLedger) {
+        const chargeAmt = parseFloat(charge.amount || "0");
+        const chargeVoucherNumber = `CHARGE-${voucherRef}-${charge.id}-${Date.now()}`;
+        const chargeDesc = order.containerNumber
+          ? `${charge.name} for offloaded container - ${order.containerNumber}`
+          : `${charge.name} - ${voucherRef}`;
+
+        await db.transaction(async (tx: any) => {
+          const [chargeVoucher] = await tx.insert(vouchers).values({
+            companyId,
+            voucherType: "Journal",
+            voucherNumber: chargeVoucherNumber,
+            voucherDate: order.orderDate || getClientDate(req),
+            description: chargeDesc,
+            totalAmount: String(chargeAmt),
+            sourceModule: "FACTORY",
+          }).returning();
+          await tx.insert(voucherEntries).values({
+            voucherId: chargeVoucher.id,
+            ledgerAccountId: customer.ledgerAccountId,
+            customerId: order.customerId,
+            debitAmount: String(chargeAmt),
+            creditAmount: "0",
+            narration: chargeDesc,
+          });
+          await tx.insert(voucherEntries).values({
+            voucherId: chargeVoucher.id,
+            ledgerAccountId: charge.ledgerAccountId,
+            debitAmount: "0",
+            creditAmount: String(chargeAmt),
+            narration: chargeDesc,
+          });
+          await tx.update(customerOrderCharges)
+            .set({ voucherId: chargeVoucher.id })
+            .where(eq(customerOrderCharges.id, charge.id));
+        });
+        linked++;
+      }
+
+      res.json({ linked, message: `${linked} charge${linked !== 1 ? "s" : ""} successfully linked to the ledger.` });
+    } catch (error: any) {
+      console.error("Error relinking charge vouchers:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.patch("/api/factory/customer-orders/:id/charges/:chargeId", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;

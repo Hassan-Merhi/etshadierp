@@ -60,6 +60,8 @@ interface OrderCharge {
   name: string;
   amount: string;
   chargeType: string;
+  voucherId?: number | null;
+  ledgerAccountId?: number | null;
 }
 
 interface OrderDetail {
@@ -227,6 +229,21 @@ export default function FactoryInvoiceCreate() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       toast({ title: "Charge removed" });
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const relinkVouchersMutation = useMutation({
+    mutationFn: async () => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/charges/relink-vouchers`, {});
+      return await res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
+      toast({ title: data.linked > 0 ? "Ledger entries created" : "Nothing to relink", description: data.message });
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
@@ -536,7 +553,20 @@ export default function FactoryInvoiceCreate() {
           </Card>
 
           <Card className="p-4 space-y-3">
-            <h3 className="font-semibold text-sm">Charges</h3>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <h3 className="font-semibold text-sm">Charges</h3>
+              {orderDetail?.status === "FINALIZED" && charges.some(c => !c.voucherId && c.ledgerAccountId) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => relinkVouchersMutation.mutate()}
+                  disabled={relinkVouchersMutation.isPending}
+                  data-testid="button-relink-charge-vouchers"
+                >
+                  {relinkVouchersMutation.isPending ? "Linking..." : "Fix Ledger Entries"}
+                </Button>
+              )}
+            </div>
 
             {charges.length > 0 && (
               <div className="space-y-1">
