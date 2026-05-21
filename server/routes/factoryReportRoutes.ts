@@ -684,7 +684,8 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
       if (batchIds.length > 0) {
         const sourcesResult = await pool.query(`
           SELECT
-            s.id, s.mix_batch_id, s.weight_kg, s.cost_per_kg, s.total_cost,
+            s.id, s.mix_batch_id, s.container_id, s.supplier_id, s.source_batch_id,
+            s.weight_kg, s.cost_per_kg, s.total_cost,
             c.container_number,
             COALESCE(sup_via_c.name, sup_direct.name, mb.batch_code, 'Unknown') AS source_name
           FROM factory_mix_batch_sources s
