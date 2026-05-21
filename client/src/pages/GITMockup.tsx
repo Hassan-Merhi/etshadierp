@@ -1538,7 +1538,7 @@ const WARNING_META: Record<WarningCode, {
 // ─── Agent card sub-component ─────────────────────────────────────────────────
 
 function AgentCard({ agent }: { agent: AgentDutySummary }) {
-  const [showActive, setShowActive]   = useState(false);
+  const [showActive, setShowActive]   = useState(true);
 
   const {
     agentName, matchConfidence, ledgerAccountName,
@@ -1683,7 +1683,7 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
               <table className="w-full text-xs whitespace-nowrap border-collapse">
                 <thead>
                   <tr className="bg-sky-100 dark:bg-sky-950/30 border-b text-sky-800 dark:text-sky-300">
-                    {["CONTAINER #","SUPPLIER","PLATE","BORDER DATE","TRANSPORTER","LOCATION","STATUS","DUTY"].map(h => (
+                    {["CONTAINER #","SUPPLIER","PLATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY"].map(h => (
                       <th key={h} className="py-1 px-2 font-bold text-center">{h}</th>
                     ))}
                   </tr>
@@ -1692,14 +1692,11 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
                   {activePreviewRows.map((r) => (
                     <tr key={r.id} className="border-b bg-sky-50/30 dark:bg-sky-950/10 text-muted-foreground">
                       <td className="py-0.5 px-2 font-mono">{r.containerNumber}</td>
-                      <td className="py-0.5 px-2">{r.supplierCode ?? "—"}</td>
+                      <td className="py-0.5 px-2">{r.supplierCode ?? r.supplierName ?? "—"}</td>
                       <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
                       <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
                       <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>
                       <td className="py-0.5 px-2">{r.location ?? "—"}</td>
-                      <td className="py-0.5 px-2 text-center">
-                        <Badge variant="outline" className="text-[10px] no-default-active-elevate">{r.status}</Badge>
-                      </td>
                       <td className="py-0.5 px-2 text-right">${fmt(r.dutyFee, 0)}</td>
                     </tr>
                   ))}

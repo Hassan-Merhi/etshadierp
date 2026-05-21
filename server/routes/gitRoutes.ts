@@ -421,6 +421,7 @@ async function buildAgentsForCompany(cid: number) {
         location: r.location,
         dutyFee: r.dutyFee,
         supplierName: r.supplierName,
+        supplierCode: r.supplierCode,
         status: r.status,
       }));
 
