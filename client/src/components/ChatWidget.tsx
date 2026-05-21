@@ -1821,7 +1821,7 @@ export function ChatWidget() {
         message: msg,
         sessionId,
         pageContext: { currentRoute: location },
-      });
+      }, false, 120000);
       return response.json() as Promise<ChatResponse>;
     },
     onSuccess: (data) => {

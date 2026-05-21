@@ -4967,7 +4967,11 @@ If the intent does not match any type, output: null`;
         suggestions: [],
       };
     }
-    throw error;
+    // Catch-all: return a friendly inline error so the route always returns 200
+    return {
+      response: `Sorry, something went wrong while processing your request. (${error.message || "Unknown error"})`,
+      suggestions: [],
+    };
   }
 }
 
