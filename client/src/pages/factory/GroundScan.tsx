@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { ScanLine, Trash2, Download, AlertCircle, X, Package, Loader2, MapPin } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { ScanLine, Trash2, Download, AlertCircle, X, Package, Loader2, MapPin, Upload, ServerCrash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -10,9 +10,16 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import * as XLSX from "@/lib/excelHelper";
 import { formatNumber } from "@/lib/formatNumber";
+
 interface StockLocation {
   id: number;
   name: string;
@@ -29,6 +36,30 @@ interface ScannedBale {
   scannedAt: Date;
 }
 
+interface GroundScanItem {
+  id: number;
+  location_id: number | null;
+  reference_number: string;
+  article_code: string | null;
+  product_name: string | null;
+  weight_kg: string | null;
+  status: string | null;
+  is_in_loading_order: boolean;
+  scanned_at: string;
+}
+
+function rowToScannedBale(r: GroundScanItem): ScannedBale {
+  return {
+    refCode:         r.reference_number,
+    articleCode:     r.article_code  || "",
+    productName:     r.product_name  || "Unknown",
+    weightKg:        parseFloat(r.weight_kg || "0"),
+    status:          r.status        || "",
+    isInLoadingOrder: r.is_in_loading_order,
+    scannedAt:       new Date(r.scanned_at),
+  };
+}
+
 function StatusBadge({ status, isInLoadingOrder }: { status: string; isInLoadingOrder?: boolean }) {
   const s = (status || "").toUpperCase();
   if ((s === "IN_STOCK" || s === "LOADING" || s === "LOADED") && isInLoadingOrder)
@@ -41,10 +72,10 @@ function StatusBadge({ status, isInLoadingOrder }: { status: string; isInLoading
   return <Badge variant="outline">{status}</Badge>;
 }
 
-const STORAGE_KEY = "ground_scan_bales";
+const STORAGE_KEY  = "ground_scan_bales";
 const LOCATION_KEY = "ground_scan_locationId";
 
-function loadPersistedBales(): ScannedBale[] {
+function loadLocalBales(): ScannedBale[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
@@ -56,70 +87,85 @@ function loadPersistedBales(): ScannedBale[] {
 }
 
 export default function GroundScan() {
-  const [scanInput, setScanInput] = useState("");
-  const [scanning, setScanning] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [scanError, setScanError] = useState("");
-  const [scannedBales, setScannedBales] = useState<ScannedBale[]>(loadPersistedBales);
+  const [scanInput, setScanInput]   = useState("");
+  const [scanning, setScanning]     = useState(false);
+  const [exporting, setExporting]   = useState(false);
+  const [scanError, setScanError]   = useState("");
+  const [uploading, setUploading]   = useState(false);
+
   const [selectedLocationId, setSelectedLocationId] = useState<string>(
     () => localStorage.getItem(LOCATION_KEY) ?? "all",
   );
+
+  const [localBales, setLocalBales] = useState<ScannedBale[]>(() => loadLocalBales());
+
   const scanRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  // Use the factory-specific endpoint so we only see locations that actually
-  // have IN_STOCK bales — avoids confusion with ERP-only locations.
+  const hasMigrationData = localBales.length > 0;
+
   const { data: stockLocations } = useQuery<StockLocation[]>({
     queryKey: ["/api/factory/stock-entry/in-stock-locations"],
     staleTime: 60000,
   });
 
-  useEffect(() => {
-    const timeout = setTimeout(() => scanRef.current?.focus(), 100);
-    return () => clearTimeout(timeout);
-  }, []);
+  const { data: serverItems = [], isLoading } = useQuery<GroundScanItem[]>({
+    queryKey: ["/api/factory/ground-scan-items", selectedLocationId],
+    queryFn: () =>
+      fetch(`/api/factory/ground-scan-items?locationId=${selectedLocationId}`, { credentials: "include" })
+        .then((r) => r.json()),
+    refetchInterval: 4000,
+  });
+
+  const scannedBales: ScannedBale[] = serverItems.map(rowToScannedBale);
+  const totalWeight = scannedBales.reduce((s, b) => s + b.weightKg, 0);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(scannedBales));
-    } catch {
-      // storage quota exceeded — silently ignore
-    }
-  }, [scannedBales]);
+    const t = setTimeout(() => scanRef.current?.focus(), 100);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(LOCATION_KEY, selectedLocationId);
   }, [selectedLocationId]);
 
-  // Auto-select whenever the loaded locations resolve — not just when "all" is
-  // the stored value.  If there is exactly one location with IN_STOCK bales we
-  // always lock to it so the export is properly scoped.
   useEffect(() => {
     if (!stockLocations) return;
     if (stockLocations.length === 1) {
-      // Single location: always force-select it regardless of what localStorage had.
       setSelectedLocationId(String(stockLocations[0].id));
     } else if (stockLocations.length > 1 && selectedLocationId !== "all") {
-      // Multiple locations: validate that the stored id is still valid.
       const valid = stockLocations.some((l) => String(l.id) === selectedLocationId);
       if (!valid) setSelectedLocationId("all");
     }
   }, [stockLocations]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const totalWeight = scannedBales.reduce((sum, b) => sum + b.weightKg, 0);
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["/api/factory/ground-scan-items", selectedLocationId] });
+
+  const removeMutation = useMutation({
+    mutationFn: (id: number) =>
+      apiRequest("DELETE", `/api/factory/ground-scan-items/${id}`).then((r) => {
+        if (!r.ok) throw new Error("Remove failed");
+      }),
+    onSuccess: invalidate,
+  });
+
+  const clearMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("DELETE", `/api/factory/ground-scan-items?locationId=${selectedLocationId}`).then((r) => {
+        if (!r.ok) throw new Error("Clear failed");
+      }),
+    onSuccess: () => { invalidate(); setScanError(""); setScanInput(""); setTimeout(() => scanRef.current?.focus(), 50); },
+  });
 
   async function handleScan() {
     const value = scanInput.trim().toUpperCase();
     if (!value) return;
 
-    const duplicate = scannedBales.find((b) => b.refCode === value);
+    const duplicate = serverItems.find((b) => b.reference_number === value);
     if (duplicate) {
       setScanError(`Already scanned: ${value}`);
-      toast({
-        title: "Duplicate scan",
-        description: `${value} is already in the list.`,
-        variant: "destructive",
-      });
+      toast({ title: "Duplicate scan", description: `${value} is already in the list.`, variant: "destructive" });
       setScanInput("");
       return;
     }
@@ -128,18 +174,12 @@ export default function GroundScan() {
     setScanning(true);
 
     try {
-      const res = await fetch(`/api/lookup/reference/${encodeURIComponent(value)}`, {
-        credentials: "include",
-      });
+      const res = await fetch(`/api/lookup/reference/${encodeURIComponent(value)}`, { credentials: "include" });
 
       if (!res.ok) {
         if (res.status === 404) {
           setScanError(`Not found: ${value}`);
-          toast({
-            title: "Bale not found",
-            description: `No bale with ref code "${value}" found.`,
-            variant: "destructive",
-          });
+          toast({ title: "Bale not found", description: `No bale with ref code "${value}" found.`, variant: "destructive" });
         } else {
           setScanError("Lookup failed — try again");
         }
@@ -148,43 +188,42 @@ export default function GroundScan() {
       }
 
       const data = await res.json();
-      const baleInfo = data.baleInfo;
-      const product = data.product;
+      const baleInfo   = data.baleInfo;
+      const product    = data.product;
       const labelPrint = data.labelPrint;
 
-      const articleCode =
-        product?.articleCode ||
-        labelPrint?.articleCode ||
-        baleInfo?.articleCode ||
-        "";
-
-      const productName =
-        baleInfo?.productName ||
-        product?.name ||
-        "Unknown";
-
-      const weightKg = parseFloat(baleInfo?.weightKg || labelPrint?.approxWeightKg || "0");
-      const status = baleInfo?.status || "";
+      const articleCode    = product?.articleCode || labelPrint?.articleCode || baleInfo?.articleCode || "";
+      const productName    = baleInfo?.productName || product?.name || "Unknown";
+      const weightKg       = parseFloat(baleInfo?.weightKg || labelPrint?.approxWeightKg || "0");
+      const status         = baleInfo?.status || "";
       const isInLoadingOrder = baleInfo?.isInLoadingOrder === true;
 
-      const entry: ScannedBale = {
-        refCode: value,
+      const saveRes = await apiRequest("POST", "/api/factory/ground-scan-items", {
+        locationId: selectedLocationId,
+        referenceNumber: value,
         articleCode,
         productName,
         weightKg,
         status,
         isInLoadingOrder,
-        scannedAt: new Date(),
-      };
+      });
 
-      setScannedBales((prev) => [entry, ...prev]);
+      if (!saveRes.ok) {
+        const err = await saveRes.json();
+        if (saveRes.status === 409) {
+          setScanError(`Already scanned: ${value}`);
+          toast({ title: "Duplicate scan", description: `${value} is already in the list.`, variant: "destructive" });
+        } else {
+          toast({ title: "Save failed", description: err.message, variant: "destructive" });
+        }
+        setScanInput("");
+        return;
+      }
+
       setScanInput("");
       setScanError("");
-
-      toast({
-        title: "Bale scanned",
-        description: `${productName} — ${status}`,
-      });
+      toast({ title: "Bale scanned", description: `${productName} — ${status}` });
+      invalidate();
     } catch {
       setScanError("Network error — try again");
     } finally {
@@ -193,38 +232,49 @@ export default function GroundScan() {
     }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") handleScan();
+  async function handleMigrateUpload() {
+    if (localBales.length === 0) return;
+    setUploading(true);
+    try {
+      const res = await apiRequest("POST", "/api/factory/ground-scan-items/bulk", {
+        locationId: selectedLocationId,
+        items: localBales,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const { inserted, skipped } = await res.json();
+      localStorage.removeItem(STORAGE_KEY);
+      setLocalBales([]);
+      invalidate();
+      toast({
+        title: "Upload complete",
+        description: `${inserted} bales uploaded${skipped > 0 ? `, ${skipped} skipped (duplicates)` : ""}.`,
+      });
+    } catch (e: any) {
+      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
   }
 
-  function removeBale(refCode: string) {
-    setScannedBales((prev) => prev.filter((b) => b.refCode !== refCode));
-  }
-
-  function clearAll() {
-    setScannedBales([]);
-    setScanError("");
-    setScanInput("");
-    setTimeout(() => scanRef.current?.focus(), 50);
+  function handleMigrateDiscard() {
+    localStorage.removeItem(STORAGE_KEY);
+    setLocalBales([]);
+    toast({ title: "Local scans discarded", description: "Your locally stored scans have been cleared." });
   }
 
   async function exportExcel() {
     if (scannedBales.length === 0) return;
     setExporting(true);
     try {
-      // ── 1. Fetch system IN_STOCK bales (scoped to selected location) ──────
       const locParam = selectedLocationId && selectedLocationId !== "all" ? `?locationId=${selectedLocationId}` : "";
       const res = await fetch(`/api/factory/stock-entry/in-stock${locParam}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch system stock");
       const allFetched: { referenceNumber: string; articleCode: string; productName?: string; weightKg: string; isInLoadingOrder?: boolean }[] = await res.json();
-      // Exclude bales currently assigned to a LOADING container order — this matches
-      // the Location Inventory "available" count (baleCount − loadingCount).
       const systemBales = allFetched.filter((b) => !b.isInLoadingOrder);
 
       const scannedRefs = new Set(scannedBales.map((b) => b.refCode.toUpperCase()));
       const systemRefs  = new Set(systemBales.map((b) => (b.referenceNumber || "").toUpperCase()));
 
-      // ── 2. Per-article aggregation ────────────────────────────────────────
       type ArticleRow = { articleCode: string; productName: string; systemQty: number; systemWt: number; scannedQty: number; scannedWt: number };
       const articleMap = new Map<string, ArticleRow>();
       const ensure = (key: string, name: string) => {
@@ -243,28 +293,26 @@ export default function GroundScan() {
       const dateStr = new Date().toISOString().slice(0, 10);
       const timeStr = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 
-      // ── ExcelJS helpers ───────────────────────────────────────────────────
       const { ExcelJS } = XLSX;
       const wb = new ExcelJS.Workbook();
       wb.creator = "HMD ERP";
       wb.created = new Date();
 
-      // Color palette
-      const NAVY   = "FF1B2A4A";
-      const BLUE   = "FF2D5A8E";
-      const GREEN  = "FF1A7A3C";
-      const LGREEN = "FFD4EDDA";
-      const RED    = "FFC0392B";
-      const LRED   = "FFFCE8E8";
-      const AMBER  = "FFB7860B";
-      const LAMBER = "FFFEF3CD";
-      const GRAY   = "FF6C757D";
-      const LGRAY  = "FFF5F7FA";
-      const WHITE  = "FFFFFFFF";
-      const BLACK  = "FF1A1A1A";
+      const NAVY    = "FF1B2A4A";
+      const BLUE    = "FF2D5A8E";
+      const GREEN   = "FF1A7A3C";
+      const LGREEN  = "FFD4EDDA";
+      const RED     = "FFC0392B";
+      const LRED    = "FFFCE8E8";
+      const AMBER   = "FFB7860B";
+      const LAMBER  = "FFFEF3CD";
+      const GRAY    = "FF6C757D";
+      const LGRAY   = "FFF5F7FA";
+      const WHITE   = "FFFFFFFF";
+      const BLACK   = "FF1A1A1A";
       const TOTALBG = "FFE8F0F8";
 
-      const solidFill = (argb: string) => ({ type: "pattern" as const, pattern: "solid" as const, fgColor: { argb } });
+      const solidFill  = (argb: string) => ({ type: "pattern" as const, pattern: "solid" as const, fgColor: { argb } });
       const thinBorder = { style: "thin" as const, color: { argb: "FFD0D7E0" } };
       const allBorders = { top: thinBorder, left: thinBorder, bottom: thinBorder, right: thinBorder };
 
@@ -291,9 +339,7 @@ export default function GroundScan() {
         row.eachCell({ includeEmpty: true }, (cell: any) => { cell.border = { ...allBorders, top: { style: "medium" as const, color: { argb: NAVY } }, bottom: { style: "medium" as const, color: { argb: NAVY } } }; });
       };
 
-      // ══════════════════════════════════════════════════════════════════════
-      // SHEET 1 — Summary
-      // ══════════════════════════════════════════════════════════════════════
+      // ══ Sheet 1 — Summary ══════════════════════════════════════════════════
       const ws1 = wb.addWorksheet("Summary");
       ws1.columns = [
         { key: "a", width: 18 }, { key: "b", width: 34 }, { key: "c", width: 14 },
@@ -305,32 +351,28 @@ export default function GroundScan() {
         ? (stockLocations?.find((l) => String(l.id) === selectedLocationId)?.name ?? `Location ${selectedLocationId}`)
         : "All Locations";
 
-      // Title row
       ws1.addRow([`Ground Stock Verification Report — ${locationLabel}`]);
       const titleRow = ws1.lastRow!;
       titleRow.height = 30;
       titleRow.getCell(1).font = { bold: true, size: 16, name: "Calibri", color: { argb: NAVY } };
       titleRow.getCell(1).alignment = { vertical: "middle" };
-      ws1.mergeCells(`A1:H1`);
+      ws1.mergeCells("A1:H1");
 
-      // Subtitle
       ws1.addRow([`Date: ${dateStr}   Time: ${timeStr}   |   Location: ${locationLabel}`]);
       const subRow = ws1.lastRow!;
       subRow.height = 16;
       subRow.getCell(1).font = { size: 10, name: "Calibri", color: { argb: GRAY } };
       subRow.getCell(1).alignment = { vertical: "middle" };
-      ws1.mergeCells(`A2:H2`);
+      ws1.mergeCells("A2:H2");
 
-      ws1.addRow([]); // spacer
+      ws1.addRow([]);
 
-      // Stats bar — 4 stat boxes side by side
       const stats = [
         { label: "System (IN STOCK)", value: systemBales.length, color: BLUE },
         { label: "Scanned on Ground", value: scannedBales.length, color: GREEN },
         { label: "Missing Bales", value: missingBales.length, color: missingBales.length > 0 ? RED : GRAY },
         { label: "Extra Bales", value: extraBales.length, color: extraBales.length > 0 ? AMBER : GRAY },
       ];
-      // Row A: labels
       const statLabelRow = ws1.addRow(stats.map((s) => s.label));
       statLabelRow.height = 18;
       stats.forEach((s, i) => {
@@ -339,11 +381,9 @@ export default function GroundScan() {
         cell.fill = solidFill(s.color);
         cell.alignment = { horizontal: "center", vertical: "middle" };
         cell.border = allBorders;
-        // Merge 2 cols per stat
         if (i < 3) ws1.mergeCells(statLabelRow.number, i * 2 + 1, statLabelRow.number, i * 2 + 2);
         else ws1.mergeCells(statLabelRow.number, 7, statLabelRow.number, 8);
       });
-      // Row B: values
       const statValueRow = ws1.addRow(stats.map((s) => s.value));
       statValueRow.height = 26;
       stats.forEach((s, i) => {
@@ -356,16 +396,12 @@ export default function GroundScan() {
         else ws1.mergeCells(statValueRow.number, 7, statValueRow.number, 8);
       });
 
-      ws1.addRow([]); // spacer
+      ws1.addRow([]);
 
-      // Article breakdown header
       const artHdrRow = ws1.addRow(["Article Code", "Product Name", "System Qty", "System Wt (kg)", "Scanned Qty", "Scanned Wt (kg)", "Missing Qty", "Missing Wt (kg)"]);
       styleHeader(artHdrRow, NAVY);
-      artHdrRow.eachCell((cell, col) => {
-        if (col >= 3) cell.alignment = { horizontal: "center", vertical: "middle" };
-      });
+      artHdrRow.eachCell((cell, col) => { if (col >= 3) cell.alignment = { horizontal: "center", vertical: "middle" }; });
 
-      // Article data rows
       summaryArticles.forEach((r, idx) => {
         const missingQty = Math.max(0, r.systemQty - r.scannedQty);
         const missingWt  = missingBales.filter((b) => (b.articleCode || "UNKNOWN") === r.articleCode).reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0);
@@ -377,7 +413,6 @@ export default function GroundScan() {
           missingQty, +missingWt.toFixed(3),
         ]);
         styleDataRow(dataRow, idx % 2 === 0, hasMissing ? { argb: LRED } : undefined);
-        // Right-align numbers, format weight
         [3, 4, 5, 6, 7, 8].forEach((col) => {
           const cell = dataRow.getCell(col);
           cell.alignment = { horizontal: "right", vertical: "middle" };
@@ -389,7 +424,6 @@ export default function GroundScan() {
         }
       });
 
-      // Totals row
       const totalsRow = ws1.addRow([
         "TOTAL", "",
         systemBales.length, +totalSystemWt.toFixed(3),
@@ -406,19 +440,14 @@ export default function GroundScan() {
         totalsRow.getCell(7).font = { bold: true, color: { argb: RED }, size: 10, name: "Calibri" };
         totalsRow.getCell(8).font = { bold: true, color: { argb: RED }, size: 10, name: "Calibri" };
       }
-
       ws1.views = [{ state: "frozen", xSplit: 0, ySplit: 7 }];
 
-      // ══════════════════════════════════════════════════════════════════════
-      // SHEET 2 — Missing Bales
-      // ══════════════════════════════════════════════════════════════════════
+      // ══ Sheet 2 — Missing Bales ════════════════════════════════════════════
       const ws2 = wb.addWorksheet("Missing Bales");
       ws2.columns = [
         { key: "a", width: 20 }, { key: "b", width: 18 },
         { key: "c", width: 36 }, { key: "d", width: 15 },
       ];
-
-      // Title
       ws2.addRow(["Missing Bales"]);
       const m_titleRow = ws2.lastRow!;
       m_titleRow.height = 28;
@@ -431,7 +460,6 @@ export default function GroundScan() {
       m_sub.height = 16;
       m_sub.getCell(1).font = { size: 9, name: "Calibri", color: { argb: GRAY } };
       ws2.mergeCells("A2:D2");
-
       ws2.addRow([]);
 
       const m_hdrRow = ws2.addRow(["Reference Number", "Article Code", "Product Name", "Weight (kg)"]);
@@ -459,19 +487,15 @@ export default function GroundScan() {
       m_totRow.getCell(4).alignment = { horizontal: "right", vertical: "middle" };
       m_totRow.getCell(4).numFmt = "#,##0.000";
       ws2.mergeCells(`A${m_totRow.number}:C${m_totRow.number}`);
-
       ws2.views = [{ state: "frozen", xSplit: 0, ySplit: 4 }];
 
-      // ══════════════════════════════════════════════════════════════════════
-      // SHEET 3 — Extra Bales (only if any)
-      // ══════════════════════════════════════════════════════════════════════
+      // ══ Sheet 3 — Extra Bales (if any) ════════════════════════════════════
       if (extraBales.length > 0) {
         const ws3 = wb.addWorksheet("Extra Bales");
         ws3.columns = [
           { key: "a", width: 20 }, { key: "b", width: 18 },
           { key: "c", width: 36 }, { key: "d", width: 15 }, { key: "e", width: 18 },
         ];
-
         ws3.addRow(["Extra Bales"]);
         const e_titleRow = ws3.lastRow!;
         e_titleRow.height = 28;
@@ -483,7 +507,6 @@ export default function GroundScan() {
         e_sub.height = 16;
         e_sub.getCell(1).font = { size: 9, name: "Calibri", color: { argb: GRAY } };
         ws3.mergeCells("A2:E2");
-
         ws3.addRow([]);
 
         const e_hdrRow = ws3.addRow(["Ref Code", "Article Code", "Product Name", "Weight (kg)", "Status"]);
@@ -497,7 +520,6 @@ export default function GroundScan() {
           dr.getCell(4).alignment = { horizontal: "right", vertical: "middle" };
           dr.getCell(4).numFmt = "#,##0.000";
         });
-
         ws3.views = [{ state: "frozen", xSplit: 0, ySplit: 4 }];
       }
 
@@ -511,7 +533,42 @@ export default function GroundScan() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      {/* Location selector */}
+
+      {/* ── Migration banner ── */}
+      {hasMigrationData && (
+        <div className="flex items-start gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+          <ServerCrash className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+              You have {localBales.length} locally stored scan{localBales.length !== 1 ? "s" : ""} from a previous session
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Upload them so the whole team can see them, or discard them.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              size="sm"
+              onClick={handleMigrateUpload}
+              disabled={uploading}
+              data-testid="button-ground-scan-upload-local"
+            >
+              {uploading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
+              {uploading ? "Uploading…" : "Upload Now"}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleMigrateDiscard}
+              data-testid="button-ground-scan-discard-local"
+            >
+              Discard
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Location selector ── */}
       <div className="flex items-center gap-2 text-sm flex-wrap">
         <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
         <span className="text-muted-foreground shrink-0">Scanning location:</span>
@@ -540,6 +597,7 @@ export default function GroundScan() {
         })()}
       </div>
 
+      {/* ── Scan bar ── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="flex-1 flex flex-col gap-2">
           <div className="relative">
@@ -548,7 +606,7 @@ export default function GroundScan() {
               ref={scanRef}
               value={scanInput}
               onChange={(e) => { setScanInput(e.target.value); setScanError(""); }}
-              onKeyDown={handleKeyDown}
+              onKeyDown={(e) => e.key === "Enter" && handleScan()}
               placeholder="Scan ref code / barcode..."
               className="pl-9"
               disabled={scanning}
@@ -578,26 +636,37 @@ export default function GroundScan() {
             disabled={scannedBales.length === 0 || exporting}
             data-testid="button-ground-scan-export"
           >
-            {exporting ? (
-              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-            ) : (
-              <Download className="h-4 w-4 mr-1.5" />
-            )}
+            {exporting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />}
             {exporting ? "Exporting..." : "Export Verification"}
           </Button>
           {scannedBales.length > 0 && (
-            <Button
-              variant="ghost"
-              onClick={clearAll}
-              data-testid="button-ground-scan-clear"
-            >
-              <Trash2 className="h-4 w-4 mr-1.5" />
-              Clear
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" data-testid="button-ground-scan-clear">
+                  <Trash2 className="h-4 w-4 mr-1.5" />
+                  Clear
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear all scans?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will remove all {scannedBales.length} scanned bales from the shared list for everyone. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => clearMutation.mutate()}>
+                    Clear All
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
       </div>
 
+      {/* ── Stats ── */}
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <span data-testid="text-ground-scan-count">
@@ -607,9 +676,11 @@ export default function GroundScan() {
           <span data-testid="text-ground-scan-weight">
             <span className="font-semibold text-foreground">{formatNumber(totalWeight, 2)} kg</span> total weight
           </span>
+          {isLoading && <span className="text-xs text-muted-foreground">Syncing…</span>}
         </div>
       </div>
 
+      {/* ── Table ── */}
       {scannedBales.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
           <Package className="h-10 w-10 opacity-30" />
@@ -658,7 +729,11 @@ export default function GroundScan() {
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={() => removeBale(bale.refCode)}
+                      onClick={() => {
+                        const item = serverItems.find((i) => i.reference_number === bale.refCode);
+                        if (item) removeMutation.mutate(item.id);
+                      }}
+                      disabled={removeMutation.isPending}
                       data-testid={`button-ground-scan-remove-${bale.refCode}`}
                     >
                       <X className="h-4 w-4" />

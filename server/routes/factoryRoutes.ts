@@ -14,6 +14,7 @@ import { registerFactoryStockAllocationV2Routes } from "./factory/factoryStockAl
 import { registerFactoryStockAllocationV5Routes } from "./factory/factoryStockAllocationV5Routes";
 import { registerFactoryShippingContainerRoutes } from "./factory/factoryShippingContainerRoutes";
 import { registerFactoryDailyScanRoutes } from "./factory/factoryDailyScanRoutes";
+import { registerFactoryGroundScanRoutes } from "./factory/factoryGroundScanRoutes";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
@@ -77,6 +78,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     // Daily bale scan removals are open to all authenticated factory users
     if (req.method === "DELETE" && /^\/daily-bale-scans\/\d+$/.test(req.path)) return next();
 
+    // Ground scan item removals/clears are open to all authenticated factory users
+    if (req.method === "DELETE" && /^\/ground-scan-items(\/\d+)?$/.test(req.path)) return next();
+
     // Worker assignment / reassignment is open to all authenticated factory users
     if (req.method === "PATCH" && /^\/bales\/\d+\/assign-worker$/.test(req.path)) return next();
     if (req.method === "PATCH" && req.path === "/bales/bulk-assign-worker") return next();
@@ -109,4 +113,5 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   registerFactoryStockAllocationV5Routes(app);
   registerFactoryShippingContainerRoutes(app);
   registerFactoryDailyScanRoutes(app);
+  registerFactoryGroundScanRoutes(app);
 }

@@ -3290,6 +3290,23 @@ let migrationsDone = false;
     `ALTER TABLE property_payments ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'USD'`,
     `ALTER TABLE property_payments ADD COLUMN IF NOT EXISTS exchange_rate NUMERIC(20,6) NOT NULL DEFAULT 1`,
 
+    // ── Ground Scan — shared server-side session (May 2026) ──────────────────
+    `CREATE TABLE IF NOT EXISTS factory_ground_scan_items (
+      id                  serial PRIMARY KEY,
+      company_id          text NOT NULL,
+      location_id         integer,
+      reference_number    text NOT NULL,
+      article_code        text,
+      product_name        text,
+      weight_kg           numeric(12,3),
+      status              text,
+      is_in_loading_order boolean NOT NULL DEFAULT false,
+      scanned_at          timestamptz NOT NULL DEFAULT now(),
+      scanned_by_user_id  text,
+      UNIQUE (company_id, location_id, reference_number)
+    )`,
+    `CREATE INDEX IF NOT EXISTS factory_ground_scan_items_company_loc_idx ON factory_ground_scan_items (company_id, location_id)`,
+
     // ── Daily Bale Scan — production day verification log (May 2026) ──────────
     `CREATE TABLE IF NOT EXISTS factory_daily_bale_scans (
       id                  serial PRIMARY KEY,
