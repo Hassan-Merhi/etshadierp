@@ -13,7 +13,7 @@ import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Star, Pencil, FileText, LayoutGrid, Download, RefreshCw, Search, BookOpen, PenLine, Truck, ArrowRightLeft, Upload, AlertCircle, Layers } from "lucide-react";
+import { Plus, Trash2, Star, Pencil, FileText, LayoutGrid, Download, RefreshCw, Search, BookOpen, PenLine, Truck, ArrowRightLeft, Upload, AlertCircle, Layers, BookmarkCheck } from "lucide-react";
 import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -410,6 +410,28 @@ export default function FactoryProformas() {
     }
   };
 
+  const saveAgreedPricesMutation = useMutation({
+    mutationFn: async (proformaId: number) => {
+      if (!customerId) throw new Error("No customer selected");
+      const res = await modeApiRequest(
+        "POST",
+        `/api/factory/customer-price-lists/${customerId}/from-proforma/${proformaId}`,
+        {},
+      );
+      return res.json();
+    },
+    onSuccess: (result) => {
+      toast({
+        title: "Agreed prices saved",
+        description: `${result.saved} price${result.saved !== 1 ? "s" : ""} saved as agreed prices for this customer. Future proformas will auto-fill these.`,
+      });
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const applyCatalogPricesMutation = useMutation({
     mutationFn: async (proformaId: number) => {
       const res = await modeApiRequest("POST", `/api/factory/customer-proformas/${proformaId}/apply-catalog-prices`, {});
@@ -659,6 +681,17 @@ export default function FactoryProformas() {
                           >
                             <Layers className="mr-1 h-3 w-3" />
                             Stock Allocation
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => saveAgreedPricesMutation.mutate(proforma.id)}
+                            disabled={saveAgreedPricesMutation.isPending}
+                            data-testid={`button-save-agreed-prices-${proforma.id}`}
+                            title="Save these prices as the customer's agreed prices — future proformas will auto-fill them"
+                          >
+                            <BookmarkCheck className="mr-1 h-3 w-3" />
+                            Save as Agreed Prices
                           </Button>
                           <Button
                             size="sm"

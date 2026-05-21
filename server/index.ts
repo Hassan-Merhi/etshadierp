@@ -3322,6 +3322,16 @@ let migrationsDone = false;
       UNIQUE (company_id, scan_date, reference_number)
     )`,
     `CREATE INDEX IF NOT EXISTS factory_daily_bale_scans_company_date_idx ON factory_daily_bale_scans (company_id, scan_date)`,
+    `CREATE TABLE IF NOT EXISTS customer_price_lists (
+      id          serial PRIMARY KEY,
+      company_id  integer NOT NULL,
+      customer_id integer NOT NULL,
+      article_code text NOT NULL,
+      price_per_bale numeric(20,4) NOT NULL,
+      updated_at  timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (company_id, customer_id, article_code)
+    )`,
+    `CREATE INDEX IF NOT EXISTS customer_price_lists_customer_idx ON customer_price_lists (company_id, customer_id)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

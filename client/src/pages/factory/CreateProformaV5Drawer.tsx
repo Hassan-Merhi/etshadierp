@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Save, Loader2, CheckCircle, CheckCircle2, Plus, Trash2, Container, SlidersHorizontal } from "lucide-react";
+import { AlertTriangle, Save, Loader2, CheckCircle, CheckCircle2, Plus, Trash2, Container, SlidersHorizontal, BookmarkCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -130,6 +130,34 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
     },
     enabled: open,
   });
+
+  // Customer agreed price list — fetched whenever a customer is selected
+  const customerPriceListQuery = useQuery<{ article_code: string; price_per_bale: string }[]>({
+    queryKey: ["/api/factory/customer-price-lists", customerId],
+    queryFn: async () => {
+      if (!customerId) return [];
+      const res = await fetch(`/api/factory/customer-price-lists/${customerId}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: open && !!customerId,
+    staleTime: 30_000,
+  });
+
+  // Auto-fill customer agreed prices whenever customer changes (without overwriting already-entered prices)
+  useEffect(() => {
+    if (!customerPriceListQuery.data || customerPriceListQuery.data.length === 0) return;
+    const priceMap = new Map(customerPriceListQuery.data.map(r => [r.article_code, r.price_per_bale]));
+    setSellingPrices(prev => {
+      const next = { ...prev };
+      for (const row of articleRows) {
+        const agreed = priceMap.get(row.articleCode);
+        if (agreed && parseFloat(agreed) > 0) next[row.articleCode] = agreed;
+      }
+      return next;
+    });
+    setAppliedPrice("customer" as any);
+  }, [customerPriceListQuery.data, articleRows]);
 
   const productMap = useCallback((): Map<string, BaleProduct> => {
     const m = new Map<string, BaleProduct>();
@@ -508,6 +536,38 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
                 {appliedPrice === "prod" && <CheckCircle2 className="h-3.5 w-3.5 mr-1.5 text-primary" />}
                 Prod Price
               </Button>
+              {customerId && (
+                <Button
+                  size="sm"
+                  variant={(appliedPrice as string) === "customer" ? "secondary" : "outline"}
+                  onClick={() => {
+                    if (!customerPriceListQuery.data?.length) {
+                      return;
+                    }
+                    const priceMap = new Map(customerPriceListQuery.data.map(r => [r.article_code, r.price_per_bale]));
+                    setSellingPrices(prev => {
+                      const next = { ...prev };
+                      for (const row of articleRows) {
+                        const agreed = priceMap.get(row.articleCode);
+                        if (agreed && parseFloat(agreed) > 0) next[row.articleCode] = agreed;
+                      }
+                      return next;
+                    });
+                    setAppliedPrice("customer" as any);
+                  }}
+                  disabled={!customerPriceListQuery.data?.length}
+                  data-testid="button-v5-apply-customer-price"
+                  title={customerPriceListQuery.data?.length ? `Apply ${customerPriceListQuery.data.length} agreed price(s) for this customer` : "No agreed prices saved for this customer yet"}
+                  className={cn((appliedPrice as string) === "customer" && "ring-2 ring-primary/40")}
+                >
+                  {(appliedPrice as string) === "customer" && <CheckCircle2 className="h-3.5 w-3.5 mr-1.5 text-primary" />}
+                  <BookmarkCheck className="h-3.5 w-3.5 mr-1.5" />
+                  Agreed Prices
+                  {customerPriceListQuery.data && customerPriceListQuery.data.length > 0 && (
+                    <span className="ml-1 text-[10px] opacity-70">({customerPriceListQuery.data.length})</span>
+                  )}
+                </Button>
+              )}
 
               {draftStatus === "saved" && (
                 <span className="flex items-center gap-1 text-xs text-muted-foreground ml-1">
