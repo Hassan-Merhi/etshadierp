@@ -1562,7 +1562,8 @@ export default function FactoryContainers() {
                 <div>
                   <Label>Total Kg</Label>
                   <Input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     value={formData.totalKg}
                     onChange={(e) => setFormData({ ...formData, totalKg: e.target.value })}
                     placeholder="0.000"
@@ -1572,7 +1573,8 @@ export default function FactoryContainers() {
                 <div>
                   <Label>Rate per Kg</Label>
                   <Input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     value={formData.ratePerKg}
                     onChange={(e) => setFormData({ ...formData, ratePerKg: e.target.value })}
                     placeholder="0.00"
