@@ -12,3 +12,9 @@ id = "4INHHAaWJ9U-gyK0e2BNI"
 uri = "file://FACTORY_NAV_PERMISSION_AUDIT.md"
 type = "text"
 title = "Factory Nav & Permission Audit"
+
+[[outputs]]
+id = "_LL2_d-_A-vETH19SXfKB"
+uri = "file://README.md"
+type = "text"
+title = "README.md"
