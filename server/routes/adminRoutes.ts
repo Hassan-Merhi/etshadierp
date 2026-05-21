@@ -45,6 +45,8 @@ import {
   employeeGroupMembers, employeeBaleRates, employeeBalePctRates,
   erpWorkerDocs, erpPayrollRunItems,
   chatMessages,
+  propertyPayments,
+  factoryTransporterTransactions,
   
   systemSettings,
 } from "@shared/schema";
@@ -984,11 +986,58 @@ export function registerAdminRoutes(app: Express) {
           await db.delete(bankAccounts)
             .where(and(eq(bankAccounts.id, itemId), eq(bankAccounts.companyId, companyId)));
           break;
-        case "voucher":
+        case "voucher": {
+          // ── Step 1: Null out nullable FKs in tables with onDelete: "restrict" ──
+          await db.update(purchaseOrders)
+            .set({ voucherId: null })
+            .where(eq(purchaseOrders.voucherId, itemId));
+          await db.update(containerSales)
+            .set({ voucherId: null })
+            .where(eq(containerSales.voucherId, itemId));
+          await db.update(interCompanyTransfers)
+            .set({ fromVoucherId: null })
+            .where(eq(interCompanyTransfers.fromVoucherId, itemId));
+          await db.update(interCompanyTransfers)
+            .set({ toVoucherId: null })
+            .where(eq(interCompanyTransfers.toVoucherId, itemId));
+          await db.update(salaryAdvances)
+            .set({ voucherId: null })
+            .where(eq(salaryAdvances.voucherId, itemId));
+          await db.update(customerOrderCharges)
+            .set({ voucherId: null })
+            .where(eq(customerOrderCharges.voucherId, itemId));
+          await db.update(wasteDispatches)
+            .set({ voucherId: null })
+            .where(eq(wasteDispatches.voucherId, itemId));
+          await db.update(propertyPayments)
+            .set({ voucherId: null })
+            .where(eq(propertyPayments.voucherId, itemId));
+          await db.update(factoryTransporterTransactions)
+            .set({ voucherId: null })
+            .where(eq(factoryTransporterTransactions.voucherId, itemId));
+
+          // ── Step 2: Delete rows with notNull FKs ──────────────────────────
+          // stock_transfer_vouchers.voucherId is notNull — delete its items first
+          const stvRows = await db.select({ id: stockTransferVouchers.id })
+            .from(stockTransferVouchers)
+            .where(eq(stockTransferVouchers.voucherId, itemId));
+          if (stvRows.length > 0) {
+            const stvIds = stvRows.map(r => r.id);
+            await db.delete(stockTransferItems).where(inArray(stockTransferItems.stockTransferVoucherId, stvIds));
+            await db.delete(stockTransferVouchers).where(inArray(stockTransferVouchers.id, stvIds));
+          }
+          // fiscal_period_closures.closingVoucherId is notNull — delete the closure row
+          await db.delete(fiscalPeriodClosures)
+            .where(eq(fiscalPeriodClosures.closingVoucherId, itemId));
+
+          // ── Step 3: Delete voucher entries (also cascade, but be explicit) ─
           await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, itemId));
+
+          // ── Step 4: Delete the voucher itself ────────────────────────────
           await db.delete(vouchers)
             .where(and(eq(vouchers.id, itemId), eq(vouchers.companyId, companyId)));
           break;
+        }
         case "orphanedPosSale":
           // Permanently delete an orphaned voucher and its entries
           await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, itemId));
