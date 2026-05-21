@@ -424,6 +424,43 @@ export async function markContainersWaSent(): Promise<void> {
   );
 }
 
+// ─── Agent Duty WhatsApp Settings ────────────────────────────────────────────
+
+export async function getAgentDutyWaGroups(): Promise<Record<string, string>> {
+  const res = await pool.query(
+    `SELECT instance_id, api_token, enabled, agent_duty_wa_groups FROM whatsapp_settings WHERE id = 1`,
+  );
+  if (!res.rows?.length) return {};
+  const r = res.rows[0];
+  return {
+    groups:     r.agent_duty_wa_groups ?? {},
+    instanceId: r.instance_id ?? "",
+    apiToken:   r.api_token ?? "",
+    enabled:    r.enabled ?? false,
+  } as any;
+}
+
+export async function getAgentDutyWaCredentials(): Promise<{ groups: Record<string, string>; instanceId: string; apiToken: string; enabled: boolean } | null> {
+  const res = await pool.query(
+    `SELECT instance_id, api_token, enabled, agent_duty_wa_groups FROM whatsapp_settings WHERE id = 1`,
+  );
+  if (!res.rows?.length) return null;
+  const r = res.rows[0];
+  return {
+    groups:     r.agent_duty_wa_groups ?? {},
+    instanceId: r.instance_id ?? "",
+    apiToken:   r.api_token ?? "",
+    enabled:    r.enabled ?? false,
+  };
+}
+
+export async function updateAgentDutyWaGroups(groups: Record<string, string>): Promise<void> {
+  await pool.query(
+    `UPDATE whatsapp_settings SET agent_duty_wa_groups = $1 WHERE id = 1`,
+    [JSON.stringify(groups)],
+  );
+}
+
 // ── Stock Transfer WhatsApp Settings (per-company) ──────────────────────────
 
 export async function getCompanyTransferWaGroupChatId(companyId: number): Promise<string> {

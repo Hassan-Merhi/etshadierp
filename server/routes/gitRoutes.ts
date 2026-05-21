@@ -1264,6 +1264,66 @@ export function registerGitRoutes(app: Express) {
     }
   });
 
+  // ── Agent Duty WhatsApp Settings ─────────────────────────────────────────────
+
+  app.get("/api/git/agent-duty-wa-settings", requireAuth, async (_req: Request, res: Response) => {
+    try {
+      const { getAgentDutyWaCredentials, getWaSettings } = await import("../services/whatsappService");
+      const [settings, main] = await Promise.all([getAgentDutyWaCredentials(), getWaSettings()]);
+      res.json({
+        groups:         settings?.groups ?? {},
+        hasCredentials: !!(main?.instanceId && main?.apiToken),
+        waEnabled:      main?.enabled ?? false,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/git/agent-duty-wa-settings", requireAuth, requireRole("Admin", "Developer", "Owner"), async (req: Request, res: Response) => {
+    try {
+      const { groups = {} } = req.body;
+      const { updateAgentDutyWaGroups } = await import("../services/whatsappService");
+      await updateAgentDutyWaGroups(groups);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/git/send-agent-duty-whatsapp", requireAuth, requireRole("Admin", "Developer", "Owner"), async (req: Request, res: Response) => {
+    try {
+      const { imageBase64, agentName, fileName } = req.body ?? {};
+      if (!imageBase64 || !agentName) {
+        return res.status(400).json({ message: "imageBase64 and agentName are required." });
+      }
+      const { getAgentDutyWaCredentials, sendWhatsAppFileToChatId } = await import("../services/whatsappService");
+      const settings = await getAgentDutyWaCredentials();
+      if (!settings) return res.status(400).json({ message: "WhatsApp not configured." });
+      const groupChatId = settings.groups[agentName] ?? settings.groups[agentName.toLowerCase()] ?? null;
+      if (!groupChatId) {
+        return res.status(400).json({ message: `No WhatsApp group configured for agent "${agentName}". Configure it in Settings → Agent Duty WA.` });
+      }
+      if (!settings.instanceId || !settings.apiToken) {
+        return res.status(400).json({ message: "WhatsApp credentials not configured." });
+      }
+      if (!settings.enabled) {
+        return res.status(400).json({ message: "WhatsApp sending is disabled." });
+      }
+      const base64Data = String(imageBase64).replace(/^data:image\/\w+;base64,/, "");
+      const buffer = Buffer.from(base64Data, "base64");
+      const today = new Date().toISOString().substring(0, 10);
+      const finalFileName = String(fileName || `AgentDuty_${agentName}_${today}.png`);
+      const caption = `Agent Duty — ${agentName} — ${today}`;
+      const result = await sendWhatsAppFileToChatId(groupChatId, buffer, finalFileName, caption, "image/png");
+      if (!result.success) return res.status(500).json({ message: result.error || "Failed to send" });
+      res.json({ ok: true, message: `Sent to WhatsApp group for ${agentName}.` });
+    } catch (err: any) {
+      console.error("[AgentDutyWA] send error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── Containers WhatsApp Settings ────────────────────────────────────────────
 
   app.get("/api/git/containers-wa-settings", requireAuth, async (req: Request, res: Response) => {

@@ -11,7 +11,7 @@
  *   6. WhatsApp Preview — sample data: formatted text message
  */
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -1537,8 +1537,49 @@ const WARNING_META: Record<WarningCode, {
 
 // ─── Agent card sub-component ─────────────────────────────────────────────────
 
-function AgentCard({ agent }: { agent: AgentDutySummary }) {
+interface AgentDutyWaSettings {
+  groups:         Record<string, string>;
+  hasCredentials: boolean;
+  waEnabled:      boolean;
+}
+
+function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupChatId?: string }) {
+  const { toast } = useToast();
   const [showActive, setShowActive]   = useState(true);
+  const [waSending,  setWaSending]    = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const sendToWhatsApp = useCallback(async () => {
+    if (!cardRef.current) return;
+    setWaSending(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const el = cardRef.current;
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+        width: el.scrollWidth,
+        height: el.scrollHeight,
+        windowWidth: el.scrollWidth,
+        windowHeight: el.scrollHeight,
+      });
+      const imageBase64 = canvas.toDataURL("image/png");
+      const today = new Date().toISOString().substring(0, 10);
+      await apiRequest("POST", "/api/git/send-agent-duty-whatsapp", {
+        imageBase64,
+        agentName: agent.agentName,
+        fileName: `AgentDuty_${agent.agentName}_${today}.png`,
+      });
+      toast({ title: "Sent", description: `Balance allocation sent to ${agent.agentName} WhatsApp group.` });
+    } catch (err: any) {
+      toast({ title: "Failed to send", description: err.message, variant: "destructive" });
+    } finally {
+      setWaSending(false);
+    }
+  }, [agent.agentName, toast]);
 
   const {
     agentName, matchConfidence, ledgerAccountName,
@@ -1561,10 +1602,28 @@ function AgentCard({ agent }: { agent: AgentDutySummary }) {
   }[matchConfidence];
 
   return (
-    <div className="rounded-md border overflow-hidden" data-testid={`agent-card-${agentName}`}>
+    <div ref={cardRef} className="rounded-md border overflow-hidden" data-testid={`agent-card-${agentName}`}>
 
       {/* ── Agent header ── */}
       <div className="bg-yellow-400 text-yellow-950 px-3 py-2 font-bold text-sm relative flex items-center justify-center gap-2 flex-wrap min-h-[2.5rem]">
+        {/* WhatsApp send button — left side, only shown when a group is configured */}
+        {waGroupChatId && (
+          <div className="absolute left-2 top-1/2 -translate-y-1/2">
+            <button
+              type="button"
+              onClick={sendToWhatsApp}
+              disabled={waSending}
+              title={`Send ${agentName} balance to WhatsApp`}
+              data-testid={`button-wa-send-${agentName}`}
+              className="flex items-center gap-1 px-2 py-0.5 rounded bg-green-600 hover:bg-green-700 text-white text-[10px] font-semibold disabled:opacity-60"
+            >
+              {waSending
+                ? <span className="animate-spin inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full" />
+                : <MessageCircle className="h-3 w-3" />}
+              {waSending ? "Sending…" : "Send"}
+            </button>
+          </div>
+        )}
         <div className="flex items-center gap-2 flex-wrap justify-center">
           <span className="tracking-wide">{agentName}</span>
           <Badge className={cn("text-[10px] font-semibold no-default-active-elevate", confidenceBadge.cls)}>
@@ -1725,6 +1784,11 @@ function TabAgentDuty() {
     queryKey: [queryUrl],
     staleTime: 60_000,
     retry: 1,
+  });
+
+  const { data: waSettings } = useQuery<AgentDutyWaSettings>({
+    queryKey: ["/api/git/agent-duty-wa-settings"],
+    staleTime: 120_000,
   });
 
   // Normalise to an array of company sections for uniform rendering.
@@ -1936,6 +2000,7 @@ function TabAgentDuty() {
                 <AgentCard
                   key={`${section.companyId}-${agent.agentName}`}
                   agent={agent}
+                  waGroupChatId={waSettings?.groups?.[agent.agentName] || waSettings?.groups?.[agent.agentName.toUpperCase()] || undefined}
                 />
               ))
           )}
