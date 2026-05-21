@@ -1,6 +1,6 @@
 import { parseId, parseOptionalId } from "../lib/parseId";
 import { getClientDate } from "../lib/dateUtils";
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
@@ -82,6 +82,32 @@ async function syncIntercoParentVoucher(
     }
   } catch (err) {
     console.error("[syncIntercoParentVoucher] Error syncing parent INTERCO voucher:", err);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// requireNonSP — blocks Supplier Partner companies from using ERP container
+// accounting routes (they must use /api/sp/* endpoints instead).
+// Does a single DB read; result is not cached — intentional for correctness.
+// ──────────────────────────────────────────────────────────────────────────────
+async function requireNonSP(req: Request, res: Response, next: NextFunction) {
+  const companyId = req.session?.currentCompanyId;
+  if (!companyId) return next(); // let requireAuth handle missing session
+
+  try {
+    const rows = await db.execute(
+      sql`SELECT company_type FROM companies WHERE id = ${companyId} LIMIT 1`
+    );
+    const row = rows.rows?.[0] as { company_type: string } | undefined;
+    if (row?.company_type === "supplier_partner") {
+      return res.status(403).json({
+        message:
+          "Supplier Partner companies must use the SP container/offload workflow (/api/sp/*).",
+      });
+    }
+    next();
+  } catch (err: any) {
+    next(err);
   }
 }
 
@@ -960,8 +986,8 @@ export function registerContainerRoutes(app: Express) {
     }
   });
 
-  // Create a manual container
-  app.post("/api/containers", requireAuth, requireNonPOS, async (req, res) => {
+  // Create a manual container (ERP only — SP companies must use /api/sp/containers)
+  app.post("/api/containers", requireAuth, requireNonPOS, requireNonSP, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
@@ -1115,11 +1141,12 @@ export function registerContainerRoutes(app: Express) {
     },
   );
 
-  // Offload container to location
+  // Offload container to location (ERP only — SP companies must use /api/sp/offload)
   app.post(
     "/api/containers/:id/offload",
     requireAuth,
     requireNonPOS,
+    requireNonSP,
     async (req, res) => {
       try {
         const containerId = parseId(req.params.id);
@@ -1281,11 +1308,12 @@ export function registerContainerRoutes(app: Express) {
     },
   );
 
-  // Reverse container offload (Admin, Owner, or Manager)
+  // Reverse container offload — ERP only (Admin, Owner, or Manager)
   app.post(
     "/api/containers/:id/reverse-offload",
     requireAuth,
     requireRole("Admin", "Owner", "Manager"),
+    requireNonSP,
     async (req, res) => {
       try {
         const containerId = parseId(req.params.id);

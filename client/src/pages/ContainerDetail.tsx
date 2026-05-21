@@ -20,6 +20,7 @@ import { ArrowLeft, Package, DollarSign, FileText, Truck, Trash2, HandCoins, Cal
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OffloadDialog } from "@/components/OffloadDialog";
+import { SpOffloadDialog } from "@/components/SpOffloadDialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -53,6 +54,7 @@ export default function ContainerDetail() {
   const { selectedCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
   const companyId = selectedCompany?.id;
+  const isSupplierPartner = selectedCompany?.companyType === "supplier_partner";
   const printRef = useRef<HTMLDivElement>(null);
   
   // Check for auto-print query parameter
@@ -71,8 +73,17 @@ export default function ContainerDetail() {
 
   const { data: containerData, isLoading } = useQuery<ContainerDetailData>({
     queryKey: [`/api/containers/${containerId}`],
-    enabled: !!containerId,
+    enabled: !!containerId && !isSupplierPartner,
   });
+
+  const { data: spContainerData, isLoading: spDetailLoading } = useQuery<any>({
+    queryKey: [`/api/sp/containers/${containerId}`],
+    queryFn: () =>
+      fetch(`/api/sp/containers/${containerId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!containerId && isSupplierPartner,
+  });
+
+  const [showSpOffloadDialog, setShowSpOffloadDialog] = useState(false);
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
@@ -548,7 +559,7 @@ export default function ContainerDetail() {
     );
   }
 
-  if (!containerData) {
+  if (!containerData && !isSupplierPartner) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px]">
         <Package className="w-16 h-16 text-muted-foreground mb-4" />
@@ -559,6 +570,235 @@ export default function ContainerDetail() {
             Back to Containers
           </Button>
         </Link>
+      </div>
+    );
+  }
+
+  // ── SP early return — all hooks already called above ─────────────────────
+  if (isSupplierPartner) {
+    const spFmt = (v: any) => {
+      const n = parseFloat(String(v ?? "0"));
+      return isNaN(n) ? "$0.00" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
+    if (spDetailLoading) {
+      return (
+        <div className="space-y-4">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      );
+    }
+    if (!spContainerData || (spContainerData as any).error) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[400px]">
+          <Package className="w-16 h-16 text-muted-foreground mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Container not found</h2>
+          <Link href="/containers">
+            <Button variant="outline">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Containers
+            </Button>
+          </Link>
+        </div>
+      );
+    }
+
+    const spc = spContainerData as any;
+    const discFactor = 1 - parseFloat(spc.discountPct || "0") / 100;
+    const baseCost = (spc.lines || []).reduce(
+      (s: number, l: any) => s + parseFloat(l.qty || "0") * parseFloat(l.unitRateUsd || "0") * discFactor,
+      0,
+    );
+
+    return (
+      <div className="space-y-4 sm:space-y-6" data-testid="sp-container-detail">
+        {/* Header */}
+        <div className="flex items-start gap-3 flex-wrap">
+          <Link href="/containers">
+            <Button variant="ghost" size="icon" data-testid="button-sp-back">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-semibold truncate">
+              {spc.invoiceNumber || spc.containerNumber || `Container #${spc.id}`}
+            </h1>
+            <p className="text-sm text-muted-foreground">{spc.supplierName}</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {spc.status === "offloaded" ? (
+              <Badge variant="outline" className="text-green-600 border-green-600/40">Offloaded</Badge>
+            ) : (
+              <Badge variant="outline" className="text-blue-600 border-blue-600/40">Open / OTW</Badge>
+            )}
+            {spc.status !== "offloaded" && (
+              <Button onClick={() => setShowSpOffloadDialog(true)} data-testid="button-sp-offload">
+                <Package className="h-4 w-4 mr-2" />
+                Offload
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Summary cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-xs text-muted-foreground">Invoice Total</p>
+              <p className="font-semibold text-lg tabular-nums">{spFmt(spc.invoiceTotalUsd)}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-xs text-muted-foreground">Discount</p>
+              <p className="font-semibold text-lg">{spc.discountPct || "0"}%</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-xs text-muted-foreground">Base Cost (discounted)</p>
+              <p className="font-semibold text-lg tabular-nums">{spFmt(baseCost)}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-xs text-muted-foreground">Invoice Date</p>
+              <p className="font-semibold text-lg">{spc.invoiceDate}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Line Items */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Line Items</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Article Code</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
+                  <TableHead className="text-right">Rate (USD)</TableHead>
+                  <TableHead className="text-right">Disc. Rate</TableHead>
+                  <TableHead className="text-right">Line Cost</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(spc.lines || []).length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">No line items</TableCell>
+                  </TableRow>
+                ) : (
+                  (spc.lines || []).map((line: any) => {
+                    const discRate = parseFloat(line.unitRateUsd || "0") * discFactor;
+                    const lineCost = parseFloat(line.qty || "0") * discRate;
+                    return (
+                      <TableRow key={line.id} data-testid={`row-sp-line-${line.id}`}>
+                        <TableCell className="font-mono text-sm">{line.articleCode}</TableCell>
+                        <TableCell className="text-sm">{line.description || "—"}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {parseFloat(line.qty).toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">{spFmt(line.unitRateUsd)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{spFmt(discRate)}</TableCell>
+                        <TableCell className="text-right tabular-nums font-medium">{spFmt(lineCost)}</TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {/* Prepaid Charges */}
+        {(spc.prepaid || []).length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Prepaid Charges</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Amount (USD)</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(spc.prepaid || []).map((p: any) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="text-sm capitalize">{p.chargeType}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{p.description || "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">{spFmt(p.amountPaidUsd)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{p.paidDate}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Offload Summary */}
+        {spc.status === "offloaded" && spc.offload && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Offload Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4">
+                <p className="text-xs text-muted-foreground">Offload Date</p>
+                <p className="font-medium">{spc.offload.offloadDate}</p>
+              </div>
+              {(spc.offloadCharges || []).length > 0 && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Amount (USD)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(spc.offloadCharges || []).map((c: any) => (
+                      <TableRow key={c.id}>
+                        <TableCell className="text-sm capitalize">{c.chargeType}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{c.description || "—"}</TableCell>
+                        <TableCell className="text-right tabular-nums font-medium">{spFmt(c.amountUsd)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Notes */}
+        {spc.notes && (
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-xs text-muted-foreground mb-1">Notes</p>
+              <p className="text-sm">{spc.notes}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        <SpOffloadDialog
+          open={showSpOffloadDialog}
+          onOpenChange={setShowSpOffloadDialog}
+          container={spc}
+          onSuccess={() =>
+            queryClient.invalidateQueries({ queryKey: [`/api/sp/containers/${containerId}`] })
+          }
+        />
       </div>
     );
   }
