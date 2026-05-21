@@ -1475,47 +1475,54 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         // Gate: charge must have a ledger account linked + charge amount > 0
         // invoiceNumber is optional — fall back to ORD-{id} so old orders aren't silently skipped
         if (newCharge && resolvedLedgerAccountId && chargeAmt > 0) {
-          const [customer] = await db.select({ ledgerAccountId: customers.ledgerAccountId })
+          const [customer] = await db.select({ ledgerAccountId: customers.ledgerAccountId, legalName: customers.legalName })
             .from(customers).where(eq(customers.id, order.customerId));
-          if (!customer?.ledgerAccountId) {
-            chargeWarning = "Charge saved but no ledger entry was created — the customer does not have a linked ledger account. Set one in the customer record.";
-          } else {
-            const voucherRef = updatedOrder.invoiceNumber || `ORD-${orderId}`;
-            const chargeVoucherNumber = `CHARGE-${voucherRef}-${newCharge.id}-${Date.now()}`;
-            const chargeDesc = order.containerNumber
-              ? `${name} for offloaded container - ${order.containerNumber}`
-              : `${name} - ${voucherRef}`;
-            // Atomic: voucher + entries + FK stamp must all commit together
-            await db.transaction(async (tx: any) => {
-              const [chargeVoucher] = await tx.insert(vouchers).values({
-                companyId,
-                voucherType: "Journal",
-                voucherNumber: chargeVoucherNumber,
-                voucherDate: updatedOrder.orderDate || getClientDate(req),
-                description: chargeDesc,
-                totalAmount: String(chargeAmt),
-                sourceModule: "FACTORY",
-              }).returning();
-              await tx.insert(voucherEntries).values({
-                voucherId: chargeVoucher.id,
-                ledgerAccountId: customer.ledgerAccountId,
-                customerId: order.customerId,
-                debitAmount: String(chargeAmt),
-                creditAmount: "0",
-                narration: chargeDesc,
-              });
-              await tx.insert(voucherEntries).values({
-                voucherId: chargeVoucher.id,
-                ledgerAccountId: resolvedLedgerAccountId,
-                debitAmount: "0",
-                creditAmount: String(chargeAmt),
-                narration: chargeDesc,
-              });
-              await tx.update(customerOrderCharges)
-                .set({ voucherId: chargeVoucher.id })
-                .where(eq(customerOrderCharges.id, newCharge.id));
-            });
+          // Auto-create and link a ledger account for the customer if one doesn't exist
+          let customerLedgerAccountId = customer?.ledgerAccountId;
+          if (!customerLedgerAccountId) {
+            const customerName = customer?.legalName || `Customer ${order.customerId}`;
+            customerLedgerAccountId = await getOrCreateLedgerAccount(
+              companyId, `CUST-${order.customerId}`, customerName, "Asset"
+            );
+            await db.update(customers)
+              .set({ ledgerAccountId: customerLedgerAccountId })
+              .where(eq(customers.id, order.customerId));
           }
+          const voucherRef = updatedOrder.invoiceNumber || `ORD-${orderId}`;
+          const chargeVoucherNumber = `CHARGE-${voucherRef}-${newCharge.id}-${Date.now()}`;
+          const chargeDesc = order.containerNumber
+            ? `${name} for offloaded container - ${order.containerNumber}`
+            : `${name} - ${voucherRef}`;
+          // Atomic: voucher + entries + FK stamp must all commit together
+          await db.transaction(async (tx: any) => {
+            const [chargeVoucher] = await tx.insert(vouchers).values({
+              companyId,
+              voucherType: "Journal",
+              voucherNumber: chargeVoucherNumber,
+              voucherDate: updatedOrder.orderDate || getClientDate(req),
+              description: chargeDesc,
+              totalAmount: String(chargeAmt),
+              sourceModule: "FACTORY",
+            }).returning();
+            await tx.insert(voucherEntries).values({
+              voucherId: chargeVoucher.id,
+              ledgerAccountId: customerLedgerAccountId,
+              customerId: order.customerId,
+              debitAmount: String(chargeAmt),
+              creditAmount: "0",
+              narration: chargeDesc,
+            });
+            await tx.insert(voucherEntries).values({
+              voucherId: chargeVoucher.id,
+              ledgerAccountId: resolvedLedgerAccountId,
+              debitAmount: "0",
+              creditAmount: String(chargeAmt),
+              narration: chargeDesc,
+            });
+            await tx.update(customerOrderCharges)
+              .set({ voucherId: chargeVoucher.id })
+              .where(eq(customerOrderCharges.id, newCharge.id));
+          });
         } else if (newCharge && !resolvedLedgerAccountId && chargeAmt > 0) {
           chargeWarning = "Charge saved but no ledger entry was created — no ledger account was linked to this charge.";
         }
@@ -1624,10 +1631,22 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (!order) return res.status(404).json({ message: "Order not found" });
       if (order.status !== "FINALIZED") return res.status(400).json({ message: "Order is not finalized" });
 
-      const [customer] = await db.select({ ledgerAccountId: customers.ledgerAccountId })
+      const [customer] = await db.select({ ledgerAccountId: customers.ledgerAccountId, legalName: customers.legalName })
         .from(customers).where(eq(customers.id, order.customerId));
-      if (!customer?.ledgerAccountId) {
-        return res.status(400).json({ message: "Customer does not have a linked ledger account. Set one in the customer record first." });
+
+      // Auto-create and link a ledger account for the customer if one doesn't exist yet
+      let customerLedgerAccountId = customer?.ledgerAccountId;
+      if (!customerLedgerAccountId) {
+        const customerName = customer?.legalName || `Customer ${order.customerId}`;
+        customerLedgerAccountId = await getOrCreateLedgerAccount(
+          companyId,
+          `CUST-${order.customerId}`,
+          customerName,
+          "Asset"
+        );
+        await db.update(customers)
+          .set({ ledgerAccountId: customerLedgerAccountId })
+          .where(eq(customers.id, order.customerId));
       }
 
       // Find all charges missing a voucher that have a ledger account linked
@@ -1664,7 +1683,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           }).returning();
           await tx.insert(voucherEntries).values({
             voucherId: chargeVoucher.id,
-            ledgerAccountId: customer.ledgerAccountId,
+            ledgerAccountId: customerLedgerAccountId,
             customerId: order.customerId,
             debitAmount: String(chargeAmt),
             creditAmount: "0",
