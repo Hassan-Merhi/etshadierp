@@ -81,6 +81,26 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const qtyRefs    = useRef<(HTMLInputElement | null)[]>([]);
 
+  // Reset to blank every time the dialog opens
+  useEffect(() => {
+    if (open) {
+      clearDraft();
+      setCustomerId("");
+      setProformaName("");
+      setIsActive(true);
+      setQuantities({});
+      setSellingPrices({});
+      setSendToLoading(false);
+      setContainerCount("1");
+      setContainerNames(["Container 1"]);
+      setAppliedPrice(null);
+      setErrors({});
+      setShowZeroItems(false);
+      setHideNonPositive(false);
+      setShowNegativeOnly(false);
+    }
+  }, [open]);
+
   // When container count changes, regenerate default names (preserving user edits)
   useEffect(() => {
     const n = Math.max(1, Math.min(100, parseInt(containerCount) || 1));
