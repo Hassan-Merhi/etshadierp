@@ -1874,39 +1874,14 @@ export default function ProductionRawStock() {
                   <p className="text-xs text-muted-foreground mt-0.5">Category × day pivot — one section per week, with opening balance, stock-in and daily consumption</p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {/* Period filter toggles */}
-                  {(["all", "year", "month", "week"] as const).map(p => {
-                    const labels = { all: "All time", year: "This year", month: "This month", week: "This week" };
-                    return (
-                      <Button
-                        key={p}
-                        variant={weeklyPeriod === p ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setWeeklyPeriod(p)}
-                        data-testid={`button-weekly-period-${p}`}
-                      >
-                        {labels[p]}
-                      </Button>
-                    );
-                  })}
-                  <div className="w-px h-5 bg-border mx-1" />
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => window.open(`/api/factory/weekly-report/export?format=excel&period=${weeklyPeriod}`, "_blank")}
+                    onClick={() => window.open(`/api/factory/weekly-report/export?format=excel&period=all`, "_blank")}
                     data-testid="button-export-weekly-excel"
                   >
                     <FileSpreadsheet className="h-4 w-4 mr-1" />
                     Excel
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(`/api/factory/weekly-report/export?format=pdf&period=${weeklyPeriod}`, "_blank")}
-                    data-testid="button-export-weekly-pdf"
-                  >
-                    <FileText className="h-4 w-4 mr-1" />
-                    PDF
                   </Button>
                 </div>
               </div>
