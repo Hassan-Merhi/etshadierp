@@ -886,6 +886,7 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
                                   <SelectItem value="erp">Normal ERP</SelectItem>
                                   <SelectItem value="factory">Factory Production</SelectItem>
                                   <SelectItem value="properties">Properties</SelectItem>
+                                  <SelectItem value="supplier_partner">Supplier Partner</SelectItem>
                                 </SelectContent>
                               </Select>
                               <FormMessage />
