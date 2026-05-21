@@ -57,7 +57,7 @@ interface ContainerWithSupplier extends FactoryContainer {
 // ── OTW Summary helpers ──────────────────────────────────────────────────────
 
 const OTW_NOTES_KEY = "factory-otw-notes";
-const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
+const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED", "RECEIVED", "PARTIALLY_RECEIVED"]);
 
 const CCY_SYMBOLS: Record<string, string> = {
   USD: "$", EUR: "€", GBP: "£", AUD: "A$", CAD: "C$",

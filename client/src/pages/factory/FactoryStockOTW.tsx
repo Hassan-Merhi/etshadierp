@@ -139,7 +139,7 @@ function CurrencyInline({ amounts }: { amounts: Record<string, number> }) {
   );
 }
 
-const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
+const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED", "RECEIVED", "PARTIALLY_RECEIVED"]);
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING:            "Pending",
