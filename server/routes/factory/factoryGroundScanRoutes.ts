@@ -12,19 +12,27 @@ export function registerFactoryGroundScanRoutes(app: Express) {
       const locVal = locationId && locationId !== "all" ? parseInt(locationId, 10) : null;
       const result = locVal !== null
         ? await pool.query(
-            `SELECT id, company_id, location_id, reference_number, article_code, product_name,
-                    weight_kg, status, is_in_loading_order, scanned_at, scanned_by_user_id
-             FROM factory_ground_scan_items
-             WHERE company_id = $1 AND location_id = $2
-             ORDER BY scanned_at ASC`,
+            `SELECT g.id, g.company_id, g.location_id, g.reference_number,
+                    COALESCE(bp.article_code, g.article_code) AS article_code,
+                    COALESCE(g.product_name, bp.name) AS product_name,
+                    g.weight_kg, g.status, g.is_in_loading_order, g.scanned_at, g.scanned_by_user_id
+             FROM factory_ground_scan_items g
+             LEFT JOIN factory_bales fb ON fb.reference_number = g.reference_number AND fb.company_id = g.company_id
+             LEFT JOIN bale_products bp ON bp.id = fb.product_id AND bp.company_id = g.company_id
+             WHERE g.company_id = $1 AND g.location_id = $2
+             ORDER BY g.scanned_at DESC`,
             [companyId, locVal],
           )
         : await pool.query(
-            `SELECT id, company_id, location_id, reference_number, article_code, product_name,
-                    weight_kg, status, is_in_loading_order, scanned_at, scanned_by_user_id
-             FROM factory_ground_scan_items
-             WHERE company_id = $1 AND location_id IS NULL
-             ORDER BY scanned_at ASC`,
+            `SELECT g.id, g.company_id, g.location_id, g.reference_number,
+                    COALESCE(bp.article_code, g.article_code) AS article_code,
+                    COALESCE(g.product_name, bp.name) AS product_name,
+                    g.weight_kg, g.status, g.is_in_loading_order, g.scanned_at, g.scanned_by_user_id
+             FROM factory_ground_scan_items g
+             LEFT JOIN factory_bales fb ON fb.reference_number = g.reference_number AND fb.company_id = g.company_id
+             LEFT JOIN bale_products bp ON bp.id = fb.product_id AND bp.company_id = g.company_id
+             WHERE g.company_id = $1 AND g.location_id IS NULL
+             ORDER BY g.scanned_at DESC`,
             [companyId],
           );
       return res.json(result.rows);

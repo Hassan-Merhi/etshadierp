@@ -963,6 +963,7 @@ export function registerBaleRoutes(app: Express) {
           baleInfo: {
             id: directBale.id,
             baleCode: directBale.baleCode,
+            articleCode: product?.articleCode || directBale.articleCode || null,
             productName: directBale.productName,
             status: directBale.status,
             isInLoadingOrder: directIsInLoadingOrder,
