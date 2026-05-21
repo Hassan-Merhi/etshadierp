@@ -174,6 +174,10 @@ export default function FactorySettings() {
   const [prodWaSearch, setProdWaSearch] = useState("");
   const [prodWaPickerOpen, setProdWaPickerOpen] = useState(false);
 
+  const [weeklyWaGroupId, setWeeklyWaGroupId] = useState<string>("");
+  const [weeklyWaSearch, setWeeklyWaSearch] = useState("");
+  const [weeklyWaPickerOpen, setWeeklyWaPickerOpen] = useState(false);
+
   const [codePrefix, setCodePrefix] = useState("HMD13");
   const [findStr, setFindStr] = useState("-");
   const [replaceStr, setReplaceStr] = useState(" ");
@@ -387,6 +391,47 @@ export default function FactorySettings() {
     staleTime: 60_000,
     retry: false,
   });
+
+  const { data: weeklyWaChats = [], isLoading: weeklyWaChatsLoading } = useQuery<WaChat[]>({
+    queryKey: ["/api/whatsapp/chats"],
+    queryFn: async () => {
+      const r = await factoryApiRequest("GET", "/api/whatsapp/chats");
+      if (!r.ok) throw new Error("Failed to load chats");
+      return r.json();
+    },
+    enabled: weeklyWaPickerOpen,
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const { data: weeklyWaSettings } = useQuery<{ groupChatId: string; hasCredentials: boolean }>({
+    queryKey: ["/api/factory/weekly-report-wa-settings"],
+  });
+
+  useEffect(() => {
+    if (weeklyWaSettings?.groupChatId) setWeeklyWaGroupId(weeklyWaSettings.groupChatId);
+  }, [weeklyWaSettings]);
+
+  const saveWeeklyWaGroupMutation = useMutation({
+    mutationFn: async (chatId: string) => {
+      const res = await factoryApiRequest("PATCH", "/api/factory/weekly-report-wa-settings", { groupChatId: chatId });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Save failed"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/weekly-report-wa-settings"] });
+      setWeeklyWaPickerOpen(false);
+      toast({ title: "Saved", description: "Weekly report WhatsApp group updated." });
+    },
+    onError: (err: any) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const filteredWeeklyWaChats = weeklyWaChats.filter(
+    (c) => !weeklyWaSearch || c.name?.toLowerCase().includes(weeklyWaSearch.toLowerCase())
+  );
 
   const saveProdWaGroupMutation = useMutation({
     mutationFn: async (chatId: string) => {
@@ -1223,6 +1268,109 @@ export default function FactorySettings() {
                   size="sm"
                   onClick={() => { setProdWaPickerOpen(false); setProdWaSearch(""); }}
                   data-testid="button-cancel-prod-wa-group"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Weekly Report WhatsApp Group ──────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageCircle className="h-5 w-5 text-muted-foreground" />
+            Weekly Report WhatsApp Group
+          </CardTitle>
+          <CardDescription>
+            Select the WhatsApp group that receives the Weekly Production Report Excel file when you press "Send" on the report panel.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {weeklyWaGroupId && !weeklyWaPickerOpen && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-medium" data-testid="text-weekly-wa-group">
+                {weeklyWaChats.find(c => c.id === weeklyWaGroupId)?.name ?? weeklyWaGroupId}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setWeeklyWaPickerOpen(true)}
+                data-testid="button-change-weekly-wa-group"
+              >
+                Change
+              </Button>
+            </div>
+          )}
+          {!weeklyWaGroupId && !weeklyWaPickerOpen && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setWeeklyWaPickerOpen(true)}
+              data-testid="button-select-weekly-wa-group"
+            >
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Select WhatsApp Group
+            </Button>
+          )}
+          {weeklyWaPickerOpen && (
+            <div className="space-y-2">
+              <Input
+                placeholder="Search chats…"
+                value={weeklyWaSearch}
+                onChange={e => setWeeklyWaSearch(e.target.value)}
+                data-testid="input-weekly-wa-search"
+              />
+              <div className="border rounded-md max-h-48 overflow-y-auto text-sm">
+                {weeklyWaChatsLoading && (
+                  <p className="text-muted-foreground text-center py-4">
+                    <Loader2 className="h-4 w-4 inline mr-1 animate-spin" />Loading chats…
+                  </p>
+                )}
+                {!weeklyWaChatsLoading && filteredWeeklyWaChats.length === 0 && (
+                  <p className="text-muted-foreground text-center py-4">No chats found</p>
+                )}
+                {filteredWeeklyWaChats.map(chat => (
+                  <button
+                    key={chat.id}
+                    type="button"
+                    onClick={() => setWeeklyWaGroupId(chat.id)}
+                    className={`w-full text-left px-3 py-2 hover-elevate transition-colors ${
+                      weeklyWaGroupId === chat.id ? "bg-primary/10 text-primary font-medium" : ""
+                    }`}
+                    data-testid={`option-weekly-wa-chat-${chat.id}`}
+                  >
+                    <div className="font-medium">{chat.name}</div>
+                    <div className="text-xs text-muted-foreground">{chat.type}</div>
+                  </button>
+                ))}
+              </div>
+              {weeklyWaGroupId && (
+                <p className="text-xs text-muted-foreground">
+                  Selected: <span className="font-medium">{
+                    weeklyWaChats.find(c => c.id === weeklyWaGroupId)?.name ?? weeklyWaGroupId
+                  }</span>
+                </p>
+              )}
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => saveWeeklyWaGroupMutation.mutate(weeklyWaGroupId)}
+                  disabled={!weeklyWaGroupId || saveWeeklyWaGroupMutation.isPending}
+                  data-testid="button-save-weekly-wa-group"
+                >
+                  {saveWeeklyWaGroupMutation.isPending
+                    ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    : <CheckCircle className="h-3 w-3 mr-1" />}
+                  Save
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setWeeklyWaPickerOpen(false); setWeeklyWaSearch(""); }}
+                  data-testid="button-cancel-weekly-wa-group"
                 >
                   Cancel
                 </Button>

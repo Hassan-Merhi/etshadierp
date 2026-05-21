@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown, AlertTriangle, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, FlaskConical, FileSpreadsheet, FileText, SlidersHorizontal, PlusCircle, MinusCircle, History, ArrowUpCircle, ArrowDownCircle, FlaskRound, Tag, ChevronRight, ChevronDown, Folder, FolderOpen, Eye, EyeOff, MessageCircle, Send, Settings2, Loader2 } from "lucide-react";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, FlaskConical, FileSpreadsheet, FileText, SlidersHorizontal, PlusCircle, MinusCircle, History, ArrowUpCircle, ArrowDownCircle, FlaskRound, Tag, ChevronRight, ChevronDown, Folder, FolderOpen, Eye, EyeOff, Send, Loader2 } from "lucide-react";
 import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
 import { EditMixBatchDialog } from "@/components/EditMixBatchDialog";
 import type { FactoryMixBatch } from "@shared/schema";
@@ -669,9 +669,6 @@ export default function ProductionRawStock() {
   const [dailyReportOpen, setDailyReportOpen] = useState(false);
   const [weeklyPeriod, setWeeklyPeriod] = useState<"all" | "year" | "month" | "week">("all");
   const [waGroupChatId, setWaGroupChatId] = useState("");
-  const [waShowPicker, setWaShowPicker] = useState(false);
-  const [waChats, setWaChats] = useState<{ id: string; name: string; type: string }[]>([]);
-  const [waChatsLoading, setWaChatsLoading] = useState(false);
   const [deleteBatchId, setDeleteBatchId] = useState<number | null>(null);
   const [editBatch, setEditBatch] = useState<FactoryMixBatch | null>(null);
   const [batchDetailOpen, setBatchDetailOpen] = useState(false);
@@ -734,32 +731,11 @@ export default function ProductionRawStock() {
     if (waSettings?.groupChatId) setWaGroupChatId(waSettings.groupChatId);
   }, [waSettings]);
 
-  const saveWaGroupMutation = useMutation({
-    mutationFn: (chatId: string) => apiRequest("PATCH", "/api/factory/weekly-report-wa-settings", { groupChatId: chatId }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/factory/weekly-report-wa-settings"] }); toast({ title: "WhatsApp group saved." }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
   const sendWaMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/factory/send-weekly-report-whatsapp", {}),
     onSuccess: () => toast({ title: "Sent", description: "Weekly production report sent to WhatsApp group." }),
     onError: (e: any) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
   });
-
-  async function loadWaChats() {
-    setWaChatsLoading(true);
-    try {
-      const res = await apiRequest("GET", "/api/whatsapp/chats");
-      if (!res.ok) throw new Error("Failed to fetch chats");
-      const data = await res.json() as { id: string; name: string; type: string }[];
-      setWaChats(data.filter((c) => c.type === "group" || String(c.id).endsWith("@g.us")));
-      setWaShowPicker(true);
-    } catch (e: any) {
-      toast({ title: "Could not load chats", description: e.message, variant: "destructive" });
-    } finally {
-      setWaChatsLoading(false);
-    }
-  }
 
   const { data: dailyReport, isLoading: dailyReportLoading } = useQuery<any>({
     queryKey: ["/api/factory/daily-report"],
@@ -1929,56 +1905,12 @@ export default function ProductionRawStock() {
                     onClick={() => sendWaMutation.mutate()}
                     disabled={!waGroupChatId || sendWaMutation.isPending}
                     data-testid="button-send-weekly-whatsapp"
-                    title={!waGroupChatId ? "Configure a WhatsApp group first (click the gear icon)" : "Send Excel to WhatsApp group"}
+                    title={!waGroupChatId ? "Configure a WhatsApp group in Export Settings first" : "Send Excel to WhatsApp group"}
                   >
                     {sendWaMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
                     Send
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => { if (!waShowPicker) loadWaChats(); else setWaShowPicker(false); }}
-                    disabled={waChatsLoading}
-                    data-testid="button-wa-group-picker"
-                    title="Configure WhatsApp group"
-                  >
-                    {waChatsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Settings2 className="h-4 w-4" />}
-                  </Button>
                 </div>
-                {waShowPicker && (
-                  <div className="w-full border rounded-md p-3 space-y-2 bg-muted/30">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 text-sm font-medium">
-                        <MessageCircle className="h-4 w-4 text-green-500" />
-                        WhatsApp group for weekly report
-                      </div>
-                      {waGroupChatId && (
-                        <span className="text-xs text-muted-foreground truncate">
-                          {waChats.find((c) => c.id === waGroupChatId)?.name || waGroupChatId}
-                        </span>
-                      )}
-                    </div>
-                    <Select
-                      value={waGroupChatId}
-                      onValueChange={(v) => { setWaGroupChatId(v); saveWaGroupMutation.mutate(v); }}
-                    >
-                      <SelectTrigger className="w-full" data-testid="select-wa-group">
-                        <SelectValue placeholder="Select a WhatsApp group…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {waChats.length === 0 ? (
-                          <SelectItem value="__none" disabled>No groups found</SelectItem>
-                        ) : (
-                          waChats.map((c) => (
-                            <SelectItem key={c.id} value={c.id} data-testid={`wa-group-${c.id}`}>
-                              {c.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
               </div>
               {dailyReportLoading ? (
                 <div className="space-y-2"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></div>
