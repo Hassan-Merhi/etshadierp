@@ -64,7 +64,7 @@
   import { useAppMode } from "@/contexts/AppModeContext";
   import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
   import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, Maximize2 } from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -187,15 +187,29 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
       return `${Math.floor(s / 3600)}h ago`;
     };
 
+    const imgRef = useRef<HTMLImageElement>(null);
+
+    const openNativeFullscreen = () => {
+      if (imgRef.current) {
+        if (imgRef.current.requestFullscreen) {
+          imgRef.current.requestFullscreen();
+        }
+      }
+    };
+
     return (
       <Dialog open onOpenChange={open => !open && onClose()}>
+        {/*
+          Override Radix Dialog centering so the content fills the entire
+          viewport: remove the default translate-x/y-[-50%] and set inset-0.
+        */}
         <DialogContent
-          className="max-w-[95vw] w-[95vw] p-0 overflow-hidden"
+          className="!fixed !inset-0 !left-0 !top-0 !translate-x-0 !translate-y-0 !max-w-none !w-screen !h-screen !rounded-none p-0 overflow-hidden flex flex-col"
           data-testid="dialog-watch-user"
           data-screenfeed-ignore="true"
         >
           {/* Header bar */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b shrink-0">
+          <div className="flex items-center gap-3 px-4 py-2.5 border-b shrink-0 flex-wrap gap-y-1">
             {isOnline ? (
               <span className="flex items-center gap-1.5">
                 <span className="relative flex h-2.5 w-2.5">
@@ -214,27 +228,42 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                 · last seen {timeAgo(presence.lastSeen)}
               </span>
             )}
-            {screenFrame?.capturedAt && (
-              <span className="ml-auto text-xs text-muted-foreground">
-                captured {timeAgo(screenFrame.capturedAt)}
-              </span>
-            )}
+            <div className="ml-auto flex items-center gap-2">
+              {screenFrame?.capturedAt && (
+                <span className="text-xs text-muted-foreground">
+                  captured {timeAgo(screenFrame.capturedAt)}
+                </span>
+              )}
+              {hasScreen && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={openNativeFullscreen}
+                  data-testid="button-fullscreen-feed"
+                >
+                  <Maximize2 className="h-3.5 w-3.5 mr-1.5" />
+                  Full Screen
+                </Button>
+              )}
+            </div>
           </div>
 
-          {/* Body: screen on left, sidebar on right */}
-          <div className="flex h-[80vh] min-h-0">
-            {/* Live screen — takes all available width */}
-            <div className="flex-1 min-w-0 flex flex-col bg-muted/20">
-              <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden">
+          {/* Body: screen on left, sidebar on right — fills remaining height */}
+          <div className="flex flex-1 min-h-0 overflow-hidden">
+            {/* Live screen — fills all available space */}
+            <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-black">
+              <div className="flex-1 min-h-0 flex items-center justify-center">
                 {hasScreen ? (
-                  <div className="relative w-full h-full">
+                  <div className="relative w-full h-full flex items-center justify-center">
                     <img
+                      ref={imgRef}
                       src={screenFrame.dataUrl}
                       alt="Live screen of user"
-                      className="w-full h-full object-contain block"
+                      className="max-w-full max-h-full object-contain block"
                       data-testid="img-screen-feed"
+                      style={{ imageRendering: "crisp-edges" }}
                     />
-                    {/* Click dot overlays */}
+                    {/* Click dot overlays — positioned relative to image natural size */}
                     {recentClicks.map((click, i) => {
                       const ageSec = (now - click.ts) / 1000;
                       const opacity = Math.max(0, 1 - ageSec / 4);
@@ -273,16 +302,16 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                 )}
               </div>
 
-              {/* Recent click log at bottom of screen panel */}
+              {/* Recent clicks — slim bar at bottom */}
               {clicks.length > 0 && (
-                <div className="border-t px-3 py-2 shrink-0">
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1 flex items-center gap-1">
-                    <Eye className="h-3 w-3" /> Recent clicks
-                  </p>
-                  <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+                <div className="border-t px-3 py-1.5 shrink-0 bg-background/80 backdrop-blur-sm">
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1 shrink-0">
+                      <Eye className="h-3 w-3" /> Clicks
+                    </span>
                     {[...clicks].reverse().slice(0, 6).map((click, i) => (
-                      <div key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <span className="truncate max-w-[180px]">{click.label || "—"}</span>
+                      <div key={i} className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <span className="truncate max-w-[160px]">{click.label || "—"}</span>
                         <span className="text-muted-foreground/50 shrink-0">
                           {new Date(click.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                         </span>
@@ -293,17 +322,27 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
               )}
             </div>
 
-            {/* Sidebar: page history */}
-            <div className="w-64 shrink-0 border-l flex flex-col min-h-0">
+            {/* Sidebar: page history — fixed width */}
+            <div className="w-72 shrink-0 border-l flex flex-col overflow-hidden">
               <div className="px-3 py-2 border-b shrink-0">
                 <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1">
                   <History className="h-3.5 w-3.5" /> Page history
                 </p>
               </div>
+
+              {/* Current page — pinned at top */}
+              {isOnline && presence?.currentRoute && (
+                <div className="px-3 py-2 border-b shrink-0 bg-muted/40">
+                  <p className="text-xs text-muted-foreground mb-0.5">Currently on</p>
+                  <p className="text-sm font-semibold truncate">{getPageLabel(presence.currentRoute)}</p>
+                  <p className="text-xs text-muted-foreground font-mono truncate">{presence.currentRoute}</p>
+                </div>
+              )}
+
               <div className="flex-1 overflow-y-auto divide-y text-sm min-h-0">
                 {activity.length === 0 ? (
                   <p className="text-xs text-muted-foreground px-3 py-3">
-                    No history yet.
+                    No history yet — pages appear here as the user navigates.
                   </p>
                 ) : (
                   activity.map((evt: any) => (
@@ -317,15 +356,6 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                   ))
                 )}
               </div>
-
-              {/* Current page pill */}
-              {isOnline && presence?.currentRoute && (
-                <div className="border-t px-3 py-2 shrink-0 bg-muted/30">
-                  <p className="text-xs text-muted-foreground mb-0.5">Currently on</p>
-                  <p className="text-sm font-semibold">{getPageLabel(presence.currentRoute)}</p>
-                  <p className="text-xs text-muted-foreground font-mono">{presence.currentRoute}</p>
-                </div>
-              )}
             </div>
           </div>
         </DialogContent>

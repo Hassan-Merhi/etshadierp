@@ -80,7 +80,7 @@ function sanitizeClone(doc: Document) {
 }
 
 const html2canvasBaseOpts = {
-  scale:                  0.5,
+  scale:                  0.75,
   useCORS:                true,
   logging:                false,
   foreignObjectRendering: false,
