@@ -608,6 +608,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
     .sort((a, b) => parseFloat(a.priceGap) - parseFloat(b.priceGap)); // most losing first
 
   
+  const lowStockAlerts: any[] = [];
   for (const item of stockItems) {
     const qty = inventoryMap.get(item.id) || 0;
     const reorderLevel = parseFloat(item.reorderLevel || '0');
