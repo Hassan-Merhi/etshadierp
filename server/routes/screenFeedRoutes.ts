@@ -28,13 +28,15 @@ export function registerScreenFeedRoutes(app: Express) {
     res.json({ watched, ...(isDev ? { userId, lastWatcherPollAgeMs: lastPoll > 0 ? ageMs : null } : {}) });
   });
 
-  // POST: client sends a trace event so we can see browser-side diagnostics in server logs.
-  // No auth required beyond login — best-effort diagnostic only.
-  app.post("/api/screen-feed/trace", requireLogin, (req, res) => {
+  // GET-based trace: CSRF-exempt diagnostic ping from the watched user's browser.
+  // Route pattern: GET /api/screen-feed/trace/:event?d=<extra>
+  // Registered BEFORE /:userId so "trace" is not mistaken for a userId.
+  app.get("/api/screen-feed/trace/:event", requireLogin, (req, res) => {
     if (!isDev) return res.status(204).end();
-    const { event, data } = req.body ?? {};
     const userId = String(req.session.userId!);
-    console.log(`[ScreenFeed][TRACE] userId=${userId} event=${event}`, data ?? "");
+    const event  = req.params.event;
+    const extra  = req.query.d ? String(req.query.d) : "";
+    console.log(`[ScreenFeed][TRACE] userId=${userId} event=${event}${extra ? " d=" + extra : ""}`);
     res.status(204).end();
   });
 

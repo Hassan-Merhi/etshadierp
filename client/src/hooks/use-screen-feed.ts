@@ -94,6 +94,56 @@ async function tryCapture(opts: Record<string, any>): Promise<HTMLCanvasElement>
   ]);
 }
 
+/** Fallback: draw a simple text frame if html2canvas fails. Always succeeds. */
+function buildFallbackCanvas(): HTMLCanvasElement {
+  const W = 800, H = 480;
+  const c   = document.createElement("canvas");
+  c.width   = W;
+  c.height  = H;
+  const ctx = c.getContext("2d")!;
+  const dark = document.documentElement.classList.contains("dark");
+
+  ctx.fillStyle = dark ? "#1c1c1e" : "#f0f0f0";
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = dark ? "#e5e5e5" : "#111";
+  ctx.font = "bold 18px system-ui, sans-serif";
+  ctx.fillText(document.title.slice(0, 70), 24, 48);
+
+  ctx.fillStyle = dark ? "#aaa" : "#555";
+  ctx.font = "14px monospace";
+  ctx.fillText(window.location.href.slice(0, 90), 24, 80);
+
+  ctx.fillStyle = dark ? "#888" : "#888";
+  ctx.font = "12px system-ui, sans-serif";
+  ctx.fillText(new Date().toLocaleTimeString(), 24, 110);
+  ctx.fillText("(html2canvas unavailable — simplified frame)", 24, 132);
+
+  // Rough header bar
+  const headerEl = document.querySelector("header");
+  if (headerEl) {
+    ctx.fillStyle = dark ? "#2c2c2e" : "#ddd";
+    ctx.fillRect(0, 160, W, 40);
+    ctx.fillStyle = dark ? "#ccc" : "#333";
+    ctx.font = "13px system-ui, sans-serif";
+    ctx.fillText(headerEl.textContent?.trim().slice(0, 80) ?? "", 12, 186);
+  }
+
+  // List visible <h1>/<h2> text on page
+  let y = 220;
+  document.querySelectorAll("h1, h2, h3").forEach(el => {
+    const t = el.textContent?.trim().slice(0, 80);
+    if (t && y < H - 20) {
+      ctx.fillStyle = dark ? "#ccc" : "#222";
+      ctx.font = el.tagName === "H1" ? "bold 16px system-ui" : "14px system-ui, sans-serif";
+      ctx.fillText(t, 24, y);
+      y += 24;
+    }
+  });
+
+  return c;
+}
+
 async function captureAndUpload() {
   // Note: we intentionally do NOT skip on document.hidden.
   // html2canvas renders from the DOM (not the visual screen), so it works
@@ -106,17 +156,20 @@ async function captureAndUpload() {
     trace("capture-ok");
   } catch (err) {
     trace("capture-fail-p1", String(err).slice(0, 80));
-    // Retry with even more conservative settings
+    // Retry once with very conservative settings
     try {
       canvas = await tryCapture({
         ...html2canvasBaseOpts,
-        scale:       0.15,
+        scale:        0.15,
         imageTimeout: 200,
       });
       trace("capture-ok-retry");
     } catch (err2) {
       trace("capture-fail-p2", String(err2).slice(0, 80));
-      return;
+      // Ultimate fallback: synthesise a simple text-based frame so the
+      // Developer still gets *something* to see.
+      canvas = buildFallbackCanvas();
+      trace("capture-fallback");
     }
   }
 
