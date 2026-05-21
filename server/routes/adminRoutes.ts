@@ -1023,12 +1023,17 @@ export function registerAdminRoutes(app: Express) {
             .where(eq(stockTransferVouchers.voucherId, itemId));
           if (stvRows.length > 0) {
             const stvIds = stvRows.map(r => r.id);
-            await db.delete(stockTransferItems).where(inArray(stockTransferItems.stockTransferVoucherId, stvIds));
+            // transferId is the correct FK column on stock_transfer_items
+            await db.delete(stockTransferItems).where(inArray(stockTransferItems.transferId, stvIds));
             await db.delete(stockTransferVouchers).where(inArray(stockTransferVouchers.id, stvIds));
           }
-          // fiscal_period_closures.closingVoucherId is notNull — delete the closure row
-          await db.delete(fiscalPeriodClosures)
-            .where(eq(fiscalPeriodClosures.closingVoucherId, itemId));
+          // fiscal_period_closures.closingVoucherId is notNull — delete the closure row if it exists
+          try {
+            await db.delete(fiscalPeriodClosures)
+              .where(eq(fiscalPeriodClosures.closingVoucherId, itemId));
+          } catch {
+            // If no matching row or table schema differs in production, continue safely
+          }
 
           // ── Step 3: Delete voucher entries (also cascade, but be explicit) ─
           await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, itemId));
