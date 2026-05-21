@@ -1035,6 +1035,7 @@ let migrationsDone = false;
     `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS containers_wa_last_sent_at timestamp`,
     `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS transfer_wa_group_chat_id text NOT NULL DEFAULT ''`,
     `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS agent_duty_wa_groups jsonb NOT NULL DEFAULT '{}'`,
+    `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS weekly_report_wa_group_chat_id text NOT NULL DEFAULT ''`,
     `ALTER TABLE companies ADD COLUMN IF NOT EXISTS transfer_wa_group_chat_id text`,
     // WhatsApp recipients (individual numbers or group chatIds) — per-tenant
     `CREATE TABLE IF NOT EXISTS whatsapp_recipients (
