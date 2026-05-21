@@ -139,18 +139,18 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   }) {
     const { data: presenceRaw } = useQuery<any>({
       queryKey: ["/api/user-presence", userId],
-      queryFn: () => apiRequest("GET", `/api/user-presence/${userId}`),
+      queryFn: () => apiRequest("GET", `/api/user-presence/${userId}`).then(r => r.json()),
       refetchInterval: 5000,
     });
     const { data: activityRaw } = useQuery<any>({
       queryKey: ["/api/user-presence", userId, "activity"],
-      queryFn: () => apiRequest("GET", `/api/user-presence/${userId}/activity`),
+      queryFn: () => apiRequest("GET", `/api/user-presence/${userId}/activity`).then(r => r.json()),
       refetchInterval: 5000,
     });
     const watchStartRef = useRef(Date.now());
     const { data: screenFrameRaw } = useQuery<any>({
       queryKey: ["/api/screen-feed", userId],
-      queryFn: () => apiRequest("GET", `/api/screen-feed/${userId}`),
+      queryFn: () => apiRequest("GET", `/api/screen-feed/${userId}`).then(r => r.json()),
       refetchInterval: 4000,
     });
 
