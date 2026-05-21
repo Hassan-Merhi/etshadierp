@@ -410,6 +410,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         .where(and(
           eq(factoryMixBatches.companyId, companyId),
           not(isNull(factoryMixBatchSources.containerId)),
+          sql`${factoryContainers.status} != 'DELETED'`,
         ));
 
       // Pre-compute total tracked source weight per container (raw, unscaled)
