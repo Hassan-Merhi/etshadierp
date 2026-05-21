@@ -194,7 +194,7 @@ export async function buildWeeklyReportExcelBuffer(companyId: number, period: st
     for (let di = 0; di < days.length; di++) sh.getColumn(4 + di).width = 10;
     sh.getColumn(4 + days.length).width = 11; sh.getColumn(5 + days.length).width = 12; hRow.height = 28; row++;
     const op = openBals.get(wk)!; const sm = weekSI.get(wk)!;
-    const activeCKs = allCKs.filter(ck => (weekCons.get(wk)!.get(ck) || 0) > 0.001 || (sm.get(ck) || 0) > 0.001 || Math.abs(op.get(ck) || 0) > 0.5).sort((a, b) => (catBalMap.get(a)?.name || "").localeCompare(catBalMap.get(b)?.name || ""));
+    const activeCKs = allCKs.filter(ck => (weekCons.get(wk)!.get(ck) || 0) > 0.001 || (sm.get(ck) || 0) > 0.001).sort((a, b) => (catBalMap.get(a)?.name || "").localeCompare(catBalMap.get(b)?.name || ""));
     let wtB = 0, wtSI = 0, wtT = 0, wtR = 0; const wtD = days.map(() => 0);
     for (const ck of activeCKs) {
       const info = catBalMap.get(ck)!; const ob = op.get(ck) || 0; const si = sm.get(ck) || 0;
@@ -804,12 +804,11 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           const opening = openingBalances.get(wk)!;
           const sMap = weekStockIn.get(wk)!;
 
-          // Active categories this week: include any category with non-zero consumption,
-          // stock-in, or opening balance (including negative balances).
+          // Active categories this week: only include categories with actual activity
+          // (stock-in or consumption). Categories with only a carry-over balance are hidden.
           const activeCats = allCatKeys.filter(ck => {
             return (weekConsumption.get(wk)!.get(ck) || 0) > 0.001
-              || (sMap.get(ck) || 0) > 0.001
-              || Math.abs(opening.get(ck) || 0) > 0.5;
+              || (sMap.get(ck) || 0) > 0.001;
           }).sort((a, b) => (catBalMap.get(a)?.name || "").localeCompare(catBalMap.get(b)?.name || ""));
 
           let weekTotalBalance = 0, weekTotalStockIn = 0, weekTotalTotal = 0, weekTotalRemains = 0;
@@ -973,7 +972,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           const opening = openingBalances.get(wk)!;
           const sMap = weekStockIn.get(wk)!;
           const activeCats = allCatKeys.filter(ck =>
-            (weekConsumption.get(wk)!.get(ck) || 0) > 0 || (sMap.get(ck) || 0) > 0 || (opening.get(ck) || 0) > 0
+            (weekConsumption.get(wk)!.get(ck) || 0) > 0 || (sMap.get(ck) || 0) > 0
           ).sort((a, b) => (catBalMap.get(a)?.name || "").localeCompare(catBalMap.get(b)?.name || ""));
 
           let weekTotalBalance = 0, weekTotalStockIn = 0, weekTotalTotal = 0, weekTotalRemains = 0;

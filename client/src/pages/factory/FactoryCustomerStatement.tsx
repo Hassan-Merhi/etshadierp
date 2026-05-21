@@ -8,13 +8,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, FileSpreadsheet, X, ExternalLink } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, Download, FileSpreadsheet, X, ExternalLink, Upload, Plus, Save, Trash2 } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { drCrClass } from "@/lib/formatNumber";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
+import * as XLSX from "xlsx";
 
 interface CustomerInfo {
   id: number;
@@ -57,6 +60,12 @@ interface StatementData {
   openingBalanceSide: string;
 }
 
+interface PriceListEntry {
+  article_code: string;
+  price_per_bale: string;
+  updated_at: string;
+}
+
 function fmtMoney(value: number | null | undefined): string {
   if (value == null || isNaN(value)) return "$0";
   const abs = Math.abs(value);
@@ -88,9 +97,25 @@ export default function FactoryCustomerStatement() {
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
 
+  // Price list state
+  const [priceEdits, setPriceEdits] = useState<Record<string, string>>({});
+  const [newCode, setNewCode] = useState("");
+  const [newPrice, setNewPrice] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const { data: statement, isLoading } = useQuery<StatementData>({
     queryKey: [`/api/factory/customers/${customerId}/statement`],
     enabled: !!customerId,
+  });
+
+  const priceListQuery = useQuery<PriceListEntry[]>({
+    queryKey: ["/api/factory/customer-price-lists", customerId],
+    enabled: !!customerId,
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/customer-price-lists/${customerId}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
   });
 
   useEffect(() => {
@@ -120,6 +145,35 @@ export default function FactoryCustomerStatement() {
     },
     onError: () => {
       toast({ title: "Failed to save note", variant: "destructive" });
+    },
+  });
+
+  const savePricesMutation = useMutation({
+    mutationFn: async (lines: { articleCode: string; pricePerBale: string | number }[]) => {
+      return await factoryApiRequest("PUT", `/api/factory/customer-price-lists/${customerId}`, lines);
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-price-lists", customerId] });
+      setPriceEdits({});
+      setNewCode("");
+      setNewPrice("");
+      toast({ title: "Price list saved", description: `${data?.saved ?? 0} price(s) updated` });
+    },
+    onError: () => {
+      toast({ title: "Failed to save prices", variant: "destructive" });
+    },
+  });
+
+  const deletePriceMutation = useMutation({
+    mutationFn: async (articleCode: string) => {
+      return await factoryApiRequest("DELETE", `/api/factory/customer-price-lists/${customerId}/${encodeURIComponent(articleCode)}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-price-lists", customerId] });
+      toast({ title: "Price removed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove price", variant: "destructive" });
     },
   });
 
@@ -169,6 +223,59 @@ export default function FactoryCustomerStatement() {
   }, [filteredHistory]);
 
   const hasFilters = filterDestination || filterDateFrom || filterDateTo;
+
+  const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = new Uint8Array(ev.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: "" });
+        const lines: { articleCode: string; pricePerBale: string | number }[] = [];
+        for (const row of rows) {
+          const code = String(row["article_code"] ?? row["Article Code"] ?? row["ARTICLE_CODE"] ?? row["code"] ?? "").trim();
+          const price = row["price"] ?? row["price_per_bale"] ?? row["Price"] ?? row["Price Per Bale"] ?? row["PRICE"] ?? "";
+          if (code && price !== "") {
+            const p = parseFloat(String(price));
+            if (!isNaN(p) && p > 0) lines.push({ articleCode: code, pricePerBale: p });
+          }
+        }
+        if (lines.length === 0) {
+          toast({ title: "No valid rows found", description: 'Excel must have columns: article_code, price', variant: "destructive" });
+          return;
+        }
+        savePricesMutation.mutate(lines);
+      } catch {
+        toast({ title: "Failed to read file", variant: "destructive" });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = "";
+  };
+
+  const handleSavePrices = () => {
+    const lines: { articleCode: string; pricePerBale: string | number }[] = [];
+    for (const entry of priceListQuery.data ?? []) {
+      const edited = priceEdits[entry.article_code];
+      const price = edited !== undefined ? edited : entry.price_per_bale;
+      const p = parseFloat(String(price));
+      if (!isNaN(p) && p > 0) lines.push({ articleCode: entry.article_code, pricePerBale: p });
+    }
+    if (newCode.trim() && newPrice) {
+      const p = parseFloat(newPrice);
+      if (!isNaN(p) && p > 0) lines.push({ articleCode: newCode.trim(), pricePerBale: p });
+    }
+    if (lines.length === 0) {
+      toast({ title: "No valid prices to save", variant: "destructive" });
+      return;
+    }
+    savePricesMutation.mutate(lines);
+  };
+
+  const hasPriceEdits = Object.keys(priceEdits).length > 0 || (newCode.trim() !== "" && newPrice !== "");
 
   if (isLoading) {
     return (
@@ -268,192 +375,362 @@ export default function FactoryCustomerStatement() {
         </Card>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-end gap-3 mb-4">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground font-medium">Destination</label>
-          <Input
-            value={filterDestination}
-            onChange={(e) => setFilterDestination(e.target.value)}
-            placeholder="Filter by destination…"
-            className="w-48"
-            data-testid="input-filter-destination"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground font-medium">Date From</label>
-          <Input
-            type="date"
-            value={filterDateFrom}
-            onChange={(e) => setFilterDateFrom(e.target.value)}
-            className="w-40"
-            data-testid="input-filter-date-from"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground font-medium">Date To</label>
-          <Input
-            type="date"
-            value={filterDateTo}
-            onChange={(e) => setFilterDateTo(e.target.value)}
-            className="w-40"
-            data-testid="input-filter-date-to"
-          />
-        </div>
-        {hasFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => { setFilterDestination(""); setFilterDateFrom(""); setFilterDateTo(""); }}
-            data-testid="button-clear-filters"
-          >
-            <X className="h-4 w-4 mr-1" />
-            Clear
-          </Button>
-        )}
-        <p className="text-xs text-muted-foreground ml-auto self-end">
-          {filteredHistory.length} of {statement.balanceHistory.length} rows
-        </p>
-      </div>
+      {/* Tabs */}
+      <Tabs defaultValue="statement" className="flex-1">
+        <TabsList className="mb-4">
+          <TabsTrigger value="statement" data-testid="tab-statement">Statement</TabsTrigger>
+          <TabsTrigger value="pricelist" data-testid="tab-pricelist">
+            Price List
+            {(priceListQuery.data?.length ?? 0) > 0 && (
+              <Badge variant="secondary" className="ml-2 text-[10px] no-default-hover-elevate no-default-active-elevate">
+                {priceListQuery.data!.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Totals bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-        <Card>
-          <CardContent className="py-3 px-4">
-            <p className="text-xs text-muted-foreground mb-0.5">Total Bales</p>
-            <p className="text-lg font-bold font-mono" data-testid="text-total-bales">
-              {fmtNum(totals.totalBales)}
+        {/* ─── Statement Tab ─── */}
+        <TabsContent value="statement">
+          {/* Filters */}
+          <div className="flex flex-wrap items-end gap-3 mb-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground font-medium">Destination</label>
+              <Input
+                value={filterDestination}
+                onChange={(e) => setFilterDestination(e.target.value)}
+                placeholder="Filter by destination…"
+                className="w-48"
+                data-testid="input-filter-destination"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground font-medium">Date From</label>
+              <Input
+                type="date"
+                value={filterDateFrom}
+                onChange={(e) => setFilterDateFrom(e.target.value)}
+                className="w-40"
+                data-testid="input-filter-date-from"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground font-medium">Date To</label>
+              <Input
+                type="date"
+                value={filterDateTo}
+                onChange={(e) => setFilterDateTo(e.target.value)}
+                className="w-40"
+                data-testid="input-filter-date-to"
+              />
+            </div>
+            {hasFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setFilterDestination(""); setFilterDateFrom(""); setFilterDateTo(""); }}
+                data-testid="button-clear-filters"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Clear
+              </Button>
+            )}
+            <p className="text-xs text-muted-foreground ml-auto self-end">
+              {filteredHistory.length} of {statement.balanceHistory.length} rows
             </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-3 px-4">
-            <p className="text-xs text-muted-foreground mb-0.5">Total Invoiced</p>
-            <p className="text-lg font-bold font-mono" data-testid="text-total-debit">
-              {fmtMoney(totals.totalAmountDebit)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-3 px-4">
-            <p className="text-xs text-muted-foreground mb-0.5">Total Paid</p>
-            <p className="text-lg font-bold font-mono" data-testid="text-total-credit">
-              {fmtMoney(totals.totalAmountCredit)}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
 
-      {/* Statement table */}
-      <Card className="table-responsive">
-        <Table>
-          <TableHeader className="sticky top-0 z-30 bg-background">
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Container</TableHead>
-              <TableHead>Destination</TableHead>
-              <TableHead className="text-right">Bales</TableHead>
-              <TableHead className="text-right">Kg</TableHead>
-              <TableHead className="text-right">Debit</TableHead>
-              <TableHead className="text-right">Credit</TableHead>
-              <TableHead className="text-right">Balance</TableHead>
-              <TableHead>Side</TableHead>
-              <TableHead className="min-w-[160px]">Note</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredHistory.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={11} className="text-center text-muted-foreground py-8" data-testid="text-no-transactions">
-                  {hasFilters ? "No rows match the current filters" : "No transactions yet"}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredHistory.map((entry) => {
-                const isInvoice = entry.referenceType === "INVOICE" && entry.referenceId;
-                return (
-                <TableRow
-                  key={entry.id}
-                  data-testid={`row-balance-${entry.id}`}
-                  className={isInvoice ? "cursor-pointer hover-elevate" : undefined}
-                  onClick={isInvoice ? () => navigate(`/factory/sales/invoices/${entry.referenceId}`) : undefined}
+          {/* Totals bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <Card>
+              <CardContent className="py-3 px-4">
+                <p className="text-xs text-muted-foreground mb-0.5">Total Bales</p>
+                <p className="text-lg font-bold font-mono" data-testid="text-total-bales">
+                  {fmtNum(totals.totalBales)}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="py-3 px-4">
+                <p className="text-xs text-muted-foreground mb-0.5">Total Invoiced</p>
+                <p className="text-lg font-bold font-mono" data-testid="text-total-debit">
+                  {fmtMoney(totals.totalAmountDebit)}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="py-3 px-4">
+                <p className="text-xs text-muted-foreground mb-0.5">Total Paid</p>
+                <p className="text-lg font-bold font-mono" data-testid="text-total-credit">
+                  {fmtMoney(totals.totalAmountCredit)}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Statement table */}
+          <Card className="table-responsive">
+            <Table>
+              <TableHeader className="sticky top-0 z-30 bg-background">
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Container</TableHead>
+                  <TableHead>Destination</TableHead>
+                  <TableHead className="text-right">Bales</TableHead>
+                  <TableHead className="text-right">Kg</TableHead>
+                  <TableHead className="text-right">Debit</TableHead>
+                  <TableHead className="text-right">Credit</TableHead>
+                  <TableHead className="text-right">Balance</TableHead>
+                  <TableHead>Side</TableHead>
+                  <TableHead className="min-w-[160px]">Note</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredHistory.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={11} className="text-center text-muted-foreground py-8" data-testid="text-no-transactions">
+                      {hasFilters ? "No rows match the current filters" : "No transactions yet"}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredHistory.map((entry) => {
+                    const isInvoice = entry.referenceType === "INVOICE" && entry.referenceId;
+                    return (
+                    <TableRow
+                      key={entry.id}
+                      data-testid={`row-balance-${entry.id}`}
+                      className={isInvoice ? "cursor-pointer hover-elevate" : undefined}
+                      onClick={isInvoice ? () => navigate(`/factory/sales/invoices/${entry.referenceId}`) : undefined}
+                    >
+                      <TableCell className="text-sm font-mono whitespace-nowrap" data-testid={`text-balance-date-${entry.id}`}>
+                        {entry.transactionDate ? formatDisplayDate(entry.transactionDate) : "-"}
+                      </TableCell>
+                      <TableCell data-testid={`text-balance-type-${entry.id}`}>
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant="outline" className="text-xs">{entry.transactionType}</Badge>
+                          {isInvoice && <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm font-mono text-muted-foreground whitespace-nowrap" data-testid={`text-balance-container-${entry.id}`}>
+                        {entry.containerNumber || "-"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground" data-testid={`text-balance-destination-${entry.id}`}>
+                        {entry.destination || "-"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-bales-${entry.id}`}>
+                        {entry.totalQtyBales != null ? fmtNum(entry.totalQtyBales) : "-"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-kg-${entry.id}`}>
+                        {entry.totalWeightKg != null ? fmtNum(entry.totalWeightKg) : "-"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-debit-${entry.id}`}>
+                        {Number(entry.debitAmount || 0) > 0 ? fmtMoney(Number(entry.debitAmount)) : "-"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-credit-${entry.id}`}>
+                        {Number(entry.creditAmount || 0) > 0 ? fmtMoney(Number(entry.creditAmount)) : "-"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono font-semibold" data-testid={`text-balance-running-${entry.id}`}>
+                        {fmtMoney(Math.abs(entry.runningBalance))}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={`text-xs font-semibold ${drCrClass(entry.runningBalanceSide)}`}>{entry.runningBalanceSide}</Badge>
+                      </TableCell>
+                      <TableCell className="min-w-[160px]" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="text"
+                          value={rowNotes[entry.id] ?? ""}
+                          onChange={(e) => setRowNotes((prev) => ({ ...prev, [entry.id]: e.target.value }))}
+                          onBlur={() => saveRowNote(entry.id, rowNotes[entry.id] ?? "")}
+                          placeholder="Add note…"
+                          disabled={savingRowNote === entry.id}
+                          className="w-full text-xs bg-transparent border border-border rounded px-2 py-1 placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                          data-testid={`input-row-note-${entry.id}`}
+                        />
+                      </TableCell>
+                    </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+
+          {/* Statement Note */}
+          <Card className="mt-4">
+            <CardContent className="p-4 space-y-2">
+              <p className="text-sm font-semibold">Statement Note</p>
+              <p className="text-xs text-muted-foreground">This note appears on exported PDF and Excel statements.</p>
+              <Textarea
+                value={draftNote ?? ""}
+                onChange={(e) => setDraftNote(e.target.value)}
+                placeholder="Add a note for this customer's statement..."
+                rows={3}
+                data-testid="textarea-statement-note"
+              />
+              <Button
+                size="sm"
+                onClick={() => saveNoteMutation.mutate(draftNote ?? "")}
+                disabled={saveNoteMutation.isPending}
+                data-testid="button-save-statement-note"
+              >
+                {saveNoteMutation.isPending ? "Saving…" : "Save Note"}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ─── Price List Tab ─── */}
+        <TabsContent value="pricelist">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <p className="text-sm font-semibold">Customer Price List</p>
+              <p className="text-xs text-muted-foreground">
+                These prices are automatically applied when creating a proforma for this customer.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                ref={fileInputRef}
+                onChange={handleExcelUpload}
+                className="hidden"
+                data-testid="input-upload-pricelist"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={savePricesMutation.isPending}
+                data-testid="button-upload-excel-pricelist"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Excel
+              </Button>
+              {hasPriceEdits && (
+                <Button
+                  size="sm"
+                  onClick={handleSavePrices}
+                  disabled={savePricesMutation.isPending}
+                  data-testid="button-save-pricelist"
                 >
-                  <TableCell className="text-sm font-mono whitespace-nowrap" data-testid={`text-balance-date-${entry.id}`}>
-                    {entry.transactionDate ? formatDisplayDate(entry.transactionDate) : "-"}
-                  </TableCell>
-                  <TableCell data-testid={`text-balance-type-${entry.id}`}>
-                    <div className="flex items-center gap-1.5">
-                      <Badge variant="outline" className="text-xs">{entry.transactionType}</Badge>
-                      {isInvoice && <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm font-mono text-muted-foreground whitespace-nowrap" data-testid={`text-balance-container-${entry.id}`}>
-                    {entry.containerNumber || "-"}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground" data-testid={`text-balance-destination-${entry.id}`}>
-                    {entry.destination || "-"}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-bales-${entry.id}`}>
-                    {entry.totalQtyBales != null ? fmtNum(entry.totalQtyBales) : "-"}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-kg-${entry.id}`}>
-                    {entry.totalWeightKg != null ? fmtNum(entry.totalWeightKg) : "-"}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-debit-${entry.id}`}>
-                    {Number(entry.debitAmount || 0) > 0 ? fmtMoney(Number(entry.debitAmount)) : "-"}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-credit-${entry.id}`}>
-                    {Number(entry.creditAmount || 0) > 0 ? fmtMoney(Number(entry.creditAmount)) : "-"}
-                  </TableCell>
-                  <TableCell className="text-right font-mono font-semibold" data-testid={`text-balance-running-${entry.id}`}>
-                    {fmtMoney(Math.abs(entry.runningBalance))}
-                  </TableCell>
+                  <Save className="h-4 w-4 mr-2" />
+                  {savePricesMutation.isPending ? "Saving…" : "Save Changes"}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <Card>
+            <Table>
+              <TableHeader className="sticky top-0 z-30 bg-background">
+                <TableRow>
+                  <TableHead>Article Code</TableHead>
+                  <TableHead className="text-right">Price per Bale ($)</TableHead>
+                  <TableHead className="text-right">Last Updated</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {priceListQuery.isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-6">
+                      <Skeleton className="h-4 w-48 mx-auto" />
+                    </TableCell>
+                  </TableRow>
+                ) : (priceListQuery.data ?? []).length === 0 && !newCode ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8" data-testid="text-no-prices">
+                      No prices set yet. Upload an Excel file or add manually below.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  (priceListQuery.data ?? []).map((entry) => (
+                    <TableRow key={entry.article_code} data-testid={`row-price-${entry.article_code}`}>
+                      <TableCell className="font-mono text-sm font-medium" data-testid={`text-price-code-${entry.article_code}`}>
+                        {entry.article_code}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={priceEdits[entry.article_code] !== undefined ? priceEdits[entry.article_code] : entry.price_per_bale}
+                          onChange={(e) => setPriceEdits(prev => ({ ...prev, [entry.article_code]: e.target.value }))}
+                          onBlur={() => {
+                            if (priceEdits[entry.article_code] !== undefined) {
+                              handleSavePrices();
+                            }
+                          }}
+                          className="w-32 ml-auto text-right font-mono"
+                          data-testid={`input-price-${entry.article_code}`}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap">
+                        {entry.updated_at ? new Date(entry.updated_at).toLocaleDateString() : "-"}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive"
+                          onClick={() => deletePriceMutation.mutate(entry.article_code)}
+                          disabled={deletePriceMutation.isPending}
+                          data-testid={`button-delete-price-${entry.article_code}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+
+                {/* Add new row */}
+                <TableRow data-testid="row-add-price">
                   <TableCell>
-                    <Badge variant="outline" className={`text-xs font-semibold ${drCrClass(entry.runningBalanceSide)}`}>{entry.runningBalanceSide}</Badge>
-                  </TableCell>
-                  <TableCell className="min-w-[160px]" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="text"
-                      value={rowNotes[entry.id] ?? ""}
-                      onChange={(e) => setRowNotes((prev) => ({ ...prev, [entry.id]: e.target.value }))}
-                      onBlur={() => saveRowNote(entry.id, rowNotes[entry.id] ?? "")}
-                      placeholder="Add note…"
-                      disabled={savingRowNote === entry.id}
-                      className="w-full text-xs bg-transparent border border-border rounded px-2 py-1 placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
-                      data-testid={`input-row-note-${entry.id}`}
+                    <Input
+                      placeholder="Article code…"
+                      value={newCode}
+                      onChange={(e) => setNewCode(e.target.value)}
+                      className="font-mono"
+                      data-testid="input-new-price-code"
                     />
                   </TableCell>
+                  <TableCell className="text-right">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={newPrice}
+                      onChange={(e) => setNewPrice(e.target.value)}
+                      className="w-32 ml-auto text-right font-mono"
+                      data-testid="input-new-price-value"
+                    />
+                  </TableCell>
+                  <TableCell />
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleSavePrices}
+                      disabled={!newCode.trim() || !newPrice || savePricesMutation.isPending}
+                      data-testid="button-add-price"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+              </TableBody>
+            </Table>
+          </Card>
 
-      {/* Statement Note */}
-      <Card className="mt-4">
-        <CardContent className="p-4 space-y-2">
-          <p className="text-sm font-semibold">Statement Note</p>
-          <p className="text-xs text-muted-foreground">This note appears on exported PDF and Excel statements.</p>
-          <Textarea
-            value={draftNote ?? ""}
-            onChange={(e) => setDraftNote(e.target.value)}
-            placeholder="Add a note for this customer's statement..."
-            rows={3}
-            data-testid="textarea-statement-note"
-          />
-          <Button
-            size="sm"
-            onClick={() => saveNoteMutation.mutate(draftNote ?? "")}
-            disabled={saveNoteMutation.isPending}
-            data-testid="button-save-statement-note"
-          >
-            {saveNoteMutation.isPending ? "Saving…" : "Save Note"}
-          </Button>
-        </CardContent>
-      </Card>
+          <p className="text-xs text-muted-foreground mt-3">
+            Excel format: columns named <span className="font-mono">article_code</span> and <span className="font-mono">price</span> (or <span className="font-mono">price_per_bale</span>).
+            Prices are also auto-saved when you create a proforma with prices set.
+          </p>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

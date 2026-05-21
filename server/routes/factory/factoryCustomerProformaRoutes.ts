@@ -1509,6 +1509,24 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
     }
   });
 
+  // DELETE /api/factory/customer-price-lists/:customerId/:articleCode
+  app.delete("/api/factory/customer-price-lists/:customerId/:articleCode", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const customerId = parseInt(req.params.customerId, 10);
+      if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customerId" });
+      const articleCode = req.params.articleCode;
+      await pool.query(
+        `DELETE FROM customer_price_lists WHERE company_id = $1 AND customer_id = $2 AND article_code = $3`,
+        [companyId, customerId, articleCode],
+      );
+      return res.json({ deleted: true });
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
   // ───────────────────────────────────────────────
   // CUSTOMER ORDERS CRUD + FINALIZE
   // ───────────────────────────────────────────────

@@ -202,7 +202,24 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
   const createMutation = useMutation({
     mutationFn: async (payload: object) =>
       apiRequest("POST", "/api/factory/v5/proforma-with-loading", payload),
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Auto-save any non-zero prices to the customer's price list
+      if (customerId) {
+        const priceLines = Object.entries(sellingPrices)
+          .filter(([, price]) => parseFloat(price) > 0)
+          .map(([articleCode, pricePerBale]) => ({ articleCode, pricePerBale }));
+        if (priceLines.length > 0) {
+          try {
+            await fetch(`/api/factory/customer-price-lists/${customerId}`, {
+              method: "PUT",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(priceLines),
+            });
+            qc.invalidateQueries({ queryKey: ["/api/factory/customer-price-lists", customerId] });
+          } catch {}
+        }
+      }
       clearDraft();
       resetForm();
       qc.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
