@@ -1556,7 +1556,7 @@ function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupC
       const html2canvas = (await import("html2canvas")).default;
       const el = cardRef.current;
       const canvas = await html2canvas(el, {
-        scale: 2,
+        scale: 3,
         useCORS: true,
         allowTaint: true,
         backgroundColor: "#ffffff",
@@ -1602,49 +1602,31 @@ function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupC
   }[matchConfidence];
 
   return (
-    <div ref={cardRef} className="rounded-md border overflow-hidden" data-testid={`agent-card-${agentName}`}>
+    <div className="space-y-1" data-testid={`agent-card-${agentName}`}>
+      {/* WA send button sits ABOVE the captured card so it never appears in the screenshot */}
+      {waGroupChatId && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={sendToWhatsApp}
+            disabled={waSending}
+            title={`Send ${agentName} balance to WhatsApp`}
+            data-testid={`button-wa-send-${agentName}`}
+            className="flex items-center gap-1 px-2 py-0.5 rounded bg-green-600 hover:bg-green-700 text-white text-[10px] font-semibold disabled:opacity-60"
+          >
+            {waSending
+              ? <span className="animate-spin inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full" />
+              : <MessageCircle className="h-3 w-3" />}
+            {waSending ? "Sending…" : "Send"}
+          </button>
+        </div>
+      )}
+
+    <div ref={cardRef} className="rounded-md border overflow-hidden">
 
       {/* ── Agent header ── */}
-      <div className="bg-yellow-400 text-yellow-950 px-3 py-2 font-bold text-sm relative flex items-center justify-center gap-2 flex-wrap min-h-[2.5rem]">
-        {/* WhatsApp send button — left side, only shown when a group is configured */}
-        {waGroupChatId && (
-          <div className="absolute left-2 top-1/2 -translate-y-1/2">
-            <button
-              type="button"
-              onClick={sendToWhatsApp}
-              disabled={waSending}
-              title={`Send ${agentName} balance to WhatsApp`}
-              data-testid={`button-wa-send-${agentName}`}
-              className="flex items-center gap-1 px-2 py-0.5 rounded bg-green-600 hover:bg-green-700 text-white text-[10px] font-semibold disabled:opacity-60"
-            >
-              {waSending
-                ? <span className="animate-spin inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full" />
-                : <MessageCircle className="h-3 w-3" />}
-              {waSending ? "Sending…" : "Send"}
-            </button>
-          </div>
-        )}
-        <div className="flex items-center gap-2 flex-wrap justify-center">
-          <span className="tracking-wide">{agentName}</span>
-          <Badge className={cn("text-[10px] font-semibold no-default-active-elevate", confidenceBadge.cls)}>
-            {confidenceBadge.label}
-          </Badge>
-          {ledgerAccountName && (
-            <span className="text-[11px] font-normal opacity-80">{ledgerAccountName}</span>
-          )}
-        </div>
-        {hasBalance && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            {warnings.includes("no_open_balance")
-              ? <Badge className="text-xs bg-green-700 text-white no-default-active-elevate">Fully Cleared</Badge>
-              : warnings.includes("allocation_gap")
-                ? <Badge className="text-xs bg-red-600 text-white no-default-active-elevate">Allocation Gap</Badge>
-                : openBalance !== null && openBalance > 0
-                  ? <Badge className="text-xs bg-amber-700 text-white no-default-active-elevate">Open: ${fmt(openBalance, 0)}</Badge>
-                  : <Badge className="text-xs bg-green-600 text-white no-default-active-elevate">Balance Allocated</Badge>
-            }
-          </div>
-        )}
+      <div className="bg-yellow-400 text-yellow-950 px-3 py-2 font-bold text-sm flex items-center justify-center min-h-[2.5rem]">
+        <span className="tracking-wide text-base">{agentName}</span>
       </div>
 
       {/* ── Warning banners ── */}
@@ -1727,11 +1709,11 @@ function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupC
         <>
           <button
             onClick={() => setShowActive(v => !v)}
-            className="w-full flex items-center justify-between px-3 py-1.5 bg-sky-50 dark:bg-sky-950/20 border-t border-sky-200 dark:border-sky-800 text-xs hover-elevate"
+            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 bg-sky-50 dark:bg-sky-950/20 border-t border-sky-200 dark:border-sky-800 text-xs hover-elevate"
             data-testid={`button-toggle-active-${agentName}`}
           >
             <span className="font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-400">
-              {showActive ? "Hide" : "Show"} Active / In Transit — {activePreviewRows.length} containers,{" "}
+              In Transit — {activePreviewRows.length} containers,{" "}
               ${fmt(activePreviewRows.reduce((s, r) => s + r.dutyFee, 0), 0)} upcoming duty
             </span>
             {showActive ? <ChevronUp className="h-3.5 w-3.5 text-sky-600" /> : <ChevronDown className="h-3.5 w-3.5 text-sky-600" />}
@@ -1765,6 +1747,7 @@ function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupC
           )}
         </>
       )}
+    </div>
     </div>
   );
 }
