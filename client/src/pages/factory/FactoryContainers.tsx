@@ -152,13 +152,17 @@ function OtwNotes() {
 }
 
 const OTW_STATUS_LABEL: Record<string, string> = {
-  PENDING: "Pending",
-  IN_TRANSIT: "In Transit",
-  ARRIVED: "Arrived",
-  OFFLOADED: "Offloaded",
-  PARTIALLY_RECEIVED: "Partially Received",
-  RECEIVED: "Received",
+  PENDING:            "Pending",
+  IN_TRANSIT:         "Pending",
+  ARRIVED:            "Pending",
+  OFFLOADED:          "Offloaded",
+  PARTIALLY_RECEIVED: "Pending",
+  RECEIVED:           "Pending",
 };
+
+function getContainerStatusLabel(status: string): string {
+  return status === "OFFLOADED" ? "Offloaded" : "Pending";
+}
 
 export default function FactoryContainers() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
@@ -1314,8 +1318,8 @@ export default function FactoryContainers() {
                               {totalValue > 0 ? `${ccy} ${formatNumber(totalValue)}` : <span className="text-muted-foreground">—</span>}
                             </TableCell>
                             <TableCell>
-                              <Badge variant={c.status === "AVAILABLE" ? "default" : "secondary"}>
-                                {c.status}
+                              <Badge variant={c.status === "OFFLOADED" ? "default" : "secondary"}>
+                                {getContainerStatusLabel(c.status)}
                               </Badge>
                             </TableCell>
                             <TableCell>
@@ -1945,7 +1949,7 @@ export default function FactoryContainers() {
                           <TableCell className="text-right font-mono">{row.totalKg || "-"}</TableCell>
                           <TableCell className="text-right font-mono">{row.ratePerKg || "-"}</TableCell>
                           <TableCell>{row.currencyCode}</TableCell>
-                          <TableCell><Badge variant="secondary">{row.status}</Badge></TableCell>
+                          <TableCell><Badge variant={row.status === "OFFLOADED" ? "default" : "secondary"}>{getContainerStatusLabel(row.status)}</Badge></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -2088,7 +2092,7 @@ export default function FactoryContainers() {
                     {viewContainer.containerNumber}
                   </DialogTitle>
                   <DialogDescription className="flex items-center gap-2 pt-1">
-                    <Badge variant={viewContainer.status === "AVAILABLE" ? "default" : "secondary"}>{viewContainer.status}</Badge>
+                    <Badge variant={viewContainer.status === "OFFLOADED" ? "default" : "secondary"}>{getContainerStatusLabel(viewContainer.status)}</Badge>
                     {viewContainer.supplierName && <span className="text-muted-foreground">{viewContainer.supplierName}</span>}
                     {viewContainer.arrivalDate && <span className="text-muted-foreground">· Arrived {viewContainer.arrivalDate}</span>}
                   </DialogDescription>

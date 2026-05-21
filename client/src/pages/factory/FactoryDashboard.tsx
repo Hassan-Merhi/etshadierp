@@ -46,12 +46,12 @@ interface Container {
 
 const STATUS_ORDER = ["PENDING", "IN_TRANSIT", "ARRIVED", "OFFLOADED", "PARTIALLY_RECEIVED", "RECEIVED"];
 const STATUS_LABEL: Record<string, string> = {
-  PENDING: "Pending",
-  IN_TRANSIT: "In Transit",
-  ARRIVED: "Arrived",
-  OFFLOADED: "Offloaded",
-  PARTIALLY_RECEIVED: "Partially Received",
-  RECEIVED: "Received",
+  PENDING:            "Pending",
+  IN_TRANSIT:         "Pending",
+  ARRIVED:            "Pending",
+  OFFLOADED:          "Offloaded",
+  PARTIALLY_RECEIVED: "Pending",
+  RECEIVED:           "Pending",
 };
 const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
 

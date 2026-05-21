@@ -795,19 +795,11 @@ export default function FactorySuppliers() {
   };
 
   const statusColor = (status: string) => {
-    switch (status) {
-      case "RECEIVED":
-      case "OFFLOADED":
-        return "default";
-      case "PENDING":
-        return "secondary";
-      case "IN_TRANSIT":
-        return "outline";
-      case "PARTIALLY_RECEIVED":
-        return "secondary";
-      default:
-        return "secondary";
-    }
+    return status === "OFFLOADED" ? "default" : "secondary";
+  };
+
+  const statusDisplayLabel = (status: string) => {
+    return status === "OFFLOADED" ? "Offloaded" : "Pending";
   };
 
   const allSuppliers = suppliers || [];
@@ -1978,7 +1970,7 @@ export default function FactorySuppliers() {
                                 <div className="flex flex-col gap-0.5">
                                   <div className="flex items-center gap-1 flex-wrap">
                                     <span>{row.ref}</span>
-                                    {row.status && <Badge variant={statusColor(row.status)} className="text-xs ml-1">{row.status}</Badge>}
+                                    {row.status && <Badge variant={statusColor(row.status)} className="text-xs ml-1">{statusDisplayLabel(row.status)}</Badge>}
                                   </div>
                                   {row.conversionNote && (
                                     <span className="text-xs text-blue-600 dark:text-blue-400 font-normal">{row.conversionNote}</span>
