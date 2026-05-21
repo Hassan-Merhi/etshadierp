@@ -1699,7 +1699,7 @@ function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupC
     } finally {
       setWaSending(false);
     }
-  }, [agent, agentName, openAndPartial, openBalance, openSum, hasBalance, activePreviewRows, toast]);
+  }, [agent, toast]);
 
   const {
     agentName, matchConfidence, ledgerAccountName,
