@@ -150,14 +150,31 @@ export default function FactoryInvoiceDetail() {
       if (!res.ok) throw new Error((await res.json()).message || "Failed to add charge");
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-orders/${orderId}`] });
       setShowAddCharge(false);
       setNewChargeName("");
       setNewChargeAmount("");
       setNewChargeType("FREIGHT");
       setNewChargeLedgerId("");
-      toast({ title: "Charge added", description: "Accounting voucher posted." });
+      if (data?.warning) {
+        toast({ title: "Charge added — ledger entry skipped", description: data.warning, variant: "destructive" });
+      } else {
+        toast({ title: "Charge added", description: "Accounting voucher posted." });
+      }
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const relinkVouchersMutation = useMutation({
+    mutationFn: async () => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/charges/relink-vouchers`, {});
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to relink");
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-orders/${orderId}`] });
+      toast({ title: data.linked > 0 ? "Ledger entries created" : "Nothing to relink", description: data.message });
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -900,7 +917,20 @@ export default function FactoryInvoiceDetail() {
 
       {isAdmin && (freightCharges.length > 0 || otherCharges.length > 0 || isFinalized) && (
         <Card className={`p-4 mb-6${hideExportSelling ? " print:hidden" : ""}`}>
-          <h3 className="font-semibold mb-3" data-testid="text-charges-header">Freight &amp; Charges</h3>
+          <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
+            <h3 className="font-semibold" data-testid="text-charges-header">Freight &amp; Charges</h3>
+            {isFinalized && [...freightCharges, ...otherCharges].some(c => !c.voucherId && c.ledgerAccountId) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => relinkVouchersMutation.mutate()}
+                disabled={relinkVouchersMutation.isPending}
+                data-testid="button-relink-charge-vouchers"
+              >
+                {relinkVouchersMutation.isPending ? "Linking..." : "Fix Ledger Entries"}
+              </Button>
+            )}
+          </div>
           <div className="space-y-3">
             {[...freightCharges, ...otherCharges].map((charge, idx) => {
               const linkedAccount = ledgerAccounts.find(a => a.id === charge.ledgerAccountId);
