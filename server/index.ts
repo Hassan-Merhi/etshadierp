@@ -3289,6 +3289,21 @@ let migrationsDone = false;
     `ALTER TABLE property_contracts ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'USD'`,
     `ALTER TABLE property_payments ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'USD'`,
     `ALTER TABLE property_payments ADD COLUMN IF NOT EXISTS exchange_rate NUMERIC(20,6) NOT NULL DEFAULT 1`,
+
+    // ── Daily Bale Scan — production day verification log (May 2026) ──────────
+    `CREATE TABLE IF NOT EXISTS factory_daily_bale_scans (
+      id                  serial PRIMARY KEY,
+      company_id          text NOT NULL,
+      scan_date           date NOT NULL,
+      reference_number    text NOT NULL,
+      article_code        text,
+      product_name        text,
+      weight_kg           numeric(12,3),
+      scanned_at          timestamptz NOT NULL DEFAULT now(),
+      scanned_by_user_id  text,
+      UNIQUE (company_id, scan_date, reference_number)
+    )`,
+    `CREATE INDEX IF NOT EXISTS factory_daily_bale_scans_company_date_idx ON factory_daily_bale_scans (company_id, scan_date)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

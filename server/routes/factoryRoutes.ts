@@ -13,6 +13,7 @@ import { registerFactoryTransporterRoutes } from "./factory/factoryTransporterRo
 import { registerFactoryStockAllocationV2Routes } from "./factory/factoryStockAllocationV2Routes";
 import { registerFactoryStockAllocationV5Routes } from "./factory/factoryStockAllocationV5Routes";
 import { registerFactoryShippingContainerRoutes } from "./factory/factoryShippingContainerRoutes";
+import { registerFactoryDailyScanRoutes } from "./factory/factoryDailyScanRoutes";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
@@ -73,6 +74,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     // Removing a bale from a customer order (loading context) is open to all authenticated factory users
     if (req.method === "DELETE" && /^\/customer-orders\/\d+\/bales\/\d+$/.test(req.path)) return next();
 
+    // Daily bale scan removals are open to all authenticated factory users
+    if (req.method === "DELETE" && /^\/daily-bale-scans\/\d+$/.test(req.path)) return next();
+
     // Worker assignment / reassignment is open to all authenticated factory users
     if (req.method === "PATCH" && /^\/bales\/\d+\/assign-worker$/.test(req.path)) return next();
     if (req.method === "PATCH" && req.path === "/bales/bulk-assign-worker") return next();
@@ -104,4 +108,5 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   registerFactoryStockAllocationV2Routes(app);
   registerFactoryStockAllocationV5Routes(app);
   registerFactoryShippingContainerRoutes(app);
+  registerFactoryDailyScanRoutes(app);
 }

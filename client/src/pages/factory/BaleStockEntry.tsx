@@ -44,6 +44,7 @@ import { PageHeader } from "@/components/PageHeader";
   import * as XLSX from "@/lib/excelHelper";
   import StockEntryHistory from "../StockEntryHistory";
 import GroundScan from "./GroundScan";
+import DailyScan from "./DailyScan";
   import { AdminAuthDialog } from "@/components/AdminAuthDialog";
   import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
   import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, formatLabelNum, A4_DESIGN_OPTIONS, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
@@ -2403,6 +2404,10 @@ import GroundScan from "./GroundScan";
               <ScanLine className="h-4 w-4 mr-1" />
               Ground Scan
             </TabsTrigger>
+            <TabsTrigger value="daily-scan" data-testid="tab-daily-scan">
+              <CalendarDays className="h-4 w-4 mr-1" />
+              Daily Scan
+            </TabsTrigger>
           </TabsList>
           {showEntry && (
             <TabsContent value="entry" className="mt-4">
@@ -2418,6 +2423,9 @@ import GroundScan from "./GroundScan";
           )}
           <TabsContent value="ground-scan" className="mt-0 p-0">
             <GroundScan />
+          </TabsContent>
+          <TabsContent value="daily-scan" className="mt-0 p-0">
+            <DailyScan />
           </TabsContent>
         </Tabs>
       </div>
