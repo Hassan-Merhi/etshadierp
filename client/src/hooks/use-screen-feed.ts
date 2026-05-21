@@ -6,8 +6,8 @@ const POLL_INTERVAL_MS    = 2000;
 // How often to capture + upload a frame while being watched
 const CAPTURE_INTERVAL_MS = 3000;
 // Max time to wait for html2canvas before giving up on a frame.
-// Two attempts × 2.5 s each = 5 s max, well inside the 12 s watcher window.
-const CAPTURE_TIMEOUT_MS  = 2500;
+// Two attempts × 4 s each = 8 s max, inside the 12 s watcher window.
+const CAPTURE_TIMEOUT_MS  = 4000;
 const CLICK_RETAIN_MS     = 8000;
 // Max dataUrl size we'll bother uploading (~1.2 MB as a base64 string)
 const MAX_DATA_URL_LEN    = 1_300_000;
@@ -62,15 +62,30 @@ function trace(event: string, extra?: string) {
   fetch(url, { credentials: "include" }).catch(() => {});
 }
 
+// Strip elements and CSS that reliably cause "createPattern" errors in html2canvas.
+// This runs on the cloned document (not the live page) so it's side-effect free.
+function sanitizeClone(doc: Document) {
+  // Remove <img> tags — they trigger createPattern when the src can't be
+  // rendered as a canvas image in Replit's Chromium sandbox.
+  doc.querySelectorAll("img").forEach(el => el.remove());
+  // Remove SVG <image> elements for the same reason.
+  doc.querySelectorAll("image").forEach(el => el.remove());
+  // Strip background-image from every element to avoid pattern fills.
+  doc.querySelectorAll<HTMLElement>("*").forEach(el => {
+    try {
+      const bg = window.getComputedStyle(el).backgroundImage;
+      if (bg && bg !== "none") el.style.backgroundImage = "none";
+    } catch { /* cross-origin iframe — skip */ }
+  });
+}
+
 const html2canvasBaseOpts = {
   scale:                  0.25,
   useCORS:                true,
   logging:                false,
-  // allowTaint intentionally NOT set (defaults false) — setting true taints the
-  // canvas on cross-origin images, causing toDataURL() to throw SecurityError.
   foreignObjectRendering: false,
-  // Don't wait more than 500 ms per image; skip it and move on.
-  imageTimeout:           500,
+  imageTimeout:           200,
+  onclone:                (_doc: Document, _el: HTMLElement) => sanitizeClone(_doc),
   ignoreElements: (el: Element) =>
     el.getAttribute("data-screenfeed-ignore") === "true",
 } as const;
@@ -144,6 +159,29 @@ function buildFallbackCanvas(): HTMLCanvasElement {
   return c;
 }
 
+/**
+ * Temporarily patch CanvasRenderingContext2D.createPattern so that the
+ * "InvalidStateError: canvas element with a width or height of 0" that
+ * html2canvas triggers in Replit's Chromium sandbox returns null instead
+ * of throwing. html2canvas checks for null before applying the pattern,
+ * so the render continues with a blank fill rather than crashing.
+ * The original method is restored in the finally block.
+ */
+function withSafeCreatePattern<T>(fn: () => T): T {
+  const orig = CanvasRenderingContext2D.prototype.createPattern;
+  CanvasRenderingContext2D.prototype.createPattern = function (
+    image: CanvasImageSource,
+    repetition: string | null,
+  ): CanvasPattern | null {
+    try { return orig.call(this, image, repetition); } catch { return null; }
+  };
+  try {
+    return fn();
+  } finally {
+    CanvasRenderingContext2D.prototype.createPattern = orig;
+  }
+}
+
 async function captureAndUpload() {
   // Note: we intentionally do NOT skip on document.hidden.
   // html2canvas renders from the DOM (not the visual screen), so it works
@@ -152,17 +190,17 @@ async function captureAndUpload() {
 
   let canvas: HTMLCanvasElement;
   try {
-    canvas = await tryCapture(html2canvasBaseOpts);
+    canvas = await withSafeCreatePattern(() => tryCapture(html2canvasBaseOpts));
     trace("capture-ok");
   } catch (err) {
     trace("capture-fail-p1", String(err).slice(0, 80));
     // Retry once with very conservative settings
     try {
-      canvas = await tryCapture({
+      canvas = await withSafeCreatePattern(() => tryCapture({
         ...html2canvasBaseOpts,
         scale:        0.15,
         imageTimeout: 200,
-      });
+      }));
       trace("capture-ok-retry");
     } catch (err2) {
       trace("capture-fail-p2", String(err2).slice(0, 80));
