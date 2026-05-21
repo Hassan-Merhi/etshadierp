@@ -35,6 +35,7 @@ import {
   FileCheck,
   ArrowLeftRight,
   TrendingUp,
+  Circle,
 } from "lucide-react";
 import {
   Select,
@@ -2152,6 +2153,29 @@ export function ChatWidget() {
     "What are my outstanding payments?",
   ];
 
+  const formatMsgTime = (iso: string) => {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return "";
+    }
+  };
+
+  const pageContext = (() => {
+    const p = location;
+    if (p.startsWith("/factory")) return "Factory";
+    if (p.startsWith("/pos")) return "POS";
+    if (p.startsWith("/properties")) return "Properties";
+    if (p.startsWith("/inventory")) return "Inventory";
+    if (p.startsWith("/accounts")) return "Accounts";
+    if (p.startsWith("/reports")) return "Reports";
+    if (p.startsWith("/customers")) return "Customers";
+    if (p.startsWith("/suppliers")) return "Suppliers";
+    if (p.startsWith("/vouchers")) return "Vouchers";
+    return "Dashboard";
+  })();
+
   const displaySuggestions = suggestions.length > 0 ? suggestions : defaultSuggestions;
 
   return (
@@ -2173,25 +2197,28 @@ export function ChatWidget() {
       ) : (
         <Card
           className={cn(
-            "w-[360px] sm:w-[420px] shadow-2xl transition-all duration-200 flex flex-col",
+            "w-[360px] sm:w-[420px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] rounded-3xl transition-all duration-200 flex flex-col overflow-hidden",
             isMinimized ? "h-auto" : "h-[600px]"
           )}
         >
-          <CardHeader className="flex flex-row items-center justify-between gap-2 py-3 px-4 border-b bg-primary/5">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-                <Sparkles className="h-4 w-4 text-primary-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between gap-2 py-4 px-5 border-b">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-full bg-blue-50 dark:bg-blue-900/40 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-blue-500 dark:text-blue-400" />
               </div>
               <div>
-                <CardTitle className="text-sm font-semibold">ERP Assistant</CardTitle>
-                <p className="text-xs text-muted-foreground">Powered by AI</p>
+                <CardTitle className="text-sm font-medium">ERP Assistant</CardTitle>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <Circle className="h-1.5 w-1.5 fill-green-500 text-green-500" />
+                  <p className="text-xs text-muted-foreground">Online</p>
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-8 w-8 rounded-full"
                 onClick={handleNewChat}
                 title="New conversation"
                 data-testid="button-new-chat"
@@ -2201,7 +2228,7 @@ export function ChatWidget() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-8 w-8 rounded-full"
                 onClick={() => setIsMinimized(!isMinimized)}
                 data-testid="button-minimize-chat"
               >
@@ -2214,7 +2241,7 @@ export function ChatWidget() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-8 w-8 rounded-full"
                 onClick={() => setIsOpen(false)}
                 data-testid="button-close-chat"
               >
@@ -2222,6 +2249,19 @@ export function ChatWidget() {
               </Button>
             </div>
           </CardHeader>
+
+          {/* Context pill */}
+          {!isMinimized && (
+            <div className="px-5 pt-2.5 pb-1 bg-background">
+              <Badge
+                variant="secondary"
+                className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-800 font-medium px-2 py-0.5 flex items-center gap-1.5 w-fit text-[11px]"
+              >
+                <Package className="h-3 w-3" />
+                Context: {pageContext}
+              </Badge>
+            </div>
+          )}
 
           {!isMinimized && (
             <CardContent className="p-0 flex flex-col flex-1 overflow-hidden">
@@ -2266,28 +2306,33 @@ export function ChatWidget() {
                   </div>
                 )}
 
-                <div className="space-y-4">
+                <div className="space-y-5">
                   {history.map((msg) => (
                     <div
                       key={msg.id}
                       className={cn(
-                        "flex gap-2",
+                        "flex gap-2.5",
                         msg.role === "user" ? "justify-end" : "justify-start"
                       )}
                       data-testid={`chat-message-${msg.id}`}
                     >
                       {msg.role === "assistant" && (
-                        <div className="flex-shrink-0 h-7 w-7 rounded-full bg-primary flex items-center justify-center mt-1">
-                          <Bot className="h-4 w-4 text-primary-foreground" />
+                        <div className="flex-shrink-0 h-7 w-7 rounded-full bg-blue-500 dark:bg-blue-600 flex items-center justify-center mt-1">
+                          <Sparkles className="h-3.5 w-3.5 text-white" />
                         </div>
                       )}
-                      <div className="flex flex-col max-w-[85%]">
+                      <div className="flex flex-col max-w-[83%]">
+                        <div className={cn("flex items-center gap-1.5 mb-1 px-0.5", msg.role === "user" ? "justify-end" : "")}>
+                          <span className="text-[11px] text-muted-foreground">
+                            {msg.role === "assistant" ? "Assistant" : "You"}{msg.createdAt ? ` · ${formatMsgTime(msg.createdAt)}` : ""}
+                          </span>
+                        </div>
                         <div
                           className={cn(
-                            "rounded-lg px-3 py-2 text-sm",
+                            "px-4 py-2.5 text-sm leading-relaxed",
                             msg.role === "user"
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted"
+                              ? "bg-blue-50 text-blue-900 dark:bg-blue-900/50 dark:text-blue-100 rounded-2xl rounded-tr-sm"
+                              : "bg-gray-50 dark:bg-zinc-800/80 rounded-2xl rounded-tl-sm"
                           )}
                         >
                           {msg.role === "assistant" ? (
@@ -2379,19 +2424,19 @@ export function ChatWidget() {
                         )}
                       </div>
                       {msg.role === "user" && (
-                        <div className="flex-shrink-0 h-7 w-7 rounded-full bg-muted flex items-center justify-center mt-1">
-                          <User className="h-4 w-4" />
+                        <div className="flex-shrink-0 h-7 w-7 rounded-full bg-gray-200 dark:bg-zinc-700 flex items-center justify-center mt-1 text-xs font-semibold text-gray-600 dark:text-zinc-300">
+                          U
                         </div>
                       )}
                     </div>
                   ))}
 
                   {sendMutation.isPending && (
-                    <div className="flex gap-2 justify-start">
-                      <div className="flex-shrink-0 h-7 w-7 rounded-full bg-primary flex items-center justify-center">
-                        <Bot className="h-4 w-4 text-primary-foreground" />
+                    <div className="flex gap-2.5 justify-start">
+                      <div className="flex-shrink-0 h-7 w-7 rounded-full bg-blue-500 dark:bg-blue-600 flex items-center justify-center">
+                        <Sparkles className="h-3.5 w-3.5 text-white" />
                       </div>
-                      <div className="bg-muted rounded-lg px-4 py-3">
+                      <div className="bg-gray-50 dark:bg-zinc-800/80 rounded-2xl rounded-tl-sm px-4 py-2.5">
                         <div className="flex items-center gap-2">
                           <Loader2 className="h-4 w-4 animate-spin" />
                           <span className="text-sm text-muted-foreground">Thinking...</span>
@@ -2517,8 +2562,8 @@ export function ChatWidget() {
                 )}
               </ScrollArea>
 
-              <div className="p-3 border-t bg-background">
-                <div className="flex gap-2">
+              <div className="p-4 border-t bg-background">
+                <div className="flex items-center gap-1 bg-muted/50 dark:bg-zinc-800/50 rounded-2xl border border-border/60 px-1 pr-1.5 focus-within:border-blue-300 dark:focus-within:border-blue-700 focus-within:ring-2 focus-within:ring-blue-100 dark:focus-within:ring-blue-900/40 transition-all">
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -2530,6 +2575,7 @@ export function ChatWidget() {
                   <Button
                     size="icon"
                     variant="ghost"
+                    className="h-9 w-9 rounded-xl shrink-0 text-muted-foreground"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={poDraftUploading || sendMutation.isPending}
                     title="Import PO from file"
@@ -2543,16 +2589,17 @@ export function ChatWidget() {
                   </Button>
                   <Input
                     ref={inputRef}
-                    placeholder="Ask about your business data..."
+                    placeholder="Ask anything..."
                     value={message}
                     onChange={e => setMessage(e.target.value)}
                     onKeyDown={handleKeyDown}
                     disabled={sendMutation.isPending}
-                    className="flex-1"
+                    className="flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0 px-1 h-10 text-sm placeholder:text-muted-foreground/60"
                     data-testid="input-chat-message"
                   />
                   <Button
                     size="icon"
+                    className="h-9 w-9 rounded-xl shrink-0 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 hover:bg-black dark:hover:bg-white"
                     onClick={() => handleSend()}
                     disabled={!message.trim() || sendMutation.isPending}
                     data-testid="button-send-message"
@@ -2560,7 +2607,7 @@ export function ChatWidget() {
                     {sendMutation.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Send className="h-4 w-4" />
+                      <Send className="h-4 w-4 ml-0.5" />
                     )}
                   </Button>
                 </div>
@@ -2572,6 +2619,9 @@ export function ChatWidget() {
                     Failed to send message. Please try again.
                   </p>
                 )}
+                <p className="text-center mt-2 text-[10px] text-muted-foreground/50 font-medium tracking-wide uppercase">
+                  AI responses may be inaccurate
+                </p>
               </div>
             </CardContent>
           )}
