@@ -1550,28 +1550,148 @@ function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupC
   const cardRef = useRef<HTMLDivElement>(null);
 
   const sendToWhatsApp = useCallback(async () => {
-    if (!cardRef.current) return;
     setWaSending(true);
     try {
       const html2canvas = (await import("html2canvas")).default;
-      const el = cardRef.current;
-      const canvas = await html2canvas(el, {
+
+      // Escape HTML special chars for inline HTML building
+      const esc = (s: unknown) =>
+        String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+      const today = new Date().toLocaleDateString("en-GB", {
+        day: "2-digit", month: "short", year: "numeric",
+      });
+
+      // ── helpers ──────────────────────────────────────────────────────────
+      const thStyle = (bg = "#92400e") =>
+        `padding:7px 10px;font-size:11.5px;font-weight:700;text-align:center;` +
+        `background:${bg};color:#ffffff;border:1px solid rgba(0,0,0,0.15);white-space:nowrap;`;
+
+      const tdBase = (align = "left", bold = false, color = "#111827") =>
+        `font-size:11.5px;padding:5px 10px;text-align:${align};color:${color};` +
+        `font-weight:${bold ? "700" : "400"};border:1px solid #e5e7eb;white-space:nowrap;`;
+
+      // ── open/partial rows ─────────────────────────────────────────────────
+      let openRowsHtml = "";
+      if (openAndPartial.length === 0) {
+        openRowsHtml = `<tr><td colspan="11" style="padding:18px;text-align:center;color:#6b7280;font-style:italic;font-size:12px;border:1px solid #e5e7eb;">No open containers — account fully cleared.</td></tr>`;
+      } else {
+        openAndPartial.forEach((r, i) => {
+          const isPartial = r.allocationStatus === "Partially Cleared";
+          const bg = isPartial ? "#fffbeb" : (i % 2 === 0 ? "#ffffff" : "#f9fafb");
+          const statusColor = isPartial ? "#b45309" : "#374151";
+          const statusLabel = isPartial ? "Partial" : "Open";
+          openRowsHtml += `<tr style="background:${bg}">
+            <td style="${tdBase("left", true)}">${esc(r.containerNumber)}</td>
+            <td style="${tdBase()}">${esc(r.supplierCode ?? "—")}</td>
+            <td style="${tdBase()}">${esc(r.numberPlate ?? "—")}</td>
+            <td style="${tdBase()}">${esc(fmtD(r.offloadDate ?? null))}</td>
+            <td style="${tdBase()}">${esc(fmtD(r.borderDate))}</td>
+            <td style="${tdBase()}">${esc(r.transporter ?? "—")}</td>
+            <td style="${tdBase()}">${esc(r.location ?? "—")}</td>
+            <td style="${tdBase("right", true)}">${esc("$" + fmt(r.dutyFee, 0))}</td>
+            <td style="${tdBase("right", false, r.clearedAmount > 0 ? "#059669" : "#9ca3af")}">${r.clearedAmount > 0 ? esc("$" + fmt(r.clearedAmount, 0)) : "—"}</td>
+            <td style="${tdBase("right", true)}">${esc("$" + fmt(r.remainingAmount, 0))}</td>
+            <td style="${tdBase("center", false, statusColor)};font-weight:600">${esc(statusLabel)}</td>
+          </tr>`;
+        });
+      }
+
+      // ── open balance footer row ───────────────────────────────────────────
+      const balanceRowHtml = hasBalance ? `
+        <tr style="background:#fbbf24">
+          <td colspan="9" style="padding:9px 10px;font-size:12px;font-weight:700;color:#1c1917;text-transform:uppercase;letter-spacing:0.05em;border:1px solid #f59e0b;">
+            Open Balance (= Account Balance)
+          </td>
+          <td style="padding:9px 10px;font-size:14px;font-weight:800;color:#1c1917;text-align:right;border:1px solid #f59e0b;">
+            $${esc(fmt(openBalance ?? openSum, 0))}
+          </td>
+          <td style="border:1px solid #f59e0b;"></td>
+        </tr>` : "";
+
+      // ── in-transit section ────────────────────────────────────────────────
+      let transitHtml = "";
+      if (activePreviewRows.length > 0) {
+        const transitTotal = activePreviewRows.reduce((s, r) => s + r.dutyFee, 0);
+        let transitRowsHtml = "";
+        activePreviewRows.forEach((r, i) => {
+          const bg = i % 2 === 0 ? "#f0f9ff" : "#e0f2fe";
+          transitRowsHtml += `<tr style="background:${bg}">
+            <td style="${tdBase("left", true, "#0c4a6e")}">${esc(r.containerNumber)}</td>
+            <td style="${tdBase("left", false, "#0c4a6e")}">${esc(r.supplierCode ?? r.supplierName ?? "—")}</td>
+            <td style="${tdBase("left", false, "#0c4a6e")}">${esc(r.numberPlate ?? "—")}</td>
+            <td style="${tdBase("left", false, "#0c4a6e")}">${esc(fmtD(r.borderDate))}</td>
+            <td style="${tdBase("left", false, "#0c4a6e")}">${esc(r.transporter ?? "—")}</td>
+            <td style="${tdBase("left", false, "#0c4a6e")}">${esc(r.location ?? "—")}</td>
+            <td style="${tdBase("right", true, "#0c4a6e")}">${esc("$" + fmt(r.dutyFee, 0))}</td>
+          </tr>`;
+        });
+
+        const transitCols = ["CONTAINER #", "SUPPLIER", "PLATE", "BORDER DATE", "TRANSPORTER", "LOCATION", "DUTY"];
+        transitHtml = `
+          <div style="background:#0284c7;padding:11px 12px;text-align:center;">
+            <span style="font-size:13px;font-weight:700;color:#ffffff;text-transform:uppercase;letter-spacing:0.08em;">
+              In Transit — ${activePreviewRows.length} Container${activePreviewRows.length !== 1 ? "s" : ""} &nbsp;·&nbsp; $${fmt(transitTotal, 0)} Upcoming Duty
+            </span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr>${transitCols.map(h => `<th style="${thStyle("#0369a1")}">${h}</th>`).join("")}</tr>
+            </thead>
+            <tbody>${transitRowsHtml}</tbody>
+          </table>`;
+      }
+
+      // ── assemble full capture element ─────────────────────────────────────
+      const capture = document.createElement("div");
+      capture.style.cssText =
+        "position:fixed;top:-9999px;left:-9999px;width:820px;" +
+        "background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;" +
+        "border:1px solid #d1d5db;border-radius:6px;overflow:hidden;";
+
+      const openCols = ["CONTAINER #", "SUPPLIER", "PLATE", "OFFLOAD DATE", "BORDER DATE", "TRANSPORTER", "LOCATION", "DUTY", "CLEARED", "REMAINING", "STATUS"];
+
+      capture.innerHTML = `
+        <div style="background:#fbbf24;padding:16px 12px;text-align:center;">
+          <div style="font-size:24px;font-weight:800;color:#1c1917;letter-spacing:0.06em;text-transform:uppercase;">${esc(agentName)}</div>
+          <div style="font-size:11px;color:#78350f;margin-top:3px;font-weight:500;">Agent Duty Summary &nbsp;·&nbsp; ${today}</div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr>${openCols.map(h => `<th style="${thStyle()}">${h}</th>`).join("")}</tr>
+          </thead>
+          <tbody>
+            ${openRowsHtml}
+            ${balanceRowHtml}
+          </tbody>
+        </table>
+        ${transitHtml}
+        <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:5px 12px;font-size:10px;color:#9ca3af;text-align:right;">
+          HMD International Group &nbsp;·&nbsp; ERP System &nbsp;·&nbsp; ${new Date().toLocaleString("en-GB")}
+        </div>`;
+
+      document.body.appendChild(capture);
+
+      const canvas = await html2canvas(capture, {
         scale: 3,
         useCORS: true,
         allowTaint: true,
         backgroundColor: "#ffffff",
         logging: false,
-        width: el.scrollWidth,
-        height: el.scrollHeight,
-        windowWidth: el.scrollWidth,
-        windowHeight: el.scrollHeight,
+        width: 820,
+        height: capture.scrollHeight,
+        windowWidth: 820,
+        windowHeight: capture.scrollHeight,
       });
+
+      document.body.removeChild(capture);
+
       const imageBase64 = canvas.toDataURL("image/png");
-      const today = new Date().toISOString().substring(0, 10);
+      const todayStr = new Date().toISOString().substring(0, 10);
       await apiRequest("POST", "/api/git/send-agent-duty-whatsapp", {
         imageBase64,
         agentName: agent.agentName,
-        fileName: `AgentDuty_${agent.agentName}_${today}.png`,
+        fileName: `AgentDuty_${agent.agentName}_${todayStr}.png`,
       });
       toast({ title: "Sent", description: `Balance allocation sent to ${agent.agentName} WhatsApp group.` });
     } catch (err: any) {
@@ -1579,7 +1699,7 @@ function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupC
     } finally {
       setWaSending(false);
     }
-  }, [agent.agentName, toast]);
+  }, [agent, agentName, openAndPartial, openBalance, openSum, hasBalance, activePreviewRows, toast]);
 
   const {
     agentName, matchConfidence, ledgerAccountName,
