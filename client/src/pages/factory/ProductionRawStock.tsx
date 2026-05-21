@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Container, Package, Plus, ArrowDown, AlertTriangle, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, FlaskConical, FileSpreadsheet, FileText, SlidersHorizontal, PlusCircle, MinusCircle, History, ArrowUpCircle, ArrowDownCircle, FlaskRound, Tag, ChevronRight, ChevronDown, Folder, FolderOpen, Eye, EyeOff, Send, Loader2 } from "lucide-react";
+import { Container, Package, Plus, ArrowDown, AlertTriangle, Gavel, X, Check, ChevronsUpDown, Link2, Pencil, Trash2, Layers, BarChart3, FlaskConical, FileSpreadsheet, FileText, SlidersHorizontal, PlusCircle, MinusCircle, History, ArrowUpCircle, ArrowDownCircle, FlaskRound, Tag, ChevronRight, ChevronDown, Folder, FolderOpen, Eye, EyeOff, Send, Loader2, Calendar, MessageCircle } from "lucide-react";
 import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
 import { EditMixBatchDialog } from "@/components/EditMixBatchDialog";
 import type { FactoryMixBatch } from "@shared/schema";
@@ -670,6 +670,9 @@ export default function ProductionRawStock() {
   const [weeklyPeriod, setWeeklyPeriod] = useState<"all" | "year" | "month" | "week">("all");
   const [waGroupChatId, setWaGroupChatId] = useState("");
   const [deleteBatchId, setDeleteBatchId] = useState<number | null>(null);
+  const [mixBatchDate, setMixBatchDate] = useState(() => new Date().toISOString().substring(0, 10));
+  const [isSendingMixBatchWa, setIsSendingMixBatchWa] = useState(false);
+  const mixBatchPrintRef = useRef<HTMLDivElement>(null);
   const [editBatch, setEditBatch] = useState<FactoryMixBatch | null>(null);
   const [batchDetailOpen, setBatchDetailOpen] = useState(false);
   const [selectedBatchDetail, setSelectedBatchDetail] = useState<MixBatchRow | null>(null);
@@ -736,6 +739,49 @@ export default function ProductionRawStock() {
     onSuccess: () => toast({ title: "Sent", description: "Weekly production report sent to WhatsApp group." }),
     onError: (e: any) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
   });
+
+  const { data: mixBatchesByDate = [], isLoading: mixBatchesByDateLoading } = useQuery<any[]>({
+    queryKey: ["/api/factory/mix-batches-by-date", mixBatchDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/mix-batches-by-date?date=${mixBatchDate}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch batches");
+      return res.json();
+    },
+    enabled: dailyReportOpen,
+  });
+
+  async function sendMixBatchToWhatsApp() {
+    const el = mixBatchPrintRef.current;
+    if (!el) return;
+    setIsSendingMixBatchWa(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(el, {
+        backgroundColor: "#111827",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      const imageBase64 = canvas.toDataURL("image/png");
+      const res = await fetch("/api/factory/send-mix-batch-image-whatsapp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          imageBase64,
+          date: mixBatchDate,
+          fileName: `MixBatch_${mixBatchDate}.png`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to send");
+      toast({ title: "Sent", description: data.message || "Mix batch image sent to WhatsApp group." });
+    } catch (err: any) {
+      toast({ title: "Send failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSendingMixBatchWa(false);
+    }
+  }
 
   const { data: dailyReport, isLoading: dailyReportLoading } = useQuery<any>({
     queryKey: ["/api/factory/daily-report"],
@@ -1881,74 +1927,189 @@ export default function ProductionRawStock() {
             </div>
           </div>
 
-          {/* All-time report panel */}
+          {/* Mix Batch Details report panel */}
           {dailyReportOpen && (
-            <div className="mt-4 border rounded-md p-4 space-y-3">
-              <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="mt-4 border rounded-md p-4 space-y-4">
+              {/* Header row: title + date picker + send button */}
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <span className="text-sm font-medium">Weekly Production Report</span>
-                  <p className="text-xs text-muted-foreground mt-0.5">Category × day pivot — one section per week, with opening balance, stock-in and daily consumption</p>
+                  <span className="text-sm font-medium">Mix Batch Details</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">Select a date to preview mix batches and send to WhatsApp</p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
+                  <div className="relative flex items-center">
+                    <Calendar className="absolute left-2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <input
+                      type="date"
+                      value={mixBatchDate}
+                      max={new Date().toISOString().substring(0, 10)}
+                      onChange={(e) => setMixBatchDate(e.target.value)}
+                      data-testid="input-mix-batch-date"
+                      className="pl-8 pr-2 py-1.5 text-sm border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => window.open(`/api/factory/weekly-report/export?format=excel&period=all`, "_blank")}
-                    data-testid="button-export-weekly-excel"
+                    onClick={sendMixBatchToWhatsApp}
+                    disabled={isSendingMixBatchWa || mixBatchesByDate.length === 0}
+                    data-testid="button-send-mix-batch-whatsapp"
+                    title={mixBatchesByDate.length === 0 ? "No batches for this date" : "Screenshot and send to WhatsApp group"}
                   >
-                    <FileSpreadsheet className="h-4 w-4 mr-1" />
-                    Excel
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => sendWaMutation.mutate()}
-                    disabled={!waGroupChatId || sendWaMutation.isPending}
-                    data-testid="button-send-weekly-whatsapp"
-                    title={!waGroupChatId ? "Configure a WhatsApp group in Export Settings first" : "Send Excel to WhatsApp group"}
-                  >
-                    {sendWaMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
-                    Send
+                    {isSendingMixBatchWa
+                      ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      : <MessageCircle className="h-4 w-4 mr-1" />}
+                    Send on WhatsApp
                   </Button>
                 </div>
               </div>
-              {dailyReportLoading ? (
-                <div className="space-y-2"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></div>
-              ) : dailyReport?.usages?.length > 0 ? (
-                <>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Batch Code</TableHead>
-                        <TableHead>Batch Name</TableHead>
-                        <TableHead>Operator</TableHead>
-                        <TableHead className="text-right">KG Used</TableHead>
-                        <TableHead className="text-right">Cost/kg</TableHead>
-                        <TableHead>Notes</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {dailyReport.usages.map((u: any) => (
-                        <TableRow key={u.id} data-testid={`row-daily-usage-${u.id}`}>
-                          <TableCell className="text-sm font-mono">{u.usedDate || "—"}</TableCell>
-                          <TableCell className="font-mono text-sm">{u.batchCode}</TableCell>
-                          <TableCell className="text-sm">{u.batchName || "—"}</TableCell>
-                          <TableCell className="text-sm">{u.operatorUser || "—"}</TableCell>
-                          <TableCell className="text-right font-mono font-medium">{fmtKg(parseFloat(u.kgUsed))} kg</TableCell>
-                          <TableCell className="text-right font-mono">{parseFloat(u.costPerKg).toFixed(4)}/kg</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{u.notes || "—"}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  <div className="text-sm text-right text-muted-foreground">
-                    Total consumed: <span className="font-mono font-medium">{formatNumber(parseFloat(dailyReport.totalKgUsed))} kg</span>
-                  </div>
-                </>
+
+              {/* Loading / empty / preview */}
+              {mixBatchesByDateLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-28 w-full" />
+                  <Skeleton className="h-28 w-full" />
+                </div>
+              ) : mixBatchesByDate.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">No mix batches found for this date.</p>
               ) : (
-                <p className="text-sm text-muted-foreground py-4 text-center">No consumption records found.</p>
+                <div className="space-y-3">
+                  {mixBatchesByDate.map((batch: any) => (
+                    <div key={batch.id} className="border rounded-md p-3 space-y-2">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                          <span className="font-mono font-semibold text-sm">{batch.batchCode}</span>
+                          {batch.name && <span className="ml-2 text-sm text-muted-foreground">{batch.name}</span>}
+                        </div>
+                        <Badge variant={batch.status === "COMPLETED" ? "default" : "secondary"} className="text-xs">
+                          {batch.status}
+                        </Badge>
+                      </div>
+                      <div className="flex gap-4 flex-wrap text-xs text-muted-foreground">
+                        <span>Weight: <span className="font-mono font-medium text-foreground">{formatNumber(batch.totalWeightKg)} kg</span></span>
+                        <span>Cost: <span className="font-mono font-medium text-foreground">${formatNumber(batch.totalCost)}</span></span>
+                        <span>$/kg: <span className="font-mono font-medium text-foreground">${batch.costPerKg.toFixed(2)}</span></span>
+                      </div>
+                      {batch.sources?.length > 0 && (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-xs py-1">Source</TableHead>
+                              <TableHead className="text-xs py-1">Container</TableHead>
+                              <TableHead className="text-xs py-1 text-right">Weight (kg)</TableHead>
+                              <TableHead className="text-xs py-1 text-right">$/kg</TableHead>
+                              <TableHead className="text-xs py-1 text-right">Total</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {batch.sources.map((src: any) => (
+                              <TableRow key={src.id} data-testid={`row-mix-batch-source-${src.id}`}>
+                                <TableCell className="text-xs py-1 font-medium">{src.sourceName}</TableCell>
+                                <TableCell className="text-xs py-1 text-muted-foreground font-mono">{src.containerNumber || "—"}</TableCell>
+                                <TableCell className="text-xs py-1 text-right font-mono">{formatNumber(src.weightKg)}</TableCell>
+                                <TableCell className="text-xs py-1 text-right font-mono">${src.costPerKg.toFixed(2)}</TableCell>
+                                <TableCell className="text-xs py-1 text-right font-mono">${formatNumber(src.totalCost)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
+
+              {/* Hidden printable card — screenshotted by html2canvas */}
+              <div
+                ref={mixBatchPrintRef}
+                style={{
+                  position: "fixed",
+                  top: "-9999px",
+                  left: "-9999px",
+                  width: "680px",
+                  backgroundColor: "#111827",
+                  color: "#f9fafb",
+                  padding: "24px",
+                  fontFamily: "Inter, system-ui, sans-serif",
+                  borderRadius: "12px",
+                  zIndex: -1,
+                }}
+              >
+                {/* Card header */}
+                <div style={{ marginBottom: "16px", borderBottom: "1px solid #374151", paddingBottom: "12px" }}>
+                  <div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "4px" }}>
+                    {new Date(mixBatchDate + "T00:00:00").toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })}
+                  </div>
+                  <div style={{ fontSize: "18px", fontWeight: 700, color: "#f9fafb" }}>Mix Batch Details</div>
+                </div>
+
+                {mixBatchesByDate.map((batch: any) => (
+                  <div key={batch.id} style={{ marginBottom: "20px" }}>
+                    {/* Batch header */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                      <div>
+                        <div style={{ fontSize: "15px", fontWeight: 700, fontFamily: "monospace", color: "#f9fafb" }}>{batch.batchCode}</div>
+                        {batch.name && <div style={{ fontSize: "12px", color: "#9ca3af", marginTop: "2px" }}>{batch.name}</div>}
+                      </div>
+                      <span style={{
+                        fontSize: "11px", fontWeight: 600, padding: "3px 10px",
+                        borderRadius: "999px", backgroundColor: batch.status === "COMPLETED" ? "#166534" : "#374151",
+                        color: batch.status === "COMPLETED" ? "#bbf7d0" : "#d1d5db",
+                        border: "1px solid " + (batch.status === "COMPLETED" ? "#16a34a" : "#4b5563"),
+                      }}>
+                        {batch.status}
+                      </span>
+                    </div>
+
+                    {/* Stats row */}
+                    <div style={{ display: "flex", gap: "16px", marginBottom: "14px" }}>
+                      {[
+                        { label: "Total Weight", value: formatNumber(batch.totalWeightKg) + " kg" },
+                        { label: "Total Cost", value: "$" + formatNumber(batch.totalCost) },
+                        { label: "Cost/kg", value: "$" + batch.costPerKg.toFixed(2) },
+                      ].map((stat) => (
+                        <div key={stat.label} style={{ flex: 1, backgroundColor: "#1f2937", borderRadius: "8px", padding: "10px 14px" }}>
+                          <div style={{ fontSize: "10px", color: "#6b7280", marginBottom: "4px" }}>{stat.label}</div>
+                          <div style={{ fontSize: "14px", fontWeight: 700, fontFamily: "monospace", color: "#f9fafb" }}>{stat.value}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Sources table */}
+                    {batch.sources?.length > 0 && (
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                        <thead>
+                          <tr style={{ backgroundColor: "#1f2937" }}>
+                            {["SOURCE", "CONTAINER", "WEIGHT", "$/KG", "TOTAL"].map((h, i) => (
+                              <th key={h} style={{
+                                padding: "8px 10px", textAlign: i > 1 ? "right" : "left",
+                                color: "#6b7280", fontWeight: 600, fontSize: "10px",
+                                borderBottom: "1px solid #374151",
+                              }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {batch.sources.map((src: any, idx: number) => (
+                            <tr key={src.id} style={{ backgroundColor: idx % 2 === 0 ? "transparent" : "#1a2332" }}>
+                              <td style={{ padding: "7px 10px", color: "#f9fafb", fontWeight: 500 }}>{src.sourceName}</td>
+                              <td style={{ padding: "7px 10px", color: "#9ca3af", fontFamily: "monospace", fontSize: "11px" }}>{src.containerNumber || "—"}</td>
+                              <td style={{ padding: "7px 10px", color: "#f9fafb", textAlign: "right", fontFamily: "monospace" }}>{formatNumber(src.weightKg)} kg</td>
+                              <td style={{ padding: "7px 10px", color: "#f9fafb", textAlign: "right", fontFamily: "monospace" }}>${src.costPerKg.toFixed(2)}</td>
+                              <td style={{ padding: "7px 10px", color: "#f9fafb", textAlign: "right", fontFamily: "monospace" }}>${formatNumber(src.totalCost)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                ))}
+
+                {/* Footer */}
+                <div style={{ marginTop: "16px", borderTop: "1px solid #374151", paddingTop: "10px", fontSize: "10px", color: "#6b7280", textAlign: "right" }}>
+                  Generated {new Date().toLocaleString()}
+                </div>
+              </div>
             </div>
           )}
         </CardHeader>

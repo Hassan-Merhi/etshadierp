@@ -7,6 +7,7 @@ import path from "path";
 import { sqlArray } from "../lib/sqlArray";
 import fs from "fs";
 import { eq, and, sql, desc } from "drizzle-orm";
+import { pool } from "../db";
 import {
   factorySuppliers,
   factoryContainers,
@@ -651,4 +652,121 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     await workbook.xlsx.write(res);
     res.end();
   }
+
+  // ── Mix batches by date ───────────────────────────────────────────────────
+  app.get("/api/factory/mix-batches-by-date", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session?.factoryCompanyId || req.session?.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const date = req.query.date as string;
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return res.status(400).json({ message: "date query param required (YYYY-MM-DD)" });
+      }
+
+      const batchesResult = await pool.query(`
+        SELECT b.id, b.batch_code, b.name, b.status, b.total_weight_kg, b.used_kg,
+               b.batch_date, b.created_at, b.notes
+        FROM factory_mix_batches b
+        WHERE b.company_id = $1
+          AND b.deleted_at IS NULL
+          AND (
+            b.batch_date = $2::date
+            OR (b.batch_date IS NULL AND DATE(b.created_at AT TIME ZONE 'UTC') = $2::date)
+          )
+        ORDER BY b.created_at DESC
+      `, [companyId, date]);
+
+      const batches = batchesResult.rows;
+      const batchIds = batches.map((b: any) => b.id);
+
+      let sources: any[] = [];
+      if (batchIds.length > 0) {
+        const sourcesResult = await pool.query(`
+          SELECT
+            s.id, s.mix_batch_id, s.weight_kg, s.cost_per_kg, s.total_cost,
+            c.container_number,
+            COALESCE(sup_via_c.name, sup_direct.name, mb.batch_code, 'Unknown') AS source_name
+          FROM factory_mix_batch_sources s
+          LEFT JOIN factory_containers c ON c.id = s.container_id
+          LEFT JOIN factory_suppliers sup_via_c ON sup_via_c.id = c.supplier_id
+          LEFT JOIN factory_suppliers sup_direct ON sup_direct.id = s.supplier_id
+          LEFT JOIN factory_mix_batches mb ON mb.id = s.source_batch_id
+          WHERE s.mix_batch_id = ANY($1)
+          ORDER BY s.id
+        `, [batchIds]);
+        sources = sourcesResult.rows;
+      }
+
+      const enriched = batches.map((b: any) => {
+        const batchSources = sources.filter((s: any) => s.mix_batch_id === b.id);
+        const totalWeight = parseFloat(b.total_weight_kg) || 0;
+        const totalCost = batchSources.reduce((sum: number, s: any) => sum + (parseFloat(s.total_cost) || 0), 0);
+        const costPerKg = totalWeight > 0 ? totalCost / totalWeight : 0;
+        return {
+          id: b.id,
+          batchCode: b.batch_code,
+          name: b.name,
+          status: b.status,
+          totalWeightKg: totalWeight,
+          totalCost,
+          costPerKg,
+          batchDate: b.batch_date,
+          createdAt: b.created_at,
+          sources: batchSources.map((s: any) => ({
+            id: s.id,
+            sourceName: s.source_name,
+            containerNumber: s.container_number,
+            weightKg: parseFloat(s.weight_kg) || 0,
+            costPerKg: parseFloat(s.cost_per_kg) || 0,
+            totalCost: parseFloat(s.total_cost) || 0,
+            percentOfBatch: totalWeight > 0 ? ((parseFloat(s.weight_kg) || 0) / totalWeight * 100) : 0,
+          })),
+        };
+      });
+
+      res.json(enriched);
+    } catch (err: any) {
+      console.error("[mix-batches-by-date]", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Send mix batch image to WhatsApp ─────────────────────────────────────
+  app.post("/api/factory/send-mix-batch-image-whatsapp", requireAuth, async (req: any, res: any) => {
+    try {
+      const { imageBase64, date, fileName } = req.body ?? {};
+      if (!imageBase64) return res.status(400).json({ message: "imageBase64 is required" });
+
+      const r = await pool.query(
+        `SELECT weekly_report_wa_group_chat_id, instance_id, api_token, enabled FROM whatsapp_settings WHERE id = 1`
+      );
+      const s = r.rows?.[0];
+      if (!s?.weekly_report_wa_group_chat_id) {
+        return res.status(400).json({ message: "No WhatsApp group configured. Go to Settings → Export Settings to configure one." });
+      }
+      if (!s.instance_id || !s.api_token) {
+        return res.status(400).json({ message: "WhatsApp credentials not configured." });
+      }
+      if (!s.enabled) {
+        return res.status(400).json({ message: "WhatsApp sending is disabled." });
+      }
+
+      const base64Data = String(imageBase64).replace(/^data:image\/\w+;base64,/, "");
+      const buffer = Buffer.from(base64Data, "base64");
+      const today = date || new Date().toISOString().substring(0, 10);
+      const finalFileName = String(fileName || `MixBatch_${today}.png`);
+      const caption = `Mix Batch Details — ${today}`;
+
+      const { sendWhatsAppFileToChatId } = await import("../services/whatsappService");
+      const result = await sendWhatsAppFileToChatId(s.weekly_report_wa_group_chat_id, buffer, finalFileName, caption, "image/png");
+      if (!result.success) {
+        return res.status(500).json({ message: result.error || "Failed to send" });
+      }
+      res.json({ ok: true, message: "Mix batch image sent to WhatsApp group." });
+    } catch (err: any) {
+      console.error("[mix-batch-wa] send error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
 }
