@@ -594,17 +594,17 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           const monDate = mondayOfWeek(dates[0]);
           const monD = new Date(monDate + "T00:00:00");
           const weekDaysMoSa: string[] = [];
-          for (let di = 0; di < 6; di++) {
+          for (let di = 0; di < 7; di++) {
             const d = new Date(monD);
             d.setUTCDate(monD.getUTCDate() + di);
             weekDaysMoSa.push(d.toISOString().slice(0, 10));
           }
 
-          const totalCols = 3 + weekDaysMoSa.length + 2; // TYPE + Balance + StockIn + days + TOTAL + REMAINS
+          const totalCols = 3 + weekDaysMoSa.length + 2; // CATEGORY + Balance + StockIn + days + TOTAL + REMAINS
 
           // ── Title row ──
           const titleRow = sh.getRow(row);
-          const titleText = `Week of ${fmtDate(monDate)} – ${fmtDate(weekDaysMoSa[5])}  |  ${wk}`;
+          const titleText = `Week of ${fmtDate(monDate)} – ${fmtDate(weekDaysMoSa[6])}  |  ${wk}`;
           const titleCell = titleRow.getCell(1);
           titleCell.value = titleText;
           titleCell.font = { bold: true, size: 11, color: { argb: "FFFFFFFF" } };
@@ -657,7 +657,8 @@ export function registerFactoryBaleExportRoutes(app: Express) {
             const openBal = opening.get(ck) || 0;
             const stockIn = sMap.get(ck) || 0;
             const dayVals = weekDaysMoSa.map(d => consumptionByDate.get(d)?.get(ck) || 0);
-            const total = dayVals.reduce((s, v) => s + v, 0);
+            // Use authoritative weekConsumption (includes all 7 days) for TOTAL and REMAINS
+            const total = weekConsumption.get(wk)!.get(ck) || 0;
             const remains = openBal + stockIn - total;
 
             weekTotalBalance += openBal;
@@ -777,19 +778,19 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           const monDate = mondayOfWeek(dates[0]);
           const monD = new Date(monDate + "T00:00:00");
           const weekDaysMoSa: string[] = [];
-          for (let di = 0; di < 6; di++) {
+          for (let di = 0; di < 7; di++) {
             const d = new Date(monD); d.setUTCDate(monD.getUTCDate() + di);
             weekDaysMoSa.push(d.toISOString().slice(0, 10));
           }
 
-          const nDays = 6;
+          const nDays = 7;
           const fixedW = 120 + 65 + 55 + 58 + 65;
-          const dayW = Math.max(40, Math.floor((pageW - fixedW) / nDays));
+          const dayW = Math.max(36, Math.floor((pageW - fixedW) / nDays));
           const colWidths = [120, 65, 55, ...Array(nDays).fill(dayW), 58, 65];
           const colX: number[] = [30];
           for (let i = 1; i < colWidths.length; i++) colX.push(colX[i - 1] + colWidths[i - 1]);
 
-          const titleText = `Week ${wk}  |  ${fmtDate(monDate)} – ${fmtDate(weekDaysMoSa[5])}`;
+          const titleText = `Week ${wk}  |  ${fmtDate(monDate)} – ${fmtDate(weekDaysMoSa[6])}`;
           doc.fontSize(11).font("Helvetica-Bold").text(titleText, 30, startY, { width: pageW, align: "center" });
           doc.moveDown(0.3);
 
@@ -822,7 +823,8 @@ export function registerFactoryBaleExportRoutes(app: Express) {
             const openBal = opening.get(ck) || 0;
             const stockIn = sMap.get(ck) || 0;
             const dayVals = weekDaysMoSa.map(d => consumptionByDate.get(d)?.get(ck) || 0);
-            const total = dayVals.reduce((s, v) => s + v, 0);
+            // Use authoritative weekConsumption (includes all 7 days) for TOTAL and REMAINS
+            const total = weekConsumption.get(wk)!.get(ck) || 0;
             const remains = openBal + stockIn - total;
             weekTotalBalance += openBal; weekTotalStockIn += stockIn;
             weekTotalTotal += total; weekTotalRemains += remains;
