@@ -17,8 +17,8 @@ export function registerFactoryGroundScanRoutes(app: Express) {
                     COALESCE(g.product_name, bp.name) AS product_name,
                     g.weight_kg, g.status, g.is_in_loading_order, g.scanned_at, g.scanned_by_user_id
              FROM factory_ground_scan_items g
-             LEFT JOIN factory_bales fb ON fb.reference_number = g.reference_number AND fb.company_id = g.company_id
-             LEFT JOIN bale_products bp ON bp.id = fb.product_id AND bp.company_id = g.company_id
+             LEFT JOIN factory_bales fb ON fb.reference_number = g.reference_number AND fb.company_id = g.company_id::integer
+             LEFT JOIN bale_products bp ON bp.id = fb.product_id AND bp.company_id = g.company_id::integer
              WHERE g.company_id = $1 AND g.location_id = $2
              ORDER BY g.scanned_at DESC`,
             [companyId, locVal],
@@ -29,8 +29,8 @@ export function registerFactoryGroundScanRoutes(app: Express) {
                     COALESCE(g.product_name, bp.name) AS product_name,
                     g.weight_kg, g.status, g.is_in_loading_order, g.scanned_at, g.scanned_by_user_id
              FROM factory_ground_scan_items g
-             LEFT JOIN factory_bales fb ON fb.reference_number = g.reference_number AND fb.company_id = g.company_id
-             LEFT JOIN bale_products bp ON bp.id = fb.product_id AND bp.company_id = g.company_id
+             LEFT JOIN factory_bales fb ON fb.reference_number = g.reference_number AND fb.company_id = g.company_id::integer
+             LEFT JOIN bale_products bp ON bp.id = fb.product_id AND bp.company_id = g.company_id::integer
              WHERE g.company_id = $1 AND g.location_id IS NULL
              ORDER BY g.scanned_at DESC`,
             [companyId],
