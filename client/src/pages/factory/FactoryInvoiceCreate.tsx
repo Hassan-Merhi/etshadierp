@@ -200,14 +200,19 @@ export default function FactoryInvoiceCreate() {
 
   const addChargeMutation = useMutation({
     mutationFn: async (data: { name: string; amount: number; chargeType: string; ledgerAccountId?: number }) => {
-      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/charges`, data);
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/charges`, data);
+      return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       setChargeName("");
       setChargeAmount("");
       setChargeLedgerAccountId("");
-      toast({ title: "Charge added" });
+      if (data?.warning) {
+        toast({ title: "Charge added — ledger entry skipped", description: data.warning, variant: "destructive" });
+      } else {
+        toast({ title: "Charge added" });
+      }
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;

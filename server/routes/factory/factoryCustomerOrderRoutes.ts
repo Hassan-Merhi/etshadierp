@@ -1455,6 +1455,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const chargeAmt = parseFloat(String(amount) || "0");
 
       // Sync customerBalances ledger entry if the order is already finalized
+      let chargeWarning: string | undefined;
       if (updatedOrder.status === "FINALIZED") {
         const newGrandTotal = parseFloat(updatedOrder.grandTotal || "0");
         const [existingLedgerEntry] = await db.select({ id: customerBalances.id })
@@ -1470,17 +1471,21 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
             .where(eq(customerBalances.id, existingLedgerEntry.id));
         }
 
-        // Create charge voucher (FINALIZED path — uses invoice number)
-        if (newCharge && resolvedLedgerAccountId && chargeAmt > 0 && updatedOrder.invoiceNumber) {
+        // Create charge voucher (FINALIZED path)
+        // Gate: charge must have a ledger account linked + charge amount > 0
+        // invoiceNumber is optional — fall back to ORD-{id} so old orders aren't silently skipped
+        if (newCharge && resolvedLedgerAccountId && chargeAmt > 0) {
           const [customer] = await db.select({ ledgerAccountId: customers.ledgerAccountId })
             .from(customers).where(eq(customers.id, order.customerId));
-          if (customer?.ledgerAccountId) {
-            const chargeVoucherNumber = `CHARGE-${updatedOrder.invoiceNumber}-${newCharge.id}-${Date.now()}`;
+          if (!customer?.ledgerAccountId) {
+            chargeWarning = "Charge saved but no ledger entry was created — the customer does not have a linked ledger account. Set one in the customer record.";
+          } else {
+            const voucherRef = updatedOrder.invoiceNumber || `ORD-${orderId}`;
+            const chargeVoucherNumber = `CHARGE-${voucherRef}-${newCharge.id}-${Date.now()}`;
             const chargeDesc = order.containerNumber
               ? `${name} for offloaded container - ${order.containerNumber}`
-              : `${name} - ${updatedOrder.invoiceNumber}`;
-            // Phase 6: atomic — voucher + entries + FK stamp must all commit together
-            // to avoid orphaned (unlinked) vouchers on mid-flight failure.
+              : `${name} - ${voucherRef}`;
+            // Atomic: voucher + entries + FK stamp must all commit together
             await db.transaction(async (tx: any) => {
               const [chargeVoucher] = await tx.insert(vouchers).values({
                 companyId,
@@ -1511,6 +1516,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
                 .where(eq(customerOrderCharges.id, newCharge.id));
             });
           }
+        } else if (newCharge && !resolvedLedgerAccountId && chargeAmt > 0) {
+          chargeWarning = "Charge saved but no ledger entry was created — no ledger account was linked to this charge.";
         }
       }
 
@@ -1596,7 +1603,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         }
       }
 
-      res.json({ ...updatedOrder, charges: updatedCharges });
+      res.json({ ...updatedOrder, charges: updatedCharges, warning: chargeWarning });
     } catch (error: any) {
       console.error("Error adding charge to order:", error);
       res.status(500).json({ message: error.message });
