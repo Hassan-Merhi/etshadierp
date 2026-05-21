@@ -537,8 +537,13 @@ export function registerAuthRoutes(app: Express) {
         if (userId && typeof userId === "string") {
           conditions.push(eq(auditLog.userId, userId));
         }
-        if (action && typeof action === "string" && ["create", "update", "delete"].includes(action)) {
-          conditions.push(eq(auditLog.action, action as any));
+        if (action && typeof action === "string") {
+          const actionVals = action.split(",").map(a => a.trim()).filter(a => ["create", "update", "delete"].includes(a));
+          if (actionVals.length === 1) {
+            conditions.push(eq(auditLog.action, actionVals[0] as any));
+          } else if (actionVals.length > 1) {
+            conditions.push(inArray(auditLog.action, actionVals as any[]));
+          }
         }
         if (dateFrom && typeof dateFrom === "string") {
           conditions.push(gte(auditLog.createdAt, new Date(dateFrom)));

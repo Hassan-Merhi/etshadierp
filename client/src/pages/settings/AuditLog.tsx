@@ -700,7 +700,7 @@ export function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void
 
 export function EditLogTable({ companyId }: { companyId?: number }) {
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
-  const [filterAction, setFilterAction] = useState("");
+  const [filterAction, setFilterAction] = useState("update,delete");
   const [filterModule, setFilterModule] = useState("");
   const [filterSearch, setFilterSearch] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
@@ -747,14 +747,15 @@ export function EditLogTable({ companyId }: { companyId?: number }) {
           data-testid="input-audit-search"
         />
         <Select value={filterAction || "all"} onValueChange={v => setFilterAction(v === "all" ? "" : v)}>
-          <SelectTrigger className="h-8 w-32 text-sm" data-testid="select-audit-action">
+          <SelectTrigger className="h-8 w-40 text-sm" data-testid="select-audit-action">
             <SelectValue placeholder="Action" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All actions</SelectItem>
-            <SelectItem value="create">Create</SelectItem>
-            <SelectItem value="update">Update</SelectItem>
-            <SelectItem value="delete">Delete</SelectItem>
+            <SelectItem value="update,delete">Updates &amp; Deletes</SelectItem>
+            <SelectItem value="create">Create only</SelectItem>
+            <SelectItem value="update">Update only</SelectItem>
+            <SelectItem value="delete">Delete only</SelectItem>
           </SelectContent>
         </Select>
         <Select value={filterModule || "all"} onValueChange={v => setFilterModule(v === "all" ? "" : v)}>
@@ -782,12 +783,12 @@ export function EditLogTable({ companyId }: { companyId?: number }) {
           className="h-8 w-36 text-sm"
           data-testid="input-audit-date-to"
         />
-        {(filterAction || filterModule || filterSearch || filterDateFrom || filterDateTo) && (
+        {(filterAction !== "update,delete" || filterModule || filterSearch || filterDateFrom || filterDateTo) && (
           <Button variant="ghost" size="sm" className="h-8 text-muted-foreground" onClick={() => {
-            setFilterAction(""); setFilterModule(""); setFilterSearch("");
+            setFilterAction("update,delete"); setFilterModule(""); setFilterSearch("");
             setFilterDateFrom(""); setFilterDateTo("");
           }} data-testid="button-audit-clear-filters">
-            <X className="h-3 w-3 mr-1" /> Clear
+            <X className="h-3 w-3 mr-1" /> Reset
           </Button>
         )}
       </div>
