@@ -1454,6 +1454,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const resolvedLedgerAccountId = newCharge?.ledgerAccountId;
       const chargeAmt = parseFloat(String(amount) || "0");
 
+      console.log("[CHARGE-DEBUG] orderId:", orderId, "status:", updatedOrder.status, "resolvedLedgerAccountId:", resolvedLedgerAccountId, "chargeAmt:", chargeAmt, "invoiceNumber:", updatedOrder.invoiceNumber, "newCharge:", JSON.stringify(newCharge));
+
       // Sync customerBalances ledger entry if the order is already finalized
       let chargeWarning: string | undefined;
       if (updatedOrder.status === "FINALIZED") {
