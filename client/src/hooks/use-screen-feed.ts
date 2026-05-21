@@ -80,7 +80,7 @@ function sanitizeClone(doc: Document) {
 }
 
 const html2canvasBaseOpts = {
-  scale:                  0.25,
+  scale:                  0.5,
   useCORS:                true,
   logging:                false,
   foreignObjectRendering: false,
@@ -213,7 +213,7 @@ async function captureAndUpload() {
 
   let dataUrl: string;
   try {
-    dataUrl = canvas.toDataURL("image/jpeg", 0.4);
+    dataUrl = canvas.toDataURL("image/jpeg", 0.75);
   } catch (err) {
     trace("to-data-url-failed", String(err).slice(0, 80));
     return;

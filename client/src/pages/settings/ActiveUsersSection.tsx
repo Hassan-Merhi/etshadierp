@@ -190,54 +190,48 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
     return (
       <Dialog open onOpenChange={open => !open && onClose()}>
         <DialogContent
-          className="max-w-4xl"
+          className="max-w-[95vw] w-[95vw] p-0 overflow-hidden"
           data-testid="dialog-watch-user"
           data-screenfeed-ignore="true"
         >
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {isOnline ? (
-                <span className="flex items-center gap-1.5">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
-                  </span>
-                  <span className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide">Live</span>
+          {/* Header bar */}
+          <div className="flex items-center gap-3 px-4 py-3 border-b shrink-0">
+            {isOnline ? (
+              <span className="flex items-center gap-1.5">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
                 </span>
-              ) : (
-                <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40" />
-              )}
-              Watching: {username}
-              {isOnline && presence && (
-                <span className="text-sm font-normal text-muted-foreground ml-1">
-                  · {presence.companyName || "no company"} · {presence.role || "—"}
-                  · last seen {timeAgo(presence.lastSeen)}
-                </span>
-              )}
-            </DialogTitle>
-            {!isOnline && (
-              <DialogDescription>User is currently offline or inactive.</DialogDescription>
+                <span className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide">Live</span>
+              </span>
+            ) : (
+              <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40" />
             )}
-          </DialogHeader>
+            <span className="font-semibold text-sm">Watching: {username}</span>
+            {isOnline && presence && (
+              <span className="text-sm text-muted-foreground">
+                · {presence.companyName || "no company"} · {presence.role || "—"}
+                · last seen {timeAgo(presence.lastSeen)}
+              </span>
+            )}
+            {screenFrame?.capturedAt && (
+              <span className="ml-auto text-xs text-muted-foreground">
+                captured {timeAgo(screenFrame.capturedAt)}
+              </span>
+            )}
+          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-4">
-            {/* Live screenshot feed */}
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1">
-                <Eye className="h-3.5 w-3.5" /> Live screen
-                {screenFrame?.capturedAt && (
-                  <span className="ml-auto normal-case font-normal">
-                    captured {timeAgo(screenFrame.capturedAt)}
-                  </span>
-                )}
-              </p>
-              <div className="rounded-md border overflow-hidden bg-muted/30 min-h-40 flex items-center justify-center">
+          {/* Body: screen on left, sidebar on right */}
+          <div className="flex h-[80vh] min-h-0">
+            {/* Live screen — takes all available width */}
+            <div className="flex-1 min-w-0 flex flex-col bg-muted/20">
+              <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden">
                 {hasScreen ? (
-                  <div className="relative w-full">
+                  <div className="relative w-full h-full">
                     <img
                       src={screenFrame.dataUrl}
                       alt="Live screen of user"
-                      className="w-full block"
+                      className="w-full h-full object-contain block"
                       data-testid="img-screen-feed"
                     />
                     {/* Click dot overlays */}
@@ -257,39 +251,39 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                             pointerEvents: "none",
                           }}
                         >
-                          <span className="relative flex h-4 w-4">
+                          <span className="relative flex h-5 w-5">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-4 w-4 bg-orange-500 border-2 border-white" />
+                            <span className="relative inline-flex rounded-full h-5 w-5 bg-orange-500 border-2 border-white" />
                           </span>
                         </div>
                       );
                     })}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
-                    <Clock className="h-8 w-8 opacity-30" />
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <Clock className="h-10 w-10 opacity-30" />
                     <p className="text-sm">Waiting for first frame…</p>
                     <p className="text-xs">Updates every 3–5 seconds while watched</p>
                     {(Date.now() - watchStartRef.current) > 20000 && (
                       <p className="text-xs text-amber-600 dark:text-amber-400 text-center max-w-xs">
-                        Still waiting — user may be on a background tab or their browser may be blocking screen capture.
+                        Still waiting — user may be on a background tab.
                       </p>
                     )}
                   </div>
                 )}
               </div>
 
-              {/* Recent click log */}
+              {/* Recent click log at bottom of screen panel */}
               {clicks.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                    Recent clicks
+                <div className="border-t px-3 py-2 shrink-0">
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1 flex items-center gap-1">
+                    <Eye className="h-3 w-3" /> Recent clicks
                   </p>
-                  <div className="rounded-md border divide-y max-h-24 overflow-y-auto">
-                    {[...clicks].reverse().slice(0, 8).map((click, i) => (
-                      <div key={i} className="flex items-center justify-between px-2 py-1 gap-2 text-xs">
-                        <span className="truncate text-muted-foreground">{click.label || "—"}</span>
-                        <span className="shrink-0 text-muted-foreground/60">
+                  <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+                    {[...clicks].reverse().slice(0, 6).map((click, i) => (
+                      <div key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span className="truncate max-w-[180px]">{click.label || "—"}</span>
+                        <span className="text-muted-foreground/50 shrink-0">
                           {new Date(click.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                         </span>
                       </div>
@@ -299,18 +293,20 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
               )}
             </div>
 
-            {/* Navigation history sidebar */}
-            <div className="space-y-2 min-w-0">
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1">
-                <History className="h-3.5 w-3.5" /> Page history
-              </p>
-              {activity.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  No history yet — pages appear here as the user navigates.
+            {/* Sidebar: page history */}
+            <div className="w-64 shrink-0 border-l flex flex-col min-h-0">
+              <div className="px-3 py-2 border-b shrink-0">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1">
+                  <History className="h-3.5 w-3.5" /> Page history
                 </p>
-              ) : (
-                <div className="max-h-96 overflow-y-auto rounded-md border divide-y text-sm">
-                  {activity.map((evt: any) => (
+              </div>
+              <div className="flex-1 overflow-y-auto divide-y text-sm min-h-0">
+                {activity.length === 0 ? (
+                  <p className="text-xs text-muted-foreground px-3 py-3">
+                    No history yet.
+                  </p>
+                ) : (
+                  activity.map((evt: any) => (
                     <div key={evt.id} className="px-3 py-2 space-y-0.5">
                       <p className="font-medium leading-tight truncate">{getPageLabel(evt.route)}</p>
                       <div className="flex items-center justify-between gap-2">
@@ -318,14 +314,14 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
                         <p className="text-xs text-muted-foreground shrink-0">{fmtTime(evt.occurredAt)}</p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  ))
+                )}
+              </div>
 
               {/* Current page pill */}
               {isOnline && presence?.currentRoute && (
-                <div className="rounded-md border p-2 space-y-0.5 bg-muted/30">
-                  <p className="text-xs text-muted-foreground">Currently on</p>
+                <div className="border-t px-3 py-2 shrink-0 bg-muted/30">
+                  <p className="text-xs text-muted-foreground mb-0.5">Currently on</p>
                   <p className="text-sm font-semibold">{getPageLabel(presence.currentRoute)}</p>
                   <p className="text-xs text-muted-foreground font-mono">{presence.currentRoute}</p>
                 </div>
