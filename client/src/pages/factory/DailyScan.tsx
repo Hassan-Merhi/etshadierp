@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   ChevronLeft, ChevronRight, ScanLine, X, Download, Loader2,
-  CalendarDays, ChevronDown, ChevronUp, CheckCircle2, AlertCircle,
+  CalendarDays, ChevronDown, ChevronUp, CheckCircle2, AlertCircle, Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,14 +48,30 @@ interface DailyScanRow {
   scanned_at: string;
 }
 
+interface ScanFeedback {
+  type: "success" | "error" | "warn";
+  refCode: string;
+  productName?: string | null;
+  articleCode?: string | null;
+  message: string;
+}
+
 export default function DailyScan() {
   const today = toLocalDateStr(new Date());
   const [selectedDate, setSelectedDate] = useState(today);
   const [scanInput, setScanInput] = useState("");
   const [scanning, setScanning] = useState(false);
   const [showScanned, setShowScanned] = useState(false);
+  const [lastScan, setLastScan] = useState<ScanFeedback | null>(null);
+  const lastScanTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scanRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const showFeedback = (fb: ScanFeedback) => {
+    if (lastScanTimer.current) clearTimeout(lastScanTimer.current);
+    setLastScan(fb);
+    lastScanTimer.current = setTimeout(() => setLastScan(null), 5000);
+  };
 
   useEffect(() => {
     const t = setTimeout(() => scanRef.current?.focus(), 120);
@@ -100,10 +116,10 @@ export default function DailyScan() {
     // Client-side validation: must be from this day's production
     const bale = dayBales.find((b) => b.reference_number === ref);
     if (!bale) {
-      toast({
-        title: "Not produced on this day",
-        description: `Bale ${ref} was not produced on ${formatDisplay(selectedDate)}.`,
-        variant: "destructive",
+      showFeedback({
+        type: "error",
+        refCode: ref,
+        message: `Not produced on ${formatDisplay(selectedDate)}`,
       });
       setScanInput("");
       setTimeout(() => scanRef.current?.focus(), 50);
@@ -112,10 +128,12 @@ export default function DailyScan() {
 
     // Already scanned?
     if (scannedRefMap.has(ref)) {
-      toast({
-        title: "Already scanned",
-        description: `Bale ${ref} has already been verified today.`,
-        variant: "destructive",
+      showFeedback({
+        type: "warn",
+        refCode: ref,
+        productName: bale.product_name,
+        articleCode: bale.article_code,
+        message: "Already scanned today",
       });
       setScanInput("");
       setTimeout(() => scanRef.current?.focus(), 50);
@@ -136,17 +154,26 @@ export default function DailyScan() {
 
       if (!saveRes.ok) {
         const err = await saveRes.json();
-        toast({
-          title: saveRes.status === 409 ? "Already scanned" : "Scan failed",
-          description: err.message,
-          variant: "destructive",
+        showFeedback({
+          type: "error",
+          refCode: ref,
+          productName: bale.product_name,
+          articleCode: bale.article_code,
+          message: err.message || "Scan failed",
         });
         return;
       }
 
+      showFeedback({
+        type: "success",
+        refCode: ref,
+        productName: bale.product_name,
+        articleCode: bale.article_code,
+        message: `${bale.weight_kg ? formatNumber(parseFloat(bale.weight_kg)) + " kg · " : ""}Verified`,
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/daily-bale-scans", selectedDate] });
     } catch {
-      toast({ title: "Error", description: "Failed to record scan.", variant: "destructive" });
+      showFeedback({ type: "error", refCode: ref, message: "Failed to record scan" });
     } finally {
       setScanning(false);
       setTimeout(() => scanRef.current?.focus(), 50);
@@ -240,7 +267,7 @@ export default function DailyScan() {
   };
 
   return (
-    <div className="space-y-4 pt-4">
+    <div className="space-y-4 pt-4 relative">
       {/* ── Date navigation ── */}
       <div className="flex items-center gap-2 flex-wrap">
         <Button
@@ -464,6 +491,59 @@ export default function DailyScan() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Scan feedback panel (bottom-right) ── */}
+      {lastScan && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 flex items-start gap-3 rounded-md border px-4 py-3 shadow-lg w-72
+            ${lastScan.type === "success"
+              ? "bg-green-50 border-green-200 dark:bg-green-950/60 dark:border-green-800"
+              : lastScan.type === "warn"
+              ? "bg-amber-50 border-amber-200 dark:bg-amber-950/60 dark:border-amber-800"
+              : "bg-red-50 border-red-200 dark:bg-red-950/60 dark:border-red-800"
+            }`}
+          data-testid="panel-scan-feedback"
+        >
+          <div className="mt-0.5 shrink-0">
+            {lastScan.type === "success" ? (
+              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+            ) : lastScan.type === "warn" ? (
+              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            ) : (
+              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm font-semibold font-mono truncate
+              ${lastScan.type === "success" ? "text-green-900 dark:text-green-200"
+                : lastScan.type === "warn" ? "text-amber-900 dark:text-amber-200"
+                : "text-red-900 dark:text-red-200"}`}
+            >
+              {lastScan.refCode}
+            </p>
+            {(lastScan.articleCode || lastScan.productName) && (
+              <p className="text-xs text-muted-foreground truncate mt-0.5">
+                {[lastScan.articleCode, lastScan.productName].filter(Boolean).join(" · ")}
+              </p>
+            )}
+            <p className={`text-xs mt-0.5
+              ${lastScan.type === "success" ? "text-green-700 dark:text-green-300"
+                : lastScan.type === "warn" ? "text-amber-700 dark:text-amber-300"
+                : "text-red-700 dark:text-red-300"}`}
+            >
+              {lastScan.message}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setLastScan(null)}
+            className="shrink-0 text-muted-foreground hover:text-foreground"
+            data-testid="button-scan-feedback-dismiss"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
       )}
     </div>
