@@ -112,9 +112,10 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
   app.patch("/api/factory/container-tracking/:id/settings", requireAuth, async (req: any, res: any) => {
     try {
       const containerId = parseId(req.params.id);
-      const { trackingEnabled, trackingAutoUpdate } = req.body as {
+      const { trackingEnabled, trackingAutoUpdate, trackingCarrierHint } = req.body as {
         trackingEnabled?: boolean;
         trackingAutoUpdate?: boolean;
+        trackingCarrierHint?: string | null;
       };
 
       const [container] = await db
@@ -125,7 +126,7 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
 
       if (!container) return res.status(404).json({ message: "Container not found" });
 
-      await updateFactoryContainerTrackingSettings(containerId, { trackingEnabled, trackingAutoUpdate });
+      await updateFactoryContainerTrackingSettings(containerId, { trackingEnabled, trackingAutoUpdate, trackingCarrierHint });
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to update tracking settings" });

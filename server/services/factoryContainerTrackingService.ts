@@ -651,7 +651,7 @@ export async function trackDueFactoryContainers(): Promise<void> {
 
 export async function updateFactoryContainerTrackingSettings(
   containerId: number,
-  settings: { trackingEnabled?: boolean; trackingAutoUpdate?: boolean },
+  settings: { trackingEnabled?: boolean; trackingAutoUpdate?: boolean; trackingCarrierHint?: string | null },
 ): Promise<void> {
   await db
     .update(factoryContainers)
