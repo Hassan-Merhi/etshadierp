@@ -1611,10 +1611,14 @@ export default function ProductionRawStock() {
               </TableHeader>
               <TableBody>
                 {(() => {
-                  // Hide rows with zero free kg before grouping (unless showZeroStock is on)
+                  // Hide rows with zero value remaining before grouping (unless showZeroStock is on).
+                  // Negative value rows still show — only exactly-zero rows are hidden.
                   const visibleRawStock = showZeroStock
                     ? rawStock
-                    : rawStock.filter(row => parseFloat(row.freeKg || "0") > 0.001);
+                    : rawStock.filter(row => {
+                        const val = parseFloat(row.valueRemainingUsd || row.valueRemaining || "0");
+                        return val < -0.005 || val > 0.005;
+                      });
 
                   // Group rows by category
                   const categoryGroups = new Map<string, { categoryId: number | null; categoryName: string | null; rows: typeof rawStock }>();
