@@ -2704,6 +2704,8 @@ export const factoryContainers = pgTable("factory_containers", {
   freightCurrencyCode: varchar("freight_currency_code", { length: 10 }).default("USD"),
   freightAccountId: integer("freight_account_id"),
   freightSupplierId: integer("freight_supplier_id"),
+  freightPaidBy: text("freight_paid_by").default("supplier"),
+  freightOwnAccountId: integer("freight_own_account_id"),
   otherCharges: decimal("other_charges", { precision: 20, scale: 2 }).default("0"),
   otherChargesCurrencyCode: varchar("other_charges_currency_code", { length: 10 }),
   otherChargesAccountId: integer("other_charges_account_id"),

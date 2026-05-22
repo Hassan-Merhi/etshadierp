@@ -189,6 +189,8 @@ export default function FactoryContainers() {
     freight: "",
     freightCurrencyCode: "USD",
     freightAccountId: "",
+    freightPaidBy: "supplier" as "supplier" | "own",
+    freightOwnAccountId: "",
     otherCharges: "",
     otherChargesAccountId: "",
   });
@@ -775,6 +777,8 @@ export default function FactoryContainers() {
       freight: "",
       freightCurrencyCode: "USD",
       freightAccountId: "",
+      freightPaidBy: "supplier" as "supplier" | "own",
+      freightOwnAccountId: "",
       otherCharges: "",
       otherChargesAccountId: "",
     });
@@ -804,6 +808,8 @@ export default function FactoryContainers() {
       freight: (c as any).freight || "",
       freightCurrencyCode: (c as any).freightCurrencyCode || "USD",
       freightAccountId: (c as any).freightAccountId ? String((c as any).freightAccountId) : "",
+      freightPaidBy: ((c as any).freightPaidBy as "supplier" | "own") || "supplier",
+      freightOwnAccountId: (c as any).freightOwnAccountId ? String((c as any).freightOwnAccountId) : "",
       otherCharges: (c as any).otherCharges || "",
       otherChargesAccountId: (c as any).otherChargesAccountId ? String((c as any).otherChargesAccountId) : "",
     });
@@ -1738,7 +1744,7 @@ export default function FactoryContainers() {
                   </Select>
                 </div>
                 <div>
-                  <Label>Freight Account <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                  <Label>Freight Expense Account <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
                   <Select
                     value={formData.freightAccountId || "__none__"}
                     onValueChange={(val) => setFormData({ ...formData, freightAccountId: val === "__none__" ? "" : val })}
@@ -1757,6 +1763,59 @@ export default function FactoryContainers() {
                   </Select>
                 </div>
               </div>
+
+              {/* Freight paid-by toggle — only shown when freight amount > 0 */}
+              {parseFloat(formData.freight || "0") > 0 && (
+                <div className="space-y-2">
+                  <Label>Freight Paid By</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={formData.freightPaidBy === "supplier" ? "default" : "outline"}
+                      onClick={() => setFormData({ ...formData, freightPaidBy: "supplier", freightOwnAccountId: "" })}
+                      data-testid="button-freight-by-supplier"
+                      className="flex-1"
+                    >
+                      By Supplier
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={formData.freightPaidBy === "own" ? "default" : "outline"}
+                      onClick={() => setFormData({ ...formData, freightPaidBy: "own" })}
+                      data-testid="button-freight-by-own"
+                      className="flex-1"
+                    >
+                      Own Account
+                    </Button>
+                  </div>
+                  {formData.freightPaidBy === "own" && (
+                    <div>
+                      <Label>Credit Account <span className="text-xs text-muted-foreground font-normal">(account that paid the freight)</span></Label>
+                      <Select
+                        value={formData.freightOwnAccountId || "__none__"}
+                        onValueChange={(val) => setFormData({ ...formData, freightOwnAccountId: val === "__none__" ? "" : val })}
+                      >
+                        <SelectTrigger data-testid="select-freight-own-account">
+                          <SelectValue placeholder="Select account..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Select account...</SelectItem>
+                          {ledgerAccounts.map((acc: any) => (
+                            <SelectItem key={acc.id} value={String(acc.id)}>
+                              {acc.name}{acc.code ? ` (${acc.code})` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {formData.freightPaidBy === "supplier" && (
+                    <p className="text-xs text-muted-foreground">Freight will be added to the supplier's payable balance.</p>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-2">
                 <div className="flex items-center gap-2">

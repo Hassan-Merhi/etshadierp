@@ -321,15 +321,18 @@ export function registerFactoryContainersRoutes(app: Express) {
       // (via container.commissionAmount in the supplier liability formula).
       // Posting a separate journal voucher would double-count it, so we skip it here.
 
-      // Double-entry: Freight (Dr Freight Expense / Cr Supplier Payable)
-      // Freight posts in its own currency (may differ from container currency)
+      // Double-entry: Freight
+      // If freightPaidBy='own': Dr Freight Expense / Cr own ledger account
+      // If freightPaidBy='supplier' (default): Dr Freight Expense / Cr Supplier Payable
       const freightAmt = parseFloat(container.freight || "0");
       const freightCcy = (container as any).freightCurrencyCode || container.currencyCode || "USD";
+      const freightPaidBy = (container as any).freightPaidBy || "supplier";
+      const freightOwnAcctId = (container as any).freightOwnAccountId ?? null;
       if (freightAmt > 0 && container.freightAccountId) {
-        const freightVoucherNum = `FACTORY-FREIGHT-${container.id}-${Date.now()}`;
+        const freightVoucherNum = `FACTORY-FREIGHT-${container.id}`;
         const [freightVoucher] = await db.insert(vouchers).values({
           companyId,
-          voucherType: "Journal",
+          voucherType: freightPaidBy === "own" ? "Payment" : "Journal",
           voucherNumber: freightVoucherNum,
           voucherDate: container.arrivalDate || today,
           description: `Freight on container ${container.containerNumber}`,
@@ -348,8 +351,17 @@ export function registerFactoryContainersRoutes(app: Express) {
           creditAmount: "0",
           narration: `Freight expense - container ${container.containerNumber}`,
         });
-        // Cr Supplier Payable
-        if (container.supplierId) {
+        if (freightPaidBy === "own" && freightOwnAcctId) {
+          // Cr Own account (paid by company itself)
+          await db.insert(voucherEntries).values({
+            voucherId: freightVoucher.id,
+            ledgerAccountId: freightOwnAcctId,
+            debitAmount: "0",
+            creditAmount: String(freightAmt),
+            narration: `Freight paid via own account - container ${container.containerNumber}`,
+          });
+        } else if (freightPaidBy === "supplier" && container.supplierId) {
+          // Cr Supplier Payable
           await db.insert(voucherEntries).values({
             voucherId: freightVoucher.id,
             factorySupplierId: container.supplierId,
@@ -408,6 +420,8 @@ export function registerFactoryContainersRoutes(app: Express) {
       if (b.freightCurrencyCode  !== undefined) updateData.freightCurrencyCode  = str(b.freightCurrencyCode);
       if (b.freightAccountId     !== undefined) updateData.freightAccountId     = int(b.freightAccountId);
       if (b.freightSupplierId    !== undefined) updateData.freightSupplierId    = int(b.freightSupplierId);
+      if (b.freightPaidBy        !== undefined) updateData.freightPaidBy        = String(b.freightPaidBy || "supplier");
+      if (b.freightOwnAccountId  !== undefined) updateData.freightOwnAccountId  = b.freightOwnAccountId === null ? null : int(b.freightOwnAccountId);
       // Other charges
       if (b.otherCharges             !== undefined) updateData.otherCharges             = dec(b.otherCharges) ?? "0";
       if (b.otherChargesCurrencyCode !== undefined) updateData.otherChargesCurrencyCode = str(b.otherChargesCurrencyCode);
@@ -469,6 +483,92 @@ export function registerFactoryContainersRoutes(app: Express) {
         .returning();
 
       if (!updated) return res.status(404).json({ message: "Container not found" });
+
+      // ── Sync freight voucher ───────────────────────────────────────────────
+      // Find any existing freight voucher for this container (stable or timestamped number)
+      const [existingFV] = await db.select().from(vouchers)
+        .where(and(
+          eq(vouchers.companyId, companyId),
+          or(
+            eq(vouchers.voucherNumber, `FACTORY-FREIGHT-${id}`),
+            ilike(vouchers.voucherNumber, `FACTORY-FREIGHT-${id}-%`)
+          )
+        )).limit(1);
+
+      const newFreightAmt = parseFloat(updated.freight || "0");
+      const newFreightAcctId = updated.freightAccountId ?? null;
+      const newFreightPaidBy = (updated as any).freightPaidBy || "supplier";
+      const newFreightOwnAcctId = (updated as any).freightOwnAccountId ?? null;
+      const freightCcy = (updated as any).freightCurrencyCode || updated.currencyCode || "USD";
+
+      if (newFreightAmt > 0 && newFreightAcctId) {
+        if (existingFV) {
+          // Update existing voucher amount
+          await db.update(vouchers)
+            .set({ totalAmount: String(newFreightAmt), voucherType: newFreightPaidBy === "own" ? "Payment" : "Journal" })
+            .where(eq(vouchers.id, existingFV.id));
+          // Update entries
+          const fEntries = await db.select().from(voucherEntries)
+            .where(eq(voucherEntries.voucherId, existingFV.id));
+          for (const fe of fEntries) {
+            if (parseFloat(fe.debitAmount || "0") > 0) {
+              // Dr Freight Expense — update amount and account
+              await db.update(voucherEntries)
+                .set({ debitAmount: String(newFreightAmt), ledgerAccountId: newFreightAcctId })
+                .where(eq(voucherEntries.id, fe.id));
+            } else if (newFreightPaidBy === "own" && newFreightOwnAcctId) {
+              // Cr Own account
+              await db.update(voucherEntries)
+                .set({ creditAmount: String(newFreightAmt), ledgerAccountId: newFreightOwnAcctId, factorySupplierId: null })
+                .where(eq(voucherEntries.id, fe.id));
+            } else if (newFreightPaidBy === "supplier" && updated.supplierId) {
+              // Cr Supplier
+              await db.update(voucherEntries)
+                .set({ creditAmount: String(newFreightAmt), factorySupplierId: updated.supplierId, ledgerAccountId: null })
+                .where(eq(voucherEntries.id, fe.id));
+            }
+          }
+        } else {
+          // Create new freight voucher
+          const today = getClientDate(null as any);
+          const [newFV] = await db.insert(vouchers).values({
+            companyId,
+            voucherType: newFreightPaidBy === "own" ? "Payment" : "Journal",
+            voucherNumber: `FACTORY-FREIGHT-${id}`,
+            voucherDate: updated.arrivalDate || today,
+            description: `Freight on container ${updated.containerNumber}`,
+            totalAmount: String(newFreightAmt),
+            currency: freightCcy,
+            sourceModule: "FACTORY",
+          }).returning();
+          await db.insert(voucherEntries).values({
+            voucherId: newFV.id, companyId,
+            ledgerAccountId: newFreightAcctId,
+            debitAmount: String(newFreightAmt), creditAmount: "0",
+            narration: `Freight expense - container ${updated.containerNumber}`,
+          });
+          if (newFreightPaidBy === "own" && newFreightOwnAcctId) {
+            await db.insert(voucherEntries).values({
+              voucherId: newFV.id, companyId,
+              ledgerAccountId: newFreightOwnAcctId,
+              debitAmount: "0", creditAmount: String(newFreightAmt),
+              narration: `Freight paid via own account - container ${updated.containerNumber}`,
+            });
+          } else if (updated.supplierId) {
+            await db.insert(voucherEntries).values({
+              voucherId: newFV.id, companyId,
+              factorySupplierId: updated.supplierId,
+              debitAmount: "0", creditAmount: String(newFreightAmt),
+              narration: `Freight payable to supplier - container ${updated.containerNumber}`,
+            });
+          }
+        }
+      } else if (existingFV) {
+        // Freight removed — delete voucher
+        await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, existingFV.id));
+        await db.delete(vouchers).where(eq(vouchers.id, existingFV.id));
+      }
+
       res.json(updated);
     } catch (error: any) {
       console.error("Error updating factory container:", error);

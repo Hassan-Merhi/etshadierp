@@ -769,6 +769,8 @@ let migrationsDone = false;
     // ── factory_containers — columns added incrementally ──────────────────────
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS freight_account_id integer`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS freight_supplier_id integer`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS freight_paid_by TEXT DEFAULT 'supplier'`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS freight_own_account_id INTEGER`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS other_charges decimal(20,2) DEFAULT 0`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS other_charges_currency_code varchar(10)`,
     // Backfill: existing rows that had no other_charges_currency_code set should use USD (not container currency)
