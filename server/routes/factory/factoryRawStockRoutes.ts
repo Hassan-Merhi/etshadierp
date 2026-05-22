@@ -670,6 +670,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
         .where(and(
           eq(factoryRawMaterialAdjustments.companyId, companyId),
           eq(factoryRawMaterialAdjustments.supplierId, supplierId),
+          isNull(factoryRawMaterialAdjustments.deletedAt),
         ))
         .orderBy(desc(factoryRawMaterialAdjustments.createdAt));
 
