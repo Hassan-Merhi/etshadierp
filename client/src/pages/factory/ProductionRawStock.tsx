@@ -1684,8 +1684,8 @@ export default function ProductionRawStock() {
                         <TableCell className="text-right font-mono text-sm py-2">
                           {fmtKg(groupTotalReceived)}
                         </TableCell>
-                        <TableCell className={`text-right font-mono text-sm py-2 font-medium ${groupTotalFree > 0.001 ? "text-green-600 dark:text-green-400" : "text-muted-foreground/50"}`}>
-                          {groupTotalFree > 0.001 ? fmtKg(groupTotalFree) : "—"}
+                        <TableCell className={`text-right font-mono text-sm py-2 font-medium ${groupTotalFree > 0.001 ? "text-green-600 dark:text-green-400" : groupTotalFree < -0.001 ? "text-destructive" : "text-muted-foreground/50"}`}>
+                          {groupTotalFree > 0.001 || groupTotalFree < -0.001 ? fmtKg(groupTotalFree) : "—"}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm py-2 text-muted-foreground">
                           {groupAvgCost != null ? `$${groupAvgCost.toFixed(4)}` : "—"}
@@ -1733,6 +1733,10 @@ export default function ProductionRawStock() {
                       <TableCell className="text-right font-mono font-medium">
                         {parseFloat(row.freeKg || "0") > 0.001 ? (
                           <span className="text-green-600 dark:text-green-400">
+                            {fmtKg(parseFloat(row.freeKg || "0"))}
+                          </span>
+                        ) : parseFloat(row.freeKg || "0") < -0.001 ? (
+                          <span className="text-destructive">
                             {fmtKg(parseFloat(row.freeKg || "0"))}
                           </span>
                         ) : (
