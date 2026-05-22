@@ -530,7 +530,7 @@ export function registerFactoryContainersRoutes(app: Express) {
           }
         } else {
           // Create new freight voucher
-          const today = getClientDate(null as any);
+          const today = getClientDate(req);
           const [newFV] = await db.insert(vouchers).values({
             companyId,
             voucherType: newFreightPaidBy === "own" ? "Payment" : "Journal",
