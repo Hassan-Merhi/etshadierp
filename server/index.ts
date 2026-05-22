@@ -3358,6 +3358,9 @@ let migrationsDone = false;
     `ALTER TABLE factory_raw_stock ADD CONSTRAINT factory_raw_stock_container_id_fkey FOREIGN KEY (container_id) REFERENCES factory_containers(id) ON DELETE RESTRICT`,
     `ALTER TABLE factory_waste_entries DROP CONSTRAINT IF EXISTS factory_waste_entries_container_id_fkey`,
     `ALTER TABLE factory_waste_entries ADD CONSTRAINT factory_waste_entries_container_id_fkey FOREIGN KEY (container_id) REFERENCES factory_containers(id) ON DELETE RESTRICT`,
+    // ── PO freight paid-by own account (May 2026) ─────────────────────────
+    `ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS freight_paid_by TEXT DEFAULT 'supplier'`,
+    `ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS freight_own_account_id INTEGER`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

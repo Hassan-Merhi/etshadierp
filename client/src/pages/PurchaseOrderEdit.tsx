@@ -10,12 +10,16 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Loader2, Plus, Trash2, Save, Search } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, Trash2, Save, Search, Check, ChevronsUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/formatNumber";
 import { PageHeader } from "@/components/PageHeader";
+import { useCompany } from "@/contexts/CompanyContext";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 interface LineItem {
   id?: number;
@@ -50,6 +54,46 @@ interface PurchaseOrder {
   otherCharges: string;
   status: string;
   items: LineItem[];
+  freightPaidBy?: string;
+  freightOwnAccountId?: number | null;
+}
+
+function FreightAccountPicker({ value, onValueChange, accounts }: {
+  value: string;
+  onValueChange: (value: string) => void;
+  accounts: Array<{ id: number; name: string }>;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = accounts.find(a => a.id.toString() === value);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open}
+          className="w-full justify-between font-normal"
+          data-testid="button-freight-account">
+          {selected ? selected.name : "Select account..."}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search accounts..." />
+          <CommandList>
+            <CommandEmpty>No account found.</CommandEmpty>
+            <CommandGroup>
+              {accounts.map(acct => (
+                <CommandItem key={acct.id} value={acct.name}
+                  onSelect={() => { onValueChange(acct.id.toString()); setOpen(false); }}>
+                  <Check className={cn("mr-2 h-4 w-4", value === acct.id.toString() ? "opacity-100" : "opacity-0")} />
+                  {acct.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export default function PurchaseOrderEdit() {
@@ -59,6 +103,8 @@ export default function PurchaseOrderEdit() {
   const { toast } = useToast();
   const poId = params?.id ? parseInt(params.id) : null;
   useEscapeToParent("/containers");
+  const { selectedCompany } = useCompany();
+  const isFactory = selectedCompany?.companyType === "factory" || selectedCompany?.companyType === "factory_v2";
 
   const [poNumber, setPoNumber] = useState("");
   const [currency, setCurrency] = useState("USD");
@@ -70,6 +116,8 @@ export default function PurchaseOrderEdit() {
   const [documentCharges, setDocumentCharges] = useState("0");
   const [discount, setDiscount] = useState("0");
   const [otherCharges, setOtherCharges] = useState("0");
+  const [freightPaidBy, setFreightPaidBy] = useState<"supplier" | "own">("supplier");
+  const [freightOwnAccountId, setFreightOwnAccountId] = useState<number | null>(null);
 
   // Sidebar state for item search
   const [showItemSidebar, setShowItemSidebar] = useState(false);
@@ -88,6 +136,11 @@ export default function PurchaseOrderEdit() {
   const { data: po, isLoading, error } = useQuery<PurchaseOrder>({
     queryKey: [`/api/purchase-orders/${poId}`],
     enabled: !!poId,
+  });
+
+  const { data: ledgerAccounts } = useQuery<Array<{ id: number; name: string }>>({
+    queryKey: ["/api/ledger-accounts"],
+    enabled: isFactory,
   });
 
   useEffect(() => {
@@ -109,6 +162,8 @@ export default function PurchaseOrderEdit() {
       setDocumentCharges(po.documentCharges || "0");
       setDiscount(po.discount || "0");
       setOtherCharges(po.otherCharges || "0");
+      setFreightPaidBy((po.freightPaidBy as "supplier" | "own") || "supplier");
+      setFreightOwnAccountId(po.freightOwnAccountId ?? null);
     }
   }, [po]);
 
@@ -124,6 +179,8 @@ export default function PurchaseOrderEdit() {
       documentCharges: string;
       discount: string;
       otherCharges: string;
+      freightPaidBy?: string;
+      freightOwnAccountId?: number | null;
     }) => {
       return apiRequest("PATCH", `/api/purchase-orders/${poId}`, data);
     },
@@ -272,6 +329,15 @@ export default function PurchaseOrderEdit() {
       return;
     }
 
+    if (isFactory && freightPaidBy === "own" && parseFloat(freight) > 0 && !freightOwnAccountId) {
+      toast({
+        title: "Account Required",
+        description: "Select an account for the freight payment.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     updateMutation.mutate({
       poNumber,
       currency,
@@ -289,6 +355,8 @@ export default function PurchaseOrderEdit() {
       documentCharges,
       discount,
       otherCharges,
+      freightPaidBy: isFactory ? freightPaidBy : undefined,
+      freightOwnAccountId: isFactory && freightPaidBy === "own" ? freightOwnAccountId : null,
     });
   };
 
@@ -534,7 +602,7 @@ export default function PurchaseOrderEdit() {
           <div className="space-y-4">
             <Label>Freight & Other Charges</Label>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="freight">Freight</Label>
                 <Input
                   id="freight"
@@ -545,6 +613,39 @@ export default function PurchaseOrderEdit() {
                   className="text-right"
                   data-testid="input-freight"
                 />
+                {isFactory && parseFloat(freight) > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={freightPaidBy === "supplier" ? "default" : "outline"}
+                        onClick={() => { setFreightPaidBy("supplier"); setFreightOwnAccountId(null); }}
+                        data-testid="button-freight-by-supplier"
+                        className="flex-1"
+                      >
+                        By Supplier
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={freightPaidBy === "own" ? "default" : "outline"}
+                        onClick={() => setFreightPaidBy("own")}
+                        data-testid="button-freight-by-own"
+                        className="flex-1"
+                      >
+                        Own Account
+                      </Button>
+                    </div>
+                    {freightPaidBy === "own" && (
+                      <FreightAccountPicker
+                        value={freightOwnAccountId?.toString() ?? ""}
+                        onValueChange={(v) => setFreightOwnAccountId(v ? parseInt(v) : null)}
+                        accounts={ledgerAccounts ?? []}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <Label htmlFor="surcharge">Surcharge</Label>

@@ -703,6 +703,8 @@ export const purchaseOrders = pgTable("purchase_orders", {
   discount: decimal("discount", { precision: 20, scale: 2 }).default("0"),
   otherCharges: decimal("other_charges", { precision: 20, scale: 2 }).default("0"),
   chargesEdited: boolean("charges_edited").default(false),
+  freightPaidBy: text("freight_paid_by").default("supplier"),
+  freightOwnAccountId: integer("freight_own_account_id"),
   status: text("status").notNull().default("Open"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
@@ -724,6 +726,8 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit
   discount: z.string().optional(),
   otherCharges: z.string().optional(),
   chargesEdited: z.boolean().optional(),
+  freightPaidBy: z.string().optional(),
+  freightOwnAccountId: z.number().optional().nullable(),
 });
 
 export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;

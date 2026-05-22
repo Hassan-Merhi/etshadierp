@@ -2097,6 +2097,10 @@ export function registerContainerRoutes(app: Express) {
         allowedUpdates.discount = req.body.discount;
       if (req.body.otherCharges !== undefined)
         allowedUpdates.otherCharges = req.body.otherCharges;
+      if (req.body.freightPaidBy !== undefined)
+        allowedUpdates.freightPaidBy = req.body.freightPaidBy;
+      if (req.body.freightOwnAccountId !== undefined)
+        allowedUpdates.freightOwnAccountId = req.body.freightOwnAccountId === null ? null : (req.body.freightOwnAccountId ? Number(req.body.freightOwnAccountId) : null);
       
       // Set chargesEdited flag if any charge field was modified
       const chargesWereEdited = req.body.freight !== undefined || 
@@ -2127,18 +2131,37 @@ export function registerContainerRoutes(app: Express) {
       
       const newGrandTotal = newItemsTotal + newFreight + newSurcharge + newFumigation + newDocumentCharges - newDiscount + newOtherCharges;
       const oldGrandTotal = oldItemsTotal + oldFreight + oldSurcharge + oldFumigation + oldDocumentCharges - oldDiscount + oldOtherCharges;
+
+      // Freight paid-by-own: supplier voucher total excludes freight
+      const newFreightPaidBy: string = req.body.freightPaidBy ?? existingPO.freightPaidBy ?? 'supplier';
+      const newFreightOwnAccountId: number | null =
+        req.body.freightOwnAccountId !== undefined
+          ? (req.body.freightOwnAccountId === null ? null : Number(req.body.freightOwnAccountId))
+          : ((existingPO as any).freightOwnAccountId ?? null);
+      const oldFreightPaidBy: string = (existingPO as any).freightPaidBy ?? 'supplier';
+      const supplierTotal = newFreightPaidBy === 'own' && newFreight > 0
+        ? newGrandTotal - newFreight
+        : newGrandTotal;
+      const oldSupplierTotal = oldFreightPaidBy === 'own' && oldFreight > 0
+        ? oldGrandTotal - oldFreight
+        : oldGrandTotal;
+      const freightPaidByChanged = newFreightPaidBy !== oldFreightPaidBy;
+      const freightOwnAccountChanged = newFreightOwnAccountId !== ((existingPO as any).freightOwnAccountId ?? null);
+      const freightVoucherNeedsUpdate = newFreightPaidBy === 'own' && (
+        freightPaidByChanged || freightOwnAccountChanged || Math.abs(newFreight - oldFreight) > 0.001
+      );
       
       // Update PO
       const updated = await storage.updatePurchaseOrder(id, allowedUpdates);
       
-      // If the grand total changed, update voucher entries and sync parent company
-      if (Math.abs(newGrandTotal - oldGrandTotal) > 0.001) {
+      // Update voucher entries when supplier total, freight payer, or own-account changes
+      if (Math.abs(supplierTotal - oldSupplierTotal) > 0.001 || freightPaidByChanged || freightOwnAccountChanged || freightVoucherNeedsUpdate) {
         await db.transaction(async (tx) => {
           // Update the subsidiary's own voucher only if it has one
-          if (existingPO.voucherId) {
-            // Update voucher total amount
+          if (existingPO.voucherId && Math.abs(supplierTotal - oldSupplierTotal) > 0.001) {
+            // Update voucher total amount (supplier's share only)
             await tx.update(vouchers)
-              .set({ totalAmount: newGrandTotal.toFixed(2) })
+              .set({ totalAmount: supplierTotal.toFixed(2) })
               .where(eq(vouchers.id, existingPO.voucherId));
             
             // Update voucher entries - both debit (purchases) and credit (supplier)
@@ -2151,12 +2174,12 @@ export function registerContainerRoutes(app: Express) {
               if (parseFloat(entry.debitAmount || "0") > 0) {
                 // Update debit entry (Purchases expense)
                 await tx.update(voucherEntries)
-                  .set({ debitAmount: newGrandTotal.toFixed(2) })
+                  .set({ debitAmount: supplierTotal.toFixed(2) })
                   .where(eq(voucherEntries.id, entry.id));
               } else if (parseFloat(entry.creditAmount || "0") > 0) {
                 // Update credit entry (Supplier payable)
                 await tx.update(voucherEntries)
-                  .set({ creditAmount: newGrandTotal.toFixed(2) })
+                  .set({ creditAmount: supplierTotal.toFixed(2) })
                   .where(eq(voucherEntries.id, entry.id));
               }
             }
@@ -2164,7 +2187,7 @@ export function registerContainerRoutes(app: Express) {
 
           // ── Inter-company sync: always update the INTERCO-PARENT voucher in the parent
           // company, regardless of whether the subsidiary PO has its own local voucherId.
-          await syncIntercoParentVoucher(tx, existingPO.poNumber, newGrandTotal);
+          await syncIntercoParentVoucher(tx, existingPO.poNumber, supplierTotal);
           
           // Update container totals if applicable
           const container = await storage.getContainerById(existingPO.containerId);
@@ -2239,6 +2262,78 @@ export function registerContainerRoutes(app: Express) {
                   });
                 }
               }
+            }
+          }
+
+          // ── Freight own-account voucher ───────────────────────────────────
+          // When the user pays freight themselves, we create/update a separate
+          // Payment voucher (Debit Purchases / Credit own account) so the
+          // freight cost never touches the supplier's balance.
+          const freightVoucherNum = `FREIGHT-${container?.containerNumber ?? existingPO.containerId}-${existingPO.poNumber}`;
+          if (freightVoucherNeedsUpdate && newFreight > 0 && newFreightOwnAccountId) {
+            // Find the Purchases account used as debit in the supplier voucher
+            let purchasesAcctId: number | null = null;
+            if (existingPO.voucherId) {
+              const svEntries = await tx.select().from(voucherEntries)
+                .where(eq(voucherEntries.voucherId, existingPO.voucherId));
+              purchasesAcctId = (svEntries.find((e: any) => parseFloat(e.debitAmount || "0") > 0) as any)?.ledgerAccountId ?? null;
+            }
+            const [existingFV] = await tx.select().from(vouchers)
+              .where(and(eq(vouchers.companyId, companyId), eq(vouchers.voucherNumber, freightVoucherNum)))
+              .limit(1);
+            if (existingFV) {
+              // Update existing freight voucher
+              await tx.update(vouchers)
+                .set({ totalAmount: newFreight.toFixed(2) })
+                .where(eq(vouchers.id, existingFV.id));
+              const fEntries = await tx.select().from(voucherEntries)
+                .where(eq(voucherEntries.voucherId, existingFV.id));
+              for (const fe of fEntries) {
+                if (parseFloat(fe.debitAmount || "0") > 0) {
+                  await tx.update(voucherEntries)
+                    .set({ debitAmount: newFreight.toFixed(2) })
+                    .where(eq(voucherEntries.id, fe.id));
+                } else {
+                  await tx.update(voucherEntries)
+                    .set({ creditAmount: newFreight.toFixed(2), ledgerAccountId: newFreightOwnAccountId })
+                    .where(eq(voucherEntries.id, fe.id));
+                }
+              }
+            } else if (purchasesAcctId) {
+              // Create new freight payment voucher
+              const today = new Date().toISOString().split('T')[0];
+              const [newFV] = await tx.insert(vouchers).values({
+                companyId,
+                voucherNumber: freightVoucherNum,
+                voucherType: 'Payment',
+                voucherDate: today,
+                description: `Freight (own account) - ${container?.containerNumber} / ${existingPO.poNumber}`,
+                totalAmount: newFreight.toFixed(2),
+                sourceModule: 'FACTORY',
+              }).returning();
+              await tx.insert(voucherEntries).values([
+                {
+                  voucherId: newFV.id, companyId,
+                  ledgerAccountId: purchasesAcctId,
+                  debitAmount: newFreight.toFixed(2), creditAmount: "0",
+                  narration: `Freight - ${container?.containerNumber}`,
+                },
+                {
+                  voucherId: newFV.id, companyId,
+                  ledgerAccountId: newFreightOwnAccountId,
+                  debitAmount: "0", creditAmount: newFreight.toFixed(2),
+                  narration: `Freight - ${container?.containerNumber}`,
+                },
+              ]);
+            }
+          } else if (oldFreightPaidBy === 'own' && newFreightPaidBy === 'supplier') {
+            // Switched back to supplier — remove the standalone freight voucher
+            const [existingFV] = await tx.select().from(vouchers)
+              .where(and(eq(vouchers.companyId, companyId), eq(vouchers.voucherNumber, freightVoucherNum)))
+              .limit(1);
+            if (existingFV) {
+              await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, existingFV.id));
+              await tx.delete(vouchers).where(eq(vouchers.id, existingFV.id));
             }
           }
         });
