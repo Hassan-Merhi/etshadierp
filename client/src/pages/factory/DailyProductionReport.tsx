@@ -888,6 +888,19 @@ export default function DailyProductionReport() {
     enabled: !!from && !!to,
   });
 
+  const { data: monthlySalarySummary } = useQuery<{
+    currentDay: number;
+    daysInMonth: number;
+    totalWorkerBaseSalary: number;
+    totalWorkerTransport: number;
+    totalWorkerPaid: number;
+    totalEmployeeMonthlySalary: number;
+    totalEmployeeBalance: number;
+  }>({
+    queryKey: ["/api/factory/monthly-salary-summary"],
+    staleTime: 60_000,
+  });
+
   const salaryKpi = useMemo(() => {
     if (!attendanceData || !attendanceData.dates.length) return null;
     let totalExpected = 0;
@@ -1131,46 +1144,138 @@ export default function DailyProductionReport() {
         </CardContent>
       </Card>
 
-      {/* ── Salary KPIs ── */}
-      {(salaryKpi || preset !== "alltime") && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Card data-testid="card-expected-salary">
-            <CardContent className="py-3 px-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Expected Salary</p>
-              {salaryKpi ? (
-                <p className="text-xl font-bold tabular-nums text-foreground" data-testid="text-expected-salary">
-                  {fmtSalary(salaryKpi.totalExpected)}
-                </p>
-              ) : (
-                <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
-              )}
-            </CardContent>
-          </Card>
-          <Card className="border-amber-300 dark:border-amber-700" data-testid="card-remaining-salary">
-            <CardContent className="py-3 px-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Remaining Salary</p>
-              {salaryKpi ? (
-                <p
-                  className={
-                    salaryKpi.totalRemaining < 0
-                      ? "text-xl font-bold tabular-nums text-blue-600 dark:text-blue-400"
-                      : salaryKpi.totalRemaining === 0
-                        ? "text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400"
-                        : "text-xl font-bold tabular-nums text-amber-600 dark:text-amber-400"
-                  }
-                  data-testid="text-remaining-salary"
-                >
-                  {salaryKpi.totalRemaining < 0
-                    ? `Overpaid ${fmtSalary(Math.abs(salaryKpi.totalRemaining))}`
-                    : fmtSalary(salaryKpi.totalRemaining)}
-                </p>
-              ) : (
-                <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {/* ── Salary Overview ── */}
+      {(() => {
+        const ms = monthlySalarySummary;
+        const ratio = ms ? ms.currentDay / ms.daysInMonth : 0;
+        const workerExpected   = ms ? ms.totalWorkerBaseSalary   * ratio : null;
+        const transportExpected = ms ? ms.totalWorkerTransport    * ratio : null;
+        const workerRemaining  = ms ? (workerExpected! + transportExpected!) - ms.totalWorkerPaid : null;
+        const empExpected      = ms ? ms.totalEmployeeMonthlySalary * ratio : null;
+        const empBalance       = ms ? ms.totalEmployeeBalance : null;
+
+        return (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 px-0.5">
+              Payroll Overview — Month to Day {ms ? `(Day ${ms.currentDay} / ${ms.daysInMonth})` : ""}
+            </p>
+
+            {/* Row 1 — Workers */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Card data-testid="card-worker-expected-salary">
+                <CardContent className="py-3 px-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Worker Expected</p>
+                  {workerExpected !== null ? (
+                    <p className="text-xl font-bold tabular-nums text-foreground" data-testid="text-worker-expected-salary">
+                      {fmtSalary(workerExpected)}
+                    </p>
+                  ) : (
+                    <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
+                  )}
+                  {salaryKpi && (
+                    <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-worker-expected-attendance">
+                      {fmtSalary(salaryKpi.totalExpected)} <span className="opacity-60">attendance-based</span>
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-worker-transport">
+                <CardContent className="py-3 px-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Transport (Workers)</p>
+                  {transportExpected !== null ? (
+                    <p className="text-xl font-bold tabular-nums text-foreground" data-testid="text-worker-transport">
+                      {fmtSalary(transportExpected)}
+                    </p>
+                  ) : (
+                    <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
+                  )}
+                  {ms && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {fmtSalary(ms.totalWorkerTransport)} <span className="opacity-60">monthly total</span>
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-amber-300 dark:border-amber-700" data-testid="card-worker-remaining">
+                <CardContent className="py-3 px-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Worker Remaining</p>
+                  {workerRemaining !== null ? (
+                    <p
+                      className={
+                        workerRemaining < 0
+                          ? "text-xl font-bold tabular-nums text-blue-600 dark:text-blue-400"
+                          : workerRemaining === 0
+                            ? "text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400"
+                            : "text-xl font-bold tabular-nums text-amber-600 dark:text-amber-400"
+                      }
+                      data-testid="text-worker-remaining"
+                    >
+                      {workerRemaining < 0
+                        ? `Overpaid ${fmtSalary(Math.abs(workerRemaining))}`
+                        : fmtSalary(workerRemaining)}
+                    </p>
+                  ) : (
+                    <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
+                  )}
+                  {ms && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {fmtSalary(ms.totalWorkerPaid)} <span className="opacity-60">paid this month</span>
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Row 2 — Employees */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Card data-testid="card-employee-expected-salary">
+                <CardContent className="py-3 px-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Employee Expected</p>
+                  {empExpected !== null ? (
+                    <p className="text-xl font-bold tabular-nums text-foreground" data-testid="text-employee-expected-salary">
+                      {fmtSalary(empExpected)}
+                    </p>
+                  ) : (
+                    <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
+                  )}
+                  {ms && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {fmtSalary(ms.totalEmployeeMonthlySalary)} <span className="opacity-60">monthly total</span>
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-amber-300 dark:border-amber-700" data-testid="card-employee-balance">
+                <CardContent className="py-3 px-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Employee Balance</p>
+                  {empBalance !== null ? (
+                    <p
+                      className={
+                        empBalance < 0
+                          ? "text-xl font-bold tabular-nums text-blue-600 dark:text-blue-400"
+                          : empBalance === 0
+                            ? "text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400"
+                            : "text-xl font-bold tabular-nums text-amber-600 dark:text-amber-400"
+                      }
+                      data-testid="text-employee-balance"
+                    >
+                      {empBalance < 0
+                        ? `Credit ${fmtSalary(Math.abs(empBalance))}`
+                        : fmtSalary(empBalance)}
+                    </p>
+                  ) : (
+                    <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-0.5 opacity-60">accumulated owed</p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Four colored boxes ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">

@@ -3555,4 +3555,93 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
+
+  // GET /api/factory/monthly-salary-summary
+  // Returns current-month totals for prorated salary display (no date params needed)
+  app.get("/api/factory/monthly-salary-summary", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const monthStart = `${year}-${month}-01`;
+      const today = now.toISOString().slice(0, 10);
+
+      // ── Workers (Monthly salary type only) ──
+      const workers = await db
+        .select({
+          baseSalary:         factoryWorkers.baseSalary,
+          transportAllowance: factoryWorkers.transportAllowance,
+          salaryType:         factoryWorkers.salaryType,
+        })
+        .from(factoryWorkers)
+        .where(
+          and(
+            eq(factoryWorkers.companyId, companyId),
+            eq(factoryWorkers.active, true),
+            eq(factoryWorkers.salaryType, "Monthly"),
+          )
+        );
+
+      let totalWorkerBaseSalary = 0;
+      let totalWorkerTransport = 0;
+      for (const w of workers) {
+        totalWorkerBaseSalary += parseFloat(w.baseSalary ?? "0");
+        totalWorkerTransport  += parseFloat(w.transportAllowance ?? "0");
+      }
+
+      // ── Worker payrolls paid this month ──
+      const payrollRows = await db
+        .select({ netSalary: factoryPayrolls.netSalary })
+        .from(factoryPayrolls)
+        .where(
+          and(
+            eq(factoryPayrolls.companyId, companyId),
+            gte(factoryPayrolls.periodStart, monthStart),
+            lte(factoryPayrolls.periodStart, today),
+          )
+        );
+
+      let totalWorkerPaid = 0;
+      for (const p of payrollRows) {
+        totalWorkerPaid += parseFloat(p.netSalary ?? "0");
+      }
+
+      // ── Employees (type = "Employee") ──
+      const empRows = await db
+        .select({
+          monthlySalary:  employees.monthlySalary,
+          currentBalance: employees.currentBalance,
+        })
+        .from(employees)
+        .where(
+          and(
+            eq(employees.companyId, companyId),
+            eq(employees.employeeType, "Employee"),
+            sql`${employees.deletedAt} IS NULL`,
+          )
+        );
+
+      let totalEmployeeMonthlySalary = 0;
+      let totalEmployeeBalance = 0;
+      for (const e of empRows) {
+        totalEmployeeMonthlySalary += parseFloat(e.monthlySalary ?? "0");
+        totalEmployeeBalance       += parseFloat(e.currentBalance ?? "0");
+      }
+
+      res.json({
+        currentDay:                  now.getDate(),
+        daysInMonth:                 new Date(year, now.getMonth() + 1, 0).getDate(),
+        totalWorkerBaseSalary,
+        totalWorkerTransport,
+        totalWorkerPaid,
+        totalEmployeeMonthlySalary,
+        totalEmployeeBalance,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 }
