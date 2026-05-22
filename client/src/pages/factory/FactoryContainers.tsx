@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient as useTQClient } from "@tanstack/react-query";
 import { useAdminOverride } from "@/hooks/use-admin-override";
-import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search, ArrowDown, AlertTriangle, RotateCcw, CheckSquare, ChevronDown, ChevronRight, Ship, Building2, StickyNote, Boxes, Package, LayoutList, GripHorizontal, Minus, PlusCircle, X, Info } from "lucide-react";
+import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search, ArrowDown, AlertTriangle, RotateCcw, CheckSquare, ChevronDown, ChevronRight, Ship, Building2, StickyNote, Boxes, Package, LayoutList, GripHorizontal, Minus, PlusCircle, X, Info, Radio, RefreshCw, Loader2, Clock, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -164,9 +164,223 @@ function getContainerStatusLabel(status: string): string {
   return status === "OFFLOADED" ? "Offloaded" : "Pending";
 }
 
+// ── OTW Tracking Panel ────────────────────────────────────────────────────────
+
+function trackingStatusBadge(status: string | null | undefined) {
+  if (!status) return <Badge variant="secondary" className="text-xs">No data</Badge>;
+  const s = status.toLowerCase();
+  if (s.includes("transit") || s.includes("depart") || s.includes("vessel") || s.includes("at sea")) {
+    return <Badge className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">{status}</Badge>;
+  }
+  if (s.includes("discharg") || s.includes("arrival") || s.includes("arrived") || s.includes("port")) {
+    return <Badge className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20">{status}</Badge>;
+  }
+  if (s.includes("deliver") || s.includes("final") || s.includes("complete")) {
+    return <Badge className="text-xs bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/20">{status}</Badge>;
+  }
+  return <Badge variant="outline" className="text-xs">{status}</Badge>;
+}
+
+interface OtwTrackingPanelProps {
+  containers: ContainerWithSupplier[];
+  suppliers?: FactorySupplier[];
+  isLoading: boolean;
+  trackingNowId: number | null;
+  setTrackingNowId: (id: number | null) => void;
+}
+
+function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrackingNowId }: OtwTrackingPanelProps) {
+  const { toast } = useToast();
+  const tqClient = useTQClient();
+
+  const trackNowMutation = useMutation({
+    mutationFn: async (containerId: number) => {
+      const res = await factoryApiRequest("POST", `/api/factory/container-tracking/${containerId}/track-now`, {});
+      return res as any;
+    },
+    onMutate: (id) => { setTrackingNowId(id); },
+    onSuccess: (data, containerId) => {
+      setTrackingNowId(null);
+      tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+      toast({
+        title: data.success ? "Tracking updated" : "Tracking failed",
+        description: data.success
+          ? `${data.containerNumber}: ${data.lastStatus ?? "Status fetched"}`
+          : `${data.containerNumber}: ${data.error ?? "Unknown error"}`,
+        variant: data.success ? "default" : "destructive",
+      });
+    },
+    onError: (err: any, containerId) => {
+      setTrackingNowId(null);
+      toast({
+        title: "Tracking failed",
+        description: err?.message ?? "Unknown error",
+        variant: "destructive",
+      });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-4">
+                <div className="h-4 bg-muted rounded w-32 animate-pulse" />
+                <div className="h-4 bg-muted rounded w-24 animate-pulse" />
+                <div className="h-4 bg-muted rounded w-48 animate-pulse" />
+                <div className="h-4 bg-muted rounded w-20 animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (containers.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-16 text-center">
+          <Radio className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-40" />
+          <p className="text-muted-foreground">No containers currently on the way.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+        <CardTitle className="text-base">OTW Container Tracking</CardTitle>
+        <span className="text-sm text-muted-foreground">{containers.length} container{containers.length !== 1 ? "s" : ""}</span>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-4">Container</TableHead>
+                <TableHead>Supplier</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Last Tracking Status</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead>ETA</TableHead>
+                <TableHead>Last Checked</TableHead>
+                <TableHead className="w-24 pr-4">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {containers.map((c) => {
+                const fc = c as any;
+                const lastChecked: Date | null = fc.trackingLastCheckedAt ? new Date(fc.trackingLastCheckedAt) : null;
+                const isTracking = trackingNowId === c.id;
+                const hasError = !!fc.trackingError;
+                const isEnabled = fc.trackingEnabled !== false;
+                const isValidNum = /^[A-Z]{4}\d{7}$/.test((c.containerNumber || "").trim().toUpperCase());
+
+                return (
+                  <TableRow key={c.id} data-testid={`row-tracking-container-${c.id}`}>
+                    <TableCell className="pl-4 font-mono text-sm font-medium">
+                      <div className="flex flex-col gap-0.5">
+                        <span>{c.containerNumber}</span>
+                        {!isValidNum && (
+                          <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            Invalid format
+                          </span>
+                        )}
+                        {fc.trackingDetectedCarrier && (
+                          <span className="text-xs text-muted-foreground">{fc.trackingDetectedCarrier}</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {(c as any).supplierName ?? <span className="text-muted-foreground/50">—</span>}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="text-xs">
+                        {c.status ?? "PENDING"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {isTracking ? (
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Tracking...
+                        </div>
+                      ) : hasError ? (
+                        <div className="flex flex-col gap-0.5">
+                          {trackingStatusBadge(fc.trackingLastStatus)}
+                          <span className="text-xs text-destructive flex items-center gap-1">
+                            <XCircle className="h-3 w-3" />
+                            {fc.trackingError?.slice(0, 60)}{fc.trackingError?.length > 60 ? "…" : ""}
+                          </span>
+                        </div>
+                      ) : (
+                        trackingStatusBadge(fc.trackingLastStatus)
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">
+                      {fc.trackingLastLocation ?? <span className="text-muted-foreground/40">—</span>}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {c.arrivalDate ? (
+                        <span className={`font-mono ${new Date(c.arrivalDate) < new Date() ? "text-amber-600 dark:text-amber-400" : ""}`}>
+                          {c.arrivalDate}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground/40">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {lastChecked ? (
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {lastChecked.toLocaleDateString()} {lastChecked.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground/40">Never</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="pr-4">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled={isTracking || !isEnabled || !isValidNum}
+                            onClick={() => trackNowMutation.mutate(c.id)}
+                            data-testid={`button-track-now-${c.id}`}
+                          >
+                            {isTracking ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {!isEnabled ? "Tracking disabled" : !isValidNum ? "Invalid container number format" : "Track Now"}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function FactoryContainers() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
-  const [viewMode, setViewMode] = useState<"list" | "summary">("list");
+  const [viewMode, setViewMode] = useState<"list" | "summary" | "tracking">("list");
+  const [trackingNowId, setTrackingNowId] = useState<number | null>(null);
   const [openOtwGroups, setOpenOtwGroups] = useState<Set<string>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
   const [editingContainer, setEditingContainer] = useState<ContainerWithSupplier | null>(null);
@@ -926,6 +1140,15 @@ export default function FactoryContainers() {
               <Ship className="h-4 w-4 mr-2" />
               OTW Summary
             </Button>
+            <Button
+              variant={viewMode === "tracking" ? "default" : "ghost"}
+              className="rounded-none"
+              onClick={() => setViewMode("tracking")}
+              data-testid="button-view-tracking"
+            >
+              <Radio className="h-4 w-4 mr-2" />
+              OTW Tracking
+            </Button>
           </div>
           <Button
             onClick={() => navigate("/factory/containers/new")}
@@ -1395,6 +1618,16 @@ export default function FactoryContainers() {
         </CardContent>
       </Card>
 
+      )}
+
+      {viewMode === "tracking" && (
+        <OtwTrackingPanel
+          containers={otwContainers}
+          suppliers={suppliers}
+          isLoading={isLoading}
+          trackingNowId={trackingNowId}
+          setTrackingNowId={setTrackingNowId}
+        />
       )}
 
       <Dialog open={createOpen || !!editingContainer} onOpenChange={(open) => {

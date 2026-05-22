@@ -3363,6 +3363,42 @@ let migrationsDone = false;
     // ── PO freight paid-by own account (May 2026) ─────────────────────────
     `ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS freight_paid_by TEXT DEFAULT 'supplier'`,
     `ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS freight_own_account_id INTEGER`,
+    // ── Factory container auto-tracking (May 2026) ────────────────────────
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_enabled BOOLEAN NOT NULL DEFAULT true`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_auto_update BOOLEAN NOT NULL DEFAULT true`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_provider TEXT`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_last_status TEXT`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_last_location TEXT`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_last_checked_at TIMESTAMPTZ`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_last_event_date TIMESTAMPTZ`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_last_description TEXT`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_error TEXT`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_changed_at TIMESTAMPTZ`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_detected_carrier TEXT`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_next_check_at TIMESTAMPTZ`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_last_skip_reason TEXT`,
+    `CREATE TABLE IF NOT EXISTS factory_container_tracking_events (
+      id SERIAL PRIMARY KEY,
+      container_id INTEGER NOT NULL,
+      provider TEXT NOT NULL DEFAULT 'parcelsapp',
+      event_time TIMESTAMPTZ,
+      event_status TEXT,
+      event_location TEXT,
+      event_description TEXT,
+      raw_event_json JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS fcte_dedup_unique ON factory_container_tracking_events (container_id, event_time, event_status)`,
+    `CREATE TABLE IF NOT EXISTS factory_container_tracking_checks (
+      id SERIAL PRIMARY KEY,
+      container_id INTEGER NOT NULL,
+      provider TEXT NOT NULL DEFAULT 'parcelsapp',
+      status TEXT NOT NULL,
+      checked_at TIMESTAMPTZ NOT NULL,
+      error_message TEXT,
+      raw_response_json JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

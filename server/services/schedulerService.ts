@@ -839,6 +839,12 @@ export function startScheduler() {
     } catch (err: any) {
       console.error("[ContainerTracking] Cron error:", err?.message);
     }
+    try {
+      const { trackDueFactoryContainers } = await import("./factoryContainerTrackingService");
+      await trackDueFactoryContainers();
+    } catch (err: any) {
+      console.error("[FactoryTracking] Cron error:", err?.message);
+    }
   }, {
     timezone: "America/New_York",
   });

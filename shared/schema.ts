@@ -2735,6 +2735,20 @@ export const factoryContainers = pgTable("factory_containers", {
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  // ── Auto-tracking fields (mirrors ERP containers table) ──────────────────
+  trackingEnabled: boolean("tracking_enabled").notNull().default(true),
+  trackingAutoUpdate: boolean("tracking_auto_update").notNull().default(true),
+  trackingProvider: text("tracking_provider"),
+  trackingLastStatus: text("tracking_last_status"),
+  trackingLastLocation: text("tracking_last_location"),
+  trackingLastCheckedAt: timestamp("tracking_last_checked_at", { withTimezone: true }),
+  trackingLastEventDate: timestamp("tracking_last_event_date", { withTimezone: true }),
+  trackingLastDescription: text("tracking_last_description"),
+  trackingError: text("tracking_error"),
+  trackingChangedAt: timestamp("tracking_changed_at", { withTimezone: true }),
+  trackingDetectedCarrier: text("tracking_detected_carrier"),
+  trackingNextCheckAt: timestamp("tracking_next_check_at", { withTimezone: true }),
+  trackingLastSkipReason: text("tracking_last_skip_reason"),
 }, (t) => ({
   companyIdx: index("factory_containers_company_idx").on(t.companyId),
 }));
@@ -2781,6 +2795,35 @@ export const insertFactoryContainerSchema = createInsertSchema(factoryContainers
 
 export type InsertFactoryContainer = z.infer<typeof insertFactoryContainerSchema>;
 export type FactoryContainer = typeof factoryContainers.$inferSelect;
+
+export const factoryContainerTrackingEvents = pgTable("factory_container_tracking_events", {
+  id: serial("id").primaryKey(),
+  containerId: integer("container_id").notNull(),
+  provider: text("provider").notNull().default("parcelsapp"),
+  eventTime: timestamp("event_time", { withTimezone: true }),
+  eventStatus: text("event_status"),
+  eventLocation: text("event_location"),
+  eventDescription: text("event_description"),
+  rawEventJson: jsonb("raw_event_json"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  dedupUnique: uniqueIndex("fcte_dedup_unique").on(t.containerId, t.eventTime, t.eventStatus),
+}));
+
+export type FactoryContainerTrackingEvent = typeof factoryContainerTrackingEvents.$inferSelect;
+
+export const factoryContainerTrackingChecks = pgTable("factory_container_tracking_checks", {
+  id: serial("id").primaryKey(),
+  containerId: integer("container_id").notNull(),
+  provider: text("provider").notNull().default("parcelsapp"),
+  status: text("status").notNull(),
+  checkedAt: timestamp("checked_at").notNull(),
+  errorMessage: text("error_message"),
+  rawResponseJson: jsonb("raw_response_json"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type FactoryContainerTrackingCheck = typeof factoryContainerTrackingChecks.$inferSelect;
 
 export const factoryOffloadAdditionalCharges = pgTable("factory_offload_additional_charges", {
   id: serial("id").primaryKey(),

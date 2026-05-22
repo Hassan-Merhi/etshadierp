@@ -15,6 +15,7 @@ import { registerFactoryStockAllocationV5Routes } from "./factory/factoryStockAl
 import { registerFactoryShippingContainerRoutes } from "./factory/factoryShippingContainerRoutes";
 import { registerFactoryDailyScanRoutes } from "./factory/factoryDailyScanRoutes";
 import { registerFactoryGroundScanRoutes } from "./factory/factoryGroundScanRoutes";
+import { registerFactoryContainerTrackingRoutes } from "./factory/factoryContainerTrackingRoutes";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
@@ -114,4 +115,5 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   registerFactoryShippingContainerRoutes(app);
   registerFactoryDailyScanRoutes(app);
   registerFactoryGroundScanRoutes(app);
+  registerFactoryContainerTrackingRoutes(app);
 }
