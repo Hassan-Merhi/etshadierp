@@ -60,7 +60,7 @@ interface ContainerWithSupplier extends FactoryContainer {
 // ── OTW Summary helpers ──────────────────────────────────────────────────────
 
 const OTW_NOTES_KEY = "factory-otw-notes";
-const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED", "RECEIVED", "PARTIALLY_RECEIVED"]);
+const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
 
 const CCY_SYMBOLS: Record<string, string> = {
   USD: "$", EUR: "€", GBP: "£", AUD: "A$", CAD: "C$",
@@ -155,16 +155,42 @@ function OtwNotes() {
 }
 
 const OTW_STATUS_LABEL: Record<string, string> = {
+  PENDING:    "Pending",
+  IN_TRANSIT: "In Transit",
+  ARRIVED:    "Arrived",
+};
+
+const CONTAINER_STATUS_LABELS: Record<string, string> = {
   PENDING:            "Pending",
-  IN_TRANSIT:         "Pending",
-  ARRIVED:            "Pending",
+  IN_TRANSIT:         "In Transit",
+  ARRIVED:            "Arrived",
   OFFLOADED:          "Offloaded",
-  PARTIALLY_RECEIVED: "Pending",
-  RECEIVED:           "Pending",
+  PARTIALLY_RECEIVED: "Partially Offloaded",
+  RECEIVED:           "Received",
+  AVAILABLE:          "Available",
+  CLOSED:             "Closed",
+  COMPLETED:          "Completed",
 };
 
 function getContainerStatusLabel(status: string): string {
-  return status === "OFFLOADED" ? "Offloaded" : "Pending";
+  return CONTAINER_STATUS_LABELS[status] ?? status;
+}
+
+function ContainerStatusBadge({ status }: { status: string }) {
+  const label = getContainerStatusLabel(status);
+  if (status === "OFFLOADED") {
+    return <Badge className="text-xs bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/20">{label}</Badge>;
+  }
+  if (status === "PARTIALLY_RECEIVED") {
+    return <Badge className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20">{label}</Badge>;
+  }
+  if (status === "IN_TRANSIT") {
+    return <Badge className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">{label}</Badge>;
+  }
+  if (status === "ARRIVED") {
+    return <Badge className="text-xs bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20">{label}</Badge>;
+  }
+  return <Badge variant="secondary" className="text-xs">{label}</Badge>;
 }
 
 // ── OTW Tracking Panel ────────────────────────────────────────────────────────
@@ -1877,9 +1903,7 @@ export default function FactoryContainers() {
                               {totalValue > 0 ? `${ccy} ${formatNumber(totalValue)}` : <span className="text-muted-foreground">—</span>}
                             </TableCell>
                             <TableCell>
-                              <Badge variant={c.status === "OFFLOADED" ? "default" : "secondary"}>
-                                {getContainerStatusLabel(c.status)}
-                              </Badge>
+                              <ContainerStatusBadge status={c.status} />
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-1">
@@ -2573,7 +2597,7 @@ export default function FactoryContainers() {
                           <TableCell className="text-right font-mono">{row.totalKg || "-"}</TableCell>
                           <TableCell className="text-right font-mono">{row.ratePerKg || "-"}</TableCell>
                           <TableCell>{row.currencyCode}</TableCell>
-                          <TableCell><Badge variant={row.status === "OFFLOADED" ? "default" : "secondary"}>{getContainerStatusLabel(row.status)}</Badge></TableCell>
+                          <TableCell><ContainerStatusBadge status={row.status} /></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
