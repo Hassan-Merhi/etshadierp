@@ -3,6 +3,7 @@ import FactoryFinancialSnapshot from "@/pages/factory/FactoryFinancialSnapshot";
 import FactoryShippingContainers from "@/pages/factory/FactoryShippingContainers";
 import FactoryStatusBuilder from "@/pages/factory/FactoryStatusBuilder";
 import FactoryContainerTracking from "@/pages/factory/FactoryContainerTracking";
+import FactoryOtwTrackingTab from "@/pages/factory/FactoryOtwTrackingTab";
 import { addDays, format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -921,6 +922,7 @@ export default function DailyProductionReport() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 overflow-hidden">
         <TabsList className="mx-4 mt-3 mb-0 flex-shrink-0 w-fit" data-testid="tabs-production-analytics">
+          <TabsTrigger value="otw-tracking" data-testid="tab-otw-tracking">OTW Tracking</TabsTrigger>
           <TabsTrigger value="production" data-testid="tab-production">Production</TabsTrigger>
           <TabsTrigger value="snapshot" data-testid="tab-snapshot">Financial Snapshot</TabsTrigger>
           <TabsTrigger value="ledger" data-testid="tab-ledger">Bale Ledger</TabsTrigger>
@@ -931,6 +933,11 @@ export default function DailyProductionReport() {
             Container Tracking
           </TabsTrigger>
         </TabsList>
+
+        {/* ── OTW Tracking tab ── */}
+        <TabsContent value="otw-tracking" className="flex-1 overflow-y-auto p-4 mt-0 data-[state=inactive]:hidden">
+          <FactoryOtwTrackingTab />
+        </TabsContent>
 
         {/* ── Production tab ── */}
         <TabsContent value="production" className="flex-1 overflow-y-auto p-4 gap-4 flex flex-col mt-0 data-[state=inactive]:hidden">
