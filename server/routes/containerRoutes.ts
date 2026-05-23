@@ -777,6 +777,8 @@ export function registerContainerRoutes(app: Express) {
             const poFreight = parseFloat(po.freight || "0");
             const poFreightParentAccountId: number | null = (po as any).freightParentAccountId
               ? Number((po as any).freightParentAccountId) : null;
+            const poFreightOwnAccountId: number | null = (po as any).freightOwnAccountId
+              ? Number((po as any).freightOwnAccountId) : null;
             const hasParentFreight   = poFreightPaidBy === 'parent' && poFreight > 0 && !!poFreightParentAccountId;
             const hasOwnFreight      = poFreightPaidBy === 'own'    && poFreight > 0 && !!poFreightOwnAccountId;
             const hasEmbeddedFreight = hasParentFreight || hasOwnFreight;
@@ -896,9 +898,8 @@ export function registerContainerRoutes(app: Express) {
                 notFoundParentVouchers.push(`PO ${po.poNumber}: no INTERCO-PARENT voucher in parent company`);
               }
             }
-            // ── Repair own-freight voucher ────────────────────────────────────
+            // ── Stale FREIGHT- voucher cleanup / missing parent freight account warning ──
             const freightVoucherNum = `FREIGHT-${cNum}-${po.poNumber}`;
-            const poFreightOwnAccountId: number | null = (po as any).freightOwnAccountId ? Number((po as any).freightOwnAccountId) : null;
             if (poFreightPaidBy === 'parent' && poFreight > 0 && !((po as any).freightParentAccountId)) {
               missingParentFreightAccount.push(`PO ${po.poNumber}: freight set to parent-paid but no parent account configured`);
             }
