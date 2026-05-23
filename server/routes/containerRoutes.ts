@@ -59,7 +59,11 @@ function calcPoAmounts(po: {
   const otherCharges    = f(po.otherCharges);
   const freightPaidBy   = po.freightPaidBy ?? "supplier";
   const grossTotal = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
-  const intercoTotal = freightPaidBy === "own" && freight > 0 ? grossTotal - freight : grossTotal;
+  // intercoTotal always equals grossTotal so that both sides of the intercompany
+  // relationship (HADI L'SHI Credit in subsidiary ↔ HMD KINSHASA Credit in parent)
+  // stay in sync. Own-paid freight is tracked via a separate FREIGHT- voucher
+  // within the subsidiary and does not reduce the parent's interco amount.
+  const intercoTotal = grossTotal;
   return { grossTotal, intercoTotal, freightPaidBy, freight };
 }
 
