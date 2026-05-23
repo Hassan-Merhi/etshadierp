@@ -2712,10 +2712,11 @@ export function registerContainerRoutes(app: Express) {
               : ((existingPO as any).freightParentAccountId ?? null);
           const _b1OldFreightPaidBy: string = (existingPO as any).freightPaidBy ?? 'supplier';
           const _b1OldFreightParentAccountId: number | null = (existingPO as any).freightParentAccountId ?? null;
-          const _b1FreightChanged = _b1FreightPaidBy !== _b1OldFreightPaidBy ||
-            _b1FreightParentAccountId !== _b1OldFreightParentAccountId ||
-            (_b1FreightPaidBy === 'parent' && Math.abs(_b1FreightForSync - parseFloat(existingPO.freight || "0")) > 0.001);
-          if (_b1FreightChanged) {
+          // Always sync when freight is/was parent-paid — syncIntercoFreightParentVoucher
+          // is idempotent (returns "skipped" if already correct), so calling it
+          // unconditionally ensures the voucher is created even for POs that had
+          // freightPaidBy="parent" set before this feature was deployed.
+          if (_b1FreightPaidBy === 'parent' || _b1OldFreightPaidBy === 'parent') {
             const _b1CNum = container?.containerNumber ?? String(existingPO.containerId);
             // Use the effective PO number (may have been changed in this request)
             const _b1EffectivePoNum = updatedPO?.poNumber ?? existingPO.poNumber;
@@ -3082,7 +3083,8 @@ export function registerContainerRoutes(app: Express) {
       }
 
       // ── Sync INTERCO-FREIGHT- voucher in parent for parent-paid freight ──
-      if (freightParentVoucherNeedsUpdate) {
+      // Always sync when freight is/was parent-paid — idempotent, safe to call every save.
+      if (newFreightPaidBy === 'parent' || oldFreightPaidBy === 'parent') {
         const [_pfContainer] = await db.select({ containerNumber: containers.containerNumber })
           .from(containers).where(eq(containers.id, existingPO.containerId)).limit(1);
         const _pfCNum = _pfContainer?.containerNumber ?? String(existingPO.containerId);
