@@ -87,6 +87,7 @@ async function syncIntercoParentVoucher(
   dbOrTx: any,
   poNumbers: string | string[],
   newAmount: number,
+  containerNumber?: string,
 ): Promise<SyncIntercoResult> {
   const amountStr = newAmount.toFixed(2);
   try {
@@ -109,10 +110,17 @@ async function syncIntercoParentVoucher(
       ? likeConditions[0]
       : or(...likeConditions);
 
+    const containerFilter = containerNumber
+      ? like(vouchers.description, `${containerNumber}%`)
+      : undefined;
+    const whereClause = containerFilter
+      ? and(eq(vouchers.companyId, parentCompanyId), patternClause, containerFilter)
+      : and(eq(vouchers.companyId, parentCompanyId), patternClause);
+
     const [parentVoucher] = await dbOrTx
       .select({ id: vouchers.id, totalAmount: vouchers.totalAmount })
       .from(vouchers)
-      .where(and(eq(vouchers.companyId, parentCompanyId), patternClause))
+      .where(whereClause)
       .limit(1);
 
     if (!parentVoucher) {
@@ -742,7 +750,7 @@ export function registerContainerRoutes(app: Express) {
 
         // Fix the INTERCO-PARENT voucher in the parent company — uses interco total (freightPaidBy-aware)
         if (parentCompanyId && po.companyId !== parentCompanyId) {
-          const svResult = await syncIntercoParentVoucher(db, po.poNumber, poIntercoTotal);
+          const svResult = await syncIntercoParentVoucher(db, po.poNumber, poIntercoTotal, container.containerNumber);
           if (svResult.updated) {
             updatedParentVouchers++;
           } else if (!svResult.found) {
@@ -825,7 +833,11 @@ export function registerContainerRoutes(app: Express) {
         freightPaidBy: (po as any).freightPaidBy,
       });
 
-      const result = await syncIntercoParentVoucher(db, po.poNumber, intercoTotal);
+      const poContainerRow = po.containerId
+        ? (await db.select({ containerNumber: containers.containerNumber }).from(containers).where(eq(containers.id, po.containerId)).limit(1))[0]
+        : undefined;
+
+      const result = await syncIntercoParentVoucher(db, po.poNumber, intercoTotal, poContainerRow?.containerNumber);
       res.json({
         message: result.found
           ? `Parent JV synced — voucher #${result.voucherId} updated to ${result.amount}`
@@ -963,34 +975,20 @@ export function registerContainerRoutes(app: Express) {
               }
             }
 
+            // ── Compute container number for this PO (used by parent + freight sync) ──
+            const poContainerId = po.containerId;
+            const cNum = poContainerId ? (containerNumberMap.get(poContainerId) ?? String(poContainerId)) : String(po.id);
+
             // ── Fix the parent INTERCO-PARENT voucher ───────────────────────
             if (parentCompanyId && po.companyId !== parentCompanyId) {
-              // Check current parent voucher amount before updating
-              const likePattern = `INTERCO-PARENT-${po.poNumber}-%`;
-              const [existingParent] = await db
-                .select({ id: vouchers.id, totalAmount: vouchers.totalAmount })
-                .from(vouchers)
-                .where(and(eq(vouchers.companyId, parentCompanyId), like(vouchers.voucherNumber, likePattern)))
-                .limit(1);
-
-              if (!existingParent) {
+              const svResult = await syncIntercoParentVoucher(db, po.poNumber, intercoTotal, cNum);
+              if (svResult.updated) {
+                updatedParentVouchers++;
+              } else if (!svResult.found) {
                 notFoundParentVouchers.push(`PO ${po.poNumber}: no INTERCO-PARENT voucher in parent company`);
-              } else {
-                const currentParentTotal = parseFloat(existingParent.totalAmount || "0");
-                const parentMismatch = Math.abs(currentParentTotal - intercoTotal) > 0.001;
-
-                if (parentMismatch) {
-                  console.log(`[SyncAll] PO ${po.poNumber}: parent JV #${existingParent.id} ${currentParentTotal} → ${intercoTotal}`);
-                  const svResult = await syncIntercoParentVoucher(db, po.poNumber, intercoTotal);
-                  if (svResult.updated) {
-                    updatedParentVouchers++;
-                  }
-                }
               }
             }
             // ── Repair own-freight voucher ────────────────────────────────────
-            const poContainerId = po.containerId;
-            const cNum = poContainerId ? (containerNumberMap.get(poContainerId) ?? String(poContainerId)) : String(po.id);
             const freightVoucherNum = `FREIGHT-${cNum}-${po.poNumber}`;
             const poFreight = parseFloat(po.freight || "0");
             const poFreightPaidBy: string = (po as any).freightPaidBy || "supplier";
@@ -2739,7 +2737,10 @@ export function registerContainerRoutes(app: Express) {
             const _b1NewPoNum = req.body.poNumber && req.body.poNumber !== existingPO.poNumber
               ? req.body.poNumber as string : null;
             const _b1PoNums = _b1NewPoNum ? [existingPO.poNumber, _b1NewPoNum] : existingPO.poNumber;
-            const _b1Sync = await syncIntercoParentVoucher(tx, _b1PoNums, _b1IntercoTotal);
+            const _b1ContainerRow = existingPO.containerId
+              ? (await tx.select({ containerNumber: containers.containerNumber }).from(containers).where(eq(containers.id, existingPO.containerId)).limit(1))[0]
+              : undefined;
+            const _b1Sync = await syncIntercoParentVoucher(tx, _b1PoNums, _b1IntercoTotal, _b1ContainerRow?.containerNumber);
             if (!_b1Sync.found) {
               console.warn(`[PO-PATCH items] No INTERCO-PARENT voucher for PO(s): ${Array.isArray(_b1PoNums) ? _b1PoNums.join(", ") : _b1PoNums}`);
             }
@@ -3208,7 +3209,10 @@ export function registerContainerRoutes(app: Express) {
           const _b2NewPoNum = req.body.poNumber && req.body.poNumber !== existingPO.poNumber
             ? req.body.poNumber as string : null;
           const _b2PoNums = _b2NewPoNum ? [existingPO.poNumber, _b2NewPoNum] : existingPO.poNumber;
-          const _b2Sync = await syncIntercoParentVoucher(db, _b2PoNums, supplierTotal);
+          const _b2ContainerRow = existingPO.containerId
+            ? (await db.select({ containerNumber: containers.containerNumber }).from(containers).where(eq(containers.id, existingPO.containerId)).limit(1))[0]
+            : undefined;
+          const _b2Sync = await syncIntercoParentVoucher(db, _b2PoNums, supplierTotal, _b2ContainerRow?.containerNumber);
           if (!_b2Sync.found) {
             console.warn(`[PO-PATCH charges] No INTERCO-PARENT voucher for PO(s): ${Array.isArray(_b2PoNums) ? _b2PoNums.join(", ") : _b2PoNums}`);
           }
