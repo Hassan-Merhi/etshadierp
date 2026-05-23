@@ -559,9 +559,20 @@ export function registerContainerRoutes(app: Express) {
           .from(purchaseOrders)
           .where(eq(purchaseOrders.companyId, companyId));
 
+        // Build a containerId → containerNumber map for freight voucher naming
+        const allContainerRows = await db
+          .select({ id: containers.id, containerNumber: containers.containerNumber })
+          .from(containers)
+          .where(eq(containers.companyId, companyId));
+        const containerNumberMap = new Map<number, string>(
+          allContainerRows.map((c) => [c.id, c.containerNumber])
+        );
+
         let scannedPOs = 0;
         let updatedLocalVouchers = 0;
         let updatedParentVouchers = 0;
+        let updatedFreightVouchers = 0;
+        let updatedContainerCharges = 0;
         const skipped: string[] = [];
         const notFoundParentVouchers: string[] = [];
         const errors: string[] = [];
@@ -655,6 +666,88 @@ export function registerContainerRoutes(app: Express) {
                 }
               }
             }
+            // ── Repair own-freight voucher ────────────────────────────────────
+            const poContainerId = po.containerId;
+            const cNum = poContainerId ? (containerNumberMap.get(poContainerId) ?? String(poContainerId)) : String(po.id);
+            const freightVoucherNum = `FREIGHT-${cNum}-${po.poNumber}`;
+            const poFreight = parseFloat(po.freight || "0");
+            const poFreightPaidBy: string = (po as any).freightPaidBy || "supplier";
+            const poFreightOwnAccountId: number | null = (po as any).freightOwnAccountId ? Number((po as any).freightOwnAccountId) : null;
+
+            if (poFreightPaidBy === "own" && poFreight > 0 && poFreightOwnAccountId) {
+              const [existingFV] = await db
+                .select({ id: vouchers.id, totalAmount: vouchers.totalAmount })
+                .from(vouchers)
+                .where(and(eq(vouchers.companyId, companyId), eq(vouchers.voucherNumber, freightVoucherNum)))
+                .limit(1);
+
+              if (existingFV) {
+                const currentFVTotal = parseFloat(existingFV.totalAmount || "0");
+                if (Math.abs(currentFVTotal - poFreight) > 0.001) {
+                  await db.update(vouchers)
+                    .set({ totalAmount: poFreight.toFixed(2) })
+                    .where(eq(vouchers.id, existingFV.id));
+                  const fEntries = await db.select().from(voucherEntries)
+                    .where(eq(voucherEntries.voucherId, existingFV.id));
+                  for (const fe of fEntries) {
+                    if (parseFloat(fe.debitAmount || "0") > 0) {
+                      await db.update(voucherEntries)
+                        .set({ debitAmount: poFreight.toFixed(2) })
+                        .where(eq(voucherEntries.id, fe.id));
+                    } else {
+                      await db.update(voucherEntries)
+                        .set({ creditAmount: poFreight.toFixed(2), ledgerAccountId: poFreightOwnAccountId })
+                        .where(eq(voucherEntries.id, fe.id));
+                    }
+                  }
+                  updatedFreightVouchers++;
+                }
+              } else if (po.voucherId) {
+                // Create missing freight voucher — need purchases account from local voucher
+                const svEntries = await db.select().from(voucherEntries)
+                  .where(eq(voucherEntries.voucherId, po.voucherId));
+                const purchasesAcctId = (svEntries.find((e: any) => parseFloat(e.debitAmount || "0") > 0) as any)?.ledgerAccountId ?? null;
+                if (purchasesAcctId) {
+                  const today = new Date().toISOString().split("T")[0];
+                  const [newFV] = await db.insert(vouchers).values({
+                    companyId,
+                    voucherNumber: freightVoucherNum,
+                    voucherType: "Payment",
+                    voucherDate: today,
+                    description: `Freight (own account) - ${cNum} / ${po.poNumber}`,
+                    totalAmount: poFreight.toFixed(2),
+                    sourceModule: "FACTORY",
+                  }).returning();
+                  await db.insert(voucherEntries).values([
+                    {
+                      voucherId: newFV.id, companyId,
+                      ledgerAccountId: purchasesAcctId,
+                      debitAmount: poFreight.toFixed(2), creditAmount: "0",
+                      narration: `Freight - ${cNum}`,
+                    },
+                    {
+                      voucherId: newFV.id, companyId,
+                      ledgerAccountId: poFreightOwnAccountId,
+                      debitAmount: "0", creditAmount: poFreight.toFixed(2),
+                      narration: `Freight - ${cNum}`,
+                    },
+                  ]);
+                  updatedFreightVouchers++;
+                }
+              }
+            } else {
+              // Not own-freight — delete any stale FREIGHT- voucher
+              const [staleFV] = await db
+                .select({ id: vouchers.id })
+                .from(vouchers)
+                .where(and(eq(vouchers.companyId, companyId), eq(vouchers.voucherNumber, freightVoucherNum)))
+                .limit(1);
+              if (staleFV) {
+                await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, staleFV.id));
+                await db.delete(vouchers).where(eq(vouchers.id, staleFV.id));
+                updatedFreightVouchers++;
+              }
+            }
           } catch (poErr: any) {
             errors.push(`PO ${po.poNumber}: ${poErr.message}`);
             console.error(`[SyncAll] Error processing PO ${po.poNumber}:`, poErr);
@@ -704,24 +797,67 @@ export function registerContainerRoutes(app: Express) {
                 updatedContainers++;
               }
             }
+
+            // ── Repair container_charges rows ────────────────────────────────
+            // Aggregate each charge type across all POs for this container
+            if (cid) {
+              const summedCharges = [
+                { chargeType: "Freight",          amount: containerPos.reduce((s, p) => s + parseFloat(p.freight || "0"), 0) },
+                { chargeType: "Surcharge",        amount: containerPos.reduce((s, p) => s + parseFloat(p.surcharge || "0"), 0) },
+                { chargeType: "Fumigation",       amount: containerPos.reduce((s, p) => s + parseFloat(p.fumigation || "0"), 0) },
+                { chargeType: "Document Charges", amount: containerPos.reduce((s, p) => s + parseFloat(p.documentCharges || "0"), 0) },
+                { chargeType: "Discount",         amount: -containerPos.reduce((s, p) => s + parseFloat(p.discount || "0"), 0) },
+                { chargeType: "Other Charges",    amount: containerPos.reduce((s, p) => s + parseFloat(p.otherCharges || "0"), 0) },
+              ];
+              for (const { chargeType, amount } of summedCharges) {
+                const [existingCharge] = await db
+                  .select({ id: containerCharges.id, amount: containerCharges.amount })
+                  .from(containerCharges)
+                  .where(and(
+                    eq(containerCharges.containerId, cid),
+                    eq(containerCharges.chargeType, chargeType),
+                  ))
+                  .limit(1);
+                if (amount === 0) {
+                  if (existingCharge) {
+                    await db.delete(containerCharges).where(eq(containerCharges.id, existingCharge.id));
+                    updatedContainerCharges++;
+                  }
+                } else {
+                  const currentAmt = parseFloat(existingCharge?.amount || "0");
+                  if (Math.abs(currentAmt - amount) > 0.001) {
+                    if (existingCharge) {
+                      await db.update(containerCharges)
+                        .set({ amount: amount.toFixed(2) })
+                        .where(eq(containerCharges.id, existingCharge.id));
+                    } else {
+                      await db.insert(containerCharges).values({ containerId: cid, chargeType, amount: amount.toFixed(2) });
+                    }
+                    updatedContainerCharges++;
+                  }
+                }
+              }
+            }
           } catch (cErr: any) {
             errors.push(`Container ${cid}: ${cErr.message}`);
           }
         }
 
         const scannedContainers = containerIds.length;
-        console.log(`[SyncAll] Done. POs=${scannedPOs} Containers=${scannedContainers} LocalVouchers=${updatedLocalVouchers} ParentVouchers=${updatedParentVouchers} Containers=${updatedContainers} Skipped=${skipped.length} NotFound=${notFoundParentVouchers.length} Errors=${errors.length}`);
+        console.log(`[SyncAll] Done. POs=${scannedPOs} Containers=${scannedContainers} LocalVouchers=${updatedLocalVouchers} ParentVouchers=${updatedParentVouchers} FreightVouchers=${updatedFreightVouchers} ContainerCharges=${updatedContainerCharges} ContainerTotals=${updatedContainers} Skipped=${skipped.length} NotFound=${notFoundParentVouchers.length} Errors=${errors.length}`);
 
         res.json({
           scannedPOs,
           scannedContainers,
           updatedLocalVouchers,
           updatedParentVouchers,
+          updatedFreightVouchers,
+          updatedContainerCharges,
           updatedContainers,
           skipped,
           notFoundParentVouchers,
           errors,
-          message: `Scanned ${scannedPOs} POs. Updated ${updatedLocalVouchers} local vouchers, ${updatedParentVouchers} parent vouchers, ${updatedContainers} containers.`,
+          message: `Scanned ${scannedPOs} POs. Updated ${updatedLocalVouchers} local vouchers, ${updatedParentVouchers} parent JVs, ${updatedContainers} container totals.`,
         });
       } catch (error: any) {
         console.error("[SyncAll] Fatal error:", error);

@@ -123,8 +123,8 @@ export default function Containers() {
   const tableRef = useRef<HTMLTableElement>(null);
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hideContainerCosts = (myErpPages?.hiddenErpCostFields ?? []).includes("container_costs");
-  const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
-  const isPrivilegedRole = ["Admin", "Owner", "Developer"].includes(currentUser?.role || "");
+  const { data: currentUser } = useQuery<{ role?: string; currentRole?: string | null }>({ queryKey: ["/api/auth/me"] });
+  const isPrivilegedRole = ["Admin", "Owner", "Developer"].includes(currentUser?.currentRole || currentUser?.role || "");
   const [syncAllConfirmOpen, setSyncAllConfirmOpen] = useState(false);
 
   const syncAllMutation = useMutation({
@@ -134,9 +134,12 @@ export default function Containers() {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
+      const parts: string[] = [data?.message ?? "All POs and parent JVs have been checked."];
+      if ((data?.updatedFreightVouchers ?? 0) > 0) parts.push(`Freight vouchers fixed: ${data.updatedFreightVouchers}.`);
+      if ((data?.updatedContainerCharges ?? 0) > 0) parts.push(`Charge rows fixed: ${data.updatedContainerCharges}.`);
       toast({
         title: "Sync Complete",
-        description: data?.message ?? "All POs and parent JVs have been checked.",
+        description: parts.join(" "),
       });
       if (data?.errors?.length > 0) {
         console.warn("[SyncAll] Errors:", data.errors);

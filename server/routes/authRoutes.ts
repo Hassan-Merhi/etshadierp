@@ -628,7 +628,7 @@ export function registerAuthRoutes(app: Express) {
       }
     }
     const { password: _, ...userWithoutPassword } = req.user as any;
-    res.json({ ...userWithoutPassword, username });
+    res.json({ ...userWithoutPassword, username, currentRole: (req.session as any).currentRole ?? null });
   });
   // User management routes (Admin only)
   app.get(
