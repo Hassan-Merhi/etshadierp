@@ -3575,6 +3575,8 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       // ── Workers (Monthly salary type only) ──
       const workers = await db
         .select({
+          id:                 factoryWorkers.id,
+          fullName:           factoryWorkers.fullName,
           baseSalary:         factoryWorkers.baseSalary,
           transportAllowance: factoryWorkers.transportAllowance,
           salaryType:         factoryWorkers.salaryType,
@@ -3615,6 +3617,9 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       // ── Employees (type = "Employee") ──
       const empRows = await db
         .select({
+          id:             employees.id,
+          firstName:      employees.firstName,
+          lastName:       employees.lastName,
           monthlySalary:  employees.monthlySalary,
           currentBalance: employees.currentBalance,
         })
@@ -3634,14 +3639,41 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         totalEmployeeBalance       += parseFloat(e.currentBalance ?? "0");
       }
 
+      const daysInMonth = new Date(year, now.getMonth() + 1, 0).getDate();
+      const currentDay  = now.getDate();
+      const ratio = currentDay / daysInMonth;
+
       res.json({
-        currentDay:                  now.getDate(),
-        daysInMonth:                 new Date(year, now.getMonth() + 1, 0).getDate(),
+        currentDay,
+        daysInMonth,
         totalWorkerBaseSalary,
         totalWorkerTransport,
         totalWorkerPaid,
         totalEmployeeMonthlySalary,
         totalEmployeeBalance,
+        workerBreakdown: workers.map((w) => {
+          const base      = parseFloat(w.baseSalary ?? "0");
+          const transport = parseFloat(w.transportAllowance ?? "0");
+          return {
+            id:            w.id,
+            name:          w.fullName,
+            baseSalary:    base,
+            transport,
+            expected:      base * ratio,
+            transportProrated: transport * ratio,
+            total:         (base + transport) * ratio,
+          };
+        }),
+        employeeBreakdown: empRows.map((e) => {
+          const monthly = parseFloat(e.monthlySalary ?? "0");
+          return {
+            id:            e.id,
+            name:          `${e.firstName} ${e.lastName}`.trim(),
+            monthlySalary: monthly,
+            expected:      monthly * ratio,
+            balance:       parseFloat(e.currentBalance ?? "0"),
+          };
+        }),
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

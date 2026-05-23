@@ -817,6 +817,8 @@ export default function DailyProductionReport() {
   const [preset, setPreset] = useState<Preset>("today");
   const [customFrom, setCustomFrom] = useState(todayStr());
   const [customTo, setCustomTo] = useState(todayStr());
+  const [workerPayrollOpen, setWorkerPayrollOpen] = useState(false);
+  const [empPayrollOpen, setEmpPayrollOpen] = useState(false);
 
   const { from, to } = useMemo(() => {
     if (preset === "today") return { from: todayStr(), to: todayStr() };
@@ -897,6 +899,8 @@ export default function DailyProductionReport() {
     totalWorkerPaid: number;
     totalEmployeeMonthlySalary: number;
     totalEmployeeBalance: number;
+    workerBreakdown: { id: number; name: string; baseSalary: number; transport: number; expected: number; transportProrated: number; total: number }[];
+    employeeBreakdown: { id: number; name: string; monthlySalary: number; expected: number; balance: number }[];
   }>({
     queryKey: ["/api/factory/monthly-salary-summary", payrollDateParam],
     queryFn: async () => {
@@ -1154,11 +1158,12 @@ export default function DailyProductionReport() {
       {(() => {
         const ms = monthlySalarySummary;
         const ratio = ms ? ms.currentDay / ms.daysInMonth : 0;
-        const workerExpected   = ms ? ms.totalWorkerBaseSalary   * ratio : null;
-        const transportExpected = ms ? ms.totalWorkerTransport    * ratio : null;
-        const workerRemaining  = ms ? (workerExpected! + transportExpected!) - ms.totalWorkerPaid : null;
-        const empExpected      = ms ? ms.totalEmployeeMonthlySalary * ratio : null;
-        const empBalance       = ms ? ms.totalEmployeeBalance : null;
+        const workerExpected    = ms ? ms.totalWorkerBaseSalary * ratio : null;
+        const transportExpected = ms ? ms.totalWorkerTransport  * ratio : null;
+        const workerTotal       = workerExpected !== null && transportExpected !== null ? workerExpected + transportExpected : null;
+        const workerRemaining   = ms && workerTotal !== null ? workerTotal - ms.totalWorkerPaid : null;
+        const empExpected       = ms ? ms.totalEmployeeMonthlySalary * ratio : null;
+        const empBalance        = ms ? ms.totalEmployeeBalance : null;
 
         return (
           <div className="space-y-2">
@@ -1166,43 +1171,74 @@ export default function DailyProductionReport() {
               Payroll Overview — Month to Day {ms ? `(Day ${ms.currentDay} / ${ms.daysInMonth})` : ""}
             </p>
 
-            {/* Row 1 — Workers */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Card data-testid="card-worker-expected-salary">
-                <CardContent className="py-3 px-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Worker Expected</p>
-                  {workerExpected !== null ? (
-                    <p className="text-xl font-bold tabular-nums text-foreground" data-testid="text-worker-expected-salary">
-                      {fmtSalary(workerExpected)}
-                    </p>
-                  ) : (
-                    <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
-                  )}
-                  {salaryKpi && (
-                    <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-worker-expected-attendance">
-                      {fmtSalary(salaryKpi.totalExpected)} <span className="opacity-60">attendance-based</span>
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card data-testid="card-worker-transport">
-                <CardContent className="py-3 px-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Transport (Workers)</p>
-                  {transportExpected !== null ? (
-                    <p className="text-xl font-bold tabular-nums text-foreground" data-testid="text-worker-transport">
-                      {fmtSalary(transportExpected)}
-                    </p>
-                  ) : (
-                    <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
-                  )}
-                  {ms && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {fmtSalary(ms.totalWorkerTransport)} <span className="opacity-60">monthly total</span>
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
+            {/* Row 1 — Workers (combined + collapsible) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Combined: Worker Expected + Transport */}
+              <Collapsible open={workerPayrollOpen} onOpenChange={setWorkerPayrollOpen}>
+                <Card data-testid="card-worker-expected-salary">
+                  <CollapsibleTrigger asChild>
+                    <div className="py-3 px-4 cursor-pointer select-none" data-testid="trigger-worker-payroll">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Workers + Transport</p>
+                        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform duration-150 ${workerPayrollOpen ? "rotate-180" : ""}`} />
+                      </div>
+                      <div className="flex items-baseline gap-3 mt-1 flex-wrap">
+                        {workerTotal !== null ? (
+                          <p className="text-xl font-bold tabular-nums text-foreground" data-testid="text-worker-expected-salary">
+                            {fmtSalary(workerTotal)}
+                          </p>
+                        ) : (
+                          <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
+                        )}
+                      </div>
+                      <div className="flex gap-3 mt-0.5 flex-wrap">
+                        {workerExpected !== null && (
+                          <p className="text-xs text-muted-foreground">
+                            {fmtSalary(workerExpected)} <span className="opacity-60">salary</span>
+                          </p>
+                        )}
+                        {transportExpected !== null && (
+                          <p className="text-xs text-muted-foreground">
+                            {fmtSalary(transportExpected)} <span className="opacity-60">transport</span>
+                          </p>
+                        )}
+                      </div>
+                      {salaryKpi && (
+                        <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-worker-expected-attendance">
+                          {fmtSalary(salaryKpi.totalExpected)} <span className="opacity-60">attendance-based</span>
+                        </p>
+                      )}
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="border-t px-4 pb-3 pt-2 space-y-1">
+                      {ms?.workerBreakdown && ms.workerBreakdown.length > 0 ? (
+                        <>
+                          <div className="grid grid-cols-3 gap-1 text-xs font-medium text-muted-foreground mb-1.5 px-0.5">
+                            <span>Worker</span>
+                            <span className="text-right">Salary</span>
+                            <span className="text-right">Transport</span>
+                          </div>
+                          {ms.workerBreakdown.map((w) => (
+                            <div key={w.id} className="grid grid-cols-3 gap-1 text-xs py-0.5">
+                              <span className="truncate text-foreground/90">{w.name}</span>
+                              <span className="text-right tabular-nums text-foreground">{fmtSalary(w.expected)}</span>
+                              <span className="text-right tabular-nums text-muted-foreground">{fmtSalary(w.transportProrated)}</span>
+                            </div>
+                          ))}
+                          <div className="grid grid-cols-3 gap-1 text-xs pt-1.5 border-t mt-1">
+                            <span className="font-medium text-muted-foreground">Total</span>
+                            <span className="text-right tabular-nums font-semibold text-foreground">{fmtSalary(workerExpected ?? 0)}</span>
+                            <span className="text-right tabular-nums font-semibold text-foreground">{fmtSalary(transportExpected ?? 0)}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">No monthly workers found.</p>
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
 
               <Card className="border-amber-300 dark:border-amber-700" data-testid="card-worker-remaining">
                 <CardContent className="py-3 px-4">
@@ -1236,23 +1272,60 @@ export default function DailyProductionReport() {
 
             {/* Row 2 — Employees */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Card data-testid="card-employee-expected-salary">
-                <CardContent className="py-3 px-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Employee Expected</p>
-                  {empExpected !== null ? (
-                    <p className="text-xl font-bold tabular-nums text-foreground" data-testid="text-employee-expected-salary">
-                      {fmtSalary(empExpected)}
-                    </p>
-                  ) : (
-                    <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
-                  )}
-                  {ms && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {fmtSalary(ms.totalEmployeeMonthlySalary)} <span className="opacity-60">monthly total</span>
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
+              {/* Employee Expected — collapsible */}
+              <Collapsible open={empPayrollOpen} onOpenChange={setEmpPayrollOpen}>
+                <Card data-testid="card-employee-expected-salary">
+                  <CollapsibleTrigger asChild>
+                    <div className="py-3 px-4 cursor-pointer select-none" data-testid="trigger-employee-payroll">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Employee Expected</p>
+                        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform duration-150 ${empPayrollOpen ? "rotate-180" : ""}`} />
+                      </div>
+                      {empExpected !== null ? (
+                        <p className="text-xl font-bold tabular-nums text-foreground mt-1" data-testid="text-employee-expected-salary">
+                          {fmtSalary(empExpected)}
+                        </p>
+                      ) : (
+                        <p className="text-xl font-bold tabular-nums text-muted-foreground mt-1">—</p>
+                      )}
+                      {ms && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {fmtSalary(ms.totalEmployeeMonthlySalary)} <span className="opacity-60">monthly total</span>
+                        </p>
+                      )}
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="border-t px-4 pb-3 pt-2 space-y-1">
+                      {ms?.employeeBreakdown && ms.employeeBreakdown.length > 0 ? (
+                        <>
+                          <div className="grid grid-cols-3 gap-1 text-xs font-medium text-muted-foreground mb-1.5 px-0.5">
+                            <span>Employee</span>
+                            <span className="text-right">Expected</span>
+                            <span className="text-right">Balance</span>
+                          </div>
+                          {ms.employeeBreakdown.map((e) => (
+                            <div key={e.id} className="grid grid-cols-3 gap-1 text-xs py-0.5">
+                              <span className="truncate text-foreground/90">{e.name}</span>
+                              <span className="text-right tabular-nums text-foreground">{fmtSalary(e.expected)}</span>
+                              <span className={`text-right tabular-nums ${e.balance > 0 ? "text-amber-600 dark:text-amber-400" : e.balance < 0 ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"}`}>
+                                {fmtSalary(Math.abs(e.balance))}{e.balance < 0 ? " cr" : ""}
+                              </span>
+                            </div>
+                          ))}
+                          <div className="grid grid-cols-3 gap-1 text-xs pt-1.5 border-t mt-1">
+                            <span className="font-medium text-muted-foreground">Total</span>
+                            <span className="text-right tabular-nums font-semibold text-foreground">{fmtSalary(empExpected ?? 0)}</span>
+                            <span className="text-right tabular-nums font-semibold text-foreground">{fmtSalary(Math.abs(empBalance ?? 0))}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">No employees found.</p>
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
 
               <Card className="border-amber-300 dark:border-amber-700" data-testid="card-employee-balance">
                 <CardContent className="py-3 px-4">
