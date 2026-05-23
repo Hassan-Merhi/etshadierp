@@ -347,13 +347,6 @@ async function trackViaParcelsAppFallback(
     await db.update(factoryContainers).set({ trackingLastCheckedAt: now, trackingError: noProviderError } as any).where(eq(factoryContainers.id, containerId));
     return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: noProviderError };
   }
-  const quotaOk = await checkParcelsAppQuota();
-  if (!quotaOk) {
-    const quotaError = "ParcelsApp API quota used — all providers exhausted";
-    await saveTrackingCheck(containerId, "skipped", "skipped_quota", quotaError, null);
-    await db.update(factoryContainers).set({ trackingLastCheckedAt: now, trackingError: quotaError } as any).where(eq(factoryContainers.id, containerId));
-    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: quotaError };
-  }
   ep(containerId, "ParcelsApp API", "running");
   const hintCarrier = detectedCarrier && detectedCarrier !== "OTHER" ? detectedCarrier : undefined;
   const result = await trackContainer(containerNumber, "United States", hintCarrier);
@@ -492,10 +485,7 @@ async function trackViaParcelsApp(
       ep(containerId, "Maersk public HTTP", "fail", mpResult.error ?? "no data");
     }
 
-    // Maersk guard: do not fall through to ParcelsApp/generic scrapers
-    console.log(`[FactoryTracking] ${containerNumber}: Maersk chain exhausted — preserving state`);
-    await db.update(factoryContainers).set({ trackingLastCheckedAt: now } as any).where(eq(factoryContainers.id, containerId));
-    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: "maersk_providers_unavailable" };
+    console.log(`[FactoryTracking] ${containerNumber}: Maersk chain exhausted — falling through to ParcelsApp`);
   }
 
   // ── CMA CGM provider chain ─────────────────────────────────────────────────
@@ -656,17 +646,6 @@ async function trackViaParcelsApp(
       .set({ trackingLastCheckedAt: now, trackingError: noProviderError } as any)
       .where(eq(factoryContainers.id, containerId));
     return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: noProviderError };
-  }
-
-  const quotaOk = await checkParcelsAppQuota();
-  if (!quotaOk) {
-    const quotaError = "ParcelsApp API quota used — all providers exhausted";
-    await saveTrackingCheck(containerId, "skipped", "skipped_quota", quotaError, null);
-    await db
-      .update(factoryContainers)
-      .set({ trackingLastCheckedAt: now, trackingError: quotaError } as any)
-      .where(eq(factoryContainers.id, containerId));
-    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: quotaError };
   }
 
   ep(containerId, "ParcelsApp API", "running");

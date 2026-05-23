@@ -142,6 +142,16 @@ export function registerFactoryContainersRoutes(app: Express) {
                GROUP BY COALESCE(currency_code, 'USD')
              ) t),
             '[]'::json)`,
+          trackingEnabled: factoryContainers.trackingEnabled,
+          trackingAutoUpdate: factoryContainers.trackingAutoUpdate,
+          trackingProvider: factoryContainers.trackingProvider,
+          trackingLastStatus: factoryContainers.trackingLastStatus,
+          trackingLastLocation: factoryContainers.trackingLastLocation,
+          trackingLastCheckedAt: factoryContainers.trackingLastCheckedAt,
+          trackingLastEventDate: factoryContainers.trackingLastEventDate,
+          trackingLastDescription: factoryContainers.trackingLastDescription,
+          trackingError: factoryContainers.trackingError,
+          trackingDetectedCarrier: factoryContainers.trackingDetectedCarrier,
         })
         .from(factoryContainers)
         .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
