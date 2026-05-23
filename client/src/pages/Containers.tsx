@@ -120,6 +120,7 @@ export default function Containers() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const isSupplierPartner = selectedCompany?.companyType === "supplier_partner";
+  const isFactory = selectedCompany?.companyType === "factory" || selectedCompany?.companyType === "factory_v2";
   const tableRef = useRef<HTMLTableElement>(null);
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hideContainerCosts = (myErpPages?.hiddenErpCostFields ?? []).includes("container_costs");
@@ -230,7 +231,7 @@ export default function Containers() {
       if (!res.ok) return {};
       return res.json();
     },
-    enabled: !!selectedCompany?.id,
+    enabled: !!selectedCompany?.id && isFactory,
   });
 
   const updateTrackingMutation = useMutation({

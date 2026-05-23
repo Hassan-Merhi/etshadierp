@@ -728,17 +728,33 @@ export function registerContainerRoutes(app: Express) {
 
         const parentCompanyId = await storage.getParentCompanyId();
 
-        // Fetch all POs for the company
+        // Collect company IDs to process: always include the current company.
+        // When the current company IS the parent, also include all subsidiaries so
+        // their INTERCO-PARENT and INTERCO-FREIGHT vouchers are repaired too.
+        const companyIdsToProcess: number[] = [companyId];
+        if (parentCompanyId && companyId === parentCompanyId) {
+          const subsidiaryConfigs = await db
+            .select({ sourceCompanyId: intercompanyPosConfigs.sourceCompanyId })
+            .from(intercompanyPosConfigs)
+            .where(eq(intercompanyPosConfigs.destCompanyId, parentCompanyId));
+          for (const cfg of subsidiaryConfigs) {
+            if (cfg.sourceCompanyId && !companyIdsToProcess.includes(cfg.sourceCompanyId)) {
+              companyIdsToProcess.push(cfg.sourceCompanyId);
+            }
+          }
+        }
+
+        // Fetch all POs for all relevant companies
         const allPos = await db
           .select()
           .from(purchaseOrders)
-          .where(eq(purchaseOrders.companyId, companyId));
+          .where(inArray(purchaseOrders.companyId, companyIdsToProcess));
 
-        // Build a containerId → containerNumber map for freight voucher naming
+        // Build a containerId → containerNumber map for all relevant companies
         const allContainerRows = await db
           .select({ id: containers.id, containerNumber: containers.containerNumber })
           .from(containers)
-          .where(eq(containers.companyId, companyId));
+          .where(inArray(containers.companyId, companyIdsToProcess));
         const containerNumberMap = new Map<number, string>(
           allContainerRows.map((c) => [c.id, c.containerNumber])
         );
