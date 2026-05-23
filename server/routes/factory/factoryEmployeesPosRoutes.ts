@@ -3556,18 +3556,21 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
     }
   });
 
-  // GET /api/factory/monthly-salary-summary
-  // Returns current-month totals for prorated salary display (no date params needed)
+  // GET /api/factory/monthly-salary-summary?date=YYYY-MM-DD
+  // Returns month totals prorated to the given date (defaults to today)
   app.get("/api/factory/monthly-salary-summary", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const now = new Date();
+      const dateParam = typeof req.query.date === "string" && req.query.date.match(/^\d{4}-\d{2}-\d{2}$/)
+        ? req.query.date
+        : null;
+      const now = dateParam ? new Date(dateParam + "T12:00:00") : new Date();
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, "0");
       const monthStart = `${year}-${month}-01`;
-      const today = now.toISOString().slice(0, 10);
+      const today = dateParam ?? now.toISOString().slice(0, 10);
 
       // ── Workers (Monthly salary type only) ──
       const workers = await db

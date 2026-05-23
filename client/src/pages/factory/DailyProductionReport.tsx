@@ -888,6 +888,7 @@ export default function DailyProductionReport() {
     enabled: !!from && !!to,
   });
 
+  const payrollDateParam = to || todayStr();
   const { data: monthlySalarySummary } = useQuery<{
     currentDay: number;
     daysInMonth: number;
@@ -897,7 +898,12 @@ export default function DailyProductionReport() {
     totalEmployeeMonthlySalary: number;
     totalEmployeeBalance: number;
   }>({
-    queryKey: ["/api/factory/monthly-salary-summary"],
+    queryKey: ["/api/factory/monthly-salary-summary", payrollDateParam],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/monthly-salary-summary?date=${payrollDateParam}`, { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
     staleTime: 60_000,
   });
 
