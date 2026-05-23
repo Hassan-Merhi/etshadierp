@@ -2268,8 +2268,15 @@ export function registerStatsRoutes(app: Express) {
       // Determine which companies to include
       let companyCondition;
       if (allCompanies === "true") {
-        const userCompanies = await storage.getUserCompaniesWithRoles(req.user!.id);
-        const companyIds = userCompanies.map((uc) => uc.companyId);
+        const isDeveloper = (req.user as any)?.role === "Developer";
+        let companyIds: number[];
+        if (isDeveloper) {
+          const all = await storage.getAllCompanies();
+          companyIds = all.map((c: any) => c.id);
+        } else {
+          const userCompanies = await storage.getUserCompaniesWithRoles(req.user!.id);
+          companyIds = userCompanies.map((uc) => uc.companyId);
+        }
         companyCondition = companyIds.length > 0 ? inArray(containers.companyId, companyIds) : eq(containers.companyId, companyId);
       } else if (specificCompanyId) {
         companyCondition = eq(containers.companyId, parseInt(specificCompanyId as string));
