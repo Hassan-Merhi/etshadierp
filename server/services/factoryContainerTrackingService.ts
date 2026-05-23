@@ -326,6 +326,63 @@ async function trackOneContainer(
   return await trackViaParcelsApp(containerId, containerNumber, detectedCarrier, lastDirectFallbackReason, now, currentEta);
 }
 
+// ParcelsApp-only fallback — used by CMA chain after exhausting carrier-specific providers.
+async function trackViaParcelsAppFallback(
+  containerId: number,
+  containerNumber: string,
+  detectedCarrier: string | null,
+  fallbackReason: string | null,
+  now: Date,
+  currentEta: string | null,
+): Promise<{
+  success: boolean;
+  lastStatus: string | null;
+  lastLocation: string | null;
+  lastDescription: string | null;
+  lastCheckedAt: Date;
+  error: string | null;
+}> {
+  if (!process.env.PARCELSAPP_API_KEY) {
+    const noProviderError = "No tracking provider configured";
+    await db.update(factoryContainers).set({ trackingLastCheckedAt: now, trackingError: noProviderError } as any).where(eq(factoryContainers.id, containerId));
+    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: noProviderError };
+  }
+  const quotaOk = await checkParcelsAppQuota();
+  if (!quotaOk) {
+    const quotaError = "ParcelsApp API quota used — all providers exhausted";
+    await saveTrackingCheck(containerId, "skipped", "skipped_quota", quotaError, null);
+    await db.update(factoryContainers).set({ trackingLastCheckedAt: now, trackingError: quotaError } as any).where(eq(factoryContainers.id, containerId));
+    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: quotaError };
+  }
+  ep(containerId, "ParcelsApp API", "running");
+  const hintCarrier = detectedCarrier && detectedCarrier !== "OTHER" ? detectedCarrier : undefined;
+  const result = await trackContainer(containerNumber, "United States", hintCarrier);
+  await saveTrackingCheck(containerId, "parcelsapp", result.success ? "success" : result.timedOut ? "timeout" : "error", result.error ?? null, result.rawResponse);
+  if (!result.success || !result.shipment) {
+    ep(containerId, "ParcelsApp API", "fail", result.error ?? "no data");
+    await db.update(factoryContainers).set({ trackingLastCheckedAt: now, trackingError: result.error ?? "Tracking failed", trackingProvider: "parcelsapp" } as any).where(eq(factoryContainers.id, containerId));
+    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: result.error ?? "Tracking failed" };
+  }
+  const shipment = result.shipment;
+  const lastStatus = deriveLastStatus(shipment);
+  const lastLocation = deriveLastLocation(shipment);
+  const lastEventDate = deriveLastEventDate(shipment);
+  const lastDescription = shipment.states?.[0]?.description ?? null;
+  const { eta: finalEta } = resolveEtaFromShipment(shipment, currentEta);
+  await saveParcelsAppEvents(containerId, shipment);
+  const updateSet: Record<string, unknown> = {
+    trackingLastCheckedAt: now, trackingLastStatus: lastStatus,
+    trackingLastEventDate: lastEventDate, trackingLastDescription: lastDescription,
+    trackingError: null, trackingChangedAt: now, trackingProvider: "parcelsapp",
+    trackingDetectedCarrier: detectedCarrier, trackingFallbackUsed: !!fallbackReason, trackingFallbackReason: fallbackReason,
+  };
+  if (finalEta) updateSet.arrivalDate = finalEta;
+  await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+  ep(containerId, "ParcelsApp API", "success", lastStatus ?? "got data");
+  console.log(`[FactoryTracking] ${containerNumber} → parcelsapp (CMA fallback): status=${lastStatus ?? "?"}`);
+  return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
+}
+
 async function trackViaParcelsApp(
   containerId: number,
   containerNumber: string,
@@ -369,6 +426,161 @@ async function trackViaParcelsApp(
       return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
     }
     ep(containerId, "HTTP scraper", "fail", scraped.error ?? "no data");
+  }
+
+  // ── Maersk provider chain ─────────────────────────────────────────────────
+  const MAERSK_PREFIXES = /^(MAEU|MSKU|MRKU|MRSU|HASU|HJSC|HJCU|SUDU|SAFM|CAJU)/i;
+  if (MAERSK_PREFIXES.test(containerNumber)) {
+    // Maersk direct scraper (Puppeteer intercept)
+    if (isMaerskDirectScraperAvailable()) {
+      ep(containerId, "Maersk Puppeteer", "running");
+      const mdResult = await scrapeMaerskDirect(containerNumber);
+      await saveTrackingCheck(containerId, "maersk_scraper",
+        mdResult.success ? "success" : mdResult.blocked ? "blocked" : "error",
+        mdResult.error ?? null, mdResult.raw ?? null);
+
+      if (mdResult.success && (mdResult.latestStatus || mdResult.eta)) {
+        const { eta: finalEta } = resolveEtaFromProvider(mdResult.eta ?? null, mdResult.events, currentEta);
+        const updateSet: Record<string, unknown> = {
+          trackingLastCheckedAt: now, trackingLastStatus: mdResult.latestStatus,
+          trackingLastEventDate: mdResult.latestEventDate, trackingLastDescription: mdResult.latestDescription,
+          trackingError: null, trackingChangedAt: now, trackingProvider: "maersk_scraper",
+          trackingDetectedCarrier: detectedCarrier,
+        };
+        if (finalEta) updateSet.arrivalDate = finalEta;
+        await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+        if (mdResult.events?.length) {
+          const fakeShipment: ParcelsAppShipment = {
+            trackingId: containerNumber, done: true,
+            attributes: { ...(mdResult.latestStatus ? { status: mdResult.latestStatus } : {}), ...(finalEta ? { estimatedArrival: finalEta } : {}) },
+            states: mdResult.events.map((e) => ({ date: e.date?.toISOString().slice(0, 10) ?? "", status: e.status ?? "", location: e.location ?? "", description: e.description ?? "" })),
+          };
+          await saveParcelsAppEvents(containerId, fakeShipment);
+        }
+        ep(containerId, "Maersk Puppeteer", "success", mdResult.latestStatus ?? "got data");
+        console.log(`[FactoryTracking] ${containerNumber} → maersk_scraper: status=${mdResult.latestStatus ?? "?"}`);
+        return { success: true, lastStatus: mdResult.latestStatus, lastLocation: mdResult.latestLocation, lastDescription: mdResult.latestDescription, lastCheckedAt: now, error: null };
+      }
+      ep(containerId, "Maersk Puppeteer", "fail", mdResult.error ?? "no data");
+    } else {
+      ep(containerId, "Maersk Puppeteer", "skip", "not available");
+    }
+
+    // Maersk public HTTP (no credentials, always available)
+    ep(containerId, "Maersk public HTTP", "running");
+    const mpResult = await maerskPublicProvider.track(containerNumber);
+    const mpStatus = mpResult.success ? "success" : mpResult.blocked ? "blocked" : mpResult.error === "rate_limited" ? "skipped" : "error";
+    await saveTrackingCheck(containerId, "maersk_public", mpStatus, mpResult.error ?? null, mpResult.raw ?? null);
+
+    if (mpResult.success && (mpResult.latestStatus || mpResult.events.length > 0)) {
+      await saveDirectEvents(containerId, mpResult);
+      const { eta: finalEta } = resolveEtaFromProvider(mpResult.eta ?? null, mpResult.events, currentEta);
+      const updateSet: Record<string, unknown> = {
+        trackingLastCheckedAt: now, trackingLastStatus: mpResult.latestStatus,
+        trackingLastEventDate: mpResult.latestEventDate, trackingLastDescription: mpResult.latestDescription,
+        trackingError: null, trackingChangedAt: now, trackingProvider: "maersk_public",
+        trackingDetectedCarrier: detectedCarrier,
+      };
+      if (finalEta) updateSet.arrivalDate = finalEta;
+      await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+      ep(containerId, "Maersk public HTTP", "success", mpResult.latestStatus ?? "got data");
+      console.log(`[FactoryTracking] ${containerNumber} → maersk_public: status=${mpResult.latestStatus ?? "?"}`);
+      return { success: true, lastStatus: mpResult.latestStatus, lastLocation: mpResult.latestLocation, lastDescription: mpResult.latestDescription, lastCheckedAt: now, error: null };
+    } else if (mpResult.error === "rate_limited") {
+      ep(containerId, "Maersk public HTTP", "skip", "rate-limited");
+    } else {
+      ep(containerId, "Maersk public HTTP", "fail", mpResult.error ?? "no data");
+    }
+
+    // Maersk guard: do not fall through to ParcelsApp/generic scrapers
+    console.log(`[FactoryTracking] ${containerNumber}: Maersk chain exhausted — preserving state`);
+    await db.update(factoryContainers).set({ trackingLastCheckedAt: now } as any).where(eq(factoryContainers.id, containerId));
+    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: "maersk_providers_unavailable" };
+  }
+
+  // ── CMA CGM provider chain ─────────────────────────────────────────────────
+  const CMA_PREFIXES = /^(CMAU|CMDU|APZU|CGMU|APMU|APHU|CXDU|CAAU|CAJU|CAIU)/i;
+  if (CMA_PREFIXES.test(containerNumber)) {
+    console.log(`[FactoryTracking] ${containerNumber}: CMA detected — trying carrier-specific providers...`);
+
+    // Step 1: CMA CGM Official DCSA API (needs API key)
+    if (cmaCgmApiProvider.isConfigured()) {
+      const apiResult = await cmaCgmApiProvider.track(containerNumber);
+      await saveTrackingCheck(containerId, "cma_cgm_api",
+        apiResult.success ? "success" : apiResult.noData ? "no_data" : "error",
+        apiResult.error ?? null, apiResult.raw ?? null);
+
+      if (apiResult.success && (apiResult.latestStatus || apiResult.events.length > 0)) {
+        await saveDirectEvents(containerId, apiResult);
+        const { eta: finalEta } = resolveEtaFromProvider(apiResult.eta ?? null, apiResult.events, currentEta);
+        const updateSet: Record<string, unknown> = {
+          trackingLastCheckedAt: now, trackingLastStatus: apiResult.latestStatus,
+          trackingLastEventDate: apiResult.latestEventDate, trackingLastDescription: apiResult.latestDescription,
+          trackingError: null, trackingChangedAt: now, trackingProvider: "cma_cgm_api",
+          trackingDetectedCarrier: detectedCarrier,
+        };
+        if (finalEta) updateSet.arrivalDate = finalEta;
+        await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+        console.log(`[FactoryTracking] ${containerNumber} → cma_cgm_api: status=${apiResult.latestStatus ?? "?"}`);
+        return { success: true, lastStatus: apiResult.latestStatus, lastLocation: apiResult.latestLocation, lastDescription: apiResult.latestDescription, lastCheckedAt: now, error: null };
+      }
+      console.log(`[FactoryTracking] ${containerNumber}: CMA official API returned no data — trying public...`);
+    }
+
+    // Step 2: CMA CGM public endpoint (no key, sometimes blocked by DataDome)
+    if (cmaPublicProvider.isEnabled()) {
+      const cmaResult = await cmaPublicProvider.track(containerNumber);
+      await saveTrackingCheck(containerId, "cma_public",
+        cmaResult.success ? "success" : cmaResult.blocked ? "blocked" : "error",
+        cmaResult.error ?? null, cmaResult.raw ?? null);
+
+      if (cmaResult.success && (cmaResult.latestStatus || cmaResult.events.length > 0)) {
+        await saveDirectEvents(containerId, cmaResult);
+        const { eta: finalEta } = resolveEtaFromProvider(cmaResult.eta ?? null, cmaResult.events, currentEta);
+        const updateSet: Record<string, unknown> = {
+          trackingLastCheckedAt: now, trackingLastStatus: cmaResult.latestStatus,
+          trackingLastEventDate: cmaResult.latestEventDate, trackingLastDescription: cmaResult.latestDescription,
+          trackingError: null, trackingChangedAt: now, trackingProvider: "cma_public",
+          trackingDetectedCarrier: detectedCarrier,
+        };
+        if (finalEta) updateSet.arrivalDate = finalEta;
+        await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+        console.log(`[FactoryTracking] ${containerNumber} → cma_public: status=${cmaResult.latestStatus ?? "?"}`);
+        return { success: true, lastStatus: cmaResult.latestStatus, lastLocation: cmaResult.latestLocation, lastDescription: cmaResult.latestDescription, lastCheckedAt: now, error: null };
+      }
+      console.log(`[FactoryTracking] ${containerNumber}: CMA public failed — trying 17track...`);
+    }
+
+    // Step 3: 17track with CMA carrier code (skip generic 17track block below)
+    if (seventeenTrack.isConfigured()) {
+      const quotaOk17 = await check17trackQuota();
+      if (quotaOk17) {
+        ep(containerId, "17track API (CMA)", "running");
+        const result17 = await seventeenTrack.track(containerNumber, seventeenTrack.CARRIER_CODES?.CMA);
+        await saveTrackingCheck(containerId, "17track",
+          result17.success ? "success" : result17.noData ? "no_data" : "error",
+          result17.error ?? null, result17.raw);
+        if (result17.success) {
+          await saveDirectEvents(containerId, result17);
+          const { eta: finalEta } = resolveEtaFromProvider(result17.eta ?? null, result17.events, currentEta);
+          const updateSet: Record<string, unknown> = {
+            trackingLastCheckedAt: now, trackingLastStatus: result17.latestStatus,
+            trackingLastEventDate: result17.latestEventDate, trackingLastDescription: result17.latestDescription,
+            trackingError: null, trackingChangedAt: now, trackingProvider: "17track",
+            trackingDetectedCarrier: detectedCarrier,
+          };
+          if (finalEta) updateSet.arrivalDate = finalEta;
+          await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+          ep(containerId, "17track API (CMA)", "success", result17.latestStatus ?? "got data");
+          console.log(`[FactoryTracking] ${containerNumber} → 17track (CMA): status=${result17.latestStatus ?? "?"}`);
+          return { success: true, lastStatus: result17.latestStatus, lastLocation: result17.latestLocation, lastDescription: result17.latestDescription, lastCheckedAt: now, error: null };
+        }
+        ep(containerId, "17track API (CMA)", "fail", result17.error ?? "no data");
+      }
+    }
+
+    // Fall through to ParcelsApp for CMA (skip generic Puppeteer / 17track blocks)
+    return await trackViaParcelsAppFallback(containerId, containerNumber, detectedCarrier, fallbackReason, now, currentEta);
   }
 
   // ── Puppeteer scraper ─────────────────────────────────────────────────────
