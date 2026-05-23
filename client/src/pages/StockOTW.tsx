@@ -58,6 +58,7 @@ function StockOTWContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedGrade, setSelectedGrade] = useState<string>("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedSupplier, setSelectedSupplier] = useState<string>("all");
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   const {
@@ -186,9 +187,18 @@ function StockOTWContent() {
     return Array.from(seen.values()).sort();
   }, [groupedItems]);
 
+  const supplierOptions = useMemo(() => {
+    const seen = new Set<string>();
+    groupedItems.forEach((item) => {
+      item.containers.forEach((c) => { if (c.supplierName) seen.add(c.supplierName); });
+    });
+    return Array.from(seen).sort();
+  }, [groupedItems]);
+
   const filteredItems = groupedItems.filter((item) => {
     if (selectedGrade !== "all" && item.gradeName !== selectedGrade) return false;
     if (selectedCategory !== "all" && item.categoryName !== selectedCategory) return false;
+    if (selectedSupplier !== "all" && !item.containers.some((c) => c.supplierName === selectedSupplier)) return false;
     if (searchTerm === "") return true;
     const search = searchTerm.toLowerCase();
     return (
@@ -223,15 +233,16 @@ function StockOTWContent() {
     (sum, c) => sum + parseFloat((c as any).grandTotal || "0"),
     0,
   );
-  const isFiltered = searchTerm.trim() !== "" || selectedGrade !== "all" || selectedCategory !== "all";
+  const isFiltered = searchTerm.trim() !== "" || selectedGrade !== "all" || selectedCategory !== "all" || selectedSupplier !== "all";
   const displayTotal = isFiltered ? totalValue : containerGrandTotal;
 
-  const hasActiveFilters = searchTerm !== "" || selectedGrade !== "all" || selectedCategory !== "all";
+  const hasActiveFilters = searchTerm !== "" || selectedGrade !== "all" || selectedCategory !== "all" || selectedSupplier !== "all";
 
   const clearFilters = () => {
     setSearchTerm("");
     setSelectedGrade("all");
     setSelectedCategory("all");
+    setSelectedSupplier("all");
   };
 
   if (isLoading) {
@@ -330,6 +341,19 @@ function StockOTWContent() {
                 <SelectItem value="all">All Categories</SelectItem>
                 {categoryOptions.map((c) => (
                   <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {supplierOptions.length > 1 && (
+            <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
+              <SelectTrigger className="w-[160px]" data-testid="select-supplier-filter">
+                <SelectValue placeholder="All Suppliers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Suppliers</SelectItem>
+                {supplierOptions.map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
