@@ -49,7 +49,7 @@ export function registerImportRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { containerNumber, supplierId, preview } = req.body;
+      const { containerNumber, supplierId, preview, freightPaidBy, freightParentAccountId } = req.body;
 
       if (!containerNumber || !supplierId || !preview) {
         return res.status(400).json({ message: "Missing required fields" });
@@ -107,6 +107,12 @@ export function registerImportRoutes(app: Express) {
               errors.push(`Item not found by name: ${item.itemName}`);
             }
           }
+        }
+
+        // Validate parent freight account when freight is present and paid by parent
+        const containerFreight = containerPreview.charges?.freight || 0;
+        if (freightPaidBy === "parent" && containerFreight > 0 && !freightParentAccountId) {
+          errors.push("A parent company freight account must be selected when freight is paid by parent company");
         }
       }
 
@@ -546,8 +552,8 @@ export function registerImportRoutes(app: Express) {
                 .select()
                 .from(intercompanyPosConfigs)
                 .where(and(
-                  eq(intercompanyPosConfigs.subsidiaryCompanyId, currentCompanyId),
-                  eq(intercompanyPosConfigs.active, true),
+                  eq(intercompanyPosConfigs.sourceCompanyId, currentCompanyId),
+                  eq(intercompanyPosConfigs.enabled, true),
                 ))
                 .limit(1);
               const destIntercoAccountId = intercoConfigs[0]?.destIntercoAccountId ?? null;
