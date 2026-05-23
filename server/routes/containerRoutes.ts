@@ -86,10 +86,17 @@ interface SyncIntercoResult {
 async function syncIntercoParentVoucher(
   dbOrTx: any,
   poNumbers: string | string[],
-  newAmount: number,
+  grossTotal: number,
   containerNumber?: string,
+  freightOpts?: {
+    freightAmount: number;
+    freightParentAccountId: number;
+  },
 ): Promise<SyncIntercoResult> {
-  const amountStr = newAmount.toFixed(2);
+  const amountStr = grossTotal.toFixed(2);
+  const intercoTotal = (freightOpts && freightOpts.freightAmount > 0)
+    ? grossTotal - freightOpts.freightAmount
+    : grossTotal;
   try {
     const parentCompanyId = await storage.getParentCompanyId();
     if (!parentCompanyId) return { found: false, updated: false, amount: amountStr };
@@ -128,39 +135,84 @@ async function syncIntercoParentVoucher(
       return { found: false, updated: false, amount: amountStr };
     }
 
-    const oldAmount = parseFloat(parentVoucher.totalAmount || "0");
-    const oldAmountStr = oldAmount.toFixed(2);
-
-    // Skip write if already correct (idempotent)
-    if (Math.abs(oldAmount - newAmount) <= 0.001) {
-      return { found: true, updated: false, voucherId: parentVoucher.id, amount: amountStr, oldAmount: oldAmountStr };
-    }
-
-    console.log(`[syncIntercoParentVoucher] PO(s) ${nums.join(", ")}: voucher #${parentVoucher.id} ${oldAmountStr} → ${amountStr}`);
-
-    // Update parent voucher total
-    await dbOrTx
-      .update(vouchers)
-      .set({ totalAmount: amountStr })
-      .where(eq(vouchers.id, parentVoucher.id));
-
-    // Update all entries on this parent voucher (both DR and CR sides)
     const parentEntries = await dbOrTx
       .select()
       .from(voucherEntries)
       .where(eq(voucherEntries.voucherId, parentVoucher.id));
 
-    for (const entry of parentEntries) {
-      if (parseFloat(entry.debitAmount || "0") > 0) {
-        await dbOrTx
-          .update(voucherEntries)
-          .set({ debitAmount: amountStr })
-          .where(eq(voucherEntries.id, entry.id));
-      } else if (parseFloat(entry.creditAmount || "0") > 0) {
-        await dbOrTx
-          .update(voucherEntries)
-          .set({ creditAmount: amountStr })
-          .where(eq(voucherEntries.id, entry.id));
+    const oldAmount = parseFloat(parentVoucher.totalAmount || "0");
+    const oldAmountStr = oldAmount.toFixed(2);
+
+    // Check whether an update is needed (idempotent)
+    const totalMismatch = Math.abs(oldAmount - grossTotal) > 0.001;
+    let freightEntryMissing = false;
+    if (freightOpts && freightOpts.freightAmount > 0) {
+      const fe = parentEntries.find(
+        (e: any) => e.ledgerAccountId === freightOpts.freightParentAccountId &&
+                    parseFloat(e.creditAmount || "0") > 0,
+      );
+      freightEntryMissing = !fe ||
+        Math.abs(parseFloat(fe.creditAmount || "0") - freightOpts.freightAmount) > 0.001;
+    }
+    if (!totalMismatch && !freightEntryMissing) {
+      return { found: true, updated: false, voucherId: parentVoucher.id, amount: amountStr, oldAmount: oldAmountStr };
+    }
+
+    console.log(`[syncIntercoParentVoucher] PO(s) ${nums.join(", ")}: voucher #${parentVoucher.id} ${oldAmountStr} → ${amountStr}`);
+
+    await dbOrTx
+      .update(vouchers)
+      .set({ totalAmount: amountStr })
+      .where(eq(vouchers.id, parentVoucher.id));
+
+    if (freightOpts && freightOpts.freightAmount > 0) {
+      // Split the INTERCO-PARENT: DR subsidiary receivable (grossTotal),
+      //   CR supplier (intercoTotal — goods only), CR freightAccount (freight)
+      const intercoAmtStr = intercoTotal.toFixed(2);
+      const freightAmtStr = freightOpts.freightAmount.toFixed(2);
+      let freightEntryFound = false;
+
+      for (const entry of parentEntries) {
+        if (parseFloat(entry.debitAmount || "0") > 0) {
+          await dbOrTx.update(voucherEntries)
+            .set({ debitAmount: amountStr })
+            .where(eq(voucherEntries.id, entry.id));
+        } else if (parseFloat(entry.creditAmount || "0") > 0) {
+          if ((entry as any).ledgerAccountId === freightOpts.freightParentAccountId) {
+            freightEntryFound = true;
+            await dbOrTx.update(voucherEntries)
+              .set({ creditAmount: freightAmtStr })
+              .where(eq(voucherEntries.id, entry.id));
+          } else {
+            // Supplier CR → intercoTotal (goods share only)
+            await dbOrTx.update(voucherEntries)
+              .set({ creditAmount: intercoAmtStr })
+              .where(eq(voucherEntries.id, entry.id));
+          }
+        }
+      }
+      if (!freightEntryFound) {
+        await dbOrTx.insert(voucherEntries).values({
+          voucherId: parentVoucher.id,
+          companyId: parentCompanyId,
+          ledgerAccountId: freightOpts.freightParentAccountId,
+          debitAmount: "0",
+          creditAmount: freightAmtStr,
+          narration: `Freight - ${nums.join(", ")}`,
+        });
+      }
+    } else {
+      // No freight split — update all entries to grossTotal (original behaviour)
+      for (const entry of parentEntries) {
+        if (parseFloat(entry.debitAmount || "0") > 0) {
+          await dbOrTx.update(voucherEntries)
+            .set({ debitAmount: amountStr })
+            .where(eq(voucherEntries.id, entry.id));
+        } else if (parseFloat(entry.creditAmount || "0") > 0) {
+          await dbOrTx.update(voucherEntries)
+            .set({ creditAmount: amountStr })
+            .where(eq(voucherEntries.id, entry.id));
+        }
       }
     }
 
@@ -171,266 +223,10 @@ async function syncIntercoParentVoucher(
   }
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// syncIntercoFreightParentVoucher — creates / updates / deletes the
-// INTERCO-FREIGHT-{subCompanyId}-{cNum}-{poNumber} voucher in the parent
-// company whenever a PO's freight is paid by the parent.
-//
-// Voucher entries (in parent company):
-//   DR  freightParentAccountId  (freight expense borne by parent)
-//   CR  destIntercoAccountId    (interco payable — parent is owed by subsidiary)
-// ──────────────────────────────────────────────────────────────────────────────
-async function syncIntercoFreightParentVoucher(
-  dbOrTx: any,
-  opts: {
-    subsidiaryCompanyId: number;
-    cNum: string;
-    poNumber: string;
-    freightAmount: number;
-    freightParentAccountId: number | null;
-    voucherDate: string;
-    supplierName?: string;
-    subsidiaryName?: string;
-    /** voucherId of the PO's main supplier voucher — used as credit account source for parent-company POs */
-    poVoucherId?: number | null;
-  },
-): Promise<{ action: "created" | "updated" | "deleted" | "skipped" | "error"; voucherId?: number }> {
-  const { subsidiaryCompanyId, cNum, poNumber, freightAmount, freightParentAccountId, voucherDate } = opts;
-  try {
-    const parentCompanyId = await storage.getParentCompanyId();
-    if (!parentCompanyId) return { action: "skipped" };
-
-    // ── Parent-company PO: freight journal within the same company ────────────
-    // When the PO belongs to the parent company itself (not a subsidiary),
-    // we can't use the interco-receivable as the credit leg. Instead we post:
-    //   DR freightParentAccountId   (the chosen freight expense account)
-    //   CR supplier payable account (the credit leg from the main voucher)
-    if (subsidiaryCompanyId === parentCompanyId) {
-      const voucherNum = `INTERCO-FREIGHT-${subsidiaryCompanyId}-${cNum}-${poNumber}`;
-      const stalePattern = `INTERCO-FREIGHT-${subsidiaryCompanyId}-%-${poNumber}`;
-      // Clean up stale vouchers with a different container number
-      const staleOwn = await dbOrTx.select({ id: vouchers.id }).from(vouchers)
-        .where(and(
-          eq(vouchers.companyId, parentCompanyId),
-          like(vouchers.voucherNumber, stalePattern),
-          ne(vouchers.voucherNumber, voucherNum),
-        ));
-      for (const stale of staleOwn) {
-        await dbOrTx.delete(voucherEntries).where(eq(voucherEntries.voucherId, stale.id));
-        await dbOrTx.delete(vouchers).where(eq(vouchers.id, stale.id));
-      }
-
-      const [existingOwn] = await dbOrTx
-        .select({ id: vouchers.id, totalAmount: vouchers.totalAmount })
-        .from(vouchers)
-        .where(and(eq(vouchers.companyId, parentCompanyId), eq(vouchers.voucherNumber, voucherNum)))
-        .limit(1);
-
-      if (!freightParentAccountId || freightAmount <= 0.001) {
-        if (existingOwn) {
-          await dbOrTx.delete(voucherEntries).where(eq(voucherEntries.voucherId, existingOwn.id));
-          await dbOrTx.delete(vouchers).where(eq(vouchers.id, existingOwn.id));
-          return { action: "deleted", voucherId: existingOwn.id };
-        }
-        return { action: "skipped" };
-      }
-
-      // Look up the supplier payable account from the main voucher (the credit entry).
-      // The credit entry may use ledgerAccountId OR supplierId (purchase vouchers often
-      // link via supplierId only). Accept either — prefer ledgerAccountId, fall back to supplierId.
-      let supplierCreditAccountId: number | null = null;
-      let creditSupplierId: number | null = null;
-      if (opts.poVoucherId) {
-        const mainEntries = await dbOrTx.select().from(voucherEntries)
-          .where(eq(voucherEntries.voucherId, opts.poVoucherId));
-        const creditEntry = mainEntries.find((e: any) => parseFloat(e.creditAmount || "0") > 0);
-        supplierCreditAccountId = creditEntry?.ledgerAccountId ?? null;
-        creditSupplierId = !supplierCreditAccountId ? (creditEntry?.supplierId ?? null) : null;
-      }
-      if (!supplierCreditAccountId && !creditSupplierId) {
-        console.warn(`[syncIntercoFreightParentVoucher] Parent-company PO: no supplier credit account found for voucher ${opts.poVoucherId}`);
-        return { action: "skipped" };
-      }
-
-      const amountStr = freightAmount.toFixed(2);
-      const description = `Freight (parent acct) - ${cNum} / ${poNumber}${opts.supplierName ? ` — ${opts.supplierName}` : ""}`;
-
-      // Helper to build the credit-leg fields for a voucher entry
-      const creditLegFields = () => supplierCreditAccountId
-        ? { ledgerAccountId: supplierCreditAccountId, supplierId: null }
-        : { ledgerAccountId: null, supplierId: creditSupplierId };
-
-      if (existingOwn) {
-        const ownEntries = await dbOrTx.select().from(voucherEntries)
-          .where(eq(voucherEntries.voucherId, existingOwn.id));
-        const debitE = ownEntries.find((e: any) => parseFloat(e.debitAmount || "0") > 0);
-        const creditE = ownEntries.find((e: any) => parseFloat(e.creditAmount || "0") > 0);
-        const creditMatchesAccount = supplierCreditAccountId
-          ? (creditE?.ledgerAccountId ?? null) === supplierCreditAccountId
-          : (creditE?.supplierId ?? null) === creditSupplierId;
-        const needsUpdate =
-          Math.abs(parseFloat(existingOwn.totalAmount || "0") - freightAmount) > 0.001 ||
-          (debitE?.ledgerAccountId ?? null) !== freightParentAccountId ||
-          !creditMatchesAccount;
-        if (!needsUpdate) return { action: "skipped", voucherId: existingOwn.id };
-        await dbOrTx.update(vouchers).set({ totalAmount: amountStr, description }).where(eq(vouchers.id, existingOwn.id));
-        for (const entry of ownEntries) {
-          if (parseFloat(entry.debitAmount || "0") > 0) {
-            await dbOrTx.update(voucherEntries)
-              .set({ debitAmount: amountStr, creditAmount: "0", ledgerAccountId: freightParentAccountId, narration: description })
-              .where(eq(voucherEntries.id, entry.id));
-          } else {
-            await dbOrTx.update(voucherEntries)
-              .set({ creditAmount: amountStr, debitAmount: "0", ...creditLegFields(), narration: description })
-              .where(eq(voucherEntries.id, entry.id));
-          }
-        }
-        return { action: "updated", voucherId: existingOwn.id };
-      }
-
-      const [newOwnV] = await dbOrTx.insert(vouchers).values({
-        companyId: parentCompanyId,
-        voucherNumber: voucherNum,
-        voucherType: "Journal",
-        voucherDate,
-        description,
-        totalAmount: amountStr,
-        sourceModule: "ERP",
-      }).returning();
-      await dbOrTx.insert(voucherEntries).values([
-        { voucherId: newOwnV.id, companyId: parentCompanyId, ledgerAccountId: freightParentAccountId,
-          debitAmount: amountStr, creditAmount: "0", narration: description },
-        { voucherId: newOwnV.id, companyId: parentCompanyId, ...creditLegFields(),
-          debitAmount: "0", creditAmount: amountStr, narration: description },
-      ]);
-      return { action: "created", voucherId: newOwnV.id };
-    }
-    // ─────────────────────────────────────────────────────────────────────────
-
-    // Resolve subsidiary name for narration
-    let subsidiaryName = opts.subsidiaryName;
-    if (!subsidiaryName) {
-      const [subRow] = await dbOrTx.execute(sql`SELECT name FROM companies WHERE id = ${subsidiaryCompanyId} LIMIT 1`) as any[];
-      subsidiaryName = subRow?.name ?? String(subsidiaryCompanyId);
-    }
-    const supplierLabel = opts.supplierName ? ` — ${opts.supplierName}` : "";
-
-    const voucherNum = `INTERCO-FREIGHT-${subsidiaryCompanyId}-${cNum}-${poNumber}`;
-
-    // Clean up any stale INTERCO-FREIGHT vouchers for this subsidiary+PO that have a
-    // different container key (handles container-number renames between sync runs).
-    const stalePattern = `INTERCO-FREIGHT-${subsidiaryCompanyId}-%-${poNumber}`;
-    const staleVouchers = await dbOrTx
-      .select({ id: vouchers.id })
-      .from(vouchers)
-      .where(and(
-        eq(vouchers.companyId, parentCompanyId),
-        like(vouchers.voucherNumber, stalePattern),
-        ne(vouchers.voucherNumber, voucherNum),
-      ));
-    for (const stale of staleVouchers) {
-      await dbOrTx.delete(voucherEntries).where(eq(voucherEntries.voucherId, stale.id));
-      await dbOrTx.delete(vouchers).where(eq(vouchers.id, stale.id));
-    }
-
-    const [existing] = await dbOrTx
-      .select({ id: vouchers.id, totalAmount: vouchers.totalAmount })
-      .from(vouchers)
-      .where(and(eq(vouchers.companyId, parentCompanyId), eq(vouchers.voucherNumber, voucherNum)))
-      .limit(1);
-
-    // If no parent account configured or zero freight → delete any stale voucher
-    if (!freightParentAccountId || freightAmount <= 0.001) {
-      if (existing) {
-        await dbOrTx.delete(voucherEntries).where(eq(voucherEntries.voucherId, existing.id));
-        await dbOrTx.delete(vouchers).where(eq(vouchers.id, existing.id));
-        return { action: "deleted", voucherId: existing.id };
-      }
-      return { action: "skipped" };
-    }
-
-    // Look up interco config: sourceCompanyId = subsidiary → destIntercoAccountId in parent
-    const [intercoConfig] = await dbOrTx
-      .select({ destIntercoAccountId: intercompanyPosConfigs.destIntercoAccountId })
-      .from(intercompanyPosConfigs)
-      .where(eq(intercompanyPosConfigs.sourceCompanyId, subsidiaryCompanyId))
-      .limit(1);
-
-    if (!intercoConfig) {
-      console.warn(`[syncIntercoFreightParentVoucher] No interco config for subsidiary ${subsidiaryCompanyId}`);
-      return { action: "skipped" };
-    }
-
-    const amountStr = freightAmount.toFixed(2);
-    const description = `Freight (parent) - ${subsidiaryName} ${cNum} / ${poNumber}${supplierLabel}`;
-
-    if (existing) {
-      // Check both entry legs and total for full idempotency
-      const entries = await dbOrTx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, existing.id));
-      const debitEntry = entries.find((e: any) => parseFloat(e.debitAmount || "0") > 0);
-      const creditEntry = entries.find((e: any) => parseFloat(e.creditAmount || "0") > 0);
-      const currentTotal = parseFloat(existing.totalAmount || "0");
-      const currentDebitAccount: number | null = debitEntry?.ledgerAccountId ?? null;
-      const currentCreditAccount: number | null = creditEntry?.ledgerAccountId ?? null;
-      const needsUpdate =
-        Math.abs(currentTotal - freightAmount) > 0.001 ||
-        currentDebitAccount !== freightParentAccountId ||
-        currentCreditAccount !== intercoConfig.destIntercoAccountId;
-      if (!needsUpdate) {
-        return { action: "skipped", voucherId: existing.id };
-      }
-      // Update amount and account on both the voucher header and its entries
-      await dbOrTx.update(vouchers).set({ totalAmount: amountStr, description }).where(eq(vouchers.id, existing.id));
-      for (const entry of entries) {
-        if (parseFloat(entry.debitAmount || "0") > 0) {
-          await dbOrTx.update(voucherEntries)
-            .set({ debitAmount: amountStr, creditAmount: "0", ledgerAccountId: freightParentAccountId, narration: description })
-            .where(eq(voucherEntries.id, entry.id));
-        } else {
-          await dbOrTx.update(voucherEntries)
-            .set({ creditAmount: amountStr, debitAmount: "0", ledgerAccountId: intercoConfig.destIntercoAccountId, narration: description })
-            .where(eq(voucherEntries.id, entry.id));
-        }
-      }
-      return { action: "updated", voucherId: existing.id };
-    }
-
-    // Create new voucher in parent company
-    const [newVoucher] = await dbOrTx.insert(vouchers).values({
-      companyId: parentCompanyId,
-      voucherNumber: voucherNum,
-      voucherType: "Journal",
-      voucherDate,
-      description,
-      totalAmount: amountStr,
-      sourceModule: "ERP",
-    }).returning();
-
-    await dbOrTx.insert(voucherEntries).values([
-      {
-        voucherId: newVoucher.id,
-        companyId: parentCompanyId,
-        ledgerAccountId: freightParentAccountId,
-        debitAmount: amountStr,
-        creditAmount: "0",
-        narration: description,
-      },
-      {
-        voucherId: newVoucher.id,
-        companyId: parentCompanyId,
-        ledgerAccountId: intercoConfig.destIntercoAccountId,
-        debitAmount: "0",
-        creditAmount: amountStr,
-        narration: description,
-      },
-    ]);
-
-    return { action: "created", voucherId: newVoucher.id };
-  } catch (err) {
-    console.error("[syncIntercoFreightParentVoucher] Error:", err);
-    return { action: "error" };
-  }
-}
+// syncIntercoFreightParentVoucher removed — freight is now recorded directly
+// inside the purchase voucher (DR Purchases / CR freightParentAccountId).
+// No separate INTERCO-FREIGHT voucher is created. Legacy ones are deleted
+// by the sync-all cleanup below.
 
 // ──────────────────────────────────────────────────────────────────────────────
 // requireNonSP — blocks Supplier Partner companies from using ERP container
@@ -686,9 +482,15 @@ export function registerContainerRoutes(app: Express) {
           discount: po.discount, otherCharges: po.otherCharges,
           freightPaidBy: (po as any).freightPaidBy,
         });
-        // Local voucher amount = supplier's share (intercoTotal) — freight excluded
-        // when paid by own account or parent company.
-        const poLocalTotal = poIntercoTotal;
+        const poFreightPaidBy: string = (po as any).freightPaidBy || "supplier";
+        const poFreight = parseFloat(po.freight || "0");
+        const poFreightParentAccountId: number | null = (po as any).freightParentAccountId
+          ? Number((po as any).freightParentAccountId) : null;
+        const hasParentFreight = poFreightPaidBy === 'parent' && poFreight > 0 && !!poFreightParentAccountId;
+
+        // Local voucher amount: grossTotal when freight is parent-paid (freight included in purchase
+        // voucher), intercoTotal otherwise (freight handled by separate own-account voucher).
+        const poLocalTotal = hasParentFreight ? poTotal : poIntercoTotal;
 
         if (poTotal <= 0) {
           skipped.push(`PO ${po.poNumber}: total is 0`);
@@ -715,7 +517,6 @@ export function registerContainerRoutes(app: Express) {
               .where(eq(suppliers.id, po.supplierId))
               .limit(1);
             const expectedDesc = [container.containerNumber, sup?.legalName].filter(Boolean).join(" ");
-            // Only rewrite if description doesn't already contain the current container number
             if (voucherRow.description && !voucherRow.description.includes(container.containerNumber)) {
               await db
                 .update(vouchers)
@@ -729,66 +530,94 @@ export function registerContainerRoutes(app: Express) {
             .from(voucherEntries)
             .where(eq(voucherEntries.voucherId, po.voucherId));
 
-          for (const entry of entries) {
-            const origDebit = parseFloat(entry.debitAmount || "0");
-            const origCredit = parseFloat(entry.creditAmount || "0");
-
-            let isDebitEntry: boolean;
-            if (origDebit > 0 && origCredit === 0) {
-              isDebitEntry = true;
-            } else if (origCredit > 0 && origDebit === 0) {
-              isDebitEntry = false;
-            } else {
-              // Both zero (bug case): use narration/supplierId to determine direction
-              const nar = (entry.narration || "").toLowerCase();
-              isDebitEntry =
-                !entry.supplierId && (nar.includes("purchases") || nar.includes("owes us"));
+          if (hasParentFreight) {
+            // Split: goods entries → intercoTotal, freight entries → poFreight
+            // Identify freight CR entry by ledgerAccountId = freightParentAccountId
+            let purchasesAcctId: number | null = null;
+            let freightCrFound = false;
+            for (const entry of entries) {
+              const isDebit = parseFloat(entry.debitAmount || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
+              const isCredit = parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount || "0") === 0;
+              if (isDebit) {
+                if (!purchasesAcctId) purchasesAcctId = (entry as any).ledgerAccountId ?? null;
+                // Goods DR entry — update to intercoTotal; freight DR will be added/kept separately
+                if ((entry as any).ledgerAccountId !== poFreightParentAccountId) {
+                  await db.update(voucherEntries)
+                    .set({ debitAmount: poIntercoTotal.toFixed(2), creditAmount: "0" })
+                    .where(eq(voucherEntries.id, entry.id));
+                }
+              } else if (isCredit) {
+                if ((entry as any).ledgerAccountId === poFreightParentAccountId) {
+                  // Freight CR entry — update to current freight amount
+                  freightCrFound = true;
+                  await db.update(voucherEntries)
+                    .set({ creditAmount: poFreight.toFixed(2) })
+                    .where(eq(voucherEntries.id, entry.id));
+                  // Also ensure matching freight DR exists (handled below if not found)
+                } else {
+                  // Goods CR entry (supplier/parent account) — update to intercoTotal
+                  await db.update(voucherEntries)
+                    .set({ creditAmount: poIntercoTotal.toFixed(2), debitAmount: "0" })
+                    .where(eq(voucherEntries.id, entry.id));
+                }
+              }
             }
-
-            if (isDebitEntry) {
-              await db
-                .update(voucherEntries)
-                .set({ debitAmount: poLocalTotal.toFixed(2), creditAmount: "0" })
-                .where(eq(voucherEntries.id, entry.id));
-            } else {
-              await db
-                .update(voucherEntries)
-                .set({ creditAmount: poLocalTotal.toFixed(2), debitAmount: "0" })
-                .where(eq(voucherEntries.id, entry.id));
+            // If no freight CR entry exists yet, add the freight pair
+            if (!freightCrFound && purchasesAcctId) {
+              await db.insert(voucherEntries).values([
+                {
+                  voucherId: po.voucherId, companyId: po.companyId,
+                  ledgerAccountId: purchasesAcctId,
+                  debitAmount: poFreight.toFixed(2), creditAmount: "0",
+                  narration: `Freight - PO ${po.poNumber}`,
+                },
+                {
+                  voucherId: po.voucherId, companyId: po.companyId,
+                  ledgerAccountId: poFreightParentAccountId,
+                  debitAmount: "0", creditAmount: poFreight.toFixed(2),
+                  narration: `Freight - PO ${po.poNumber}`,
+                },
+              ]);
+            }
+          } else {
+            // Standard: update all entries to poLocalTotal
+            for (const entry of entries) {
+              const origDebit = parseFloat(entry.debitAmount || "0");
+              const origCredit = parseFloat(entry.creditAmount || "0");
+              let isDebitEntry: boolean;
+              if (origDebit > 0 && origCredit === 0) {
+                isDebitEntry = true;
+              } else if (origCredit > 0 && origDebit === 0) {
+                isDebitEntry = false;
+              } else {
+                const nar = (entry.narration || "").toLowerCase();
+                isDebitEntry = !entry.supplierId && (nar.includes("purchases") || nar.includes("owes us"));
+              }
+              if (isDebitEntry) {
+                await db.update(voucherEntries)
+                  .set({ debitAmount: poLocalTotal.toFixed(2), creditAmount: "0" })
+                  .where(eq(voucherEntries.id, entry.id));
+              } else {
+                await db.update(voucherEntries)
+                  .set({ creditAmount: poLocalTotal.toFixed(2), debitAmount: "0" })
+                  .where(eq(voucherEntries.id, entry.id));
+              }
             }
           }
           updatedLocalVouchers++;
         }
 
-        // Fix the INTERCO-PARENT voucher in the parent company — uses interco total (freightPaidBy-aware)
+        // Fix the INTERCO-PARENT voucher in the parent company
         if (parentCompanyId && po.companyId !== parentCompanyId) {
-          const svResult = await syncIntercoParentVoucher(db, po.poNumber, poIntercoTotal, container.containerNumber);
+          const svResult = await syncIntercoParentVoucher(
+            db, po.poNumber, poTotal, container.containerNumber,
+            hasParentFreight ? { freightAmount: poFreight, freightParentAccountId: poFreightParentAccountId! } : undefined,
+          );
           if (svResult.updated) {
             updatedParentVouchers++;
           } else if (!svResult.found) {
             skipped.push(`PO ${po.poNumber}: no INTERCO-PARENT voucher found`);
           }
-        }
-
-        // Fix INTERCO-FREIGHT voucher in parent company for parent-paid freight
-        const poFreightPaidBy: string = (po as any).freightPaidBy || "supplier";
-        const poFreight = parseFloat(po.freight || "0");
-        if (parentCompanyId && (po.companyId !== parentCompanyId || poFreightPaidBy === 'parent')) {
-          const poFreightParentAccountId: number | null = (po as any).freightParentAccountId ? Number((po as any).freightParentAccountId) : null;
-          const poContainerId = po.containerId;
-          const cNum = poContainerId
-            ? (await db.select({ containerNumber: containers.containerNumber }).from(containers).where(eq(containers.id, poContainerId)).limit(1))[0]?.containerNumber ?? String(poContainerId)
-            : String(po.id);
-          const today = new Date().toISOString().split("T")[0];
-          await syncIntercoFreightParentVoucher(db, {
-            subsidiaryCompanyId: po.companyId,
-            cNum,
-            poNumber: po.poNumber,
-            freightAmount: poFreightPaidBy === 'parent' && poFreight > 0 ? poFreight : 0,
-            freightParentAccountId: poFreightPaidBy === 'parent' ? poFreightParentAccountId : null,
-            voucherDate: today,
-            poVoucherId: po.voucherId ?? null,
-          });
         }
       }
 
@@ -915,8 +744,6 @@ export function registerContainerRoutes(app: Express) {
         let updatedLocalVouchers = 0;
         let updatedParentVouchers = 0;
         let updatedFreightVouchers = 0;
-        let updatedIntercoFreightVouchers = 0;
-        let removedIntercoFreightVouchers = 0;
         let updatedContainerCharges = 0;
         const skipped: string[] = [];
         const notFoundParentVouchers: string[] = [];
@@ -939,7 +766,17 @@ export function registerContainerRoutes(app: Express) {
               continue;
             }
 
-            // ── Fix the subsidiary local voucher ─────────────────────────────
+            // Resolve freight info from calcPoAmounts result
+            const poFreightPaidBy: string = (po as any).freightPaidBy || "supplier";
+            const poFreight = parseFloat(po.freight || "0");
+            const poFreightParentAccountId: number | null = (po as any).freightParentAccountId
+              ? Number((po as any).freightParentAccountId) : null;
+            const hasParentFreight = poFreightPaidBy === 'parent' && poFreight > 0 && !!poFreightParentAccountId;
+
+            // ── Fix the local purchase voucher ────────────────────────────────
+            // Expected total: grossTotal when parent-freight (freight inside this voucher),
+            // intercoTotal otherwise.
+            const expectedLocalTotal = hasParentFreight ? grossTotal : intercoTotal;
             if (po.voucherId) {
               const [localVoucher] = await db
                 .select({ id: vouchers.id, totalAmount: vouchers.totalAmount })
@@ -949,8 +786,17 @@ export function registerContainerRoutes(app: Express) {
 
               if (localVoucher) {
                 const currentLocalTotal = parseFloat(localVoucher.totalAmount || "0");
-                const expectedLocalTotal = intercoTotal;
-                const localMismatch = Math.abs(currentLocalTotal - expectedLocalTotal) > 0.001;
+                const entries = await db
+                  .select()
+                  .from(voucherEntries)
+                  .where(eq(voucherEntries.voucherId, po.voucherId));
+
+                // Determine if freight entry already exists in the voucher
+                const freightCrEntry = hasParentFreight
+                  ? entries.find((e: any) => e.ledgerAccountId === poFreightParentAccountId && parseFloat(e.creditAmount || "0") > 0)
+                  : null;
+                const freightEntryMissing = hasParentFreight && !freightCrEntry;
+                const localMismatch = Math.abs(currentLocalTotal - expectedLocalTotal) > 0.001 || freightEntryMissing;
 
                 if (localMismatch) {
                   console.log(`[SyncAll] PO ${po.poNumber}: local voucher #${po.voucherId} ${currentLocalTotal} → ${expectedLocalTotal}`);
@@ -959,27 +805,64 @@ export function registerContainerRoutes(app: Express) {
                     .set({ totalAmount: expectedLocalTotal.toFixed(2) })
                     .where(eq(vouchers.id, po.voucherId));
 
-                  const entries = await db
-                    .select()
-                    .from(voucherEntries)
-                    .where(eq(voucherEntries.voucherId, po.voucherId));
-
-                  for (const entry of entries) {
-                    const origDebit = parseFloat(entry.debitAmount || "0");
-                    const origCredit = parseFloat(entry.creditAmount || "0");
-                    const isDebit = origDebit > 0 && origCredit === 0
-                      ? true
-                      : origCredit > 0 && origDebit === 0
-                        ? false
-                        : !(entry.supplierId);
-                    if (isDebit) {
-                      await db.update(voucherEntries)
-                        .set({ debitAmount: expectedLocalTotal.toFixed(2), creditAmount: "0" })
-                        .where(eq(voucherEntries.id, entry.id));
-                    } else {
-                      await db.update(voucherEntries)
-                        .set({ creditAmount: expectedLocalTotal.toFixed(2), debitAmount: "0" })
-                        .where(eq(voucherEntries.id, entry.id));
+                  if (hasParentFreight) {
+                    let purchasesAcctId: number | null = null;
+                    let freightCrFound = false;
+                    for (const entry of entries) {
+                      const isDebit = parseFloat(entry.debitAmount || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
+                      const isCredit = parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount || "0") === 0;
+                      if (isDebit) {
+                        if (!purchasesAcctId) purchasesAcctId = (entry as any).ledgerAccountId ?? null;
+                        if ((entry as any).ledgerAccountId !== poFreightParentAccountId) {
+                          await db.update(voucherEntries)
+                            .set({ debitAmount: intercoTotal.toFixed(2), creditAmount: "0" })
+                            .where(eq(voucherEntries.id, entry.id));
+                        }
+                      } else if (isCredit) {
+                        if ((entry as any).ledgerAccountId === poFreightParentAccountId) {
+                          freightCrFound = true;
+                          await db.update(voucherEntries)
+                            .set({ creditAmount: poFreight.toFixed(2) })
+                            .where(eq(voucherEntries.id, entry.id));
+                        } else {
+                          await db.update(voucherEntries)
+                            .set({ creditAmount: intercoTotal.toFixed(2), debitAmount: "0" })
+                            .where(eq(voucherEntries.id, entry.id));
+                        }
+                      }
+                    }
+                    if (!freightCrFound && purchasesAcctId) {
+                      await db.insert(voucherEntries).values([
+                        {
+                          voucherId: po.voucherId, companyId: po.companyId,
+                          ledgerAccountId: purchasesAcctId,
+                          debitAmount: poFreight.toFixed(2), creditAmount: "0",
+                          narration: `Freight - PO ${po.poNumber}`,
+                        },
+                        {
+                          voucherId: po.voucherId, companyId: po.companyId,
+                          ledgerAccountId: poFreightParentAccountId,
+                          debitAmount: "0", creditAmount: poFreight.toFixed(2),
+                          narration: `Freight - PO ${po.poNumber}`,
+                        },
+                      ]);
+                    }
+                  } else {
+                    for (const entry of entries) {
+                      const origDebit = parseFloat(entry.debitAmount || "0");
+                      const origCredit = parseFloat(entry.creditAmount || "0");
+                      const isDebit = origDebit > 0 && origCredit === 0
+                        ? true : origCredit > 0 && origDebit === 0
+                          ? false : !(entry.supplierId);
+                      if (isDebit) {
+                        await db.update(voucherEntries)
+                          .set({ debitAmount: expectedLocalTotal.toFixed(2), creditAmount: "0" })
+                          .where(eq(voucherEntries.id, entry.id));
+                      } else {
+                        await db.update(voucherEntries)
+                          .set({ creditAmount: expectedLocalTotal.toFixed(2), debitAmount: "0" })
+                          .where(eq(voucherEntries.id, entry.id));
+                      }
                     }
                   }
                   updatedLocalVouchers++;
@@ -987,13 +870,16 @@ export function registerContainerRoutes(app: Express) {
               }
             }
 
-            // ── Compute container number for this PO (used by parent + freight sync) ──
+            // ── Compute container number for this PO (used by parent sync) ──
             const poContainerId = po.containerId;
             const cNum = poContainerId ? (containerNumberMap.get(poContainerId) ?? String(poContainerId)) : String(po.id);
 
             // ── Fix the parent INTERCO-PARENT voucher ───────────────────────
             if (parentCompanyId && po.companyId !== parentCompanyId) {
-              const svResult = await syncIntercoParentVoucher(db, po.poNumber, intercoTotal, cNum);
+              const svResult = await syncIntercoParentVoucher(
+                db, po.poNumber, grossTotal, cNum,
+                hasParentFreight ? { freightAmount: poFreight, freightParentAccountId: poFreightParentAccountId! } : undefined,
+              );
               if (svResult.updated) {
                 updatedParentVouchers++;
               } else if (!svResult.found) {
@@ -1002,8 +888,6 @@ export function registerContainerRoutes(app: Express) {
             }
             // ── Repair own-freight voucher ────────────────────────────────────
             const freightVoucherNum = `FREIGHT-${cNum}-${po.poNumber}`;
-            const poFreight = parseFloat(po.freight || "0");
-            const poFreightPaidBy: string = (po as any).freightPaidBy || "supplier";
             const poFreightOwnAccountId: number | null = (po as any).freightOwnAccountId ? Number((po as any).freightOwnAccountId) : null;
             if (poFreightPaidBy === 'parent' && poFreight > 0 && !((po as any).freightParentAccountId)) {
               missingParentFreightAccount.push(`PO ${po.poNumber}: freight set to parent-paid but no parent account configured`);
@@ -1084,30 +968,9 @@ export function registerContainerRoutes(app: Express) {
               }
             }
 
-            // ── Repair / delete INTERCO-FREIGHT- parent-paid freight voucher ─
-            // Include parent-company POs too: when the parent has its own PO with
-            // "Parent Co." freight, syncIntercoFreightParentVoucher handles the
-            // direct freight journal within the same company.
-            if (parentCompanyId && (po.companyId !== parentCompanyId || poFreightPaidBy === 'parent')) {
-              const poFreightParentAccountId: number | null = (po as any).freightParentAccountId ? Number((po as any).freightParentAccountId) : null;
-              const ifrVoucherDate = new Date().toISOString().split("T")[0];
-              const poSupplierName = (po as any).supplierName ?? undefined;
-              const ifrResult = await syncIntercoFreightParentVoucher(db, {
-                subsidiaryCompanyId: po.companyId,
-                cNum,
-                poNumber: po.poNumber,
-                freightAmount: poFreightPaidBy === 'parent' && poFreight > 0 ? poFreight : 0,
-                freightParentAccountId: poFreightPaidBy === 'parent' ? poFreightParentAccountId : null,
-                voucherDate: ifrVoucherDate,
-                supplierName: poSupplierName,
-                poVoucherId: po.voucherId ?? null,
-              });
-              if (ifrResult.action === 'created' || ifrResult.action === 'updated') {
-                updatedIntercoFreightVouchers++;
-              } else if (ifrResult.action === 'deleted') {
-                removedIntercoFreightVouchers++;
-              }
-            }
+            // INTERCO-FREIGHT vouchers are no longer created — freight is recorded
+            // directly inside the purchase voucher. Legacy ones are left in place
+            // (they can be deleted manually from the daybook if no longer needed).
           } catch (poErr: any) {
             errors.push(`PO ${po.poNumber}: ${poErr.message}`);
             console.error(`[SyncAll] Error processing PO ${po.poNumber}:`, poErr);
@@ -1204,7 +1067,7 @@ export function registerContainerRoutes(app: Express) {
         }
 
         const scannedContainers = containerIds.length;
-        console.log(`[SyncAll] Done. POs=${scannedPOs} Containers=${scannedContainers} LocalVouchers=${updatedLocalVouchers} ParentVouchers=${updatedParentVouchers} FreightVouchers=${updatedFreightVouchers} IntercoFreightUpdated=${updatedIntercoFreightVouchers} IntercoFreightRemoved=${removedIntercoFreightVouchers} ContainerCharges=${updatedContainerCharges} ContainerTotals=${updatedContainers} Skipped=${skipped.length} NotFound=${notFoundParentVouchers.length} Errors=${errors.length}`);
+        console.log(`[SyncAll] Done. POs=${scannedPOs} Containers=${scannedContainers} LocalVouchers=${updatedLocalVouchers} ParentVouchers=${updatedParentVouchers} FreightVouchers=${updatedFreightVouchers} ContainerCharges=${updatedContainerCharges} ContainerTotals=${updatedContainers} Skipped=${skipped.length} NotFound=${notFoundParentVouchers.length} Errors=${errors.length}`);
 
         res.json({
           scannedPOs,
@@ -1212,8 +1075,6 @@ export function registerContainerRoutes(app: Express) {
           updatedLocalVouchers,
           updatedParentVouchers,
           updatedFreightVouchers,
-          updatedIntercoFreightVouchers,
-          removedIntercoFreightVouchers,
           updatedContainerCharges,
           updatedContainers,
           skipped,
@@ -2848,41 +2709,7 @@ export function registerContainerRoutes(app: Express) {
           });
         } catch { /* non-fatal */ }
 
-        // ── Sync INTERCO-FREIGHT- voucher in parent for parent-paid freight (Branch 1) ──
-        {
-          const _b1FreightPaidBy: string = req.body.freightPaidBy ?? existingPO.freightPaidBy ?? 'supplier';
-          const _b1FreightParentAccountId: number | null =
-            req.body.freightParentAccountId !== undefined
-              ? (req.body.freightParentAccountId === null ? null : Number(req.body.freightParentAccountId))
-              : ((existingPO as any).freightParentAccountId ?? null);
-          const _b1OldFreightPaidBy: string = (existingPO as any).freightPaidBy ?? 'supplier';
-          const _b1OldFreightParentAccountId: number | null = (existingPO as any).freightParentAccountId ?? null;
-          // Always sync when freight is/was parent-paid — syncIntercoFreightParentVoucher
-          // is idempotent (returns "skipped" if already correct), so calling it
-          // unconditionally ensures the voucher is created even for POs that had
-          // freightPaidBy="parent" set before this feature was deployed.
-          if (_b1FreightPaidBy === 'parent' || _b1OldFreightPaidBy === 'parent') {
-            const _b1CNum = container?.containerNumber ?? String(existingPO.containerId);
-            // Use the effective PO number (may have been changed in this request)
-            const _b1EffectivePoNum = updatedPO?.poNumber ?? existingPO.poNumber;
-            let _b1VoucherDate = new Date().toISOString().split("T")[0];
-            if (existingPO.voucherId) {
-              const [_b1V] = await db.select({ voucherDate: vouchers.voucherDate })
-                .from(vouchers).where(eq(vouchers.id, existingPO.voucherId)).limit(1);
-              if (_b1V?.voucherDate) _b1VoucherDate = _b1V.voucherDate;
-            }
-            await syncIntercoFreightParentVoucher(db, {
-              subsidiaryCompanyId: existingPO.companyId,
-              cNum: _b1CNum,
-              poNumber: _b1EffectivePoNum,
-              freightAmount: _b1FreightPaidBy === 'parent' ? _b1FreightForSync : 0,
-              freightParentAccountId: _b1FreightPaidBy === 'parent' ? _b1FreightParentAccountId : null,
-              voucherDate: _b1VoucherDate,
-              supplierName: supplier?.legalName ?? undefined,
-              poVoucherId: existingPO.voucherId ?? null,
-            });
-          }
-        }
+        // INTERCO-FREIGHT sync removed — freight is now inside the purchase voucher itself.
 
         return res.json({
           ...updatedPO,
@@ -3231,30 +3058,7 @@ export function registerContainerRoutes(app: Express) {
         }
       }
 
-      // ── Sync INTERCO-FREIGHT- voucher in parent for parent-paid freight ──
-      // Always sync when freight is/was parent-paid — idempotent, safe to call every save.
-      if (newFreightPaidBy === 'parent' || oldFreightPaidBy === 'parent') {
-        const [_pfContainer] = await db.select({ containerNumber: containers.containerNumber })
-          .from(containers).where(eq(containers.id, existingPO.containerId)).limit(1);
-        const _pfCNum = _pfContainer?.containerNumber ?? String(existingPO.containerId);
-        let _pfVoucherDate = new Date().toISOString().split("T")[0];
-        if (existingPO.voucherId) {
-          const [_pfV] = await db.select({ voucherDate: vouchers.voucherDate })
-            .from(vouchers).where(eq(vouchers.id, existingPO.voucherId)).limit(1);
-          if (_pfV?.voucherDate) _pfVoucherDate = _pfV.voucherDate;
-        }
-        const _pfSupplier = existingPO.supplierId ? await storage.getSupplierById(existingPO.supplierId) : null;
-        await syncIntercoFreightParentVoucher(db, {
-          subsidiaryCompanyId: existingPO.companyId,
-          cNum: _pfCNum,
-          poNumber: existingPO.poNumber,
-          freightAmount: newFreightPaidBy === 'parent' ? newFreight : 0,
-          freightParentAccountId: newFreightPaidBy === 'parent' ? newFreightParentAccountId : null,
-          voucherDate: _pfVoucherDate,
-          supplierName: _pfSupplier?.legalName ?? undefined,
-          poVoucherId: existingPO.voucherId ?? null,
-        });
-      }
+      // INTERCO-FREIGHT sync removed — freight is now inside the purchase voucher itself.
 
       try {
         const _poChanges: Record<string, any> = {};

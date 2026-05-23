@@ -142,8 +142,6 @@ export default function Containers() {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
       const parts: string[] = [data?.message ?? "All POs and parent JVs have been checked."];
       if ((data?.updatedFreightVouchers ?? 0) > 0) parts.push(`Freight vouchers fixed: ${data.updatedFreightVouchers}.`);
-      if ((data?.updatedIntercoFreightVouchers ?? 0) > 0) parts.push(`Parent freight vouchers updated: ${data.updatedIntercoFreightVouchers}.`);
-      if ((data?.removedIntercoFreightVouchers ?? 0) > 0) parts.push(`Stale parent freight vouchers removed: ${data.removedIntercoFreightVouchers}.`);
       if ((data?.updatedContainerCharges ?? 0) > 0) parts.push(`Charge rows fixed: ${data.updatedContainerCharges}.`);
       if ((data?.notFoundParentVouchers?.length ?? 0) > 0) parts.push(`${data.notFoundParentVouchers.length} PO(s) have no parent JV yet — import or re-save those POs to create them.`);
       toast({

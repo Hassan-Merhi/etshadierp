@@ -393,7 +393,7 @@ export function registerImportRoutes(app: Express) {
           voucherType: "Purchase",
           voucherDate: importDate,
           description: `${containerNumber} ${supplier?.legalName || 'Unknown'}`,
-          totalAmount: poIntercoTotal.toString(),
+          totalAmount: (resolvedFreightPaidBy === "parent" ? poGrandTotal : poIntercoTotal).toString(),
           optional: false,
           sourceModule: "ERP",
         });
@@ -475,11 +475,15 @@ export function registerImportRoutes(app: Express) {
             }
             
             // Create voucher entries in SUBSIDIARY: DR Purchases, CR Parent Credit Account
-            // Use intercoTotal (excludes freight when paid by parent) so supplier AP is correct
+            // When freight is parent-paid, the full grossTotal (including freight) is credited
+            // to the parent account — the parent will settle freight with the freight company.
+            const subsidiaryVoucherAmount = (resolvedFreightPaidBy === "parent" && poFreight > 0)
+              ? poGrandTotal
+              : poIntercoTotal;
             await storage.createVoucherEntry({
               voucherId: voucher.id,
               ledgerAccountId: purchasesAccount.id,
-              debitAmount: poIntercoTotal.toFixed(2),
+              debitAmount: subsidiaryVoucherAmount.toFixed(2),
               creditAmount: "0",
               narration: `PO ${poNumber} - Container ${containerNumber}`,
             });
@@ -488,7 +492,7 @@ export function registerImportRoutes(app: Express) {
               voucherId: voucher.id,
               ledgerAccountId: parentCreditAccountId,
               debitAmount: "0",
-              creditAmount: poIntercoTotal.toFixed(2),
+              creditAmount: subsidiaryVoucherAmount.toFixed(2),
               narration: `PO ${poNumber} - Credit from ${subsidiaryName}`,
             });
             
@@ -513,8 +517,13 @@ export function registerImportRoutes(app: Express) {
               });
             }
             
-            // Create matching INTERCO-PARENT voucher in PARENT: DR Subsidiary Receivable, CR Supplier
-            // Use intercoTotal so the supplier balance excludes parent-borne freight
+            // Create matching INTERCO-PARENT voucher in PARENT:
+            //   DR Subsidiary Receivable (grossTotal)
+            //   CR Supplier (intercoTotal — goods only)
+            //   CR FreightParentAccount (freight — when parent-paid)
+            const intercoParentTotal = (resolvedFreightPaidBy === "parent" && poFreight > 0)
+              ? poGrandTotal
+              : poIntercoTotal;
             const parentVoucher = await storage.createVoucher({
               companyId: parentCompanyId,
               currency: "USD",
@@ -522,21 +531,21 @@ export function registerImportRoutes(app: Express) {
               voucherType: "Journal",
               voucherDate: importDate,
               description: `${containerNumber} ${supplier?.legalName || 'Unknown'}`,
-              totalAmount: poIntercoTotal.toString(),
+              totalAmount: intercoParentTotal.toString(),
               optional: false,
               sourceModule: "ERP",
             });
             
-            // DR: Subsidiary receivable (Asset increases - they owe us)
+            // DR: Subsidiary receivable (Asset increases - they owe us the full amount)
             await storage.createVoucherEntry({
               voucherId: parentVoucher.id,
               ledgerAccountId: subsidiaryReceivableAccount.id,
-              debitAmount: poIntercoTotal.toFixed(2),
+              debitAmount: intercoParentTotal.toFixed(2),
               creditAmount: "0",
               narration: `${subsidiaryName} PO ${poNumber} - Container ${containerNumber}`,
             });
             
-            // CR: Supplier account (Liability increases - we owe supplier)
+            // CR: Supplier account (Liability increases - we owe supplier for goods only)
             await storage.createVoucherEntry({
               voucherId: parentVoucher.id,
               supplierId: supplierId,
@@ -545,49 +554,15 @@ export function registerImportRoutes(app: Express) {
               narration: `${subsidiaryName} PO ${poNumber} - Container ${containerNumber}`,
             });
 
-            // === CREATE INTERCO-FREIGHT VOUCHER IN PARENT (if freight paid by parent) ===
+            // CR: Freight account (when freight is parent-paid — we owe freight company)
             if (resolvedFreightPaidBy === "parent" && resolvedFreightParentAccountId && poFreight > 0) {
-              // Look up the interco config to find the dest interco account (CR side)
-              const intercoConfigs = await db
-                .select()
-                .from(intercompanyPosConfigs)
-                .where(and(
-                  eq(intercompanyPosConfigs.sourceCompanyId, currentCompanyId),
-                  eq(intercompanyPosConfigs.enabled, true),
-                ))
-                .limit(1);
-              const destIntercoAccountId = intercoConfigs[0]?.destIntercoAccountId ?? null;
-
-              if (destIntercoAccountId) {
-                const freightVoucherNum = `INTERCO-FREIGHT-${currentCompanyId}-${containerNumber}-${poNumber}`;
-                const intercoFreightVoucher = await storage.createVoucher({
-                  companyId: parentCompanyId,
-                  currency: "USD",
-                  voucherNumber: freightVoucherNum,
-                  voucherType: "Journal",
-                  voucherDate: importDate,
-                  description: `Freight for ${subsidiaryName} | ${supplier?.legalName || ''} PO ${poNumber} ${containerNumber}`,
-                  totalAmount: poFreight.toFixed(2),
-                  optional: false,
-                  sourceModule: "ERP",
-                });
-                // DR: parent freight expense account
-                await storage.createVoucherEntry({
-                  voucherId: intercoFreightVoucher.id,
-                  ledgerAccountId: resolvedFreightParentAccountId,
-                  debitAmount: poFreight.toFixed(2),
-                  creditAmount: "0",
-                  narration: `Freight ${subsidiaryName} PO ${poNumber} ${containerNumber}`,
-                });
-                // CR: interco payable (dest interco account)
-                await storage.createVoucherEntry({
-                  voucherId: intercoFreightVoucher.id,
-                  ledgerAccountId: destIntercoAccountId,
-                  debitAmount: "0",
-                  creditAmount: poFreight.toFixed(2),
-                  narration: `Freight ${subsidiaryName} PO ${poNumber} ${containerNumber}`,
-                });
-              }
+              await storage.createVoucherEntry({
+                voucherId: parentVoucher.id,
+                ledgerAccountId: resolvedFreightParentAccountId,
+                debitAmount: "0",
+                creditAmount: poFreight.toFixed(2),
+                narration: `Freight - ${subsidiaryName} PO ${poNumber} - Container ${containerNumber}`,
+              });
             }
           }
         } else {
@@ -610,24 +585,51 @@ export function registerImportRoutes(app: Express) {
             });
           }
           
-          // DR Purchases (expense increases)
+          // When freight is parent-paid, split the voucher:
+          //   DR Purchases (intercoTotal)  CR Supplier (intercoTotal)   ← goods
+          //   DR Purchases (freight)       CR FreightAccount (freight)  ← freight payable
+          // Otherwise use grandTotal for both legs (supplier carries freight in their price).
+          const hasParentFreight = resolvedFreightPaidBy === "parent" &&
+            resolvedFreightParentAccountId && poFreight > 0;
+          const goodsAmount = hasParentFreight ? poIntercoTotal : poGrandTotal;
+
+          // DR Purchases — goods portion
           await storage.createVoucherEntry({
             voucherId: voucher.id,
             ledgerAccountId: purchasesAccount.id,
-            debitAmount: poGrandTotal.toFixed(2),
+            debitAmount: goodsAmount.toFixed(2),
             creditAmount: "0",
             narration: `PO ${poNumber} - Container ${containerNumber}`,
           });
           
-          // CR Supplier (liability increases - we owe supplier)
-          // Only create if supplierId is provided
+          // CR Supplier — goods payable
           if (supplierId) {
             await storage.createVoucherEntry({
               voucherId: voucher.id,
               supplierId: supplierId,
               debitAmount: "0",
-              creditAmount: poGrandTotal.toFixed(2),
+              creditAmount: goodsAmount.toFixed(2),
               narration: `PO ${poNumber} - Container ${containerNumber}`,
+            });
+          }
+
+          // When freight is parent-paid: add freight entries to this same purchase voucher
+          if (hasParentFreight) {
+            // DR Purchases — freight portion (same account as goods debit)
+            await storage.createVoucherEntry({
+              voucherId: voucher.id,
+              ledgerAccountId: purchasesAccount.id,
+              debitAmount: poFreight.toFixed(2),
+              creditAmount: "0",
+              narration: `Freight - PO ${poNumber} - Container ${containerNumber}`,
+            });
+            // CR FreightParentAccount — we owe money to the freight company
+            await storage.createVoucherEntry({
+              voucherId: voucher.id,
+              ledgerAccountId: resolvedFreightParentAccountId!,
+              debitAmount: "0",
+              creditAmount: poFreight.toFixed(2),
+              narration: `Freight - PO ${poNumber} - Container ${containerNumber}`,
             });
           }
         }
