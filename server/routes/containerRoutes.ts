@@ -658,6 +658,9 @@ export function registerContainerRoutes(app: Express) {
           discount: po.discount, otherCharges: po.otherCharges,
           freightPaidBy: (po as any).freightPaidBy,
         });
+        // Local voucher amount = supplier's share (intercoTotal) — freight excluded
+        // when paid by own account or parent company.
+        const poLocalTotal = poIntercoTotal;
 
         if (poTotal <= 0) {
           skipped.push(`PO ${po.poNumber}: total is 0`);
@@ -668,7 +671,7 @@ export function registerContainerRoutes(app: Express) {
         if (po.voucherId) {
           await db
             .update(vouchers)
-            .set({ totalAmount: poTotal.toFixed(2) })
+            .set({ totalAmount: poLocalTotal.toFixed(2) })
             .where(eq(vouchers.id, po.voucherId));
 
           // Also update the description to use the current container number
@@ -717,12 +720,12 @@ export function registerContainerRoutes(app: Express) {
             if (isDebitEntry) {
               await db
                 .update(voucherEntries)
-                .set({ debitAmount: poTotal.toFixed(2), creditAmount: "0" })
+                .set({ debitAmount: poLocalTotal.toFixed(2), creditAmount: "0" })
                 .where(eq(voucherEntries.id, entry.id));
             } else {
               await db
                 .update(voucherEntries)
-                .set({ creditAmount: poTotal.toFixed(2), debitAmount: "0" })
+                .set({ creditAmount: poLocalTotal.toFixed(2), debitAmount: "0" })
                 .where(eq(voucherEntries.id, entry.id));
             }
           }
@@ -737,6 +740,27 @@ export function registerContainerRoutes(app: Express) {
           } else if (!svResult.found) {
             skipped.push(`PO ${po.poNumber}: no INTERCO-PARENT voucher found`);
           }
+        }
+
+        // Fix INTERCO-FREIGHT voucher in parent company for parent-paid freight
+        const poFreightPaidBy: string = (po as any).freightPaidBy || "supplier";
+        const poFreight = parseFloat(po.freight || "0");
+        if (parentCompanyId && (po.companyId !== parentCompanyId || poFreightPaidBy === 'parent')) {
+          const poFreightParentAccountId: number | null = (po as any).freightParentAccountId ? Number((po as any).freightParentAccountId) : null;
+          const poContainerId = po.containerId;
+          const cNum = poContainerId
+            ? (await db.select({ containerNumber: containers.containerNumber }).from(containers).where(eq(containers.id, poContainerId)).limit(1))[0]?.containerNumber ?? String(poContainerId)
+            : String(po.id);
+          const today = new Date().toISOString().split("T")[0];
+          await syncIntercoFreightParentVoucher(db, {
+            subsidiaryCompanyId: po.companyId,
+            cNum,
+            poNumber: po.poNumber,
+            freightAmount: poFreightPaidBy === 'parent' && poFreight > 0 ? poFreight : 0,
+            freightParentAccountId: poFreightPaidBy === 'parent' ? poFreightParentAccountId : null,
+            voucherDate: today,
+            poVoucherId: po.voucherId ?? null,
+          });
         }
       }
 
