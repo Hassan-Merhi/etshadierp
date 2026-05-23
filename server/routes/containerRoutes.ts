@@ -193,6 +193,22 @@ async function syncIntercoFreightParentVoucher(
 
     const voucherNum = `INTERCO-FREIGHT-${subsidiaryCompanyId}-${cNum}-${poNumber}`;
 
+    // Clean up any stale INTERCO-FREIGHT vouchers for this subsidiary+PO that have a
+    // different container key (handles container-number renames between sync runs).
+    const stalePattern = `INTERCO-FREIGHT-${subsidiaryCompanyId}-%-${poNumber}`;
+    const staleVouchers = await dbOrTx
+      .select({ id: vouchers.id })
+      .from(vouchers)
+      .where(and(
+        eq(vouchers.companyId, parentCompanyId),
+        like(vouchers.voucherNumber, stalePattern),
+        ne(vouchers.voucherNumber, voucherNum),
+      ));
+    for (const stale of staleVouchers) {
+      await dbOrTx.delete(voucherEntries).where(eq(voucherEntries.voucherId, stale.id));
+      await dbOrTx.delete(vouchers).where(eq(vouchers.id, stale.id));
+    }
+
     const [existing] = await dbOrTx
       .select({ id: vouchers.id, totalAmount: vouchers.totalAmount })
       .from(vouchers)
@@ -225,12 +241,17 @@ async function syncIntercoFreightParentVoucher(
     const description = `Freight (parent) - ${subsidiaryName} ${cNum} / ${poNumber}${supplierLabel}`;
 
     if (existing) {
-      // Check current debit entry's account and amount for full idempotency
+      // Check both entry legs and total for full idempotency
       const entries = await dbOrTx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, existing.id));
       const debitEntry = entries.find((e: any) => parseFloat(e.debitAmount || "0") > 0);
+      const creditEntry = entries.find((e: any) => parseFloat(e.creditAmount || "0") > 0);
       const currentTotal = parseFloat(existing.totalAmount || "0");
       const currentDebitAccount: number | null = debitEntry?.ledgerAccountId ?? null;
-      const needsUpdate = Math.abs(currentTotal - freightAmount) > 0.001 || currentDebitAccount !== freightParentAccountId;
+      const currentCreditAccount: number | null = creditEntry?.ledgerAccountId ?? null;
+      const needsUpdate =
+        Math.abs(currentTotal - freightAmount) > 0.001 ||
+        currentDebitAccount !== freightParentAccountId ||
+        currentCreditAccount !== intercoConfig.destIntercoAccountId;
       if (!needsUpdate) {
         return { action: "skipped", voucherId: existing.id };
       }

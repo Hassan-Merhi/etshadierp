@@ -148,6 +148,7 @@ export default function PurchaseOrderEdit() {
   const { data: parentFreightAccounts } = useQuery<Array<{ id: number; name: string; code: string; accountType: string }>>({
     queryKey: ["/api/purchase-orders/parent-freight-accounts"],
     retry: false,
+    enabled: !isFactory,
   });
 
   useEffect(() => {
@@ -683,7 +684,7 @@ export default function PurchaseOrderEdit() {
                           Own Account
                         </Button>
                       )}
-                      {parentFreightAccounts && parentFreightAccounts.length > 0 && (
+                      {!isFactory && parentFreightAccounts && parentFreightAccounts.length > 0 && (
                         <Button
                           type="button"
                           size="sm"
