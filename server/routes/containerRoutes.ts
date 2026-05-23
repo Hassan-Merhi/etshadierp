@@ -2774,12 +2774,30 @@ export function registerContainerRoutes(app: Express) {
       
       // Update PO
       const updated = await storage.updatePurchaseOrder(id, allowedUpdates);
-      
-      // Update voucher entries when local voucher total, freight payer, or own-account changes
-      if (Math.abs(newLocalVoucherTotal - oldLocalVoucherTotal) > 0.001 || freightPaidByChanged || freightOwnAccountChanged || freightVoucherNeedsUpdate) {
+
+      // Fetch actual current voucher total from DB so we catch vouchers that were
+      // created before the freight-embedding fix (their stored total is wrong even
+      // though the PO fields haven't "changed").
+      let actualDbVoucherTotal: number | null = null;
+      if (existingPO.voucherId) {
+        const [currentVoucher] = await db
+          .select({ totalAmount: vouchers.totalAmount })
+          .from(vouchers)
+          .where(eq(vouchers.id, existingPO.voucherId))
+          .limit(1);
+        if (currentVoucher) {
+          actualDbVoucherTotal = parseFloat(currentVoucher.totalAmount || "0");
+        }
+      }
+      const voucherTotalMismatch = actualDbVoucherTotal !== null &&
+        Math.abs(newLocalVoucherTotal - actualDbVoucherTotal) > 0.001;
+
+      // Update voucher entries when local voucher total, freight payer, or own-account changes,
+      // OR when the actual DB voucher total doesn't match the expected total.
+      if (voucherTotalMismatch || Math.abs(newLocalVoucherTotal - oldLocalVoucherTotal) > 0.001 || freightPaidByChanged || freightOwnAccountChanged || freightVoucherNeedsUpdate) {
         await db.transaction(async (tx) => {
           // Update the purchase voucher linked to the PO
-          if (existingPO.voucherId && Math.abs(newLocalVoucherTotal - oldLocalVoucherTotal) > 0.001 || (existingPO.voucherId && (freightPaidByChanged || freightOwnAccountChanged))) {
+          if (existingPO.voucherId && (voucherTotalMismatch || Math.abs(newLocalVoucherTotal - oldLocalVoucherTotal) > 0.001 || freightPaidByChanged || freightOwnAccountChanged)) {
             // Update voucher total amount
             await tx.update(vouchers)
               .set({ totalAmount: newLocalVoucherTotal.toFixed(2) })
