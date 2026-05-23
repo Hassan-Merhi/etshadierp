@@ -1488,6 +1488,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const [locationFilters, setLocationFilters] = useState<string[]>([]);
   const [docsFilter, setDocsFilter] = useState("ALL");
   const [delayedFilter, setDelayedFilter] = useState("ALL");
+  const [freightFilter, setFreightFilter] = useState("ALL");
   const [sortOrder, setSortOrder] = useState("DEFAULT");
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -1674,6 +1675,8 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
       if (docsFilter === "RECEIVED" && !c.docReceived) return false;
       if (delayedFilter === "YES" && !(c.daysDelayed && c.daysDelayed > 0)) return false;
       if (delayedFilter === "OVERDUE" && !c.isOverdue) return false;
+      if (freightFilter === "HAS_FREIGHT" && !(parseFloat(c.poFreight ?? "0") > 0)) return false;
+      if (freightFilter === "NO_FREIGHT" && parseFloat(c.poFreight ?? "0") > 0) return false;
       if (search) {
         const q = search.toLowerCase();
         if (
@@ -1697,7 +1700,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
       if (sh !== 0) return sh;
       return a.containerNumber.localeCompare(b.containerNumber);
     });
-  }, [allContainers, companyFilter, transporterFilters, agentFilters, truckFilters, locationFilters, docsFilter, delayedFilter, sortOrder, search]);
+  }, [allContainers, companyFilter, transporterFilters, agentFilters, truckFilters, locationFilters, docsFilter, delayedFilter, freightFilter, sortOrder, search]);
 
   // Summary stats — follow the active filters so they match what's visible in the table
   const atSea          = filteredContainers.filter((c) => c.status === "OTW" || c.status === "Sea").length;
@@ -1730,6 +1733,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     setLocationFilters([]);
     setDocsFilter("ALL");
     setDelayedFilter("ALL");
+    setFreightFilter("ALL");
     setSortOrder("DEFAULT");
     setSearch("");
   }
@@ -2132,9 +2136,9 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
         {/* ── Expandable Filters ── */}
         {showFilters && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 gap-2 p-3 rounded-md border bg-muted/30">
+          <div className="flex flex-wrap gap-2 p-3 rounded-md border bg-muted/30">
             {allCompanies && (
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1 min-w-[130px] flex-1">
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <Building2 className="h-3 w-3" /> Company
                 </p>
@@ -2149,7 +2153,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                 </Select>
               </div>
             )}
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1 min-w-[130px] flex-1">
               <p className="text-xs text-muted-foreground">Transporter</p>
               <MultiFilterSelect
                 allLabel="All Transporters"
@@ -2159,7 +2163,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                 testId="select-otw-transporter"
               />
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1 min-w-[130px] flex-1">
               <p className="text-xs text-muted-foreground">Agent / Declarant</p>
               <MultiFilterSelect
                 allLabel="All Agents"
@@ -2169,7 +2173,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                 testId="select-otw-agent"
               />
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1 min-w-[130px] flex-1">
               <p className="text-xs text-muted-foreground">Truck #</p>
               <MultiFilterSelect
                 allLabel="All Trucks"
@@ -2183,7 +2187,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                 testId="select-otw-truck"
               />
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1 min-w-[130px] flex-1">
               <p className="text-xs text-muted-foreground">Location</p>
               <MultiFilterSelect
                 allLabel="All Locations"
@@ -2197,7 +2201,20 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                 testId="select-otw-location"
               />
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1 min-w-[130px] flex-1">
+              <p className="text-xs text-muted-foreground">Freight</p>
+              <Select value={freightFilter} onValueChange={setFreightFilter}>
+                <SelectTrigger className="h-8 text-xs" data-testid="select-otw-freight">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All</SelectItem>
+                  <SelectItem value="HAS_FREIGHT">Has Freight</SelectItem>
+                  <SelectItem value="NO_FREIGHT">No Freight</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1 min-w-[120px] flex-1">
               <p className="text-xs text-muted-foreground">Docs</p>
               <Select value={docsFilter} onValueChange={setDocsFilter}>
                 <SelectTrigger className="h-8 text-xs" data-testid="select-otw-docs">
@@ -2210,7 +2227,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1 min-w-[130px] flex-1">
               <p className="text-xs text-muted-foreground">Delay / Overdue</p>
               <Select value={delayedFilter} onValueChange={setDelayedFilter}>
                 <SelectTrigger className="h-8 text-xs" data-testid="select-otw-delayed">
@@ -2223,7 +2240,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1 min-w-[120px] flex-1">
               <p className="text-xs text-muted-foreground">Sort by ETA</p>
               <Select value={sortOrder} onValueChange={setSortOrder}>
                 <SelectTrigger className="h-8 text-xs" data-testid="select-otw-sort">
@@ -2240,7 +2257,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 text-xs"
+                className="h-8 text-xs whitespace-nowrap"
                 onClick={clearFilters}
                 data-testid="button-otw-clear"
               >
