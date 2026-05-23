@@ -147,6 +147,7 @@ export default function PurchaseOrderEdit() {
 
   const { data: parentFreightAccounts } = useQuery<Array<{ id: number; name: string; code: string; accountType: string }>>({
     queryKey: ["/api/purchase-orders/parent-freight-accounts"],
+    retry: false,
   });
 
   useEffect(() => {

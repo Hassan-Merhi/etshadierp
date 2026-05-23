@@ -136,6 +136,8 @@ export default function Containers() {
       queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
       const parts: string[] = [data?.message ?? "All POs and parent JVs have been checked."];
       if ((data?.updatedFreightVouchers ?? 0) > 0) parts.push(`Freight vouchers fixed: ${data.updatedFreightVouchers}.`);
+      if ((data?.updatedIntercoFreightVouchers ?? 0) > 0) parts.push(`Parent freight vouchers updated: ${data.updatedIntercoFreightVouchers}.`);
+      if ((data?.removedIntercoFreightVouchers ?? 0) > 0) parts.push(`Stale parent freight vouchers removed: ${data.removedIntercoFreightVouchers}.`);
       if ((data?.updatedContainerCharges ?? 0) > 0) parts.push(`Charge rows fixed: ${data.updatedContainerCharges}.`);
       toast({
         title: "Sync Complete",
