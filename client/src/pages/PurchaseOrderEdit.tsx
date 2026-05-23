@@ -10,7 +10,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Loader2, Plus, Trash2, Save, Search, Check, ChevronsUpDown } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, Trash2, Save, Search, Check, ChevronsUpDown, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -202,6 +202,34 @@ export default function PurchaseOrderEdit() {
       toast({
         title: "Update Failed",
         description: error.message || "Failed to update purchase order",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const syncParentJvMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", `/api/purchase-orders/${poId}/sync-parent-voucher`, {});
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/purchase-orders/${poId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
+      if (po?.containerId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/containers/${po.containerId}`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/containers/${po.containerId}/sync-voucher`] });
+      }
+      toast({
+        title: data?.found ? "Parent JV Synced" : "No Parent JV Found",
+        description: data?.message ?? (data?.found ? `Updated to ${data?.intercoTotal}` : "No INTERCO-PARENT voucher exists for this PO"),
+        variant: data?.found ? "default" : "destructive",
+      });
+    },
+    onError: (error: any) => {
+      if (error?._handledGlobally) return;
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync parent journal voucher",
         variant: "destructive",
       });
     },
@@ -720,18 +748,33 @@ export default function PurchaseOrderEdit() {
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col-reverse sm:flex-row justify-end gap-2">
-          <Button variant="outline" onClick={() => navigate("/daybook")} data-testid="button-cancel">
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={updateMutation.isPending} data-testid="button-save">
-            {updateMutation.isPending ? (
+        <CardFooter className="flex flex-col-reverse sm:flex-row justify-between gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={() => syncParentJvMutation.mutate()}
+            disabled={syncParentJvMutation.isPending}
+            data-testid="button-sync-parent-jv"
+          >
+            {syncParentJvMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
             ) : (
-              <Save className="h-4 w-4 mr-2" />
+              <RefreshCw className="h-4 w-4 mr-2" />
             )}
-            Save Changes
+            Sync PO &amp; Parent JV
           </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate("/daybook")} data-testid="button-cancel">
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={updateMutation.isPending} data-testid="button-save">
+              {updateMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Save Changes
+            </Button>
+          </div>
         </CardFooter>
       </Card>
 

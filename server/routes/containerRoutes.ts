@@ -32,56 +32,72 @@ import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelpe
 // When a subsidiary PO is edited (amount or container number), the matching
 // INTERCO-PARENT-{poNumber} voucher in the parent company must also be updated.
 // ──────────────────────────────────────────────────────────────────────────────
+interface SyncIntercoResult {
+  found: boolean;
+  updated: boolean;
+  voucherId?: number;
+  amount: string;
+}
+
 async function syncIntercoParentVoucher(
-  tx: any,
-  poNumber: string,
+  dbOrTx: any,
+  poNumbers: string | string[],
   newAmount: number,
-): Promise<void> {
+): Promise<SyncIntercoResult> {
+  const amountStr = newAmount.toFixed(2);
   try {
     const parentCompanyId = await storage.getParentCompanyId();
-    if (!parentCompanyId) return;
+    if (!parentCompanyId) return { found: false, updated: false, amount: amountStr };
 
-    // Find the INTERCO-PARENT voucher for this PO in the parent company
-    const [parentVoucher] = await tx
+    const nums = Array.isArray(poNumbers) ? poNumbers.filter(Boolean) : [poNumbers];
+
+    // Build OR condition across all provided PO number patterns
+    const likeConditions = nums.map((n) => like(vouchers.voucherNumber, `INTERCO-PARENT-${n}-%`));
+    const patternClause = likeConditions.length === 1
+      ? likeConditions[0]
+      : or(...likeConditions);
+
+    const [parentVoucher] = await dbOrTx
       .select({ id: vouchers.id })
       .from(vouchers)
-      .where(
-        and(
-          eq(vouchers.companyId, parentCompanyId),
-          like(vouchers.voucherNumber, `INTERCO-PARENT-${poNumber}-%`),
-        ),
-      )
+      .where(and(eq(vouchers.companyId, parentCompanyId), patternClause))
       .limit(1);
 
-    if (!parentVoucher) return;
+    if (!parentVoucher) {
+      console.warn(`[syncIntercoParentVoucher] No INTERCO-PARENT voucher found for PO(s): ${nums.join(", ")}`);
+      return { found: false, updated: false, amount: amountStr };
+    }
 
     // Update parent voucher total
-    await tx
+    await dbOrTx
       .update(vouchers)
-      .set({ totalAmount: newAmount.toFixed(2) })
+      .set({ totalAmount: amountStr })
       .where(eq(vouchers.id, parentVoucher.id));
 
     // Update all entries on this parent voucher (both DR and CR sides)
-    const parentEntries = await tx
+    const parentEntries = await dbOrTx
       .select()
       .from(voucherEntries)
       .where(eq(voucherEntries.voucherId, parentVoucher.id));
 
     for (const entry of parentEntries) {
       if (parseFloat(entry.debitAmount || "0") > 0) {
-        await tx
+        await dbOrTx
           .update(voucherEntries)
-          .set({ debitAmount: newAmount.toFixed(2) })
+          .set({ debitAmount: amountStr })
           .where(eq(voucherEntries.id, entry.id));
       } else if (parseFloat(entry.creditAmount || "0") > 0) {
-        await tx
+        await dbOrTx
           .update(voucherEntries)
-          .set({ creditAmount: newAmount.toFixed(2) })
+          .set({ creditAmount: amountStr })
           .where(eq(voucherEntries.id, entry.id));
       }
     }
+
+    return { found: true, updated: true, voucherId: parentVoucher.id, amount: amountStr };
   } catch (err) {
     console.error("[syncIntercoParentVoucher] Error syncing parent INTERCO voucher:", err);
+    return { found: false, updated: false, amount: amountStr };
   }
 }
 
@@ -327,7 +343,10 @@ export function registerContainerRoutes(app: Express) {
         .where(eq(purchaseOrders.containerId, id));
 
       const parentCompanyId = await storage.getParentCompanyId();
-      let updatedVouchers = 0;
+      let updatedLocalVouchers = 0;
+      let updatedParentVouchers = 0;
+      const skipped: string[] = [];
+      const errors: string[] = [];
 
       for (const po of pos) {
         const poItemsTotal = parseFloat(po.itemsTotal || "0");
@@ -337,10 +356,21 @@ export function registerContainerRoutes(app: Express) {
         const poDocumentCharges = parseFloat(po.documentCharges || "0");
         const poDiscount = parseFloat(po.discount || "0");
         const poOtherCharges = parseFloat(po.otherCharges || "0");
-        const poTotal =
+        const poGrossTotal =
           poItemsTotal + poFreight + poSurcharge + poFumigation + poDocumentCharges - poDiscount + poOtherCharges;
+        // Respect freightPaidBy: if own, exclude freight from supplier/interco total
+        const poFreightPaidBy = (po as any).freightPaidBy ?? "supplier";
+        const poSupplierTotal = poFreightPaidBy === "own" && poFreight > 0
+          ? poGrossTotal - poFreight
+          : poGrossTotal;
+        // Local voucher always uses gross total; interco parent uses supplier total
+        const poTotal = poGrossTotal;
+        const poIntercoTotal = poSupplierTotal;
 
-        if (poTotal <= 0) continue;
+        if (poTotal <= 0) {
+          skipped.push(`PO ${po.poNumber}: total is 0`);
+          continue;
+        }
 
         // Fix the purchase voucher linked directly to the PO
         if (po.voucherId) {
@@ -404,64 +434,71 @@ export function registerContainerRoutes(app: Express) {
                 .where(eq(voucherEntries.id, entry.id));
             }
           }
-          updatedVouchers++;
+          updatedLocalVouchers++;
         }
 
-        // Fix the INTERCO-PARENT voucher in the parent company (inter-company setup)
+        // Fix the INTERCO-PARENT voucher in the parent company — uses interco total (freightPaidBy-aware)
         if (parentCompanyId && po.companyId !== parentCompanyId) {
-          const [parentVoucher] = await db
-            .select({ id: vouchers.id })
-            .from(vouchers)
-            .where(
-              and(
-                eq(vouchers.companyId, parentCompanyId),
-                like(vouchers.voucherNumber, `INTERCO-PARENT-${po.poNumber}-%`),
-              ),
-            )
-            .limit(1);
-
-          if (parentVoucher) {
-            await db
-              .update(vouchers)
-              .set({ totalAmount: poTotal.toFixed(2) })
-              .where(eq(vouchers.id, parentVoucher.id));
-
-            const parentEntries = await db
-              .select()
-              .from(voucherEntries)
-              .where(eq(voucherEntries.voucherId, parentVoucher.id));
-
-            for (const entry of parentEntries) {
-              const origDebit = parseFloat(entry.debitAmount || "0");
-              const origCredit = parseFloat(entry.creditAmount || "0");
-
-              let isDebitEntry: boolean;
-              if (origDebit > 0 && origCredit === 0) {
-                isDebitEntry = true;
-              } else if (origCredit > 0 && origDebit === 0) {
-                isDebitEntry = false;
-              } else {
-                isDebitEntry = !entry.supplierId;
-              }
-
-              if (isDebitEntry) {
-                await db
-                  .update(voucherEntries)
-                  .set({ debitAmount: poTotal.toFixed(2), creditAmount: "0" })
-                  .where(eq(voucherEntries.id, entry.id));
-              } else {
-                await db
-                  .update(voucherEntries)
-                  .set({ creditAmount: poTotal.toFixed(2), debitAmount: "0" })
-                  .where(eq(voucherEntries.id, entry.id));
-              }
-            }
-            updatedVouchers++;
+          const svResult = await syncIntercoParentVoucher(db, po.poNumber, poIntercoTotal);
+          if (svResult.updated) {
+            updatedParentVouchers++;
+          } else if (!svResult.found) {
+            skipped.push(`PO ${po.poNumber}: no INTERCO-PARENT voucher found`);
           }
         }
       }
 
-      res.json({ message: `Synced ${updatedVouchers} purchase voucher(s)`, updatedVouchers });
+      res.json({
+        message: `Synced ${updatedLocalVouchers} local voucher(s) and ${updatedParentVouchers} parent JV(s)`,
+        updatedVouchers: updatedLocalVouchers + updatedParentVouchers,
+        updatedLocalVouchers,
+        updatedParentVouchers,
+        skipped,
+        errors,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Per-PO parent JV sync endpoint
+  app.post("/api/purchase-orders/:id/sync-parent-voucher", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+
+      const po = await storage.getPurchaseOrderById(id);
+      if (!po) return res.status(404).json({ message: "Purchase order not found" });
+      if (po.companyId !== companyId) return res.status(403).json({ message: "Access denied" });
+
+      const parentCompanyId = await storage.getParentCompanyId();
+      if (!parentCompanyId || po.companyId === parentCompanyId) {
+        return res.json({ message: "No parent company — nothing to sync", found: false, updated: false });
+      }
+
+      const poItemsTotal = parseFloat(po.itemsTotal || "0");
+      const poFreight = parseFloat(po.freight || "0");
+      const poSurcharge = parseFloat(po.surcharge || "0");
+      const poFumigation = parseFloat(po.fumigation || "0");
+      const poDocumentCharges = parseFloat(po.documentCharges || "0");
+      const poDiscount = parseFloat(po.discount || "0");
+      const poOtherCharges = parseFloat(po.otherCharges || "0");
+      const grossTotal = poItemsTotal + poFreight + poSurcharge + poFumigation + poDocumentCharges - poDiscount + poOtherCharges;
+      const freightPaidBy = (po as any).freightPaidBy ?? "supplier";
+      const intercoTotal = freightPaidBy === "own" && poFreight > 0 ? grossTotal - poFreight : grossTotal;
+
+      const result = await syncIntercoParentVoucher(db, po.poNumber, intercoTotal);
+      res.json({
+        message: result.found
+          ? `Parent JV synced — voucher #${result.voucherId} updated to ${result.amount}`
+          : `No INTERCO-PARENT voucher found for PO ${po.poNumber}`,
+        ...result,
+        poNumber: po.poNumber,
+        intercoTotal: result.amount,
+        updatedVouchers: result.updated ? 1 : 0,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1973,9 +2010,20 @@ export function registerContainerRoutes(app: Express) {
             }
           }
 
-          // ── Inter-company sync: always update the INTERCO-PARENT voucher in the parent
-          // company, regardless of whether the subsidiary PO has its own local voucherId.
-          await syncIntercoParentVoucher(tx, existingPO.poNumber, poGrandTotal);
+          // ── Inter-company sync: use freightPaidBy-aware supplier total for the parent voucher.
+          {
+            const _b1FreightPaidBy = req.body.freightPaidBy ?? existingPO.freightPaidBy ?? "supplier";
+            const _b1IntercoTotal = _b1FreightPaidBy === "own" && freight > 0
+              ? poGrandTotal - freight
+              : poGrandTotal;
+            const _b1NewPoNum = req.body.poNumber && req.body.poNumber !== existingPO.poNumber
+              ? req.body.poNumber as string : null;
+            const _b1PoNums = _b1NewPoNum ? [existingPO.poNumber, _b1NewPoNum] : existingPO.poNumber;
+            const _b1Sync = await syncIntercoParentVoucher(tx, _b1PoNums, _b1IntercoTotal);
+            if (!_b1Sync.found) {
+              console.warn(`[PO-PATCH items] No INTERCO-PARENT voucher for PO(s): ${Array.isArray(_b1PoNums) ? _b1PoNums.join(", ") : _b1PoNums}`);
+            }
+          }
           
           // Sync container_charges table when PO charges are edited
           if (chargesWereEdited && existingPO.containerId) {
@@ -2185,9 +2233,7 @@ export function registerContainerRoutes(app: Express) {
             }
           }
 
-          // ── Inter-company sync: always update the INTERCO-PARENT voucher in the parent
-          // company, regardless of whether the subsidiary PO has its own local voucherId.
-          await syncIntercoParentVoucher(tx, existingPO.poNumber, supplierTotal);
+          // (interco sync moved to unconditional block below the transaction)
           
           // Update container totals if applicable
           const container = await storage.getContainerById(existingPO.containerId);
@@ -2382,6 +2428,21 @@ export function registerContainerRoutes(app: Express) {
         }
       }
       
+      // ── Inter-company sync — runs unconditionally after every charges-only update.
+      // (Branch 1/items path runs its own sync inside the transaction above.)
+      {
+        const _b2ParentId = await storage.getParentCompanyId();
+        if (_b2ParentId && existingPO.companyId !== _b2ParentId) {
+          const _b2NewPoNum = req.body.poNumber && req.body.poNumber !== existingPO.poNumber
+            ? req.body.poNumber as string : null;
+          const _b2PoNums = _b2NewPoNum ? [existingPO.poNumber, _b2NewPoNum] : existingPO.poNumber;
+          const _b2Sync = await syncIntercoParentVoucher(db, _b2PoNums, supplierTotal);
+          if (!_b2Sync.found) {
+            console.warn(`[PO-PATCH charges] No INTERCO-PARENT voucher for PO(s): ${Array.isArray(_b2PoNums) ? _b2PoNums.join(", ") : _b2PoNums}`);
+          }
+        }
+      }
+
       try {
         const _poChanges: Record<string, any> = {};
         for (const _f of ["poNumber", "currency", "status", "freight", "surcharge", "fumigation", "documentCharges", "discount", "otherCharges", "itemsTotal"] as const) {
