@@ -882,8 +882,33 @@ export function registerAccountRoutes(app: Express) {
       }
 
       const account = await storage.getLedgerAccountById(ledgerAccountId);
+
+      // If not found as a ledger account, it may be a bank account ID (entries stored
+      // in voucherEntries.bankAccountId, not ledgerAccountId). Compute balance from
+      // the bankAccounts table + getVoucherEntriesByBankAccount so the Daybook entry
+      // balance display shows the correct value instead of $0.
       if (!account) {
-        return res.status(404).json({ message: "Account not found" });
+        const [bankAcct] = await db
+          .select({ openingBalance: bankAccounts.openingBalance, openingBalanceSide: bankAccounts.openingBalanceSide })
+          .from(bankAccounts)
+          .where(eq(bankAccounts.id, ledgerAccountId))
+          .limit(1);
+
+        if (!bankAcct) {
+          return res.status(404).json({ message: "Account not found" });
+        }
+
+        const bankTxs = await storage.getVoucherEntriesByBankAccount(ledgerAccountId);
+        let bDebits = 0;
+        let bCredits = 0;
+        for (const tx of bankTxs) {
+          bDebits += parseFloat(tx.debitAmount || "0");
+          bCredits += parseFloat(tx.creditAmount || "0");
+        }
+        const bOB = parseFloat(bankAcct.openingBalance || "0");
+        const bSide = bankAcct.openingBalanceSide || "Dr";
+        const bankBalance = (bOB * (bSide === "Cr" ? -1 : 1)) + bDebits - bCredits;
+        return res.json({ balance: bankBalance });
       }
 
       // Check if this ledger account is linked to a customer
