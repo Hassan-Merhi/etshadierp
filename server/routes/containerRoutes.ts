@@ -504,6 +504,204 @@ export function registerContainerRoutes(app: Express) {
     }
   });
 
+  // ── Global PO / Parent JV sync-all endpoint ──────────────────────────────
+  // Scans every PO in the current company, recalculates exact amounts, and
+  // updates only mismatched local vouchers + mismatched parent INTERCO-PARENT
+  // vouchers. Idempotent — safe to run multiple times.
+  app.post(
+    "/api/containers/sync-all-vouchers",
+    requireAuth,
+    requireNonPOS,
+    requireRole("Admin", "Owner", "Developer"),
+    async (req, res) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+        const parentCompanyId = await storage.getParentCompanyId();
+
+        // Fetch all POs for the company
+        const allPos = await db
+          .select()
+          .from(purchaseOrders)
+          .where(eq(purchaseOrders.companyId, companyId));
+
+        let scannedPOs = 0;
+        let updatedLocalVouchers = 0;
+        let updatedParentVouchers = 0;
+        const skipped: string[] = [];
+        const notFoundParentVouchers: string[] = [];
+        const errors: string[] = [];
+
+        for (const po of allPos) {
+          scannedPOs++;
+          try {
+            // Recalculate exact amounts
+            const itemsTotal = parseFloat(po.itemsTotal || "0");
+            const freight = parseFloat(po.freight || "0");
+            const surcharge = parseFloat(po.surcharge || "0");
+            const fumigation = parseFloat(po.fumigation || "0");
+            const documentCharges = parseFloat(po.documentCharges || "0");
+            const discount = parseFloat(po.discount || "0");
+            const otherCharges = parseFloat(po.otherCharges || "0");
+
+            const grossTotal = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
+            const freightPaidBy = (po as any).freightPaidBy ?? "supplier";
+            const intercoTotal = freightPaidBy === "own" && freight > 0 ? grossTotal - freight : grossTotal;
+
+            if (grossTotal <= 0) {
+              skipped.push(`PO ${po.poNumber}: total is 0 — skipped`);
+              continue;
+            }
+
+            // ── Fix the subsidiary local voucher ─────────────────────────────
+            if (po.voucherId) {
+              const [localVoucher] = await db
+                .select({ id: vouchers.id, totalAmount: vouchers.totalAmount })
+                .from(vouchers)
+                .where(eq(vouchers.id, po.voucherId))
+                .limit(1);
+
+              if (localVoucher) {
+                const currentLocalTotal = parseFloat(localVoucher.totalAmount || "0");
+                const expectedLocalTotal = grossTotal;
+                const localMismatch = Math.abs(currentLocalTotal - expectedLocalTotal) > 0.001;
+
+                if (localMismatch) {
+                  console.log(`[SyncAll] PO ${po.poNumber}: local voucher #${po.voucherId} ${currentLocalTotal} → ${expectedLocalTotal}`);
+                  await db
+                    .update(vouchers)
+                    .set({ totalAmount: expectedLocalTotal.toFixed(2) })
+                    .where(eq(vouchers.id, po.voucherId));
+
+                  const entries = await db
+                    .select()
+                    .from(voucherEntries)
+                    .where(eq(voucherEntries.voucherId, po.voucherId));
+
+                  for (const entry of entries) {
+                    const origDebit = parseFloat(entry.debitAmount || "0");
+                    const origCredit = parseFloat(entry.creditAmount || "0");
+                    const isDebit = origDebit > 0 && origCredit === 0
+                      ? true
+                      : origCredit > 0 && origDebit === 0
+                        ? false
+                        : !(entry.supplierId);
+                    if (isDebit) {
+                      await db.update(voucherEntries)
+                        .set({ debitAmount: expectedLocalTotal.toFixed(2), creditAmount: "0" })
+                        .where(eq(voucherEntries.id, entry.id));
+                    } else {
+                      await db.update(voucherEntries)
+                        .set({ creditAmount: expectedLocalTotal.toFixed(2), debitAmount: "0" })
+                        .where(eq(voucherEntries.id, entry.id));
+                    }
+                  }
+                  updatedLocalVouchers++;
+                }
+              }
+            }
+
+            // ── Fix the parent INTERCO-PARENT voucher ───────────────────────
+            if (parentCompanyId && po.companyId !== parentCompanyId) {
+              // Check current parent voucher amount before updating
+              const likePattern = `INTERCO-PARENT-${po.poNumber}-%`;
+              const [existingParent] = await db
+                .select({ id: vouchers.id, totalAmount: vouchers.totalAmount })
+                .from(vouchers)
+                .where(and(eq(vouchers.companyId, parentCompanyId), like(vouchers.voucherNumber, likePattern)))
+                .limit(1);
+
+              if (!existingParent) {
+                notFoundParentVouchers.push(`PO ${po.poNumber}: no INTERCO-PARENT voucher in parent company`);
+              } else {
+                const currentParentTotal = parseFloat(existingParent.totalAmount || "0");
+                const parentMismatch = Math.abs(currentParentTotal - intercoTotal) > 0.001;
+
+                if (parentMismatch) {
+                  console.log(`[SyncAll] PO ${po.poNumber}: parent JV #${existingParent.id} ${currentParentTotal} → ${intercoTotal}`);
+                  const svResult = await syncIntercoParentVoucher(db, po.poNumber, intercoTotal);
+                  if (svResult.updated) {
+                    updatedParentVouchers++;
+                  }
+                }
+              }
+            }
+          } catch (poErr: any) {
+            errors.push(`PO ${po.poNumber}: ${poErr.message}`);
+            console.error(`[SyncAll] Error processing PO ${po.poNumber}:`, poErr);
+          }
+        }
+
+        // ── Update container totals ──────────────────────────────────────────
+        let updatedContainers = 0;
+        const containerIds = [...new Set(allPos.map((p) => p.containerId))];
+        for (const cid of containerIds) {
+          try {
+            const containerPos = allPos.filter((p) => p.containerId === cid);
+            const containerItemsTotal = containerPos.reduce((sum, p) => sum + parseFloat(p.itemsTotal || "0"), 0);
+            const containerChargesTotal = containerPos.reduce((sum, p) => {
+              return sum +
+                parseFloat(p.freight || "0") +
+                parseFloat(p.surcharge || "0") +
+                parseFloat(p.fumigation || "0") +
+                parseFloat(p.documentCharges || "0") -
+                parseFloat(p.discount || "0") +
+                parseFloat(p.otherCharges || "0");
+            }, 0);
+            const containerGrandTotal = containerItemsTotal + containerChargesTotal;
+
+            const [existingContainer] = await db
+              .select({ id: containers.id, itemsTotal: containers.itemsTotal, chargesTotal: containers.chargesTotal, grandTotal: containers.grandTotal })
+              .from(containers)
+              .where(eq(containers.id, cid))
+              .limit(1);
+
+            if (existingContainer) {
+              const curItems = parseFloat(existingContainer.itemsTotal || "0");
+              const curCharges = parseFloat(existingContainer.chargesTotal || "0");
+              const curGrand = parseFloat(existingContainer.grandTotal || "0");
+              const mismatch =
+                Math.abs(curItems - containerItemsTotal) > 0.001 ||
+                Math.abs(curCharges - containerChargesTotal) > 0.001 ||
+                Math.abs(curGrand - containerGrandTotal) > 0.001;
+              if (mismatch) {
+                await db.update(containers)
+                  .set({
+                    itemsTotal: containerItemsTotal.toFixed(2),
+                    chargesTotal: containerChargesTotal.toFixed(2),
+                    grandTotal: containerGrandTotal.toFixed(2),
+                  })
+                  .where(eq(containers.id, cid));
+                updatedContainers++;
+              }
+            }
+          } catch (cErr: any) {
+            errors.push(`Container ${cid}: ${cErr.message}`);
+          }
+        }
+
+        const scannedContainers = containerIds.length;
+        console.log(`[SyncAll] Done. POs=${scannedPOs} Containers=${scannedContainers} LocalVouchers=${updatedLocalVouchers} ParentVouchers=${updatedParentVouchers} Containers=${updatedContainers} Skipped=${skipped.length} NotFound=${notFoundParentVouchers.length} Errors=${errors.length}`);
+
+        res.json({
+          scannedPOs,
+          scannedContainers,
+          updatedLocalVouchers,
+          updatedParentVouchers,
+          updatedContainers,
+          skipped,
+          notFoundParentVouchers,
+          errors,
+          message: `Scanned ${scannedPOs} POs. Updated ${updatedLocalVouchers} local vouchers, ${updatedParentVouchers} parent vouchers, ${updatedContainers} containers.`,
+        });
+      } catch (error: any) {
+        console.error("[SyncAll] Fatal error:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
   // Bulk import container tracking from Excel data
   app.post("/api/containers/tracking/import", requireAuth, requireNonPOS, async (req, res) => {
     try {

@@ -3,6 +3,16 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Link, useLocation } from "wouter";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
@@ -25,6 +35,8 @@ import {
   FileSpreadsheet,
   Pencil,
   ChevronDown,
+  Wrench,
+  Loader2,
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -111,6 +123,37 @@ export default function Containers() {
   const tableRef = useRef<HTMLTableElement>(null);
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hideContainerCosts = (myErpPages?.hiddenErpCostFields ?? []).includes("container_costs");
+  const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
+  const isPrivilegedRole = ["Admin", "Owner", "Developer"].includes(currentUser?.role || "");
+  const [syncAllConfirmOpen, setSyncAllConfirmOpen] = useState(false);
+
+  const syncAllMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/containers/sync-all-vouchers", {}),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/containers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
+      toast({
+        title: "Sync Complete",
+        description: data?.message ?? "All POs and parent JVs have been checked.",
+      });
+      if (data?.errors?.length > 0) {
+        console.warn("[SyncAll] Errors:", data.errors);
+      }
+      if (data?.notFoundParentVouchers?.length > 0) {
+        console.info("[SyncAll] Not found parent vouchers:", data.notFoundParentVouchers);
+      }
+    },
+    onError: (error: any) => {
+      if (error?._handledGlobally) return;
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync vouchers",
+        variant: "destructive",
+      });
+    },
+  });
 
   const trackingFields = [
     "shopName",
@@ -889,6 +932,23 @@ export default function Containers() {
         subtitle="Track containers and manage offloading"
       >
         <div className="flex gap-2 flex-wrap">
+          {isPrivilegedRole && (
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => setSyncAllConfirmOpen(true)}
+              disabled={syncAllMutation.isPending}
+              data-testid="button-sync-all-vouchers"
+            >
+              {syncAllMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Wrench className="h-4 w-4" />
+              )}
+              Fix All PO &amp; Parent JV Sync
+            </Button>
+          )}
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2" data-testid="button-export-dropdown">
@@ -1937,6 +1997,29 @@ export default function Containers() {
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
       />
+
+      <AlertDialog open={syncAllConfirmOpen} onOpenChange={setSyncAllConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Fix all PO and Parent JV sync?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will scan all purchase orders and update only vouchers and totals that are out of sync. It is safe to run multiple times.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-sync-all-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="button-sync-all-confirm"
+              onClick={() => {
+                setSyncAllConfirmOpen(false);
+                syncAllMutation.mutate();
+              }}
+            >
+              Run Sync
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
