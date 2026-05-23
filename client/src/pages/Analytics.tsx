@@ -1,4 +1,4 @@
-import { useState, Fragment } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 import { useQuery } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -323,6 +323,14 @@ export default function Analytics() {
   const [reportSupplierId, setReportSupplierId] = useState("all");
   const [reportContainerStatus, setReportContainerStatus] = useState("Offloaded");
   const [reportAllCompanies, setReportAllCompanies] = useState("all");
+  const [containerPeriodFilter, setContainerPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
+  const containerCompanyInitialized = useRef(false);
+  useEffect(() => {
+    if (!containerCompanyInitialized.current && selectedCompany?.id) {
+      setReportAllCompanies(String(selectedCompany.id));
+      containerCompanyInitialized.current = true;
+    }
+  }, [selectedCompany?.id]);
   
   // Opening Stock Summary state
   const [openingStockLocationId, setOpeningStockLocationId] = useState("all");
@@ -537,8 +545,8 @@ export default function Analytics() {
   // Fetch container report
   const buildContainerUrl = () => {
     const params = new URLSearchParams();
-    if (reportStartDate) params.append("startDate", reportStartDate);
-    if (reportEndDate) params.append("endDate", reportEndDate);
+    if (containerPeriodFilter.fromDate) params.append("startDate", containerPeriodFilter.fromDate);
+    if (containerPeriodFilter.toDate) params.append("endDate", containerPeriodFilter.toDate);
     if (reportSupplierId && reportSupplierId !== "all") params.append("supplierId", reportSupplierId);
     // Status is always set (Offloaded or OTW)
     params.append("status", reportContainerStatus);
@@ -2094,24 +2102,16 @@ export default function Analytics() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-              <div>
-                <Label htmlFor="container-start-date">Start Date</Label>
-                <DatePickerInput
-                  value={reportStartDate}
-                  onChange={setReportStartDate}
-                  placeholder="Start date"
+            <div className="flex flex-wrap gap-4 mb-6 items-end">
+              <div className="flex flex-col gap-1.5">
+                <Label>Period</Label>
+                <PeriodFilter
+                  value={containerPeriodFilter}
+                  onChange={setContainerPeriodFilter}
+                  data-testid="container-report-period-filter"
                 />
               </div>
-              <div>
-                <Label htmlFor="container-end-date">End Date</Label>
-                <DatePickerInput
-                  value={reportEndDate}
-                  onChange={setReportEndDate}
-                  placeholder="End date"
-                />
-              </div>
-              <div>
+              <div className="flex flex-col gap-1.5 min-w-[160px]">
                 <Label htmlFor="container-supplier">Supplier</Label>
                 <Select value={reportSupplierId} onValueChange={setReportSupplierId}>
                   <SelectTrigger id="container-supplier">
@@ -2127,7 +2127,7 @@ export default function Analytics() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
+              <div className="flex flex-col gap-1.5 min-w-[140px]">
                 <Label htmlFor="container-status">Status</Label>
                 <Select value={reportContainerStatus} onValueChange={setReportContainerStatus}>
                   <SelectTrigger id="container-status">
@@ -2139,7 +2139,7 @@ export default function Analytics() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
+              <div className="flex flex-col gap-1.5 min-w-[160px]">
                 <Label htmlFor="container-company">Company</Label>
                 <Select value={reportAllCompanies} onValueChange={setReportAllCompanies}>
                   <SelectTrigger id="container-company">
