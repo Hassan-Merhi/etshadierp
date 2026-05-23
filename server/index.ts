@@ -3363,6 +3363,8 @@ let migrationsDone = false;
     // ── PO freight paid-by own account (May 2026) ─────────────────────────
     `ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS freight_paid_by TEXT DEFAULT 'supplier'`,
     `ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS freight_own_account_id INTEGER`,
+    // ── PO freight paid-by parent company account (May 2026) ──────────────
+    `ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS freight_parent_account_id INTEGER`,
     // ── Factory container auto-tracking (May 2026) ────────────────────────
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_enabled BOOLEAN NOT NULL DEFAULT true`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_auto_update BOOLEAN NOT NULL DEFAULT true`,
