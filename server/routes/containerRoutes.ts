@@ -2471,6 +2471,10 @@ export function registerContainerRoutes(app: Express) {
           };
         });
 
+        // Capture freight in outer scope so the post-transaction parent-freight sync
+        // can access it without a ReferenceError.
+        let _b1FreightForSync = parseFloat(existingPO.freight ?? "0");
+
         // Delete existing line items and create new ones in a transaction
         await db.transaction(async (tx) => {
           // Delete old line items
@@ -2484,6 +2488,7 @@ export function registerContainerRoutes(app: Express) {
           // Update PO with new items total and charges
           // Use ?? to correctly handle explicit zero values from the request
           const freight = parseFloat(req.body.freight ?? existingPO.freight ?? "0");
+          _b1FreightForSync = freight; // lift into outer scope for post-tx sync
           const surcharge = parseFloat(req.body.surcharge ?? existingPO.surcharge ?? "0");
           const fumigation = parseFloat(req.body.fumigation ?? existingPO.fumigation ?? "0");
           const documentCharges = parseFloat(req.body.documentCharges ?? existingPO.documentCharges ?? "0");
@@ -2693,9 +2698,11 @@ export function registerContainerRoutes(app: Express) {
           const _b1OldFreightParentAccountId: number | null = (existingPO as any).freightParentAccountId ?? null;
           const _b1FreightChanged = _b1FreightPaidBy !== _b1OldFreightPaidBy ||
             _b1FreightParentAccountId !== _b1OldFreightParentAccountId ||
-            (_b1FreightPaidBy === 'parent' && Math.abs(freight - parseFloat(existingPO.freight || "0")) > 0.001);
+            (_b1FreightPaidBy === 'parent' && Math.abs(_b1FreightForSync - parseFloat(existingPO.freight || "0")) > 0.001);
           if (_b1FreightChanged) {
             const _b1CNum = container?.containerNumber ?? String(existingPO.containerId);
+            // Use the effective PO number (may have been changed in this request)
+            const _b1EffectivePoNum = updatedPO?.poNumber ?? existingPO.poNumber;
             let _b1VoucherDate = new Date().toISOString().split("T")[0];
             if (existingPO.voucherId) {
               const [_b1V] = await db.select({ voucherDate: vouchers.voucherDate })
@@ -2705,8 +2712,8 @@ export function registerContainerRoutes(app: Express) {
             await syncIntercoFreightParentVoucher(db, {
               subsidiaryCompanyId: existingPO.companyId,
               cNum: _b1CNum,
-              poNumber: existingPO.poNumber,
-              freightAmount: _b1FreightPaidBy === 'parent' ? freight : 0,
+              poNumber: _b1EffectivePoNum,
+              freightAmount: _b1FreightPaidBy === 'parent' ? _b1FreightForSync : 0,
               freightParentAccountId: _b1FreightPaidBy === 'parent' ? _b1FreightParentAccountId : null,
               voucherDate: _b1VoucherDate,
               supplierName: supplier?.legalName ?? undefined,
