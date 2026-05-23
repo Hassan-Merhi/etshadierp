@@ -108,6 +108,7 @@ interface EnrichedContainerRow {
   docsSentDate: string | null;
   freightStatus: string | null;
   trackingLink: string | null;
+  poFreight: string | null;
   // ParcelsApp auto-tracking
   trackingProvider: string | null;
   trackingEnabled: boolean;
@@ -2277,6 +2278,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                 <TableHead>Shop Name</TableHead>
                 <TableHead>ETA</TableHead>
                 <TableHead className="text-right">Cost</TableHead>
+                <TableHead className="text-right">Freight</TableHead>
                 <TableHead>Truck #</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead>Border Date</TableHead>
@@ -2327,6 +2329,11 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                       <TableCell><EtaCell container={c} fmtDate={fmtDate} /></TableCell>
                       <TableCell className="text-right font-medium">
                         {c.grandTotal ? `$${fmt(parseNum(c.grandTotal))}` : "—"}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {c.poFreight && parseNum(c.poFreight) > 0
+                          ? `$${fmt(parseNum(c.poFreight))}`
+                          : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell>
                         {c.numberPlate

@@ -213,6 +213,7 @@ export type RawContainerRow = {
   docsSentDate: string | null;
   freightStatus: string | null;
   trackingLink: string | null;
+  poFreight: string | null;
   // ParcelsApp tracking fields
   trackingProvider: string | null;
   trackingEnabled: boolean;
@@ -290,6 +291,7 @@ export async function fetchActiveContainers(
       docsSentDate: containers.docsSentDate,
       freightStatus: containers.freightStatus,
       trackingLink: containers.trackingLink,
+      poFreight: sql<string>`(SELECT COALESCE(SUM(po.freight::numeric), 0) FROM purchase_orders po WHERE po.container_id = ${containers.id})::text`,
       // ParcelsApp tracking fields
       trackingProvider: containers.trackingProvider,
       trackingEnabled: containers.trackingEnabled,
