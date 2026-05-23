@@ -28,15 +28,53 @@ import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeW
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Centralised PO amount calculator — single source of truth for gross/interco
+// totals. All PATCH routes and repair endpoints call this so the formula
+// cannot drift between them.
+// ──────────────────────────────────────────────────────────────────────────────
+interface PoAmounts {
+  grossTotal: number;   // full gross — used for local subsidiary voucher
+  intercoTotal: number; // supplier share — used for INTERCO-PARENT voucher
+  freightPaidBy: string;
+  freight: number;
+}
+
+function calcPoAmounts(po: {
+  itemsTotal?:      string | number | null;
+  freight?:         string | number | null;
+  surcharge?:       string | number | null;
+  fumigation?:      string | number | null;
+  documentCharges?: string | number | null;
+  discount?:        string | number | null;
+  otherCharges?:    string | number | null;
+  freightPaidBy?:   string | null;
+}): PoAmounts {
+  const f = (v: string | number | null | undefined) => parseFloat(String(v ?? "0")) || 0;
+  const itemsTotal      = f(po.itemsTotal);
+  const freight         = f(po.freight);
+  const surcharge       = f(po.surcharge);
+  const fumigation      = f(po.fumigation);
+  const documentCharges = f(po.documentCharges);
+  const discount        = f(po.discount);
+  const otherCharges    = f(po.otherCharges);
+  const freightPaidBy   = po.freightPaidBy ?? "supplier";
+  const grossTotal = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
+  const intercoTotal = freightPaidBy === "own" && freight > 0 ? grossTotal - freight : grossTotal;
+  return { grossTotal, intercoTotal, freightPaidBy, freight };
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Inter-company sync helper
 // When a subsidiary PO is edited (amount or container number), the matching
 // INTERCO-PARENT-{poNumber} voucher in the parent company must also be updated.
+// Only writes to the DB when the stored amount actually differs (idempotent).
 // ──────────────────────────────────────────────────────────────────────────────
 interface SyncIntercoResult {
   found: boolean;
   updated: boolean;
   voucherId?: number;
   amount: string;
+  oldAmount?: string;
 }
 
 async function syncIntercoParentVoucher(
@@ -58,7 +96,7 @@ async function syncIntercoParentVoucher(
       : or(...likeConditions);
 
     const [parentVoucher] = await dbOrTx
-      .select({ id: vouchers.id })
+      .select({ id: vouchers.id, totalAmount: vouchers.totalAmount })
       .from(vouchers)
       .where(and(eq(vouchers.companyId, parentCompanyId), patternClause))
       .limit(1);
@@ -67,6 +105,16 @@ async function syncIntercoParentVoucher(
       console.warn(`[syncIntercoParentVoucher] No INTERCO-PARENT voucher found for PO(s): ${nums.join(", ")}`);
       return { found: false, updated: false, amount: amountStr };
     }
+
+    const oldAmount = parseFloat(parentVoucher.totalAmount || "0");
+    const oldAmountStr = oldAmount.toFixed(2);
+
+    // Skip write if already correct (idempotent)
+    if (Math.abs(oldAmount - newAmount) <= 0.001) {
+      return { found: true, updated: false, voucherId: parentVoucher.id, amount: amountStr, oldAmount: oldAmountStr };
+    }
+
+    console.log(`[syncIntercoParentVoucher] PO(s) ${nums.join(", ")}: voucher #${parentVoucher.id} ${oldAmountStr} → ${amountStr}`);
 
     // Update parent voucher total
     await dbOrTx
@@ -94,7 +142,7 @@ async function syncIntercoParentVoucher(
       }
     }
 
-    return { found: true, updated: true, voucherId: parentVoucher.id, amount: amountStr };
+    return { found: true, updated: true, voucherId: parentVoucher.id, amount: amountStr, oldAmount: oldAmountStr };
   } catch (err) {
     console.error("[syncIntercoParentVoucher] Error syncing parent INTERCO voucher:", err);
     return { found: false, updated: false, amount: amountStr };
@@ -349,23 +397,12 @@ export function registerContainerRoutes(app: Express) {
       const errors: string[] = [];
 
       for (const po of pos) {
-        const poItemsTotal = parseFloat(po.itemsTotal || "0");
-        const poFreight = parseFloat(po.freight || "0");
-        const poSurcharge = parseFloat(po.surcharge || "0");
-        const poFumigation = parseFloat(po.fumigation || "0");
-        const poDocumentCharges = parseFloat(po.documentCharges || "0");
-        const poDiscount = parseFloat(po.discount || "0");
-        const poOtherCharges = parseFloat(po.otherCharges || "0");
-        const poGrossTotal =
-          poItemsTotal + poFreight + poSurcharge + poFumigation + poDocumentCharges - poDiscount + poOtherCharges;
-        // Respect freightPaidBy: if own, exclude freight from supplier/interco total
-        const poFreightPaidBy = (po as any).freightPaidBy ?? "supplier";
-        const poSupplierTotal = poFreightPaidBy === "own" && poFreight > 0
-          ? poGrossTotal - poFreight
-          : poGrossTotal;
-        // Local voucher always uses gross total; interco parent uses supplier total
-        const poTotal = poGrossTotal;
-        const poIntercoTotal = poSupplierTotal;
+        const { grossTotal: poTotal, intercoTotal: poIntercoTotal } = calcPoAmounts({
+          itemsTotal: po.itemsTotal, freight: po.freight, surcharge: po.surcharge,
+          fumigation: po.fumigation, documentCharges: po.documentCharges,
+          discount: po.discount, otherCharges: po.otherCharges,
+          freightPaidBy: (po as any).freightPaidBy,
+        });
 
         if (poTotal <= 0) {
           skipped.push(`PO ${po.poNumber}: total is 0`);
@@ -478,16 +515,12 @@ export function registerContainerRoutes(app: Express) {
         return res.json({ message: "No parent company — nothing to sync", found: false, updated: false });
       }
 
-      const poItemsTotal = parseFloat(po.itemsTotal || "0");
-      const poFreight = parseFloat(po.freight || "0");
-      const poSurcharge = parseFloat(po.surcharge || "0");
-      const poFumigation = parseFloat(po.fumigation || "0");
-      const poDocumentCharges = parseFloat(po.documentCharges || "0");
-      const poDiscount = parseFloat(po.discount || "0");
-      const poOtherCharges = parseFloat(po.otherCharges || "0");
-      const grossTotal = poItemsTotal + poFreight + poSurcharge + poFumigation + poDocumentCharges - poDiscount + poOtherCharges;
-      const freightPaidBy = (po as any).freightPaidBy ?? "supplier";
-      const intercoTotal = freightPaidBy === "own" && poFreight > 0 ? grossTotal - poFreight : grossTotal;
+      const { intercoTotal } = calcPoAmounts({
+        itemsTotal: po.itemsTotal, freight: po.freight, surcharge: po.surcharge,
+        fumigation: po.fumigation, documentCharges: po.documentCharges,
+        discount: po.discount, otherCharges: po.otherCharges,
+        freightPaidBy: (po as any).freightPaidBy,
+      });
 
       const result = await syncIntercoParentVoucher(db, po.poNumber, intercoTotal);
       res.json({
@@ -537,17 +570,12 @@ export function registerContainerRoutes(app: Express) {
           scannedPOs++;
           try {
             // Recalculate exact amounts
-            const itemsTotal = parseFloat(po.itemsTotal || "0");
-            const freight = parseFloat(po.freight || "0");
-            const surcharge = parseFloat(po.surcharge || "0");
-            const fumigation = parseFloat(po.fumigation || "0");
-            const documentCharges = parseFloat(po.documentCharges || "0");
-            const discount = parseFloat(po.discount || "0");
-            const otherCharges = parseFloat(po.otherCharges || "0");
-
-            const grossTotal = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
-            const freightPaidBy = (po as any).freightPaidBy ?? "supplier";
-            const intercoTotal = freightPaidBy === "own" && freight > 0 ? grossTotal - freight : grossTotal;
+            const { grossTotal, intercoTotal } = calcPoAmounts({
+              itemsTotal: po.itemsTotal, freight: po.freight, surcharge: po.surcharge,
+              fumigation: po.fumigation, documentCharges: po.documentCharges,
+              discount: po.discount, otherCharges: po.otherCharges,
+              freightPaidBy: (po as any).freightPaidBy,
+            });
 
             if (grossTotal <= 0) {
               skipped.push(`PO ${po.poNumber}: total is 0 — skipped`);
@@ -2210,10 +2238,10 @@ export function registerContainerRoutes(app: Express) {
 
           // ── Inter-company sync: use freightPaidBy-aware supplier total for the parent voucher.
           {
-            const _b1FreightPaidBy = req.body.freightPaidBy ?? existingPO.freightPaidBy ?? "supplier";
-            const _b1IntercoTotal = _b1FreightPaidBy === "own" && freight > 0
-              ? poGrandTotal - freight
-              : poGrandTotal;
+            const { intercoTotal: _b1IntercoTotal } = calcPoAmounts({
+              itemsTotal, freight, surcharge, fumigation, documentCharges, discount, otherCharges,
+              freightPaidBy: req.body.freightPaidBy ?? existingPO.freightPaidBy,
+            });
             const _b1NewPoNum = req.body.poNumber && req.body.poNumber !== existingPO.poNumber
               ? req.body.poNumber as string : null;
             const _b1PoNums = _b1NewPoNum ? [existingPO.poNumber, _b1NewPoNum] : existingPO.poNumber;
@@ -2375,9 +2403,6 @@ export function registerContainerRoutes(app: Express) {
       const oldOtherCharges = parseFloat(existingPO.otherCharges || "0");
       const oldItemsTotal = parseFloat(existingPO.itemsTotal || "0");
       
-      const newGrandTotal = newItemsTotal + newFreight + newSurcharge + newFumigation + newDocumentCharges - newDiscount + newOtherCharges;
-      const oldGrandTotal = oldItemsTotal + oldFreight + oldSurcharge + oldFumigation + oldDocumentCharges - oldDiscount + oldOtherCharges;
-
       // Freight paid-by-own: supplier voucher total excludes freight
       const newFreightPaidBy: string = req.body.freightPaidBy ?? existingPO.freightPaidBy ?? 'supplier';
       const newFreightOwnAccountId: number | null =
@@ -2385,12 +2410,20 @@ export function registerContainerRoutes(app: Express) {
           ? (req.body.freightOwnAccountId === null ? null : Number(req.body.freightOwnAccountId))
           : ((existingPO as any).freightOwnAccountId ?? null);
       const oldFreightPaidBy: string = (existingPO as any).freightPaidBy ?? 'supplier';
-      const supplierTotal = newFreightPaidBy === 'own' && newFreight > 0
-        ? newGrandTotal - newFreight
-        : newGrandTotal;
-      const oldSupplierTotal = oldFreightPaidBy === 'own' && oldFreight > 0
-        ? oldGrandTotal - oldFreight
-        : oldGrandTotal;
+
+      // Use centralised calculator — single source of truth for both branches
+      const { grossTotal: newGrandTotal, intercoTotal: supplierTotal } = calcPoAmounts({
+        itemsTotal: newItemsTotal, freight: newFreight, surcharge: newSurcharge,
+        fumigation: newFumigation, documentCharges: newDocumentCharges,
+        discount: newDiscount, otherCharges: newOtherCharges,
+        freightPaidBy: newFreightPaidBy,
+      });
+      const { grossTotal: oldGrandTotal, intercoTotal: oldSupplierTotal } = calcPoAmounts({
+        itemsTotal: oldItemsTotal, freight: oldFreight, surcharge: oldSurcharge,
+        fumigation: oldFumigation, documentCharges: oldDocumentCharges,
+        discount: oldDiscount, otherCharges: oldOtherCharges,
+        freightPaidBy: oldFreightPaidBy,
+      });
       const freightPaidByChanged = newFreightPaidBy !== oldFreightPaidBy;
       const freightOwnAccountChanged = newFreightOwnAccountId !== ((existingPO as any).freightOwnAccountId ?? null);
       const freightVoucherNeedsUpdate = newFreightPaidBy === 'own' && (
