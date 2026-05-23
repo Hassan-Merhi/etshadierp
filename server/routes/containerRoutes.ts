@@ -235,15 +235,19 @@ async function syncIntercoFreightParentVoucher(
         return { action: "skipped" };
       }
 
-      // Look up the supplier payable account from the main voucher (the credit entry)
+      // Look up the supplier payable account from the main voucher (the credit entry).
+      // The credit entry may use ledgerAccountId OR supplierId (purchase vouchers often
+      // link via supplierId only). Accept either — prefer ledgerAccountId, fall back to supplierId.
       let supplierCreditAccountId: number | null = null;
+      let creditSupplierId: number | null = null;
       if (opts.poVoucherId) {
         const mainEntries = await dbOrTx.select().from(voucherEntries)
           .where(eq(voucherEntries.voucherId, opts.poVoucherId));
         const creditEntry = mainEntries.find((e: any) => parseFloat(e.creditAmount || "0") > 0);
         supplierCreditAccountId = creditEntry?.ledgerAccountId ?? null;
+        creditSupplierId = !supplierCreditAccountId ? (creditEntry?.supplierId ?? null) : null;
       }
-      if (!supplierCreditAccountId) {
+      if (!supplierCreditAccountId && !creditSupplierId) {
         console.warn(`[syncIntercoFreightParentVoucher] Parent-company PO: no supplier credit account found for voucher ${opts.poVoucherId}`);
         return { action: "skipped" };
       }
@@ -251,15 +255,23 @@ async function syncIntercoFreightParentVoucher(
       const amountStr = freightAmount.toFixed(2);
       const description = `Freight (parent acct) - ${cNum} / ${poNumber}${opts.supplierName ? ` — ${opts.supplierName}` : ""}`;
 
+      // Helper to build the credit-leg fields for a voucher entry
+      const creditLegFields = () => supplierCreditAccountId
+        ? { ledgerAccountId: supplierCreditAccountId, supplierId: null }
+        : { ledgerAccountId: null, supplierId: creditSupplierId };
+
       if (existingOwn) {
         const ownEntries = await dbOrTx.select().from(voucherEntries)
           .where(eq(voucherEntries.voucherId, existingOwn.id));
         const debitE = ownEntries.find((e: any) => parseFloat(e.debitAmount || "0") > 0);
         const creditE = ownEntries.find((e: any) => parseFloat(e.creditAmount || "0") > 0);
+        const creditMatchesAccount = supplierCreditAccountId
+          ? (creditE?.ledgerAccountId ?? null) === supplierCreditAccountId
+          : (creditE?.supplierId ?? null) === creditSupplierId;
         const needsUpdate =
           Math.abs(parseFloat(existingOwn.totalAmount || "0") - freightAmount) > 0.001 ||
           (debitE?.ledgerAccountId ?? null) !== freightParentAccountId ||
-          (creditE?.ledgerAccountId ?? null) !== supplierCreditAccountId;
+          !creditMatchesAccount;
         if (!needsUpdate) return { action: "skipped", voucherId: existingOwn.id };
         await dbOrTx.update(vouchers).set({ totalAmount: amountStr, description }).where(eq(vouchers.id, existingOwn.id));
         for (const entry of ownEntries) {
@@ -269,7 +281,7 @@ async function syncIntercoFreightParentVoucher(
               .where(eq(voucherEntries.id, entry.id));
           } else {
             await dbOrTx.update(voucherEntries)
-              .set({ creditAmount: amountStr, debitAmount: "0", ledgerAccountId: supplierCreditAccountId, narration: description })
+              .set({ creditAmount: amountStr, debitAmount: "0", ...creditLegFields(), narration: description })
               .where(eq(voucherEntries.id, entry.id));
           }
         }
@@ -288,7 +300,7 @@ async function syncIntercoFreightParentVoucher(
       await dbOrTx.insert(voucherEntries).values([
         { voucherId: newOwnV.id, companyId: parentCompanyId, ledgerAccountId: freightParentAccountId,
           debitAmount: amountStr, creditAmount: "0", narration: description },
-        { voucherId: newOwnV.id, companyId: parentCompanyId, ledgerAccountId: supplierCreditAccountId,
+        { voucherId: newOwnV.id, companyId: parentCompanyId, ...creditLegFields(),
           debitAmount: "0", creditAmount: amountStr, narration: description },
       ]);
       return { action: "created", voucherId: newOwnV.id };
