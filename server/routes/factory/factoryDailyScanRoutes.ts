@@ -12,7 +12,8 @@ export function registerFactoryDailyScanRoutes(app: Express) {
       const date = req.query.date as string;
       if (!date) return res.status(400).json({ message: "date query param required (YYYY-MM-DD)" });
       const result = await pool.query(
-        `SELECT id, reference_number, article_code, product_name, weight_kg::text, status
+        `SELECT id, reference_number, article_code, product_name, weight_kg::text, status,
+                stock_entry_date::text AS date_bale_produced, worker_name
          FROM factory_bales
          WHERE company_id = $1 AND stock_entry_date = $2 AND deleted_at IS NULL
          ORDER BY id ASC`,

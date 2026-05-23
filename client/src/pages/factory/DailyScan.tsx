@@ -36,6 +36,8 @@ interface DayBale {
   product_name: string | null;
   weight_kg: string | null;
   status: string;
+  date_bale_produced: string | null;
+  worker_name: string | null;
 }
 
 interface DailyScanRow {
@@ -394,6 +396,8 @@ export default function DailyScan() {
                       <TableHead>Article Code</TableHead>
                       <TableHead>Product Name</TableHead>
                       <TableHead className="text-right">Weight (kg)</TableHead>
+                      <TableHead>Date Produced</TableHead>
+                      <TableHead>Worker</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -411,6 +415,14 @@ export default function DailyScan() {
                           {b.weight_kg
                             ? formatNumber(parseFloat(b.weight_kg))
                             : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {b.date_bale_produced
+                            ? (() => { const [y,m,d] = b.date_bale_produced.split("-"); return `${d}/${m}/${y}`; })()
+                            : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {b.worker_name ?? <span className="text-muted-foreground">—</span>}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -448,6 +460,8 @@ export default function DailyScan() {
                         <TableHead>Article Code</TableHead>
                         <TableHead>Product Name</TableHead>
                         <TableHead className="text-right">Weight (kg)</TableHead>
+                        <TableHead>Date Produced</TableHead>
+                        <TableHead>Worker</TableHead>
                         <TableHead className="text-right">Scanned At</TableHead>
                         <TableHead className="w-10" />
                       </TableRow>
@@ -467,6 +481,14 @@ export default function DailyScan() {
                             </TableCell>
                             <TableCell className="text-right font-mono text-sm text-muted-foreground">
                               {b.weight_kg ? formatNumber(parseFloat(b.weight_kg)) : "—"}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {b.date_bale_produced
+                                ? (() => { const [y,m,d] = b.date_bale_produced.split("-"); return `${d}/${m}/${y}`; })()
+                                : "—"}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {b.worker_name ?? "—"}
                             </TableCell>
                             <TableCell className="text-right text-sm text-muted-foreground">
                               {new Date(scanRow.scanned_at).toLocaleTimeString("en-GB")}

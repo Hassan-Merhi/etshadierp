@@ -15,7 +15,9 @@ export function registerFactoryGroundScanRoutes(app: Express) {
             `SELECT g.id, g.company_id, g.location_id, g.reference_number,
                     COALESCE(bp.article_code, g.article_code) AS article_code,
                     COALESCE(g.product_name, bp.name) AS product_name,
-                    g.weight_kg, g.status, g.is_in_loading_order, g.scanned_at, g.scanned_by_user_id
+                    g.weight_kg, g.status, g.is_in_loading_order, g.scanned_at, g.scanned_by_user_id,
+                    fb.stock_entry_date::text AS date_bale_produced,
+                    fb.worker_name
              FROM factory_ground_scan_items g
              LEFT JOIN factory_bales fb ON fb.reference_number = g.reference_number AND fb.company_id = g.company_id::integer
              LEFT JOIN bale_products bp ON bp.id = fb.product_id AND bp.company_id = g.company_id::integer
@@ -27,7 +29,9 @@ export function registerFactoryGroundScanRoutes(app: Express) {
             `SELECT g.id, g.company_id, g.location_id, g.reference_number,
                     COALESCE(bp.article_code, g.article_code) AS article_code,
                     COALESCE(g.product_name, bp.name) AS product_name,
-                    g.weight_kg, g.status, g.is_in_loading_order, g.scanned_at, g.scanned_by_user_id
+                    g.weight_kg, g.status, g.is_in_loading_order, g.scanned_at, g.scanned_by_user_id,
+                    fb.stock_entry_date::text AS date_bale_produced,
+                    fb.worker_name
              FROM factory_ground_scan_items g
              LEFT JOIN factory_bales fb ON fb.reference_number = g.reference_number AND fb.company_id = g.company_id::integer
              LEFT JOIN bale_products bp ON bp.id = fb.product_id AND bp.company_id = g.company_id::integer

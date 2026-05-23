@@ -34,6 +34,8 @@ interface ScannedBale {
   status: string;
   isInLoadingOrder?: boolean;
   scannedAt: Date;
+  dateBaleProduced: string | null;
+  workerName: string | null;
 }
 
 interface GroundScanItem {
@@ -46,17 +48,21 @@ interface GroundScanItem {
   status: string | null;
   is_in_loading_order: boolean;
   scanned_at: string;
+  date_bale_produced: string | null;
+  worker_name: string | null;
 }
 
 function rowToScannedBale(r: GroundScanItem): ScannedBale {
   return {
-    refCode:         r.reference_number,
-    articleCode:     r.article_code  || "",
-    productName:     r.product_name  || "Unknown",
-    weightKg:        parseFloat(r.weight_kg || "0"),
-    status:          r.status        || "",
+    refCode:          r.reference_number,
+    articleCode:      r.article_code  || "",
+    productName:      r.product_name  || "Unknown",
+    weightKg:         parseFloat(r.weight_kg || "0"),
+    status:           r.status        || "",
     isInLoadingOrder: r.is_in_loading_order,
-    scannedAt:       new Date(r.scanned_at),
+    scannedAt:        new Date(r.scanned_at),
+    dateBaleProduced: r.date_bale_produced ?? null,
+    workerName:       r.worker_name ?? null,
   };
 }
 
@@ -697,6 +703,8 @@ export default function GroundScan() {
                 <TableHead>Product Name</TableHead>
                 <TableHead className="text-right">Weight (kg)</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Date Produced</TableHead>
+                <TableHead>Worker</TableHead>
                 <TableHead className="w-8" />
               </TableRow>
             </TableHeader>
@@ -724,6 +732,14 @@ export default function GroundScan() {
                   </TableCell>
                   <TableCell data-testid={`text-ground-scan-status-${bale.refCode}`}>
                     <StatusBadge status={bale.status} isInLoadingOrder={bale.isInLoadingOrder} />
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground" data-testid={`text-ground-scan-date-produced-${bale.refCode}`}>
+                    {bale.dateBaleProduced
+                      ? (() => { const [y,m,d] = bale.dateBaleProduced.split("-"); return `${d}/${m}/${y}`; })()
+                      : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground" data-testid={`text-ground-scan-worker-${bale.refCode}`}>
+                    {bale.workerName ?? <span className="text-muted-foreground">—</span>}
                   </TableCell>
                   <TableCell>
                     <Button
