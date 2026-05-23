@@ -17,6 +17,7 @@ import {
   vouchers, voucherEntries, salesItems, suppliers, customers, customerBalances,
   employees, locations, userLocations, userCompanyRoles, companies,
   auditLog, users, FEATURE_KEYS, companySettings,
+  intercompanyPosConfigs,
   purchaseOrders, poLineItems, interCompanyTransfers,
   insertInterCompanyTransferSchema, insertContainerSaleSchema, containerSales,
   insertUserPreferencesSchema, userPreferences,
@@ -133,7 +134,12 @@ export function registerImportRoutes(app: Express) {
         supplierId,
         importDate,
         preview,
+        freightPaidBy,
+        freightParentAccountId,
       } = req.body;
+
+      const resolvedFreightPaidBy: string = freightPaidBy || "supplier";
+      const resolvedFreightParentAccountId: number | null = freightParentAccountId ? Number(freightParentAccountId) : null;
 
       if (
         !fileHash ||
@@ -143,6 +149,11 @@ export function registerImportRoutes(app: Express) {
         !preview
       ) {
         return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Validate parent freight account when freightPaidBy=parent
+      if (resolvedFreightPaidBy === "parent" && !resolvedFreightParentAccountId) {
+        return res.status(400).json({ message: "A parent freight account must be selected when freight is paid by parent company" });
       }
 
       // SERVER-SIDE VALIDATION - Mandatory before import
@@ -361,6 +372,11 @@ export function registerImportRoutes(app: Express) {
         const poChargesTotal = poFreight + poSurcharge + poFumigation + poDocumentCharges - poDiscount + poOtherCharges;
         const poGrandTotal = poItemsTotal + poChargesTotal;
 
+        // When freight is paid by parent, exclude freight from the subsidiary's supplier balance
+        const poIntercoTotal = (resolvedFreightPaidBy === "parent") && poFreight > 0
+          ? poItemsTotal + poSurcharge + poFumigation + poDocumentCharges - poDiscount + poOtherCharges
+          : poGrandTotal;
+
         // Create voucher for this PO
         // If subsidiary with parent credit account: entries created here at import time
         // Otherwise: entries created at container offload time per Tally conventions
@@ -371,7 +387,7 @@ export function registerImportRoutes(app: Express) {
           voucherType: "Purchase",
           voucherDate: importDate,
           description: `${containerNumber} ${supplier?.legalName || 'Unknown'}`,
-          totalAmount: poGrandTotal.toString(),
+          totalAmount: poIntercoTotal.toString(),
           optional: false,
           sourceModule: "ERP",
         });
@@ -453,10 +469,11 @@ export function registerImportRoutes(app: Express) {
             }
             
             // Create voucher entries in SUBSIDIARY: DR Purchases, CR Parent Credit Account
+            // Use intercoTotal (excludes freight when paid by parent) so supplier AP is correct
             await storage.createVoucherEntry({
               voucherId: voucher.id,
               ledgerAccountId: purchasesAccount.id,
-              debitAmount: poGrandTotal.toFixed(2),
+              debitAmount: poIntercoTotal.toFixed(2),
               creditAmount: "0",
               narration: `PO ${poNumber} - Container ${containerNumber}`,
             });
@@ -465,7 +482,7 @@ export function registerImportRoutes(app: Express) {
               voucherId: voucher.id,
               ledgerAccountId: parentCreditAccountId,
               debitAmount: "0",
-              creditAmount: poGrandTotal.toFixed(2),
+              creditAmount: poIntercoTotal.toFixed(2),
               narration: `PO ${poNumber} - Credit from ${subsidiaryName}`,
             });
             
@@ -490,7 +507,8 @@ export function registerImportRoutes(app: Express) {
               });
             }
             
-            // Create matching voucher in PARENT: DR Subsidiary Credit, CR Supplier
+            // Create matching INTERCO-PARENT voucher in PARENT: DR Subsidiary Receivable, CR Supplier
+            // Use intercoTotal so the supplier balance excludes parent-borne freight
             const parentVoucher = await storage.createVoucher({
               companyId: parentCompanyId,
               currency: "USD",
@@ -498,7 +516,7 @@ export function registerImportRoutes(app: Express) {
               voucherType: "Journal",
               voucherDate: importDate,
               description: `${containerNumber} ${supplier?.legalName || 'Unknown'}`,
-              totalAmount: poGrandTotal.toString(),
+              totalAmount: poIntercoTotal.toString(),
               optional: false,
               sourceModule: "ERP",
             });
@@ -507,7 +525,7 @@ export function registerImportRoutes(app: Express) {
             await storage.createVoucherEntry({
               voucherId: parentVoucher.id,
               ledgerAccountId: subsidiaryReceivableAccount.id,
-              debitAmount: poGrandTotal.toFixed(2),
+              debitAmount: poIntercoTotal.toFixed(2),
               creditAmount: "0",
               narration: `${subsidiaryName} PO ${poNumber} - Container ${containerNumber}`,
             });
@@ -517,9 +535,54 @@ export function registerImportRoutes(app: Express) {
               voucherId: parentVoucher.id,
               supplierId: supplierId,
               debitAmount: "0",
-              creditAmount: poGrandTotal.toFixed(2),
+              creditAmount: poIntercoTotal.toFixed(2),
               narration: `${subsidiaryName} PO ${poNumber} - Container ${containerNumber}`,
             });
+
+            // === CREATE INTERCO-FREIGHT VOUCHER IN PARENT (if freight paid by parent) ===
+            if (resolvedFreightPaidBy === "parent" && resolvedFreightParentAccountId && poFreight > 0) {
+              // Look up the interco config to find the dest interco account (CR side)
+              const intercoConfigs = await db
+                .select()
+                .from(intercompanyPosConfigs)
+                .where(and(
+                  eq(intercompanyPosConfigs.subsidiaryCompanyId, currentCompanyId),
+                  eq(intercompanyPosConfigs.active, true),
+                ))
+                .limit(1);
+              const destIntercoAccountId = intercoConfigs[0]?.destIntercoAccountId ?? null;
+
+              if (destIntercoAccountId) {
+                const freightVoucherNum = `INTERCO-FREIGHT-${currentCompanyId}-${containerNumber}-${poNumber}`;
+                const intercoFreightVoucher = await storage.createVoucher({
+                  companyId: parentCompanyId,
+                  currency: "USD",
+                  voucherNumber: freightVoucherNum,
+                  voucherType: "Journal",
+                  voucherDate: importDate,
+                  description: `Freight for ${subsidiaryName} | ${supplier?.legalName || ''} PO ${poNumber} ${containerNumber}`,
+                  totalAmount: poFreight.toFixed(2),
+                  optional: false,
+                  sourceModule: "ERP",
+                });
+                // DR: parent freight expense account
+                await storage.createVoucherEntry({
+                  voucherId: intercoFreightVoucher.id,
+                  ledgerAccountId: resolvedFreightParentAccountId,
+                  debitAmount: poFreight.toFixed(2),
+                  creditAmount: "0",
+                  narration: `Freight ${subsidiaryName} PO ${poNumber} ${containerNumber}`,
+                });
+                // CR: interco payable (dest interco account)
+                await storage.createVoucherEntry({
+                  voucherId: intercoFreightVoucher.id,
+                  ledgerAccountId: destIntercoAccountId,
+                  debitAmount: "0",
+                  creditAmount: poFreight.toFixed(2),
+                  narration: `Freight ${subsidiaryName} PO ${poNumber} ${containerNumber}`,
+                });
+              }
+            }
           }
         } else {
           // === PARENT COMPANY: Create direct supplier entry ===
@@ -578,7 +641,9 @@ export function registerImportRoutes(app: Express) {
           discount: poDiscount.toString(),
           otherCharges: poOtherCharges.toString(),
           chargesEdited: hasAnyCharges,
-        }, getClientDate(req));
+          freightPaidBy: resolvedFreightPaidBy,
+          freightParentAccountId: resolvedFreightPaidBy === "parent" ? resolvedFreightParentAccountId : null,
+        } as any, getClientDate(req));
 
         for (const item of poItems) {
           // Re-lookup stock item by code/alias or name to get fresh ID (not stale preview data)

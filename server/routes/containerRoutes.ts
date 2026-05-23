@@ -731,6 +731,7 @@ export function registerContainerRoutes(app: Express) {
         let updatedContainerCharges = 0;
         const skipped: string[] = [];
         const notFoundParentVouchers: string[] = [];
+        const missingParentFreightAccount: string[] = [];
         const errors: string[] = [];
 
         for (const po of allPos) {
@@ -829,6 +830,9 @@ export function registerContainerRoutes(app: Express) {
             const poFreight = parseFloat(po.freight || "0");
             const poFreightPaidBy: string = (po as any).freightPaidBy || "supplier";
             const poFreightOwnAccountId: number | null = (po as any).freightOwnAccountId ? Number((po as any).freightOwnAccountId) : null;
+            if (poFreightPaidBy === 'parent' && poFreight > 0 && !((po as any).freightParentAccountId)) {
+              missingParentFreightAccount.push(`PO ${po.poNumber}: freight set to parent-paid but no parent account configured`);
+            }
 
             if (poFreightPaidBy === "own" && poFreight > 0 && poFreightOwnAccountId) {
               const [existingFV] = await db
@@ -1035,6 +1039,7 @@ export function registerContainerRoutes(app: Express) {
           updatedContainers,
           skipped,
           notFoundParentVouchers,
+          missingParentFreightAccount,
           errors,
           message: `Scanned ${scannedPOs} POs. Updated ${updatedLocalVouchers} local vouchers, ${updatedParentVouchers} parent JVs, ${updatedContainers} container totals.`,
         });

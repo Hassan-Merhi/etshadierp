@@ -149,6 +149,13 @@ export default function Containers() {
       if (data?.notFoundParentVouchers?.length > 0) {
         console.info("[SyncAll] Not found parent vouchers:", data.notFoundParentVouchers);
       }
+      if (data?.missingParentFreightAccount?.length > 0) {
+        toast({
+          title: "Action Required",
+          description: `${data.missingParentFreightAccount.length} PO(s) have parent-paid freight but no parent account set. Please edit each PO to select the parent freight account.`,
+          variant: "destructive",
+        });
+      }
     },
     onError: (error: any) => {
       if (error?._handledGlobally) return;

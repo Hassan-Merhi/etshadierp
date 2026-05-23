@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { Supplier } from "@shared/schema";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface SupplierComboboxProps {
   value: string;
@@ -109,9 +110,16 @@ export default function POImport() {
   const [importDate, setImportDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
+  const [freightPaidBy, setFreightPaidBy] = useState<"supplier" | "parent">("supplier");
+  const [freightParentAccountId, setFreightParentAccountId] = useState<string>("");
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
+  });
+
+  const { data: parentFreightAccounts = [] } = useQuery<{ id: number; name: string; code: string }[]>({
+    queryKey: ["/api/purchase-orders/parent-freight-accounts"],
+    retry: false,
   });
 
   const parseMutation = useMutation({
@@ -274,6 +282,17 @@ export default function POImport() {
       return;
     }
 
+    const selectedContainer = preview?.preview?.find((c: any) => c.containerNumber === containerNumber);
+    const containerFreight = selectedContainer?.charges?.freight || 0;
+    if (freightPaidBy === "parent" && containerFreight > 0 && !freightParentAccountId) {
+      toast({
+        title: "Parent freight account required",
+        description: "Please select a parent company account to book the freight against",
+        variant: "destructive",
+      });
+      return;
+    }
+
     importMutation.mutate({
       fileHash: preview.fileHash,
       fileName: preview.fileName,
@@ -281,6 +300,8 @@ export default function POImport() {
       supplierId: parseInt(selectedSupplier),
       importDate,
       preview: preview.preview,
+      freightPaidBy,
+      freightParentAccountId: freightParentAccountId ? parseInt(freightParentAccountId) : null,
     });
   };
 
@@ -319,6 +340,8 @@ export default function POImport() {
       supplierId: parseInt(selectedSupplier),
       importDate,
       preview: preview.preview,
+      freightPaidBy,
+      freightParentAccountId: freightParentAccountId ? parseInt(freightParentAccountId) : null,
     });
   };
 
@@ -328,6 +351,8 @@ export default function POImport() {
     setValidationResult(null);
     setContainerNumber("");
     setSelectedSupplier("");
+    setFreightPaidBy("supplier");
+    setFreightParentAccountId("");
   };
 
   const hasValidationErrors = validationResult && validationResult.errors && validationResult.errors.length > 0;
@@ -432,6 +457,58 @@ export default function POImport() {
                     />
                   </div>
                 </div>
+
+                {/* Freight payer selection — only shown when the selected container has freight and a parent company exists */}
+                {(() => {
+                  const selContainer = preview?.preview?.find((c: any) => c.containerNumber === containerNumber);
+                  const hasFreight = selContainer?.charges?.freight > 0;
+                  if (!hasFreight || parentFreightAccounts.length === 0) return null;
+                  return (
+                    <div className="space-y-3 pt-1">
+                      <Label>Freight Paid By</Label>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={freightPaidBy === "supplier" ? "default" : "outline"}
+                          onClick={() => { setFreightPaidBy("supplier"); setFreightParentAccountId(""); }}
+                          data-testid="button-freight-by-supplier"
+                        >
+                          By Supplier
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={freightPaidBy === "parent" ? "default" : "outline"}
+                          onClick={() => setFreightPaidBy("parent")}
+                          data-testid="button-freight-by-parent"
+                        >
+                          Parent Co.
+                        </Button>
+                      </div>
+                      {freightPaidBy === "parent" && (
+                        <div className="space-y-1">
+                          <Label>Parent Freight Account *</Label>
+                          <Select
+                            value={freightParentAccountId}
+                            onValueChange={setFreightParentAccountId}
+                          >
+                            <SelectTrigger data-testid="select-freight-parent-account">
+                              <SelectValue placeholder="Select account..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {parentFreightAccounts.map((acc) => (
+                                <SelectItem key={acc.id} value={String(acc.id)}>
+                                  {acc.name} {acc.code ? `(${acc.code})` : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </>
           )}
