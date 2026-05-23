@@ -175,13 +175,109 @@ async function syncIntercoFreightParentVoucher(
     voucherDate: string;
     supplierName?: string;
     subsidiaryName?: string;
+    /** voucherId of the PO's main supplier voucher — used as credit account source for parent-company POs */
+    poVoucherId?: number | null;
   },
 ): Promise<{ action: "created" | "updated" | "deleted" | "skipped" | "error"; voucherId?: number }> {
   const { subsidiaryCompanyId, cNum, poNumber, freightAmount, freightParentAccountId, voucherDate } = opts;
   try {
     const parentCompanyId = await storage.getParentCompanyId();
     if (!parentCompanyId) return { action: "skipped" };
-    if (subsidiaryCompanyId === parentCompanyId) return { action: "skipped" };
+
+    // ── Parent-company PO: freight journal within the same company ────────────
+    // When the PO belongs to the parent company itself (not a subsidiary),
+    // we can't use the interco-receivable as the credit leg. Instead we post:
+    //   DR freightParentAccountId   (the chosen freight expense account)
+    //   CR supplier payable account (the credit leg from the main voucher)
+    if (subsidiaryCompanyId === parentCompanyId) {
+      const voucherNum = `INTERCO-FREIGHT-${subsidiaryCompanyId}-${cNum}-${poNumber}`;
+      const stalePattern = `INTERCO-FREIGHT-${subsidiaryCompanyId}-%-${poNumber}`;
+      // Clean up stale vouchers with a different container number
+      const staleOwn = await dbOrTx.select({ id: vouchers.id }).from(vouchers)
+        .where(and(
+          eq(vouchers.companyId, parentCompanyId),
+          like(vouchers.voucherNumber, stalePattern),
+          ne(vouchers.voucherNumber, voucherNum),
+        ));
+      for (const stale of staleOwn) {
+        await dbOrTx.delete(voucherEntries).where(eq(voucherEntries.voucherId, stale.id));
+        await dbOrTx.delete(vouchers).where(eq(vouchers.id, stale.id));
+      }
+
+      const [existingOwn] = await dbOrTx
+        .select({ id: vouchers.id, totalAmount: vouchers.totalAmount })
+        .from(vouchers)
+        .where(and(eq(vouchers.companyId, parentCompanyId), eq(vouchers.voucherNumber, voucherNum)))
+        .limit(1);
+
+      if (!freightParentAccountId || freightAmount <= 0.001) {
+        if (existingOwn) {
+          await dbOrTx.delete(voucherEntries).where(eq(voucherEntries.voucherId, existingOwn.id));
+          await dbOrTx.delete(vouchers).where(eq(vouchers.id, existingOwn.id));
+          return { action: "deleted", voucherId: existingOwn.id };
+        }
+        return { action: "skipped" };
+      }
+
+      // Look up the supplier payable account from the main voucher (the credit entry)
+      let supplierCreditAccountId: number | null = null;
+      if (opts.poVoucherId) {
+        const mainEntries = await dbOrTx.select().from(voucherEntries)
+          .where(eq(voucherEntries.voucherId, opts.poVoucherId));
+        const creditEntry = mainEntries.find((e: any) => parseFloat(e.creditAmount || "0") > 0);
+        supplierCreditAccountId = creditEntry?.ledgerAccountId ?? null;
+      }
+      if (!supplierCreditAccountId) {
+        console.warn(`[syncIntercoFreightParentVoucher] Parent-company PO: no supplier credit account found for voucher ${opts.poVoucherId}`);
+        return { action: "skipped" };
+      }
+
+      const amountStr = freightAmount.toFixed(2);
+      const description = `Freight (parent acct) - ${cNum} / ${poNumber}${opts.supplierName ? ` — ${opts.supplierName}` : ""}`;
+
+      if (existingOwn) {
+        const ownEntries = await dbOrTx.select().from(voucherEntries)
+          .where(eq(voucherEntries.voucherId, existingOwn.id));
+        const debitE = ownEntries.find((e: any) => parseFloat(e.debitAmount || "0") > 0);
+        const creditE = ownEntries.find((e: any) => parseFloat(e.creditAmount || "0") > 0);
+        const needsUpdate =
+          Math.abs(parseFloat(existingOwn.totalAmount || "0") - freightAmount) > 0.001 ||
+          (debitE?.ledgerAccountId ?? null) !== freightParentAccountId ||
+          (creditE?.ledgerAccountId ?? null) !== supplierCreditAccountId;
+        if (!needsUpdate) return { action: "skipped", voucherId: existingOwn.id };
+        await dbOrTx.update(vouchers).set({ totalAmount: amountStr, description }).where(eq(vouchers.id, existingOwn.id));
+        for (const entry of ownEntries) {
+          if (parseFloat(entry.debitAmount || "0") > 0) {
+            await dbOrTx.update(voucherEntries)
+              .set({ debitAmount: amountStr, creditAmount: "0", ledgerAccountId: freightParentAccountId, narration: description })
+              .where(eq(voucherEntries.id, entry.id));
+          } else {
+            await dbOrTx.update(voucherEntries)
+              .set({ creditAmount: amountStr, debitAmount: "0", ledgerAccountId: supplierCreditAccountId, narration: description })
+              .where(eq(voucherEntries.id, entry.id));
+          }
+        }
+        return { action: "updated", voucherId: existingOwn.id };
+      }
+
+      const [newOwnV] = await dbOrTx.insert(vouchers).values({
+        companyId: parentCompanyId,
+        voucherNumber: voucherNum,
+        voucherType: "Journal",
+        voucherDate,
+        description,
+        totalAmount: amountStr,
+        sourceModule: "ERP",
+      }).returning();
+      await dbOrTx.insert(voucherEntries).values([
+        { voucherId: newOwnV.id, companyId: parentCompanyId, ledgerAccountId: freightParentAccountId,
+          debitAmount: amountStr, creditAmount: "0", narration: description },
+        { voucherId: newOwnV.id, companyId: parentCompanyId, ledgerAccountId: supplierCreditAccountId,
+          debitAmount: "0", creditAmount: amountStr, narration: description },
+      ]);
+      return { action: "created", voucherId: newOwnV.id };
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     // Resolve subsidiary name for narration
     let subsidiaryName = opts.subsidiaryName;
@@ -947,7 +1043,10 @@ export function registerContainerRoutes(app: Express) {
             }
 
             // ── Repair / delete INTERCO-FREIGHT- parent-paid freight voucher ─
-            if (parentCompanyId && po.companyId !== parentCompanyId) {
+            // Include parent-company POs too: when the parent has its own PO with
+            // "Parent Co." freight, syncIntercoFreightParentVoucher handles the
+            // direct freight journal within the same company.
+            if (parentCompanyId && (po.companyId !== parentCompanyId || poFreightPaidBy === 'parent')) {
               const poFreightParentAccountId: number | null = (po as any).freightParentAccountId ? Number((po as any).freightParentAccountId) : null;
               const ifrVoucherDate = new Date().toISOString().split("T")[0];
               const poSupplierName = (po as any).supplierName ?? undefined;
@@ -959,6 +1058,7 @@ export function registerContainerRoutes(app: Express) {
                 freightParentAccountId: poFreightPaidBy === 'parent' ? poFreightParentAccountId : null,
                 voucherDate: ifrVoucherDate,
                 supplierName: poSupplierName,
+                poVoucherId: po.voucherId ?? null,
               });
               if (ifrResult.action === 'created' || ifrResult.action === 'updated') {
                 updatedIntercoFreightVouchers++;
@@ -2734,6 +2834,7 @@ export function registerContainerRoutes(app: Express) {
               freightParentAccountId: _b1FreightPaidBy === 'parent' ? _b1FreightParentAccountId : null,
               voucherDate: _b1VoucherDate,
               supplierName: supplier?.legalName ?? undefined,
+              poVoucherId: existingPO.voucherId ?? null,
             });
           }
         }
@@ -3103,6 +3204,7 @@ export function registerContainerRoutes(app: Express) {
           freightParentAccountId: newFreightPaidBy === 'parent' ? newFreightParentAccountId : null,
           voucherDate: _pfVoucherDate,
           supplierName: _pfSupplier?.legalName ?? undefined,
+          poVoucherId: existingPO.voucherId ?? null,
         });
       }
 
