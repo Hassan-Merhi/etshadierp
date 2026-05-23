@@ -95,8 +95,16 @@ async function syncIntercoParentVoucher(
 
     const nums = Array.isArray(poNumbers) ? poNumbers.filter(Boolean) : [poNumbers];
 
-    // Build OR condition across all provided PO number patterns
-    const likeConditions = nums.map((n) => like(vouchers.voucherNumber, `INTERCO-PARENT-${n}-%`));
+    // Build OR condition across all provided PO number patterns.
+    // Three naming conventions exist depending on which creation path was used:
+    //   INTERCO-PARENT-{n}-{ts}  — storage.ts / adminRoutes.ts
+    //   INTERCO-{n}-{ts}         — adminRoutes.ts (older path)
+    //   IC-{n}-{ts}              — importRoutes.ts (container import flow)
+    const likeConditions = nums.flatMap((n) => [
+      like(vouchers.voucherNumber, `INTERCO-PARENT-${n}-%`),
+      like(vouchers.voucherNumber, `INTERCO-${n}-%`),
+      like(vouchers.voucherNumber, `IC-${n}-%`),
+    ]);
     const patternClause = likeConditions.length === 1
       ? likeConditions[0]
       : or(...likeConditions);
