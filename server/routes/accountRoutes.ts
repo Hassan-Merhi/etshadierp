@@ -966,9 +966,30 @@ export function registerAccountRoutes(app: Express) {
         credits += parseFloat(tx.creditAmount || "0");
       }
 
+      // Some bank accounts have a linkedLedgerId pointing to this ledger account.
+      // Their voucher entries are stored under bankAccountId (not ledgerAccountId),
+      // so getVoucherEntriesByLedger misses them. Mirror the factoryWorkerPayrollRoutes
+      // pattern: find linked banks and fold in their entries + opening balances.
+      const linkedBanks = await db
+        .select({ id: bankAccounts.id, openingBalance: bankAccounts.openingBalance, openingBalanceSide: bankAccounts.openingBalanceSide })
+        .from(bankAccounts)
+        .where(eq(bankAccounts.linkedLedgerId, ledgerAccountId));
+
+      let linkedBankOB = 0;
+      for (const bank of linkedBanks) {
+        const bankTxs = await storage.getVoucherEntriesByBankAccount(bank.id);
+        for (const tx of bankTxs) {
+          debits += parseFloat(tx.debitAmount || "0");
+          credits += parseFloat(tx.creditAmount || "0");
+        }
+        const bOB = parseFloat(bank.openingBalance || "0");
+        const bSide = bank.openingBalanceSide || "Dr";
+        linkedBankOB += bOB * (bSide === "Cr" ? -1 : 1);
+      }
+
       const rawOB = parseFloat((linkedCustomer?.ob ?? account.openingBalance) || "0");
       const rawSide = linkedCustomer?.side ?? account.openingBalanceSide;
-      const balance = (rawOB * (rawSide === "Cr" ? -1 : 1)) + debits - credits;
+      const balance = (rawOB * (rawSide === "Cr" ? -1 : 1)) + linkedBankOB + debits - credits;
 
       res.json({ balance });
     } catch (error: any) {
