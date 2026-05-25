@@ -71,6 +71,9 @@ export default function ContainerDetail() {
     }
   }, []);
 
+  const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
+  const isDeveloper = currentUser?.role === "Developer";
+
   const { data: containerData, isLoading } = useQuery<ContainerDetailData>({
     queryKey: [`/api/containers/${containerId}`],
     enabled: !!containerId && !isSupplierPartner,
@@ -977,15 +980,19 @@ export default function ContainerDetail() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem
-              onClick={() => syncVoucherMutation.mutate()}
-              disabled={syncVoucherMutation.isPending}
-              data-testid="button-sync-voucher"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              {syncVoucherMutation.isPending ? "Syncing..." : "Sync Supplier Balance"}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
+            {isDeveloper && (
+              <>
+                <DropdownMenuItem
+                  onClick={() => syncVoucherMutation.mutate()}
+                  disabled={syncVoucherMutation.isPending}
+                  data-testid="button-sync-voucher"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  {syncVoucherMutation.isPending ? "Syncing..." : "Sync Supplier Balance"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuItem
               onClick={() => setLocation(`/containers/${containerId}/verification`)}
               data-testid="button-verify-container"

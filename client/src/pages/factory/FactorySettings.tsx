@@ -168,6 +168,8 @@ interface WaChat { id: string; name: string; type: string; }
 
 export default function FactorySettings() {
   const { toast } = useToast();
+  const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
+  const isDeveloper = currentUser?.role === "Developer";
   const [settings, setSettings] = useState<FactorySettingsData>(defaultSettings);
 
   const [prodWaGroupId, setProdWaGroupId] = useState<string>("");
@@ -1035,7 +1037,7 @@ export default function FactorySettings() {
       </Card>
 
       {/* ── Fix Other Charges Currency ───────────────────────── */}
-      <Card data-testid="card-fix-oc-currency">
+      {isDeveloper && <Card data-testid="card-fix-oc-currency">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5 text-muted-foreground" />
@@ -1132,7 +1134,7 @@ export default function FactorySettings() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* ── Import Bales ─────────────────────────────────────── */}
       <Card>

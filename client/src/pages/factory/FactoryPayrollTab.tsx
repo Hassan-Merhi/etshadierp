@@ -102,9 +102,10 @@ interface BatchRowProps {
   setDeleteBatchGroup: (g: PayrollGroup) => void;
   formatDisplayDate: (d: string | Date) => string;
   condensed?: boolean;
+  isDeveloper?: boolean;
 }
 
-function BatchRow({ group, expanded, toggleGroup, selectedIds, setSelectedIds, setPayTargetId, setPayCashAccountId, setPayOpen, setFixAcctTargetId, setFixAcctCashId, setFixAcctOpen, setUndoTargetId, setDeleteBatchGroup, formatDisplayDate, condensed }: BatchRowProps) {
+function BatchRow({ group, expanded, toggleGroup, selectedIds, setSelectedIds, setPayTargetId, setPayCashAccountId, setPayOpen, setFixAcctTargetId, setFixAcctCashId, setFixAcctOpen, setUndoTargetId, setDeleteBatchGroup, formatDisplayDate, condensed, isDeveloper }: BatchRowProps) {
   const isExpanded = expanded.has(group.key);
   const total = group.records.reduce((s, p) => s + parseFloat(p.netSalary || "0"), 0);
   const paidCount = group.records.filter((p) => p.status === "PAID").length;
@@ -215,7 +216,7 @@ function BatchRow({ group, expanded, toggleGroup, selectedIds, setSelectedIds, s
                             Pay
                           </Button>
                         )}
-                        {(p.status === "PAID" || p.status === "APPROVED") && !p.cashAccountId && (
+                        {isDeveloper && (p.status === "PAID" || p.status === "APPROVED") && !p.cashAccountId && (
                           <Button size="icon" variant="ghost" onClick={() => { setFixAcctTargetId(p.id); setFixAcctCashId(""); setFixAcctOpen(true); }} data-testid={`button-fix-acct-${p.id}`} title="Generate missing accounting entry">
                             <Wrench className="h-4 w-4 text-amber-500" />
                           </Button>
@@ -295,6 +296,9 @@ export default function FactoryPayrollTab() {
     absentDates: AttendanceEntry[];
     halfDayDates: AttendanceEntry[];
   } | null>(null);
+
+  const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
+  const isDeveloper = currentUser?.role === "Developer";
 
   const { data: payrolls, isLoading } = useQuery<PayrollRecord[]>({
     queryKey: ["/api/factory/payrolls"],
@@ -651,15 +655,17 @@ export default function FactoryPayrollTab() {
               Pay {selectedIds.size} Selected
             </Button>
           )}
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => { setRepairResult(null); setRepairOpen(true); }}
-            data-testid="button-repair-ledger"
-            title="Repair Ledger — remove stale entries from undone payrolls"
-          >
-            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-          </Button>
+          {isDeveloper && (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => { setRepairResult(null); setRepairOpen(true); }}
+              data-testid="button-repair-ledger"
+              title="Repair Ledger — remove stale entries from undone payrolls"
+            >
+              <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          )}
           <Button onClick={() => setRunOpen(true)} data-testid="button-run-payroll">
             <Play className="h-4 w-4 mr-2" />
             Run Payroll
@@ -690,7 +696,7 @@ export default function FactoryPayrollTab() {
               </div>
             )}
             <div className="divide-y">
-              {activeGroups.map((group) => <BatchRow key={group.key} group={group} expanded={expandedGroups} toggleGroup={toggleGroup} selectedIds={selectedIds} setSelectedIds={setSelectedIds} setPayTargetId={setPayTargetId} setPayCashAccountId={setPayCashAccountId} setPayOpen={setPayOpen} setFixAcctTargetId={setFixAcctTargetId} setFixAcctCashId={setFixAcctCashId} setFixAcctOpen={setFixAcctOpen} setUndoTargetId={setUndoTargetId} setDeleteBatchGroup={setDeleteBatchGroup} formatDisplayDate={formatDisplayDate} />)}
+              {activeGroups.map((group) => <BatchRow key={group.key} group={group} expanded={expandedGroups} toggleGroup={toggleGroup} selectedIds={selectedIds} setSelectedIds={setSelectedIds} setPayTargetId={setPayTargetId} setPayCashAccountId={setPayCashAccountId} setPayOpen={setPayOpen} setFixAcctTargetId={setFixAcctTargetId} setFixAcctCashId={setFixAcctCashId} setFixAcctOpen={setFixAcctOpen} setUndoTargetId={setUndoTargetId} setDeleteBatchGroup={setDeleteBatchGroup} formatDisplayDate={formatDisplayDate} isDeveloper={isDeveloper} />)}
             </div>
 
             {/* ── Completed batches (all paid) ── */}
@@ -707,7 +713,7 @@ export default function FactoryPayrollTab() {
                 </button>
                 {showCompletedBatches && (
                   <div className="divide-y bg-muted/20">
-                    {completedGroups.map((group) => <BatchRow key={group.key} group={group} expanded={expandedGroups} toggleGroup={toggleGroup} selectedIds={selectedIds} setSelectedIds={setSelectedIds} setPayTargetId={setPayTargetId} setPayCashAccountId={setPayCashAccountId} setPayOpen={setPayOpen} setFixAcctTargetId={setFixAcctTargetId} setFixAcctCashId={setFixAcctCashId} setFixAcctOpen={setFixAcctOpen} setUndoTargetId={setUndoTargetId} setDeleteBatchGroup={setDeleteBatchGroup} formatDisplayDate={formatDisplayDate} condensed />)}
+                    {completedGroups.map((group) => <BatchRow key={group.key} group={group} expanded={expandedGroups} toggleGroup={toggleGroup} selectedIds={selectedIds} setSelectedIds={setSelectedIds} setPayTargetId={setPayTargetId} setPayCashAccountId={setPayCashAccountId} setPayOpen={setPayOpen} setFixAcctTargetId={setFixAcctTargetId} setFixAcctCashId={setFixAcctCashId} setFixAcctOpen={setFixAcctOpen} setUndoTargetId={setUndoTargetId} setDeleteBatchGroup={setDeleteBatchGroup} formatDisplayDate={formatDisplayDate} condensed isDeveloper={isDeveloper} />)}
                   </div>
                 )}
               </div>

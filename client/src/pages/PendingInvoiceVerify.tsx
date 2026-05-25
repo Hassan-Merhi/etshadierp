@@ -165,6 +165,7 @@ export default function PendingInvoiceVerify() {
     retry: false,
   });
   const isAdminOrOwner = currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
+  const isDeveloper = currentUser?.role === "Developer";
 
   const { data: ledgerAccounts = [] } = useQuery<{ id: number; name: string; code: string; accountType: string }[]>({
     queryKey: ["/api/ledger-accounts"],
@@ -821,7 +822,7 @@ export default function PendingInvoiceVerify() {
               Approve & Verify
             </Button>
           )}
-          {isVerified && isAdminOrOwner && orderDetail?.invoiceNumber && (
+          {isVerified && isDeveloper && orderDetail?.invoiceNumber && (
             <Button
               variant="outline"
               onClick={() => setShowFixBalesDialog(true)}

@@ -126,6 +126,7 @@ export default function Containers() {
   const hideContainerCosts = (myErpPages?.hiddenErpCostFields ?? []).includes("container_costs");
   const { data: currentUser } = useQuery<{ role?: string; currentRole?: string | null }>({ queryKey: ["/api/auth/me"] });
   const isPrivilegedRole = ["Admin", "Owner", "Developer"].includes(currentUser?.currentRole || currentUser?.role || "");
+  const isDeveloper = currentUser?.role === "Developer";
   const [syncAllConfirmOpen, setSyncAllConfirmOpen] = useState(false);
 
   const syncAllMutation = useMutation({
@@ -946,7 +947,7 @@ export default function Containers() {
         subtitle="Track containers and manage offloading"
       >
         <div className="flex gap-2 flex-wrap">
-          {isPrivilegedRole && (
+          {isDeveloper && (
             <Button
               variant="outline"
               className="gap-2"

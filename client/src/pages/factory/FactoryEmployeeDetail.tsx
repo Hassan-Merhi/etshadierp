@@ -88,6 +88,8 @@ function fmt(val: string | number | null | undefined) {
 
 export default function FactoryEmployeeDetail() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
+  const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
+  const isDeveloper = currentUser?.role === "Developer";
   const [, navigate] = useLocation();
   useEscapeToParent("/factory/payroll-hub?tab=employees");
   const [, params] = useRoute("/factory/employees/:id");
@@ -401,19 +403,21 @@ export default function FactoryEmployeeDetail() {
                 >
                   <Pencil className="h-3.5 w-3.5 mr-2" />Edit
                 </Button>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  size="sm"
-                  onClick={() => wrapAdminAction(() => recalcMutation.mutate(), "Recalculate Balance")}
-                  disabled={recalcMutation.isPending}
-                  data-testid="button-recalculate-balance"
-                >
-                  {recalcMutation.isPending
-                    ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                    : <RefreshCw className="h-3.5 w-3.5 mr-2" />}
-                  Recalculate
-                </Button>
+                {isDeveloper && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    size="sm"
+                    onClick={() => wrapAdminAction(() => recalcMutation.mutate(), "Recalculate Balance")}
+                    disabled={recalcMutation.isPending}
+                    data-testid="button-recalculate-balance"
+                  >
+                    {recalcMutation.isPending
+                      ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                      : <RefreshCw className="h-3.5 w-3.5 mr-2" />}
+                    Recalculate
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>

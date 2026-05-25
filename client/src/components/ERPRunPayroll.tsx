@@ -143,6 +143,9 @@ export default function ERPRunPayroll() {
   const [migrateResult, setMigrateResult] = useState<{ migrated: number; alreadyCorrect: number; noGroups: number; noVoucher: number; total: number } | null>(null);
 
   // ── Queries ───────────────────────────────────────────────────────────────
+  const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
+  const isDeveloper = currentUser?.role === "Developer";
+
   const { data: allEmployees, isLoading: empLoading } = useQuery<Employee[]>({
     queryKey: ["/api/employees", companyId],
   });
@@ -848,20 +851,22 @@ export default function ERPRunPayroll() {
             </div>
           ) : (
             <>
-            <div className="flex justify-end mb-3">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setMigrateConfirmOpen(true)}
-                disabled={migrateGroupExpensesMutation.isPending}
-                data-testid="button-migrate-group-expenses"
-              >
-                {migrateGroupExpensesMutation.isPending
-                  ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                  : <RefreshCw className="h-3.5 w-3.5 mr-2" />}
-                Fix Historical Runs
-              </Button>
-            </div>
+            {isDeveloper && (
+              <div className="flex justify-end mb-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setMigrateConfirmOpen(true)}
+                  disabled={migrateGroupExpensesMutation.isPending}
+                  data-testid="button-migrate-group-expenses"
+                >
+                  {migrateGroupExpensesMutation.isPending
+                    ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                    : <RefreshCw className="h-3.5 w-3.5 mr-2" />}
+                  Fix Historical Runs
+                </Button>
+              </div>
+            )}
             <div className="border rounded-md overflow-x-auto">
               <Table>
                 <TableHeader>

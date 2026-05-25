@@ -216,6 +216,9 @@ export default function FactoryWorkerDetail() {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [viewingDoc, setViewingDoc] = useState<FactoryWorkerDocument | null>(null);
 
+  const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
+  const isDeveloper = currentUser?.role === "Developer";
+
   const { data: tabSettings } = useQuery<any>({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => { const r = await fetch("/api/factory/settings"); return r.ok ? r.json() : {}; },
@@ -947,7 +950,7 @@ export default function FactoryWorkerDetail() {
                                         Pay
                                       </Button>
                                     )}
-                                    {(p.status === "PAID" || p.status === "APPROVED") && !p.cashAccountId && (
+                                    {isDeveloper && (p.status === "PAID" || p.status === "APPROVED") && !p.cashAccountId && (
                                       <Button
                                         size="icon"
                                         variant="ghost"
