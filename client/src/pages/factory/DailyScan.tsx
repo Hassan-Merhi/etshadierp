@@ -85,7 +85,7 @@ export default function DailyScan() {
     queryFn: () =>
       fetch(`/api/factory/daily-bale-scans/produced?date=${selectedDate}`, { credentials: "include" })
         .then((r) => r.json()),
-    refetchInterval: 4000,
+    refetchInterval: 10000,
   });
 
   const { data: scans = [], isLoading: loadingScans } = useQuery<DailyScanRow[]>({
@@ -93,7 +93,7 @@ export default function DailyScan() {
     queryFn: () =>
       fetch(`/api/factory/daily-bale-scans?date=${selectedDate}`, { credentials: "include" })
         .then((r) => r.json()),
-    refetchInterval: 4000,
+    refetchInterval: 10000,
   });
 
   const isLoading = loadingBales || loadingScans;

@@ -226,7 +226,7 @@ export default function FactoryContainerLoadingScan() {
       return res.json();
     },
     enabled: !!orderId,
-    refetchInterval: 5000,
+    refetchInterval: 15000,
   });
 
   const { data: baleRemovals = [] } = useQuery<BaleRemoval[]>({

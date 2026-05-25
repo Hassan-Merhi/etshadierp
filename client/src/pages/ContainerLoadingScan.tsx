@@ -133,7 +133,7 @@ export default function ContainerLoadingScan() {
       return res.json();
     },
     enabled: !!orderId,
-    refetchInterval: 5000,
+    refetchInterval: 15000,
   });
 
   // Auto-select location when there is only one option

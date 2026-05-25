@@ -184,7 +184,7 @@ function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => void })
       if (!r.ok) throw new Error("Failed to fetch load detail");
       return r.json();
     },
-    refetchInterval: 8000,
+    refetchInterval: 30000,
   });
 
   const scanMutation = useMutation({
