@@ -348,7 +348,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   // Suppliers and customers are deferred until the user opens an account picker
   // or an existing voucher is being edited. Declared before the queries so we
   // can reference it in the enabled flags.
-  const [accountPickersNeeded, setAccountPickersNeeded] = useState(false);
+  // Lazy initializer: when voucherIdToEdit is already in the URL on mount
+  // (edit mode), start as true so suppliers/customers fetch on the FIRST
+  // render — before the hydration effect runs — avoiding a hydration race.
+  const [accountPickersNeeded, setAccountPickersNeeded] = useState(() => !!voucherIdToEdit);
 
   const isFactoryMode = appMode === "factory";
   const visibleSidebarGroups = isFactoryMode
