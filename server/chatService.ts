@@ -3,6 +3,18 @@ import OpenAI from "openai";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import { eq, and, desc, sql, lt, gt, gte, isNull, asc, ilike, or, inArray } from "drizzle-orm";
+import {
+  searchStockItems,
+  getStockByLocation,
+  searchSuppliers,
+  searchCustomers,
+  searchLedgerAccounts,
+  searchVouchers,
+  getLowStockItems,
+  getPricingHealth,
+  getSalesForItem,
+  getBusinessSummary,
+} from "./aiTools";
 
 // AI Provider types
 type AIProvider = "gemini" | "chatgpt" | "grok";
@@ -1379,6 +1391,205 @@ function buildActionSystemPrompt(intent: ChatIntent, pageContext?: { currentRout
   return base;
 }
 
+// Intents served by targeted tool queries — no full ERP context needed
+const TOOL_INTENTS = new Set<ChatIntent>([
+  "inventory_query",
+  "supplier_query",
+  "customer_query",
+  "sales_query",
+  "business_summary",
+]);
+
+// Extract meaningful search keywords from a user message, dropping stop words
+function extractSearchTerm(message: string): string {
+  const STOP = new Set([
+    "what","how","much","many","is","are","was","were","the","for","about",
+    "do","we","have","show","me","find","get","list","all","any","can","you",
+    "our","in","at","of","and","or","a","an","to","from","with","this","that",
+    "stock","items","item","supply","supplies","customer","customers",
+    "supplier","suppliers","voucher","vouchers","account","accounts",
+    "inventory","balance","please","tell","give","price","prices",
+  ]);
+  return message
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !STOP.has(w))
+    .slice(0, 4)
+    .join(" ");
+}
+
+// Load only the data relevant to the classified intent
+async function loadToolData(
+  intent: ChatIntent,
+  companyId: number,
+  userMessage: string,
+): Promise<Record<string, any>> {
+  const term = extractSearchTerm(userMessage) || userMessage.slice(0, 60);
+
+  switch (intent) {
+    case "inventory_query": {
+      const [items, lowStock] = await Promise.all([
+        searchStockItems(companyId, term, 20),
+        getLowStockItems(companyId, 10),
+      ]);
+      // If a single item was found, add its per-location breakdown
+      let locationBreakdown: any[] = [];
+      if (items.length === 1) {
+        locationBreakdown = await getStockByLocation(companyId, items[0].id);
+      }
+      return { items, lowStock, locationBreakdown };
+    }
+
+    case "supplier_query": {
+      const suppliers = await searchSuppliers(companyId, term, 15);
+      return { suppliers };
+    }
+
+    case "customer_query": {
+      const customers = await searchCustomers(companyId, term, 15);
+      return { customers };
+    }
+
+    case "sales_query": {
+      const [summary, items] = await Promise.all([
+        getBusinessSummary(companyId),
+        searchStockItems(companyId, term, 5),
+      ]);
+      let salesHistory: any[] = [];
+      if (items.length > 0) {
+        salesHistory = await getSalesForItem(companyId, items[0].id, 20);
+      }
+      return { summary, matchedItems: items, salesHistory };
+    }
+
+    case "business_summary": {
+      const [summary, lowStock, pricingHealth] = await Promise.all([
+        getBusinessSummary(companyId),
+        getLowStockItems(companyId, 5),
+        getPricingHealth(companyId, 5),
+      ]);
+      return { summary, lowStock, pricingHealth };
+    }
+
+    default:
+      return {};
+  }
+}
+
+// Build a focused system prompt from tool data (much smaller than full ERP context)
+function buildToolSystemPrompt(
+  intent: ChatIntent,
+  data: Record<string, any>,
+  pageContext?: { currentRoute?: string; entityType?: string; entityId?: number; entityName?: string },
+): string {
+  const today = new Date().toISOString().slice(0, 10);
+  let prompt = `You are ERP Assistant, an AI for a business ERP/POS system. Today is ${today}.`;
+  if (pageContext?.currentRoute) prompt += ` The user is on page: ${pageContext.currentRoute}.`;
+  prompt += `\nAnswer the user's question using ONLY the data below. Be concise and accurate.\n`;
+
+  switch (intent) {
+    case "inventory_query": {
+      const { items, lowStock, locationBreakdown } = data;
+      prompt += `\n## INVENTORY DATA (real-time):\n`;
+      if (items.length === 0) {
+        prompt += "No matching stock items found.\n";
+      } else {
+        prompt += items.map((i: any) =>
+          `- ${i.name} (${i.code}): qty=${i.totalQty}, sellingPrice=${i.sellingPrice}, avgCost=${i.avgCost}, value=${i.totalValue}, pricing=${i.pricingStatus}`
+        ).join("\n") + "\n";
+      }
+      if (locationBreakdown.length > 0) {
+        prompt += `\n## LOCATION BREAKDOWN for ${items[0]?.name}:\n`;
+        prompt += locationBreakdown.map((l: any) =>
+          `- ${l.location}: qty=${l.quantity}, avgCost=${l.avgCost}, value=${l.totalValue}`
+        ).join("\n") + "\n";
+      }
+      if (lowStock.length > 0) {
+        prompt += `\n## LOW STOCK ALERTS (${lowStock.length} items):\n`;
+        prompt += lowStock.map((i: any) =>
+          `- ${i.name} (${i.code}): qty=${i.qty}, reorderLevel=${i.reorderLevel}, status=${i.status}`
+        ).join("\n") + "\n";
+      }
+      break;
+    }
+
+    case "supplier_query": {
+      const { suppliers } = data;
+      prompt += `\n## SUPPLIER DATA:\n`;
+      if (suppliers.length === 0) {
+        prompt += "No matching suppliers found.\n";
+      } else {
+        prompt += suppliers.map((s: any) =>
+          `- ${s.name} (${s.code}): phone=${s.phone || "—"}, email=${s.email || "—"}, openingBalance=${s.openingBalance}`
+        ).join("\n") + "\n";
+      }
+      break;
+    }
+
+    case "customer_query": {
+      const { customers } = data;
+      prompt += `\n## CUSTOMER DATA:\n`;
+      if (customers.length === 0) {
+        prompt += "No matching customers found.\n";
+      } else {
+        prompt += customers.map((c: any) =>
+          `- ${c.name} (${c.code}): phone=${c.phone || "—"}`
+        ).join("\n") + "\n";
+      }
+      break;
+    }
+
+    case "sales_query": {
+      const { summary, matchedItems, salesHistory } = data;
+      prompt += `\n## SALES SUMMARY:\n`;
+      prompt += `Today (${summary.today.date}): revenue=${summary.today.revenue}, profit=${summary.today.profit}, margin=${summary.today.margin}, transactions=${summary.today.transactions}\n`;
+      prompt += `This Month (since ${summary.thisMonth.monthStart}): revenue=${summary.thisMonth.revenue}, profit=${summary.thisMonth.profit}, margin=${summary.thisMonth.margin}, transactions=${summary.thisMonth.transactions}\n`;
+      if (summary.topItemsThisMonth.length > 0) {
+        prompt += `\nTop items this month:\n`;
+        prompt += summary.topItemsThisMonth.map((i: any) =>
+          `- ${i.name}: revenue=${i.revenue}, profit=${i.profit}, qty=${i.qty}`
+        ).join("\n") + "\n";
+      }
+      if (matchedItems.length > 0) {
+        prompt += `\n## MATCHED ITEM: ${matchedItems[0].name} (${matchedItems[0].code})\n`;
+        prompt += `Current stock: qty=${matchedItems[0].totalQty}, sellingPrice=${matchedItems[0].sellingPrice}, avgCost=${matchedItems[0].avgCost}\n`;
+      }
+      if (salesHistory.length > 0) {
+        prompt += `\nRecent sales history for this item:\n`;
+        prompt += salesHistory.slice(0, 10).map((s: any) =>
+          `- ${s.date} | ${s.voucherNumber} | qty=${s.qty} | price=${s.sellingPrice} | cost=${s.costPrice} | profit=${s.profit}`
+        ).join("\n") + "\n";
+      }
+      break;
+    }
+
+    case "business_summary": {
+      const { summary, lowStock, pricingHealth } = data;
+      prompt += `\n## BUSINESS SUMMARY:\n`;
+      prompt += `Today (${summary.today.date}): revenue=${summary.today.revenue}, cost=${summary.today.cost}, profit=${summary.today.profit}, margin=${summary.today.margin}, transactions=${summary.today.transactions}\n`;
+      prompt += `This Month (since ${summary.thisMonth.monthStart}): revenue=${summary.thisMonth.revenue}, cost=${summary.thisMonth.cost}, profit=${summary.thisMonth.profit}, margin=${summary.thisMonth.margin}, transactions=${summary.thisMonth.transactions}\n`;
+      prompt += `Open Purchase Orders: ${summary.openPurchaseOrders}\n`;
+      if (summary.topItemsThisMonth.length > 0) {
+        prompt += `\nTop items this month:\n`;
+        prompt += summary.topItemsThisMonth.map((i: any) =>
+          `- ${i.name}: revenue=${i.revenue}, profit=${i.profit}, qty=${i.qty}`
+        ).join("\n") + "\n";
+      }
+      if (lowStock.length > 0) {
+        prompt += `\nLow stock alerts (${lowStock.length} items): ${lowStock.map((i: any) => `${i.name} (${i.qty} left)`).join(", ")}\n`;
+      }
+      if (pricingHealth.filter((i: any) => i.status === "LOSING").length > 0) {
+        const losing = pricingHealth.filter((i: any) => i.status === "LOSING");
+        prompt += `\nPricing issues — selling below cost: ${losing.map((i: any) => `${i.name} (gap=${i.priceGap})`).join(", ")}\n`;
+      }
+      break;
+    }
+  }
+
+  return prompt;
+}
+
 export async function chat(
   userMessage: string,
   companyId: number,
@@ -1413,7 +1624,15 @@ export async function chat(
       systemPrompt = buildActionSystemPrompt(intent, pageContext);
       suggestions = [];
       console.log("[ChatService] Skipping getERPContext for action intent");
+    } else if (TOOL_INTENTS.has(intent)) {
+      // Tool intents: targeted DB queries, no full ERP context
+      const toolStart = Date.now();
+      const toolData = await loadToolData(intent, companyId, userMessage);
+      console.log(`[ChatService] Tool data loaded in ${Date.now() - toolStart}ms for intent "${intent}"`);
+      systemPrompt = buildToolSystemPrompt(intent, toolData, pageContext);
+      suggestions = [];
     } else {
+      // General / unclassified: load full cached ERP context
       const ctxStart = Date.now();
       context = await getCachedERPContext(companyId);
       console.log(`[ChatService] Context ready in ${Date.now() - ctxStart}ms (company ${companyId})`);
