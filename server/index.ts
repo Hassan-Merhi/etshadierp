@@ -354,6 +354,8 @@ let migrationsDone = false;
     // ── Add missing columns to existing tables ─────────────────────────────────
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS hidden_erp_cost_fields text[] NOT NULL DEFAULT '{}'`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS chatbot_enabled boolean NOT NULL DEFAULT false`,
+    // Enable chatbot for all existing users (column was added with DEFAULT false — flip to opt-out model)
+    `UPDATE users SET chatbot_enabled = true WHERE chatbot_enabled = false`,
     `ALTER TABLE user_company_roles ADD COLUMN IF NOT EXISTS can_sell_negative_stock boolean NOT NULL DEFAULT false`,
     `ALTER TABLE user_company_roles ADD COLUMN IF NOT EXISTS daybook_edit_days integer NOT NULL DEFAULT 0`,
     `ALTER TABLE user_company_roles ADD COLUMN IF NOT EXISTS can_access_customers boolean NOT NULL DEFAULT false`,

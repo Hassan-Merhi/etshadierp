@@ -132,7 +132,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   active: boolean("active").notNull().default(true),
-  chatbotEnabled: boolean("chatbot_enabled").notNull().default(false),
+  chatbotEnabled: boolean("chatbot_enabled").notNull().default(true),
   hiddenErpCostFields: text("hidden_erp_cost_fields").array().notNull().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
