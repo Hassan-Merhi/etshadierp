@@ -394,11 +394,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     queryKey: ["/api/ledger-accounts", selectedCompany?.id],
   });
 
-  // Suppliers and customers are only needed when hydrating an existing voucher for editing.
-  // When creating a new voucher the AccountCombobox fetches them on-demand via ?search=.
+  // Suppliers and customers are used in allAccounts (payment, receipt, and journal pickers).
+  // staleTime prevents redundant re-fetches when the user navigates back to this page.
+  // Full lazy-load is tracked in follow-up task #10 (requires combobox-level search wiring).
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers", selectedCompany?.id],
-    enabled: !!voucherIdToEdit,
+    enabled: !!selectedCompany,
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: factorySuppliersList = [] } = useQuery<FactorySupplierBasic[]>({
@@ -408,7 +410,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers", selectedCompany?.id],
-    enabled: !!voucherIdToEdit,
+    enabled: !!selectedCompany,
+    staleTime: 5 * 60 * 1000,
   });
 
   // Only load stock items and locations when the user is on a tab that needs them.
