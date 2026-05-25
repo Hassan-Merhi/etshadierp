@@ -23,10 +23,17 @@ import { format } from "date-fns";
 import { z } from "zod";
 
 export function registerSupplierRoutes(app: Express) {
-  app.get("/api/suppliers", requireAuth, async (_req, res) => {
+  app.get("/api/suppliers", requireAuth, async (req, res) => {
     try {
-      const suppliers = await storage.getAllSuppliers();
-      res.json(suppliers);
+      const search = (req.query.search as string | undefined)?.trim();
+      let result = await storage.getAllSuppliers();
+      if (search) {
+        const term = search.toLowerCase();
+        result = result
+          .filter((s) => s.legalName.toLowerCase().includes(term))
+          .slice(0, 50);
+      }
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

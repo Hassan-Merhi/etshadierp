@@ -407,12 +407,17 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     queryKey: ["/api/customers", selectedCompany?.id],
   });
 
+  // Only load stock items and locations when the user is on a tab that needs them.
+  // The default tab is "payment" — deferring these avoids 2 large queries on every page open.
+  const needsStockData = isPOS || activeTab === "transfer" || activeTab === "transferorder" || activeTab === "adjustment";
   const { data: stockItems = [] } = useQuery<StockItem[]>({
     queryKey: ["/api/stock-items", selectedCompany?.id],
+    enabled: needsStockData,
   });
 
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations", selectedCompany?.id],
+    enabled: needsStockData,
   });
 
   // Get POS user's location name for auto-populating source location

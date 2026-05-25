@@ -396,7 +396,8 @@ export default function Analytics() {
     setStockGroupItems(new Map());
   };
 
-  // Fetch reference data
+  // Fetch reference data — locations and stock groups are shared across sections.
+  // staleTime avoids redundant refetches when the user navigates between sections.
   const { data: locations = [] } = useQuery<Location[]>({ 
     queryKey: ["/api/locations", selectedCompany?.id],
     queryFn: async ({ queryKey }) => {
@@ -405,6 +406,7 @@ export default function Analytics() {
       return response.json();
     },
     enabled: !!selectedCompany,
+    staleTime: 5 * 60 * 1000,
   });
   const { data: stockGroups = [] } = useQuery<StockGroup[]>({ 
     queryKey: ["/api/stock-groups", selectedCompany?.id],
@@ -414,7 +416,9 @@ export default function Analytics() {
       return response.json();
     },
     enabled: !!selectedCompany,
+    staleTime: 5 * 60 * 1000,
   });
+  // Suppliers are only used in the Container Report filter — defer until that section opens.
   const { data: suppliers = [] } = useQuery<Supplier[]>({ 
     queryKey: ["/api/suppliers", selectedCompany?.id],
     queryFn: async ({ queryKey }) => {
@@ -422,7 +426,8 @@ export default function Analytics() {
       if (!response.ok) throw new Error("Failed to fetch suppliers");
       return response.json();
     },
-    enabled: !!selectedCompany,
+    enabled: !!selectedCompany && activeSection === "containers",
+    staleTime: 5 * 60 * 1000,
   });
 
   // Fetch all accounts (with optional date filter for balance sections)
