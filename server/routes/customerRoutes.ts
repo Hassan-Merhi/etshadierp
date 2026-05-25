@@ -44,14 +44,9 @@ export function registerCustomerRoutes(app: Express) {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      const search = (req.query.search as string | undefined)?.trim();
-      let result = await storage.getAllCustomers(req.session.currentCompanyId);
-      if (search) {
-        const term = search.toLowerCase();
-        result = result
-          .filter((c) => c.legalName.toLowerCase().includes(term))
-          .slice(0, 50);
-      }
+      const search = (req.query.search as string | undefined)?.trim() || undefined;
+      const limit = search ? 50 : undefined;
+      const result = await storage.getAllCustomers(req.session.currentCompanyId, search, limit);
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

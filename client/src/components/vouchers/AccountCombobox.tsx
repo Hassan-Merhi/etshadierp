@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -13,7 +13,8 @@ export function AccountCombobox({
   onChange,
   ledgerAccounts,
   bankAccounts,
-  suppliers,
+  suppliers: suppliersProp = [],
+  customers: customersProp = [],
   rowIndex,
   onFocus,
   onKeyDown,
@@ -23,14 +24,65 @@ export function AccountCombobox({
   onChange: (type: "ledger" | "bank" | "supplier" | "customer", id: number, name: string) => void;
   ledgerAccounts: LedgerAccount[];
   bankAccounts: BankAccount[];
-  suppliers: Supplier[];
-  customers: Customer[];
+  suppliers?: Supplier[];
+  customers?: Customer[];
   rowIndex: number;
   onFocus?: () => void;
   onKeyDown?: (e: React.KeyboardEvent) => void;
   testIdPrefix?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const { selectedCompany } = useCompany();
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(debounceRef.current);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (!open) {
+      setSearchTerm("");
+      setDebouncedSearch("");
+    }
+  }, [open]);
+
+  const ownFetchMode = open && suppliersProp.length === 0;
+  const canSearch = ownFetchMode && debouncedSearch.length >= 2;
+
+  const { data: fetchedSuppliers = [] } = useQuery<Supplier[]>({
+    queryKey: ["/api/suppliers", selectedCompany?.id, "combobox", debouncedSearch],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/suppliers?search=${encodeURIComponent(debouncedSearch)}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: canSearch,
+    staleTime: 60_000,
+  });
+
+  const { data: fetchedCustomers = [] } = useQuery<Customer[]>({
+    queryKey: ["/api/customers", selectedCompany?.id, "combobox", debouncedSearch],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/customers?search=${encodeURIComponent(debouncedSearch)}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: canSearch,
+    staleTime: 60_000,
+  });
+
+  const suppliers = suppliersProp.length > 0 ? suppliersProp : fetchedSuppliers;
+  const customers = customersProp.length > 0 ? customersProp : fetchedCustomers;
 
   const allAccounts = [
     ...ledgerAccounts.map((a) => ({
@@ -51,9 +103,11 @@ export function AccountCombobox({
     ...customers.map((c) => ({
       type: "customer" as const,
       id: c.id,
-      name: c.name,
+      name: (c as any).legalName || (c as any).name || "",
     })),
-  ].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  ].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+  const showSearchHint = ownFetchMode && searchTerm.length < 2;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -73,9 +127,20 @@ export function AccountCombobox({
       </PopoverTrigger>
       <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[400px] p-0 bg-popover text-popover-foreground">
         <Command className="bg-popover text-popover-foreground">
-          <CommandInput placeholder="Search accounts..." className="bg-popover text-popover-foreground" />
+          <CommandInput
+            placeholder={ownFetchMode ? "Type name to search..." : "Search accounts..."}
+            className="bg-popover text-popover-foreground"
+            value={searchTerm}
+            onValueChange={setSearchTerm}
+          />
           <CommandList className="bg-popover text-popover-foreground">
-            <CommandEmpty>No account found.</CommandEmpty>
+            {showSearchHint ? (
+              <p className="px-4 py-3 text-sm text-muted-foreground">
+                Type at least 2 characters to search suppliers or customers.
+              </p>
+            ) : (
+              <CommandEmpty>No account found.</CommandEmpty>
+            )}
             <CommandGroup>
               {allAccounts.map((account) => (
                 <CommandItem

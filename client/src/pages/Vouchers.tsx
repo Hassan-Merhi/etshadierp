@@ -394,8 +394,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     queryKey: ["/api/ledger-accounts", selectedCompany?.id],
   });
 
+  // Suppliers and customers are only needed when hydrating an existing voucher for editing.
+  // When creating a new voucher the AccountCombobox fetches them on-demand via ?search=.
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers", selectedCompany?.id],
+    enabled: !!voucherIdToEdit,
   });
 
   const { data: factorySuppliersList = [] } = useQuery<FactorySupplierBasic[]>({
@@ -405,6 +408,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers", selectedCompany?.id],
+    enabled: !!voucherIdToEdit,
   });
 
   // Only load stock items and locations when the user is on a tab that needs them.

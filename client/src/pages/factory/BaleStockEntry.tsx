@@ -177,10 +177,16 @@ import DailyScan from "./DailyScan";
     const isAdmin = ["Admin", "Owner", "Developer"].includes(currentUser?.role || "");
     const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
     const { data: categories } = useQuery<FactoryCategory[]>({ queryKey: ["/api/factory/categories"] });
-    const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/factory/workers"] });
+    // Workers and their category groups are only needed when the user has items in the cart
+    // (worker assignment appears per cart item). Deferring avoids loading this large list upfront.
+    const { data: workers = [] } = useQuery<any[]>({
+      queryKey: ["/api/factory/workers"],
+      enabled: cart.length > 0,
+    });
     const { data: workerCategoryGroups = [] } = useQuery<any[]>({
       queryKey: ["/api/factory/worker-categories"],
       queryFn: () => fetch("/api/factory/worker-categories", { credentials: "include" }).then(r => r.json()),
+      enabled: cart.length > 0,
     });
     const { data: allCustomers = [] } = useQuery<any[]>({
       queryKey: ["/api/factory/customers"],

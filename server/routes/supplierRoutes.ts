@@ -25,14 +25,9 @@ import { z } from "zod";
 export function registerSupplierRoutes(app: Express) {
   app.get("/api/suppliers", requireAuth, async (req, res) => {
     try {
-      const search = (req.query.search as string | undefined)?.trim();
-      let result = await storage.getAllSuppliers();
-      if (search) {
-        const term = search.toLowerCase();
-        result = result
-          .filter((s) => s.legalName.toLowerCase().includes(term))
-          .slice(0, 50);
-      }
+      const search = (req.query.search as string | undefined)?.trim() || undefined;
+      const limit = search ? 50 : undefined;
+      const result = await storage.getAllSuppliers(search, limit);
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

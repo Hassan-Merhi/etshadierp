@@ -468,6 +468,7 @@ export default function Accounts() {
       enabled: !!selectedCompany,
     });
 
+  // Bank accounts are only needed in the account detail/edit views — not the initial list.
   const { data: bankAccounts = [], isLoading: bankAccountsLoading } = useQuery<
     BankAccount[]
   >({
@@ -483,7 +484,7 @@ export default function Accounts() {
       if (!response.ok) throw new Error("Failed to fetch bank accounts");
       return await response.json();
     },
-    enabled: !!selectedCompany,
+    enabled: !!selectedCompany && (!!selectedAccount || !!bankToEdit || !!accountToEdit),
   });
 
   const isFactorySupplierAccount = selectedAccount?.type === "factorySupplier";

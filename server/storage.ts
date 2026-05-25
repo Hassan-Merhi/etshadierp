@@ -1,4 +1,4 @@
-import { eq, and, or, sql, inArray, desc, ne, isNull, isNotNull, asc } from "drizzle-orm";
+import { eq, and, or, sql, inArray, desc, ne, isNull, isNotNull, asc, ilike } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import { adjustInventory } from "./inventoryHelper";
@@ -106,7 +106,7 @@ export interface IStorage {
   removeEmployeeFromGroup(groupId: number, employeeId: number): Promise<void>;
 
   // Suppliers
-  getAllSuppliers(): Promise<Supplier[]>;
+  getAllSuppliers(search?: string, limit?: number): Promise<Supplier[]>;
   getSupplierByCode(code: string): Promise<Supplier | undefined>;
   getSupplierById(id: number): Promise<Supplier | undefined>;
   createSupplier(supplier: InsertSupplier): Promise<Supplier>;
@@ -272,7 +272,7 @@ export interface IStorage {
   getVoucherHistoryForItem(stockItemId: number, companyId: number): Promise<any[]>;
 
   // Customers
-  getAllCustomers(companyId: number): Promise<schema.Customer[]>;
+  getAllCustomers(companyId: number, search?: string, limit?: number): Promise<schema.Customer[]>;
   getCustomerById(id: number): Promise<schema.Customer | undefined>;
   getCustomerByCode(code: string, companyId: number): Promise<schema.Customer | undefined>;
   createCustomer(customer: schema.InsertCustomer): Promise<schema.Customer>;
@@ -1029,10 +1029,18 @@ export class DbStorage implements IStorage {
   }
 
   // Suppliers
-  async getAllSuppliers(): Promise<Supplier[]> {
-    return await db.select().from(schema.suppliers)
-      .where(isNull(schema.suppliers.deletedAt))
-      .orderBy(asc(schema.suppliers.legalName));
+  async getAllSuppliers(search?: string, limit?: number): Promise<Supplier[]> {
+    const conditions: any[] = [isNull(schema.suppliers.deletedAt)];
+    if (search) {
+      conditions.push(ilike(schema.suppliers.legalName, `%${search}%`));
+    }
+    let query = db.select().from(schema.suppliers)
+      .where(conditions.length === 1 ? conditions[0] : and(...conditions))
+      .orderBy(asc(schema.suppliers.legalName)) as any;
+    if (limit) {
+      query = query.limit(limit);
+    }
+    return await query;
   }
 
   async getSupplierByCode(code: string): Promise<Supplier | undefined> {
@@ -5379,10 +5387,21 @@ export class DbStorage implements IStorage {
   }
 
   // Customer Methods
-  async getAllCustomers(companyId: number): Promise<schema.Customer[]> {
-    return await db.select().from(schema.customers)
-      .where(and(eq(schema.customers.companyId, companyId), isNull(schema.customers.deletedAt)))
-      .orderBy(schema.customers.legalName);
+  async getAllCustomers(companyId: number, search?: string, limit?: number): Promise<schema.Customer[]> {
+    const conditions: any[] = [
+      eq(schema.customers.companyId, companyId),
+      isNull(schema.customers.deletedAt),
+    ];
+    if (search) {
+      conditions.push(ilike(schema.customers.legalName, `%${search}%`));
+    }
+    let query = db.select().from(schema.customers)
+      .where(and(...conditions))
+      .orderBy(schema.customers.legalName) as any;
+    if (limit) {
+      query = query.limit(limit);
+    }
+    return await query;
   }
 
   async getCustomerById(id: number): Promise<schema.Customer | undefined> {
