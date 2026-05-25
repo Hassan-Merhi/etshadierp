@@ -281,6 +281,28 @@ export function registerImportRoutes(app: Express) {
         return acc;
       }, {});
 
+      // Auto-generate a PO number if the Excel PO Number column was blank
+      if (poGroups[""]) {
+        const year = new Date().getFullYear();
+        const prefix = `PO-${year}-`;
+        const companyId = req.session.currentCompanyId!;
+        const existingPoRows = await db
+          .select({ poNumber: purchaseOrders.poNumber })
+          .from(purchaseOrders)
+          .where(and(
+            eq(purchaseOrders.companyId, companyId),
+            like(purchaseOrders.poNumber, `${prefix}%`),
+          ));
+        let maxSeq = 0;
+        for (const { poNumber: pn } of existingPoRows) {
+          const n = parseInt(pn.slice(prefix.length), 10);
+          if (!isNaN(n) && n > maxSeq) maxSeq = n;
+        }
+        const generatedPoNumber = `${prefix}${String(maxSeq + 1).padStart(3, "0")}`;
+        poGroups[generatedPoNumber] = poGroups[""];
+        delete poGroups[""];
+      }
+
       // Get fresh stock items data for barcode lookup during import
       const freshStockItems = await storage.getAllStockItems(
         req.session.currentCompanyId!,
