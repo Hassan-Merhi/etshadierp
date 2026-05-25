@@ -345,6 +345,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   );
   const [editVoucherId, setEditVoucherId] = useState<number | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  // Suppliers and customers are deferred until the user opens an account picker
+  // or an existing voucher is being edited. Declared before the queries so we
+  // can reference it in the enabled flags.
+  const [accountPickersNeeded, setAccountPickersNeeded] = useState(false);
 
   const isFactoryMode = appMode === "factory";
   const visibleSidebarGroups = isFactoryMode
@@ -394,12 +398,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     queryKey: ["/api/ledger-accounts", selectedCompany?.id],
   });
 
-  // Suppliers and customers are used in allAccounts (payment, receipt, and journal pickers).
-  // staleTime prevents redundant re-fetches when the user navigates back to this page.
-  // Full lazy-load is tracked in follow-up task #10 (requires combobox-level search wiring).
+  // Suppliers and customers are deferred until the user opens an account picker
+  // (payment sidebar, receipt sidebar, or journal entry row) or edits an
+  // existing voucher. Two useEffects below set accountPickersNeeded when those
+  // triggers fire; staleTime prevents re-fetches on subsequent navigation.
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers", selectedCompany?.id],
-    enabled: !!selectedCompany,
+    enabled: accountPickersNeeded && !!selectedCompany,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -410,7 +415,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers", selectedCompany?.id],
-    enabled: !!selectedCompany,
+    enabled: accountPickersNeeded && !!selectedCompany,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -444,6 +449,25 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const { data: fixedAssets = [] } = useQuery<FixedAsset[]>({
     queryKey: ["/api/fixed-assets", selectedCompany?.id],
   });
+
+  // Activate supplier/customer loading when editing an existing voucher.
+  useEffect(() => {
+    if (voucherIdToEdit) setAccountPickersNeeded(true);
+  }, [voucherIdToEdit]);
+
+  // Activate when any entry row becomes active (entry rows always expose the
+  // account picker). activeRowIndex is declared before the queries so is safe here.
+  useEffect(() => {
+    if (activeRowIndex !== null) setAccountPickersNeeded(true);
+  }, [activeRowIndex]);
+
+  // Activate supplier/customer loading when the payment/receipt account sidebar
+  // opens — sidebarSearchValue is set (to the current account name or "") when the
+  // user focuses the account-name input inside PaymentReceiptTab/VoucherEntriesTable.
+  // Also covers the "pay from" sidebar opening when user types to search.
+  useEffect(() => {
+    if (sidebarSearchValue !== "") setAccountPickersNeeded(true);
+  }, [sidebarSearchValue]);
 
   // Fetch accounts for sidebar (with balances)
   const { data: sidebarAccounts = [] } = useQuery<Account[]>({
@@ -3964,6 +3988,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               originalTotal={originalTotal}
               isPending={saveMutation.isPending}
               voucherNumber={voucherToEdit?.voucherNumber}
+              onAccountPickerOpen={() => setAccountPickersNeeded(true)}
             />
           </div>
         )}
@@ -4030,6 +4055,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               originalTotal={originalTotal}
               isPending={saveMutation.isPending}
               voucherNumber={voucherToEdit?.voucherNumber}
+              onAccountPickerOpen={() => setAccountPickersNeeded(true)}
             />
           </div>
         )}
@@ -4140,6 +4166,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   setJournalAccountHighlightedIndex(0);
                                 }}
                                 onFocus={() => {
+                                  setAccountPickersNeeded(true);
                                   setActiveJournalRow(index);
                                   setShowAccountSidebar(true);
                                   setJournalAccountSearchTerm("");
@@ -4355,6 +4382,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                               setJournalAccountHighlightedIndex(0);
                                             }}
                                             onFocus={() => {
+                                              setAccountPickersNeeded(true);
                                               setActiveJournalRow(index);
                                               setShowAccountSidebar(true);
                                               setJournalAccountSearchTerm("");

@@ -90,6 +90,7 @@ export interface PaymentReceiptTabProps {
   originalTotal?: number;
   isPending?: boolean;
   voucherNumber?: string;
+  onAccountPickerOpen?: () => void;
 }
 
 export function PaymentReceiptTab({
@@ -127,6 +128,7 @@ export function PaymentReceiptTab({
   originalTotal = 0,
   isPending = false,
   voucherNumber,
+  onAccountPickerOpen,
 }: PaymentReceiptTabProps) {
   const { formatAmount } = useCurrencyContext();
   const { formatDisplayDate } = useDateFormat();
@@ -332,7 +334,10 @@ export function PaymentReceiptTab({
                           {/* onFocus on the wrapper detects when the pay-from autocomplete is active */}
                           <div
                             className="w-full min-w-0"
-                            onFocus={() => setPayFromActive(true)}
+                            onFocus={() => {
+                              setPayFromActive(true);
+                              onAccountPickerOpen?.();
+                            }}
                           >
                             <AccountAutocomplete
                               value={
