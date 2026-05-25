@@ -172,6 +172,32 @@ async function callAIWithFallback(
   throw lastError || new Error("No AI providers available");
 }
 
+// ── Intent types ──────────────────────────────────────────────────────────────
+type ChatIntent =
+  | "create_voucher"
+  | "create_stock_adjustment"
+  | "create_stock_transfer"
+  | "create_stock_item"
+  | "price_update"
+  | "search_voucher"
+  | "account_query"
+  | "inventory_query"
+  | "supplier_query"
+  | "customer_query"
+  | "sales_query"
+  | "excel_import"
+  | "business_summary"
+  | "general";
+
+// ── Module-level intent regexes (shared between classifyChatIntent + chat) ────
+const RE_VOUCHER = /\b(create|make|record|add|post|enter|book)\b.{0,80}\b(payment|receipt|journal|voucher|entry|invoice|transaction)\b|\b(pay|paid|receive[d]?|collect[ed]?|transfer[red]?|deposit[ed]?)\b.{0,60}\$?\d|\b(journal|receipt|payment)\b.{0,40}\$?\d/i;
+const RE_STOCK_ADJ = /\b(produce|producing|production|consume|consuming|consumption|stock\s+adjust|adjust\s+stock|record\s+production|record\s+consumption|produced|consumed)\b/i;
+const RE_STOCK_TRANSFER = /\b(transfer|move|shift)\b.{0,80}\b(stock|item|inventory)\b|\b(stock|item|inventory)\b.{0,60}\b(transfer|move|shift)\b|\btransfer\b.{0,40}\bfrom\b.{0,40}\bto\b/i;
+const RE_STOCK_ITEM_CREATE = /\b(create\s+(a\s+)?stock\s+item|add\s+(a\s+)?stock\s+item|new\s+stock\s+item|create\s+(a\s+)?new\s+item|add\s+(a\s+)?new\s+item|new\s+item)\b/i;
+const RE_PRICE_UPDATE = /\b(update.*price|change.*price|set.*price|price.*to|price.*for|update.*selling|change.*selling|new price|price list)\b/i;
+const RE_VOUCHER_SEARCH = /\b(when did (i|we) pay|find (the )?(payment|receipt|voucher|transaction)|search (for )?(voucher|payment|receipt)|show (me )?(the )?(voucher|payment|receipt)|paid for|receipt for|voucher for|payment (for|of)|what voucher|which voucher|show.*payment.*for|show.*receipt.*for)\b/i;
+const RE_ACCOUNT_QUERY = /\b(balance of|account.*balance|how much.*account|account.*how much|what.*balance|balance.*account|when did.*account|account.*transactions|transactions.*account|paid.*from account|received.*account|when.*balance.*was|balance.*was.*when|ledger.*balance|account.*paid|account.*received)\b/i;
+
 interface ERPContext {
   dataFetchedAt: string; // ISO timestamp when data was fetched
   inventory: any[];
@@ -1254,6 +1280,72 @@ function generateQuickSuggestions(context: ERPContext): string[] {
   return suggestions.slice(0, 6);
 }
 
+// ── Intent classifier (pure keyword/regex — no AI call) ───────────────────────
+function classifyChatIntent(
+  userMessage: string,
+  _pageContext?: { currentRoute?: string; entityType?: string; entityId?: number; entityName?: string }
+): ChatIntent {
+  // Action intents — checked in priority order
+  if (RE_STOCK_ADJ.test(userMessage)) return "create_stock_adjustment";
+  if (RE_STOCK_ITEM_CREATE.test(userMessage)) return "create_stock_item";
+  // Transfer before voucher — "transfer stock" should not match voucher keywords
+  if (RE_STOCK_TRANSFER.test(userMessage) && !RE_VOUCHER.test(userMessage)) return "create_stock_transfer";
+  if (RE_VOUCHER_SEARCH.test(userMessage)) return "search_voucher";
+  if (RE_ACCOUNT_QUERY.test(userMessage)) return "account_query";
+  if (RE_PRICE_UPDATE.test(userMessage)) return "price_update";
+  if (RE_VOUCHER.test(userMessage)) return "create_voucher";
+
+  // Query intents that need broad context
+  if (/\b(excel|import|export|template|download.*excel)\b/i.test(userMessage)) return "excel_import";
+  if (/\b(summary|overview|dashboard|today.{0,20}business|how.{0,15}doing|performance|monthly|this month|last month)\b/i.test(userMessage)) return "business_summary";
+  if (/\b(sales|revenue|sold|profit|margin|top.{0,10}sell|best.{0,10}sell)\b/i.test(userMessage)) return "sales_query";
+  if (/\b(inventory|stock|item|quantity|qty|warehouse|location.{0,20}stock|in stock|how much stock)\b/i.test(userMessage)) return "inventory_query";
+  if (/\b(supplier|vendor|purchase order|po\b|container.{0,20}(arriv|transit|offload))\b/i.test(userMessage)) return "supplier_query";
+  if (/\b(customer|client|receivable|owed by|owes|outstanding)\b/i.test(userMessage)) return "customer_query";
+
+  return "general";
+}
+
+// Intents that skip getERPContext — only load the minimum data needed
+const ACTION_INTENTS = new Set<ChatIntent>([
+  "create_voucher",
+  "create_stock_adjustment",
+  "create_stock_transfer",
+  "create_stock_item",
+  "price_update",
+  "search_voucher",
+  "account_query",
+  "excel_import",
+]);
+
+function buildActionSystemPrompt(intent: ChatIntent, pageContext?: { currentRoute?: string }): string {
+  const today = new Date().toISOString().slice(0, 10);
+  let base = `You are ERP Assistant, an AI for a business ERP/POS system. Today is ${today}.`;
+  if (pageContext?.currentRoute) base += ` The user is on page: ${pageContext.currentRoute}.`;
+  base += `\nThe user has made a specific request. Acknowledge it briefly and naturally (1-2 sentences). `;
+  switch (intent) {
+    case "create_voucher":
+      base += "Let them know you've prepared a voucher draft for them to review and confirm."; break;
+    case "create_stock_adjustment":
+      base += "Let them know you've prepared a stock adjustment draft for them to review."; break;
+    case "create_stock_transfer":
+      base += "Let them know you've prepared a stock transfer draft for them to review."; break;
+    case "create_stock_item":
+      base += "Let them know you've prepared the new stock item details for them to confirm."; break;
+    case "price_update":
+      base += "Let them know you've prepared a price update for them to confirm."; break;
+    case "search_voucher":
+      base += "Let them know you've searched the voucher records and found the results below."; break;
+    case "account_query":
+      base += "Let them know you've retrieved the account information below."; break;
+    case "excel_import":
+      base += "Help the user with their Excel import/export question concisely."; break;
+    default:
+      base += "Answer the user's request as helpfully and concisely as possible.";
+  }
+  return base;
+}
+
 export async function chat(
   userMessage: string,
   companyId: number,
@@ -1271,23 +1363,39 @@ export async function chat(
   }
 
   try {
-    console.log("[ChatService] Getting ERP context for company:", companyId);
-    const context = await getERPContext(companyId);
-    console.log("[ChatService] ERP context retrieved successfully");
-    
-    let systemPrompt = buildSystemPrompt(context, userPreferences);
-    const suggestions = generateQuickSuggestions(context);
-    console.log("[ChatService] System prompt built, suggestions generated");
+    // ── Step 1: Classify intent (pure regex, no AI call) ─────────────────
+    const intent = classifyChatIntent(userMessage, pageContext);
+    const isActionIntent = ACTION_INTENTS.has(intent);
+    console.log(`[ChatService] Intent: ${intent} (action=${isActionIntent})`);
 
-    // Inject page context if provided
-    if (pageContext?.currentRoute) {
-      const pageLines: string[] = [`\n## CURRENT PAGE CONTEXT:`];
-      pageLines.push(`- User is currently on route: ${pageContext.currentRoute}`);
-      if (pageContext.entityType) pageLines.push(`- Viewing entity type: ${pageContext.entityType}`);
-      if (pageContext.entityName) pageLines.push(`- Entity name: ${pageContext.entityName}`);
-      if (pageContext.entityId) pageLines.push(`- Entity ID: ${pageContext.entityId}`);
-      pageLines.push(`Use this context to give more relevant and specific answers (e.g. if they are on the vouchers page, answers about vouchers should be especially specific).`);
-      systemPrompt = systemPrompt + pageLines.join("\n");
+    // ── Step 2: Load ERP context only when needed ─────────────────────────
+    let context: ERPContext | null = null;
+    let systemPrompt: string;
+    let suggestions: string[];
+
+    if (isActionIntent) {
+      // Action intents: skip the expensive full-context load, use a light prompt
+      systemPrompt = buildActionSystemPrompt(intent, pageContext);
+      suggestions = [];
+      console.log("[ChatService] Skipping getERPContext for action intent");
+    } else {
+      console.log("[ChatService] Getting ERP context for company:", companyId);
+      context = await getERPContext(companyId);
+      console.log("[ChatService] ERP context retrieved successfully");
+      systemPrompt = buildSystemPrompt(context, userPreferences);
+      suggestions = generateQuickSuggestions(context);
+      console.log("[ChatService] System prompt built, suggestions generated");
+
+      // Inject page context into full-context prompt
+      if (pageContext?.currentRoute) {
+        const pageLines: string[] = [`\n## CURRENT PAGE CONTEXT:`];
+        pageLines.push(`- User is currently on route: ${pageContext.currentRoute}`);
+        if (pageContext.entityType) pageLines.push(`- Viewing entity type: ${pageContext.entityType}`);
+        if (pageContext.entityName) pageLines.push(`- Entity name: ${pageContext.entityName}`);
+        if (pageContext.entityId) pageLines.push(`- Entity ID: ${pageContext.entityId}`);
+        pageLines.push(`Use this context to give more relevant and specific answers (e.g. if they are on the vouchers page, answers about vouchers should be especially specific).`);
+        systemPrompt = systemPrompt + pageLines.join("\n");
+      }
     }
 
     // Get selected provider and call with fallback
@@ -1306,10 +1414,9 @@ export async function chat(
     // ── Phase 5b: detect voucher creation intent ──────────────────────────
     // Ask the AI to extract a voucher draft if the message contains creation intent.
     // We do a lightweight structured extraction call only when keywords are found.
-    const VOUCHER_KEYWORDS = /\b(create|make|record|add|post|enter|book)\b.{0,80}\b(payment|receipt|journal|voucher|entry|invoice|transaction)\b|\b(pay|paid|receive[d]?|collect[ed]?|transfer[red]?|deposit[ed]?)\b.{0,60}\$?\d|\b(journal|receipt|payment)\b.{0,40}\$?\d/i;
     let voucherDraft: any = undefined;
 
-    if (VOUCHER_KEYWORDS.test(userMessage)) {
+    if (RE_VOUCHER.test(userMessage)) {
       try {
         const accts = await db
           .select({ id: schema.ledgerAccounts.id, name: schema.ledgerAccounts.name, accountType: schema.ledgerAccounts.accountType })
@@ -1374,10 +1481,9 @@ If the intent is unclear or amounts/accounts are too ambiguous to resolve, respo
     }
 
     // ── Stock adjustment detection ─────────────────────────────────────
-    const STOCK_ADJ_KEYWORDS = /\b(produce|producing|production|consume|consuming|consumption|stock\s+adjust|adjust\s+stock|record\s+production|record\s+consumption|produced|consumed)\b/i;
     let stockAdjustmentDraft: any = undefined;
 
-    if (STOCK_ADJ_KEYWORDS.test(userMessage)) {
+    if (RE_STOCK_ADJ.test(userMessage)) {
       try {
         const [items, locs] = await Promise.all([
           db.select({ id: schema.stockItems.id, name: schema.stockItems.name, code: schema.stockItems.code })
@@ -1463,10 +1569,9 @@ If intent is unclear, respond with exactly: null`;
     }
 
     // ── Voucher search by description ─────────────────────────────────
-    const VOUCHER_SEARCH_KEYWORDS = /\b(when did (i|we) pay|find (the )?(payment|receipt|voucher|transaction)|search (for )?(voucher|payment|receipt)|show (me )?(the )?(voucher|payment|receipt)|paid for|receipt for|voucher for|payment (for|of)|what voucher|which voucher|show.*payment.*for|show.*receipt.*for)\b/i;
     let voucherSearchResults: any[] | undefined = undefined;
 
-    if (VOUCHER_SEARCH_KEYWORDS.test(userMessage)) {
+    if (RE_VOUCHER_SEARCH.test(userMessage)) {
       try {
         const termPrompt = `Extract the description search term the user wants to search for in their voucher records.
 User message: "${userMessage}"
@@ -1505,10 +1610,9 @@ Return ONLY the search term as plain text (e.g. "rent", "electricity bill", "cli
     }
 
     // ── New stock item creation ────────────────────────────────────────
-    const STOCK_ITEM_CREATE_KEYWORDS = /\b(create\s+(a\s+)?stock\s+item|add\s+(a\s+)?stock\s+item|new\s+stock\s+item|create\s+(a\s+)?new\s+item|add\s+(a\s+)?new\s+item|new\s+item)\b/i;
     let stockItemDraft: any = undefined;
 
-    if (STOCK_ITEM_CREATE_KEYWORDS.test(userMessage)) {
+    if (RE_STOCK_ITEM_CREATE.test(userMessage)) {
       try {
         const groups = await db
           .select({ id: schema.stockGroups.id, name: schema.stockGroups.name })
@@ -1560,10 +1664,9 @@ If the user is not clearly trying to create a stock item, respond with exactly: 
     }
 
     // ── Price list update ──────────────────────────────────────────────
-    const PRICE_UPDATE_KEYWORDS = /\b(update.*price|change.*price|set.*price|price.*to|price.*for|update.*selling|change.*selling|new price|price list)\b/i;
     let priceUpdateDraft: any = undefined;
 
-    if (PRICE_UPDATE_KEYWORDS.test(userMessage)) {
+    if (RE_PRICE_UPDATE.test(userMessage)) {
       try {
         const [items, masterRows] = await Promise.all([
           db.select({ id: schema.stockItems.id, name: schema.stockItems.name, code: schema.stockItems.code })
@@ -1641,10 +1744,9 @@ If intent is not a price update, respond with exactly: null`;
     }
 
     // ── Account queries: balance / transaction search / balance history ──
-    const ACCOUNT_QUERY_KEYWORDS = /\b(balance of|account.*balance|how much.*account|account.*how much|what.*balance|balance.*account|when did.*account|account.*transactions|transactions.*account|paid.*from account|received.*account|when.*balance.*was|balance.*was.*when|ledger.*balance|account.*paid|account.*received)\b/i;
     let accountQueryResult: any = undefined;
 
-    if (ACCOUNT_QUERY_KEYWORDS.test(userMessage)) {
+    if (RE_ACCOUNT_QUERY.test(userMessage)) {
       try {
         const accounts = await db
           .select({ id: schema.ledgerAccounts.id, name: schema.ledgerAccounts.name, code: schema.ledgerAccounts.code, accountType: schema.ledgerAccounts.accountType, openingBalance: schema.ledgerAccounts.openingBalance, openingBalanceSide: schema.ledgerAccounts.openingBalanceSide })
@@ -1790,10 +1892,9 @@ If intent is not about an account query, respond with exactly: null`;
     }
 
     // ── Stock transfer detection ───────────────────────────────────────
-    const STOCK_TRANSFER_KEYWORDS = /\b(transfer|move|shift)\b.{0,80}\b(stock|item|inventory)\b|\b(stock|item|inventory)\b.{0,60}\b(transfer|move|shift)\b|\btransfer\b.{0,40}\bfrom\b.{0,40}\bto\b/i;
     let stockTransferDraft: any = undefined;
 
-    if (STOCK_TRANSFER_KEYWORDS.test(userMessage) && !voucherDraft && !stockAdjustmentDraft) {
+    if (RE_STOCK_TRANSFER.test(userMessage) && !voucherDraft && !stockAdjustmentDraft) {
       try {
         const [items, locs] = await Promise.all([
           db.select({ id: schema.stockItems.id, name: schema.stockItems.name, code: schema.stockItems.code })
