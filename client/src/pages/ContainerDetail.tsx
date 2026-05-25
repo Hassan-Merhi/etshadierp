@@ -470,7 +470,7 @@ export default function ContainerDetail() {
             idx,
             item.stockItemCode || "",
             item.stockItemName || "",
-            item.quantity || "0",
+            parseFloat(item.quantity) || 0,
           ]);
           row.eachCell({ includeEmpty: true }, (cell, colNum) => {
             if (isEven) {
