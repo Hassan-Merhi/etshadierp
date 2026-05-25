@@ -192,7 +192,18 @@ export function registerVoucherRoutes(app: Express) {
           endDate as string,
         );
       } else {
-        vouchers = await storage.getAllVouchers(req.session.currentCompanyId);
+        // No date range supplied — default to the last 90 days so we never do
+        // a full-table scan. The UI already shows this window by default.
+        // getVouchersByDateRange hits the vouchers_company_date_idx index.
+        const end = new Date();
+        const start = new Date();
+        start.setDate(start.getDate() - 90);
+        const fmt = (d: Date) => d.toISOString().slice(0, 10);
+        vouchers = await storage.getVouchersByDateRange(
+          req.session.currentCompanyId,
+          fmt(start),
+          fmt(end),
+        );
       }
 
       // Strip totalAmount from Stock Transfer vouchers for POS users
