@@ -876,11 +876,15 @@ export function registerContainerRoutes(app: Express) {
           .from(purchaseOrders)
           .where(inArray(purchaseOrders.companyId, companyIdsToProcess));
 
-        // Build a containerId → containerNumber map for all relevant companies
+        // Build a containerId → containerNumber map across ALL companies.
+        // POs may reference containers owned by the parent company or another
+        // entity — restricting by companyIdsToProcess causes
+        // containerNumberMap.get(poContainerId) to return undefined, making
+        // cNum fall back to String(containerId) and breaking the INTERCO
+        // journal lookup in syncIntercoParentVoucher.
         const allContainerRows = await db
           .select({ id: containers.id, containerNumber: containers.containerNumber })
-          .from(containers)
-          .where(inArray(containers.companyId, companyIdsToProcess));
+          .from(containers);
         const containerNumberMap = new Map<number, string>(
           allContainerRows.map((c) => [c.id, c.containerNumber])
         );
@@ -960,7 +964,18 @@ export function registerContainerRoutes(app: Express) {
                     parseFloat(e.debitAmount || "0") > 0 && parseFloat(e.creditAmount || "0") === 0
                   );
                   const drSum = drEntries.reduce((s: number, e: any) => s + parseFloat(e.debitAmount || "0"), 0);
-                  freightEntryMissing = drEntries.length !== 2 || Math.abs(drSum - grossTotal) > 0.001;
+                  // Also detect stray freight-account CR inside child voucher.
+                  // freightParentAccountId belongs ONLY in the parent INTERCO journal.
+                  // If it appears as a CR here it means the parent credit entry was
+                  // left at intercoTotal and the freight leaked into the wrong account,
+                  // causing an intercompany receivable/payable mismatch.
+                  const strayFreightCr = poFreightParentAccountId
+                    ? entries.some(
+                        (e: any) => Number((e as any).ledgerAccountId) === poFreightParentAccountId &&
+                                    parseFloat(e.creditAmount || "0") > 0
+                      )
+                    : false;
+                  freightEntryMissing = drEntries.length !== 2 || Math.abs(drSum - grossTotal) > 0.001 || strayFreightCr;
                 } else if (hasOwnFreight) {
                   // Own-freight: freight CR to freightAccountId must exist in child's voucher
                   const freightCrEntry = entries.find(
