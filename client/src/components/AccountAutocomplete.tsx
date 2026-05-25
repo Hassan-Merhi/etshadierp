@@ -29,6 +29,7 @@ export interface AccountAutocompleteProps {
   testId?: string;
   rowIndex?: number;
   dropdownPosition?: "below" | "right";
+  onSearchChange?: (term: string) => void;
 }
 
 export interface AccountAutocompleteHandle {
@@ -55,6 +56,7 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
       testId,
       rowIndex = 0,
       dropdownPosition = "below",
+      onSearchChange,
     },
     ref
   ) => {
@@ -178,6 +180,7 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
           onChange={(e) => {
             const newValue = e.target.value;
             setSearchTerm(newValue);
+            onSearchChange?.(newValue);
             if (!open) setOpen(true);
           }}
           onKeyDown={handleKeyDown}

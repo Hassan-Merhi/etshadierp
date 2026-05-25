@@ -91,6 +91,7 @@ export interface PaymentReceiptTabProps {
   isPending?: boolean;
   voucherNumber?: string;
   onAccountPickerOpen?: () => void;
+  onAccountSearchChange?: (term: string) => void;
 }
 
 export function PaymentReceiptTab({
@@ -129,6 +130,7 @@ export function PaymentReceiptTab({
   isPending = false,
   voucherNumber,
   onAccountPickerOpen,
+  onAccountSearchChange,
 }: PaymentReceiptTabProps) {
   const { formatAmount } = useCurrencyContext();
   const { formatDisplayDate } = useDateFormat();
@@ -358,6 +360,7 @@ export function PaymentReceiptTab({
                               rowIndex={-1}
                               placeholder={accountPlaceholder}
                               testId={accountTestId}
+                              onSearchChange={onAccountSearchChange}
                             />
                           </div>
                         </FormControl>

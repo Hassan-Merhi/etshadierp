@@ -453,6 +453,29 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     queryKey: ["/api/fixed-assets", selectedCompany?.id],
   });
 
+  // Live search state for supplier/customer lookup from account pickers.
+  // Updated by the "pay from" AccountAutocomplete (via onAccountSearchChange prop)
+  // and by the journal account search term (via useEffect below).
+  const [liveAccountSearch, setLiveAccountSearch] = useState("");
+  const [debouncedAccountSearch, setDebouncedAccountSearch] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedAccountSearch(liveAccountSearch), 300);
+    return () => clearTimeout(timer);
+  }, [liveAccountSearch]);
+
+  // Fetch matching suppliers/customers when the user types ≥2 chars in any
+  // account picker. Results are merged into allAccounts below.
+  const { data: supplierSearchResults = [] } = useQuery<Supplier[]>({
+    queryKey: ["/api/suppliers", "live-search", debouncedAccountSearch, selectedCompany?.id],
+    enabled: debouncedAccountSearch.length >= 2 && !!selectedCompany,
+    staleTime: 30 * 1000,
+  });
+  const { data: customerSearchResults = [] } = useQuery<Customer[]>({
+    queryKey: ["/api/customers", "live-search", debouncedAccountSearch, selectedCompany?.id],
+    enabled: debouncedAccountSearch.length >= 2 && !!selectedCompany,
+    staleTime: 30 * 1000,
+  });
+
   // Activate supplier/customer loading when editing an existing voucher.
   useEffect(() => {
     if (voucherIdToEdit) setAccountPickersNeeded(true);
@@ -552,6 +575,17 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         name: s.legalName,
         code: s.code,
       })),
+      // Merge live search results that are not already in the preloaded list.
+      // When accountPickersNeeded=false (initial load), suppliers/customers are
+      // empty so search results are the only source for those account types.
+      ...supplierSearchResults
+        .filter(s => !suppliers.find(p => p.id === s.id))
+        .map((s) => ({
+          type: "supplier" as const,
+          id: s.id,
+          name: s.legalName,
+          code: s.code,
+        })),
       ...employees.map((e) => ({
         type: "employee" as const,
         id: e.id,
@@ -573,6 +607,15 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         code: c.code,
         openingBalance: c.openingBalance,
       })),
+      ...customerSearchResults
+        .filter((c: any) => !customers.find((p: any) => p.id === c.id))
+        .map((c: any) => ({
+          type: "customer" as const,
+          id: c.id,
+          name: c.legalName,
+          code: c.code,
+          openingBalance: c.openingBalance,
+        })),
       ...factorySuppliersList.map((s) => ({
         type: "factorySupplier" as const,
         id: s.id,
@@ -581,7 +624,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       })),
     ];
     return accounts.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }, [ledgerAccounts, bankAccounts, suppliers, employees, fixedAssets, customers, factorySuppliersList]);
+  }, [ledgerAccounts, bankAccounts, suppliers, supplierSearchResults, employees, fixedAssets, customers, customerSearchResults, factorySuppliersList]);
 
   const form = useForm<VoucherFormData>({
     resolver: zodResolver(voucherFormSchema),
@@ -1601,6 +1644,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [journalAccountSearchTerm, setJournalAccountSearchTerm] = useState("");
   const [journalAccountHighlightedIndex, setJournalAccountHighlightedIndex] = useState(0);
   const journalSidebarRef = useRef<HTMLDivElement>(null);
+
+  // Keep liveAccountSearch in sync with the journal account search so that
+  // typing in a journal row also triggers the debounced supplier/customer API call.
+  useEffect(() => {
+    setLiveAccountSearch(journalAccountSearchTerm);
+  }, [journalAccountSearchTerm]);
 
   // Create account modal state
   const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
@@ -3992,6 +4041,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               isPending={saveMutation.isPending}
               voucherNumber={voucherToEdit?.voucherNumber}
               onAccountPickerOpen={() => setAccountPickersNeeded(true)}
+              onAccountSearchChange={setLiveAccountSearch}
             />
           </div>
         )}
@@ -4059,6 +4109,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               isPending={saveMutation.isPending}
               voucherNumber={voucherToEdit?.voucherNumber}
               onAccountPickerOpen={() => setAccountPickersNeeded(true)}
+              onAccountSearchChange={setLiveAccountSearch}
             />
           </div>
         )}
