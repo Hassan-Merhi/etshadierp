@@ -151,6 +151,20 @@ export default function PurchaseOrderEdit() {
     enabled: !isFactory,
   });
 
+  const isNew = poId === null;
+  const { data: nextPoData, refetch: refetchNextPo, isFetching: isFetchingNextPo } = useQuery<{ poNumber: string }>({
+    queryKey: ["/api/purchase-orders/next-po-number"],
+    enabled: isNew,
+    staleTime: 0,
+  });
+
+  // Auto-populate PO number for new POs once the suggestion arrives
+  useEffect(() => {
+    if (isNew && nextPoData?.poNumber && !poNumber) {
+      setPoNumber(nextPoData.poNumber);
+    }
+  }, [isNew, nextPoData, poNumber]);
+
   useEffect(() => {
     if (po) {
       setPoNumber(po.poNumber);
@@ -460,12 +474,28 @@ export default function PurchaseOrderEdit() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="poNumber">PO Number</Label>
-              <Input
-                id="poNumber"
-                value={poNumber}
-                onChange={(e) => setPoNumber(e.target.value)}
-                data-testid="input-po-number"
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="poNumber"
+                  value={poNumber}
+                  onChange={(e) => setPoNumber(e.target.value)}
+                  data-testid="input-po-number"
+                  placeholder={isNew ? "Auto-generating…" : undefined}
+                />
+                {isNew && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    data-testid="button-generate-po-number"
+                    title="Generate a new PO number"
+                    onClick={() => refetchNextPo().then(r => { if (r.data?.poNumber) setPoNumber(r.data.poNumber); })}
+                    disabled={isFetchingNextPo}
+                  >
+                    {isFetchingNextPo ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  </Button>
+                )}
+              </div>
             </div>
             <div>
               <Label htmlFor="currency">Currency</Label>

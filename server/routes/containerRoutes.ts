@@ -744,6 +744,41 @@ export function registerContainerRoutes(app: Express) {
     }
   });
 
+  // Auto-generate the next available PO number for the current company.
+  // Format: PO-{YYYY}-{NNN} — scans existing PO numbers and returns the next
+  // unused sequence so every new PO gets a unique, trackable identifier.
+  app.get("/api/purchase-orders/next-po-number", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = (req.user as any)?.companyId;
+      if (!companyId) return res.status(400).json({ message: "No company in session" });
+
+      const year = new Date().getFullYear();
+      const prefix = `PO-${year}-`;
+
+      // Fetch all PO numbers for this company that match the auto-format
+      const rows = await db
+        .select({ poNumber: purchaseOrders.poNumber })
+        .from(purchaseOrders)
+        .where(and(
+          eq(purchaseOrders.companyId, companyId),
+          like(purchaseOrders.poNumber, `${prefix}%`),
+        ));
+
+      // Extract the numeric suffix and find the highest
+      let maxSeq = 0;
+      for (const { poNumber } of rows) {
+        const suffix = poNumber.slice(prefix.length);
+        const n = parseInt(suffix, 10);
+        if (!isNaN(n) && n > maxSeq) maxSeq = n;
+      }
+
+      const next = String(maxSeq + 1).padStart(3, "0");
+      res.json({ poNumber: `${prefix}${next}` });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Ledger accounts from the parent company — used for "Parent pays freight" picker
   app.get("/api/purchase-orders/parent-freight-accounts", requireAuth, requireNonPOS, async (req, res) => {
     try {
