@@ -1573,9 +1573,22 @@ export class DbStorage implements IStorage {
       if (parentCompany && po.companyId !== parentCompany.id) {
         // ============================================================
         // SUBSIDIARY COMPANY - Create TWO vouchers
-        // 1. In subsidiary: DR Purchases, CR [Parent] Credit
-        // 2. In Parent: DR [Subsidiary] Credit, CR Supplier
+        // 1. In subsidiary: DR Purchases (goods), [DR Purchases (freight)], CR [Parent] Credit
+        // 2. In Parent: DR [Subsidiary] Credit, CR Supplier (goods only), [CR Freight account]
+        //
+        // When freightPaidBy='parent', the parent fronts the freight on behalf of the
+        // subsidiary. The child owes the parent the full grossTotal. The supplier only
+        // gets credited for goods (intercoTotal). The freight account gets the freight CR.
         // ============================================================
+
+        // Determine freight split
+        const isParentFreight = (po as any).freightPaidBy === 'parent' && poFreight > 0;
+        // intercoTotal = goods-only portion (grossTotal minus freight when parent pays freight)
+        const poIntercoTotal = isParentFreight ? poTotal - poFreight : poTotal;
+        // freightParentAccountId: account in parent company to credit for freight
+        const freightParentAcctId: number | null = isParentFreight
+          ? ((po as any).freightParentAccountId ?? null)
+          : null;
         
         // --- SUBSIDIARY VOUCHER ---
         // Get or create "[Parent] Credit" liability account in subsidiary
@@ -1608,6 +1621,7 @@ export class DbStorage implements IStorage {
         }
         
         // Create Purchase voucher in subsidiary
+        // Total is always grossTotal — child owes parent the full amount
         const subsidiaryVoucherNumber = `PURCH-${created.poNumber}-${Date.now()}`;
         const [subsidiaryVoucher] = await db.insert(schema.vouchers).values({
           companyId: po.companyId,
@@ -1619,16 +1633,27 @@ export class DbStorage implements IStorage {
           optional: false,
         }).returning();
         
-        // DR Purchases
+        // DR Purchases — goods portion
         await db.insert(schema.voucherEntries).values({
           voucherId: subsidiaryVoucher.id,
           ledgerAccountId: purchasesAccount[0].id,
-          debitAmount: poTotal.toFixed(2),
+          debitAmount: poIntercoTotal.toFixed(2),
           creditAmount: "0",
           narration: `PO ${created.poNumber} - Purchases`,
         });
+
+        // DR Purchases — freight portion (only when parent pays freight)
+        if (isParentFreight) {
+          await db.insert(schema.voucherEntries).values({
+            voucherId: subsidiaryVoucher.id,
+            ledgerAccountId: purchasesAccount[0].id,
+            debitAmount: poFreight.toFixed(2),
+            creditAmount: "0",
+            narration: `PO ${created.poNumber} - Freight (paid by ${parentCompany.name})`,
+          });
+        }
         
-        // CR [Parent] Credit (we owe parent company)
+        // CR [Parent] Credit (we owe parent company the full grossTotal)
         await db.insert(schema.voucherEntries).values({
           voucherId: subsidiaryVoucher.id,
           ledgerAccountId: parentCreditAccount[0].id,
@@ -1673,34 +1698,54 @@ export class DbStorage implements IStorage {
         }
         
         // Create Journal voucher in parent company
+        // Total = grossTotal when parent-freight, else intercoTotal
         const parentVoucherNumber = `INTERCO-PARENT-${created.poNumber}-${Date.now()}`;
         const [parentVoucher] = await db.insert(schema.vouchers).values({
           companyId: parentCompany.id,
           voucherNumber: parentVoucherNumber,
           voucherType: "Journal",
           voucherDate,
-          description: `Inter-company credit for PO ${created.poNumber} - ${currentCompany?.name || 'Subsidiary'}`,
+          description: descBase
+            ? `${descBase} - ${currentCompany?.name || 'Subsidiary'}`
+            : `Inter-company PO ${created.poNumber} - ${currentCompany?.name || 'Subsidiary'}`,
           totalAmount: poTotal.toFixed(2),
           optional: false,
         }).returning();
         
-        // DR [Subsidiary] Credit (they owe us)
+        const intercoNarration = containerNum
+          ? `${currentCompany?.name || 'Subsidiary'} PO ${created.poNumber} - Container ${containerNum}`
+          : `PO ${created.poNumber} - ${currentCompany?.name || 'Subsidiary'} owes us`;
+
+        // DR [Subsidiary] Credit (they owe us the full grossTotal)
         await db.insert(schema.voucherEntries).values({
           voucherId: parentVoucher.id,
           ledgerAccountId: subsidiaryReceivableAccount[0].id,
           debitAmount: poTotal.toFixed(2),
           creditAmount: "0",
-          narration: `PO ${created.poNumber} - ${currentCompany?.name || 'Subsidiary'} owes us`,
+          narration: intercoNarration,
         });
         
-        // CR Supplier (we owe supplier)
+        // CR Supplier — goods only (intercoTotal, excludes freight when parent pays it)
         if (po.supplierId) {
           await db.insert(schema.voucherEntries).values({
             voucherId: parentVoucher.id,
             supplierId: po.supplierId,
             debitAmount: "0",
-            creditAmount: poTotal.toFixed(2),
-            narration: `PO ${created.poNumber} - Supplier payment`,
+            creditAmount: poIntercoTotal.toFixed(2),
+            narration: intercoNarration,
+          });
+        }
+
+        // CR Freight account in parent (when parent pays freight and account is configured)
+        if (isParentFreight && freightParentAcctId) {
+          await db.insert(schema.voucherEntries).values({
+            voucherId: parentVoucher.id,
+            ledgerAccountId: freightParentAcctId,
+            debitAmount: "0",
+            creditAmount: poFreight.toFixed(2),
+            narration: containerNum
+              ? `Freight - ${currentCompany?.name || 'Subsidiary'} PO ${created.poNumber} - Container ${containerNum}`
+              : `Freight - PO ${created.poNumber}`,
           });
         }
         

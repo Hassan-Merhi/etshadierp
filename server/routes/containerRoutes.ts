@@ -2900,8 +2900,13 @@ export function registerContainerRoutes(app: Express) {
       const newFreightAccountId = newHasParentFreight ? newFreightParentAccountId
                                 : newHasOwnFreight    ? newFreightOwnAccountId
                                 : null;
-      // Local voucher total = grossTotal when freight is embedded, else intercoTotal (goods only)
-      const newLocalVoucherTotal = newHasEmbeddedFreight ? newGrandTotal : supplierTotal;
+      // Local voucher total = grossTotal when freight is parent-paid (child always owes
+      // the parent the full amount including freight, regardless of whether the freight
+      // account has been configured yet) or when freight is own-embedded.
+      const newLocalVoucherTotal =
+        (newHasEmbeddedFreight || (newFreightPaidBy === 'parent' && newFreight > 0))
+          ? newGrandTotal
+          : supplierTotal;
       const oldHasEmbeddedFreight = (oldFreightPaidBy === 'own' || oldFreightPaidBy === 'parent');
       const oldLocalVoucherTotal  = oldHasEmbeddedFreight ? oldGrandTotal : oldSupplierTotal;
       const freightVoucherNeedsUpdate = newFreightPaidBy === 'own' && (
