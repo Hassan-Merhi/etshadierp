@@ -2123,7 +2123,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 (posSelectedLocation as any).cashAccountId ? (
                   <div className="px-2 sm:px-3 py-1.5 bg-muted/50 rounded-md border">
                     <span className="text-xs sm:text-sm">{(posSelectedLocation as any).cashAccountName || `Account #${(posSelectedLocation as any).cashAccountId}`}</span>
-                    {(posSelectedLocation as any).cashAccountCode && <span className="text-xs text-muted-foreground ml-1 sm:ml-2 hidden sm:inline">({(posSelectedLocation as any).cashAccountCode})</span>}
                   </div>
                 ) : (
                   <div className="px-2 sm:px-3 py-1.5 bg-destructive/10 rounded-md border border-destructive/30">
@@ -2238,15 +2237,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           </div>
         )}
 
-        <div className="col-span-2 sm:col-span-1 sm:flex-1 flex items-center gap-2 order-last sm:order-none">
-          <Textarea
-            placeholder="Notes (optional)"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="resize-none h-9"
-            data-testid="input-notes"
-          />
-        </div>
       </div>
 
       {/* ── MOBILE card list (hidden on md+) ── */}
@@ -2610,6 +2600,17 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             </div>
           </div>
         </Card>
+      </div>
+
+      {/* ── Notes row (desktop) ── */}
+      <div className="hidden md:flex items-center gap-2 mt-1">
+        <Textarea
+          placeholder="Notes (optional)"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className="resize-none h-9"
+          data-testid="input-notes"
+        />
       </div>
 
       {/* ── MOBILE: Full-screen item search Sheet ── */}
