@@ -121,7 +121,7 @@ export default function FactoryWorkers() {
       if (!res.ok) return {};
       return res.json();
     },
-    staleTime: 0,
+    staleTime: 15000,
   });
 
   // ── Categories ─────────────────────────────────────────────────────────────

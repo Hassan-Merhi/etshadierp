@@ -160,7 +160,7 @@ export default function FactoryDispatchBatchDetail() {
       return res.json();
     },
     enabled: !!batchId && previewOpen,
-    staleTime: 0,
+    staleTime: 15000,
   });
 
   interface AuditScan {

@@ -132,7 +132,7 @@ export function ERPWorkerDetail({ worker, onBack, onEdit }: Props) {
       return res.json();
     },
     enabled: activeTab === "statement",
-    staleTime: 0,
+    staleTime: 15000,
   });
 
   // Fetch ERP advances for this worker

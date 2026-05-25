@@ -274,7 +274,7 @@ function AdvancesView() {
       return res.json();
     },
     enabled: repayAuditOpen,
-    staleTime: 0,
+    staleTime: 15000,
     refetchOnMount: true,
   });
 
@@ -286,7 +286,7 @@ function AdvancesView() {
       return res.json();
     },
     enabled: !!repayAuditForm.cashAccountId && repayAuditOpen,
-    staleTime: 0,
+    staleTime: 15000,
     refetchOnMount: true,
   });
 
@@ -329,7 +329,7 @@ function AdvancesView() {
       return json;
     },
     enabled: reconcileOpen,
-    staleTime: 0,
+    staleTime: 15000,
   });
 
   const reconcileMutation = useMutation({

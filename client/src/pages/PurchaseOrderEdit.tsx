@@ -155,7 +155,7 @@ export default function PurchaseOrderEdit() {
   const { data: nextPoData, refetch: refetchNextPo, isFetching: isFetchingNextPo } = useQuery<{ poNumber: string }>({
     queryKey: ["/api/purchase-orders/next-po-number"],
     enabled: isNew,
-    staleTime: 0,
+    staleTime: 15000,
   });
 
   // Auto-populate PO number for new POs once the suggestion arrives

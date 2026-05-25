@@ -539,7 +539,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const data = await res.json();
       return Array.isArray(data) ? data[0] : data;
     },
-    staleTime: 0,
+    staleTime: 15000,
   });
 
   // Stable transfer ID ref — prevents revision query key from going undefined during

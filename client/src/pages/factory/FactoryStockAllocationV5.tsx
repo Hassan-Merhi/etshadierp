@@ -261,7 +261,7 @@ export default function FactoryStockAllocationV5() {
       return res.json();
     },
     enabled: !!linkDialog,
-    staleTime: 0,
+    staleTime: 15000,
   });
 
   const linkMut = useMutation({
@@ -304,7 +304,7 @@ export default function FactoryStockAllocationV5() {
       return res.json();
     },
     enabled: restoreDialogOpen,
-    staleTime: 0,
+    staleTime: 15000,
   });
 
   const restoreContainerMut = useMutation({
