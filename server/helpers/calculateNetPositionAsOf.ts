@@ -9,7 +9,7 @@
 import { db } from "../db";
 import { storage } from "../storage";
 import {
-  vouchers, voucherEntries, locations, employees, suppliers, containers,
+  vouchers, locations, employees, suppliers, containers,
 } from "@shared/schema";
 import { eq, and, or, isNull, lte, sql } from "drizzle-orm";
 import { classifyNetPositionAccounts, round2 } from "../netPositionHelper";
@@ -37,42 +37,47 @@ export async function calculateNetPositionAsOf(
 ): Promise<NetPositionSnapshot> {
   const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
 
-  const companyEntries = await db
-    .select({
-      ledgerAccountId: voucherEntries.ledgerAccountId,
-      supplierId:      voucherEntries.supplierId,
-      employeeId:      voucherEntries.employeeId,
-      debitAmount:     voucherEntries.debitAmount,
-      creditAmount:    voucherEntries.creditAmount,
-    })
-    .from(voucherEntries)
-    .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-    .where(and(
-      eq(vouchers.companyId, companyId),
-      eq(vouchers.optional, false),
-      isNull(vouchers.deletedAt),
-      lte(vouchers.voucherDate, toDate),
-    ))
-    .execute();
+  // Push the summation to PostgreSQL — avoids transferring every individual
+  // entry row over the wire. The index vouchers_company_date_idx covers the
+  // WHERE clause; GROUP BY collapses millions of rows to one per account/
+  // supplier/employee combination before the result leaves the DB.
+  const grouped = await db.execute(sql`
+    SELECT
+      ve.ledger_account_id,
+      ve.supplier_id,
+      ve.employee_id,
+      SUM(CAST(ve.debit_amount  AS numeric)) AS total_debit,
+      SUM(CAST(ve.credit_amount AS numeric)) AS total_credit
+    FROM voucher_entries ve
+    INNER JOIN vouchers v ON ve.voucher_id = v.id
+    WHERE v.company_id  = ${companyId}
+      AND v.optional    = false
+      AND v.deleted_at  IS NULL
+      AND v.voucher_date <= ${toDate}
+    GROUP BY ve.ledger_account_id, ve.supplier_id, ve.employee_id
+  `);
 
   const accountBalances  = new Map<number, { debit: number; credit: number }>();
   const supplierBalances = new Map<number, { debit: number; credit: number }>();
   const employeeBalances = new Map<number, { debit: number; credit: number }>();
 
-  for (const e of companyEntries) {
-    const d = parseFloat(e.debitAmount  || "0");
-    const c = parseFloat(e.creditAmount || "0");
-    if (e.ledgerAccountId) {
-      const cur = accountBalances.get(e.ledgerAccountId) || { debit: 0, credit: 0 };
-      accountBalances.set(e.ledgerAccountId, { debit: cur.debit + d, credit: cur.credit + c });
+  for (const row of grouped.rows as any[]) {
+    const d = parseFloat(row.total_debit  || "0");
+    const c = parseFloat(row.total_credit || "0");
+    if (row.ledger_account_id != null) {
+      const id  = Number(row.ledger_account_id);
+      const cur = accountBalances.get(id) || { debit: 0, credit: 0 };
+      accountBalances.set(id, { debit: cur.debit + d, credit: cur.credit + c });
     }
-    if (e.supplierId) {
-      const cur = supplierBalances.get(e.supplierId) || { debit: 0, credit: 0 };
-      supplierBalances.set(e.supplierId, { debit: cur.debit + d, credit: cur.credit + c });
+    if (row.supplier_id != null) {
+      const id  = Number(row.supplier_id);
+      const cur = supplierBalances.get(id) || { debit: 0, credit: 0 };
+      supplierBalances.set(id, { debit: cur.debit + d, credit: cur.credit + c });
     }
-    if (e.employeeId) {
-      const cur = employeeBalances.get(e.employeeId) || { debit: 0, credit: 0 };
-      employeeBalances.set(e.employeeId, { debit: cur.debit + d, credit: cur.credit + c });
+    if (row.employee_id != null) {
+      const id  = Number(row.employee_id);
+      const cur = employeeBalances.get(id) || { debit: 0, credit: 0 };
+      employeeBalances.set(id, { debit: cur.debit + d, credit: cur.credit + c });
     }
   }
 
