@@ -2411,7 +2411,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               key={rid}
                               data-row-id={rid}
                               data-testid={`row-offload-${o.id}`}
-                              className={cn("cursor-pointer", selectedRowId === rid && "bg-accent/30")}
+                              className={cn("group cursor-pointer", selectedRowId === rid ? "bg-accent/30" : "hover:bg-muted/40")}
                               onClick={() => setSelectedRowId(rid)}
                             >
                               <TableCell className="font-medium sticky left-0 bg-background z-10">
@@ -2432,7 +2432,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 </TableCell>
                               )}
                               <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-1">
+                                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                                   <Button variant="ghost" size="icon" onClick={() => navigate(`/offloads/${o.id}`)} data-testid={`button-view-offload-${o.id}`}>
                                     <Eye className="w-4 h-4" />
                                   </Button>
@@ -2456,11 +2456,13 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               data-row-id={dvid}
                               data-testid={`row-voucher-${voucher.id}`}
                               className={cn(
+                                "group",
                                 !isDvPendingSync && "cursor-pointer",
                                 isDvPendingSync && "opacity-75",
                                 selectedRowId === dvid && "bg-accent/30",
                                 isDvHidden && showHidden && "opacity-50",
                                 isExpanded && "bg-accent/20",
+                                !isDvPendingSync && !isExpanded && selectedRowId !== dvid && "hover:bg-muted/40",
                               )}
                               onClick={() => {
                                 if (isDvPendingSync) return;
@@ -2514,7 +2516,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 {isDvPendingSync ? (
                                   <span className="text-xs text-amber-600 dark:text-amber-400 italic">Pending sync</span>
                                 ) : (
-                                <div className="flex items-center justify-end gap-1">
+                                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                                   <Button
                                     variant="ghost"
                                     size="icon"
