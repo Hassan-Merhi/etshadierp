@@ -465,15 +465,33 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   // Fetch matching suppliers/customers when the user types ≥2 chars in any
   // account picker. Results are merged into allAccounts below.
+  // Explicit queryFn required so that ?search= is included — the global fetcher
+  // only uses queryKey[0] as the URL which would strip the search parameter.
   const { data: supplierSearchResults = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers", "live-search", debouncedAccountSearch, selectedCompany?.id],
     enabled: debouncedAccountSearch.length >= 2 && !!selectedCompany,
     staleTime: 30 * 1000,
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/suppliers?search=${encodeURIComponent(debouncedAccountSearch)}&limit=50`,
+        { credentials: "include" }
+      );
+      if (!res.ok) throw new Error("Failed to search suppliers");
+      return res.json();
+    },
   });
   const { data: customerSearchResults = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers", "live-search", debouncedAccountSearch, selectedCompany?.id],
     enabled: debouncedAccountSearch.length >= 2 && !!selectedCompany,
     staleTime: 30 * 1000,
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/customers?search=${encodeURIComponent(debouncedAccountSearch)}&limit=50`,
+        { credentials: "include" }
+      );
+      if (!res.ok) throw new Error("Failed to search customers");
+      return res.json();
+    },
   });
 
   // Activate supplier/customer loading when editing an existing voucher.
