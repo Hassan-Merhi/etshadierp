@@ -3401,6 +3401,25 @@ let migrationsDone = false;
       raw_response_json JSONB,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`,
+
+    // ── Performance indexes (May 2026) ────────────────────────────────────────
+    // voucher_entries: supplier/employee/bank lookups do full table scans without these.
+    // Used by ledger statement queries that filter entries by a specific supplier or employee.
+    `CREATE INDEX IF NOT EXISTS voucher_entries_supplier_idx ON voucher_entries(supplier_id)`,
+    `CREATE INDEX IF NOT EXISTS voucher_entries_employee_idx ON voucher_entries(employee_id)`,
+    `CREATE INDEX IF NOT EXISTS voucher_entries_bank_account_idx ON voucher_entries(bank_account_id)`,
+
+    // audit_log: no indexes exist at all; any lookup (by company, user, or date) is a seq scan.
+    `CREATE INDEX IF NOT EXISTS audit_log_company_idx ON audit_log(company_id)`,
+    `CREATE INDEX IF NOT EXISTS audit_log_user_idx ON audit_log(user_id)`,
+    `CREATE INDEX IF NOT EXISTS audit_log_created_at_idx ON audit_log(created_at)`,
+
+    // customer_orders: date-range reports filter by (companyId, orderDate) with no index.
+    `CREATE INDEX IF NOT EXISTS customer_orders_company_date_idx ON customer_orders(company_id, order_date)`,
+
+    // stock_items: grade/category filters have no index; stockGroupId is already covered.
+    `CREATE INDEX IF NOT EXISTS stock_items_grade_idx ON stock_items(company_id, grade_id)`,
+    `CREATE INDEX IF NOT EXISTS stock_items_category_idx ON stock_items(company_id, category_id)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
