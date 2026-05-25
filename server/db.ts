@@ -54,22 +54,12 @@ pool.on('error', (err) => {
   logPoolStats('on-error');
 });
 
-// Log every new physical connection — useful for spotting connection churn.
-pool.on('connect', () => {
-  logPoolStats('new-connection');
-});
-
 // Log when a client is acquired from the pool.
 pool.on('acquire', () => {
   // Only log when the pool is under pressure to avoid noise.
   if (pool.waitingCount > 0) {
     logPoolStats('acquire-under-pressure');
   }
-});
-
-// Log when a client is removed (pool shrinking).
-pool.on('remove', () => {
-  logPoolStats('client-removed');
 });
 
 export function logPoolStats(trigger: string) {
