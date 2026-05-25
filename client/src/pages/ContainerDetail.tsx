@@ -407,18 +407,17 @@ export default function ContainerDetail() {
       const wb = new ExcelJS.Workbook();
       const ws = wb.addWorksheet("Container Items");
 
-      // Column definitions (B hidden)
+      // Column definitions: NO | BARCODE (hidden) | DESCRIPTION | Q'TY
       ws.columns = [
         { key: "no",   width: 6 },
         { key: "bc",   width: 20, hidden: true },
         { key: "desc", width: 70 },
         { key: "qty",  width: 18 },
-        { key: "unit", width: 15 },
       ];
 
-      // ── Row 1: supplier label (merged A1:E1) ──
-      ws.addRow([supplierLabel, "", "", "", ""]);
-      ws.mergeCells("A1:E1");
+      // ── Row 1: supplier label (merged A1:D1) ──
+      ws.addRow([supplierLabel, "", "", ""]);
+      ws.mergeCells("A1:D1");
       const r1 = ws.getRow(1);
       r1.height = 28;
       r1.eachCell((cell) => {
@@ -431,10 +430,9 @@ export default function ContainerDetail() {
         };
       });
 
-      // ── Row 2: container + truck (merged A2:C2 and D2:E2) ──
-      ws.addRow([`CONTAINER: ${containerNumber}`, "", "", `TRUCK: ${truckNumber}`, ""]);
+      // ── Row 2: container (A2:C2) + truck (D2) ──
+      ws.addRow([`CONTAINER: ${containerNumber}`, "", "", `TRUCK: ${truckNumber}`]);
       ws.mergeCells("A2:C2");
-      ws.mergeCells("D2:E2");
       const r2 = ws.getRow(2);
       r2.height = 22;
       r2.eachCell({ includeEmpty: true }, (cell) => {
@@ -448,7 +446,7 @@ export default function ContainerDetail() {
       });
 
       // ── Row 3: column headers ──
-      ws.addRow(["NO", "BARCODE", "DESCRIPTION", "Q'TY", "UNIT (KG)"]);
+      ws.addRow(["NO", "BARCODE", "DESCRIPTION", "Q'TY"]);
       const r3 = ws.getRow(3);
       r3.eachCell((cell, colNum) => {
         cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2E3B4E" } };
@@ -473,7 +471,6 @@ export default function ContainerDetail() {
             item.stockItemCode || "",
             item.stockItemName || "",
             item.quantity || "0",
-            "",
           ]);
           row.eachCell({ includeEmpty: true }, (cell, colNum) => {
             if (isEven) {
