@@ -30,6 +30,52 @@ const MARGIN_X = 36;
 const MARGIN_Y = 36;
 const USABLE_W = PAGE_W - MARGIN_X * 2;   // 523 pt
 
+// ── Text line height at fontSize 7.5 (fontSize × 1.2) ────────────────────────
+const LINE_H_PT   = 9;
+// Max description lines per row — caps row height and prevents 23-page invoices
+const MAX_DESC_LINES = 2;
+
+/**
+ * Manually wrap `text` into at most `maxLines` lines that each fit within
+ * `maxWidth` points, using the PDFKit doc's current font/size for measurement.
+ * The last line gets a "…" suffix if text was truncated.
+ *
+ * Using lineBreak:false for every doc.text() call after this prevents PDFKit
+ * from inserting its own page-breaks mid-row, which is what caused the
+ * 23-page invoice bug.
+ */
+function wrapText(doc: any, text: string, maxWidth: number, maxLines: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (doc.widthOfString(candidate) <= maxWidth) {
+      current = candidate;
+    } else {
+      if (current) lines.push(current);
+      if (lines.length >= maxLines) break;
+      current = word;
+    }
+  }
+  if (current && lines.length < maxLines) lines.push(current);
+
+  // If text was truncated add ellipsis to the last line
+  const rendered = lines.join(" ");
+  const original = words.join(" ");
+  if (rendered.length < original.length && lines.length > 0) {
+    let last = lines[lines.length - 1];
+    const ellipsis = "…";
+    while (last.length > 0 && doc.widthOfString(last + ellipsis) > maxWidth) {
+      last = last.slice(0, -1).trimEnd();
+    }
+    lines[lines.length - 1] = last + ellipsis;
+  }
+
+  return lines.length > 0 ? lines : [""];
+}
+
 // ── Number formatting — matches fmtPrint() in POS.tsx ────────────────────────
 function fmtNum(n: number, prefix = ""): string {
   const fixed = Math.abs(n).toFixed(2).replace(/\.00$/, "");
@@ -277,10 +323,14 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     totalAmt += amtUSD;
     totalPL  += itemPL;
 
-    // Dynamic row height — expand if the product name wraps in the description column
+    // ── Dynamic row height: wrap the name into at most MAX_DESC_LINES lines
+    // using our manual wrapper so we NEVER pass lineBreak:true to PDFKit.
+    // lineBreak:true was the root cause of the 23-page invoice bug — PDFKit
+    // would auto-insert page breaks mid-row, desynchronising our `y` counter.
     doc.font("Helvetica-Bold").fontSize(7.5);
-    const nameH  = doc.heightOfString(item.stockItemName, { width: COL_DESC_W - 8 });
-    const dynH   = Math.max(ROW_H, Math.ceil(nameH) + 4);
+    const descW    = COL_DESC_W - 8;
+    const descLines = wrapText(doc, item.stockItemName, descW, MAX_DESC_LINES);
+    const dynH     = Math.max(ROW_H, descLines.length * LINE_H_PT + 6);
 
     // Page break — re-draw column header on new page
     if (y + dynH > PAGE_H - MARGIN_Y) {
@@ -294,9 +344,14 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     doc.restore();
     drawRowBorders(doc, y, dynH, false, innerDividers);
 
-    // Description: top-aligned so wrapping text stays inside the cell border
+    // Description: render each wrapped line individually with lineBreak:false
+    // so PDFKit never auto-paginates inside our managed row.
     doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#000000");
-    doc.text(item.stockItemName, X_DESC + 4, y + 3, { width: COL_DESC_W - 8, align: "left", lineBreak: true });
+    for (let li = 0; li < descLines.length; li++) {
+      doc.text(descLines[li], X_DESC + 4, y + 3 + li * LINE_H_PT, {
+        width: descW, align: "left", lineBreak: false,
+      });
+    }
 
     // All other cells: single-line, vertically centred
     const cy = y + Math.round((dynH - 7.5) / 2);
