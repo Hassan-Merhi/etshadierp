@@ -3420,6 +3420,40 @@ let migrationsDone = false;
     // stock_items: grade/category filters have no index; stockGroupId is already covered.
     `CREATE INDEX IF NOT EXISTS stock_items_grade_idx ON stock_items(company_id, grade_id)`,
     `CREATE INDEX IF NOT EXISTS stock_items_category_idx ON stock_items(company_id, category_id)`,
+
+    // ── AI Excel Import staging tables (May 2026) ─────────────────────────────
+    `CREATE TABLE IF NOT EXISTS ai_import_jobs (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      user_id varchar NOT NULL,
+      import_type text NOT NULL,
+      original_file_name text,
+      status text NOT NULL DEFAULT 'uploaded',
+      total_rows integer DEFAULT 0,
+      valid_rows integer DEFAULT 0,
+      warning_rows integer DEFAULT 0,
+      error_rows integer DEFAULT 0,
+      confirmed_at timestamp,
+      posted_at timestamp,
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS ai_import_jobs_company_idx ON ai_import_jobs(company_id)`,
+    `CREATE INDEX IF NOT EXISTS ai_import_jobs_user_idx ON ai_import_jobs(user_id)`,
+    `CREATE TABLE IF NOT EXISTS ai_import_rows (
+      id serial PRIMARY KEY,
+      job_id integer NOT NULL,
+      row_number integer NOT NULL,
+      raw_data jsonb NOT NULL,
+      mapped_data jsonb,
+      status text NOT NULL DEFAULT 'pending',
+      errors jsonb DEFAULT '[]',
+      warnings jsonb DEFAULT '[]',
+      created_record_type text,
+      created_record_id integer,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS ai_import_rows_job_idx ON ai_import_rows(job_id)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
