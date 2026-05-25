@@ -11,7 +11,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
-import { MapPin, Wallet, Printer, AlertCircle, AlertTriangle, Search, Check, Trash2, User, Upload, ArrowLeft, FileDown, ChevronDown, Plus, Pencil, X, Send } from "lucide-react";
+import { MapPin, Wallet, Printer, AlertCircle, AlertTriangle, Search, Check, Trash2, User, Upload, ArrowLeft, FileDown, ChevronDown, Plus, Pencil, X, Send, MoreHorizontal } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { utils, writeFile } from "@/lib/excelHelper";
 import {
   DropdownMenu,
@@ -1941,70 +1944,64 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         title={editVoucherId ? "Edit Sale" : "Point of Sale"}
         subtitle={editVoucherId && editVoucher ? `Voucher #${editVoucher.voucherNumber}` : undefined}
       >
-        <div className="flex flex-wrap gap-1 sm:gap-2">
-          {!editVoucherId && showPosImport && (
-            <Link href="/pos-import">
-              <Button variant="outline" size="sm" className="gap-1 sm:gap-2" data-testid="button-import-sales">
-                <Upload className="h-4 w-4" />
-                <span className="hidden sm:inline">Import</span>
-              </Button>
-            </Link>
+        <div className="flex items-center gap-2">
+          {lastAutosaved && (
+            <span className="text-xs text-muted-foreground hidden sm:inline whitespace-nowrap" data-testid="text-autosaved">
+              Autosaved {Math.floor((Date.now() - lastAutosaved.getTime()) / 60000) < 1
+                ? "just now"
+                : `${Math.floor((Date.now() - lastAutosaved.getTime()) / 60000)}m ago`}
+            </span>
           )}
           {!editVoucherId && (
-            <>
-              <Button 
-                variant="outline"
-                size="sm"
-                onClick={() => setShowDraftDialog(true)}
-                disabled={drafts.length === 0}
-                data-testid="button-load-draft"
-              >
-                <span className="hidden sm:inline">Load Draft</span>
-                <span className="sm:hidden">Load</span>
-                {drafts.length > 0 && ` (${drafts.length})`}
-              </Button>
-              <Button 
-                variant="outline"
-                size="sm"
-                onClick={() => saveDraftMutation.mutate()}
-                disabled={saveDraftMutation.isPending || rows.filter(r => r.stockItemId && r.quantity > 0).length === 0}
-                data-testid="button-save-draft"
-              >
-                {saveDraftMutation.isPending ? "..." : currentDraftId ? <span className="hidden sm:inline">Update Draft</span> : <span className="hidden sm:inline">Save Draft</span>}
-                {!saveDraftMutation.isPending && <span className="sm:hidden">Draft</span>}
-              </Button>
-              {lastAutosaved && (
-                <span className="text-xs text-muted-foreground hidden sm:inline whitespace-nowrap" data-testid="text-autosaved">
-                  Autosaved {Math.floor((Date.now() - lastAutosaved.getTime()) / 60000) < 1
-                    ? "just now"
-                    : `${Math.floor((Date.now() - lastAutosaved.getTime()) / 60000)}m ago`}
-                </span>
-              )}
-            </>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" data-testid="button-more-actions" title="More actions">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                {showPosImport && (
+                  <DropdownMenuItem asChild data-testid="button-import-sales">
+                    <Link href="/pos-import" className="flex items-center gap-2">
+                      <Upload className="h-4 w-4" />
+                      Import Sales
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem
+                  onClick={() => setShowDraftDialog(true)}
+                  disabled={drafts.length === 0}
+                  data-testid="button-load-draft"
+                >
+                  Load Draft{drafts.length > 0 && ` (${drafts.length})`}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => saveDraftMutation.mutate()}
+                  disabled={saveDraftMutation.isPending || rows.filter(r => r.stockItemId && r.quantity > 0).length === 0}
+                  data-testid="button-save-draft"
+                >
+                  {saveDraftMutation.isPending ? "Saving…" : currentDraftId ? "Update Draft" : "Save Draft"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => handleExportSale(false)}
+                  disabled={rows.filter(r => r.stockItemId && r.quantity > 0 && r.rate > 0).length === 0}
+                  data-testid="export-sale-summary"
+                >
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Summary Export
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleExportSale(true)}
+                  disabled={rows.filter(r => r.stockItemId && r.quantity > 0 && r.rate > 0).length === 0}
+                  data-testid="export-sale-detailed"
+                >
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Detailed Export
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={rows.filter(r => r.stockItemId && r.quantity > 0 && r.rate > 0).length === 0}
-                className="gap-1"
-                data-testid="button-export-sale"
-              >
-                <FileDown className="h-4 w-4" />
-                <span className="hidden sm:inline">Export</span>
-                <ChevronDown className="h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleExportSale(false)} data-testid="export-sale-summary">
-                Summary Export
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportSale(true)} data-testid="export-sale-detailed">
-                Detailed Export
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
           {saleJustCompleted && !editVoucherId ? (
             <Button
               size="sm"
@@ -2019,20 +2016,24 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           ) : (
             <Button
               onClick={handleSaveSale}
-              size="sm"
               disabled={saveMutation.isPending || !hasValidItems}
-              className="gap-1 sm:gap-2"
+              className="gap-2 px-5"
               data-testid="button-complete-sale"
             >
-              {saveMutation.isPending ? "..." : <><span className="hidden sm:inline">{editVoucherId ? "Update" : "Save"}</span><span className="sm:hidden">Save</span></>}
               {!saveMutation.isPending && <Check className="h-4 w-4" />}
+              {saveMutation.isPending ? "Saving…" : (editVoucherId ? "Update" : "Save")}
             </Button>
           )}
         </div>
       </PageHeader>
 
 
-      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4">
+      <div className={cn(
+        "grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4 rounded-lg border px-3 py-2.5 transition-colors duration-200",
+        isCreditSale
+          ? "bg-blue-50/60 border-blue-200/70 dark:bg-blue-950/20 dark:border-blue-800/40"
+          : "bg-muted/20 border-border"
+      )}>
         <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
           <MapPin className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
           {posUser ? (
@@ -2339,7 +2340,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               <div className="max-h-[calc(100vh-24rem)] overflow-y-auto">
                 {rows.map((row, rowIndex) => (
                   <div key={row.id}>
-                    <div className="flex border-b border-muted/50 hover-elevate">
+                    <div className="group flex border-b border-muted/50 hover-elevate">
                       <div className="w-8 sm:w-12 flex items-center justify-center border-r border-muted/50 h-10 sm:h-10 text-xs text-muted-foreground">
                         {rowIndex + 1}
                       </div>
@@ -2359,7 +2360,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                           }}
                         >
                           {col.key === "delete" ? (
-                            <div className="flex items-center justify-center h-full">
+                            <div className="flex items-center justify-center h-full opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -2454,34 +2455,34 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           </div>
 
           {/* Total Section */}
-          <div className="border-t border-muted bg-muted/20 p-2 sm:p-4">
-            <div className="flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-2 sm:gap-6 sm:max-w-lg ml-auto">
-              <div className="flex items-center justify-between sm:justify-start gap-2 text-xs sm:text-sm">
-                <span className="text-muted-foreground">Items:</span>
-                <span className="font-mono">{rows.filter((r) => r.amount > 0).length}</span>
-                <span className="text-muted-foreground ml-2">Qty:</span>
-                <span className="font-mono" data-testid="text-total-qty">{totalQty > 0 ? totalQty.toFixed(3) : "0"}</span>
-              </div>
-              {(() => {
-                const totalPLUSD = rows.reduce((sum, row) => {
-                  if (!row.stockItemId || !(row.configuredPrice ?? 0)) return sum;
-                  return sum + (row.rateUSD - (row.configuredPrice ?? 0)) * row.quantity;
-                }, 0);
-                const totalPLDisplay = activeCurrency === "CFA" && exchangeRate ? totalPLUSD * exchangeRate : totalPLUSD;
-                const anyConfig = rows.some(r => r.stockItemId && (r.configuredPrice ?? 0) > 0);
-                if (!anyConfig) return null;
-                return (
-                  <div className="flex items-center justify-between sm:justify-start gap-2">
-                    <span className="text-sm font-medium text-muted-foreground">P/L:</span>
-                    <span className={`text-base sm:text-lg font-semibold font-mono ${totalPLDisplay > 0 ? "text-green-700 dark:text-green-400" : totalPLDisplay < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`} data-testid="text-total-pl">
-                      {totalPLDisplay >= 0 ? "" : "-"}{formatDisplayAmount(Math.abs(totalPLDisplay))}
+          <div className="border-t border-muted bg-muted/10 px-4 py-3">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <span>
+                  <span className="font-medium text-foreground">{rows.filter((r) => r.amount > 0).length}</span>
+                  {" "}items
+                </span>
+                <span>
+                  Qty <span className="font-medium text-foreground font-mono" data-testid="text-total-qty">{totalQty > 0 ? totalQty.toFixed(2) : "0"}</span>
+                </span>
+                {(() => {
+                  const totalPLUSD = rows.reduce((sum, row) => {
+                    if (!row.stockItemId || !(row.configuredPrice ?? 0)) return sum;
+                    return sum + (row.rateUSD - (row.configuredPrice ?? 0)) * row.quantity;
+                  }, 0);
+                  const totalPLDisplay = activeCurrency === "CFA" && exchangeRate ? totalPLUSD * exchangeRate : totalPLUSD;
+                  const anyConfig = rows.some(r => r.stockItemId && (r.configuredPrice ?? 0) > 0);
+                  if (!anyConfig) return null;
+                  return (
+                    <span className={cn("font-semibold font-mono", totalPLDisplay > 0 ? "text-green-700 dark:text-green-400" : totalPLDisplay < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground")} data-testid="text-total-pl">
+                      P/L {totalPLDisplay >= 0 ? "" : "-"}{formatDisplayAmount(Math.abs(totalPLDisplay))}
                     </span>
-                  </div>
-                );
-              })()}
-              <div className="flex items-center justify-between sm:justify-start gap-2">
-                <span className="text-sm sm:text-lg font-medium">Total:</span>
-                <span className="text-lg sm:text-2xl font-semibold font-mono" data-testid="text-grand-total">
+                  );
+                })()}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Total</span>
+                <span className="text-2xl sm:text-3xl font-bold font-mono tracking-tight" data-testid="text-grand-total">
                   {formatDisplayAmount(total)}
                 </span>
               </div>
@@ -2492,7 +2493,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         {/* Right Panel - Item Search */}
         <Card className="hidden lg:flex w-96 flex-col sticky top-4 max-h-[calc(100vh-8rem)] self-start">
           <div className="p-4 border-b">
-            <h3 className="text-sm font-medium mb-3">Search Items</h3>
+            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Search className="h-3.5 w-3.5 text-muted-foreground" />
+              Items
+            </h3>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -2590,17 +2594,16 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                         {item.code}
                       </div>
                     </div>
-                    <div className="flex items-center">
-                      <div className={`text-xs font-medium px-2 py-0.5 rounded ${
-                        item.stock === 0 
-                          ? "bg-destructive/10 text-destructive" 
-                          : item.stock < 10
-                          ? "bg-chart-3/10 text-chart-3"
-                          : "bg-chart-2/10 text-chart-2"
-                      }`}>
-                        {item.stock === 0 ? "Out" : `${item.stock}`}
-                      </div>
-                    </div>
+                    <Badge variant="outline" className={cn(
+                      "text-xs font-medium shrink-0",
+                      item.stock === 0
+                        ? "border-destructive/30 bg-destructive/10 text-destructive"
+                        : item.stock < 10
+                        ? "border-amber-400/40 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                        : "border-emerald-400/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                    )}>
+                      {item.stock === 0 ? "Out" : item.stock}
+                    </Badge>
                   </div>
                 </button>
               ))}
