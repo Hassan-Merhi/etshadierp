@@ -12,6 +12,7 @@ import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useToast } from "@/hooks/use-toast";
+import { useWsInvalidation } from "@/hooks/use-ws-invalidation";
 import type { DirectMessage } from "@shared/schema";
 
 interface ChatUser {
@@ -45,9 +46,10 @@ export default function Chat() {
   const modeApiRequest = getApiRequest(appMode);
   const { toast } = useToast();
 
+  useWsInvalidation();
+
   const { data: chatUsers = [], isLoading: usersLoading } = useQuery<ChatUser[]>({
     queryKey: ["/api/chat/users"],
-    refetchInterval: 5000,
   });
 
   const { data: messages = [], isLoading: messagesLoading } = useQuery<DirectMessage[]>({
@@ -59,22 +61,9 @@ export default function Chat() {
       return res.json();
     },
     enabled: !!selectedUserId,
-    refetchInterval: 3000,
   });
 
-  const { data: typingData } = useQuery<{ isTyping: boolean }>({
-    queryKey: ["/api/chat/typing", selectedUserId],
-    queryFn: async () => {
-      if (!selectedUserId) return { isTyping: false };
-      const res = await fetch(`/api/chat/typing/${selectedUserId}`, { credentials: "include" });
-      if (!res.ok) return { isTyping: false };
-      return res.json();
-    },
-    enabled: !!selectedUserId,
-    refetchInterval: 2000,
-  });
-
-  const isTyping = typingData?.isTyping ?? false;
+  const isTyping = false;
 
   const sendTypingSignal = useCallback((isTyping: boolean) => {
     if (!selectedUserId) return;

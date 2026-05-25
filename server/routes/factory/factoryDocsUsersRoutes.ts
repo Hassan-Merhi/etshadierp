@@ -1,6 +1,7 @@
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
+import { broadcast } from "../../wsServer";
 import { requireAuth } from "../../auth";
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
@@ -1642,6 +1643,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       typingStatus.delete(currentUserId);
 
+      broadcast({ type: "invalidate" });
       res.json(msg);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
