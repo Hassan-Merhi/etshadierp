@@ -3461,6 +3461,26 @@ let migrationsDone = false;
       created_at timestamp NOT NULL DEFAULT now()
     )`,
     `CREATE INDEX IF NOT EXISTS ai_import_rows_job_idx ON ai_import_rows(job_id)`,
+
+    // ── AI Correction Memory (May 2026) ───────────────────────────────────────
+    // Stores user-confirmed entity resolution corrections for the AI import flow.
+    // Exact rawValue matches (confidence=100) are auto-applied during validation;
+    // low-confidence entries are surfaced as suggestions only.
+    `CREATE TABLE IF NOT EXISTS ai_correction_memory (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      memory_type varchar(40) NOT NULL,
+      raw_value text NOT NULL,
+      resolved_type text,
+      resolved_id integer,
+      resolved_value text,
+      confidence integer NOT NULL DEFAULT 100,
+      created_by varchar NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS ai_correction_memory_company_idx ON ai_correction_memory(company_id)`,
+    `CREATE INDEX IF NOT EXISTS ai_correction_memory_lookup_idx ON ai_correction_memory(company_id, memory_type)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

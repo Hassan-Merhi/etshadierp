@@ -2119,6 +2119,31 @@ export const insertAiImportRowSchema = createInsertSchema(aiImportRows).omit({ i
 export type InsertAiImportRow = z.infer<typeof insertAiImportRowSchema>;
 export type AiImportRow = typeof aiImportRows.$inferSelect;
 
+// ── AI Correction Memory ──────────────────────────────────────────────────────
+// Stores user-confirmed entity resolution corrections for AI import validation.
+// During future validation, exact rawValue matches (confidence=100) are applied
+// automatically; low-confidence entries are surfaced as suggestions only.
+export const aiCorrectionMemory = pgTable("ai_correction_memory", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  // 'supplier_alias' | 'customer_alias' | 'item_alias' | 'ledger_alias' | 'column_mapping'
+  memoryType: varchar("memory_type", { length: 40 }).notNull(),
+  rawValue: text("raw_value").notNull(),          // original string from the import file
+  resolvedType: text("resolved_type"),            // e.g. 'stock_group', 'ledger_account'
+  resolvedId: integer("resolved_id"),             // FK into the ERP table (nullable)
+  resolvedValue: text("resolved_value"),          // canonical display name / code
+  confidence: integer("confidence").notNull().default(100),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  companyIdx:  index("ai_correction_memory_company_idx").on(t.companyId),
+  lookupIdx:   index("ai_correction_memory_lookup_idx").on(t.companyId, t.memoryType),
+}));
+export const insertAiCorrectionMemorySchema = createInsertSchema(aiCorrectionMemory).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAiCorrectionMemory = z.infer<typeof insertAiCorrectionMemorySchema>;
+export type AiCorrectionMemory = typeof aiCorrectionMemory.$inferSelect;
+
 // Direct Messages - user-to-user chat
 export const directMessages = pgTable("direct_messages", {
   id: serial("id").primaryKey(),
