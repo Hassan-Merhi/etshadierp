@@ -1473,6 +1473,7 @@ export function registerDebugRoutes(app: Express) {
           containerId: containerOffloads.containerId,
           locationId: containerOffloads.locationId,
           optional: containerOffloads.optional,
+          offloadedAt: containerOffloads.offloadedAt,
           companyId: containers.companyId,
           containerNumber: containers.containerNumber,
         })
@@ -1541,13 +1542,44 @@ export function registerDebugRoutes(app: Express) {
           .update(containerOffloads)
           .set({ optional: makeOptional })
           .where(eq(containerOffloads.id, offloadId));
+
+        // 4. Sync container status to match the new offload state
+        if (makeOptional) {
+          // Suspending: check if ALL offloads for this container are now optional.
+          // If so, revert the container back to OTW so it shows on the tracking page.
+          const remainingActive = await tx
+            .select({ id: containerOffloads.id })
+            .from(containerOffloads)
+            .where(
+              and(
+                eq(containerOffloads.containerId, offload.containerId),
+                eq(containerOffloads.optional, false),
+              )
+            );
+          if (remainingActive.length === 0) {
+            await tx
+              .update(containers)
+              .set({ status: "OTW", offloadDate: null })
+              .where(eq(containers.id, offload.containerId));
+          }
+        } else {
+          // Unsuspending: container must be OFFLOADED again.
+          // Restore offloadDate from the offload's offloadedAt timestamp.
+          const restoredDate = offload.offloadedAt instanceof Date
+            ? offload.offloadedAt.toISOString().split("T")[0]
+            : new Date().toISOString().split("T")[0];
+          await tx
+            .update(containers)
+            .set({ status: "OFFLOADED", offloadDate: restoredDate })
+            .where(eq(containers.id, offload.containerId));
+        }
       });
 
       res.json({
         optional: makeOptional,
         message: makeOptional
-          ? "Offload suspended — stock removed and vouchers set to optional."
-          : "Offload restored — stock re-added and vouchers made active.",
+          ? "Offload suspended — stock removed, vouchers set to optional, container moved back to OTW."
+          : "Offload restored — stock re-added, vouchers made active, container marked OFFLOADED.",
       });
     } catch (error: any) {
       console.error("Error toggling offload optional:", error);
