@@ -1662,6 +1662,7 @@ export function registerContainerRoutes(app: Express) {
         container: {
           containerNumber: container.containerNumber,
           supplierName: supplier?.legalName || "",
+          numberPlate: container.numberPlate || "",
           status: container.status,
           importDate: container.importDate,
           itemsTotal: container.itemsTotal,
@@ -1670,6 +1671,10 @@ export function registerContainerRoutes(app: Express) {
           itemName: container.itemName,
           ratePerKg: container.ratePerKg,
           totalKg: container.totalKg,
+        },
+        supplier: {
+          code: (supplier as any)?.code || "",
+          legalName: supplier?.legalName || "",
         },
         purchaseOrders: posWithItems,
         offload: offloadDetails,

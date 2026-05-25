@@ -26,7 +26,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import type { Supplier, Customer, ContainerSale } from "@shared/schema";
-import { utils, writeFile, read as readExcel } from "@/lib/excelHelper";
+import { utils, writeFile, read as readExcel, ExcelJS } from "@/lib/excelHelper";
 
 interface ContainerDetailData {
   container: any;
@@ -379,6 +379,137 @@ export default function ContainerDetail() {
       await writeFile(workbook, `container_${data.container.containerNumber}.xlsx`);
 
       toast({ title: "Export successful", description: "Container data downloaded as Excel" });
+    } catch (error: any) {
+      toast({ title: "Export failed", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleExportContainerNoCost = async () => {
+    if (!navigator.onLine) { toast({ title: "Not available offline", description: "Exports require a connection", variant: "destructive" }); return; }
+    try {
+      const response = await fetch(`/api/containers/${containerId}/export`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Export failed");
+
+      const supplierLabel =
+        data.supplier?.code ||
+        data.container?.supplierCode ||
+        data.supplier?.legalName ||
+        data.container?.supplierName ||
+        "";
+      const containerNumber = data.container?.containerNumber || "";
+      const truckNumber =
+        data.container?.numberPlate ||
+        data.container?.truckNumber ||
+        "";
+
+      // ── build ExcelJS workbook directly for full styling support ──
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet("Container Items");
+
+      // Column definitions (B hidden)
+      ws.columns = [
+        { key: "no",   width: 6 },
+        { key: "bc",   width: 20, hidden: true },
+        { key: "desc", width: 70 },
+        { key: "qty",  width: 18 },
+        { key: "unit", width: 15 },
+      ];
+
+      // ── Row 1: supplier label (merged A1:E1) ──
+      ws.addRow([supplierLabel, "", "", "", ""]);
+      ws.mergeCells("A1:E1");
+      const r1 = ws.getRow(1);
+      r1.height = 28;
+      r1.eachCell((cell) => {
+        cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1B2A4A" } };
+        cell.font   = { bold: true, color: { argb: "FFFFFFFF" }, size: 13 };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.border = {
+          top: { style: "thin" }, bottom: { style: "thin" },
+          left: { style: "thin" }, right: { style: "thin" },
+        };
+      });
+
+      // ── Row 2: container + truck (merged A2:C2 and D2:E2) ──
+      ws.addRow([`CONTAINER: ${containerNumber}`, "", "", `TRUCK: ${truckNumber}`, ""]);
+      ws.mergeCells("A2:C2");
+      ws.mergeCells("D2:E2");
+      const r2 = ws.getRow(2);
+      r2.height = 22;
+      r2.eachCell({ includeEmpty: true }, (cell) => {
+        cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: "FFBDD7EE" } };
+        cell.font   = { bold: true, size: 11 };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.border = {
+          top: { style: "thin" }, bottom: { style: "thin" },
+          left: { style: "thin" }, right: { style: "thin" },
+        };
+      });
+
+      // ── Row 3: column headers ──
+      ws.addRow(["NO", "BARCODE", "DESCRIPTION", "Q'TY", "UNIT (KG)"]);
+      const r3 = ws.getRow(3);
+      r3.eachCell((cell, colNum) => {
+        cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2E3B4E" } };
+        cell.font   = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+        cell.alignment = {
+          horizontal: colNum === 3 ? "left" : "center",
+          vertical: "middle",
+        };
+        cell.border = {
+          top: { style: "thin" }, bottom: { style: "thin" },
+          left: { style: "thin" }, right: { style: "thin" },
+        };
+      });
+
+      // ── Rows 4+: line items ──
+      let idx = 1;
+      for (const po of data.purchaseOrders || []) {
+        for (const item of po.lineItems || []) {
+          const isEven = idx % 2 === 0;
+          const row = ws.addRow([
+            idx,
+            item.stockItemCode || "",
+            item.stockItemName || "",
+            item.quantity || "0",
+            "",
+          ]);
+          row.eachCell({ includeEmpty: true }, (cell, colNum) => {
+            if (isEven) {
+              cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F6FC" } };
+            }
+            cell.alignment = {
+              horizontal: colNum === 3 ? "left" : "center",
+              vertical: "middle",
+              wrapText: colNum === 3,
+            };
+            cell.border = {
+              top: { style: "thin" }, bottom: { style: "thin" },
+              left: { style: "thin" }, right: { style: "thin" },
+            };
+            cell.font = { size: 10 };
+          });
+          idx++;
+        }
+      }
+
+      // Freeze top 3 rows
+      ws.views = [{ state: "frozen", xSplit: 0, ySplit: 3 }];
+
+      // ── download ──
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `container_${containerNumber}_no_cost.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({ title: "No-cost export downloaded" });
     } catch (error: any) {
       toast({ title: "Export failed", description: error.message, variant: "destructive" });
     }
@@ -917,7 +1048,11 @@ export default function ContainerDetail() {
           <DropdownMenuContent align="start">
             <DropdownMenuItem onClick={handleExportContainer} data-testid="button-export-excel">
               <Download className="w-4 h-4 mr-2" />
-              Export Excel
+              Full Export
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportContainerNoCost} data-testid="button-export-no-cost">
+              <Download className="w-4 h-4 mr-2" />
+              No Cost / Freight Export
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handlePrint} data-testid="button-export-pdf">
               <Printer className="w-4 h-4 mr-2" />
