@@ -3,7 +3,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries } from "./_helpers";
-import { saveMessage, chat, getConversationHistory, getConversationHistoryForAI, getAllChatHistory, saveFeedback, getConfiguredProviders, extractPOFromText } from "../chatService";
+import { saveMessage, chat, getConversationHistory, getConversationHistoryForAI, getAllChatHistory, saveFeedback, getConfiguredProviders, extractPOFromText, clearERPContextCache } from "../chatService";
 import {
   inventory, stockItems, stockGroups, stockItemCodeAliases,
   stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
@@ -426,6 +426,7 @@ export function registerChatbotRoutes(app: Express) {
         } as any);
       } catch (_) {}
 
+      clearERPContextCache(companyId);
       res.json({ success: true, transferId: data.id, voucherId: data.voucherId });
     } catch (error: any) {
       console.error("[Chatbot] confirm-stock-transfer error:", error.message);
@@ -874,6 +875,7 @@ export function registerChatbotRoutes(app: Express) {
         .where(and(eq(supplierProformas.companyId, companyId), eq(supplierProformas.supplierId, Number(supplierId))))
         .orderBy(desc(supplierProformas.createdAt));
 
+      clearERPContextCache(companyId);
       res.json({
         success:            true,
         poId:               po.id,

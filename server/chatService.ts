@@ -198,6 +198,39 @@ const RE_PRICE_UPDATE = /\b(update.*price|change.*price|set.*price|price.*to|pri
 const RE_VOUCHER_SEARCH = /\b(when did (i|we) pay|find (the )?(payment|receipt|voucher|transaction)|search (for )?(voucher|payment|receipt)|show (me )?(the )?(voucher|payment|receipt)|paid for|receipt for|voucher for|payment (for|of)|what voucher|which voucher|show.*payment.*for|show.*receipt.*for)\b/i;
 const RE_ACCOUNT_QUERY = /\b(balance of|account.*balance|how much.*account|account.*how much|what.*balance|balance.*account|when did.*account|account.*transactions|transactions.*account|paid.*from account|received.*account|when.*balance.*was|balance.*was.*when|ledger.*balance|account.*paid|account.*received)\b/i;
 
+// ── ERP context in-memory cache (TTL = 60 s per companyId) ───────────────────
+const ERP_CACHE_TTL_MS = 60_000;
+interface ERPCacheEntry { context: ERPContext; expiresAt: number; }
+const erpContextCache = new Map<string, ERPCacheEntry>();
+
+export function clearERPContextCache(companyId?: number): void {
+  if (companyId !== undefined) {
+    const key = `erp-context:${companyId}`;
+    erpContextCache.delete(key);
+    console.log(`[ChatService] Cache cleared for company ${companyId}`);
+  } else {
+    erpContextCache.clear();
+    console.log("[ChatService] Cache cleared for all companies");
+  }
+}
+
+async function getCachedERPContext(companyId: number): Promise<ERPContext> {
+  const key = `erp-context:${companyId}`;
+  const now = Date.now();
+  const cached = erpContextCache.get(key);
+  if (cached && now < cached.expiresAt) {
+    const ageMs = now - (cached.expiresAt - ERP_CACHE_TTL_MS);
+    console.log(`[ChatService] Cache HIT for company ${companyId} (age ${Math.round(ageMs / 1000)}s)`);
+    return cached.context;
+  }
+  console.log(`[ChatService] Cache MISS for company ${companyId} — fetching`);
+  const t0 = Date.now();
+  const context = await getERPContext(companyId);
+  console.log(`[ChatService] Context loaded in ${Date.now() - t0}ms`);
+  erpContextCache.set(key, { context, expiresAt: now + ERP_CACHE_TTL_MS });
+  return context;
+}
+
 interface ERPContext {
   dataFetchedAt: string; // ISO timestamp when data was fetched
   inventory: any[];
@@ -1363,6 +1396,8 @@ export async function chat(
   }
 
   try {
+    const chatStart = Date.now();
+
     // ── Step 1: Classify intent (pure regex, no AI call) ─────────────────
     const intent = classifyChatIntent(userMessage, pageContext);
     const isActionIntent = ACTION_INTENTS.has(intent);
@@ -1379,12 +1414,11 @@ export async function chat(
       suggestions = [];
       console.log("[ChatService] Skipping getERPContext for action intent");
     } else {
-      console.log("[ChatService] Getting ERP context for company:", companyId);
-      context = await getERPContext(companyId);
-      console.log("[ChatService] ERP context retrieved successfully");
+      const ctxStart = Date.now();
+      context = await getCachedERPContext(companyId);
+      console.log(`[ChatService] Context ready in ${Date.now() - ctxStart}ms (company ${companyId})`);
       systemPrompt = buildSystemPrompt(context, userPreferences);
       suggestions = generateQuickSuggestions(context);
-      console.log("[ChatService] System prompt built, suggestions generated");
 
       // Inject page context into full-context prompt
       if (pageContext?.currentRoute) {
@@ -1402,14 +1436,14 @@ export async function chat(
     const selectedProvider = await getSelectedAIProvider();
     console.log(`[ChatService] Selected provider: ${selectedProvider}, Available: ${available.join(", ")}`);
     
+    const aiStart = Date.now();
     const { response, usedProvider } = await callAIWithFallback(
       selectedProvider,
       systemPrompt,
       conversationHistory,
       userMessage
     );
-    
-    console.log(`[ChatService] Response received from ${usedProvider}`);
+    console.log(`[ChatService] AI call (${usedProvider}) took ${Date.now() - aiStart}ms`);
 
     // ── Phase 5b: detect voucher creation intent ──────────────────────────
     // Ask the AI to extract a voucher draft if the message contains creation intent.
@@ -5039,6 +5073,7 @@ If the intent does not match any type, output: null`;
       }
     }
 
+    console.log(`[ChatService] Total chat time: ${Date.now() - chatStart}ms`);
     return {
       response,
       suggestions,
