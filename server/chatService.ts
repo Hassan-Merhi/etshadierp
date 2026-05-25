@@ -15,6 +15,7 @@ import {
   getSalesForItem,
   getBusinessSummary,
 } from "./aiTools";
+import { getOrBuildAISnapshot } from "./lib/aiSnapshots";
 
 // AI Provider types
 type AIProvider = "gemini" | "chatgpt" | "grok";
@@ -1429,21 +1430,25 @@ async function loadToolData(
 
   switch (intent) {
     case "inventory_query": {
-      const [items, lowStock] = await Promise.all([
+      // snapshot for low-stock alerts; live search for specific item matches
+      const [items, lowStockSnap] = await Promise.all([
         searchStockItems(companyId, term, 20),
-        getLowStockItems(companyId, 10),
+        getOrBuildAISnapshot(companyId, "low_stock"),
       ]);
-      // If a single item was found, add its per-location breakdown
       let locationBreakdown: any[] = [];
       if (items.length === 1) {
         locationBreakdown = await getStockByLocation(companyId, items[0].id);
       }
-      return { items, lowStock, locationBreakdown };
+      return { items, lowStock: (lowStockSnap.items as any[]).slice(0, 10), locationBreakdown };
     }
 
     case "supplier_query": {
-      const suppliers = await searchSuppliers(companyId, term, 15);
-      return { suppliers };
+      // targeted name/code search stays live; balances from snapshot
+      const [suppliers, supplierBalSnap] = await Promise.all([
+        searchSuppliers(companyId, term, 15),
+        getOrBuildAISnapshot(companyId, "supplier_balances"),
+      ]);
+      return { suppliers, supplierBalances: supplierBalSnap.balances };
     }
 
     case "customer_query": {
@@ -1452,24 +1457,30 @@ async function loadToolData(
     }
 
     case "sales_query": {
-      const [summary, items] = await Promise.all([
-        getBusinessSummary(companyId),
+      // business_summary snapshot covers today + month figures; item search stays live
+      const [summarySnap, items] = await Promise.all([
+        getOrBuildAISnapshot(companyId, "business_summary"),
         searchStockItems(companyId, term, 5),
       ]);
       let salesHistory: any[] = [];
       if (items.length > 0) {
         salesHistory = await getSalesForItem(companyId, items[0].id, 20);
       }
-      return { summary, matchedItems: items, salesHistory };
+      return { summary: summarySnap, matchedItems: items, salesHistory };
     }
 
     case "business_summary": {
-      const [summary, lowStock, pricingHealth] = await Promise.all([
-        getBusinessSummary(companyId),
-        getLowStockItems(companyId, 5),
-        getPricingHealth(companyId, 5),
+      // All three sub-datasets served from TTL-gated snapshots
+      const [summary, lowStockSnap, pricingSnap] = await Promise.all([
+        getOrBuildAISnapshot(companyId, "business_summary"),
+        getOrBuildAISnapshot(companyId, "low_stock"),
+        getOrBuildAISnapshot(companyId, "pricing_health"),
       ]);
-      return { summary, lowStock, pricingHealth };
+      return {
+        summary,
+        lowStock:      (lowStockSnap.items as any[]).slice(0, 5),
+        pricingHealth: (pricingSnap.items  as any[]).slice(0, 5),
+      };
     }
 
     default:
@@ -1515,13 +1526,19 @@ function buildToolSystemPrompt(
     }
 
     case "supplier_query": {
-      const { suppliers } = data;
-      prompt += `\n## SUPPLIER DATA:\n`;
+      const { suppliers, supplierBalances } = data;
+      prompt += `\n## SUPPLIER SEARCH RESULTS:\n`;
       if (suppliers.length === 0) {
         prompt += "No matching suppliers found.\n";
       } else {
         prompt += suppliers.map((s: any) =>
           `- ${s.name} (${s.code}): phone=${s.phone || "—"}, email=${s.email || "—"}, openingBalance=${s.openingBalance}`
+        ).join("\n") + "\n";
+      }
+      if (supplierBalances && supplierBalances.length > 0) {
+        prompt += `\n## SUPPLIER BALANCES (${supplierBalances.length} with non-zero balance):\n`;
+        prompt += (supplierBalances as any[]).slice(0, 15).map((s: any) =>
+          `- ${s.supplierName} (${s.supplierCode}): balance=${s.balance} [${s.status}]`
         ).join("\n") + "\n";
       }
       break;

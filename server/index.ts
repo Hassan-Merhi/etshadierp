@@ -3481,6 +3481,18 @@ let migrationsDone = false;
     )`,
     `CREATE INDEX IF NOT EXISTS ai_correction_memory_company_idx ON ai_correction_memory(company_id)`,
     `CREATE INDEX IF NOT EXISTS ai_correction_memory_lookup_idx ON ai_correction_memory(company_id, memory_type)`,
+
+    // AI company snapshots — precomputed summaries with TTL for chatbot
+    `CREATE TABLE IF NOT EXISTS ai_company_snapshots (
+      id            serial PRIMARY KEY,
+      company_id    integer NOT NULL,
+      snapshot_type varchar(60) NOT NULL,
+      data          jsonb NOT NULL DEFAULT '{}',
+      calculated_at timestamp NOT NULL DEFAULT now(),
+      expires_at    timestamp NOT NULL
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS ai_snapshots_company_type_unique ON ai_company_snapshots(company_id, snapshot_type)`,
+    `CREATE INDEX IF NOT EXISTS ai_snapshots_expires_idx ON ai_company_snapshots(expires_at)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

@@ -5800,3 +5800,21 @@ export const spProfitSplits = pgTable("sp_profit_splits", {
 export const insertSpProfitSplitSchema = createInsertSchema(spProfitSplits).omit({ id: true, createdAt: true });
 export type InsertSpProfitSplit = z.infer<typeof insertSpProfitSplitSchema>;
 export type SpProfitSplit = typeof spProfitSplits.$inferSelect;
+
+// ── AI company snapshots ──────────────────────────────────────────────────────
+// Precomputed, TTL-gated summaries served to the chatbot instead of live queries.
+// snapshotType values: business_summary | inventory_summary | sales_today |
+//                      sales_month | supplier_balances | pricing_health | low_stock
+export const aiCompanySnapshots = pgTable("ai_company_snapshots", {
+  id:           serial("id").primaryKey(),
+  companyId:    integer("company_id").notNull(),
+  snapshotType: varchar("snapshot_type", { length: 60 }).notNull(),
+  data:         jsonb("data").notNull().default({}),
+  calculatedAt: timestamp("calculated_at").notNull().defaultNow(),
+  expiresAt:    timestamp("expires_at").notNull(),
+}, (t) => ({
+  companyTypeUniq: uniqueIndex("ai_snapshots_company_type_unique").on(t.companyId, t.snapshotType),
+  expiresIdx:      index("ai_snapshots_expires_idx").on(t.expiresAt),
+}));
+
+export type AiCompanySnapshot = typeof aiCompanySnapshots.$inferSelect;
