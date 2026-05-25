@@ -2060,7 +2060,12 @@ export const aiActionLog = pgTable("ai_action_log", {
   sessionId: varchar("session_id"),
   prompt: text("prompt"),
   draftJson: jsonb("draft_json"),
+  // actionType = permission level: 'read' | 'draft' | 'write'
   actionType: varchar("action_type", { length: 80 }),
+  // actionName = specific action: 'chat_message' | 'stock_transfer' | 'po_import' | etc.
+  actionName: varchar("action_name", { length: 120 }),
+  inputJson: jsonb("input_json"),
+  outputJson: jsonb("output_json"),
   createdRecordId: integer("created_record_id"),
   status: varchar("status", { length: 20 }).default("confirmed"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

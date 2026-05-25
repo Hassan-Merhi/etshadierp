@@ -3421,6 +3421,13 @@ let migrationsDone = false;
     `CREATE INDEX IF NOT EXISTS stock_items_grade_idx ON stock_items(company_id, grade_id)`,
     `CREATE INDEX IF NOT EXISTS stock_items_category_idx ON stock_items(company_id, category_id)`,
 
+    // ── AI action log — new columns (May 2026) ────────────────────────────────
+    // actionName: specific action identifier ('chat_message', 'stock_transfer', etc.)
+    // inputJson / outputJson: structured request/response snapshots for audit trails
+    `ALTER TABLE ai_action_log ADD COLUMN IF NOT EXISTS action_name varchar(120)`,
+    `ALTER TABLE ai_action_log ADD COLUMN IF NOT EXISTS input_json jsonb`,
+    `ALTER TABLE ai_action_log ADD COLUMN IF NOT EXISTS output_json jsonb`,
+
     // ── AI Excel Import staging tables (May 2026) ─────────────────────────────
     `CREATE TABLE IF NOT EXISTS ai_import_jobs (
       id serial PRIMARY KEY,

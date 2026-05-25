@@ -50,6 +50,7 @@ import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelpe
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
 import path from "path";
 import fs from "fs";
+import { requireAIActionPermission, logAIAction } from "../lib/aiActionPermission";
 
 export function registerChatbotRoutes(app: Express) {
   app.get("/api/chatbot/status", requireAuth, async (req, res) => {
@@ -140,6 +141,9 @@ export function registerChatbotRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
+      const denied = await requireAIActionPermission(req, "read");
+      if (denied) return res.status(denied.code).json({ message: denied.message });
+
       const { message, sessionId, pageContext } = req.body;
       if (!message || !sessionId) {
         return res.status(400).json({ message: "Message and sessionId are required" });
@@ -156,6 +160,17 @@ export function registerChatbotRoutes(app: Express) {
 
       // Save assistant response
       await saveMessage(companyId, userId, "assistant", result.response, sessionId);
+
+      await logAIAction({
+        req,
+        actionType: "read",
+        actionName: "chat_message",
+        inputJson: { message, sessionId },
+        outputJson: {
+          hasDraft: !!(result.voucherDraft || result.stockTransferDraft || result.stockItemDraft || result.stockAdjustmentDraft),
+        },
+        status: "success",
+      });
 
       res.json({
         response: result.response,
@@ -365,14 +380,24 @@ export function registerChatbotRoutes(app: Express) {
       const userId = req.session.userId;
       const companyId = req.session.currentCompanyId;
       if (!userId || !companyId) return res.status(400).json({ message: "No company selected" });
-      const { sessionId, prompt, draftJson, actionType, createdRecordId, status } = req.body;
+
+      const { sessionId, prompt, draftJson, actionType, actionName, createdRecordId, status } = req.body;
+
+      // Determine permission tier from client-supplied actionType
+      const tier: "read" | "draft" | "write" =
+        actionType === "write" ? "write" : actionType === "draft" ? "draft" : "read";
+
+      const denied = await requireAIActionPermission(req, tier);
+      if (denied) return res.status(denied.code).json({ message: denied.message });
+
       await db.insert(aiActionLog).values({
         companyId,
         userId,
         sessionId: sessionId || null,
         prompt: prompt || null,
         draftJson: draftJson || null,
-        actionType: actionType || null,
+        actionType: tier,
+        actionName: actionName || null,
         createdRecordId: createdRecordId || null,
         status: status || "confirmed",
       } as any);
@@ -388,6 +413,9 @@ export function registerChatbotRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       const userId = req.session.userId;
       if (!companyId || !userId) return res.status(400).json({ message: "No company selected" });
+
+      const denied = await requireAIActionPermission(req, "write");
+      if (denied) return res.status(denied.code).json({ message: denied.message });
 
       const { date, sourceLocationId, destinationLocationId, notes, items, sessionId, prompt } = req.body;
       if (!sourceLocationId || !destinationLocationId) return res.status(400).json({ message: "Source and destination locations are required" });
@@ -412,19 +440,16 @@ export function registerChatbotRoutes(app: Express) {
       const data = await resp.json();
       if (!resp.ok) return res.status(resp.status).json(data);
 
-      // Write audit log
-      try {
-        await db.insert(aiActionLog).values({
-          companyId,
-          userId,
-          sessionId: sessionId || null,
-          prompt: prompt || null,
-          draftJson: req.body,
-          actionType: "stock_transfer",
-          createdRecordId: data.id || data.voucherId || null,
-          status: "confirmed",
-        } as any);
-      } catch (_) {}
+      // Write audit log via centralised helper
+      await logAIAction({
+        req,
+        actionType: "write",
+        actionName: "stock_transfer",
+        inputJson: { sourceLocationId, destinationLocationId, date, notes, itemCount: items?.length ?? 0 },
+        outputJson: { transferId: data.id, voucherId: data.voucherId },
+        status: "success",
+        createdRecordId: data.id || data.voucherId || null,
+      });
 
       clearERPContextCache(companyId);
       res.json({ success: true, transferId: data.id, voucherId: data.voucherId });
@@ -486,6 +511,10 @@ export function registerChatbotRoutes(app: Express) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const denied = await requireAIActionPermission(req, "read");
+      if (denied) return res.status(denied.code).json({ message: denied.message });
+
       const q = ((req.query.q as string) || "").trim();
       const modules = ((req.query.modules as string) || "").split(",").filter(Boolean);
       if (!q) return res.json({ results: [] });
@@ -526,6 +555,15 @@ export function registerChatbotRoutes(app: Express) {
         irows.forEach(r => results.push({ module: "Stock Item", id: r.id, title: r.name, subtitle: r.code || "", meta: "Item", path: `/stock-items` }));
       }
 
+      await logAIAction({
+        req,
+        actionType: "read",
+        actionName: "smart_search",
+        inputJson: { q, modules: searchModules },
+        outputJson: { resultCount: results.length },
+        status: "success",
+      });
+
       res.json({ results });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -538,6 +576,9 @@ export function registerChatbotRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+      const denied = await requireAIActionPermission(req, "draft");
+      if (denied) return res.status(denied.code).json({ message: denied.message });
 
       const fileExt = (req.file.originalname || "").toLowerCase().split(".").pop();
       const allSuppliers  = await storage.getAllSuppliers();
@@ -780,6 +821,9 @@ export function registerChatbotRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
+      const denied = await requireAIActionPermission(req, "write");
+      if (denied) return res.status(denied.code).json({ message: denied.message });
+
       const { poNumber, containerNumber, importDate, currency, supplierId, lines, charges } = req.body;
 
       if (!poNumber)        return res.status(400).json({ message: "PO number is required" });
@@ -874,6 +918,22 @@ export function registerChatbotRoutes(app: Express) {
         .from(supplierProformas)
         .where(and(eq(supplierProformas.companyId, companyId), eq(supplierProformas.supplierId, Number(supplierId))))
         .orderBy(desc(supplierProformas.createdAt));
+
+      await logAIAction({
+        req,
+        actionType: "write",
+        actionName: "po_import",
+        inputJson: {
+          poNumber,
+          containerNumber,
+          supplierId: Number(supplierId),
+          lineCount: lines.length,
+          currency: currency || "USD",
+        },
+        outputJson: { poId: po.id, containerId: container.id, grandTotal: grandTotal.toFixed(2) },
+        status: "success",
+        createdRecordId: po.id,
+      });
 
       clearERPContextCache(companyId);
       res.json({
