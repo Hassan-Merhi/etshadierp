@@ -68,6 +68,7 @@ import { registerDispatchBatchRoutes } from "./routes/factory/factoryDispatchBat
 import { registerSpRoutes } from "./routes/spRoutes";
 import { registerSpMigrationRoutes } from "./routes/spMigrationRoutes";
 import { registerAiImportRoutes } from "./routes/aiImportRoutes";
+import { registerAiValidationRoutes } from "./routes/aiValidationRoutes";
 import {
   requireAuth,
   requireRole,
@@ -1784,6 +1785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerSpRoutes(app);
   registerSpMigrationRoutes(app);
   registerAiImportRoutes(app);
+  registerAiValidationRoutes(app);
 
   const httpServer = createServer(app);
 
