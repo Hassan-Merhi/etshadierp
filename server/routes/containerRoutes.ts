@@ -117,18 +117,50 @@ async function syncIntercoParentVoucher(
       ? likeConditions[0]
       : or(...likeConditions);
 
-    const containerFilter = containerNumber
-      ? like(vouchers.description, `${containerNumber}%`)
-      : undefined;
-    const whereClause = containerFilter
-      ? and(eq(vouchers.companyId, parentCompanyId), patternClause, containerFilter)
-      : and(eq(vouchers.companyId, parentCompanyId), patternClause);
-
-    const [parentVoucher] = await dbOrTx
-      .select({ id: vouchers.id, totalAmount: vouchers.totalAmount })
-      .from(vouchers)
-      .where(whereClause)
-      .limit(1);
+    // Locate the parent INTERCO voucher for this specific container.
+    // Two description formats exist depending on which creation path was used:
+    //   A) Container-based:  description starts with the container number
+    //      e.g. "CAJU5262333 EUROGULF"
+    //   B) PO-based:         description is generic "Inter-company credit: …"
+    //      but the entry NARRATION contains "- Container EMCU7265605"
+    // We try format A first (description LIKE), then fall back to format B
+    // (entry narration LIKE) so both paths are handled.
+    let parentVoucher: { id: number; totalAmount: string | null } | undefined;
+    if (containerNumber) {
+      // Format A: container number in description
+      const [byDesc] = await dbOrTx
+        .select({ id: vouchers.id, totalAmount: vouchers.totalAmount })
+        .from(vouchers)
+        .where(and(
+          eq(vouchers.companyId, parentCompanyId),
+          patternClause,
+          like(vouchers.description, `%${containerNumber}%`),
+        ))
+        .limit(1);
+      if (byDesc) {
+        parentVoucher = byDesc;
+      } else {
+        // Format B: container number in entry narration
+        const [byNarration] = await dbOrTx
+          .select({ id: vouchers.id, totalAmount: vouchers.totalAmount })
+          .from(vouchers)
+          .innerJoin(voucherEntries, eq(voucherEntries.voucherId, vouchers.id))
+          .where(and(
+            eq(vouchers.companyId, parentCompanyId),
+            patternClause,
+            like(voucherEntries.narration, `%${containerNumber}%`),
+          ))
+          .limit(1);
+        parentVoucher = byNarration;
+      }
+    } else {
+      const [byPo] = await dbOrTx
+        .select({ id: vouchers.id, totalAmount: vouchers.totalAmount })
+        .from(vouchers)
+        .where(and(eq(vouchers.companyId, parentCompanyId), patternClause))
+        .limit(1);
+      parentVoucher = byPo;
+    }
 
     if (!parentVoucher) {
       console.warn(`[syncIntercoParentVoucher] No INTERCO-PARENT voucher found for PO(s): ${nums.join(", ")}`);
