@@ -2608,5 +2608,240 @@ export function registerStockRoutes(app: Express) {
     }
   });
 
+  // ── Bulk Merge: POST /api/stock-items/bulk-merge ─────────────────────────
+  // Accepts an array of { oldCode, keepCode } pairs.
+  // Resolves each code to an item ID (checking aliases too), then runs the
+  // same merge logic as the single-merge endpoint for each pair.
+  // Returns a per-pair results array — no pair failure aborts the others.
+  app.post("/api/stock-items/bulk-merge", requireAuth, requireNonPOS, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const userId: number = req.user?.id ?? req.session.userId;
+
+      const pairs: { oldCode: string; keepCode: string }[] = req.body.pairs ?? [];
+      if (!Array.isArray(pairs) || pairs.length === 0)
+        return res.status(400).json({ message: "pairs array is required and must not be empty" });
+      if (pairs.length > 500)
+        return res.status(400).json({ message: "Maximum 500 pairs per request" });
+
+      // Helper: resolve a code to a stock item (checks direct code first, then aliases)
+      async function resolveItem(code: string) {
+        const trimmed = code.trim().toUpperCase();
+        // Direct match
+        const [direct] = await db
+          .select()
+          .from(stockItems)
+          .where(
+            and(
+              eq(stockItems.companyId, companyId!),
+              sql`UPPER(${stockItems.code}) = ${trimmed}`,
+              isNull(stockItems.deletedAt),
+            )
+          )
+          .limit(1);
+        if (direct) return direct;
+        // Alias match
+        const [aliasRow] = await db
+          .select({ stockItemId: stockItemCodeAliases.stockItemId })
+          .from(stockItemCodeAliases)
+          .where(
+            and(
+              eq(stockItemCodeAliases.companyId, companyId!),
+              sql`UPPER(${stockItemCodeAliases.aliasCode}) = ${trimmed}`,
+            )
+          )
+          .limit(1);
+        if (!aliasRow) return null;
+        const [fromAlias] = await db
+          .select()
+          .from(stockItems)
+          .where(
+            and(
+              eq(stockItems.id, aliasRow.stockItemId),
+              isNull(stockItems.deletedAt),
+            )
+          )
+          .limit(1);
+        return fromAlias ?? null;
+      }
+
+      type PairResult = {
+        oldCode: string;
+        keepCode: string;
+        status: "success" | "skipped" | "error";
+        reason?: string;
+        keptItemName?: string;
+        oldItemName?: string;
+        keptItemId?: number;
+        mergedItemId?: number;
+      };
+
+      const results: PairResult[] = [];
+
+      for (const pair of pairs) {
+        const { oldCode, keepCode } = pair;
+        if (!oldCode || !keepCode) {
+          results.push({ oldCode: oldCode ?? "", keepCode: keepCode ?? "", status: "skipped", reason: "Missing code" });
+          continue;
+        }
+
+        try {
+          const [keptItem, duplicateItem] = await Promise.all([
+            resolveItem(keepCode),
+            resolveItem(oldCode),
+          ]);
+
+          if (!keptItem) {
+            results.push({ oldCode, keepCode, status: "skipped", reason: `Keep code "${keepCode}" not found` });
+            continue;
+          }
+          if (!duplicateItem) {
+            results.push({ oldCode, keepCode, status: "skipped", reason: `Old code "${oldCode}" not found` });
+            continue;
+          }
+          if (keptItem.id === duplicateItem.id) {
+            results.push({ oldCode, keepCode, status: "skipped", reason: "Old and keep codes resolve to the same item", keptItemName: keptItem.name, oldItemName: duplicateItem.name });
+            continue;
+          }
+          if (duplicateItem.deletedAt) {
+            results.push({ oldCode, keepCode, status: "skipped", reason: "Old item is already merged or deleted", keptItemName: keptItem.name, oldItemName: duplicateItem.name });
+            continue;
+          }
+          if (keptItem.uom !== duplicateItem.uom) {
+            results.push({ oldCode, keepCode, status: "skipped", reason: `UOM mismatch: "${keptItem.uom}" vs "${duplicateItem.uom}"`, keptItemName: keptItem.name, oldItemName: duplicateItem.name });
+            continue;
+          }
+
+          const keptId      = keptItem.id;
+          const duplicateId = duplicateItem.id;
+
+          const keptInvBefore = await db.select().from(inventory)
+            .where(and(eq(inventory.stockItemId, keptId), eq(inventory.companyId, companyId)));
+          const dupInvBefore  = await db.select().from(inventory)
+            .where(and(eq(inventory.stockItemId, duplicateId), eq(inventory.companyId, companyId)));
+
+          const totalValueBefore = [...keptInvBefore, ...dupInvBefore].reduce((s, r) => s + parseFloat(r.totalValue), 0);
+
+          const snapshotBefore: Record<string, unknown> = {};
+          for (const r of [...keptInvBefore, ...dupInvBefore]) {
+            snapshotBefore[`${r.stockItemId}_${r.locationId}`] = {
+              stockItemId: r.stockItemId, locationId: r.locationId,
+              quantity: r.quantity, averageRate: r.averageRate, totalValue: r.totalValue,
+            };
+          }
+
+          let snapshotAfter: Record<string, unknown> = {};
+
+          await db.transaction(async (tx) => {
+            const keptMap = new Map(keptInvBefore.map(r => [r.locationId, r]));
+
+            for (const dupRow of dupInvBefore) {
+              const locId   = dupRow.locationId;
+              const keptRow = keptMap.get(locId);
+              if (!keptRow) {
+                await tx.update(inventory)
+                  .set({ stockItemId: keptId, lastUpdated: new Date() })
+                  .where(and(eq(inventory.stockItemId, duplicateId), eq(inventory.locationId, locId)));
+              } else {
+                const combinedQty   = parseFloat(keptRow.quantity)   + parseFloat(dupRow.quantity);
+                const combinedValue = parseFloat(keptRow.totalValue) + parseFloat(dupRow.totalValue);
+                const combinedRate  = combinedQty > 0 ? combinedValue / combinedQty : 0;
+                await tx.update(inventory)
+                  .set({
+                    quantity:    combinedQty.toFixed(3),
+                    totalValue:  combinedValue.toFixed(2),
+                    averageRate: combinedRate.toFixed(2),
+                    lastUpdated: new Date(),
+                  })
+                  .where(and(eq(inventory.stockItemId, keptId), eq(inventory.locationId, locId)));
+                await tx.delete(inventory)
+                  .where(and(eq(inventory.stockItemId, duplicateId), eq(inventory.locationId, locId)));
+              }
+            }
+
+            const dupAliases  = await tx.select().from(stockItemCodeAliases).where(eq(stockItemCodeAliases.stockItemId, duplicateId));
+            const keptAliases = await tx.select().from(stockItemCodeAliases).where(eq(stockItemCodeAliases.stockItemId, keptId));
+            const keptAliasCodes = new Set([keptItem.code, ...keptAliases.map(a => a.aliasCode)]);
+            for (const alias of dupAliases) {
+              if (keptAliasCodes.has(alias.aliasCode)) continue;
+              await tx.update(stockItemCodeAliases).set({ stockItemId: keptId }).where(eq(stockItemCodeAliases.id, alias.id));
+              keptAliasCodes.add(alias.aliasCode);
+            }
+            if (!keptAliasCodes.has(duplicateItem.code)) {
+              await tx.insert(stockItemCodeAliases).values({
+                companyId,
+                stockItemId: keptId,
+                aliasCode: duplicateItem.code,
+                description: `Merged from: ${duplicateItem.name}`,
+              });
+            }
+
+            const dupPrices  = await tx.select().from(stockItemLocationPrices).where(eq(stockItemLocationPrices.stockItemId, duplicateId));
+            const keptPrices = await tx.select().from(stockItemLocationPrices).where(eq(stockItemLocationPrices.stockItemId, keptId));
+            const keptPriceLocations = new Set(keptPrices.map(p => p.locationId));
+            for (const price of dupPrices) {
+              if (!keptPriceLocations.has(price.locationId)) {
+                await tx.update(stockItemLocationPrices).set({ stockItemId: keptId }).where(eq(stockItemLocationPrices.id, price.id));
+              } else {
+                await tx.delete(stockItemLocationPrices).where(eq(stockItemLocationPrices.id, price.id));
+              }
+            }
+
+            await tx.update(stockItems)
+              .set({ active: false, deletedAt: new Date(), name: `[MERGED] ${duplicateItem.name}` })
+              .where(eq(stockItems.id, duplicateId));
+
+            const keptInvAfter = await tx.select().from(inventory)
+              .where(and(eq(inventory.stockItemId, keptId), eq(inventory.companyId, companyId)));
+            const totalValueAfter = keptInvAfter.reduce((s, r) => s + parseFloat(r.totalValue), 0);
+            if (Math.abs(totalValueAfter - totalValueBefore) > 0.02) {
+              throw new Error(`Value integrity check failed — before: ${totalValueBefore.toFixed(2)}, after: ${totalValueAfter.toFixed(2)}`);
+            }
+
+            for (const r of keptInvAfter) {
+              snapshotAfter[`${r.stockItemId}_${r.locationId}`] = {
+                stockItemId: r.stockItemId, locationId: r.locationId,
+                quantity: r.quantity, averageRate: r.averageRate, totalValue: r.totalValue,
+              };
+            }
+          });
+
+          // Audit log (non-fatal)
+          try {
+            await db.insert(stockItemMergeLogs).values({
+              companyId,
+              keptItemId:     keptId,
+              keptItemCode:   keptItem.code.slice(0, 50),
+              keptItemName:   keptItem.name,
+              mergedItemId:   duplicateId,
+              mergedItemCode: duplicateItem.code.slice(0, 50),
+              mergedItemName: duplicateItem.name,
+              snapshotBefore,
+              snapshotAfter,
+              mergedByUserId: userId,
+              notes: `Bulk merge via Excel`,
+            });
+          } catch (_auditErr) { /* non-fatal */ }
+
+          results.push({
+            oldCode, keepCode,
+            status: "success",
+            keptItemName:   keptItem.name,
+            oldItemName:    duplicateItem.name,
+            keptItemId:     keptId,
+            mergedItemId:   duplicateId,
+          });
+        } catch (pairErr: any) {
+          results.push({ oldCode, keepCode, status: "error", reason: pairErr.message });
+        }
+      }
+
+      return res.json({ results });
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  });
+
   // Bank Accounts
 }
