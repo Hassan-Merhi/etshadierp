@@ -60,6 +60,7 @@ const Analytics = lazy(() => import("@/pages/Analytics"));
 const AccountingCreate = lazy(() => import("@/pages/AccountingCreate"));
 const POImport = lazy(() => import("@/pages/POImport"));
 const AiValidationPage = lazy(() => import("@/pages/AiValidationPage"));
+const AICommandCenter  = lazy(() => import("@/pages/AICommandCenter"));
 const POSImport = lazy(() => import("@/pages/pos/POSImport"));
 const ContainerDetail = lazy(() => import("@/pages/ContainerDetail"));
 const LocationInventory = lazy(() => import("@/pages/LocationInventory"));
@@ -319,6 +320,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/offloads/:id" component={OffloadDetail} />
       <Route path="/po-import" component={POImport} />
       <Route path="/ai-validation" component={AiValidationPage} />
+      <Route path="/ai-command-center" component={AICommandCenter} />
       <Route path="/pos-import" component={POSImport} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/accounts" component={Accounts} />

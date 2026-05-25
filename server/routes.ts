@@ -69,6 +69,7 @@ import { registerSpRoutes } from "./routes/spRoutes";
 import { registerSpMigrationRoutes } from "./routes/spMigrationRoutes";
 import { registerAiImportRoutes } from "./routes/aiImportRoutes";
 import { registerAiValidationRoutes } from "./routes/aiValidationRoutes";
+import { registerAiAgentRoutes } from "./routes/aiAgentRoutes";
 import {
   requireAuth,
   requireRole,
@@ -1786,6 +1787,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerSpMigrationRoutes(app);
   registerAiImportRoutes(app);
   registerAiValidationRoutes(app);
+  registerAiAgentRoutes(app);
 
   const httpServer = createServer(app);
 

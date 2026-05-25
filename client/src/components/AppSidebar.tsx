@@ -36,6 +36,8 @@ import {
   PackagePlus,
   Tags,
   Wrench,
+  Bot,
+  ShieldCheck,
 } from "lucide-react";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
@@ -114,6 +116,14 @@ export const ERP_NAV_SECTIONS: NavSection[] = [
       { title: "Warehouses",    url: "/erp/rental/warehouses", icon: Building2      },
       { title: "Shops",         url: "/erp/rental/shops",      icon: Store          },
       { title: "Payments Log",  url: "/erp/rental/payments",   icon: ClipboardList  },
+    ],
+  },
+  {
+    label: "AI Tools",
+    color: NAV_COLOR.analytics,
+    items: [
+      { title: "AI Command Center", url: "/ai-command-center", icon: Bot         },
+      { title: "AI Validation",     url: "/ai-validation",     icon: ShieldCheck },
     ],
   },
 ];

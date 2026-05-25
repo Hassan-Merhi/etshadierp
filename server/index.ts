@@ -3493,6 +3493,42 @@ let migrationsDone = false;
     )`,
     `CREATE UNIQUE INDEX IF NOT EXISTS ai_snapshots_company_type_unique ON ai_company_snapshots(company_id, snapshot_type)`,
     `CREATE INDEX IF NOT EXISTS ai_snapshots_expires_idx ON ai_company_snapshots(expires_at)`,
+
+    // AI Agent Tasks — Command Center orchestration tasks
+    `CREATE TABLE IF NOT EXISTS ai_agent_tasks (
+      id               serial PRIMARY KEY,
+      company_id       integer NOT NULL,
+      user_id          varchar(100) NOT NULL,
+      task_type        varchar(80) NOT NULL DEFAULT 'general',
+      user_instruction text NOT NULL,
+      status           varchar(30) NOT NULL DEFAULT 'planned',
+      plan_json        jsonb,
+      result_json      jsonb,
+      error_message    text,
+      created_at       timestamp NOT NULL DEFAULT now(),
+      updated_at       timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS ai_agent_tasks_company_idx ON ai_agent_tasks(company_id)`,
+    `CREATE INDEX IF NOT EXISTS ai_agent_tasks_status_idx ON ai_agent_tasks(status)`,
+
+    // AI Agent Approvals — gated write actions requiring user sign-off
+    `CREATE TABLE IF NOT EXISTS ai_agent_approvals (
+      id           serial PRIMARY KEY,
+      task_id      integer NOT NULL,
+      company_id   integer NOT NULL,
+      user_id      varchar(100) NOT NULL,
+      action_type  varchar(80) NOT NULL,
+      action_label text NOT NULL,
+      payload_json jsonb,
+      preview_json jsonb,
+      status       varchar(30) NOT NULL DEFAULT 'pending',
+      approved_by  varchar(100),
+      approved_at  timestamp,
+      posted_at    timestamp,
+      created_at   timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS ai_agent_approvals_task_idx    ON ai_agent_approvals(task_id)`,
+    `CREATE INDEX IF NOT EXISTS ai_agent_approvals_company_idx ON ai_agent_approvals(company_id)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

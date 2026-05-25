@@ -5818,3 +5818,47 @@ export const aiCompanySnapshots = pgTable("ai_company_snapshots", {
 }));
 
 export type AiCompanySnapshot = typeof aiCompanySnapshots.$inferSelect;
+
+// ── AI Agent Tasks ────────────────────────────────────────────────────────────
+// status: planned → running → waiting_for_approval | completed | failed | cancelled
+export const aiAgentTasks = pgTable("ai_agent_tasks", {
+  id:              serial("id").primaryKey(),
+  companyId:       integer("company_id").notNull(),
+  userId:          varchar("user_id", { length: 100 }).notNull(),
+  taskType:        varchar("task_type", { length: 80 }).notNull().default("general"),
+  userInstruction: text("user_instruction").notNull(),
+  status:          varchar("status", { length: 30 }).notNull().default("planned"),
+  planJson:        jsonb("plan_json"),
+  resultJson:      jsonb("result_json"),
+  errorMessage:    text("error_message"),
+  createdAt:       timestamp("created_at").notNull().defaultNow(),
+  updatedAt:       timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  companyIdx: index("ai_agent_tasks_company_idx").on(t.companyId),
+  statusIdx:  index("ai_agent_tasks_status_idx").on(t.status),
+}));
+
+export type AiAgentTask = typeof aiAgentTasks.$inferSelect;
+
+// ── AI Agent Approvals ────────────────────────────────────────────────────────
+// status: pending → approved | rejected | posted
+export const aiAgentApprovals = pgTable("ai_agent_approvals", {
+  id:          serial("id").primaryKey(),
+  taskId:      integer("task_id").notNull(),
+  companyId:   integer("company_id").notNull(),
+  userId:      varchar("user_id", { length: 100 }).notNull(),
+  actionType:  varchar("action_type", { length: 80 }).notNull(),
+  actionLabel: text("action_label").notNull(),
+  payloadJson: jsonb("payload_json"),
+  previewJson: jsonb("preview_json"),
+  status:      varchar("status", { length: 30 }).notNull().default("pending"),
+  approvedBy:  varchar("approved_by", { length: 100 }),
+  approvedAt:  timestamp("approved_at"),
+  postedAt:    timestamp("posted_at"),
+  createdAt:   timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  taskIdx:    index("ai_agent_approvals_task_idx").on(t.taskId),
+  companyIdx: index("ai_agent_approvals_company_idx").on(t.companyId),
+}));
+
+export type AiAgentApproval = typeof aiAgentApprovals.$inferSelect;
