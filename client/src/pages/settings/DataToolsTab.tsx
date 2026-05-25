@@ -827,8 +827,8 @@ export function DataToolsTab() {
           <MergeStockItemsCard />
         )}
 
-        {/* Bulk Merge via Excel — ERP mode, Admin/Owner/Developer */}
-        {appMode !== "factory" && ["Admin", "Owner", "Developer"].includes(dtCurrentUser?.role || "") && selectedCompany && (
+        {/* Bulk Merge via Excel — ERP mode, Developer only */}
+        {appMode !== "factory" && dtCurrentUser?.role === "Developer" && selectedCompany && (
           <BulkMergeStockItemsCard />
         )}
 
