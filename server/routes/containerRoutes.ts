@@ -2487,26 +2487,42 @@ export function registerContainerRoutes(app: Express) {
             .where(
               and(
                 eq(vouchers.companyId, req.session.currentCompanyId!),
-                like(sql`LOWER(${vouchers.description})`, `%container ${(container.containerNumber || "").toLowerCase()}%`),
                 sql`(
-                  ${vouchers.voucherNumber} LIKE 'DUTY-%' OR
-                  ${vouchers.voucherNumber} LIKE 'OFFICE-%' OR
-                  ${vouchers.voucherNumber} LIKE 'TRANS-%' OR
-                  ${vouchers.voucherNumber} LIKE 'CHG-%' OR
-                  ${vouchers.voucherNumber} LIKE 'XFER-%'
+                  (
+                    LOWER(${vouchers.description}) LIKE LOWER(${'%container ' + (container.containerNumber || '') + '%'})
+                    AND (
+                      ${vouchers.voucherNumber} LIKE 'DUTY-%' OR
+                      ${vouchers.voucherNumber} LIKE 'OFFICE-%' OR
+                      ${vouchers.voucherNumber} LIKE 'TRANS-%' OR
+                      ${vouchers.voucherNumber} LIKE 'CHG-%' OR
+                      ${vouchers.voucherNumber} LIKE 'XFER-%'
+                    )
+                  )
+                  OR ${vouchers.voucherNumber} LIKE ${'SP-OTW-REV-ERP-' + containerId + '-%'}
+                  OR ${vouchers.voucherNumber} LIKE ${'SP-STOCK-ERP-' + containerId + '-%'}
+                  OR ${vouchers.voucherNumber} LIKE ${'SP-AGENT-SETTLE-' + containerId + '-%'}
                 )`,
               ),
             );
 
           for (const voucher of containerVouchers) {
-            // Delete voucher entries first
-            await tx
-              .delete(voucherEntries)
-              .where(eq(voucherEntries.voucherId, voucher.id));
-
-            // Delete the voucher
+            await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucher.id));
             await tx.delete(vouchers).where(eq(vouchers.id, voucher.id));
+          }
 
+          // Also reverse the HADI L'SHI side SP agent journal (companyId=1)
+          const hadiSpVouchers = await tx
+            .select()
+            .from(vouchers)
+            .where(
+              and(
+                eq(vouchers.companyId, 1),
+                sql`${vouchers.voucherNumber} LIKE ${'SP-AGENT-ERP-' + containerId + '-%'}`,
+              ),
+            );
+          for (const v of hadiSpVouchers) {
+            await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, v.id));
+            await tx.delete(vouchers).where(eq(vouchers.id, v.id));
           }
 
           // Delete the offload record
