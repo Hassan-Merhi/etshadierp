@@ -4129,5 +4129,20 @@ END $mig$`;
     }
   });
 
+  // Graceful shutdown: close DB pool so Render's zero-downtime deploys don't
+  // leave zombie connections that exhaust max_connections on the next instance.
+  const shutdown = async (signal: string) => {
+    console.log(`[Shutdown] ${signal} received — closing DB pool...`);
+    try {
+      await pool.end();
+      console.log("[Shutdown] DB pool closed cleanly.");
+    } catch (e: any) {
+      console.warn("[Shutdown] DB pool close error:", e.message);
+    }
+    process.exit(0);
+  };
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT",  () => shutdown("SIGINT"));
+
   doListen();
 })();

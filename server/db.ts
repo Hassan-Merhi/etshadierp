@@ -41,11 +41,11 @@ if (isLocalReplitDB) {
 export const pool = new Pool({
   connectionString,
   ssl: requiresSSL ? { rejectUnauthorized: false } : false,
-  // 10 connections per instance. Render DB has max_connections=103.
-  // Two instances during zero-downtime deploy: 10*2 + session(3*2) = 26, well within 103.
-  // Kept deliberately low to leave headroom for zombie connections from previous deploys.
-  max: 10,
-  // Fail fast so requests get an error quickly rather than queuing indefinitely.
+  // 5 connections per instance. Render DB has max_connections=103.
+  // Two instances during zero-downtime deploy: 5*2 + session(3*2) = 16, well within 103.
+  // Deliberately low to leave headroom for zombie connections from crashed deploys.
+  max: 5,
+  // Fail fast so requests error quickly rather than queuing indefinitely.
   connectionTimeoutMillis: 8000,
   // Release idle connections after 30 seconds.
   idleTimeoutMillis: 30000,
