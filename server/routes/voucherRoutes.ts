@@ -445,12 +445,14 @@ export function registerVoucherRoutes(app: Express) {
         return res.status(403).json({ message: "Access denied: This resource is not available for POS users" });
       }
       // Block unsafe ERP posting for supplier_partner companies
-      const SP_BLOCKED_VOUCHER_TYPES = ["Sale", "Purchase", "Stock Adjustment"];
-      if (SP_BLOCKED_VOUCHER_TYPES.includes(voucherType) && req.session.currentCompanyId) {
+      if (req.session.currentCompanyId) {
         const [spCo] = await db.select({ companyType: companies.companyType })
           .from(companies).where(eq(companies.id, req.session.currentCompanyId)).limit(1);
         if (spCo?.companyType === "supplier_partner") {
-          return res.status(403).json({ message: "Supplier Partner companies must use SP Sales / SP Containers for this action." });
+          const blockedForSP = ["Sales", "StockTransfer", "Stock Transfer", "Adjustment", "Purchase"];
+          if (blockedForSP.includes(voucherType)) {
+            return res.status(403).json({ message: "This voucher type is not available for Supplier Partner companies. Use SP Sales for sales transactions." });
+          }
         }
       }
       const companyId = req.session.currentCompanyId;
@@ -476,12 +478,12 @@ export function registerVoucherRoutes(app: Express) {
         }
 
         // Block unsafe ERP posting for supplier_partner companies
-        const SP_BLOCKED_VOUCHER_TYPES = ["Sale", "Purchase", "Stock Adjustment"];
-        if (SP_BLOCKED_VOUCHER_TYPES.includes(voucher?.voucherType)) {
-          const [spCo] = await db.select({ companyType: companies.companyType })
-            .from(companies).where(eq(companies.id, req.session.currentCompanyId)).limit(1);
-          if (spCo?.companyType === "supplier_partner") {
-            return res.status(403).json({ message: "Supplier Partner companies must use SP Sales / SP Containers for this action." });
+        const [spCo] = await db.select({ companyType: companies.companyType })
+          .from(companies).where(eq(companies.id, req.session.currentCompanyId)).limit(1);
+        if (spCo?.companyType === "supplier_partner") {
+          const blockedForSP = ["Sales", "StockTransfer", "Stock Transfer", "Adjustment", "Purchase"];
+          if (blockedForSP.includes(voucher?.voucherType)) {
+            return res.status(403).json({ message: "This voucher type is not available for Supplier Partner companies. Use SP Sales for sales transactions." });
           }
         }
 
