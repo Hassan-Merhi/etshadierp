@@ -2858,6 +2858,54 @@ export function registerStockRoutes(app: Express) {
     }
   });
 
+  // ── Historical merge reconstruction: GET /api/stock-items/merge-logs/historical ──
+  // Rebuilds pre-feature merge history from the alias breadcrumbs that the merge
+  // logic always writes: aliasCode = merged item's code, description = "Merged from: …".
+  // Excludes any merges already present in stock_item_merge_logs (already covered).
+  app.get("/api/stock-items/merge-logs/historical", requireAuth, requireNonPOS, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const rows = await db.execute(sql`
+        SELECT
+          a.stock_item_id        AS "keptItemId",
+          si_kept.code           AS "keptItemCode",
+          si_kept.name           AS "keptItemName",
+          si_merged.id           AS "mergedItemId",
+          si_merged.code         AS "mergedItemCode",
+          REPLACE(si_merged.name, '[MERGED] ', '') AS "mergedItemName",
+          COALESCE(si_merged.deleted_at, a.created_at) AS "mergedAt",
+          a.description          AS "notes"
+        FROM stock_item_code_aliases a
+        JOIN stock_items si_kept
+          ON si_kept.id = a.stock_item_id
+         AND si_kept.company_id = a.company_id
+        JOIN stock_items si_merged
+          ON si_merged.code = a.alias_code
+         AND si_merged.company_id = a.company_id
+         AND si_merged.active = false
+        WHERE a.company_id = ${companyId}
+          AND a.description LIKE 'Merged from:%'
+          AND si_merged.id NOT IN (
+            SELECT merged_item_id FROM stock_item_merge_logs WHERE company_id = ${companyId}
+          )
+        ORDER BY COALESCE(si_merged.deleted_at, a.created_at) DESC
+        LIMIT 200
+      `);
+
+      const data = ((rows as any).rows ?? (rows as any)).map((r: any) => ({
+        ...r,
+        id: null,
+        source: "historical",
+      }));
+
+      return res.json(data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  });
+
   // ── Unmerge: POST /api/stock-items/merge-logs/:logId/unmerge ─────────────
   // Reverses a previous merge using the saved snapshotBefore.
   // Restores: item active status, inventory quantities/values, and the main code alias.

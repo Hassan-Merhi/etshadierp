@@ -1986,7 +1986,7 @@ function BulkMergeStockItemsCard() {
 // ── Merge History / Unmerge Card ─────────────────────────────────────────────
 
 interface MergeLogEntry {
-  id: number;
+  id: number | null;
   keptItemId: number;
   keptItemCode: string;
   keptItemName: string;
@@ -1995,6 +1995,7 @@ interface MergeLogEntry {
   mergedItemName: string;
   mergedAt: string;
   notes: string | null;
+  source?: "historical";
 }
 
 function MergeHistoryCard() {
@@ -2002,9 +2003,17 @@ function MergeHistoryCard() {
   const [unmergeTarget, setUnmergeTarget] = useState<MergeLogEntry | null>(null);
   const [isUnmerging, setIsUnmerging] = useState(false);
 
-  const { data: logs = [], isLoading, refetch } = useQuery<MergeLogEntry[]>({
+  const { data: logs = [], isLoading } = useQuery<MergeLogEntry[]>({
     queryKey: ["/api/stock-items/merge-logs"],
   });
+
+  const { data: historicalLogs = [], isLoading: historicalLoading } = useQuery<MergeLogEntry[]>({
+    queryKey: ["/api/stock-items/merge-logs/historical"],
+  });
+
+  const allLogs = [...logs, ...historicalLogs].sort(
+    (a, b) => new Date(b.mergedAt).getTime() - new Date(a.mergedAt).getTime()
+  );
 
   async function handleUnmerge() {
     if (!unmergeTarget) return;
@@ -2037,52 +2046,71 @@ function MergeHistoryCard() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {isLoading || historicalLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
           </div>
-        ) : logs.length === 0 ? (
+        ) : allLogs.length === 0 ? (
           <p className="text-sm text-muted-foreground">No merges recorded for this company yet.</p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Kept item</TableHead>
-                <TableHead>Merged away</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead className="w-24"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {logs.map((log) => (
-                <TableRow key={log.id} data-testid={`row-merge-log-${log.id}`}>
-                  <TableCell>
-                    <p className="font-medium text-sm">{log.keptItemName}</p>
-                    <p className="text-xs text-muted-foreground">{log.keptItemCode}</p>
-                  </TableCell>
-                  <TableCell>
-                    <p className="font-medium text-sm">{log.mergedItemName}</p>
-                    <p className="text-xs text-muted-foreground">{log.mergedItemCode}</p>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {new Date(log.mergedAt).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setUnmergeTarget(log)}
-                      data-testid={`button-unmerge-${log.id}`}
-                    >
-                      <RotateCcw className="h-3 w-3 mr-1" />
-                      Unmerge
-                    </Button>
-                  </TableCell>
+          <>
+            {historicalLogs.length > 0 && logs.length === 0 && (
+              <p className="text-xs text-muted-foreground mb-3">
+                These merges were done before history tracking was added. They were reconstructed from alias records — no snapshot is available so they cannot be unmerged automatically.
+              </p>
+            )}
+            {historicalLogs.length > 0 && logs.length > 0 && (
+              <p className="text-xs text-muted-foreground mb-3">
+                Entries marked <span className="font-medium">Historical</span> were done before history tracking was added and cannot be unmerged automatically.
+              </p>
+            )}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Kept item</TableHead>
+                  <TableHead>Merged away</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="w-32"></TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {allLogs.map((log, idx) => (
+                  <TableRow key={log.id ?? `hist-${idx}`} data-testid={`row-merge-log-${log.id ?? idx}`}>
+                    <TableCell>
+                      <p className="font-medium text-sm">{log.keptItemName}</p>
+                      <p className="text-xs text-muted-foreground">{log.keptItemCode}</p>
+                    </TableCell>
+                    <TableCell>
+                      <p className="font-medium text-sm">{log.mergedItemName}</p>
+                      <p className="text-xs text-muted-foreground">{log.mergedItemCode}</p>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                      {new Date(log.mergedAt).toLocaleDateString()}
+                      {log.source === "historical" && (
+                        <Badge variant="outline" className="ml-2 text-[10px]">Historical</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {log.source === "historical" ? (
+                        <span className="text-xs text-muted-foreground">No snapshot</span>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setUnmergeTarget(log)}
+                          data-testid={`button-unmerge-${log.id}`}
+                        >
+                          <RotateCcw className="h-3 w-3 mr-1" />
+                          Unmerge
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </>
         )}
       </CardContent>
 
