@@ -117,8 +117,13 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   // All Stock keyboard navigation + Stock Movement dialog
   const [allStockSelectedRowIndex, setAllStockSelectedRowIndex] = useState<number>(-1);
   const [stockMovementOpen, setStockMovementOpen] = useState(false);
-  const [stockMovementItem, setStockMovementItem] = useState<{ stockItemId: number; stockItemName: string } | null>(null);
-  const [stockMovementPeriod, setStockMovementPeriod] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_year"));
+  const [stockMovementItem, setStockMovementItem] = useState<{
+    stockItemId: number;
+    stockItemName: string;
+    locationId: number | null;
+    locationName: string | null;
+  } | null>(null);
+  const [stockMovementPeriod, setStockMovementPeriod] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
   const allStockTableRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
   const { setSelectedLocation } = useLocation();
@@ -632,7 +637,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
   // ── Stock Movement dialog data (fetched when dialog opens) ──────────────────
   const smApiUrl = stockMovementItem
-    ? `/api/stock-items/${stockMovementItem.stockItemId}/monthly-summary?startDate=${stockMovementPeriod.fromDate}&endDate=${stockMovementPeriod.toDate}`
+    ? stockMovementItem.locationId
+      ? `/api/locations/${stockMovementItem.locationId}/stock-items/${stockMovementItem.stockItemId}/monthly-summary?startDate=${stockMovementPeriod.fromDate}&endDate=${stockMovementPeriod.toDate}`
+      : `/api/stock-items/${stockMovementItem.stockItemId}/monthly-summary?startDate=${stockMovementPeriod.fromDate}&endDate=${stockMovementPeriod.toDate}`
     : null;
   const { data: stockMovementData, isLoading: stockMovementLoading } = useQuery<any>({
     queryKey: smApiUrl ? [smApiUrl] : ["__disabled__"],
@@ -644,17 +651,25 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     enabled: !!stockMovementItem && stockMovementOpen,
   });
 
-  // Derive opening qty/value/rate from prior month's closing (API doesn't include it)
+  // Location-specific API returns openingQty directly; all-locations API does not — derive it
   const smRows: Array<any> = useMemo(() => {
     if (!stockMovementData?.monthlyData) return [];
+    const hasOpening = stockMovementData.monthlyData[0]?.openingQty !== undefined;
     return stockMovementData.monthlyData.map((m: any, idx: number, arr: any[]) => {
-      const prevClose = idx === 0 ? null : arr[idx - 1];
-      const openingQty   = prevClose ? prevClose.closingQty   : 0;
-      const openingValue = prevClose ? prevClose.closingValue  : 0;
-      const openingRate  = openingQty > 0 ? openingValue / openingQty : 0;
-      const inwardRate   = m.inwardQty  > 0 ? m.inwardValue  / m.inwardQty  : 0;
-      const outwardRate  = m.outwardQty > 0 ? m.outwardValue / m.outwardQty : 0;
-      const closingRate  = m.closingQty > 0 ? m.closingValue / m.closingQty : 0;
+      let openingQty: number, openingValue: number, openingRate: number;
+      if (hasOpening) {
+        openingQty   = m.openingQty   ?? 0;
+        openingValue = m.openingValue ?? 0;
+        openingRate  = m.openingRate  ?? (openingQty > 0 ? openingValue / openingQty : 0);
+      } else {
+        const prevClose = idx === 0 ? null : arr[idx - 1];
+        openingQty   = prevClose ? prevClose.closingQty   : 0;
+        openingValue = prevClose ? prevClose.closingValue  : 0;
+        openingRate  = openingQty > 0 ? openingValue / openingQty : 0;
+      }
+      const inwardRate  = m.inwardQty  > 0 ? m.inwardValue  / m.inwardQty  : 0;
+      const outwardRate = m.outwardQty > 0 ? m.outwardValue / m.outwardQty : 0;
+      const closingRate = m.closingQty > 0 ? m.closingValue / m.closingQty : 0;
       return { ...m, openingQty, openingValue, openingRate, inwardRate, outwardRate, closingRate };
     });
   }, [stockMovementData]);
@@ -684,7 +699,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         e.preventDefault();
         const item = filteredCombinedRows[allStockSelectedRowIndex];
         if (item) {
-          setStockMovementItem({ stockItemId: item.stockItemId, stockItemName: item.stockItemName });
+          setStockMovementItem({ stockItemId: item.stockItemId, stockItemName: item.stockItemName, locationId: null, locationName: null });
           setStockMovementOpen(true);
         }
       }
@@ -2026,6 +2041,11 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           );
                         }
                         const isSelected = allStockSelectedRowIndex === currentIdx;
+                        const openMovement = (locId: number | null, locName: string | null, e?: React.MouseEvent) => {
+                          e?.stopPropagation();
+                          setStockMovementItem({ stockItemId: row.stockItemId, stockItemName: row.stockItemName, locationId: locId, locationName: locName });
+                          setStockMovementOpen(true);
+                        };
                         rows.push(
                           <tr
                             key={row.stockItemId}
@@ -2037,10 +2057,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                             )}
                             data-testid={`row-allstock-${row.stockItemId}`}
                             data-allstock-row-index={currentIdx}
-                            onClick={() => {
-                              setStockMovementItem({ stockItemId: row.stockItemId, stockItemName: row.stockItemName });
-                              setStockMovementOpen(true);
-                            }}
+                            onClick={() => openMovement(null, null)}
                           >
                             <td className={cn(
                               "px-4 py-2 font-medium whitespace-nowrap sticky left-0 z-10 transition-colors",
@@ -2049,7 +2066,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                               {row.stockItemName}
                             </td>
                             {allInventoryLocations.map((loc) => (
-                              <td key={loc.id} className="px-4 py-2 text-right font-mono whitespace-nowrap text-muted-foreground">
+                              <td
+                                key={loc.id}
+                                className="px-4 py-2 text-right font-mono whitespace-nowrap text-muted-foreground hover:text-foreground hover:underline"
+                                title={`View movement for ${loc.name}`}
+                                onClick={(e) => {
+                                  if (row.qtyByLocation[loc.id] != null) openMovement(loc.id, loc.name, e);
+                                  else e.stopPropagation();
+                                }}
+                              >
                                 {row.qtyByLocation[loc.id] != null && row.qtyByLocation[loc.id] > 0
                                   ? row.qtyByLocation[loc.id].toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
                                   : <span className="text-muted-foreground/30">—</span>}
@@ -3540,7 +3565,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               </DialogTitle>
               <DialogDescription className="flex items-center gap-1.5 mt-1 text-sm">
                 <Globe className="h-3.5 w-3.5" />
-                All Locations
+                {stockMovementItem?.locationName ?? "All Locations"}
               </DialogDescription>
             </div>
             <PeriodFilter value={stockMovementPeriod} onChange={setStockMovementPeriod} data-testid="sm-period-filter" />
@@ -3658,7 +3683,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             {stockMovementItem && (
               <Button
                 onClick={() => {
-                  navigate(`/locations/0/stock-items/${stockMovementItem.stockItemId}/monthly-summary`);
+                  const locId = stockMovementItem.locationId ?? 0;
+                  navigate(`/locations/${locId}/stock-items/${stockMovementItem.stockItemId}/monthly-summary`);
                   setStockMovementOpen(false);
                 }}
                 data-testid="button-sm-open-full"
