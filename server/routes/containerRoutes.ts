@@ -2085,6 +2085,7 @@ export function registerContainerRoutes(app: Express) {
                       ${vouchers.voucherNumber} LIKE 'CHG-%' OR
                       ${vouchers.voucherNumber} LIKE 'XFER-%' OR
                       ${vouchers.voucherNumber} LIKE ${'SP-OTW-REV-ERP-' + containerId + '-%'} OR
+                      ${vouchers.voucherNumber} LIKE ${'SP-COST-CLR-ERP-' + containerId + '-%'} OR
                       ${vouchers.voucherNumber} LIKE ${'SP-AGENT-SETTLE-' + containerId + '-%'}
                     )`,
                   ),
@@ -2135,7 +2136,8 @@ export function registerContainerRoutes(app: Express) {
           inventoryCostCorrections,
         );
 
-        // ── SP company: detect company type once for all SP-specific journals ──
+        // ── SP company: all SP-specific journals in one atomic transaction ──
+        // Detect company type first (outside the tx — read-only, no side effects)
         const spCompanyRow = await db.execute(
           sql`SELECT company_type FROM companies WHERE id = ${container.companyId} LIMIT 1`
         );
@@ -2143,34 +2145,71 @@ export function registerContainerRoutes(app: Express) {
         const isSpCompany = spCompanyType === "supplier_partner";
 
         if (isSpCompany) {
-          // ── Voucher A: Reverse Goods OTW ─────────────────────────────────────
-          // Mirrors the same step in POST /api/sp/offload for native SP containers.
-          // Clears both OTW asset/liability AND supplier balance (OTW Clearing
-          // entries carry supplierId so reversing them zeroes the supplier payable).
-          const vDateOtw = offloadDate || getClientDate(req);
-          const [otwAcct, otwClrAcct] = await Promise.all([
+          const vDate = offloadDate || getClientDate(req);
+          const validAgentLines = agentChargeLines.filter(l => l.amountUsd > 0);
+          const totalAgentAmt = validAgentLines.reduce((s, l) => s + l.amountUsd, 0);
+          const pos = await storage.getPurchaseOrdersByContainer(containerId);
+          const totalOtw = pos.reduce((s, po) => s + parseFloat(po.grandTotal || "0"), 0);
+
+          // Pre-fetch all required ledger accounts in parallel (outside tx)
+          const [
+            otwAcct,
+            otwClrAcct,
+            spCostClrAcct,
+            hadiSpInterco,
+            spHadiIcAcct,
+            spPrepaidExpAcct,
+          ] = await Promise.all([
             db.select().from(ledgerAccounts).where(
               and(eq(ledgerAccounts.companyId, container.companyId), eq(ledgerAccounts.subType, "sp_goods_otw"), isNull(ledgerAccounts.deletedAt))
             ).then(r => r[0]),
             db.select().from(ledgerAccounts).where(
               and(eq(ledgerAccounts.companyId, container.companyId), eq(ledgerAccounts.subType, "sp_otw_clearing"), isNull(ledgerAccounts.deletedAt))
             ).then(r => r[0]),
+            db.select().from(ledgerAccounts).where(
+              and(eq(ledgerAccounts.companyId, container.companyId), eq(ledgerAccounts.subType, "sp_cost_clearing"), isNull(ledgerAccounts.deletedAt))
+            ).then(r => r[0]),
+            validAgentLines.length > 0
+              ? db.select().from(ledgerAccounts).where(
+                  and(eq(ledgerAccounts.companyId, 1), eq(ledgerAccounts.subType, "hadi_sp_intercompany"), isNull(ledgerAccounts.deletedAt))
+                ).then(r => r[0])
+              : Promise.resolve(undefined),
+            validAgentLines.length > 0
+              ? db.select().from(ledgerAccounts).where(
+                  and(eq(ledgerAccounts.companyId, container.companyId), eq(ledgerAccounts.subType, "sp_hadi_intercompany"), isNull(ledgerAccounts.deletedAt))
+                ).then(r => r[0])
+              : Promise.resolve(undefined),
+            validAgentLines.length > 0
+              ? db.select().from(ledgerAccounts).where(
+                  and(eq(ledgerAccounts.companyId, container.companyId), eq(ledgerAccounts.subType, "sp_prepaid_expenses"), isNull(ledgerAccounts.deletedAt))
+                ).then(r => r[0])
+              : Promise.resolve(undefined),
           ]);
 
           if (!otwAcct || !otwClrAcct) {
             throw new Error("SP OTW accounts not found. Run SP Setup first.");
           }
+          if (!spCostClrAcct) {
+            throw new Error("SP Cost Clearing account not found. Run SP Setup first.");
+          }
+          if (validAgentLines.length > 0) {
+            if (!hadiSpInterco) throw new Error("HADI L'SHI intercompany account not found. Contact admin.");
+            if (!spHadiIcAcct) throw new Error("SP intercompany account (SP-HADI-IC) not found. Run SP Setup first.");
+            if (!spPrepaidExpAcct) throw new Error("SP Prepaid Expenses account not found. Run SP Setup first.");
+          }
 
-          const pos = await storage.getPurchaseOrdersByContainer(containerId);
-          const totalOtw = pos.reduce((s, po) => s + parseFloat(po.grandTotal || "0"), 0);
+          // ── Single transaction: Voucher A + Voucher B + agent journals ──
+          await db.transaction(async (tx) => {
 
-          if (totalOtw > 0) {
-            await db.transaction(async (tx) => {
+            // ── Voucher A: Reverse Goods OTW (clears OTW asset + OTW Clearing liability) ──
+            // OTW Clearing Dr lines carry supplierId → zeroes the supplier sub-ledger balance.
+            // Mirrors the same step in POST /api/sp/offload for native SP containers.
+            if (totalOtw > 0) {
               const [voucherA] = await tx.insert(vouchers).values({
                 companyId: container.companyId,
                 voucherType: "Journal",
                 voucherNumber: `SP-OTW-REV-ERP-${containerId}-${Date.now()}`,
-                voucherDate: vDateOtw,
+                voucherDate: vDate,
                 description: `Goods OTW Reversal — ERP container #${containerId}`,
                 totalAmount: String(totalOtw),
                 currency: "USD",
@@ -2178,7 +2217,7 @@ export function registerContainerRoutes(app: Express) {
                 sourceModule: "SP",
               }).returning();
 
-              // Dr OTW Clearing per PO (with supplierId — zeroes supplier balance)
+              // Dr OTW Clearing per PO (with supplierId — zeroes supplier sub-ledger balance)
               for (const po of pos) {
                 const poTotal = parseFloat(po.grandTotal || "0");
                 if (poTotal <= 0) continue;
@@ -2192,7 +2231,7 @@ export function registerContainerRoutes(app: Express) {
                 });
               }
 
-              // Cr Goods OTW (full total)
+              // Cr Goods OTW (full total — reduces the OTW asset to zero)
               await tx.insert(voucherEntries).values({
                 voucherId: voucherA.id,
                 ledgerAccountId: otwAcct.id,
@@ -2200,94 +2239,101 @@ export function registerContainerRoutes(app: Express) {
                 creditAmount: String(totalOtw),
                 narration: `Goods OTW reversal — ERP container #${containerId}`,
               });
-            });
-          }
-        }
+            }
 
-        // ── Agent journals for SP company using ERP container ──
-        // Settlement in SP Test Co:  Dr SP-HADI-IC / Cr SP-PREEXP
-        // Voucher C in HADI L'SHI:  Dr HADI-SP-IC / Cr Agent (one line per agent)
-        const validAgentLines = agentChargeLines.filter(l => l.amountUsd > 0);
-        if (validAgentLines.length > 0) {
-          const vDate = offloadDate || getClientDate(req);
-          const totalAgentAmt = validAgentLines.reduce((s, l) => s + l.amountUsd, 0);
+            // ── Voucher B: Settle goods cost payable through SP Cost Clearing ──
+            // Dr sp_cost_clearing / Cr Goods OTW (base cost of goods received).
+            // Mirrors the cost-clearing step done in the native SP offload for
+            // inventory received into stock via the ERP route.
+            if (totalOtw > 0) {
+              const [voucherB] = await tx.insert(vouchers).values({
+                companyId: container.companyId,
+                voucherType: "Journal",
+                voucherNumber: `SP-COST-CLR-ERP-${containerId}-${Date.now()}`,
+                voucherDate: vDate,
+                description: `Goods cost clearing — ERP container #${containerId}`,
+                totalAmount: String(totalOtw),
+                currency: "USD",
+                exchangeRate: "1",
+                sourceModule: "SP",
+              }).returning();
 
-          // Fetch all required accounts in parallel
-          const [hadiSpInterco, spHadiIcAcct, spPrepaidExpAcct] = await Promise.all([
-            db.select().from(ledgerAccounts).where(
-              and(eq(ledgerAccounts.companyId, 1), eq(ledgerAccounts.subType, "hadi_sp_intercompany"), isNull(ledgerAccounts.deletedAt))
-            ).then(r => r[0]),
-            db.select().from(ledgerAccounts).where(
-              and(eq(ledgerAccounts.companyId, container.companyId), eq(ledgerAccounts.subType, "sp_hadi_intercompany"), isNull(ledgerAccounts.deletedAt))
-            ).then(r => r[0]),
-            db.select().from(ledgerAccounts).where(
-              and(eq(ledgerAccounts.companyId, container.companyId), eq(ledgerAccounts.subType, "sp_prepaid_expenses"), isNull(ledgerAccounts.deletedAt))
-            ).then(r => r[0]),
-          ]);
+              // Dr sp_cost_clearing (absorb the payable into cost clearing)
+              await tx.insert(voucherEntries).values({
+                voucherId: voucherB.id,
+                ledgerAccountId: spCostClrAcct.id,
+                debitAmount: String(totalOtw),
+                creditAmount: "0",
+                narration: `Goods cost clearing — ERP container #${containerId}`,
+              });
 
-          if (!hadiSpInterco) throw new Error("HADI L'SHI intercompany account not found. Contact admin.");
-          if (!spHadiIcAcct) throw new Error("SP intercompany account (SP-HADI-IC) not found. Run SP Setup first.");
-          if (!spPrepaidExpAcct) throw new Error("SP Prepaid Expenses account not found. Run SP Setup first.");
+              // Cr Goods OTW (counterpart — completes the cost recognition leg)
+              await tx.insert(voucherEntries).values({
+                voucherId: voucherB.id,
+                ledgerAccountId: otwAcct.id,
+                debitAmount: "0",
+                creditAmount: String(totalOtw),
+                narration: `Goods OTW cost recognition — ERP container #${containerId}`,
+              });
+            }
 
-          await db.transaction(async (tx) => {
-            // ── Journal in SP Test Co: Dr SP-HADI-IC / Cr SP-PREEXP ──
-            const [settlementVoucher] = await tx.insert(vouchers).values({
-              companyId: container.companyId,
-              voucherType: "Journal",
-              voucherNumber: `SP-AGENT-SETTLE-${containerId}-${Date.now()}`,
-              voucherDate: vDate,
-              description: `Agent charge settlement via HADI L'SHI — container #${containerId}`,
-              totalAmount: String(totalAgentAmt),
-              currency: "USD",
-              exchangeRate: "1",
-              sourceModule: "SP",
-            }).returning();
-            // Dr SP-HADI-IC
-            await tx.insert(voucherEntries).values({
-              voucherId: settlementVoucher.id,
-              ledgerAccountId: spHadiIcAcct.id,
-              debitAmount: String(totalAgentAmt),
-              creditAmount: "0",
-              narration: `Agent charges via HADI L'SHI — ERP container #${containerId}`,
-            });
-            // Cr SP-PREEXP
-            await tx.insert(voucherEntries).values({
-              voucherId: settlementVoucher.id,
-              ledgerAccountId: spPrepaidExpAcct.id,
-              debitAmount: "0",
-              creditAmount: String(totalAgentAmt),
-              narration: `Prepaid expenses used for agent charges — ERP container #${containerId}`,
-            });
+            // ── Agent settlement journals (only when agent charges exist) ──
+            if (validAgentLines.length > 0 && spHadiIcAcct && spPrepaidExpAcct && hadiSpInterco) {
+              // Journal in SP Test Co: Dr SP-HADI-IC / Cr SP-PREEXP
+              const [settlementVoucher] = await tx.insert(vouchers).values({
+                companyId: container.companyId,
+                voucherType: "Journal",
+                voucherNumber: `SP-AGENT-SETTLE-${containerId}-${Date.now()}`,
+                voucherDate: vDate,
+                description: `Agent charge settlement via HADI L'SHI — container #${containerId}`,
+                totalAmount: String(totalAgentAmt),
+                currency: "USD",
+                exchangeRate: "1",
+                sourceModule: "SP",
+              }).returning();
+              await tx.insert(voucherEntries).values({
+                voucherId: settlementVoucher.id,
+                ledgerAccountId: spHadiIcAcct.id,
+                debitAmount: String(totalAgentAmt),
+                creditAmount: "0",
+                narration: `Agent charges via HADI L'SHI — ERP container #${containerId}`,
+              });
+              await tx.insert(voucherEntries).values({
+                voucherId: settlementVoucher.id,
+                ledgerAccountId: spPrepaidExpAcct.id,
+                debitAmount: "0",
+                creditAmount: String(totalAgentAmt),
+                narration: `Prepaid expenses used for agent charges — ERP container #${containerId}`,
+              });
 
-            // ── Voucher C in HADI L'SHI: Dr HADI-SP-IC / Cr Agent (per line) ──
-            const [voucherC] = await tx.insert(vouchers).values({
-              companyId: 1,
-              voucherType: "Journal",
-              voucherNumber: `SP-AGENT-ERP-${containerId}-${Date.now()}`,
-              voucherDate: vDate,
-              description: `Agent charges for ERP offload — container #${containerId}`,
-              totalAmount: String(totalAgentAmt),
-              currency: "USD",
-              exchangeRate: "1",
-              sourceModule: "SP",
-            }).returning();
-            // Dr HADI-SP-IC (total)
-            await tx.insert(voucherEntries).values({
-              voucherId: voucherC.id,
-              ledgerAccountId: hadiSpInterco.id,
-              debitAmount: String(totalAgentAmt),
-              creditAmount: "0",
-              narration: `ERP container offload agent charges — container #${containerId}`,
-            });
-            // Cr Agent (one line per agent)
-            for (const line of validAgentLines) {
+              // Voucher C in HADI L'SHI: Dr HADI-SP-IC / Cr Agent (per line)
+              const [voucherC] = await tx.insert(vouchers).values({
+                companyId: 1,
+                voucherType: "Journal",
+                voucherNumber: `SP-AGENT-ERP-${containerId}-${Date.now()}`,
+                voucherDate: vDate,
+                description: `Agent charges for ERP offload — container #${containerId}`,
+                totalAmount: String(totalAgentAmt),
+                currency: "USD",
+                exchangeRate: "1",
+                sourceModule: "SP",
+              }).returning();
               await tx.insert(voucherEntries).values({
                 voucherId: voucherC.id,
-                ledgerAccountId: line.parentAgentAccountId,
-                debitAmount: "0",
-                creditAmount: String(line.amountUsd),
-                narration: `Agent credit for ERP container #${containerId}${line.description ? ` — ${line.description}` : ""}`,
+                ledgerAccountId: hadiSpInterco.id,
+                debitAmount: String(totalAgentAmt),
+                creditAmount: "0",
+                narration: `ERP container offload agent charges — container #${containerId}`,
               });
+              for (const line of validAgentLines) {
+                await tx.insert(voucherEntries).values({
+                  voucherId: voucherC.id,
+                  ledgerAccountId: line.parentAgentAccountId,
+                  debitAmount: "0",
+                  creditAmount: String(line.amountUsd),
+                  narration: `Agent credit for ERP container #${containerId}${line.description ? ` — ${line.description}` : ""}`,
+                });
+              }
             }
           });
         }
