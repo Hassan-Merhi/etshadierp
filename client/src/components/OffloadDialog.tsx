@@ -46,13 +46,6 @@ import {
 import type { Location } from "@shared/schema";
 import { useCompany } from "@/contexts/CompanyContext";
 
-interface AgentChargeLine {
-  id: string;
-  description: string;
-  amountUsd: string;
-  parentAgentAccountId: string;
-}
-
 interface OffloadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -79,7 +72,6 @@ interface AccountComboboxProps {
 
 function AccountCombobox({ value, onValueChange, accounts, placeholder = "Select account", disabled = false, testId }: AccountComboboxProps) {
   const [open, setOpen] = useState(false);
-  
   const selectedAccount = accounts.find((account) => account.id.toString() === value);
 
   return (
@@ -139,7 +131,6 @@ interface LocationComboboxProps {
 
 function LocationCombobox({ value, onValueChange, locations, placeholder = "Select location", testId }: LocationComboboxProps) {
   const [open, setOpen] = useState(false);
-  
   const selectedLocation = locations.find((location) => location.id.toString() === value);
 
   return (
@@ -199,8 +190,12 @@ export function OffloadDialog({
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const isSpCompany = selectedCompany?.companyType === "supplier_partner";
+
+  // ── Shared state ──────────────────────────────────────────────────────────
   const [locationId, setLocationId] = useState<number | null>(null);
-  const [offloadDate, setOffloadDate] = useState(new Date().toLocaleDateString('en-CA'));
+  const [offloadDate, setOffloadDate] = useState(new Date().toLocaleDateString("en-CA"));
+
+  // ── ERP-only state ────────────────────────────────────────────────────────
   const [duties, setDuties] = useState("0");
   const [dutiesAccountId, setDutiesAccountId] = useState("");
   const [officeCharges, setOfficeCharges] = useState("0");
@@ -210,22 +205,35 @@ export function OffloadDialog({
   const [transportFees, setTransportFees] = useState("0");
   const [transportAccountId, setTransportAccountId] = useState("");
   const [additionalCharges, setAdditionalCharges] = useState<AdditionalCharge[]>([]);
-  const [agentChargeLines, setAgentChargeLines] = useState<AgentChargeLine[]>([]);
   const [costCorrections, setCostCorrections] = useState<Record<number, string>>({});
   const [correctionSectionOpen, setCorrectionSectionOpen] = useState(false);
+
+  // ── SP-mode state ─────────────────────────────────────────────────────────
+  const [spDutiesAmount, setSpDutiesAmount] = useState("");
+  const [spDutiesMethod, setSpDutiesMethod] = useState<"prepaid_expenses" | "parent_agent">("prepaid_expenses");
+  const [spDutiesAgentId, setSpDutiesAgentId] = useState("");
+  const [spTransportAmount, setSpTransportAmount] = useState("");
+  const [spTransportMethod, setSpTransportMethod] = useState<"prepaid_expenses" | "parent_agent">("prepaid_expenses");
+  const [spTransportAgentId, setSpTransportAgentId] = useState("");
 
   useEffect(() => {
     setCostCorrections({});
     setCorrectionSectionOpen(false);
   }, [open, containerId, locationId]);
 
+  // ── Queries ───────────────────────────────────────────────────────────────
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
   });
 
   const { data: ledgerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts"],
-    enabled: open,
+    enabled: open && !isSpCompany,
+  });
+
+  const { data: spStatusData } = useQuery<any>({
+    queryKey: ["/api/sp/setup/status"],
+    enabled: open && isSpCompany,
   });
 
   const { data: parentAgents = [] } = useQuery<any[]>({
@@ -233,12 +241,16 @@ export function OffloadDialog({
     enabled: open && isSpCompany,
   });
 
-  // Fetch container with PO data to get charges
   const { data: containerData } = useQuery<any>({
     queryKey: [`/api/containers/${containerId}`],
     enabled: open && !!containerId,
   });
 
+  // ── Derived SP accounts ───────────────────────────────────────────────────
+  const spPrepaidExpAcct = (spStatusData?.spAccounts || []).find((a: any) => a.subType === "sp_prepaid_expenses");
+  const spHadiIcAcct = (spStatusData?.spAccounts || []).find((a: any) => a.subType === "sp_hadi_intercompany");
+
+  // ── ERP charge calculations ───────────────────────────────────────────────
   const containerStockItemIds = (() => {
     if (!containerData?.pos) return [];
     const ids = new Set<number>();
@@ -259,129 +271,136 @@ export function OffloadDialog({
       const res = await factoryApiRequest("GET", `/api/locations/${locationId}/inventory-rates?stockItemIds=${containerStockItemIds.join(",")}`);
       return res.json();
     },
-    enabled: open && !!locationId && containerStockItemIds.length > 0,
+    enabled: open && !!locationId && containerStockItemIds.length > 0 && !isSpCompany,
   });
 
   const hasExistingInventory = inventoryRates.some((r: any) => parseFloat(r.quantity) > 0);
 
-  // Calculate PO charges (freight, document charges, etc.) from charges array
   let poChargesTotal = 0;
   if (containerData?.charges && Array.isArray(containerData.charges)) {
     containerData.charges.forEach((charge: any) => {
       const amount = parseFloat(charge.amount || "0");
-      if (amount > 0) {
-        poChargesTotal += amount;
-      }
+      if (amount > 0) poChargesTotal += amount;
     });
   }
 
-  const manualCharges =
+  const erpManualCharges =
     parseFloat(duties || "0") +
     parseFloat(officeCharges || "0") +
     parseFloat(transferCharges || "0") +
     parseFloat(transportFees || "0") +
     additionalCharges.reduce((sum, charge) => sum + parseFloat(charge.amount || "0"), 0);
 
+  const spManualCharges = parseFloat(spDutiesAmount || "0") + parseFloat(spTransportAmount || "0");
+
+  const manualCharges = isSpCompany ? spManualCharges : erpManualCharges;
   const totalCharges = manualCharges + poChargesTotal;
   const additionalCostPerBale = totalBales > 0 ? totalCharges / totalBales : 0;
 
-  const handleAddAgentLine = () => {
-    setAgentChargeLines(prev => [
-      ...prev,
-      { id: Date.now().toString(), description: "", amountUsd: "", parentAgentAccountId: "" },
-    ]);
-  };
-
-  const handleRemoveAgentLine = (id: string) => {
-    setAgentChargeLines(prev => prev.filter(l => l.id !== id));
-  };
-
-  const handleUpdateAgentLine = (id: string, field: keyof AgentChargeLine, value: string) => {
-    setAgentChargeLines(prev => prev.map(l => l.id === id ? { ...l, [field]: value } : l));
-  };
-
+  // ── ERP handlers ──────────────────────────────────────────────────────────
   const handleAddCharge = () => {
     setAdditionalCharges([
       ...additionalCharges,
-      {
-        id: Date.now().toString(),
-        description: "",
-        amount: "0",
-        ledgerAccountId: "",
-      },
+      { id: Date.now().toString(), description: "", amount: "0", ledgerAccountId: "" },
     ]);
   };
 
   const handleRemoveCharge = (id: string) => {
-    setAdditionalCharges(additionalCharges.filter((charge) => charge.id !== id));
+    setAdditionalCharges(additionalCharges.filter((c) => c.id !== id));
   };
 
   const handleUpdateCharge = (id: string, field: keyof AdditionalCharge, value: string) => {
-    setAdditionalCharges(
-      additionalCharges.map((charge) =>
-        charge.id === id ? { ...charge, [field]: value } : charge
-      )
-    );
+    setAdditionalCharges(additionalCharges.map((c) => (c.id === id ? { ...c, [field]: value } : c)));
   };
 
+  // ── Mutation ──────────────────────────────────────────────────────────────
   const offloadMutation = useMutation({
     mutationFn: async () => {
-      if (!locationId) {
-        throw new Error("Please select a location");
-      }
+      if (!locationId) throw new Error("Please select a location");
 
-      // Validate duties account if duties amount is set
-      if (parseFloat(duties) > 0 && !dutiesAccountId) {
-        throw new Error("Please select an account for duties");
-      }
+      if (isSpCompany) {
+        // ── SP mode ──
+        const dutiesAmt = parseFloat(spDutiesAmount || "0");
+        const transportAmt = parseFloat(spTransportAmount || "0");
 
-      // Validate office charges account if office charges are set
-      if (parseFloat(officeCharges) > 0 && !officeChargesAccountId) {
-        throw new Error("Please select an office charges account");
-      }
-
-      // Validate office charges cash account if office charges are set
-      if (parseFloat(officeCharges) > 0 && !officeChargesCashAccountId) {
-        throw new Error("Please select a cash account for office charges");
-      }
-
-      // Validate transport account if transport fees are set
-      if (parseFloat(transportFees) > 0 && !transportAccountId) {
-        throw new Error("Please select an account for transport fees");
-      }
-
-      // Validate additional charges
-      for (const charge of additionalCharges) {
-        if (parseFloat(charge.amount) > 0) {
-          if (!charge.description) {
-            throw new Error("Please provide a description for all additional charges");
-          }
-          if (!charge.ledgerAccountId) {
-            throw new Error("Please select an account for all additional charges");
-          }
+        if (dutiesAmt > 0 && spDutiesMethod === "parent_agent" && !spDutiesAgentId) {
+          throw new Error("Please select an agent for duties");
         }
-      }
+        if (transportAmt > 0 && spTransportMethod === "parent_agent" && !spTransportAgentId) {
+          throw new Error("Please select an agent for transport");
+        }
+        if (!spPrepaidExpAcct) throw new Error("SP Prepaid Expenses account not found. Run SP Setup first.");
+        if (!spHadiIcAcct) throw new Error("SP Intercompany account not found. Run SP Setup first.");
 
-      const response = await factoryApiRequest(
-        "POST",
-        `/api/containers/${containerId}/offload`,
-        {
+        const resolvedDutiesAccountId = dutiesAmt > 0
+          ? (spDutiesMethod === "prepaid_expenses" ? spPrepaidExpAcct.id : spHadiIcAcct.id)
+          : null;
+        const resolvedTransportAccountId = transportAmt > 0
+          ? (spTransportMethod === "prepaid_expenses" ? spPrepaidExpAcct.id : spHadiIcAcct.id)
+          : null;
+
+        const agentChargeLines: any[] = [];
+        if (dutiesAmt > 0 && spDutiesMethod === "parent_agent") {
+          agentChargeLines.push({ description: "Duties", amountUsd: dutiesAmt, parentAgentAccountId: parseInt(spDutiesAgentId) });
+        }
+        if (transportAmt > 0 && spTransportMethod === "parent_agent") {
+          agentChargeLines.push({ description: "Transport", amountUsd: transportAmt, parentAgentAccountId: parseInt(spTransportAgentId) });
+        }
+
+        const response = await factoryApiRequest("POST", `/api/containers/${containerId}/offload`, {
           locationId,
           offloadDate,
-          duties: duties,
+          duties: String(dutiesAmt),
+          dutiesAccountId: resolvedDutiesAccountId,
+          officeCharges: "0",
+          officeChargesAccountId: null,
+          officeChargesCashAccountId: null,
+          transferCharges: "0",
+          transportFees: String(transportAmt),
+          transportAccountId: resolvedTransportAccountId,
+          additionalCharges: [],
+          inventoryCostCorrections: [],
+          agentChargeLines,
+        });
+        return await response.json();
+      } else {
+        // ── ERP mode ──
+        if (parseFloat(duties) > 0 && !dutiesAccountId) {
+          throw new Error("Please select an account for duties");
+        }
+        if (parseFloat(officeCharges) > 0 && !officeChargesAccountId) {
+          throw new Error("Please select an office charges account");
+        }
+        if (parseFloat(officeCharges) > 0 && !officeChargesCashAccountId) {
+          throw new Error("Please select a cash account for office charges");
+        }
+        if (parseFloat(transportFees) > 0 && !transportAccountId) {
+          throw new Error("Please select an account for transport fees");
+        }
+        for (const charge of additionalCharges) {
+          if (parseFloat(charge.amount) > 0) {
+            if (!charge.description) throw new Error("Please provide a description for all additional charges");
+            if (!charge.ledgerAccountId) throw new Error("Please select an account for all additional charges");
+          }
+        }
+
+        const response = await factoryApiRequest("POST", `/api/containers/${containerId}/offload`, {
+          locationId,
+          offloadDate,
+          duties,
           dutiesAccountId: dutiesAccountId ? parseInt(dutiesAccountId) : null,
-          officeCharges: officeCharges,
+          officeCharges,
           officeChargesAccountId: officeChargesAccountId ? parseInt(officeChargesAccountId) : null,
           officeChargesCashAccountId: officeChargesCashAccountId ? parseInt(officeChargesCashAccountId) : null,
-          transferCharges: transferCharges,
-          transportFees: transportFees,
+          transferCharges,
+          transportFees,
           transportAccountId: transportAccountId ? parseInt(transportAccountId) : null,
           additionalCharges: additionalCharges
-            .filter((charge) => parseFloat(charge.amount) > 0)
-            .map((charge) => ({
-              description: charge.description,
-              amount: parseFloat(charge.amount),
-              ledgerAccountId: parseInt(charge.ledgerAccountId),
+            .filter((c) => parseFloat(c.amount) > 0)
+            .map((c) => ({
+              description: c.description,
+              amount: parseFloat(c.amount),
+              ledgerAccountId: parseInt(c.ledgerAccountId),
             })),
           inventoryCostCorrections: Object.entries(costCorrections)
             .filter(([, rate]) => parseFloat(rate) > 0)
@@ -389,26 +408,21 @@ export function OffloadDialog({
               stockItemId: parseInt(stockItemId),
               correctRate: parseFloat(rate),
             })),
-          agentChargeLines: agentChargeLines
-            .filter(l => parseFloat(l.amountUsd) > 0 && l.parentAgentAccountId)
-            .map(l => ({
-              description: l.description,
-              amountUsd: parseFloat(l.amountUsd),
-              parentAgentAccountId: parseInt(l.parentAgentAccountId),
-            })),
-        }
-      );
-      return await response.json();
+          agentChargeLines: [],
+        });
+        return await response.json();
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/containers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
-      // Invalidate stock item queries so stock query page updates automatically
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ predicate: (query) => {
-        const key = query.queryKey[0];
-        return typeof key === 'string' && key.startsWith('/api/stock-items/');
-      }});
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === "string" && key.startsWith("/api/stock-items/");
+        },
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/stats/net-profit"] });
       toast({
         title: "Container offloaded successfully",
@@ -419,11 +433,7 @@ export function OffloadDialog({
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
-      toast({
-        title: "Offload failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Offload failed", description: error.message, variant: "destructive" });
     },
   });
 
@@ -432,13 +442,16 @@ export function OffloadDialog({
     offloadMutation.mutate();
   };
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Offload Container {containerNumber}</DialogTitle>
           <DialogDescription>
-            Enter the offload charges, select accounts, and choose a destination location. The additional cost per bale will be calculated and added to each item's rate.
+            {isSpCompany
+              ? "Set the offload date, enter any landed charges, and choose a destination location."
+              : "Enter the offload charges, select accounts, and choose a destination location. The additional cost per bale will be calculated and added to each item's rate."}
           </DialogDescription>
         </DialogHeader>
 
@@ -455,235 +468,278 @@ export function OffloadDialog({
             />
           </div>
 
-          {/* Duties Section */}
-          <div className="space-y-2">
-            <Label>Duties</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Amount"
-                value={duties}
-                onChange={(e) => setDuties(e.target.value)}
-                data-testid="input-duties"
-              />
-              <AccountCombobox
-                value={dutiesAccountId}
-                onValueChange={setDutiesAccountId}
-                accounts={ledgerAccounts}
-                placeholder="Select account"
-                disabled={parseFloat(duties) === 0}
-                testId="select-duties-account"
-              />
-            </div>
-          </div>
-
-          {/* Office Charges Section */}
-          <div className="space-y-2">
-            <Label>Office Charges</Label>
-            <div className="grid grid-cols-3 gap-2">
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Amount"
-                value={officeCharges}
-                onChange={(e) => setOfficeCharges(e.target.value)}
-                data-testid="input-office-charges"
-              />
-              <AccountCombobox
-                value={officeChargesAccountId}
-                onValueChange={setOfficeChargesAccountId}
-                accounts={ledgerAccounts}
-                placeholder="Office account"
-                disabled={parseFloat(officeCharges) === 0}
-                testId="select-office-charges-account"
-              />
-              <AccountCombobox
-                value={officeChargesCashAccountId}
-                onValueChange={setOfficeChargesCashAccountId}
-                accounts={ledgerAccounts}
-                placeholder="Cash account"
-                disabled={parseFloat(officeCharges) === 0}
-                testId="select-office-charges-cash-account"
-              />
-            </div>
-          </div>
-
-          {/* Transfer Charges */}
-          <div className="space-y-2">
-            <Label htmlFor="transfer-charges">Transfer Charges</Label>
-            <Input
-              id="transfer-charges"
-              type="number"
-              step="0.01"
-              min="0"
-              value={transferCharges}
-              onChange={(e) => setTransferCharges(e.target.value)}
-              data-testid="input-transfer-charges"
-            />
-          </div>
-
-          {/* Transport Fees Section */}
-          <div className="space-y-2">
-            <Label>Transport Fees</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Amount"
-                value={transportFees}
-                onChange={(e) => setTransportFees(e.target.value)}
-                data-testid="input-transport-fees"
-              />
-              <AccountCombobox
-                value={transportAccountId}
-                onValueChange={setTransportAccountId}
-                accounts={ledgerAccounts}
-                placeholder="Select account"
-                disabled={parseFloat(transportFees) === 0}
-                testId="select-transport-account"
-              />
-            </div>
-          </div>
-
-          {/* Additional Charges Section */}
-          <div className="space-y-2 pt-2 border-t">
-            <div className="flex items-center justify-between">
-              <Label>Additional Charges (Optional)</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleAddCharge}
-                className="gap-2"
-                data-testid="button-add-charge"
-              >
-                <Plus className="h-4 w-4" />
-                Add Charge
-              </Button>
-            </div>
-            {additionalCharges.length > 0 && (
+          {isSpCompany ? (
+            /* ── SP-mode form ── */
+            <>
+              {/* Duties */}
               <div className="space-y-2">
-                {additionalCharges.map((charge) => (
-                  <div key={charge.id} className="grid grid-cols-12 gap-2 items-start">
-                    <Input
-                      placeholder="Description"
-                      value={charge.description}
-                      onChange={(e) =>
-                        handleUpdateCharge(charge.id, "description", e.target.value)
-                      }
-                      className="col-span-4"
-                      data-testid={`input-charge-description-${charge.id}`}
-                    />
+                <Label>Duties</Label>
+                <div className="grid grid-cols-12 gap-2 items-start">
+                  <div className="col-span-3">
                     <Input
                       type="number"
                       step="0.01"
                       min="0"
                       placeholder="Amount"
-                      value={charge.amount}
-                      onChange={(e) => handleUpdateCharge(charge.id, "amount", e.target.value)}
-                      className="col-span-3"
-                      data-testid={`input-charge-amount-${charge.id}`}
+                      value={spDutiesAmount}
+                      onChange={(e) => setSpDutiesAmount(e.target.value)}
+                      data-testid="input-sp-duties"
                     />
-                    <div className="col-span-4">
-                      <AccountCombobox
-                        value={charge.ledgerAccountId}
-                        onValueChange={(value) =>
-                          handleUpdateCharge(charge.id, "ledgerAccountId", value)
-                        }
-                        accounts={ledgerAccounts}
-                        placeholder="Select account"
-                        testId={`select-charge-account-${charge.id}`}
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleRemoveCharge(charge.id)}
-                      className="col-span-1"
-                      data-testid={`button-remove-charge-${charge.id}`}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Agent Charges via HADI L'SHI (SP companies only) */}
-          {isSpCompany && (
-            <div className="space-y-2 pt-2 border-t">
-              <div className="flex items-center justify-between">
-                <Label>Agent Charges via HADI L&apos;SHI</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddAgentLine}
-                  className="gap-2"
-                  data-testid="button-add-agent-line"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Agent
-                </Button>
-              </div>
-              {agentChargeLines.length === 0 && (
-                <p className="text-xs text-muted-foreground">Add lines to charge HADI L&apos;SHI agents. Each line creates a Dr Agent / Cr Interco journal in HADI L&apos;SHI.</p>
-              )}
-              {agentChargeLines.map((line) => (
-                <div key={line.id} className="grid grid-cols-12 gap-2 items-start">
-                  <div className="col-span-5">
+                  <div className="col-span-4">
                     <Select
-                      value={line.parentAgentAccountId}
-                      onValueChange={(v) => handleUpdateAgentLine(line.id, "parentAgentAccountId", v)}
+                      value={spDutiesMethod}
+                      onValueChange={(v) => {
+                        setSpDutiesMethod(v as "prepaid_expenses" | "parent_agent");
+                        setSpDutiesAgentId("");
+                      }}
                     >
-                      <SelectTrigger data-testid={`select-agent-${line.id}`}>
-                        <SelectValue placeholder="Select agent" />
+                      <SelectTrigger data-testid="select-sp-duties-method">
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {(parentAgents as any[]).map((a: any) => (
-                          <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
-                            {a.agent_name}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="prepaid_expenses">Prepaid Expenses</SelectItem>
+                        <SelectItem value="parent_agent">Agent via HADI L&apos;SHI</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+                  {spDutiesMethod === "prepaid_expenses" ? (
+                    <div className="col-span-5 flex items-center h-9 px-3 rounded-md border bg-muted/40 text-sm text-muted-foreground">
+                      {spPrepaidExpAcct?.name ?? "Prepaid Expenses"}
+                    </div>
+                  ) : (
+                    <div className="col-span-5">
+                      <Select value={spDutiesAgentId} onValueChange={setSpDutiesAgentId}>
+                        <SelectTrigger data-testid="select-sp-duties-agent">
+                          <SelectValue placeholder="Select agent" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(parentAgents as any[]).map((a: any) => (
+                            <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
+                              {a.account_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Transport */}
+              <div className="space-y-2">
+                <Label>Transport</Label>
+                <div className="grid grid-cols-12 gap-2 items-start">
+                  <div className="col-span-3">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Amount"
+                      value={spTransportAmount}
+                      onChange={(e) => setSpTransportAmount(e.target.value)}
+                      data-testid="input-sp-transport"
+                    />
+                  </div>
+                  <div className="col-span-4">
+                    <Select
+                      value={spTransportMethod}
+                      onValueChange={(v) => {
+                        setSpTransportMethod(v as "prepaid_expenses" | "parent_agent");
+                        setSpTransportAgentId("");
+                      }}
+                    >
+                      <SelectTrigger data-testid="select-sp-transport-method">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="prepaid_expenses">Prepaid Expenses</SelectItem>
+                        <SelectItem value="parent_agent">Agent via HADI L&apos;SHI</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {spTransportMethod === "prepaid_expenses" ? (
+                    <div className="col-span-5 flex items-center h-9 px-3 rounded-md border bg-muted/40 text-sm text-muted-foreground">
+                      {spPrepaidExpAcct?.name ?? "Prepaid Expenses"}
+                    </div>
+                  ) : (
+                    <div className="col-span-5">
+                      <Select value={spTransportAgentId} onValueChange={setSpTransportAgentId}>
+                        <SelectTrigger data-testid="select-sp-transport-agent">
+                          <SelectValue placeholder="Select agent" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(parentAgents as any[]).map((a: any) => (
+                            <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
+                              {a.account_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            /* ── ERP-mode form ── */
+            <>
+              {/* Duties */}
+              <div className="space-y-2">
+                <Label>Duties</Label>
+                <div className="grid grid-cols-2 gap-2">
                   <Input
                     type="number"
                     step="0.01"
                     min="0"
-                    placeholder="Amount USD"
-                    value={line.amountUsd}
-                    onChange={(e) => handleUpdateAgentLine(line.id, "amountUsd", e.target.value)}
-                    className="col-span-3"
-                    data-testid={`input-agent-amount-${line.id}`}
+                    placeholder="Amount"
+                    value={duties}
+                    onChange={(e) => setDuties(e.target.value)}
+                    data-testid="input-duties"
                   />
+                  <AccountCombobox
+                    value={dutiesAccountId}
+                    onValueChange={setDutiesAccountId}
+                    accounts={ledgerAccounts}
+                    placeholder="Select account"
+                    disabled={parseFloat(duties) === 0}
+                    testId="select-duties-account"
+                  />
+                </div>
+              </div>
+
+              {/* Office Charges */}
+              <div className="space-y-2">
+                <Label>Office Charges</Label>
+                <div className="grid grid-cols-3 gap-2">
                   <Input
-                    placeholder="Note (optional)"
-                    value={line.description}
-                    onChange={(e) => handleUpdateAgentLine(line.id, "description", e.target.value)}
-                    className="col-span-3"
-                    data-testid={`input-agent-desc-${line.id}`}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Amount"
+                    value={officeCharges}
+                    onChange={(e) => setOfficeCharges(e.target.value)}
+                    data-testid="input-office-charges"
                   />
+                  <AccountCombobox
+                    value={officeChargesAccountId}
+                    onValueChange={setOfficeChargesAccountId}
+                    accounts={ledgerAccounts}
+                    placeholder="Office account"
+                    disabled={parseFloat(officeCharges) === 0}
+                    testId="select-office-charges-account"
+                  />
+                  <AccountCombobox
+                    value={officeChargesCashAccountId}
+                    onValueChange={setOfficeChargesCashAccountId}
+                    accounts={ledgerAccounts}
+                    placeholder="Cash account"
+                    disabled={parseFloat(officeCharges) === 0}
+                    testId="select-office-charges-cash-account"
+                  />
+                </div>
+              </div>
+
+              {/* Transfer Charges */}
+              <div className="space-y-2">
+                <Label htmlFor="transfer-charges">Transfer Charges</Label>
+                <Input
+                  id="transfer-charges"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={transferCharges}
+                  onChange={(e) => setTransferCharges(e.target.value)}
+                  data-testid="input-transfer-charges"
+                />
+              </div>
+
+              {/* Transport Fees */}
+              <div className="space-y-2">
+                <Label>Transport Fees</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Amount"
+                    value={transportFees}
+                    onChange={(e) => setTransportFees(e.target.value)}
+                    data-testid="input-transport-fees"
+                  />
+                  <AccountCombobox
+                    value={transportAccountId}
+                    onValueChange={setTransportAccountId}
+                    accounts={ledgerAccounts}
+                    placeholder="Select account"
+                    disabled={parseFloat(transportFees) === 0}
+                    testId="select-transport-account"
+                  />
+                </div>
+              </div>
+
+              {/* Additional Charges */}
+              <div className="space-y-2 pt-2 border-t">
+                <div className="flex items-center justify-between">
+                  <Label>Additional Charges (Optional)</Label>
                   <Button
                     type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleRemoveAgentLine(line.id)}
-                    className="col-span-1"
-                    data-testid={`button-remove-agent-${line.id}`}
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddCharge}
+                    className="gap-2"
+                    data-testid="button-add-charge"
                   >
-                    <X className="h-4 w-4" />
+                    <Plus className="h-4 w-4" />
+                    Add Charge
                   </Button>
                 </div>
-              ))}
-            </div>
+                {additionalCharges.length > 0 && (
+                  <div className="space-y-2">
+                    {additionalCharges.map((charge) => (
+                      <div key={charge.id} className="grid grid-cols-12 gap-2 items-start">
+                        <Input
+                          placeholder="Description"
+                          value={charge.description}
+                          onChange={(e) => handleUpdateCharge(charge.id, "description", e.target.value)}
+                          className="col-span-4"
+                          data-testid={`input-charge-description-${charge.id}`}
+                        />
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="Amount"
+                          value={charge.amount}
+                          onChange={(e) => handleUpdateCharge(charge.id, "amount", e.target.value)}
+                          className="col-span-3"
+                          data-testid={`input-charge-amount-${charge.id}`}
+                        />
+                        <div className="col-span-4">
+                          <AccountCombobox
+                            value={charge.ledgerAccountId}
+                            onValueChange={(value) => handleUpdateCharge(charge.id, "ledgerAccountId", value)}
+                            accounts={ledgerAccounts}
+                            placeholder="Select account"
+                            testId={`select-charge-account-${charge.id}`}
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveCharge(charge.id)}
+                          className="col-span-1"
+                          data-testid={`button-remove-charge-${charge.id}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
           )}
 
           {/* Destination Location */}
@@ -698,8 +754,8 @@ export function OffloadDialog({
             />
           </div>
 
-          {/* Inventory Cost Correction (Advanced) */}
-          {hasExistingInventory && locationId && (
+          {/* Inventory Cost Correction — ERP only */}
+          {!isSpCompany && hasExistingInventory && locationId && (
             <Collapsible
               open={correctionSectionOpen}
               onOpenChange={setCorrectionSectionOpen}
@@ -749,10 +805,9 @@ export function OffloadDialog({
                           min="0"
                           placeholder="Leave empty to keep current rate"
                           value={costCorrections[r.stockItemId] || ""}
-                          onChange={(e) => setCostCorrections(prev => ({
-                            ...prev,
-                            [r.stockItemId]: e.target.value,
-                          }))}
+                          onChange={(e) =>
+                            setCostCorrections((prev) => ({ ...prev, [r.stockItemId]: e.target.value }))
+                          }
                           data-testid={`input-correct-rate-${r.stockItemId}`}
                         />
                       </div>
@@ -780,15 +835,11 @@ export function OffloadDialog({
               )}
               <div className="flex justify-between font-semibold border-t pt-2">
                 <span className="text-muted-foreground">Total Charges:</span>
-                <span data-testid="text-total-charges">
-                  ${formatNumber(totalCharges)}
-                </span>
+                <span data-testid="text-total-charges">${formatNumber(totalCharges)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Bales:</span>
-                <span className="font-medium" data-testid="text-total-bales">
-                  {formatNumber(totalBales)}
-                </span>
+                <span className="font-medium" data-testid="text-total-bales">{formatNumber(totalBales)}</span>
               </div>
               <div className="flex justify-between pt-2 border-t">
                 <span className="text-muted-foreground">Additional Cost per Bale:</span>
