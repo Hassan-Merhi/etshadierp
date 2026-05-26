@@ -2077,15 +2077,20 @@ export function registerContainerRoutes(app: Express) {
                 .where(
                   and(
                     eq(vouchers.companyId, container.companyId),
-                    sql`LOWER(${vouchers.description}) LIKE LOWER(${containerDescPattern})`,
                     sql`(
-                      ${vouchers.voucherNumber} LIKE 'DUTY-%' OR
-                      ${vouchers.voucherNumber} LIKE 'OFFICE-%' OR
-                      ${vouchers.voucherNumber} LIKE 'TRANS-%' OR
-                      ${vouchers.voucherNumber} LIKE 'CHG-%' OR
-                      ${vouchers.voucherNumber} LIKE 'XFER-%' OR
-                      ${vouchers.voucherNumber} LIKE ${'SP-OTW-REV-ERP-' + containerId + '-%'} OR
-                      ${vouchers.voucherNumber} LIKE ${'SP-AGENT-SETTLE-' + containerId + '-%'}
+                      (
+                        LOWER(${vouchers.description}) LIKE LOWER(${containerDescPattern})
+                        AND (
+                          ${vouchers.voucherNumber} LIKE 'DUTY-%' OR
+                          ${vouchers.voucherNumber} LIKE 'OFFICE-%' OR
+                          ${vouchers.voucherNumber} LIKE 'TRANS-%' OR
+                          ${vouchers.voucherNumber} LIKE 'CHG-%' OR
+                          ${vouchers.voucherNumber} LIKE 'XFER-%'
+                        )
+                      )
+                      OR ${vouchers.voucherNumber} LIKE ${'SP-OTW-REV-ERP-' + containerId + '-%'}
+                      OR ${vouchers.voucherNumber} LIKE ${'SP-STOCK-ERP-' + containerId + '-%'}
+                      OR ${vouchers.voucherNumber} LIKE ${'SP-AGENT-SETTLE-' + containerId + '-%'}
                     )`,
                   ),
                 );
@@ -2154,6 +2159,8 @@ export function registerContainerRoutes(app: Express) {
           const [
             otwAcct,
             otwClrAcct,
+            spStockAcct,
+            spCostClrAcct,
             hadiSpInterco,
             spHadiIcAcct,
             spPrepaidExpAcct,
@@ -2163,6 +2170,12 @@ export function registerContainerRoutes(app: Express) {
             ).then(r => r[0]),
             db.select().from(ledgerAccounts).where(
               and(eq(ledgerAccounts.companyId, container.companyId), eq(ledgerAccounts.subType, "sp_otw_clearing"), isNull(ledgerAccounts.deletedAt))
+            ).then(r => r[0]),
+            db.select().from(ledgerAccounts).where(
+              and(eq(ledgerAccounts.companyId, container.companyId), eq(ledgerAccounts.subType, "sp_stock"), isNull(ledgerAccounts.deletedAt))
+            ).then(r => r[0]),
+            db.select().from(ledgerAccounts).where(
+              and(eq(ledgerAccounts.companyId, container.companyId), eq(ledgerAccounts.subType, "sp_cost_clearing"), isNull(ledgerAccounts.deletedAt))
             ).then(r => r[0]),
             validAgentLines.length > 0
               ? db.select().from(ledgerAccounts).where(
@@ -2183,6 +2196,9 @@ export function registerContainerRoutes(app: Express) {
 
           if (!otwAcct || !otwClrAcct) {
             throw new Error("SP OTW accounts not found. Run SP Setup first.");
+          }
+          if (!spStockAcct || !spCostClrAcct) {
+            throw new Error("SP Stock / Cost Clearing accounts not found. Run SP Setup first.");
           }
           if (validAgentLines.length > 0) {
             if (!hadiSpInterco) throw new Error("HADI L'SHI intercompany account not found. Contact admin.");
@@ -2234,6 +2250,39 @@ export function registerContainerRoutes(app: Express) {
                 debitAmount: "0",
                 creditAmount: String(totalOtw),
                 narration: `Goods OTW reversal — ERP container #${containerId}`,
+              });
+
+              // ── Voucher B: Recognise goods cost (Dr sp_stock / Cr sp_cost_clearing) ──
+              // Mirrors the exact same step in POST /api/sp/offload.
+              // Dr sp_stock: marks the base goods value as stock on floor.
+              // Cr sp_cost_clearing: records the corresponding cost payable to HADI.
+              // (Inventory quantity is also tracked in bales via storage.offloadContainer.)
+              const [voucherB] = await tx.insert(vouchers).values({
+                companyId: container.companyId,
+                voucherType: "Journal",
+                voucherNumber: `SP-STOCK-ERP-${containerId}-${Date.now()}`,
+                voucherDate: vDate,
+                description: `Stock cost recognition — ERP container #${containerId}`,
+                totalAmount: String(totalOtw),
+                currency: "USD",
+                exchangeRate: "1",
+                sourceModule: "SP",
+              }).returning();
+              // Dr sp_stock (goods now on floor)
+              await tx.insert(voucherEntries).values({
+                voucherId: voucherB.id,
+                ledgerAccountId: spStockAcct.id,
+                debitAmount: String(totalOtw),
+                creditAmount: "0",
+                narration: `Stock on floor — ERP container #${containerId}`,
+              });
+              // Cr sp_cost_clearing (base cost payable to HADI)
+              await tx.insert(voucherEntries).values({
+                voucherId: voucherB.id,
+                ledgerAccountId: spCostClrAcct.id,
+                debitAmount: "0",
+                creditAmount: String(totalOtw),
+                narration: `Base goods cost payable — ERP container #${containerId}`,
               });
             }
 
