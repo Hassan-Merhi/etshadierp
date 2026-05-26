@@ -4006,7 +4006,7 @@ END $mig$`;
               console.error("Migration error:", err);
               migrationsDone = true;
             })
-          : (console.log("⚠ Startup migrations DISABLED via RUN_STARTUP_MIGRATIONS=false"), Promise.resolve())
+          : (console.log("⚠ Startup migrations DISABLED via RUN_STARTUP_MIGRATIONS=false"), migrationsDone = true, Promise.resolve())
       ).then(async () => {
         // ── Post-migration startup diagnostic summary ───────────────────────────
         try {
