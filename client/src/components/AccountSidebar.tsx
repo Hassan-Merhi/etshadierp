@@ -194,7 +194,7 @@ export default function AccountSidebar({
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-3">
           <div className="min-w-0">
-            <h3 className="text-base font-semibold">Select Account</h3>
+            <span className="text-sm font-medium">Select Account</span>
             {activeTargetLabel && (
               <p className="text-xs text-muted-foreground mt-0.5 truncate" data-testid="text-active-target">
                 Selecting for: <span className="font-medium text-foreground">{activeTargetLabel}</span>
@@ -258,7 +258,7 @@ export default function AccountSidebar({
                   key={`${account.type}-${account.id}`}
                   data-index={idx}
                   onClick={() => onSelectAccount(account)}
-                  className={`w-full text-left px-3 py-2.5 rounded-md hover-elevate active-elevate-2 transition-colors ${
+                  className={`w-full text-left px-2 py-2 rounded-md hover-elevate active-elevate-2 transition-colors ${
                     isSelected ? "ring-2 ring-primary" : ""
                   } ${isHighlighted ? "bg-accent" : ""}`}
                   data-testid={`account-${idx}`}
@@ -271,7 +271,7 @@ export default function AccountSidebar({
                           `${account.type}-${account.id}`}
                       </div>
                       {TYPE_BADGE[account.type] && (
-                        <span className={`inline-block text-[10px] font-medium px-1.5 py-0 rounded mt-0.5 ${TYPE_BADGE[account.type].cls}`}>
+                        <span className={`inline-block text-[9px] font-medium px-1.5 py-0 rounded mt-0.5 ${TYPE_BADGE[account.type].cls}`}>
                           {TYPE_BADGE[account.type].label}
                         </span>
                       )}
@@ -283,7 +283,7 @@ export default function AccountSidebar({
                         </div>
                       )}
                       <div
-                        className={`text-sm font-mono font-semibold flex-shrink-0 ${getBalanceColorClass(projectedBalance, account.type)}`}
+                        className={`text-xs font-mono font-semibold flex-shrink-0 ${getBalanceColorClass(projectedBalance, account.type)}`}
                       >
                         {formatBalance(projectedBalance)}
                       </div>

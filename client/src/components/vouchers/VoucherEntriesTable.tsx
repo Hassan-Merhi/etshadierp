@@ -194,7 +194,7 @@ export function VoucherEntriesTable({
               const isEmpty = !entry?.accountId || entry.accountId === 0;
               const typeBadge = entry?.accountType ? ENTRY_TYPE_BADGE[entry.accountType] : null;
               return (
-              <tr key={field.id} className={cn("border-t hover-elevate", isEmpty && "bg-muted/20", activeRow === index && !isEmpty && "bg-primary/5 dark:bg-primary/10")}>
+              <tr key={field.id} className={cn("border-t hover-elevate", isEmpty && "bg-muted/20", activeRow === index && !isEmpty && (mode === "payment" ? "bg-amber-50 dark:bg-amber-950/20" : "bg-emerald-50 dark:bg-emerald-950/20"))}>
                 <td className="px-2 py-3 text-center text-xs font-medium text-muted-foreground tabular-nums">
                   {index + 1}
                 </td>

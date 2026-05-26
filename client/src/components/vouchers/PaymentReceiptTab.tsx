@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Form,
@@ -151,9 +151,6 @@ export function PaymentReceiptTab({
 
   // Tab-specific styling / labels
   const Icon = isPayment ? ArrowUpCircle : ArrowDownCircle;
-  const headerBg = isPayment
-    ? "bg-amber-50/60 dark:bg-amber-950/15"
-    : "bg-emerald-50/60 dark:bg-emerald-950/15";
   const iconColor = isPayment
     ? "text-amber-600 dark:text-amber-400"
     : "text-emerald-600 dark:text-emerald-400";
@@ -250,288 +247,277 @@ export function PaymentReceiptTab({
       {/* ── Left column: form ── */}
       <div className="flex-1 min-w-0">
         <Card>
-          {/* Header */}
-          <CardHeader
-            className="relative p-4 sm:p-5 rounded-t-lg flex flex-row items-center gap-3 flex-wrap overflow-hidden border-b border-border/50"
-            style={{
-              background: `linear-gradient(135deg, ${accentColor}22 0%, ${accentColor}08 55%, transparent 100%)`,
-            }}
-          >
-            {/* Left accent stripe */}
-            <div
-              className="absolute left-0 top-0 bottom-0 w-[3px] rounded-tl-lg"
-              style={{ backgroundColor: accentColor }}
-            />
-
-            <div className="flex items-center gap-3 flex-1 min-w-0 pl-2">
-              {/* Icon tile */}
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="flex flex-col"
+              noValidate
+            >
+              {/* ── Compact header strip ── */}
               <div
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white"
+                className="relative flex items-center gap-2 px-4 py-3 border-b border-border/50 overflow-hidden flex-wrap rounded-t-lg"
                 style={{
-                  backgroundColor: accentColor,
-                  boxShadow: `0 2px 12px ${accentColor}55, inset 0 1px 0 rgba(255,255,255,0.2)`,
+                  background: `linear-gradient(135deg, ${accentColor}22 0%, ${accentColor}08 55%, transparent 100%)`,
                 }}
               >
-                <Icon className="h-5 w-5" />
-              </div>
+                {/* Left accent stripe */}
+                <div
+                  className="absolute left-0 top-0 bottom-0 w-[3px] rounded-tl-lg"
+                  style={{ backgroundColor: accentColor }}
+                />
 
-              <div className="flex flex-col min-w-0">
-                <CardTitle className="text-base sm:text-lg leading-snug">{title}</CardTitle>
-                {(isEditMode || voucherNumber) && (
-                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                    {isEditMode && (
-                      <Badge variant="secondary" className="text-xs" data-testid="badge-editing">
-                        Editing
-                      </Badge>
-                    )}
-                    {voucherNumber && (
-                      <span
-                        className="text-xs font-mono text-muted-foreground"
-                        data-testid="text-voucher-number"
+                {/* Icon tile */}
+                <div
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white ml-2"
+                  style={{
+                    backgroundColor: accentColor,
+                    boxShadow: `0 2px 8px ${accentColor}55, inset 0 1px 0 rgba(255,255,255,0.2)`,
+                  }}
+                >
+                  <Icon className="h-4 w-4" />
+                </div>
+
+                {/* Title + badges */}
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="text-sm font-medium">{title}</span>
+                  {isEditMode && (
+                    <Badge variant="secondary" className="text-xs" data-testid="badge-editing">
+                      Editing
+                    </Badge>
+                  )}
+                  {voucherNumber && (
+                    <span
+                      className="text-xs font-mono text-muted-foreground"
+                      data-testid="text-voucher-number"
+                    >
+                      #{voucherNumber}
+                    </span>
+                  )}
+                </div>
+
+                {/* Date input */}
+                <FormField
+                  control={form.control}
+                  name="voucherDate"
+                  render={({ field }) => (
+                    <FormItem className="shrink-0 space-y-0">
+                      <FormControl>
+                        <Input
+                          type="date"
+                          className="w-36"
+                          value={
+                            field.value instanceof Date
+                              ? format(field.value, "yyyy-MM-dd")
+                              : typeof field.value === "string"
+                                ? field.value
+                                : ""
+                          }
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value
+                                ? new Date(e.target.value + "T00:00:00")
+                                : new Date()
+                            )
+                          }
+                          data-testid="input-date-picker"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {/* Print */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className={!canPrint ? "cursor-not-allowed" : ""}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!canPrint}
+                        onClick={handlePrint}
+                        data-testid="button-print"
+                        className={!canPrint ? "pointer-events-none" : ""}
                       >
-                        #{voucherNumber}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+                        <Printer className="h-4 w-4" />
+                        <span className="hidden sm:inline ml-1.5">Print</span>
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {!canPrint && (
+                    <TooltipContent side="bottom" className="max-w-xs text-center">
+                      {printDisabledReason}
+                    </TooltipContent>
+                  )}
+                </Tooltip>
 
-            {/* Mobile accounts drawer trigger — hidden on sm+ */}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="sm:hidden shrink-0"
-              onClick={() => setSheetOpen(true)}
-              data-testid="button-open-accounts-drawer"
-            >
-              <BookOpen className="h-4 w-4 mr-1.5" />
-              Accounts
-              {activeTargetLabel && (
-                <span className="ml-1.5 text-xs text-muted-foreground font-normal">
-                  — {activeTargetLabel}
-                </span>
-              )}
-            </Button>
-          </CardHeader>
-
-          <CardContent>
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="space-y-6"
-                noValidate
-              >
-                {/* ── Row 1: account | date | actions ── */}
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_180px_auto] lg:items-start">
-                  {/* Account selector */}
-                  <FormField
-                    control={form.control}
-                    name="paymentAccountId"
-                    render={() => (
-                      <FormItem className="min-w-0">
-                        <FormLabel>{accountLabel}</FormLabel>
-                        <FormControl>
-                          {/* onFocus on the wrapper detects when the pay-from autocomplete is active */}
-                          <div
-                            className="w-full min-w-0"
-                            onFocus={() => {
-                              setPayFromActive(true);
-                              onAccountPickerOpen?.();
-                            }}
-                          >
-                            <AccountAutocomplete
-                              value={
-                                paymentAccountId > 0
-                                  ? {
-                                      type: paymentAccountType,
-                                      id: paymentAccountId,
-                                      name: paymentAccountName,
-                                    }
-                                  : null
-                              }
-                              onChange={(type, id, name) => {
-                                form.setValue("paymentAccountType", type);
-                                form.setValue("paymentAccountId", id);
-                                form.setValue("paymentAccountName", name);
-                              }}
-                              allAccounts={allAccounts}
-                              rowIndex={-1}
-                              placeholder={accountPlaceholder}
-                              testId={accountTestId}
-                              onSearchChange={onAccountSearchChange}
-                            />
-                          </div>
-                        </FormControl>
-
-                        {/* Balance / projection display */}
-                        {paymentAccountId > 0 &&
-                          (accountCurrencyBalances &&
-                          accountCurrencyBalances.length > 0 ? (
-                            <div className="flex flex-col gap-0.5 mt-1.5">
-                              {accountCurrencyBalances.map(
-                                ({ currency, balance }) => (
-                                  <div
-                                    key={currency}
-                                    className="flex items-center gap-1.5 text-sm font-mono"
-                                  >
-                                    <span className="text-muted-foreground text-xs">
-                                      Bal:
-                                    </span>
-                                    <span className={cn(balColor(balance))}>
-                                      {fmtCurr(balance, currency)}{" "}
-                                      {balance > 0
-                                        ? "CR"
-                                        : balance < 0
-                                          ? "DR"
-                                          : ""}
-                                    </span>
-                                  </div>
-                                )
-                              )}
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1.5 flex-wrap text-sm mt-1.5 font-mono">
-                              <span className="text-muted-foreground text-xs">
-                                Bal:
-                              </span>
-                              <span className={cn(balColor(accountBalance))}>
-                                {formatAmount(accountBalance)}
-                              </span>
-                              {total > 0 && (
-                                <>
-                                  <span className="text-muted-foreground">
-                                    →
-                                  </span>
-                                  <span
-                                    className={cn(
-                                      "font-semibold",
-                                      balColor(projected)
-                                    )}
-                                  >
-                                    {formatAmount(projected)}
-                                  </span>
-                                  <span className="text-muted-foreground text-xs">
-                                    after
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          ))}
-
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* Date */}
-                  <FormField
-                    control={form.control}
-                    name="voucherDate"
-                    render={({ field }) => (
-                      <FormItem className="min-w-0">
-                        <FormLabel>Date</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="date"
-                            value={
-                              field.value instanceof Date
-                                ? format(field.value, "yyyy-MM-dd")
-                                : typeof field.value === "string"
-                                  ? field.value
-                                  : ""
-                            }
-                            onChange={(e) =>
-                              field.onChange(
-                                e.target.value
-                                  ? new Date(e.target.value + "T00:00:00")
-                                  : new Date()
-                              )
-                            }
-                            data-testid="input-date-picker"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* Print / Export — with tooltip when disabled */}
-                  <div className="flex flex-col gap-1 lg:items-end lg:pt-[22px]">
-                    <div className="flex items-center gap-2">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className={!canPrint ? "cursor-not-allowed" : ""}>
+                {/* Export */}
+                {hasExport && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className={!canExport ? "cursor-not-allowed" : ""}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
                             <Button
                               type="button"
                               variant="outline"
-                              size="default"
-                              disabled={!canPrint}
-                              onClick={handlePrint}
-                              data-testid="button-print"
-                              className={!canPrint ? "pointer-events-none" : ""}
+                              size="sm"
+                              disabled={!canExport}
+                              data-testid="button-export"
+                              className={!canExport ? "pointer-events-none" : ""}
                             >
-                              <Printer className="h-4 w-4 mr-2" />
-                              Print
+                              <FileDown className="h-4 w-4" />
+                              <span className="hidden sm:inline ml-1.5">Export</span>
+                              <ChevronDown className="h-3.5 w-3.5 ml-1" />
                             </Button>
-                          </span>
-                        </TooltipTrigger>
-                        {!canPrint && (
-                          <TooltipContent side="bottom" className="max-w-xs text-center">
-                            {printDisabledReason}
-                          </TooltipContent>
-                        )}
-                      </Tooltip>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleExportVoucher?.(false)}
+                              data-testid="export-summary"
+                            >
+                              <FileDown className="h-4 w-4 mr-2" />
+                              Summary
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleExportVoucher?.(true)}
+                              data-testid="export-detailed"
+                            >
+                              <FileDown className="h-4 w-4 mr-2" />
+                              Detailed
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </span>
+                    </TooltipTrigger>
+                    {!canExport && (
+                      <TooltipContent side="bottom" className="max-w-xs text-center">
+                        {printDisabledReason}
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                )}
 
-                      {hasExport && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className={!canExport ? "cursor-not-allowed" : ""}>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="default"
-                                    disabled={!canExport}
-                                    data-testid="button-export"
-                                    className={!canExport ? "pointer-events-none" : ""}
-                                  >
-                                    <FileDown className="h-4 w-4 mr-2" />
-                                    Export
-                                    <ChevronDown className="h-4 w-4 ml-2" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    onClick={() => handleExportVoucher?.(false)}
-                                    data-testid="export-summary"
-                                  >
-                                    <FileDown className="h-4 w-4 mr-2" />
-                                    Summary
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => handleExportVoucher?.(true)}
-                                    data-testid="export-detailed"
-                                  >
-                                    <FileDown className="h-4 w-4 mr-2" />
-                                    Detailed
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                {/* Mobile accounts drawer trigger — hidden on sm+ */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="sm:hidden shrink-0"
+                  onClick={() => setSheetOpen(true)}
+                  data-testid="button-open-accounts-drawer"
+                >
+                  <BookOpen className="h-4 w-4 mr-1.5" />
+                  Accounts
+                  {activeTargetLabel && (
+                    <span className="ml-1.5 text-xs text-muted-foreground font-normal">
+                      — {activeTargetLabel}
+                    </span>
+                  )}
+                </Button>
+              </div>
+
+              {/* ── Form fields ── */}
+              <div className="p-4 sm:p-5 space-y-6">
+                {/* Account selector — full width */}
+                <FormField
+                  control={form.control}
+                  name="paymentAccountId"
+                  render={() => (
+                    <FormItem className="min-w-0">
+                      <FormLabel>{accountLabel}</FormLabel>
+                      <FormControl>
+                        {/* onFocus on the wrapper detects when the pay-from autocomplete is active */}
+                        <div
+                          className="w-full min-w-0"
+                          onFocus={() => {
+                            setPayFromActive(true);
+                            onAccountPickerOpen?.();
+                          }}
+                        >
+                          <AccountAutocomplete
+                            value={
+                              paymentAccountId > 0
+                                ? {
+                                    type: paymentAccountType,
+                                    id: paymentAccountId,
+                                    name: paymentAccountName,
+                                  }
+                                : null
+                            }
+                            onChange={(type, id, name) => {
+                              form.setValue("paymentAccountType", type);
+                              form.setValue("paymentAccountId", id);
+                              form.setValue("paymentAccountName", name);
+                            }}
+                            allAccounts={allAccounts}
+                            rowIndex={-1}
+                            placeholder={accountPlaceholder}
+                            testId={accountTestId}
+                            onSearchChange={onAccountSearchChange}
+                          />
+                        </div>
+                      </FormControl>
+
+                      {/* Balance / projection display */}
+                      {paymentAccountId > 0 &&
+                        (accountCurrencyBalances &&
+                        accountCurrencyBalances.length > 0 ? (
+                          <div className="flex flex-col gap-0.5 mt-1.5">
+                            {accountCurrencyBalances.map(
+                              ({ currency, balance }) => (
+                                <div
+                                  key={currency}
+                                  className="flex items-center gap-1.5 text-sm font-mono"
+                                >
+                                  <span className="text-muted-foreground text-xs">
+                                    Bal:
+                                  </span>
+                                  <span className={cn(balColor(balance))}>
+                                    {fmtCurr(balance, currency)}{" "}
+                                    {balance > 0
+                                      ? "CR"
+                                      : balance < 0
+                                        ? "DR"
+                                        : ""}
+                                  </span>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 flex-wrap text-sm mt-1.5 font-mono">
+                            <span className="text-muted-foreground text-xs">
+                              Bal:
                             </span>
-                          </TooltipTrigger>
-                          {!canExport && (
-                            <TooltipContent side="bottom" className="max-w-xs text-center">
-                              {printDisabledReason}
-                            </TooltipContent>
-                          )}
-                        </Tooltip>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                            <span className={cn(balColor(accountBalance))}>
+                              {formatAmount(accountBalance)}
+                            </span>
+                            {total > 0 && (
+                              <>
+                                <span className="text-muted-foreground">
+                                  →
+                                </span>
+                                <span
+                                  className={cn(
+                                    "font-semibold",
+                                    balColor(projected)
+                                  )}
+                                >
+                                  {formatAmount(projected)}
+                                </span>
+                                <span className="text-muted-foreground text-xs">
+                                  after
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        ))}
+
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 {/* ── Entries table ── */}
                 <VoucherEntriesTable
@@ -566,7 +552,10 @@ export function PaymentReceiptTab({
                 />
 
                 {/* ── Summary / validation ── */}
-                <div className="rounded-lg border bg-muted/20 overflow-hidden">
+                <div
+                  className="rounded-r-lg border bg-muted/20 overflow-hidden"
+                  style={{ borderLeftColor: accentColor, borderLeftWidth: "3px" }}
+                >
                   <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-3">
                     {/* Left: stats + validation hints */}
                     <div className="flex flex-wrap items-center gap-4">
@@ -604,7 +593,7 @@ export function PaymentReceiptTab({
                       </span>
                       <span
                         className={cn(
-                          "text-2xl font-bold tabular-nums leading-tight",
+                          "text-xl font-bold tabular-nums leading-tight",
                           total === 0 && "text-muted-foreground"
                         )}
                         style={total > 0 ? { color: accentColor } : undefined}
@@ -690,6 +679,7 @@ export function PaymentReceiptTab({
                   <Button
                     type="submit"
                     size="default"
+                    className="w-full sm:w-auto"
                     disabled={paymentAccountId === 0 || total === 0 || isPending}
                     data-testid="button-save-voucher"
                   >
@@ -702,9 +692,9 @@ export function PaymentReceiptTab({
                         : `Save Voucher${total > 0 ? ` · ${formatAmount(total)}` : ""}`}
                   </Button>
                 </div>
-              </form>
-            </Form>
-          </CardContent>
+              </div>
+            </form>
+          </Form>
         </Card>
       </div>
 
