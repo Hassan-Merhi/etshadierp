@@ -86,9 +86,13 @@ export async function calculateNetPositionAsOf(
   const parentCompanyId = await storage.getParentCompanyId();
   const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
 
-  // SP: exclude sp_stock accounts to avoid double-counting with inventory table
-  // (sp_stock is an internal counterpart to the ERP inventory table, hidden from display)
-  const accountsForClassify = companyAccounts.filter((a: any) => a.subType !== "sp_stock");
+  // SP: exclude sp_stock and sp_cost_clearing accounts from Net Position.
+  // sp_stock is an internal counterpart to the ERP inventory table (stock value comes from
+  // the inventory table instead). sp_cost_clearing is an internal clearing account whose
+  // real economic counterpart is Supplier Cash Payable — showing it would double-count liabilities.
+  const accountsForClassify = companyAccounts.filter(
+    (a: any) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing"
+  );
   const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {
     includeSupplierTypeAccounts: shouldIncludeSuppliers,
   });
