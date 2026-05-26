@@ -36,6 +36,8 @@ export async function calculateNetPositionAsOf(
   toDate: string, // YYYY-MM-DD
 ): Promise<NetPositionSnapshot> {
   const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
+  const companyRow = await storage.getCompanyById(companyId);
+  const isSupplierPartner = (companyRow as any)?.companyType === "supplier_partner";
 
   // Push the summation to PostgreSQL — avoids transferring every individual
   // entry row over the wire. The index vouchers_company_date_idx covers the
@@ -187,24 +189,28 @@ export async function calculateNetPositionAsOf(
   }
 
   // ── Stock OTW ─────────────────────────────────────────────────────────
-  const otwContainers = await db
-    .select({ grandTotal: containers.grandTotal, itemsTotal: containers.itemsTotal })
-    .from(containers)
-    .where(and(
-      eq(containers.companyId, companyId),
-      lte(containers.importDate, toDate),
-      or(isNull(containers.offloadDate), sql`${containers.offloadDate} > ${toDate}`)
-    ))
-    .execute();
+  // SP companies track OTW via their sp_goods_otw ledger account ("Goods On The Way"),
+  // so we skip the containers-based calculation to avoid double-counting.
+  if (!isSupplierPartner) {
+    const otwContainers = await db
+      .select({ grandTotal: containers.grandTotal, itemsTotal: containers.itemsTotal })
+      .from(containers)
+      .where(and(
+        eq(containers.companyId, companyId),
+        lte(containers.importDate, toDate),
+        or(isNull(containers.offloadDate), sql`${containers.offloadDate} > ${toDate}`)
+      ))
+      .execute();
 
-  let otwTotal = 0;
-  for (const c of otwContainers) {
-    otwTotal += parseFloat(c.grandTotal || c.itemsTotal || "0");
-  }
-  otwTotal = round2(otwTotal);
-  if (otwTotal !== 0) {
-    forUsTotal += otwTotal;
-    forUsLines.push({ label: "Stock On The Way (OTW)", value: otwTotal, category: "In Transit", side: "forUs" });
+    let otwTotal = 0;
+    for (const c of otwContainers) {
+      otwTotal += parseFloat(c.grandTotal || c.itemsTotal || "0");
+    }
+    otwTotal = round2(otwTotal);
+    if (otwTotal !== 0) {
+      forUsTotal += otwTotal;
+      forUsLines.push({ label: "Stock On The Way (OTW)", value: otwTotal, category: "In Transit", side: "forUs" });
+    }
   }
 
   forUsTotal = round2(forUsTotal);
