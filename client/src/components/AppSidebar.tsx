@@ -292,8 +292,6 @@ export function AppSidebar({ user }: { user?: any }) {
                 color: NAV_COLOR.operations,
                 items: [
                   { title: "SP Reports",    url: "/sp/reports",        icon: BarChart3      },
-                  { title: "Opening Stock", url: "/sp/opening-stock",  icon: PackagePlus    },
-                  { title: "Aliases",       url: "/sp/aliases",        icon: Tags           },
                   { title: "Setup",         url: "/sp/setup",          icon: Wrench         },
                   { title: "Migration",     url: "/sp/migration",      icon: ArrowLeftRight },
                 ],
