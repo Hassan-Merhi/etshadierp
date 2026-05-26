@@ -1922,24 +1922,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   return (
     <div className="space-y-4">
-      {selectedCompany?.companyType === "supplier_partner" && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3 flex items-start gap-3" data-testid="banner-sp-redirect">
-          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-              Supplier Partner companies use SP Sales / POS
-            </p>
-            <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
-              Normal POS posting is blocked for Supplier Partner accounts to protect FIFO lot tracking and supplier payable logic. Use the dedicated SP Sales screen instead.
-            </p>
-          </div>
-          <Link href="/sp/sales">
-            <Button variant="outline" size="sm" data-testid="button-sp-redirect-sales">
-              Go to SP Sales
-            </Button>
-          </Link>
-        </div>
-      )}
       <PageHeader 
         title={editVoucherId ? "Edit Sale" : "Point of Sale"}
         subtitle={editVoucherId && editVoucher ? `Voucher #${editVoucher.voucherNumber}` : undefined}
