@@ -45,6 +45,7 @@ const TrackingHub = lazy(() => import("@/pages/TrackingHub"));
 const POS = lazy(() => import("@/pages/pos/POS"));
 const StockItems = lazy(() => import("@/pages/StockItems"));
 const Containers = lazy(() => import("@/pages/Containers"));
+const ContainersPage = lazy(() => import("@/pages/ContainersPage"));
 const InventoryHub = lazy(() => import("@/pages/InventoryHub"));
 const StockHub = lazy(() => import("@/pages/StockHub"));
 const Accounts = lazy(() => import("@/pages/Accounts"));
@@ -315,7 +316,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/containers-otw" component={ContainersOTW} />
       <Route path="/mock-git" component={GITMockup} />
       <Route path="/git" component={GITMockup} />
-      <Route path="/containers"><Redirect to="/inventory?tab=containers" /></Route>
+      <Route path="/containers" component={ContainersPage} />
       <Route path="/containers/:id" component={ContainerDetail} />
       <Route path="/offloads/:id" component={OffloadDetail} />
       <Route path="/po-import" component={POImport} />
