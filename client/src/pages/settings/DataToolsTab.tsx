@@ -65,7 +65,7 @@ import { StockItemAutocomplete } from "@/components/StockItemAutocomplete";
   import { useAppMode } from "@/contexts/AppModeContext";
   import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
   import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, TrendingDown, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, FileSpreadsheet, FileDown } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, TrendingDown, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, FileSpreadsheet, FileDown, RotateCcw } from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -830,6 +830,11 @@ export function DataToolsTab() {
         {/* Bulk Merge via Excel — ERP mode, Developer only */}
         {appMode !== "factory" && dtCurrentUser?.role === "Developer" && selectedCompany && (
           <BulkMergeStockItemsCard />
+        )}
+
+        {/* Merge History / Unmerge — ERP mode, Admin/Owner/Developer */}
+        {appMode !== "factory" && ["Admin", "Owner", "Developer"].includes(dtCurrentUser?.role || "") && selectedCompany && (
+          <MergeHistoryCard />
         )}
 
         {/* Merge Bale Products — factory mode, Admin/Owner/Developer */}
@@ -1974,6 +1979,144 @@ function BulkMergeStockItemsCard() {
           </div>
         )}
       </CardContent>
+    </Card>
+  );
+}
+
+// ── Merge History / Unmerge Card ─────────────────────────────────────────────
+
+interface MergeLogEntry {
+  id: number;
+  keptItemId: number;
+  keptItemCode: string;
+  keptItemName: string;
+  mergedItemId: number;
+  mergedItemCode: string;
+  mergedItemName: string;
+  mergedAt: string;
+  notes: string | null;
+}
+
+function MergeHistoryCard() {
+  const { toast } = useToast();
+  const [unmergeTarget, setUnmergeTarget] = useState<MergeLogEntry | null>(null);
+  const [isUnmerging, setIsUnmerging] = useState(false);
+
+  const { data: logs = [], isLoading, refetch } = useQuery<MergeLogEntry[]>({
+    queryKey: ["/api/stock-items/merge-logs"],
+  });
+
+  async function handleUnmerge() {
+    if (!unmergeTarget) return;
+    setIsUnmerging(true);
+    try {
+      const res = await apiRequest("POST", `/api/stock-items/merge-logs/${unmergeTarget.id}/unmerge`, {});
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Unmerge failed");
+      toast({ title: "Unmerge complete", description: data.message });
+      setUnmergeTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/merge-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+    } catch (err: any) {
+      toast({ title: "Unmerge failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsUnmerging(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <RotateCcw className="h-4 w-4" />
+          Merge History
+        </CardTitle>
+        <CardDescription>
+          View recent item merges and reverse them if needed. Inventory quantities and values are restored exactly from the pre-merge snapshot. Location prices deleted during merge cannot be recovered.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : logs.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No merges recorded for this company yet.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Kept item</TableHead>
+                <TableHead>Merged away</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead className="w-24"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {logs.map((log) => (
+                <TableRow key={log.id} data-testid={`row-merge-log-${log.id}`}>
+                  <TableCell>
+                    <p className="font-medium text-sm">{log.keptItemName}</p>
+                    <p className="text-xs text-muted-foreground">{log.keptItemCode}</p>
+                  </TableCell>
+                  <TableCell>
+                    <p className="font-medium text-sm">{log.mergedItemName}</p>
+                    <p className="text-xs text-muted-foreground">{log.mergedItemCode}</p>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                    {new Date(log.mergedAt).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setUnmergeTarget(log)}
+                      data-testid={`button-unmerge-${log.id}`}
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1" />
+                      Unmerge
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+
+      {/* Unmerge confirmation dialog */}
+      <AlertDialog open={!!unmergeTarget} onOpenChange={(open) => { if (!open) setUnmergeTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unmerge this item?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  This will restore <strong>{unmergeTarget?.mergedItemName}</strong> as a separate active item and revert inventory quantities back to the pre-merge state.
+                </p>
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    Any selling prices that were deleted during the merge (because the kept item already had a price for that location) cannot be recovered automatically. You may need to re-enter them manually.
+                  </AlertDescription>
+                </Alert>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUnmerging} data-testid="button-unmerge-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleUnmerge}
+              disabled={isUnmerging}
+              data-testid="button-unmerge-confirm"
+            >
+              {isUnmerging ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Unmerging…</> : "Yes, unmerge it"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
