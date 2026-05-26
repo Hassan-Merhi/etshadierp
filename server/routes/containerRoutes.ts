@@ -2118,51 +2118,91 @@ export function registerContainerRoutes(app: Express) {
           inventoryCostCorrections,
         );
 
-        // ── Voucher C: HADI L'SHI agent journals (SP company using ERP container) ──
+        // ── Agent journals for SP company using ERP container ──
+        // Settlement in SP Test Co:  Dr SP-HADI-IC / Cr SP-PREEXP
+        // Voucher C in HADI L'SHI:  Dr HADI-SP-IC / Cr Agent (one line per agent)
         const validAgentLines = agentChargeLines.filter(l => l.amountUsd > 0);
         if (validAgentLines.length > 0) {
-          const [hadiSpInterco] = await db
-            .select()
-            .from(ledgerAccounts)
-            .where(
-              and(
-                eq(ledgerAccounts.companyId, 1),
-                eq(ledgerAccounts.subType, "hadi_sp_intercompany"),
-                isNull(ledgerAccounts.deletedAt)
-              )
-            );
-          if (!hadiSpInterco) {
-            throw new Error("HADI L'SHI intercompany account not found. Contact admin.");
-          }
+          const vDate = offloadDate || getClientDate(req);
           const totalAgentAmt = validAgentLines.reduce((s, l) => s + l.amountUsd, 0);
+
+          // Fetch all required accounts in parallel
+          const [hadiSpInterco, spHadiIcAcct, spPrepaidExpAcct] = await Promise.all([
+            db.select().from(ledgerAccounts).where(
+              and(eq(ledgerAccounts.companyId, 1), eq(ledgerAccounts.subType, "hadi_sp_intercompany"), isNull(ledgerAccounts.deletedAt))
+            ).then(r => r[0]),
+            db.select().from(ledgerAccounts).where(
+              and(eq(ledgerAccounts.companyId, container.companyId), eq(ledgerAccounts.subType, "sp_hadi_intercompany"), isNull(ledgerAccounts.deletedAt))
+            ).then(r => r[0]),
+            db.select().from(ledgerAccounts).where(
+              and(eq(ledgerAccounts.companyId, container.companyId), eq(ledgerAccounts.subType, "sp_prepaid_expenses"), isNull(ledgerAccounts.deletedAt))
+            ).then(r => r[0]),
+          ]);
+
+          if (!hadiSpInterco) throw new Error("HADI L'SHI intercompany account not found. Contact admin.");
+          if (!spHadiIcAcct) throw new Error("SP intercompany account (SP-HADI-IC) not found. Run SP Setup first.");
+          if (!spPrepaidExpAcct) throw new Error("SP Prepaid Expenses account not found. Run SP Setup first.");
+
           await db.transaction(async (tx) => {
+            // ── Journal in SP Test Co: Dr SP-HADI-IC / Cr SP-PREEXP ──
+            const [settlementVoucher] = await tx.insert(vouchers).values({
+              companyId: container.companyId,
+              voucherType: "Journal",
+              voucherNumber: `SP-AGENT-SETTLE-${containerId}-${Date.now()}`,
+              voucherDate: vDate,
+              description: `Agent charge settlement via HADI L'SHI — container #${containerId}`,
+              totalAmount: String(totalAgentAmt),
+              currency: "USD",
+              exchangeRate: "1",
+              sourceModule: "SP",
+            }).returning();
+            // Dr SP-HADI-IC
+            await tx.insert(voucherEntries).values({
+              voucherId: settlementVoucher.id,
+              ledgerAccountId: spHadiIcAcct.id,
+              debitAmount: String(totalAgentAmt),
+              creditAmount: "0",
+              narration: `Agent charges via HADI L'SHI — ERP container #${containerId}`,
+            });
+            // Cr SP-PREEXP
+            await tx.insert(voucherEntries).values({
+              voucherId: settlementVoucher.id,
+              ledgerAccountId: spPrepaidExpAcct.id,
+              debitAmount: "0",
+              creditAmount: String(totalAgentAmt),
+              narration: `Prepaid expenses used for agent charges — ERP container #${containerId}`,
+            });
+
+            // ── Voucher C in HADI L'SHI: Dr HADI-SP-IC / Cr Agent (per line) ──
             const [voucherC] = await tx.insert(vouchers).values({
               companyId: 1,
               voucherType: "Journal",
               voucherNumber: `SP-AGENT-ERP-${containerId}-${Date.now()}`,
-              voucherDate: offloadDate || getClientDate(req),
+              voucherDate: vDate,
               description: `Agent charges for ERP offload — container #${containerId}`,
               totalAmount: String(totalAgentAmt),
               currency: "USD",
               exchangeRate: "1",
               sourceModule: "SP",
             }).returning();
+            // Dr HADI-SP-IC (total)
+            await tx.insert(voucherEntries).values({
+              voucherId: voucherC.id,
+              ledgerAccountId: hadiSpInterco.id,
+              debitAmount: String(totalAgentAmt),
+              creditAmount: "0",
+              narration: `ERP container offload agent charges — container #${containerId}`,
+            });
+            // Cr Agent (one line per agent)
             for (const line of validAgentLines) {
               await tx.insert(voucherEntries).values({
                 voucherId: voucherC.id,
                 ledgerAccountId: line.parentAgentAccountId,
-                debitAmount: String(line.amountUsd),
-                creditAmount: "0",
-                narration: `Agent charge for ERP container #${containerId}${line.description ? ` — ${line.description}` : ""}`,
+                debitAmount: "0",
+                creditAmount: String(line.amountUsd),
+                narration: `Agent credit for ERP container #${containerId}${line.description ? ` — ${line.description}` : ""}`,
               });
             }
-            await tx.insert(voucherEntries).values({
-              voucherId: voucherC.id,
-              ledgerAccountId: hadiSpInterco.id,
-              debitAmount: "0",
-              creditAmount: String(totalAgentAmt),
-              narration: `ERP container offload agent charges — container #${containerId}`,
-            });
           });
         }
 
