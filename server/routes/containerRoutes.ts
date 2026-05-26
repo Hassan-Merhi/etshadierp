@@ -2083,7 +2083,9 @@ export function registerContainerRoutes(app: Express) {
                       ${vouchers.voucherNumber} LIKE 'OFFICE-%' OR
                       ${vouchers.voucherNumber} LIKE 'TRANS-%' OR
                       ${vouchers.voucherNumber} LIKE 'CHG-%' OR
-                      ${vouchers.voucherNumber} LIKE 'XFER-%'
+                      ${vouchers.voucherNumber} LIKE 'XFER-%' OR
+                      ${vouchers.voucherNumber} LIKE ${'SP-OTW-REV-ERP-' + containerId + '-%'} OR
+                      ${vouchers.voucherNumber} LIKE ${'SP-AGENT-SETTLE-' + containerId + '-%'}
                     )`,
                   ),
                 );
@@ -2091,6 +2093,21 @@ export function registerContainerRoutes(app: Express) {
               for (const voucher of oldVouchers) {
                 await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucher.id));
                 await tx.delete(vouchers).where(eq(vouchers.id, voucher.id));
+              }
+
+              // Also delete HADI L'SHI side SP agent vouchers (companyId=1) for this container
+              const hadiAgentVouchers = await tx
+                .select()
+                .from(vouchers)
+                .where(
+                  and(
+                    eq(vouchers.companyId, 1),
+                    sql`${vouchers.voucherNumber} LIKE ${'SP-AGENT-ERP-' + containerId + '-%'}`,
+                  ),
+                );
+              for (const v of hadiAgentVouchers) {
+                await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, v.id));
+                await tx.delete(vouchers).where(eq(vouchers.id, v.id));
               }
 
               await tx.delete(containerOffloads).where(eq(containerOffloads.id, existingOffload.id));
@@ -2117,6 +2134,75 @@ export function registerContainerRoutes(app: Express) {
           offloadDate || getClientDate(req),
           inventoryCostCorrections,
         );
+
+        // ── SP company: detect company type once for all SP-specific journals ──
+        const spCompanyRow = await db.execute(
+          sql`SELECT company_type FROM companies WHERE id = ${container.companyId} LIMIT 1`
+        );
+        const spCompanyType = (spCompanyRow as any).rows?.[0]?.company_type ?? (spCompanyRow as any)[0]?.company_type;
+        const isSpCompany = spCompanyType === "supplier_partner";
+
+        if (isSpCompany) {
+          // ── Voucher A: Reverse Goods OTW ─────────────────────────────────────
+          // Mirrors the same step in POST /api/sp/offload for native SP containers.
+          // Clears both OTW asset/liability AND supplier balance (OTW Clearing
+          // entries carry supplierId so reversing them zeroes the supplier payable).
+          const vDateOtw = offloadDate || getClientDate(req);
+          const [otwAcct, otwClrAcct] = await Promise.all([
+            db.select().from(ledgerAccounts).where(
+              and(eq(ledgerAccounts.companyId, container.companyId), eq(ledgerAccounts.subType, "sp_goods_otw"), isNull(ledgerAccounts.deletedAt))
+            ).then(r => r[0]),
+            db.select().from(ledgerAccounts).where(
+              and(eq(ledgerAccounts.companyId, container.companyId), eq(ledgerAccounts.subType, "sp_otw_clearing"), isNull(ledgerAccounts.deletedAt))
+            ).then(r => r[0]),
+          ]);
+
+          if (!otwAcct || !otwClrAcct) {
+            throw new Error("SP OTW accounts not found. Run SP Setup first.");
+          }
+
+          const pos = await storage.getPurchaseOrdersByContainer(containerId);
+          const totalOtw = pos.reduce((s, po) => s + parseFloat(po.grandTotal || "0"), 0);
+
+          if (totalOtw > 0) {
+            await db.transaction(async (tx) => {
+              const [voucherA] = await tx.insert(vouchers).values({
+                companyId: container.companyId,
+                voucherType: "Journal",
+                voucherNumber: `SP-OTW-REV-ERP-${containerId}-${Date.now()}`,
+                voucherDate: vDateOtw,
+                description: `Goods OTW Reversal — ERP container #${containerId}`,
+                totalAmount: String(totalOtw),
+                currency: "USD",
+                exchangeRate: "1",
+                sourceModule: "SP",
+              }).returning();
+
+              // Dr OTW Clearing per PO (with supplierId — zeroes supplier balance)
+              for (const po of pos) {
+                const poTotal = parseFloat(po.grandTotal || "0");
+                if (poTotal <= 0) continue;
+                await tx.insert(voucherEntries).values({
+                  voucherId: voucherA.id,
+                  ledgerAccountId: otwClrAcct.id,
+                  supplierId: po.supplierId || null,
+                  debitAmount: String(poTotal),
+                  creditAmount: "0",
+                  narration: `OTW Clearing reversal — ERP container #${containerId}`,
+                });
+              }
+
+              // Cr Goods OTW (full total)
+              await tx.insert(voucherEntries).values({
+                voucherId: voucherA.id,
+                ledgerAccountId: otwAcct.id,
+                debitAmount: "0",
+                creditAmount: String(totalOtw),
+                narration: `Goods OTW reversal — ERP container #${containerId}`,
+              });
+            });
+          }
+        }
 
         // ── Agent journals for SP company using ERP container ──
         // Settlement in SP Test Co:  Dr SP-HADI-IC / Cr SP-PREEXP
