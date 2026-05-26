@@ -150,9 +150,9 @@ if (process.env.DATABASE_URL || process.env.PGHOST) {
     conObject: {
       connectionString,
       ssl: requiresSSL ? { rejectUnauthorized: false } : false,
-      // Keep session pool small to stay within Render's connection limit.
-      // Main pool: 7, session pool: 4 — total 11, well within Render's 25 limit.
-      max: 4,
+      // Keep session pool small — two instances run during Render zero-downtime
+      // deploys; main(8) + session(2) = 10 per instance × 2 = 20 < 25 limit.
+      max: 2,
       connectionTimeoutMillis: 10000,
       idleTimeoutMillis: 30000,
     },
