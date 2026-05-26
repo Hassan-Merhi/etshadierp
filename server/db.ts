@@ -50,16 +50,6 @@ export const pool = new Pool({
   allowExitOnIdle: false,
 });
 
-// Set lock_timeout on every pool connection so that a query waiting for a DDL
-// lock (e.g. ALTER TABLE held by a migration on another instance) fails after
-// 5 s and releases the pool slot, instead of holding it indefinitely and
-// exhausting the pool for all other requests.
-pool.on('connect', (client) => {
-  client.query(`SET lock_timeout = '5s'`).catch((e) => {
-    console.warn('[DB Pool] Could not set lock_timeout on new connection:', e.message);
-  });
-});
-
 // Log unexpected errors on idle clients.
 pool.on('error', (err) => {
   console.error('[DB Pool] Idle client error:', err.message);

@@ -3679,9 +3679,28 @@ let migrationsDone = false;
       // once the old instance is gone. statement_timeout caps runaway migration queries.
       await migrationClient.query(`SET lock_timeout = '3s'`);
       await migrationClient.query(`SET statement_timeout = '60s'`);
+      // Convert any "ALTER TABLE t ADD COLUMN IF NOT EXISTS col ..."  to a DO
+      // block that first checks information_schema.columns.  If the column
+      // already exists the DO block is a no-op and never requests an ACCESS
+      // EXCLUSIVE lock, preventing it from blocking concurrent SELECT queries.
+      const addColRe = /^\s*ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+(\w+)\s+([\s\S]+?)\s*$/i;
+      function safeMigration(sql: string): string {
+        const m = sql.match(addColRe);
+        if (!m) return sql;
+        const [, table, column, rest] = m;
+        return `DO $mig$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = '${table}' AND column_name = '${column}'
+  ) THEN
+    ALTER TABLE ${table} ADD COLUMN ${column} ${rest};
+  END IF;
+END $mig$`;
+      }
+
       for (const migration of migrations) {
         try {
-          await migrationClient.query(migration);
+          await migrationClient.query(safeMigration(migration));
         } catch (err: any) {
           console.warn(`Migration skipped: ${err.message?.split('\n')[0]}`);
         }
