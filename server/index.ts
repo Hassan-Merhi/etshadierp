@@ -3558,13 +3558,17 @@ let migrationsDone = false;
   startScheduler();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    // DB connection pool exhausted — return 503 immediately instead of a generic 500.
-    // This surfaces clearly in logs and tells the client to retry rather than report a bug.
+    // DB unavailable errors — return 503 immediately instead of a generic 500.
     const isPoolTimeout =
       err?.cause?.message?.includes("timeout exceeded when trying to connect") ||
       err?.message?.includes("timeout exceeded when trying to connect");
-    if (isPoolTimeout) {
-      console.error("[DB Pool] Connection timeout — pool exhausted or DB unreachable");
+    const isLockTimeout =
+      err?.cause?.message?.includes("lock timeout") ||
+      err?.message?.includes("lock timeout") ||
+      err?.cause?.message?.includes("canceling statement due to lock timeout") ||
+      err?.message?.includes("canceling statement due to lock timeout");
+    if (isPoolTimeout || isLockTimeout) {
+      console.error("[DB Pool] Connection/lock timeout — pool exhausted or DDL lock contention");
       return res.status(503).json({ message: "Service temporarily unavailable — please retry." });
     }
 
