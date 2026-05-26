@@ -82,7 +82,8 @@ export function registerFactoryDaybookRoutes(app: Express) {
           'WORKER_CREATED',
           'ORDER_CANCELLED',
           'CONTRACT_SETTLED',
-          'CONTRACT_REACTIVATED'
+          'CONTRACT_REACTIVATED',
+          'CONTRACT_ENDED'
         )`,
       ];
       // If user is restricted to own entries only, show their entries + unattributed ones (NULL createdBy)
@@ -154,9 +155,14 @@ export function registerFactoryDaybookRoutes(app: Express) {
       }
 
       // ── 1c. Safety-net: drop payroll-referenced daybook entries whose payroll was deleted ─
-      // This covers PAYROLL_PAYMENT and PAYROLL_GENERATED entries left behind after undo/delete.
+      // Covers PAYROLL_PAYMENT and PAYROLL_GENERATED entries left behind after undo/delete.
+      // NOTE: older entries were written without referenceTable, so also match by txType.
+      const PAYROLL_TX_TYPES = new Set(["PAYROLL_PAYMENT", "PAYROLL_GENERATED"]);
       const payrollRefIds = daybookRows
-        .filter((r: any) => r.referenceTable === "factory_payrolls" && r.referenceId != null)
+        .filter((r: any) =>
+          (r.referenceTable === "factory_payrolls" || PAYROLL_TX_TYPES.has(r.txType)) &&
+          r.referenceId != null
+        )
         .map((r: any) => r.referenceId as number);
 
       const validPayrollIds = new Set<number>();
@@ -175,7 +181,11 @@ export function registerFactoryDaybookRoutes(app: Express) {
             return validVoucherIds.has(r.referenceId);
           }
           // Drop payroll-backed entries whose payroll was deleted
-          if (r.referenceTable === "factory_payrolls" && r.referenceId != null) {
+          // Match by referenceTable OR txType (older entries lack referenceTable)
+          if (
+            (r.referenceTable === "factory_payrolls" || PAYROLL_TX_TYPES.has(r.txType)) &&
+            r.referenceId != null
+          ) {
             return validPayrollIds.has(r.referenceId);
           }
           return true;
