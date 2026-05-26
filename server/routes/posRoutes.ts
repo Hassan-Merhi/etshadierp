@@ -741,6 +741,7 @@ export function registerPosRoutes(app: Express) {
       // ── SP company: fetch configured POS accounts & pre-compute supplier cost ──
       let spPosPayableAccountId: number | null = null;
       let spPosProfitAccountId: number | null = null;
+      let spPosCostClrAccountId: number | null = null;
       let totalSupplierCost = 0;
       if (isSpCompany) {
         const spSettings = await storage.getCompanySettings(req.session.currentCompanyId!);
@@ -751,6 +752,19 @@ export function registerPosRoutes(app: Express) {
             message: "Supplier POS payable/profit accounts are not configured. Go to SP Setup to set them up.",
           });
         }
+        // Look up Stock Cost Payable Clearing account (sp_cost_clearing subType)
+        const [clrAcct] = await db
+          .select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.companyId, req.session.currentCompanyId!),
+              eq(ledgerAccounts.subType, "sp_cost_clearing"),
+              isNull(ledgerAccounts.deletedAt),
+            ),
+          )
+          .limit(1);
+        spPosCostClrAccountId = clrAcct?.id ?? null;
         // Pre-compute total supplier cost from inventory averageRate (includes landed/offloading cost)
         totalSupplierCost = inventoryValidation.reduce(
           (sum, v) => sum + v.saleQty * v.currentRate,
@@ -842,12 +856,27 @@ export function registerPosRoutes(app: Express) {
             narration: creditSaleNarration,
           });
         } else {
-          // Supplier Partner: split credit between Supplier Payable (cost) and Profit account
+          // Supplier Partner: clear stock cost liability, confirm payable, credit full revenue
+          // Accounting (balanced):
+          //   Dr Cash                     = grandTotal  (already posted above)
+          //   Dr Stock Cost Payable Clr   = supplierCost  (reduce provisional stock liability)
+          //   Cr Supplier Cash Payable    = supplierCost  (confirm definitive payable to supplier)
+          //   Cr Revenue/Profit           = grandTotal    (full sale as income; net profit shows in net position)
           const grandTotalRounded = Number(grandTotal.toFixed(2));
           const supplierCostRounded = Number(totalSupplierCost.toFixed(2));
-          const profitRounded = Number((grandTotalRounded - supplierCostRounded).toFixed(2));
 
-          // Cr Supplier Payable = total cost (what is owed to the supplier)
+          // Dr Stock Cost Payable Clearing (reduces the provisional stock liability)
+          if (spPosCostClrAccountId && supplierCostRounded > 0) {
+            await tx.insert(voucherEntries).values({
+              voucherId: txVoucher.id,
+              ledgerAccountId: spPosCostClrAccountId,
+              debitAmount: supplierCostRounded.toFixed(2),
+              creditAmount: "0",
+              narration: `Stock cost clearing — ${voucherNumber}`,
+            });
+          }
+
+          // Cr Supplier Cash Payable = supplier cost (what is owed to the supplier)
           if (supplierCostRounded > 0) {
             await tx.insert(voucherEntries).values({
               voucherId: txVoucher.id,
@@ -858,22 +887,22 @@ export function registerPosRoutes(app: Express) {
             });
           }
 
-          // Cr/Dr Profit account = selling price minus supplier cost
-          if (profitRounded > 0) {
+          // Cr Revenue/Profit = full grandTotal (balances: Dr Cash + Dr Clearing = Cr Payable + Cr Revenue)
+          if (grandTotalRounded > 0) {
             await tx.insert(voucherEntries).values({
               voucherId: txVoucher.id,
               ledgerAccountId: spPosProfitAccountId!,
               debitAmount: "0",
-              creditAmount: profitRounded.toFixed(2),
-              narration: `Supplier POS profit — ${voucherNumber}`,
+              creditAmount: grandTotalRounded.toFixed(2),
+              narration: `Supplier POS revenue — ${voucherNumber}`,
             });
-          } else if (profitRounded < 0) {
+          } else if (grandTotalRounded < 0) {
             await tx.insert(voucherEntries).values({
               voucherId: txVoucher.id,
               ledgerAccountId: spPosProfitAccountId!,
-              debitAmount: Math.abs(profitRounded).toFixed(2),
+              debitAmount: Math.abs(grandTotalRounded).toFixed(2),
               creditAmount: "0",
-              narration: `Supplier POS loss — ${voucherNumber}`,
+              narration: `Supplier POS reversal — ${voucherNumber}`,
             });
           }
         }
@@ -1049,6 +1078,7 @@ export function registerPosRoutes(app: Express) {
       // For SP companies fetch configured POS payable/profit accounts upfront
       let editSpPayableAccountId: number | null = null;
       let editSpProfitAccountId: number | null = null;
+      let editSpCostClrAccountId: number | null = null;
       if (isSpCompanyEdit) {
         const spSettings = await storage.getCompanySettings(req.session.currentCompanyId!);
         editSpPayableAccountId = spSettings?.spPosPayableAccountId ?? null;
@@ -1058,6 +1088,19 @@ export function registerPosRoutes(app: Express) {
             message: "Supplier POS payable/profit accounts are not configured. Go to SP Setup to set them up.",
           });
         }
+        // Look up Stock Cost Payable Clearing account (sp_cost_clearing subType)
+        const [clrAcct] = await db
+          .select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.companyId, req.session.currentCompanyId!),
+              eq(ledgerAccounts.subType, "sp_cost_clearing"),
+              isNull(ledgerAccounts.deletedAt),
+            ),
+          )
+          .limit(1);
+        editSpCostClrAccountId = clrAcct?.id ?? null;
       }
 
       const { description, items, paymentAccountType, paymentAccountId, isCreditSale, voucherDate, locationId: newLocationId } = req.body;
@@ -1320,11 +1363,27 @@ export function registerPosRoutes(app: Express) {
             narration: revenueEntry.narration || "",
           });
         } else {
-          // Supplier Partner: split credit between Supplier Payable (cost) and Profit account
+          // Supplier Partner: clear stock cost liability, confirm payable, credit full revenue
+          // Accounting (balanced):
+          //   Dr Cash                     = grandTotal  (already posted above)
+          //   Dr Stock Cost Payable Clr   = supplierCost  (reduce provisional stock liability)
+          //   Cr Supplier Cash Payable    = supplierCost  (confirm definitive payable to supplier)
+          //   Cr Revenue/Profit           = grandTotal    (full sale as income; net profit shows in net position)
           const grandTotalRounded = Number(grandTotal.toFixed(2));
           const supplierCostRounded = Number(totalSupplierCostEdit.toFixed(2));
-          const profitRounded = Number((grandTotalRounded - supplierCostRounded).toFixed(2));
 
+          // Dr Stock Cost Payable Clearing (reduces the provisional stock liability)
+          if (editSpCostClrAccountId && supplierCostRounded > 0) {
+            await tx.insert(voucherEntries).values({
+              voucherId,
+              ledgerAccountId: editSpCostClrAccountId,
+              debitAmount: supplierCostRounded.toFixed(2),
+              creditAmount: "0",
+              narration: `Stock cost clearing`,
+            });
+          }
+
+          // Cr Supplier Cash Payable = supplier cost
           if (supplierCostRounded > 0) {
             await tx.insert(voucherEntries).values({
               voucherId,
@@ -1335,21 +1394,22 @@ export function registerPosRoutes(app: Express) {
             });
           }
 
-          if (profitRounded > 0) {
+          // Cr Revenue/Profit = full grandTotal (balances: Dr Cash + Dr Clearing = Cr Payable + Cr Revenue)
+          if (grandTotalRounded > 0) {
             await tx.insert(voucherEntries).values({
               voucherId,
               ledgerAccountId: editSpProfitAccountId!,
               debitAmount: "0",
-              creditAmount: profitRounded.toFixed(2),
-              narration: `Supplier POS profit`,
+              creditAmount: grandTotalRounded.toFixed(2),
+              narration: `Supplier POS revenue`,
             });
-          } else if (profitRounded < 0) {
+          } else if (grandTotalRounded < 0) {
             await tx.insert(voucherEntries).values({
               voucherId,
               ledgerAccountId: editSpProfitAccountId!,
-              debitAmount: Math.abs(profitRounded).toFixed(2),
+              debitAmount: Math.abs(grandTotalRounded).toFixed(2),
               creditAmount: "0",
-              narration: `Supplier POS loss`,
+              narration: `Supplier POS reversal`,
             });
           }
         }
