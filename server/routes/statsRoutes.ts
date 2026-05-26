@@ -411,37 +411,42 @@ export function registerStatsRoutes(app: Express) {
       }
 
       // Stock OTW — historical as of toDate (containers that were in transit on that date).
-      // Rule: a container was OTW as of toDate if it was imported by then AND either
-      //   (a) it is still OTW (never formally offloaded via the offload workflow), OR
-      //   (b) it was formally offloaded AFTER toDate (so it was still in transit as of toDate).
-      // A manually-entered tracking offloadDate does NOT indicate a formal offload — only
-      // status='OFFLOADED' (set by the offload workflow) is authoritative. This keeps the
-      // date-filtered result consistent with the no-filter query (status = 'OTW').
-      const otwContainersQuery = toDate
-        ? and(
-            eq(containers.companyId, companyId),
-            lte(containers.importDate, toDate),
-            or(
-              eq(containers.status, "OTW"),
-              and(eq(containers.status, "OFFLOADED"), sql`${containers.offloadDate} > ${toDate}`)
+      // SP (supplier_partner) companies track OTW via the sp_goods_otw ledger account instead
+      // of the containers table, so skip the container-based calculation to avoid double-counting.
+      const isSpCompany = companyRecord?.companyType === "supplier_partner";
+      if (!isSpCompany) {
+        // Rule: a container was OTW as of toDate if it was imported by then AND either
+        //   (a) it is still OTW (never formally offloaded via the offload workflow), OR
+        //   (b) it was formally offloaded AFTER toDate (so it was still in transit as of toDate).
+        // A manually-entered tracking offloadDate does NOT indicate a formal offload — only
+        // status='OFFLOADED' (set by the offload workflow) is authoritative. This keeps the
+        // date-filtered result consistent with the no-filter query (status = 'OTW').
+        const otwContainersQuery = toDate
+          ? and(
+              eq(containers.companyId, companyId),
+              lte(containers.importDate, toDate),
+              or(
+                eq(containers.status, "OTW"),
+                and(eq(containers.status, "OFFLOADED"), sql`${containers.offloadDate} > ${toDate}`)
+              )
             )
-          )
-        : and(eq(containers.companyId, companyId), eq(containers.status, "OTW"));
-      const otwContainers = await db.select().from(containers).where(otwContainersQuery).execute();
+          : and(eq(containers.companyId, companyId), eq(containers.status, "OTW"));
+        const otwContainers = await db.select().from(containers).where(otwContainersQuery).execute();
 
-      let stockOtwValue = 0;
-      for (const container of otwContainers) {
-        // Use numeric OR so that grandTotal="0" (DB default) falls through to itemsTotal.
-        // String OR ("0" || itemsTotal) would never reach itemsTotal because "0" is truthy.
-        const gTotal = parseFloat(container.grandTotal ?? "0");
-        const containerValue = gTotal || parseFloat(container.itemsTotal ?? "0");
-        stockOtwValue += containerValue;
-      }
+        let stockOtwValue = 0;
+        for (const container of otwContainers) {
+          // Use numeric OR so that grandTotal="0" (DB default) falls through to itemsTotal.
+          // String OR ("0" || itemsTotal) would never reach itemsTotal because "0" is truthy.
+          const gTotal = parseFloat(container.grandTotal ?? "0");
+          const containerValue = gTotal || parseFloat(container.itemsTotal ?? "0");
+          stockOtwValue += containerValue;
+        }
 
-      if (stockOtwValue > 0) {
-        forUsTotal += stockOtwValue;
-        categoryTotals["asset_Stock OTW"] = stockOtwValue;
-        forUsAccounts.push({ name: "Stock On The Way", code: "STOCK_OTW", value: stockOtwValue, category: "Stock OTW" });
+        if (stockOtwValue > 0) {
+          forUsTotal += stockOtwValue;
+          categoryTotals["asset_Stock OTW"] = stockOtwValue;
+          forUsAccounts.push({ name: "Stock On The Way", code: "STOCK_OTW", value: stockOtwValue, category: "Stock OTW" });
+        }
       }
 
       // Build breakdowns from category totals (with rounding)
