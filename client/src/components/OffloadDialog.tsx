@@ -44,6 +44,14 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import type { Location } from "@shared/schema";
+import { useCompany } from "@/contexts/CompanyContext";
+
+interface AgentChargeLine {
+  id: string;
+  description: string;
+  amountUsd: string;
+  parentAgentAccountId: string;
+}
 
 interface OffloadDialogProps {
   open: boolean;
@@ -189,6 +197,8 @@ export function OffloadDialog({
 }: OffloadDialogProps) {
   const [_location, setLocation] = useLocation();
   const { toast } = useToast();
+  const { selectedCompany } = useCompany();
+  const isSpCompany = selectedCompany?.companyType === "supplier_partner";
   const [locationId, setLocationId] = useState<number | null>(null);
   const [offloadDate, setOffloadDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [duties, setDuties] = useState("0");
@@ -200,6 +210,7 @@ export function OffloadDialog({
   const [transportFees, setTransportFees] = useState("0");
   const [transportAccountId, setTransportAccountId] = useState("");
   const [additionalCharges, setAdditionalCharges] = useState<AdditionalCharge[]>([]);
+  const [agentChargeLines, setAgentChargeLines] = useState<AgentChargeLine[]>([]);
   const [costCorrections, setCostCorrections] = useState<Record<number, string>>({});
   const [correctionSectionOpen, setCorrectionSectionOpen] = useState(false);
 
@@ -215,6 +226,11 @@ export function OffloadDialog({
   const { data: ledgerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts"],
     enabled: open,
+  });
+
+  const { data: parentAgents = [] } = useQuery<any[]>({
+    queryKey: ["/api/sp/parent-agents"],
+    enabled: open && isSpCompany,
   });
 
   // Fetch container with PO data to get charges
@@ -268,6 +284,21 @@ export function OffloadDialog({
 
   const totalCharges = manualCharges + poChargesTotal;
   const additionalCostPerBale = totalBales > 0 ? totalCharges / totalBales : 0;
+
+  const handleAddAgentLine = () => {
+    setAgentChargeLines(prev => [
+      ...prev,
+      { id: Date.now().toString(), description: "", amountUsd: "", parentAgentAccountId: "" },
+    ]);
+  };
+
+  const handleRemoveAgentLine = (id: string) => {
+    setAgentChargeLines(prev => prev.filter(l => l.id !== id));
+  };
+
+  const handleUpdateAgentLine = (id: string, field: keyof AgentChargeLine, value: string) => {
+    setAgentChargeLines(prev => prev.map(l => l.id === id ? { ...l, [field]: value } : l));
+  };
 
   const handleAddCharge = () => {
     setAdditionalCharges([
@@ -357,6 +388,13 @@ export function OffloadDialog({
             .map(([stockItemId, rate]) => ({
               stockItemId: parseInt(stockItemId),
               correctRate: parseFloat(rate),
+            })),
+          agentChargeLines: agentChargeLines
+            .filter(l => parseFloat(l.amountUsd) > 0 && l.parentAgentAccountId)
+            .map(l => ({
+              description: l.description,
+              amountUsd: parseFloat(l.amountUsd),
+              parentAgentAccountId: parseInt(l.parentAgentAccountId),
             })),
         }
       );
@@ -576,6 +614,77 @@ export function OffloadDialog({
               </div>
             )}
           </div>
+
+          {/* Agent Charges via HADI L'SHI (SP companies only) */}
+          {isSpCompany && (
+            <div className="space-y-2 pt-2 border-t">
+              <div className="flex items-center justify-between">
+                <Label>Agent Charges via HADI L&apos;SHI</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddAgentLine}
+                  className="gap-2"
+                  data-testid="button-add-agent-line"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Agent
+                </Button>
+              </div>
+              {agentChargeLines.length === 0 && (
+                <p className="text-xs text-muted-foreground">Add lines to charge HADI L&apos;SHI agents. Each line creates a Dr Agent / Cr Interco journal in HADI L&apos;SHI.</p>
+              )}
+              {agentChargeLines.map((line) => (
+                <div key={line.id} className="grid grid-cols-12 gap-2 items-start">
+                  <div className="col-span-5">
+                    <Select
+                      value={line.parentAgentAccountId}
+                      onValueChange={(v) => handleUpdateAgentLine(line.id, "parentAgentAccountId", v)}
+                    >
+                      <SelectTrigger data-testid={`select-agent-${line.id}`}>
+                        <SelectValue placeholder="Select agent" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(parentAgents as any[]).map((a: any) => (
+                          <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
+                            {a.agent_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Amount USD"
+                    value={line.amountUsd}
+                    onChange={(e) => handleUpdateAgentLine(line.id, "amountUsd", e.target.value)}
+                    className="col-span-3"
+                    data-testid={`input-agent-amount-${line.id}`}
+                  />
+                  <Input
+                    placeholder="Note (optional)"
+                    value={line.description}
+                    onChange={(e) => handleUpdateAgentLine(line.id, "description", e.target.value)}
+                    className="col-span-3"
+                    data-testid={`input-agent-desc-${line.id}`}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleRemoveAgentLine(line.id)}
+                    className="col-span-1"
+                    data-testid={`button-remove-agent-${line.id}`}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Destination Location */}
           <div className="space-y-2 pt-2 border-t">

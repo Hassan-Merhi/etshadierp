@@ -884,6 +884,11 @@ export const offloadRequestSchema = insertContainerOffloadSchema.omit({
     stockItemId: z.number().min(1),
     correctRate: z.number().min(0),
   })).optional(),
+  agentChargeLines: z.array(z.object({
+    description: z.string().optional(),
+    amountUsd: z.number().min(0),
+    parentAgentAccountId: z.number().min(1),
+  })).optional(),
 });
 
 export type InsertContainerOffload = z.infer<typeof insertContainerOffloadSchema>;

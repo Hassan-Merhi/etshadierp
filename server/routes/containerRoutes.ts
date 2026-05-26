@@ -1964,7 +1964,6 @@ export function registerContainerRoutes(app: Express) {
     "/api/containers/:id/offload",
     requireAuth,
     requireNonPOS,
-    requireNonSP,
     async (req, res) => {
       try {
         const containerId = parseId(req.params.id);
@@ -1992,6 +1991,7 @@ export function registerContainerRoutes(app: Express) {
           transportAccountId,
           additionalCharges = [],
           inventoryCostCorrections = [],
+          agentChargeLines = [],
         } = validation.data;
 
         // Validate container exists
@@ -2117,6 +2117,54 @@ export function registerContainerRoutes(app: Express) {
           offloadDate || getClientDate(req),
           inventoryCostCorrections,
         );
+
+        // ── Voucher C: HADI L'SHI agent journals (SP company using ERP container) ──
+        const validAgentLines = agentChargeLines.filter(l => l.amountUsd > 0);
+        if (validAgentLines.length > 0) {
+          const [hadiSpInterco] = await db
+            .select()
+            .from(ledgerAccounts)
+            .where(
+              and(
+                eq(ledgerAccounts.companyId, 1),
+                eq(ledgerAccounts.subType, "hadi_sp_intercompany"),
+                isNull(ledgerAccounts.deletedAt)
+              )
+            );
+          if (!hadiSpInterco) {
+            throw new Error("HADI L'SHI intercompany account not found. Contact admin.");
+          }
+          const totalAgentAmt = validAgentLines.reduce((s, l) => s + l.amountUsd, 0);
+          await db.transaction(async (tx) => {
+            const [voucherC] = await tx.insert(vouchers).values({
+              companyId: 1,
+              voucherType: "Journal",
+              voucherNumber: `SP-AGENT-ERP-${containerId}-${Date.now()}`,
+              voucherDate: offloadDate || getClientDate(req),
+              description: `Agent charges for ERP offload — container #${containerId}`,
+              totalAmount: String(totalAgentAmt),
+              currency: "USD",
+              exchangeRate: "1",
+              sourceModule: "SP",
+            }).returning();
+            for (const line of validAgentLines) {
+              await tx.insert(voucherEntries).values({
+                voucherId: voucherC.id,
+                ledgerAccountId: line.parentAgentAccountId,
+                debitAmount: String(line.amountUsd),
+                creditAmount: "0",
+                narration: `Agent charge for ERP container #${containerId}${line.description ? ` — ${line.description}` : ""}`,
+              });
+            }
+            await tx.insert(voucherEntries).values({
+              voucherId: voucherC.id,
+              ledgerAccountId: hadiSpInterco.id,
+              debitAmount: "0",
+              creditAmount: String(totalAgentAmt),
+              narration: `ERP container offload agent charges — container #${containerId}`,
+            });
+          });
+        }
 
         res.json(offload);
       } catch (error: any) {
