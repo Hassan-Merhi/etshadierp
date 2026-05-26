@@ -156,13 +156,17 @@ export function registerStatsRoutes(app: Express) {
       }
 
       // 1. Classify balance-sheet accounts (assets vs liabilities) via shared helper.
-      // SP: exclude sp_stock and sp_cost_clearing before classification.
-      // sp_stock: stock value comes from inventory table, not a ledger account.
-      // sp_cost_clearing: internal clearing account; real liability is Supplier Cash Payable.
-      // Showing sp_cost_clearing would double-count liabilities for supplier_partner companies.
-      const accountsForClassify = companyAccounts.filter(
-        (a: any) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing"
-      );
+      // SP formula: What We Have = Cash + Stock (from inventory table); What We Owe = Supplier Cash Payable only.
+      // All other SP ledger accounts (OTW, prepaid, intercompany, clearing accounts, etc.) are excluded.
+      // For non-SP: exclude sp_stock (inventory table is authoritative) and sp_cost_clearing (double-counts).
+      const isSupplierPartner = (companyRecord as any)?.companyType === "supplier_partner";
+      const accountsForClassify = isSupplierPartner
+        ? companyAccounts.filter(
+            (a: any) => a.accountType === "Cash" || a.subType === "sp_payable"
+          )
+        : companyAccounts.filter(
+            (a: any) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing"
+          );
       const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {
         includeSupplierTypeAccounts: shouldIncludeSuppliers,
       });
@@ -686,11 +690,15 @@ export function registerStatsRoutes(app: Express) {
       // ── 2. Classify accounts ──────────────────────────────────────────────
       const parentCompanyId = await storage.getParentCompanyId();
       const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
-      // SP: exclude sp_stock and sp_cost_clearing (same rule as main net-position endpoint).
-      // sp_cost_clearing is an internal clearing account; real liability is Supplier Cash Payable.
-      const accountsForClassify = companyAccounts.filter(
-        (a: any) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing"
-      );
+      // SP formula: Cash + Stock (inventory) → What We Have; sp_payable only → What We Owe.
+      const isSupplierPartner = (company as any)?.companyType === "supplier_partner";
+      const accountsForClassify = isSupplierPartner
+        ? companyAccounts.filter(
+            (a: any) => a.accountType === "Cash" || a.subType === "sp_payable"
+          )
+        : companyAccounts.filter(
+            (a: any) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing"
+          );
       const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, { includeSupplierTypeAccounts: shouldIncludeSuppliers });
       let forUsTotal = classified.forUsTotal;
       let onUsTotal  = classified.onUsTotal;
