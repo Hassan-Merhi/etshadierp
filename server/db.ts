@@ -32,19 +32,16 @@ if (isLocalReplitDB) {
   console.log('✓ SSL enabled for external database connection');
 }
 
-// Single shared Pool for the entire application.
-// Session store uses its own separate pool (server/index.ts, max 3).
-// Render DB has max_connections=103; two instances during zero-downtime deploy:
-//   Per instance: main(12) + session(3) = 15  →  2 instances = 30, well within 103.
-// The real guard against pool exhaustion is lock_timeout on the migration client
-// (server/index.ts) which prevents DDL locks from blocking user queries during deploys.
+// Configurable via PG_POOL_MAX env var (default 5).
+// Keep low to leave headroom for zombie connections from crashed deploys.
+// Two instances during zero-downtime deploy: 5*2 + session(1*2) = 12, well within 103.
+const poolMax = Number(process.env.PG_POOL_MAX || 5);
+console.log(`[DB Pool] max=${poolMax} (PG_POOL_MAX=${process.env.PG_POOL_MAX ?? 'unset'})`);
+
 export const pool = new Pool({
   connectionString,
   ssl: requiresSSL ? { rejectUnauthorized: false } : false,
-  // 5 connections per instance. Render DB has max_connections=103.
-  // Two instances during zero-downtime deploy: 5*2 + session(3*2) = 16, well within 103.
-  // Deliberately low to leave headroom for zombie connections from crashed deploys.
-  max: 5,
+  max: poolMax,
   // Fail fast so requests error quickly rather than queuing indefinitely.
   connectionTimeoutMillis: 8000,
   // Release idle connections after 30 seconds.
@@ -59,9 +56,12 @@ pool.on('error', (err) => {
   logPoolStats('on-error');
 });
 
-// Log when a client is acquired from the pool.
+// Log every new physical connection and every removal for diagnostics.
+pool.on('connect', () => logPoolStats('connect'));
+pool.on('remove', () => logPoolStats('remove'));
+
+// Log when a client is acquired from the pool under pressure.
 pool.on('acquire', () => {
-  // Only log when the pool is under pressure to avoid noise.
   if (pool.waitingCount > 0) {
     logPoolStats('acquire-under-pressure');
   }

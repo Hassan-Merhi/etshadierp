@@ -150,9 +150,9 @@ if (process.env.DATABASE_URL || process.env.PGHOST) {
     conObject: {
       connectionString,
       ssl: requiresSSL ? { rejectUnauthorized: false } : false,
-      // Render DB max_connections=103; per instance: main(12)+session(3)=15, ×2=30.
-      max: 3,
-      connectionTimeoutMillis: 5000,
+      // 1 connection is enough for session reads/writes. Configurable via PG_SESSION_POOL_MAX.
+      max: Number(process.env.PG_SESSION_POOL_MAX || 1),
+      connectionTimeoutMillis: 8000,
       idleTimeoutMillis: 30000,
     },
     createTableIfMissing: true,
@@ -3574,7 +3574,12 @@ let migrationsDone = false;
 
   const server = await registerRoutes(app);
   setupWS(server);
-  startScheduler();
+  if (process.env.ENABLE_SCHEDULERS !== 'false') {
+    startScheduler();
+    console.log('[Schedulers] Started (ENABLE_SCHEDULERS != false)');
+  } else {
+    console.log('[Schedulers] Disabled via ENABLE_SCHEDULERS=false');
+  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     // DB unavailable errors — return 503 immediately instead of a generic 500.
