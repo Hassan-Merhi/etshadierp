@@ -275,7 +275,7 @@ export default function GroundScan() {
       const locParam = selectedLocationId && selectedLocationId !== "all" ? `?locationId=${selectedLocationId}` : "";
       const res = await fetch(`/api/factory/stock-entry/in-stock${locParam}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch system stock");
-      const allFetched: { referenceNumber: string; articleCode: string; productName?: string; weightKg: string; isInLoadingOrder?: boolean; date_bale_produced?: string | null; worker_name?: string | null; }[] = await res.json();
+      const allFetched: { referenceNumber: string; articleCode: string; productName?: string; weightKg: string; isInLoadingOrder?: boolean; stockEntryDate?: string | null; workerName?: string | null; }[] = await res.json();
       const systemBales = allFetched.filter((b) => !b.isInLoadingOrder);
 
       const scannedRefs = new Set(scannedBales.map((b) => b.refCode.toUpperCase()));
@@ -483,8 +483,8 @@ export default function GroundScan() {
           const dr = ws2.addRow([
             b.referenceNumber, b.articleCode || "—", b.productName || "—",
             +parseFloat(b.weightKg || "0").toFixed(3),
-            b.date_bale_produced || "—",
-            b.worker_name || "—",
+            b.stockEntryDate || "—",
+            b.workerName || "—",
           ]);
           styleDataRow(dr, idx % 2 === 0, { argb: idx % 2 === 0 ? LRED : "FFFDF0F0" });
           dr.getCell(1).font = { name: "Courier New", size: 10, color: { argb: BLACK } };
