@@ -491,6 +491,34 @@ export function registerStatsRoutes(app: Express) {
       incomeTotal = round2(incomeTotal);
       expensesTotal = round2(expensesTotal);
       
+      // ── Merge stock accounts into one combined Inventory line ────────────────
+      // "Stock In Hand (Inventory)" (computed from inventory table) and ledger
+      // accounts like "Stock on Floor" (accountType: Asset) represent the same
+      // physical stock and should appear as a single line in the breakdown.
+      {
+        const isStockEntry = (a: any) => {
+          const nl = (a.name || "").toLowerCase();
+          const cat = (a.category || "").toLowerCase();
+          return (
+            cat === "inventory" ||
+            nl.includes("stock in hand") ||
+            nl.includes("stock on floor")
+          );
+        };
+        const stockEntries = forUsAccounts.filter(isStockEntry);
+        if (stockEntries.length > 1) {
+          const combined = round2(stockEntries.reduce((s: number, a: any) => s + (a.value || 0), 0));
+          for (let i = forUsAccounts.length - 1; i >= 0; i--) {
+            if (isStockEntry(forUsAccounts[i])) forUsAccounts.splice(i, 1);
+          }
+          if (combined > 0) {
+            forUsAccounts.push({ name: "Stock In Hand / Stock on Floor", code: "COMPUTED", value: combined, category: "Inventory" });
+          }
+        } else if (stockEntries.length === 1 && stockEntries[0].name !== "Stock In Hand / Stock on Floor") {
+          stockEntries[0].name = "Stock In Hand / Stock on Floor";
+        }
+      }
+
       // Net Position = Pure sign-based: Sum(positive balances) - Sum(negative balances)
       // Positive balance = asset (what we have)
       // Negative balance = liability (what we owe)
@@ -757,6 +785,27 @@ export function registerStatsRoutes(app: Express) {
       const currency = (n: number) => `$${new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)}`;
 
       // ── Sheet 1: Summary ──────────────────────────────────────────────────
+      // ── Merge stock accounts into one combined Inventory line (Excel) ────────
+      {
+        const isStockEntry = (a: any) => {
+          const nl = (a.name || "").toLowerCase();
+          const cat = (a.category || "").toLowerCase();
+          return cat === "inventory" || nl.includes("stock in hand") || nl.includes("stock on floor");
+        };
+        const stockEntries = forUsAccounts.filter(isStockEntry);
+        if (stockEntries.length > 1) {
+          const combined = round2(stockEntries.reduce((s: number, a: any) => s + (a.value || 0), 0));
+          for (let i = forUsAccounts.length - 1; i >= 0; i--) {
+            if (isStockEntry(forUsAccounts[i])) forUsAccounts.splice(i, 1);
+          }
+          if (combined > 0) {
+            forUsAccounts.push({ name: "Stock In Hand / Stock on Floor", code: "COMPUTED", value: combined, category: "Inventory" });
+          }
+        } else if (stockEntries.length === 1 && stockEntries[0].name !== "Stock In Hand / Stock on Floor") {
+          stockEntries[0].name = "Stock In Hand / Stock on Floor";
+        }
+      }
+
       const ws1 = wb.addWorksheet("Net Position Summary");
       ws1.columns = [
         { key: "label", width: 35 },
