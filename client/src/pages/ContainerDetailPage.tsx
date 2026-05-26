@@ -166,12 +166,8 @@ function SpContainerDetailView() {
     );
   }
 
-  if (!spc || spc.message) {
-    return (
-      <div className="p-6" data-testid="sp-container-detail">
-        <p className="text-muted-foreground text-sm">Container not found.</p>
-      </div>
-    );
+  if (!isLoading && (!spc || spc.message)) {
+    return <ContainerDetailERP />;
   }
 
   const discountFactor = 1 - parseFloat(spc.discountPct ?? "0") / 100;
