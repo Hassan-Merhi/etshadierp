@@ -4,6 +4,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "@/contexts/LocationContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useLocation as useRoute } from "wouter";
+import { cn } from "@/lib/utils";
+import { PeriodFilter, getDefaultPeriodValue, PeriodFilterValue } from "@/components/ui/period-filter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -111,6 +113,13 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [allStockSearchTerm, setAllStockSearchTerm] = useState("");
   const [allStockLocationFilter, setAllStockLocationFilter] = useState<string>("");
   const tableRef = useRef<HTMLDivElement>(null);
+
+  // All Stock keyboard navigation + Stock Movement dialog
+  const [allStockSelectedRowIndex, setAllStockSelectedRowIndex] = useState<number>(-1);
+  const [stockMovementOpen, setStockMovementOpen] = useState(false);
+  const [stockMovementItem, setStockMovementItem] = useState<{ stockItemId: number; stockItemName: string } | null>(null);
+  const [stockMovementPeriod, setStockMovementPeriod] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_year"));
+  const allStockTableRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
   const { setSelectedLocation } = useLocation();
   const [_route, navigate] = useRoute();
@@ -620,6 +629,84 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     });
     return () => clearCursorNav();
   }, [selectedGroup, selectedRowIndex]);
+
+  // ── Stock Movement dialog data (fetched when dialog opens) ──────────────────
+  const smApiUrl = stockMovementItem
+    ? `/api/stock-items/${stockMovementItem.stockItemId}/monthly-summary?startDate=${stockMovementPeriod.fromDate}&endDate=${stockMovementPeriod.toDate}`
+    : null;
+  const { data: stockMovementData, isLoading: stockMovementLoading } = useQuery<any>({
+    queryKey: smApiUrl ? [smApiUrl] : ["__disabled__"],
+    queryFn: async () => {
+      const res = await fetch(smApiUrl!, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load stock movement");
+      return res.json();
+    },
+    enabled: !!stockMovementItem && stockMovementOpen,
+  });
+
+  // Derive opening qty/value/rate from prior month's closing (API doesn't include it)
+  const smRows: Array<any> = useMemo(() => {
+    if (!stockMovementData?.monthlyData) return [];
+    return stockMovementData.monthlyData.map((m: any, idx: number, arr: any[]) => {
+      const prevClose = idx === 0 ? null : arr[idx - 1];
+      const openingQty   = prevClose ? prevClose.closingQty   : 0;
+      const openingValue = prevClose ? prevClose.closingValue  : 0;
+      const openingRate  = openingQty > 0 ? openingValue / openingQty : 0;
+      const inwardRate   = m.inwardQty  > 0 ? m.inwardValue  / m.inwardQty  : 0;
+      const outwardRate  = m.outwardQty > 0 ? m.outwardValue / m.outwardQty : 0;
+      const closingRate  = m.closingQty > 0 ? m.closingValue / m.closingQty : 0;
+      return { ...m, openingQty, openingValue, openingRate, inwardRate, outwardRate, closingRate };
+    });
+  }, [stockMovementData]);
+
+  // ── Keyboard navigation for All Stock table ────────────────────────────────
+  useEffect(() => {
+    if (!showAllStock) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (hasAnyOpenDialog() || stockMovementOpen) return;
+      const rowCount = filteredCombinedRows.length;
+      if (rowCount === 0) return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setAllStockSelectedRowIndex(prev => Math.min(prev + 1, rowCount - 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setAllStockSelectedRowIndex(prev => (prev <= 0 ? 0 : prev - 1));
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        allStockTableRef.current?.scrollBy({ left: 150, behavior: "smooth" });
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        allStockTableRef.current?.scrollBy({ left: -150, behavior: "smooth" });
+      } else if (e.key === "Enter" && allStockSelectedRowIndex >= 0) {
+        e.preventDefault();
+        const item = filteredCombinedRows[allStockSelectedRowIndex];
+        if (item) {
+          setStockMovementItem({ stockItemId: item.stockItemId, stockItemName: item.stockItemName });
+          setStockMovementOpen(true);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showAllStock, filteredCombinedRows, allStockSelectedRowIndex, stockMovementOpen]);
+
+  // Auto-scroll the highlighted All Stock row into view
+  useEffect(() => {
+    if (!showAllStock || allStockSelectedRowIndex < 0 || !allStockTableRef.current) return;
+    const rowEl = allStockTableRef.current.querySelector(
+      `[data-allstock-row-index="${allStockSelectedRowIndex}"]`
+    );
+    if (rowEl) rowEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [allStockSelectedRowIndex, showAllStock]);
+
+  // Reset selection when All Stock filters change
+  useEffect(() => {
+    setAllStockSelectedRowIndex(-1);
+  }, [allStockSearchTerm, allStockGroupFilter, allStockLocationFilter]);
 
   // Import handlers
   const downloadImportTemplate = async () => {
@@ -1878,7 +1965,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 description={allInventoryData.length === 0 ? "Stock has not been recorded across any location yet." : "Try adjusting your search to see other items."}
               />
             ) : (
-              <div className="w-full overflow-auto max-h-[calc(100vh-200px)]">
+              <div className="w-full overflow-auto max-h-[calc(100vh-200px)]" ref={allStockTableRef}>
                 <table className="w-full text-sm border-collapse">
                   <thead className="sticky top-0 z-30 bg-muted/50">
                     <tr className="bg-muted/60 border-b">
@@ -1905,7 +1992,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                     {(() => {
                       const rows: JSX.Element[] = [];
                       let lastGroup = "";
+                      let rowIdx = 0;
                       for (const row of filteredCombinedRows) {
+                        const currentIdx = rowIdx++;
                         // Group separator when group changes
                         if (!allStockGroupFilter && row.stockGroupName !== lastGroup) {
                           lastGroup = row.stockGroupName;
@@ -1936,13 +2025,27 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                             </tr>
                           );
                         }
+                        const isSelected = allStockSelectedRowIndex === currentIdx;
                         rows.push(
                           <tr
                             key={row.stockItemId}
-                            className="hover-elevate"
+                            className={cn(
+                              "cursor-pointer transition-colors",
+                              isSelected
+                                ? "bg-accent text-accent-foreground"
+                                : "hover-elevate"
+                            )}
                             data-testid={`row-allstock-${row.stockItemId}`}
+                            data-allstock-row-index={currentIdx}
+                            onClick={() => {
+                              setStockMovementItem({ stockItemId: row.stockItemId, stockItemName: row.stockItemName });
+                              setStockMovementOpen(true);
+                            }}
                           >
-                            <td className="px-4 py-2 font-medium whitespace-nowrap sticky left-0 bg-background z-10">
+                            <td className={cn(
+                              "px-4 py-2 font-medium whitespace-nowrap sticky left-0 z-10 transition-colors",
+                              isSelected ? "bg-accent" : "bg-background"
+                            )}>
                               {row.stockItemName}
                             </td>
                             {allInventoryLocations.map((loc) => (
@@ -3423,6 +3526,148 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               {renameLocationMutation.isPending ? "Saving..." : "Rename"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Stock Movement Dialog ────────────────────────────────────────────── */}
+      <Dialog open={stockMovementOpen} onOpenChange={(open) => { setStockMovementOpen(open); if (!open) setStockMovementItem(null); }}>
+        <DialogContent className="max-w-5xl w-full p-0 gap-0 overflow-hidden flex flex-col" style={{ maxHeight: "90vh" }} data-testid="dialog-stock-movement">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b flex-shrink-0">
+            <div>
+              <DialogTitle className="text-lg font-bold leading-tight">
+                Stock Movement — {stockMovementItem?.stockItemName}
+              </DialogTitle>
+              <DialogDescription className="flex items-center gap-1.5 mt-1 text-sm">
+                <Globe className="h-3.5 w-3.5" />
+                All Locations
+              </DialogDescription>
+            </div>
+            <PeriodFilter value={stockMovementPeriod} onChange={setStockMovementPeriod} data-testid="sm-period-filter" />
+          </div>
+
+          {/* Table */}
+          <div className="overflow-auto flex-1 min-h-0">
+            {stockMovementLoading ? (
+              <div className="p-6 space-y-2">
+                {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-8 w-full" />)}
+              </div>
+            ) : (
+              <table className="w-full text-sm border-collapse" style={{ minWidth: 860 }}>
+                <thead className="sticky top-0 z-20">
+                  <tr className="bg-muted border-b">
+                    <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r font-semibold w-28 whitespace-nowrap">Month</th>
+                    <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-muted-foreground text-xs">Opening</th>
+                    <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-green-700 dark:text-green-400 text-xs">Stock In</th>
+                    <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-red-700 dark:text-red-400 text-xs">Stock Out</th>
+                    <th colSpan={3} className="text-center px-2 py-1.5 font-semibold text-primary text-xs">Closing</th>
+                  </tr>
+                  <tr className="bg-muted/70 border-b text-xs">
+                    {["Qty","Rate","Value","Qty","Rate","Value","Qty","Rate","Value","Qty","Rate","Value"].map((h, i) => (
+                      <th key={i} className={cn(
+                        "text-right px-3 py-1.5 font-medium whitespace-nowrap",
+                        i < 3  ? "text-muted-foreground border-r" :
+                        i < 6  ? "text-green-700 dark:text-green-400 border-r" :
+                        i < 9  ? "text-red-700 dark:text-red-400 border-r" :
+                                 "text-primary"
+                      )}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {smRows.length === 0 && (
+                    <tr>
+                      <td colSpan={13} className="text-center py-12 text-muted-foreground">
+                        No stock movement for this period
+                      </td>
+                    </tr>
+                  )}
+                  {smRows.map((m: any, idx: number) => {
+                    const hasActivity = m.inwardQty > 0 || m.outwardQty > 0 || m.openingQty !== 0 || m.closingQty !== 0;
+                    const fmtQ = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</>;
+                    const fmtR = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</>;
+                    const fmtV = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{formatAmount(n)}</>;
+                    return (
+                      <tr
+                        key={m.month}
+                        className={cn(
+                          "border-b transition-colors",
+                          hasActivity ? "" : "opacity-40",
+                          idx % 2 === 0 ? "bg-background" : "bg-muted/20"
+                        )}
+                      >
+                        <td className="px-4 py-2 font-semibold border-r whitespace-nowrap">{m.monthName}</td>
+                        {/* Opening */}
+                        <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtQ(m.openingQty)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtR(m.openingRate)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-muted-foreground border-r">{fmtV(m.openingValue)}</td>
+                        {/* Stock In */}
+                        <td className="px-3 py-2 text-right font-mono text-green-700 dark:text-green-400">{fmtQ(m.inwardQty)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-green-700 dark:text-green-400">{fmtR(m.inwardRate)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-green-700 dark:text-green-400 border-r">{fmtV(m.inwardValue)}</td>
+                        {/* Stock Out */}
+                        <td className="px-3 py-2 text-right font-mono text-red-700 dark:text-red-400">{fmtQ(m.outwardQty)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-red-700 dark:text-red-400">{fmtR(m.outwardRate)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-red-700 dark:text-red-400 border-r">{fmtV(m.outwardValue)}</td>
+                        {/* Closing */}
+                        <td className="px-3 py-2 text-right font-mono font-semibold text-primary">{fmtQ(m.closingQty)}</td>
+                        <td className="px-3 py-2 text-right font-mono font-semibold text-primary">{fmtR(m.closingRate)}</td>
+                        <td className="px-3 py-2 text-right font-mono font-semibold text-primary">{fmtV(m.closingValue)}</td>
+                      </tr>
+                    );
+                  })}
+                  {/* Grand total row */}
+                  {smRows.length > 0 && stockMovementData?.grandTotal && (() => {
+                    const gt = stockMovementData.grandTotal;
+                    const fmtQ = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</>;
+                    const fmtR = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</>;
+                    const fmtV = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{formatAmount(n)}</>;
+                    const inRate  = gt.inwardQty  > 0 ? gt.inwardValue  / gt.inwardQty  : 0;
+                    const outRate = gt.outwardQty > 0 ? gt.outwardValue / gt.outwardQty : 0;
+                    const clsRate = gt.closingQty > 0 ? gt.closingValue / gt.closingQty : 0;
+                    return (
+                      <tr className="bg-muted/50 border-t-2 font-semibold text-sm">
+                        <td className="px-4 py-2.5 border-r">Total</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-muted-foreground">{fmtQ(smRows[0]?.openingQty ?? 0)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-muted-foreground">{fmtR(smRows[0]?.openingRate ?? 0)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-muted-foreground border-r">{fmtV(smRows[0]?.openingValue ?? 0)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-green-700 dark:text-green-400">{fmtQ(gt.inwardQty)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-green-700 dark:text-green-400">{fmtR(inRate)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-green-700 dark:text-green-400 border-r">{fmtV(gt.inwardValue)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-red-700 dark:text-red-400">{fmtQ(gt.outwardQty)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-red-700 dark:text-red-400">{fmtR(outRate)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-red-700 dark:text-red-400 border-r">{fmtV(gt.outwardValue)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-primary">{fmtQ(gt.closingQty)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-primary">{fmtR(clsRate)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-primary">{fmtV(gt.closingValue)}</td>
+                      </tr>
+                    );
+                  })()}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-2 px-6 py-4 border-t flex-shrink-0">
+            <Button variant="outline" onClick={() => setStockMovementOpen(false)} data-testid="button-sm-close">
+              Close
+            </Button>
+            {stockMovementItem && (
+              <Button
+                onClick={() => {
+                  navigate(`/locations/0/stock-items/${stockMovementItem.stockItemId}/monthly-summary`);
+                  setStockMovementOpen(false);
+                }}
+                data-testid="button-sm-open-full"
+              >
+                <ArrowRight className="h-4 w-4 mr-1.5" />
+                Open full history
+              </Button>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
