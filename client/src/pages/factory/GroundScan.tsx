@@ -275,7 +275,7 @@ export default function GroundScan() {
       const locParam = selectedLocationId && selectedLocationId !== "all" ? `?locationId=${selectedLocationId}` : "";
       const res = await fetch(`/api/factory/stock-entry/in-stock${locParam}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch system stock");
-      const allFetched: { referenceNumber: string; articleCode: string; productName?: string; weightKg: string; isInLoadingOrder?: boolean }[] = await res.json();
+      const allFetched: { referenceNumber: string; articleCode: string; productName?: string; weightKg: string; isInLoadingOrder?: boolean; date_bale_produced?: string | null; worker_name?: string | null; }[] = await res.json();
       const systemBales = allFetched.filter((b) => !b.isInLoadingOrder);
 
       const scannedRefs = new Set(scannedBales.map((b) => b.refCode.toUpperCase()));
@@ -453,22 +453,23 @@ export default function GroundScan() {
       ws2.columns = [
         { key: "a", width: 20 }, { key: "b", width: 18 },
         { key: "c", width: 36 }, { key: "d", width: 15 },
+        { key: "e", width: 16 }, { key: "f", width: 22 },
       ];
       ws2.addRow(["Missing Bales"]);
       const m_titleRow = ws2.lastRow!;
       m_titleRow.height = 28;
       m_titleRow.getCell(1).font = { bold: true, size: 15, name: "Calibri", color: { argb: RED } };
       m_titleRow.getCell(1).alignment = { vertical: "middle" };
-      ws2.mergeCells("A1:D1");
+      ws2.mergeCells("A1:F1");
 
       ws2.addRow([`Bales recorded IN_STOCK in the system but not found during ground scan  —  ${dateStr}`]);
       const m_sub = ws2.lastRow!;
       m_sub.height = 16;
       m_sub.getCell(1).font = { size: 9, name: "Calibri", color: { argb: GRAY } };
-      ws2.mergeCells("A2:D2");
+      ws2.mergeCells("A2:F2");
       ws2.addRow([]);
 
-      const m_hdrRow = ws2.addRow(["Reference Number", "Article Code", "Product Name", "Weight (kg)"]);
+      const m_hdrRow = ws2.addRow(["Reference Number", "Article Code", "Product Name", "Weight (kg)", "Date Produced", "Worker"]);
       styleHeader(m_hdrRow, RED);
       m_hdrRow.getCell(4).alignment = { horizontal: "right", vertical: "middle" };
 
@@ -476,10 +477,15 @@ export default function GroundScan() {
         const emptyRow = ws2.addRow(["No missing bales — all system bales were found on the ground."]);
         emptyRow.getCell(1).font = { italic: true, color: { argb: GREEN }, name: "Calibri", size: 10 };
         emptyRow.getCell(1).fill = solidFill(LGREEN);
-        ws2.mergeCells(`A${emptyRow.number}:D${emptyRow.number}`);
+        ws2.mergeCells(`A${emptyRow.number}:F${emptyRow.number}`);
       } else {
         missingBales.forEach((b, idx) => {
-          const dr = ws2.addRow([b.referenceNumber, b.articleCode || "—", b.productName || "—", +parseFloat(b.weightKg || "0").toFixed(3)]);
+          const dr = ws2.addRow([
+            b.referenceNumber, b.articleCode || "—", b.productName || "—",
+            +parseFloat(b.weightKg || "0").toFixed(3),
+            b.date_bale_produced || "—",
+            b.worker_name || "—",
+          ]);
           styleDataRow(dr, idx % 2 === 0, { argb: idx % 2 === 0 ? LRED : "FFFDF0F0" });
           dr.getCell(1).font = { name: "Courier New", size: 10, color: { argb: BLACK } };
           dr.getCell(4).alignment = { horizontal: "right", vertical: "middle" };
@@ -488,7 +494,7 @@ export default function GroundScan() {
       }
 
       ws2.addRow([]);
-      const m_totRow = ws2.addRow([`Total missing: ${missingBales.length} bales`, "", "", +totalMissingWt.toFixed(3)]);
+      const m_totRow = ws2.addRow([`Total missing: ${missingBales.length} bales`, "", "", +totalMissingWt.toFixed(3), "", ""]);
       styleTotals(m_totRow);
       m_totRow.getCell(4).alignment = { horizontal: "right", vertical: "middle" };
       m_totRow.getCell(4).numFmt = "#,##0.000";
@@ -500,27 +506,33 @@ export default function GroundScan() {
         const ws3 = wb.addWorksheet("Extra Bales");
         ws3.columns = [
           { key: "a", width: 20 }, { key: "b", width: 18 },
-          { key: "c", width: 36 }, { key: "d", width: 15 }, { key: "e", width: 18 },
+          { key: "c", width: 36 }, { key: "d", width: 15 },
+          { key: "e", width: 18 }, { key: "f", width: 16 }, { key: "g", width: 22 },
         ];
         ws3.addRow(["Extra Bales"]);
         const e_titleRow = ws3.lastRow!;
         e_titleRow.height = 28;
         e_titleRow.getCell(1).font = { bold: true, size: 15, name: "Calibri", color: { argb: AMBER } };
-        ws3.mergeCells("A1:E1");
+        ws3.mergeCells("A1:G1");
 
         ws3.addRow([`Bales scanned on ground that are NOT recorded as IN_STOCK in the system  —  ${dateStr}`]);
         const e_sub = ws3.lastRow!;
         e_sub.height = 16;
         e_sub.getCell(1).font = { size: 9, name: "Calibri", color: { argb: GRAY } };
-        ws3.mergeCells("A2:E2");
+        ws3.mergeCells("A2:G2");
         ws3.addRow([]);
 
-        const e_hdrRow = ws3.addRow(["Ref Code", "Article Code", "Product Name", "Weight (kg)", "Status"]);
+        const e_hdrRow = ws3.addRow(["Ref Code", "Article Code", "Product Name", "Weight (kg)", "Status", "Date Produced", "Worker"]);
         styleHeader(e_hdrRow, BLUE);
         e_hdrRow.getCell(4).alignment = { horizontal: "right", vertical: "middle" };
 
         extraBales.forEach((b, idx) => {
-          const dr = ws3.addRow([b.refCode, b.articleCode || "—", b.productName || "—", +b.weightKg.toFixed(3), b.status]);
+          const dr = ws3.addRow([
+            b.refCode, b.articleCode || "—", b.productName || "—",
+            +b.weightKg.toFixed(3), b.status,
+            b.dateBaleProduced || "—",
+            b.workerName || "—",
+          ]);
           styleDataRow(dr, idx % 2 === 0, { argb: idx % 2 === 0 ? LAMBER : "FFFDF8E1" });
           dr.getCell(1).font = { name: "Courier New", size: 10, color: { argb: BLACK } };
           dr.getCell(4).alignment = { horizontal: "right", vertical: "middle" };

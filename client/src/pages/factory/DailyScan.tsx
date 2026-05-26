@@ -215,16 +215,18 @@ export default function DailyScan() {
     const solidFill  = (argb: string) => ({ type: "pattern" as const, pattern: "solid" as const, fgColor: { argb } });
 
     ws.columns = [
-      { key: "num",     width: 6  },
-      { key: "ref",     width: 18 },
-      { key: "art",     width: 16 },
-      { key: "name",    width: 32 },
-      { key: "wt",      width: 14 },
-      { key: "status",  width: 12 },
-      { key: "time",    width: 14 },
+      { key: "num",      width: 6  },
+      { key: "ref",      width: 18 },
+      { key: "art",      width: 16 },
+      { key: "name",     width: 32 },
+      { key: "wt",       width: 14 },
+      { key: "dateProd", width: 16 },
+      { key: "worker",   width: 20 },
+      { key: "status",   width: 12 },
+      { key: "time",     width: 14 },
     ];
 
-    const headers = ["#", "Ref Code", "Article Code", "Product Name", "Weight (kg)", "Status", "Scanned At"];
+    const headers = ["#", "Ref Code", "Article Code", "Product Name", "Weight (kg)", "Date Produced", "Worker", "Status", "Scanned At"];
     const hRow = ws.addRow(headers);
     hRow.eachCell((cell) => {
       cell.fill = solidFill(NAVY);
@@ -245,6 +247,8 @@ export default function DailyScan() {
         b.article_code || "",
         b.product_name || "",
         b.weight_kg ? parseFloat(b.weight_kg) : "",
+        b.date_bale_produced || "",
+        b.worker_name || "",
         isScanned ? "Scanned" : "Missing",
         scan ? new Date(scan.scanned_at).toLocaleTimeString("en-GB") : "",
       ]);
@@ -257,7 +261,7 @@ export default function DailyScan() {
       row.getCell(5).alignment = { horizontal: "right",  vertical: "middle" };
     });
 
-    const totalRow = ws.addRow(["", "TOTAL", "", "", totalKg, `${scanned.length}/${totalBales} scanned`, ""]);
+    const totalRow = ws.addRow(["", "TOTAL", "", "", totalKg, "", "", `${scanned.length}/${totalBales} scanned`, ""]);
     totalRow.eachCell((cell, col) => {
       cell.border  = allBorders;
       cell.font    = { bold: true };
