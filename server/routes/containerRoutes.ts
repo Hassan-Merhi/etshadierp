@@ -2085,7 +2085,6 @@ export function registerContainerRoutes(app: Express) {
                       ${vouchers.voucherNumber} LIKE 'CHG-%' OR
                       ${vouchers.voucherNumber} LIKE 'XFER-%' OR
                       ${vouchers.voucherNumber} LIKE ${'SP-OTW-REV-ERP-' + containerId + '-%'} OR
-                      ${vouchers.voucherNumber} LIKE ${'SP-COST-CLR-ERP-' + containerId + '-%'} OR
                       ${vouchers.voucherNumber} LIKE ${'SP-AGENT-SETTLE-' + containerId + '-%'}
                     )`,
                   ),
@@ -2155,7 +2154,6 @@ export function registerContainerRoutes(app: Express) {
           const [
             otwAcct,
             otwClrAcct,
-            spCostClrAcct,
             hadiSpInterco,
             spHadiIcAcct,
             spPrepaidExpAcct,
@@ -2165,9 +2163,6 @@ export function registerContainerRoutes(app: Express) {
             ).then(r => r[0]),
             db.select().from(ledgerAccounts).where(
               and(eq(ledgerAccounts.companyId, container.companyId), eq(ledgerAccounts.subType, "sp_otw_clearing"), isNull(ledgerAccounts.deletedAt))
-            ).then(r => r[0]),
-            db.select().from(ledgerAccounts).where(
-              and(eq(ledgerAccounts.companyId, container.companyId), eq(ledgerAccounts.subType, "sp_cost_clearing"), isNull(ledgerAccounts.deletedAt))
             ).then(r => r[0]),
             validAgentLines.length > 0
               ? db.select().from(ledgerAccounts).where(
@@ -2189,16 +2184,17 @@ export function registerContainerRoutes(app: Express) {
           if (!otwAcct || !otwClrAcct) {
             throw new Error("SP OTW accounts not found. Run SP Setup first.");
           }
-          if (!spCostClrAcct) {
-            throw new Error("SP Cost Clearing account not found. Run SP Setup first.");
-          }
           if (validAgentLines.length > 0) {
             if (!hadiSpInterco) throw new Error("HADI L'SHI intercompany account not found. Contact admin.");
             if (!spHadiIcAcct) throw new Error("SP intercompany account (SP-HADI-IC) not found. Run SP Setup first.");
             if (!spPrepaidExpAcct) throw new Error("SP Prepaid Expenses account not found. Run SP Setup first.");
           }
 
-          // ── Single transaction: Voucher A + Voucher B + agent journals ──
+          // ── Single transaction: Voucher A + agent journals ──
+          // Note: Voucher B (Dr sp_stock / Cr sp_cost_clearing) in the native SP offload
+          // creates a stock asset. For ERP containers, inventory is managed through
+          // storage.offloadContainer (bales/products tables), so no separate stock ledger
+          // entry is needed — sp_goods_otw and sp_otw_clearing are fully cleared by Voucher A.
           await db.transaction(async (tx) => {
 
             // ── Voucher A: Reverse Goods OTW (clears OTW asset + OTW Clearing liability) ──
@@ -2238,42 +2234,6 @@ export function registerContainerRoutes(app: Express) {
                 debitAmount: "0",
                 creditAmount: String(totalOtw),
                 narration: `Goods OTW reversal — ERP container #${containerId}`,
-              });
-            }
-
-            // ── Voucher B: Settle goods cost payable through SP Cost Clearing ──
-            // Dr sp_cost_clearing / Cr Goods OTW (base cost of goods received).
-            // Mirrors the cost-clearing step done in the native SP offload for
-            // inventory received into stock via the ERP route.
-            if (totalOtw > 0) {
-              const [voucherB] = await tx.insert(vouchers).values({
-                companyId: container.companyId,
-                voucherType: "Journal",
-                voucherNumber: `SP-COST-CLR-ERP-${containerId}-${Date.now()}`,
-                voucherDate: vDate,
-                description: `Goods cost clearing — ERP container #${containerId}`,
-                totalAmount: String(totalOtw),
-                currency: "USD",
-                exchangeRate: "1",
-                sourceModule: "SP",
-              }).returning();
-
-              // Dr sp_cost_clearing (absorb the payable into cost clearing)
-              await tx.insert(voucherEntries).values({
-                voucherId: voucherB.id,
-                ledgerAccountId: spCostClrAcct.id,
-                debitAmount: String(totalOtw),
-                creditAmount: "0",
-                narration: `Goods cost clearing — ERP container #${containerId}`,
-              });
-
-              // Cr Goods OTW (counterpart — completes the cost recognition leg)
-              await tx.insert(voucherEntries).values({
-                voucherId: voucherB.id,
-                ledgerAccountId: otwAcct.id,
-                debitAmount: "0",
-                creditAmount: String(totalOtw),
-                narration: `Goods OTW cost recognition — ERP container #${containerId}`,
               });
             }
 
