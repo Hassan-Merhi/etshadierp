@@ -3574,6 +3574,13 @@ let migrationsDone = false;
     `INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, active, is_hidden)
      SELECT 1, 'SP-IC', 'SP Test Co — Intercompany', 'Intercompany', 'hadi_sp_intercompany', true, false
      WHERE NOT EXISTS (SELECT 1 FROM ledger_accounts WHERE company_id = 1 AND code = 'SP-IC')`,
+
+    // ── SP: Hide "Stock on Floor" (sp_stock) from normal Accounts UI (May 2026) ──
+    // sp_stock is an internal double-entry counterpart to the inventory table.
+    // It is NOT a normal postable ledger account; showing it alongside user accounts
+    // causes confusion and apparent double-counting. isHidden=true removes it from
+    // the Accounts page and voucher dropdowns while preserving all ledger history.
+    `UPDATE ledger_accounts SET is_hidden = true WHERE sub_type = 'sp_stock' AND is_hidden = false`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

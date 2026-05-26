@@ -86,7 +86,10 @@ export async function calculateNetPositionAsOf(
   const parentCompanyId = await storage.getParentCompanyId();
   const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
 
-  const classified = classifyNetPositionAccounts(companyAccounts, accountBalances, {
+  // SP: exclude sp_stock accounts to avoid double-counting with inventory table
+  // (sp_stock is an internal counterpart to the ERP inventory table, hidden from display)
+  const accountsForClassify = companyAccounts.filter((a: any) => a.subType !== "sp_stock");
+  const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {
     includeSupplierTypeAccounts: shouldIncludeSuppliers,
   });
 

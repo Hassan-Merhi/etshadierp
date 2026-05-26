@@ -155,8 +155,13 @@ export function registerStatsRoutes(app: Express) {
         }
       }
 
-      // 1. Classify balance-sheet accounts (assets vs liabilities) via shared helper
-      const classified = classifyNetPositionAccounts(companyAccounts, accountBalances, {
+      // 1. Classify balance-sheet accounts (assets vs liabilities) via shared helper.
+      // SP: exclude sp_stock accounts before classification to avoid double-counting with
+      // the ERP inventory table. The inventory table (updated by adjustInventory on every
+      // POS sale) is the authoritative stock value for supplier_partner companies.
+      // sp_stock is kept in the DB (for double-entry history) but hidden from display.
+      const accountsForClassify = companyAccounts.filter((a: any) => a.subType !== "sp_stock");
+      const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {
         includeSupplierTypeAccounts: shouldIncludeSuppliers,
       });
       let forUsTotal = classified.forUsTotal;
@@ -657,7 +662,9 @@ export function registerStatsRoutes(app: Express) {
       // ── 2. Classify accounts ──────────────────────────────────────────────
       const parentCompanyId = await storage.getParentCompanyId();
       const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
-      const classified = classifyNetPositionAccounts(companyAccounts, accountBalances, { includeSupplierTypeAccounts: shouldIncludeSuppliers });
+      // SP: exclude sp_stock accounts to avoid double-counting with inventory table (same as main net-position endpoint)
+      const accountsForClassify = companyAccounts.filter((a: any) => a.subType !== "sp_stock");
+      const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, { includeSupplierTypeAccounts: shouldIncludeSuppliers });
       let forUsTotal = classified.forUsTotal;
       let onUsTotal  = classified.onUsTotal;
       const forUsAccounts: any[] = [...classified.forUsAccounts];

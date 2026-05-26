@@ -57,7 +57,9 @@ const SP_ACCOUNTS = [
   { code: "SP-OTW",     name: "Goods On The Way",              accountType: "Asset",          subType: "sp_goods_otw",          isHidden: false },
   { code: "SP-OTWCLR",  name: "Goods OTW Clearing",            accountType: "Liability",       subType: "sp_otw_clearing",       isHidden: true  },
   { code: "SP-PREPAID", name: "Prepaid Charges",               accountType: "Asset",          subType: "sp_prepaid",            isHidden: false },
-  { code: "SP-STOCK",   name: "Stock on Floor",                accountType: "Asset",          subType: "sp_stock",              isHidden: false },
+  // SP-STOCK is isHidden=true: it is an internal double-entry counterpart to the ERP
+  // inventory table and must NOT appear as a normal postable account in the Accounts UI.
+  { code: "SP-STOCK",   name: "Stock on Floor",                accountType: "Asset",          subType: "sp_stock",              isHidden: true  },
   { code: "SP-COSTCLR", name: "Stock Cost Payable Clearing",   accountType: "Liability",       subType: "sp_cost_clearing",      isHidden: true  },
   { code: "SP-PAY",     name: "Supplier Cash Payable",         accountType: "Liability",       subType: "sp_payable",            isHidden: false },
   { code: "SP-SALES",   name: "Sales",                         accountType: "Income",         subType: "sp_sales",              isHidden: false },
@@ -1548,20 +1550,64 @@ export function registerSpRoutes(app: Express) {
 
       const { startDate, endDate } = req.query;
 
-      const conditions: any[] = [eq(spSales.companyId, companyId), eq(spSales.status, "posted")];
-      if (startDate) conditions.push(sql`${spSales.saleDate} >= ${startDate}`);
-      if (endDate) conditions.push(sql`${spSales.saleDate} <= ${endDate}`);
+      // ── Resolve configured POS accounts from company settings ──────────────
+      // SP POS sales no longer use the sp_sales table — they go through the standard
+      // ERP POS route (posRoutes.ts) and land in vouchers + voucher_entries.
+      // Revenue = credits to the profit account (grandTotal per sale).
+      // COGS    = credits to the payable account (supplier cost per sale).
+      // Net profit = Revenue − COGS  (e.g. $775 − $482.60 = $292.40).
+      const settingsRows = await db.execute(sql`
+        SELECT sp_pos_payable_account_id, sp_pos_profit_account_id
+        FROM company_settings
+        WHERE company_id = ${companyId}
+        LIMIT 1
+      `);
+      const settingsRow = ((settingsRows as any).rows ?? settingsRows)[0];
+      const spPosProfitAccountId  = settingsRow?.sp_pos_profit_account_id  ?? null;
+      const spPosPayableAccountId = settingsRow?.sp_pos_payable_account_id ?? null;
 
-      const sales = await db
-        .select()
-        .from(spSales)
-        .where(and(...conditions));
+      let totalRevenue = 0;
+      let totalCogs    = 0;
+      let saleCount    = 0;
 
-      const totalRevenue    = sales.reduce((s, r) => s + parseNum(r.totalSalePriceUsd), 0);
-      const totalCogs       = sales.reduce((s, r) => s + parseNum(r.totalFinalCostUsd), 0);
-      const grossProfit     = totalRevenue - totalCogs;
+      if (spPosProfitAccountId && spPosPayableAccountId) {
+        // Revenue: sum of credits to the profit account on Sales vouchers
+        const revenueRows = await db.execute(sql`
+          SELECT COALESCE(SUM(CAST(ve.credit_amount AS DECIMAL)), 0) AS total,
+                 COUNT(DISTINCT v.id)                                 AS cnt
+          FROM voucher_entries ve
+          JOIN vouchers v ON ve.voucher_id = v.id
+          WHERE ve.ledger_account_id = ${spPosProfitAccountId}
+            AND v.company_id         = ${companyId}
+            AND v.voucher_type       = 'Sales'
+            AND v.deleted_at IS NULL
+            ${startDate ? sql`AND v.voucher_date >= ${startDate}` : sql``}
+            ${endDate   ? sql`AND v.voucher_date <= ${endDate}`   : sql``}
+        `);
+        const revRow = ((revenueRows as any).rows ?? revenueRows)[0];
+        totalRevenue = parseNum(revRow?.total);
+        saleCount    = parseInt(String(revRow?.cnt ?? "0"), 10);
 
-      // Shared charges from voucher entries
+        // COGS: sum of credits to the payable account on the same Sales vouchers
+        // (each sale posts Cr spPosPayableAccountId = supplier cost)
+        const cogsRows = await db.execute(sql`
+          SELECT COALESCE(SUM(CAST(ve.credit_amount AS DECIMAL)), 0) AS total
+          FROM voucher_entries ve
+          JOIN vouchers v ON ve.voucher_id = v.id
+          WHERE ve.ledger_account_id = ${spPosPayableAccountId}
+            AND v.company_id         = ${companyId}
+            AND v.voucher_type       = 'Sales'
+            AND v.deleted_at IS NULL
+            ${startDate ? sql`AND v.voucher_date >= ${startDate}` : sql``}
+            ${endDate   ? sql`AND v.voucher_date <= ${endDate}`   : sql``}
+        `);
+        const cogsRow = ((cogsRows as any).rows ?? cogsRows)[0];
+        totalCogs = parseNum(cogsRow?.total);
+      }
+
+      const grossProfit = totalRevenue - totalCogs;
+
+      // Shared charges: debits to the sp_shared_charges account in the period
       const sharedAcct = await getSpAccount(companyId, "sp_shared_charges");
       let totalSharedCharges = 0;
       if (sharedAcct) {
@@ -1570,18 +1616,19 @@ export function registerSpRoutes(app: Express) {
           FROM voucher_entries ve
           JOIN vouchers v ON ve.voucher_id = v.id
           WHERE ve.ledger_account_id = ${sharedAcct.id}
-            AND v.company_id = ${companyId}
+            AND v.company_id         = ${companyId}
+            AND v.deleted_at IS NULL
             ${startDate ? sql`AND v.voucher_date >= ${startDate}` : sql``}
-            ${endDate ? sql`AND v.voucher_date <= ${endDate}` : sql``}
+            ${endDate   ? sql`AND v.voucher_date <= ${endDate}`   : sql``}
         `);
         const sr = ((sharedRows as any).rows ?? sharedRows)[0];
         totalSharedCharges = parseNum(sr?.total);
       }
 
-      const netProfit = grossProfit - totalSharedCharges;
-      const splitPct = 50;
-      const ourShare       = netProfit * (splitPct / 100);
-      const supplierShare  = netProfit - ourShare;
+      const netProfit     = grossProfit - totalSharedCharges;
+      const splitPct      = 50;
+      const ourShare      = netProfit * (splitPct / 100);
+      const supplierShare = netProfit - ourShare;
 
       res.json({
         totalRevenue,
@@ -1592,7 +1639,7 @@ export function registerSpRoutes(app: Express) {
         splitPct,
         ourShare,
         supplierShare,
-        saleCount: sales.length,
+        saleCount,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
