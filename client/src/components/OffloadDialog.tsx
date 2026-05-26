@@ -216,10 +216,37 @@ export function OffloadDialog({
   const [spTransportMethod, setSpTransportMethod] = useState<"prepaid_expenses" | "parent_agent">("prepaid_expenses");
   const [spTransportAgentId, setSpTransportAgentId] = useState("");
 
+  // Reset all form state whenever the dialog opens or targets a new container
+  useEffect(() => {
+    if (!open) return;
+    setLocationId(null);
+    setOffloadDate(new Date().toLocaleDateString("en-CA"));
+    // ERP fields
+    setDuties("0");
+    setDutiesAccountId("");
+    setOfficeCharges("0");
+    setOfficeChargesAccountId("");
+    setOfficeChargesCashAccountId("");
+    setTransferCharges("0");
+    setTransportFees("0");
+    setTransportAccountId("");
+    setAdditionalCharges([]);
+    setCostCorrections({});
+    setCorrectionSectionOpen(false);
+    // SP fields
+    setSpDutiesAmount("");
+    setSpDutiesMethod("prepaid_expenses");
+    setSpDutiesAgentId("");
+    setSpTransportAmount("");
+    setSpTransportMethod("prepaid_expenses");
+    setSpTransportAgentId("");
+  }, [open, containerId]);
+
+  // Reset cost corrections when location changes (keep other fields intact)
   useEffect(() => {
     setCostCorrections({});
     setCorrectionSectionOpen(false);
-  }, [open, containerId, locationId]);
+  }, [locationId]);
 
   // ── Queries ───────────────────────────────────────────────────────────────
   const { data: locations = [] } = useQuery<Location[]>({
