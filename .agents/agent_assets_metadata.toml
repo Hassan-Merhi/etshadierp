@@ -24,3 +24,9 @@ id = "_fkdWCHrsl7nREq_e6iFR"
 uri = "file://fix_mjs16003_inventory.sql.gz"
 type = "unspecified"
 title = "fix_mjs16003_inventory.sql.gz — Run this on Render to restore MJS16003 inventory"
+
+[[outputs]]
+id = "y81POcpvpPwjEXE4trKSx"
+uri = "file://fix_mjs16003_complete.sql.gz"
+type = "unspecified"
+title = "fix_mjs16003_complete.sql.gz — Complete Render fix (all tables)"
