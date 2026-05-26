@@ -30,3 +30,9 @@ id = "y81POcpvpPwjEXE4trKSx"
 uri = "file://fix_mjs16003_complete.sql.gz"
 type = "unspecified"
 title = "fix_mjs16003_complete.sql.gz — Complete Render fix (all tables)"
+
+[[outputs]]
+id = "YJJh7Wr4OSgUo3b07KwN_"
+uri = "file://fix_mjs16003_tableplus.sql.gz"
+type = "unspecified"
+title = "fix_mjs16003_tableplus.sql.gz — Paste into TablePlus Query tab"
