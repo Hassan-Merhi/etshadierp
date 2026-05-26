@@ -856,53 +856,24 @@ export function registerPosRoutes(app: Express) {
             narration: creditSaleNarration,
           });
         } else {
-          // Supplier Partner: clear stock cost liability, confirm payable, credit full revenue
-          // Accounting (balanced):
-          //   Dr Cash                     = grandTotal  (already posted above)
-          //   Dr Stock Cost Payable Clr   = supplierCost  (reduce provisional stock liability)
-          //   Cr Supplier Cash Payable    = supplierCost  (confirm definitive payable to supplier)
-          //   Cr Revenue/Profit           = grandTotal    (full sale as income; net profit shows in net position)
+          // Supplier Partner: simple accounting — Dr Cash / Cr Supplier Cash Payable = full sale amount.
+          // The supplier is owed everything collected. Profit is report-only (salesItems.totalSales − totalCost).
           const grandTotalRounded = Number(grandTotal.toFixed(2));
-          const supplierCostRounded = Number(totalSupplierCost.toFixed(2));
-
-          // Dr Stock Cost Payable Clearing (reduces the provisional stock liability)
-          if (spPosCostClrAccountId && supplierCostRounded > 0) {
-            await tx.insert(voucherEntries).values({
-              voucherId: txVoucher.id,
-              ledgerAccountId: spPosCostClrAccountId,
-              debitAmount: supplierCostRounded.toFixed(2),
-              creditAmount: "0",
-              narration: `Stock cost clearing — ${voucherNumber}`,
-            });
-          }
-
-          // Cr Supplier Cash Payable = supplier cost (what is owed to the supplier)
-          if (supplierCostRounded > 0) {
+          if (grandTotalRounded > 0) {
             await tx.insert(voucherEntries).values({
               voucherId: txVoucher.id,
               ledgerAccountId: spPosPayableAccountId!,
               debitAmount: "0",
-              creditAmount: supplierCostRounded.toFixed(2),
-              narration: `Supplier POS payable — ${voucherNumber}`,
-            });
-          }
-
-          // Cr Revenue/Profit = full grandTotal (balances: Dr Cash + Dr Clearing = Cr Payable + Cr Revenue)
-          if (grandTotalRounded > 0) {
-            await tx.insert(voucherEntries).values({
-              voucherId: txVoucher.id,
-              ledgerAccountId: spPosProfitAccountId!,
-              debitAmount: "0",
               creditAmount: grandTotalRounded.toFixed(2),
-              narration: `Supplier POS revenue — ${voucherNumber}`,
+              narration: `Supplier Cash Payable — ${voucherNumber}`,
             });
           } else if (grandTotalRounded < 0) {
             await tx.insert(voucherEntries).values({
               voucherId: txVoucher.id,
-              ledgerAccountId: spPosProfitAccountId!,
+              ledgerAccountId: spPosPayableAccountId!,
               debitAmount: Math.abs(grandTotalRounded).toFixed(2),
               creditAmount: "0",
-              narration: `Supplier POS reversal — ${voucherNumber}`,
+              narration: `Supplier Cash Payable reversal — ${voucherNumber}`,
             });
           }
         }
@@ -1363,53 +1334,24 @@ export function registerPosRoutes(app: Express) {
             narration: revenueEntry.narration || "",
           });
         } else {
-          // Supplier Partner: clear stock cost liability, confirm payable, credit full revenue
-          // Accounting (balanced):
-          //   Dr Cash                     = grandTotal  (already posted above)
-          //   Dr Stock Cost Payable Clr   = supplierCost  (reduce provisional stock liability)
-          //   Cr Supplier Cash Payable    = supplierCost  (confirm definitive payable to supplier)
-          //   Cr Revenue/Profit           = grandTotal    (full sale as income; net profit shows in net position)
+          // Supplier Partner: simple accounting — Cr Supplier Cash Payable = full sale amount.
+          // The supplier is owed everything collected. Profit is report-only (salesItems.totalSales − totalCost).
           const grandTotalRounded = Number(grandTotal.toFixed(2));
-          const supplierCostRounded = Number(totalSupplierCostEdit.toFixed(2));
-
-          // Dr Stock Cost Payable Clearing (reduces the provisional stock liability)
-          if (editSpCostClrAccountId && supplierCostRounded > 0) {
-            await tx.insert(voucherEntries).values({
-              voucherId,
-              ledgerAccountId: editSpCostClrAccountId,
-              debitAmount: supplierCostRounded.toFixed(2),
-              creditAmount: "0",
-              narration: `Stock cost clearing`,
-            });
-          }
-
-          // Cr Supplier Cash Payable = supplier cost
-          if (supplierCostRounded > 0) {
+          if (grandTotalRounded > 0) {
             await tx.insert(voucherEntries).values({
               voucherId,
               ledgerAccountId: editSpPayableAccountId!,
               debitAmount: "0",
-              creditAmount: supplierCostRounded.toFixed(2),
-              narration: `Supplier POS payable`,
-            });
-          }
-
-          // Cr Revenue/Profit = full grandTotal (balances: Dr Cash + Dr Clearing = Cr Payable + Cr Revenue)
-          if (grandTotalRounded > 0) {
-            await tx.insert(voucherEntries).values({
-              voucherId,
-              ledgerAccountId: editSpProfitAccountId!,
-              debitAmount: "0",
               creditAmount: grandTotalRounded.toFixed(2),
-              narration: `Supplier POS revenue`,
+              narration: `Supplier Cash Payable`,
             });
           } else if (grandTotalRounded < 0) {
             await tx.insert(voucherEntries).values({
               voucherId,
-              ledgerAccountId: editSpProfitAccountId!,
+              ledgerAccountId: editSpPayableAccountId!,
               debitAmount: Math.abs(grandTotalRounded).toFixed(2),
               creditAmount: "0",
-              narration: `Supplier POS reversal`,
+              narration: `Supplier Cash Payable reversal`,
             });
           }
         }
