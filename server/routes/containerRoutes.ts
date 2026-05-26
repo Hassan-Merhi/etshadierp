@@ -2152,17 +2152,9 @@ export function registerContainerRoutes(app: Express) {
           const vDate = offloadDate || getClientDate(req);
           const validAgentLines = agentChargeLines.filter(l => l.amountUsd > 0);
           const totalAgentAmt = validAgentLines.reduce((s, l) => s + l.amountUsd, 0);
-          const pos = await storage.getPurchaseOrdersByContainer(containerId);
-          // purchase_orders has no grand_total column — compute from individual charge columns
-          const calcPoTotal = (po: any): number =>
-            parseFloat(po.itemsTotal || "0") +
-            parseFloat(po.freight || "0") +
-            parseFloat(po.otherCharges || "0") +
-            parseFloat(po.surcharge || "0") +
-            parseFloat(po.fumigation || "0") +
-            parseFloat(po.documentCharges || "0") -
-            parseFloat(po.discount || "0");
-          const totalOtw = pos.reduce((s, po) => s + calcPoTotal(po), 0);
+          // Use the container's stored grand total as the authoritative OTW amount.
+          // Avoids computing from PO columns (which had issues with closure capture inside tx).
+          const totalOtw = parseFloat(container.grandTotal || "0");
 
           // Pre-fetch all required ledger accounts in parallel (outside tx)
           const [
@@ -2238,18 +2230,44 @@ export function registerContainerRoutes(app: Express) {
                 sourceModule: "SP",
               }).returning();
 
-              // Dr OTW Clearing per PO (with supplierId — zeroes supplier sub-ledger balance)
-              for (const po of pos) {
-                const poTotal = calcPoTotal(po);
-                if (poTotal <= 0) continue;
+              // Dr OTW Clearing per PO (with supplierId — zeroes supplier sub-ledger balance).
+              // Re-query POs INSIDE the transaction to avoid closure-capture issues with the
+              // outer pos variable that caused the loop to silently produce zero rows.
+              const txPos = await tx.select().from(purchaseOrders)
+                .where(eq(purchaseOrders.containerId, containerId));
+
+              const calcPoTotal = (po: any): number =>
+                parseFloat(po.itemsTotal || "0") +
+                parseFloat(po.freight || "0") +
+                parseFloat(po.otherCharges || "0") +
+                parseFloat(po.surcharge || "0") +
+                parseFloat(po.fumigation || "0") +
+                parseFloat(po.documentCharges || "0") -
+                parseFloat(po.discount || "0");
+
+              if (txPos.length === 0) {
+                // Fallback: single Dr entry for full totalOtw with no supplierId
                 await tx.insert(voucherEntries).values({
                   voucherId: voucherA.id,
                   ledgerAccountId: otwClrAcct.id,
-                  supplierId: po.supplierId || null,
-                  debitAmount: String(poTotal),
+                  supplierId: null,
+                  debitAmount: String(totalOtw),
                   creditAmount: "0",
                   narration: `OTW Clearing reversal — ERP container #${containerId}`,
                 });
+              } else {
+                for (const po of txPos) {
+                  const poTotal = calcPoTotal(po);
+                  if (poTotal <= 0) continue;
+                  await tx.insert(voucherEntries).values({
+                    voucherId: voucherA.id,
+                    ledgerAccountId: otwClrAcct.id,
+                    supplierId: po.supplierId || null,
+                    debitAmount: String(poTotal),
+                    creditAmount: "0",
+                    narration: `OTW Clearing reversal — ERP container #${containerId}`,
+                  });
+                }
               }
 
               // Cr Goods OTW (full total — reduces the OTW asset to zero)
