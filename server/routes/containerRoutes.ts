@@ -2153,7 +2153,16 @@ export function registerContainerRoutes(app: Express) {
           const validAgentLines = agentChargeLines.filter(l => l.amountUsd > 0);
           const totalAgentAmt = validAgentLines.reduce((s, l) => s + l.amountUsd, 0);
           const pos = await storage.getPurchaseOrdersByContainer(containerId);
-          const totalOtw = pos.reduce((s, po) => s + parseFloat(po.grandTotal || "0"), 0);
+          // purchase_orders has no grand_total column — compute from individual charge columns
+          const calcPoTotal = (po: any): number =>
+            parseFloat(po.itemsTotal || "0") +
+            parseFloat(po.freight || "0") +
+            parseFloat(po.otherCharges || "0") +
+            parseFloat(po.surcharge || "0") +
+            parseFloat(po.fumigation || "0") +
+            parseFloat(po.documentCharges || "0") -
+            parseFloat(po.discount || "0");
+          const totalOtw = pos.reduce((s, po) => s + calcPoTotal(po), 0);
 
           // Pre-fetch all required ledger accounts in parallel (outside tx)
           const [
@@ -2231,7 +2240,7 @@ export function registerContainerRoutes(app: Express) {
 
               // Dr OTW Clearing per PO (with supplierId — zeroes supplier sub-ledger balance)
               for (const po of pos) {
-                const poTotal = parseFloat(po.grandTotal || "0");
+                const poTotal = calcPoTotal(po);
                 if (poTotal <= 0) continue;
                 await tx.insert(voucherEntries).values({
                   voucherId: voucherA.id,
