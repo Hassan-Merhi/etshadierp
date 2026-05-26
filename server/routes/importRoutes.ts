@@ -425,8 +425,62 @@ export function registerImportRoutes(app: Express) {
         const parentCompanyId = await storage.getParentCompanyId();
         const currentCompanyId = req.session.currentCompanyId!;
         const isSubsidiary = parentCompanyId && parentCompanyId !== currentCompanyId;
-        
-        if (isSubsidiary) {
+
+        // ── SP Company: DR Goods OTW / CR OTW Clearing ───────────────────────
+        const companyRow = await db.execute(
+          sql`SELECT company_type FROM companies WHERE id = ${currentCompanyId} LIMIT 1`
+        );
+        const companyType = (companyRow as any).rows?.[0]?.company_type ?? (companyRow as any)[0]?.company_type;
+        const isSpCompany = companyType === "supplier_partner";
+
+        if (isSpCompany) {
+          const [otwAcct] = await db
+            .select()
+            .from(ledgerAccounts)
+            .where(
+              and(
+                eq(ledgerAccounts.companyId, currentCompanyId),
+                eq(ledgerAccounts.subType, "sp_goods_otw"),
+                isNull(ledgerAccounts.deletedAt)
+              )
+            );
+
+          const [otwClrAcct] = await db
+            .select()
+            .from(ledgerAccounts)
+            .where(
+              and(
+                eq(ledgerAccounts.companyId, currentCompanyId),
+                eq(ledgerAccounts.subType, "sp_otw_clearing"),
+                isNull(ledgerAccounts.deletedAt)
+              )
+            );
+
+          if (!otwAcct || !otwClrAcct) {
+            return res.status(400).json({
+              message: "SP accounts not configured. Please run SP Setup first at /sp/setup.",
+            });
+          }
+
+          // DR Goods OTW (Asset increases — goods are on the way)
+          await storage.createVoucherEntry({
+            voucherId: voucher.id,
+            ledgerAccountId: otwAcct.id,
+            debitAmount: poGrandTotal.toFixed(2),
+            creditAmount: "0",
+            narration: `PO ${poNumber} - Container ${containerNumber}`,
+          });
+
+          // CR OTW Clearing (Liability — we owe for goods in transit)
+          await storage.createVoucherEntry({
+            voucherId: voucher.id,
+            ledgerAccountId: otwClrAcct.id,
+            debitAmount: "0",
+            creditAmount: poGrandTotal.toFixed(2),
+            narration: `PO ${poNumber} - Container ${containerNumber}`,
+          });
+
+        } else if (isSubsidiary) {
           // Get the subsidiary's company settings for parent credit account
           const companySettings = await storage.getCompanySettings(currentCompanyId);
           let parentCreditAccountId = companySettings?.parentCreditAccountId;

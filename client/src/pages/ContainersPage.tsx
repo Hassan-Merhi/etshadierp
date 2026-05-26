@@ -1,10 +1,8 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PageHeader } from "@/components/PageHeader";
-import { AddContainerDialog } from "@/components/AddContainerDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,7 +17,6 @@ import {
 } from "@/components/ui/table";
 import { Package, Plus } from "lucide-react";
 import ContainersERP from "./Containers";
-import { queryClient } from "@/lib/queryClient";
 
 export default function ContainersPage() {
   const { selectedCompany } = useCompany();
@@ -35,7 +32,6 @@ export default function ContainersPage() {
 function SpContainerList() {
   const [, navigate] = useLocation();
   const { formatAmount } = useCurrencyContext();
-  const [dialogOpen, setDialogOpen] = useState(false);
 
   const { data: containers = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/sp/containers"],
@@ -46,13 +42,12 @@ function SpContainerList() {
       <PageHeader
         title="Container Tracking"
         actions={
-          <Button
-            onClick={() => setDialogOpen(true)}
-            data-testid="button-add-container"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Import Container
-          </Button>
+          <Link href="/po-import">
+            <Button className="gap-2" data-testid="button-add-container">
+              <Plus className="h-4 w-4" />
+              Import Container
+            </Button>
+          </Link>
         }
       />
 
@@ -137,15 +132,6 @@ function SpContainerList() {
           </Card>
         )}
       </div>
-
-      <AddContainerDialog
-        open={dialogOpen}
-        onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) queryClient.invalidateQueries({ queryKey: ["/api/sp/containers"] });
-        }}
-        isSP={true}
-      />
     </div>
   );
 }
