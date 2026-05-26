@@ -58,6 +58,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
   const { toast } = useToast();
   const [offloadDate, setOffloadDate] = useState(new Date().toISOString().slice(0, 10));
   const [chargeLines, setChargeLines] = useState<ChargeLine[]>([]);
+  const [selectedLocationId, setSelectedLocationId] = useState("");
 
   const { data: statusData } = useQuery<any>({
     queryKey: ["/api/sp/setup/status"],
@@ -66,6 +67,11 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
 
   const { data: ledgerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts"],
+    enabled: open,
+  });
+
+  const { data: locationsList = [] } = useQuery<any[]>({
+    queryKey: ["/api/locations"],
     enabled: open,
   });
 
@@ -100,17 +106,25 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
     setChargeLines(prev => prev.map((c, i) => i === idx ? { ...c, [key]: value } : c));
 
   const offloadMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/sp/offload", {
-      containerId: container.id,
-      offloadDate,
-      chargeLines: chargeLines.filter(c => parseFloat(c.amountUsd || "0") > 0),
-    }),
+    mutationFn: () => {
+      if (!selectedLocationId) {
+        toast({ title: "Select a location", variant: "destructive" });
+        return Promise.reject(new Error("Select a location"));
+      }
+      return apiRequest("POST", "/api/sp/offload", {
+        containerId: container.id,
+        offloadDate,
+        locationId: selectedLocationId,
+        chargeLines: chargeLines.filter(c => parseFloat(c.amountUsd || "0") > 0),
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sp/containers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sp/stock"] });
       toast({ title: "Offload recorded", description: "Goods OTW reversed and stock created." });
       onOpenChange(false);
       setChargeLines([]);
+      setSelectedLocationId("");
       onSuccess?.();
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -129,6 +143,21 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
         </DialogHeader>
 
         <div className="space-y-5">
+          {/* Offload Location */}
+          <div>
+            <Label htmlFor="sp-offload-location">Offload Location</Label>
+            <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+              <SelectTrigger id="sp-offload-location" className="mt-1" data-testid="select-sp-offload-location">
+                <SelectValue placeholder="Select a location…" />
+              </SelectTrigger>
+              <SelectContent>
+                {(locationsList as any[]).map((l: any) => (
+                  <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Offload Date */}
           <div className="flex items-center gap-4">
             <div className="flex-1">

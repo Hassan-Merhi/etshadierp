@@ -533,10 +533,19 @@ export function registerSpRoutes(app: Express) {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
 
-      const { containerId, offloadDate, chargeLines } = req.body;
+      const { containerId, offloadDate, chargeLines, locationId } = req.body;
 
       if (!containerId || !offloadDate) {
         return res.status(400).json({ message: "containerId and offloadDate are required" });
+      }
+
+      if (!locationId) {
+        return res.status(400).json({ message: "locationId is required" });
+      }
+      const [offloadLocation] = await db.select().from(locations)
+        .where(and(eq(locations.id, parseInt(locationId)), eq(locations.companyId, companyId), isNull(locations.deletedAt)));
+      if (!offloadLocation) {
+        return res.status(400).json({ message: "Invalid location for this company" });
       }
 
       const [container] = await db
@@ -567,13 +576,6 @@ export function registerSpRoutes(app: Express) {
         return res.status(400).json({ message: "SP accounts not configured. Run setup first." });
       }
 
-      // Get default location for this company
-      const [defaultLocation] = await db
-        .select()
-        .from(locations)
-        .where(and(eq(locations.companyId, companyId), isNull(locations.deletedAt)))
-        .orderBy(asc(locations.id))
-        .limit(1);
 
       // Discount rate
       const discountPct = parseNum(container.discountPct);
@@ -791,7 +793,7 @@ export function registerSpRoutes(app: Express) {
             articleCode: line.articleCode,
             description: line.description || null,
             stockItemId: line.stockItemId || null,
-            locationId: defaultLocation?.id || null,
+            locationId: offloadLocation.id,
             qtyIn: String(qty),
             qtyRemaining: String(qty),
             baseUnitCostUsd: String(baseUnitCost),
@@ -800,9 +802,9 @@ export function registerSpRoutes(app: Express) {
           });
 
           // Call adjustInventory if stock item + location are configured
-          if (line.stockItemId && defaultLocation) {
+          if (line.stockItemId) {
             try {
-              await adjustInventory(tx, defaultLocation.id, line.stockItemId, qty, companyId, finalUnitCost, "SP_OFFLOAD", offload.id);
+              await adjustInventory(tx, offloadLocation.id, line.stockItemId, qty, companyId, finalUnitCost, "SP_OFFLOAD", offload.id);
             } catch {
               // Non-blocking for Phase 1 — sp_stock_movements is the primary lot tracker
             }
