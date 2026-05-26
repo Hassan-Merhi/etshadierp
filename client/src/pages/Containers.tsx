@@ -944,7 +944,7 @@ export default function Containers() {
               <div
                 key={c._key}
                 className="flex items-center gap-4 p-4 rounded-md border border-border bg-card hover-elevate cursor-pointer"
-                onClick={() => setLocation(`/containers/${c.id}`)}
+                onClick={() => setLocation(c._source === "erp" ? `/containers/${c.id}?src=erp` : `/containers/${c.id}`)}
                 data-testid={`row-sp-container-${c.id}`}
               >
                 <div className="flex-1 min-w-0">
@@ -972,7 +972,10 @@ export default function Containers() {
                     ${c.totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
-                <Link href={`/containers/${c.id}`} onClick={e => e.stopPropagation()}>
+                <Link
+                  href={c._source === "erp" ? `/containers/${c.id}?src=erp` : `/containers/${c.id}`}
+                  onClick={e => e.stopPropagation()}
+                >
                   <Button size="sm" variant="outline" data-testid={`button-view-sp-${c.id}`}>
                     <Eye className="h-4 w-4 mr-1" />
                     View

@@ -73,7 +73,12 @@ export default function ContainerDetailPage() {
   const { selectedCompany } = useCompany();
   const isSupplierPartner = selectedCompany?.companyType === "supplier_partner";
 
-  if (!isSupplierPartner) {
+  // ERP containers viewed from the SP list are tagged with ?src=erp — render
+  // the standard ERP detail page directly without trying the SP lookup first.
+  const srcErp = typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("src") === "erp";
+
+  if (!isSupplierPartner || srcErp) {
     return <ContainerDetailERP />;
   }
 
