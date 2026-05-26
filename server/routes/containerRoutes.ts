@@ -2356,11 +2356,11 @@ export function registerContainerRoutes(app: Express) {
   );
 
   // Reverse container offload — ERP only (Admin, Owner, or Manager)
+  // SP companies that offloaded via the ERP route are also permitted here.
   app.post(
     "/api/containers/:id/reverse-offload",
     requireAuth,
     requireRole("Admin", "Owner", "Manager"),
-    requireNonSP,
     async (req, res) => {
       try {
         const containerId = parseId(req.params.id);
