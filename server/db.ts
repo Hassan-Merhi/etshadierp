@@ -33,17 +33,17 @@ if (isLocalReplitDB) {
 }
 
 // Single shared Pool for the entire application.
-// Session store uses its own separate pool (server/index.ts, max 2).
-// Render zero-downtime deploys run TWO instances simultaneously, so each
-// instance must stay within half the DB connection limit (25 total on Render):
-//   Per instance: main(8) + session(2) = 10  →  2 instances = 20 < 25 ✓
+// Session store uses its own separate pool (server/index.ts, max 3).
+// Render DB has max_connections=103; two instances during zero-downtime deploy:
+//   Per instance: main(12) + session(3) = 15  →  2 instances = 30, well within 103.
+// The real guard against pool exhaustion is lock_timeout on the migration client
+// (server/index.ts) which prevents DDL locks from blocking user queries during deploys.
 export const pool = new Pool({
   connectionString,
   ssl: requiresSSL ? { rejectUnauthorized: false } : false,
-  max: 8,
-  // Give connections 10 seconds to become available before throwing.
-  // Routes that are non-critical (presence heartbeat, leave) handle this gracefully.
-  connectionTimeoutMillis: 10000,
+  max: 12,
+  // Fail fast — 5 s is enough for a healthy DB; long waits only mask lock contention.
+  connectionTimeoutMillis: 5000,
   // Release idle connections after 30 seconds.
   idleTimeoutMillis: 30000,
   // Keep the pool alive across idle periods instead of draining to zero.

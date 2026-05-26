@@ -150,10 +150,9 @@ if (process.env.DATABASE_URL || process.env.PGHOST) {
     conObject: {
       connectionString,
       ssl: requiresSSL ? { rejectUnauthorized: false } : false,
-      // Keep session pool small — two instances run during Render zero-downtime
-      // deploys; main(8) + session(2) = 10 per instance × 2 = 20 < 25 limit.
-      max: 2,
-      connectionTimeoutMillis: 10000,
+      // Render DB max_connections=103; per instance: main(12)+session(3)=15, ×2=30.
+      max: 3,
+      connectionTimeoutMillis: 5000,
       idleTimeoutMillis: 30000,
     },
     createTableIfMissing: true,
@@ -3559,6 +3558,16 @@ let migrationsDone = false;
   startScheduler();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    // DB connection pool exhausted — return 503 immediately instead of a generic 500.
+    // This surfaces clearly in logs and tells the client to retry rather than report a bug.
+    const isPoolTimeout =
+      err?.cause?.message?.includes("timeout exceeded when trying to connect") ||
+      err?.message?.includes("timeout exceeded when trying to connect");
+    if (isPoolTimeout) {
+      console.error("[DB Pool] Connection timeout — pool exhausted or DB unreachable");
+      return res.status(503).json({ message: "Service temporarily unavailable — please retry." });
+    }
+
     const status = err.status || err.statusCode || 500;
     const isProduction = process.env.NODE_ENV === "production";
     
@@ -3641,6 +3650,12 @@ let migrationsDone = false;
 
     try {
       await migrationClient.connect();
+      // Short lock_timeout prevents DDL migrations from blocking user queries on the
+      // running instance. If a lock cannot be acquired within 3 s the statement throws
+      // and is silently skipped by the catch below — it will succeed on the next deploy
+      // once the old instance is gone. statement_timeout caps runaway migration queries.
+      await migrationClient.query(`SET lock_timeout = '3s'`);
+      await migrationClient.query(`SET statement_timeout = '60s'`);
       for (const migration of migrations) {
         try {
           await migrationClient.query(migration);
