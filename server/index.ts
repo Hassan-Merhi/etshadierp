@@ -3238,6 +3238,7 @@ let migrationsDone = false;
     `ALTER TABLE sp_containers ADD COLUMN IF NOT EXISTS freight_estimate_usd DECIMAL(20,4) DEFAULT 0`,
     `ALTER TABLE sp_prepaid_charges ADD COLUMN IF NOT EXISTS prepaid_date DATE`,
     `DO $$ BEGIN ALTER TABLE sp_prepaid_charges ALTER COLUMN container_id DROP NOT NULL; EXCEPTION WHEN others THEN NULL; END $$`,
+    `ALTER TABLE sp_containers ADD COLUMN IF NOT EXISTS supplier_id INTEGER REFERENCES suppliers(id)`,
 
     `CREATE TABLE IF NOT EXISTS sp_sales (
       id SERIAL PRIMARY KEY,

@@ -65,6 +65,7 @@ const spLineSchema = z.object({
 });
 
 const spFormSchema = z.object({
+  supplierId: z.number().optional(),
   supplierName: z.string().min(1, "Required"),
   containerNumber: z.string().optional(),
   invoiceNumber: z.string().min(1, "Required"),
@@ -237,9 +238,14 @@ function SpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => vo
   const [pasteText, setPasteText] = useState("");
   const [showPaste, setShowPaste] = useState(false);
 
+  const { data: suppliers = [] } = useQuery<{ id: number; legalName: string; code: string }[]>({
+    queryKey: ["/api/suppliers"],
+  });
+
   const form = useForm<SpForm>({
     resolver: zodResolver(spFormSchema),
     defaultValues: {
+      supplierId: undefined,
       supplierName: "",
       containerNumber: "",
       invoiceNumber: "",
@@ -319,9 +325,33 @@ function SpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => vo
         <div className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Supplier &amp; Invoice</p>
           <div className="grid grid-cols-2 gap-3">
+            <FormField control={form.control} name="supplierId" render={({ field }) => (
+              <FormItem className="col-span-2">
+                <FormLabel>Supplier</FormLabel>
+                <Select
+                  value={field.value ? String(field.value) : ""}
+                  onValueChange={(val) => {
+                    const id = parseInt(val);
+                    field.onChange(id);
+                    const found = suppliers.find(s => s.id === id);
+                    if (found) form.setValue("supplierName", found.legalName);
+                  }}
+                >
+                  <FormControl>
+                    <SelectTrigger data-testid="select-sp-supplier"><SelectValue placeholder="Select supplier…" /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {suppliers.map(s => (
+                      <SelectItem key={s.id} value={String(s.id)}>{s.legalName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
             <FormField control={form.control} name="supplierName" render={({ field }) => (
               <FormItem className="col-span-2">
-                <FormLabel>Supplier Name</FormLabel>
+                <FormLabel>Supplier Name <span className="text-muted-foreground font-normal text-xs">(override or type if unlisted)</span></FormLabel>
                 <FormControl><Input {...field} data-testid="input-sp-supplier-name" /></FormControl>
                 <FormMessage />
               </FormItem>

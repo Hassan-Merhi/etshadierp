@@ -184,7 +184,7 @@ export function registerSpRoutes(app: Express) {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
 
-      const { supplierName, containerNumber, invoiceNumber, invoiceDate, invoiceTotalUsd, discountPct, freightEstimateUsd, notes, lines, otwAccountId, otwClearingAccountId } = req.body;
+      const { supplierId, supplierName, containerNumber, invoiceNumber, invoiceDate, invoiceTotalUsd, discountPct, freightEstimateUsd, notes, lines, otwAccountId, otwClearingAccountId } = req.body;
 
       if (!supplierName || !invoiceNumber || !invoiceDate) {
         return res.status(400).json({ message: "supplierName, invoiceNumber, invoiceDate are required" });
@@ -213,10 +213,12 @@ export function registerSpRoutes(app: Express) {
       }
 
       const totalUsd = parseNum(invoiceTotalUsd);
+      const supplierIdNum = supplierId ? parseInt(String(supplierId)) : null;
 
       const result = await db.transaction(async (tx) => {
         const [container] = await tx.insert(spContainers).values({
           companyId,
+          supplierId: supplierIdNum,
           supplierName,
           containerNumber: containerNumber || null,
           invoiceNumber,
@@ -256,6 +258,7 @@ export function registerSpRoutes(app: Express) {
             currency: "USD",
             exchangeRate: "1",
             sourceModule: "SP",
+            supplierId: supplierIdNum,
           }).returning();
 
           await tx.insert(voucherEntries).values({
@@ -283,6 +286,125 @@ export function registerSpRoutes(app: Express) {
       });
 
       res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PATCH /api/sp/containers/:id — edit header fields + regenerate OTW voucher
+  app.patch("/api/sp/containers/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = await requireSpCompany(req, res);
+      if (!companyId) return;
+
+      const containerId = parseInt(req.params.id);
+      if (isNaN(containerId)) return res.status(400).json({ message: "Invalid container ID" });
+
+      const [existing] = await db.select().from(spContainers).where(
+        and(eq(spContainers.id, containerId), eq(spContainers.companyId, companyId))
+      );
+      if (!existing) return res.status(404).json({ message: "Container not found" });
+      if (existing.status === "offloaded") {
+        return res.status(400).json({ message: "Cannot edit an offloaded container" });
+      }
+
+      const { supplierId, supplierName, containerNumber, invoiceNumber, invoiceDate, invoiceTotalUsd, discountPct, freightEstimateUsd, notes } = req.body;
+
+      const totalUsd = parseNum(invoiceTotalUsd ?? existing.invoiceTotalUsd);
+      const supplierIdNum = supplierId ? parseInt(String(supplierId)) : (existing.supplierId ?? null);
+      const newSupplierName = supplierName ?? existing.supplierName;
+      const newInvoiceNumber = invoiceNumber ?? existing.invoiceNumber;
+      const newInvoiceDate = invoiceDate ?? existing.invoiceDate;
+
+      let otwAcct = await getSpAccount(companyId, "sp_goods_otw");
+      let otwClrAcct = await getSpAccount(companyId, "sp_otw_clearing");
+      if (!otwAcct || !otwClrAcct) {
+        return res.status(400).json({ message: "Chart of accounts not set up" });
+      }
+
+      const updated = await db.transaction(async (tx) => {
+        // Update container fields
+        const [updatedContainer] = await tx.update(spContainers).set({
+          supplierId: supplierIdNum,
+          supplierName: newSupplierName,
+          containerNumber: containerNumber !== undefined ? (containerNumber || null) : existing.containerNumber,
+          invoiceNumber: newInvoiceNumber,
+          invoiceDate: newInvoiceDate,
+          invoiceTotalUsd: String(totalUsd),
+          discountPct: String(parseNum(discountPct ?? existing.discountPct)),
+          freightEstimateUsd: String(parseNum(freightEstimateUsd ?? existing.freightEstimateUsd)),
+          notes: notes !== undefined ? (notes || null) : existing.notes,
+        }).where(and(eq(spContainers.id, containerId), eq(spContainers.companyId, companyId))).returning();
+
+        // Regenerate OTW voucher if amount or supplier changed
+        if (existing.goodsOtwVoucherId && totalUsd > 0) {
+          // Update voucher header
+          await tx.update(vouchers).set({
+            voucherDate: newInvoiceDate,
+            description: `Goods OTW: ${newSupplierName} — Invoice ${newInvoiceNumber}`,
+            totalAmount: String(totalUsd),
+            supplierId: supplierIdNum,
+          }).where(eq(vouchers.id, existing.goodsOtwVoucherId));
+
+          // Delete old entries and recreate with updated amounts
+          await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, existing.goodsOtwVoucherId));
+
+          await tx.insert(voucherEntries).values({
+            voucherId: existing.goodsOtwVoucherId,
+            ledgerAccountId: otwAcct.id,
+            debitAmount: String(totalUsd),
+            creditAmount: "0",
+            narration: `Goods OTW — ${newSupplierName} inv ${newInvoiceNumber}`,
+          });
+
+          await tx.insert(voucherEntries).values({
+            voucherId: existing.goodsOtwVoucherId,
+            ledgerAccountId: otwClrAcct.id,
+            debitAmount: "0",
+            creditAmount: String(totalUsd),
+            narration: `OTW Clearing — ${newSupplierName} inv ${newInvoiceNumber}`,
+          });
+        } else if (!existing.goodsOtwVoucherId && totalUsd > 0) {
+          // Create new voucher if none existed
+          const voucherNum = `SP-OTW-${containerId}-${Date.now()}`;
+          const [voucher] = await tx.insert(vouchers).values({
+            companyId,
+            voucherType: "Journal",
+            voucherNumber: voucherNum,
+            voucherDate: newInvoiceDate,
+            description: `Goods OTW: ${newSupplierName} — Invoice ${newInvoiceNumber}`,
+            totalAmount: String(totalUsd),
+            currency: "USD",
+            exchangeRate: "1",
+            sourceModule: "SP",
+            supplierId: supplierIdNum,
+          }).returning();
+
+          await tx.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: otwAcct.id,
+            debitAmount: String(totalUsd),
+            creditAmount: "0",
+            narration: `Goods OTW — ${newSupplierName} inv ${newInvoiceNumber}`,
+          });
+
+          await tx.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: otwClrAcct.id,
+            debitAmount: "0",
+            creditAmount: String(totalUsd),
+            narration: `OTW Clearing — ${newSupplierName} inv ${newInvoiceNumber}`,
+          });
+
+          await tx.update(spContainers)
+            .set({ goodsOtwVoucherId: voucher.id })
+            .where(eq(spContainers.id, containerId));
+        }
+
+        return updatedContainer;
+      });
+
+      res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

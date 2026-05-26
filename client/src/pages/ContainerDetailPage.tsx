@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useParams, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useCompany } from "@/contexts/CompanyContext";
 import { queryClient } from "@/lib/queryClient";
 import { SpOffloadDialog } from "@/components/SpOffloadDialog";
@@ -8,6 +11,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -16,7 +42,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Truck } from "lucide-react";
+import { ArrowLeft, Truck, Edit } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import ContainerDetailERP from "./ContainerDetail";
 
 function fmt2(v: any) {
@@ -28,6 +55,19 @@ function fmt4(v: any) {
   const n = parseFloat(String(v ?? "0"));
   return isNaN(n) ? "$0.0000" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`;
 }
+
+const editSchema = z.object({
+  supplierId: z.number().optional(),
+  supplierName: z.string().min(1, "Required"),
+  containerNumber: z.string().optional(),
+  invoiceNumber: z.string().min(1, "Required"),
+  invoiceDate: z.string().min(1, "Required"),
+  invoiceTotalUsd: z.string().min(1, "Required"),
+  discountPct: z.string().optional(),
+  freightEstimateUsd: z.string().optional(),
+  notes: z.string().optional(),
+});
+type EditForm = z.infer<typeof editSchema>;
 
 export default function ContainerDetailPage() {
   const { selectedCompany } = useCompany();
@@ -44,6 +84,8 @@ function SpContainerDetailView() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const [showOffloadDialog, setShowOffloadDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const { toast } = useToast();
 
   const { data: spc, isLoading } = useQuery<any>({
     queryKey: [`/api/sp/containers/${id}`],
@@ -51,6 +93,66 @@ function SpContainerDetailView() {
       fetch(`/api/sp/containers/${id}`, { credentials: "include" }).then((r) => r.json()),
     enabled: !!id,
   });
+
+  const { data: suppliers = [] } = useQuery<{ id: number; legalName: string; code: string }[]>({
+    queryKey: ["/api/suppliers"],
+  });
+
+  const editForm = useForm<EditForm>({
+    resolver: zodResolver(editSchema),
+    defaultValues: {
+      supplierId: undefined,
+      supplierName: "",
+      containerNumber: "",
+      invoiceNumber: "",
+      invoiceDate: "",
+      invoiceTotalUsd: "",
+      discountPct: "0",
+      freightEstimateUsd: "0",
+      notes: "",
+    },
+  });
+
+  const editMutation = useMutation({
+    mutationFn: async (data: EditForm) => {
+      const res = await fetch(`/api/sp/containers/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to update container");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/sp/containers/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sp/containers"] });
+      toast({ title: "Container updated", description: "Accounting voucher has been regenerated." });
+      setShowEditDialog(false);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const openEdit = () => {
+    if (!spc) return;
+    editForm.reset({
+      supplierId: spc.supplierId ?? undefined,
+      supplierName: spc.supplierName ?? "",
+      containerNumber: spc.containerNumber ?? "",
+      invoiceNumber: spc.invoiceNumber ?? "",
+      invoiceDate: spc.invoiceDate ?? "",
+      invoiceTotalUsd: spc.invoiceTotalUsd ?? "",
+      discountPct: spc.discountPct ?? "0",
+      freightEstimateUsd: spc.freightEstimateUsd ?? "0",
+      notes: spc.notes ?? "",
+    });
+    setShowEditDialog(true);
+  };
 
   if (isLoading) {
     return (
@@ -111,13 +213,23 @@ function SpContainerDetailView() {
               {spc.status === "offloaded" ? "Offloaded" : "Open / OTW"}
             </Badge>
             {spc.status !== "offloaded" && (
-              <Button
-                onClick={() => setShowOffloadDialog(true)}
-                data-testid="button-sp-offload"
-              >
-                <Truck className="h-4 w-4 mr-2" />
-                Offload
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  onClick={openEdit}
+                  data-testid="button-sp-edit"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+                <Button
+                  onClick={() => setShowOffloadDialog(true)}
+                  data-testid="button-sp-offload"
+                >
+                  <Truck className="h-4 w-4 mr-2" />
+                  Offload
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -326,10 +438,124 @@ function SpContainerDetailView() {
         open={showOffloadDialog}
         onOpenChange={setShowOffloadDialog}
         container={spc}
-        onSuccess={() =>
-          queryClient.invalidateQueries({ queryKey: [`/api/sp/containers/${id}`] })
-        }
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: [`/api/sp/containers/${id}`] });
+          queryClient.invalidateQueries({ queryKey: ["/api/sp/containers"] });
+          setShowOffloadDialog(false);
+        }}
       />
+
+      {/* Edit Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Container</DialogTitle>
+            <DialogDescription>
+              Update the container details. The accounting voucher (Dr Goods OTW / Cr OTW Clearing) will be regenerated automatically.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(d => editMutation.mutate(d))} className="space-y-4" noValidate>
+              <FormField control={editForm.control} name="supplierId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Supplier</FormLabel>
+                  <Select
+                    value={field.value ? String(field.value) : ""}
+                    onValueChange={(val) => {
+                      const numId = parseInt(val);
+                      field.onChange(numId);
+                      const found = suppliers.find(s => s.id === numId);
+                      if (found) editForm.setValue("supplierName", found.legalName);
+                    }}
+                  >
+                    <FormControl>
+                      <SelectTrigger data-testid="select-edit-supplier">
+                        <SelectValue placeholder="Select supplier…" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {suppliers.map(s => (
+                        <SelectItem key={s.id} value={String(s.id)}>{s.legalName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={editForm.control} name="supplierName" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Supplier Name <span className="text-muted-foreground text-xs font-normal">(override)</span></FormLabel>
+                  <FormControl><Input {...field} data-testid="input-edit-supplier-name" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <div className="grid grid-cols-2 gap-3">
+                <FormField control={editForm.control} name="invoiceNumber" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Invoice Number</FormLabel>
+                    <FormControl><Input {...field} data-testid="input-edit-invoice-number" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={editForm.control} name="containerNumber" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Container No. <span className="text-muted-foreground text-xs font-normal">(opt.)</span></FormLabel>
+                    <FormControl><Input {...field} placeholder="ABCD1234567" data-testid="input-edit-container-number" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={editForm.control} name="invoiceDate" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Invoice Date</FormLabel>
+                    <FormControl><Input type="date" {...field} data-testid="input-edit-invoice-date" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={editForm.control} name="invoiceTotalUsd" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Invoice Total (USD)</FormLabel>
+                    <FormControl><Input type="number" step="0.01" {...field} data-testid="input-edit-invoice-total" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={editForm.control} name="discountPct" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Discount %</FormLabel>
+                    <FormControl><Input type="number" step="0.01" {...field} data-testid="input-edit-discount-pct" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={editForm.control} name="freightEstimateUsd" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Freight Estimate (USD)</FormLabel>
+                    <FormControl><Input type="number" step="0.01" {...field} data-testid="input-edit-freight-estimate" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+
+              <FormField control={editForm.control} name="notes" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notes <span className="text-muted-foreground text-xs font-normal">(opt.)</span></FormLabel>
+                  <FormControl><Input {...field} data-testid="input-edit-notes" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)} data-testid="button-edit-cancel">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={editMutation.isPending} data-testid="button-edit-submit">
+                  {editMutation.isPending ? "Saving…" : "Save Changes"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

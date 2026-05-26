@@ -1,0 +1,1 @@
+- [SP container supplier linking](sp-container-supplier.md) — sp_containers needs supplierId FK to suppliers; voucher must have supplierId set for supplier balance to appear in ledger.

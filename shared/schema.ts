@@ -5617,6 +5617,7 @@ export type CustomerDispatchBaleScan = typeof customerDispatchBaleScans.$inferSe
 export const spContainers = pgTable("sp_containers", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
+  supplierId: integer("supplier_id"),
   supplierName: text("supplier_name").notNull(),
   containerNumber: varchar("container_number", { length: 100 }),
   invoiceNumber: varchar("invoice_number", { length: 100 }).notNull(),
