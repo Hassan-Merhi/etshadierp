@@ -4014,9 +4014,9 @@ let migrationsDone = false;
               UPDATE daily_export_runs
                  SET status         = 'failed',
                      finished_at    = NOW(),
-                     skipped_reason = 'Export timed out — exceeded 90-minute safety limit'
+                     skipped_reason = 'Export timed out — exceeded 3-hour safety limit'
                WHERE status         = 'running'
-                 AND started_at     < NOW() - INTERVAL '90 minutes'
+                 AND started_at     < NOW() - INTERVAL '3 hours'
               RETURNING id, run_type
             `);
             if (r.rowCount && r.rowCount > 0) {

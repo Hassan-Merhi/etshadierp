@@ -425,7 +425,7 @@ export async function fetchCompanyExportData(
     q(`SELECT * FROM factory_daily_kpi_snapshots WHERE company_id = ${cid} ${df("date")} ORDER BY date DESC`),
     q(`SELECT * FROM factory_daily_usages WHERE company_id = ${cid} ${df("used_date")} ORDER BY used_date DESC`),
     q(`SELECT * FROM factory_alerts WHERE company_id = ${cid} ORDER BY id DESC`),
-    q(`SELECT * FROM factory_duty_audit_log WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT * FROM factory_duty_audit_log WHERE company_id = ${cid} ORDER BY id DESC LIMIT 50000`),
 
     // ── Factory Raw / Production ──────────────────────────────────────────────
     q(`SELECT * FROM factory_raw_stock WHERE company_id = ${cid} ORDER BY id`),
@@ -436,14 +436,14 @@ export async function fetchCompanyExportData(
     q(`SELECT fms.* FROM factory_mix_batch_sources fms INNER JOIN factory_mix_batches fmb ON fmb.id = fms.mix_batch_id WHERE fmb.company_id = ${cid} ORDER BY fms.id`),
     q(`SELECT * FROM mix_batches WHERE company_id = ${cid} ORDER BY id DESC`),
     q(`SELECT mbs.* FROM mix_batch_sources mbs INNER JOIN mix_batches mb ON mb.id = mbs.batch_id WHERE mb.company_id = ${cid} ORDER BY mbs.id`),
-    q(`SELECT * FROM production_bales WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT * FROM production_bales WHERE company_id = ${cid} ORDER BY id DESC LIMIT 100000`),
     q(`SELECT * FROM production_raw_stock WHERE company_id = ${cid} ORDER BY id`),
 
     // ── Factory Bales ─────────────────────────────────────────────────────────
     q(`SELECT * FROM factory_bale_products WHERE company_id = ${cid} ORDER BY name`),
     q(`SELECT * FROM factory_bales WHERE company_id = ${cid} ${df("pressed_at::date")} ORDER BY pressed_at DESC, id`),
     q(`SELECT * FROM factory_bale_sequences WHERE company_id = ${cid} ORDER BY id`),
-    q(`SELECT * FROM factory_bale_cost_snapshots WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT * FROM factory_bale_cost_snapshots WHERE company_id = ${cid} ORDER BY id DESC LIMIT 50000`),
     q(`SELECT * FROM factory_bale_waste_dispatches WHERE company_id = ${cid} ORDER BY id DESC`),
     q(`SELECT * FROM factory_waste_entries WHERE company_id = ${cid} ${df("entry_date")} ORDER BY entry_date DESC, id`),
 
@@ -473,7 +473,7 @@ export async function fetchCompanyExportData(
     q(`SELECT * FROM bale_products WHERE company_id = ${cid} ORDER BY name`),
     q(`SELECT * FROM bale_product_categories WHERE company_id = ${cid} ORDER BY name`),
     q(`SELECT * FROM bale_sequences WHERE company_id = ${cid} ORDER BY id`),
-    q(`SELECT * FROM bale_label_prints WHERE company_id = ${cid} ORDER BY id DESC`),
+    q(`SELECT * FROM bale_label_prints WHERE company_id = ${cid} ORDER BY id DESC LIMIT 100000`),
     q(`SELECT * FROM bale_transfers WHERE company_id = ${cid} ORDER BY id DESC`),
     q(`SELECT bti.* FROM bale_transfer_items bti INNER JOIN bale_transfers bt ON bt.id = bti.transfer_id WHERE bt.company_id = ${cid} ORDER BY bti.id`),
     q(`SELECT * FROM bale_recode_sessions WHERE company_id = ${cid} ORDER BY id DESC`),
@@ -622,7 +622,7 @@ export async function fetchCompanyExportData(
     q(`SELECT * FROM import_logs WHERE company_id = ${cid} ORDER BY id DESC LIMIT 10000`),
 
     // ── Audit ─────────────────────────────────────────────────────────────────
-    q(`SELECT * FROM audit_log WHERE company_id = ${cid} ${df("created_at::date")} ORDER BY created_at DESC LIMIT 100000`),
+    q(`SELECT * FROM audit_log WHERE company_id = ${cid} ${df("created_at::date")} ORDER BY created_at DESC LIMIT 50000`),
 
     // ── Factory Enriched Detail Views ─────────────────────────────────────────
     q(`SELECT fb.bale_code, fb.reference_number, fb.article_code, fb.product_name, fb.weight_kg, fb.cost_per_kg, fb.total_cost, fb.status, fb.pressed_at, fb.finalized_at, fb.category, fb.grade, fb.quantity, fb.stock_entry_date, fb.notes, fbp.code AS product_code, fbp.selling_price, fbp.production_price, l.name AS erp_location, fmb.batch_code AS mix_batch_code, fmb.batch_number AS mix_batch_number FROM factory_bales fb LEFT JOIN factory_bale_products fbp ON fbp.id = fb.product_id LEFT JOIN locations l ON l.id = fb.erp_location_id LEFT JOIN factory_mix_batches fmb ON fmb.id = fb.mix_batch_id WHERE fb.company_id = ${cid} ${df("fb.pressed_at::date")} ORDER BY fb.pressed_at DESC, fb.id`),

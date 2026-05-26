@@ -162,9 +162,17 @@ async function runDailyExport(): Promise<boolean> {
     }
 
     const today = getTodayLabel();
-    console.log(`[DailyExport] Building full-history export for ${companies.length} company/companies (label: ${today})`);
 
-    const { zip, names, skipped } = await buildFullExportZip(companies, undefined, undefined);
+    // Limit the scheduled daily export to the last 3 years so the ZIP stays
+    // a manageable size. Older data is available via the manual "Export Now"
+    // flow where the user can pick an explicit date range.
+    const threeYearsAgo = new Date();
+    threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
+    const exportFromDate = threeYearsAgo.toISOString().substring(0, 10);
+
+    console.log(`[DailyExport] Building export for ${companies.length} company/companies (label: ${today}, from: ${exportFromDate})`);
+
+    const { zip, names, skipped } = await buildFullExportZip(companies, exportFromDate, undefined);
 
     if (!names.length || !zip.length) {
       console.error("[DailyExport] ZIP is empty — no companies exported successfully. Nothing will be sent.");
