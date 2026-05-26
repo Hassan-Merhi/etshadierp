@@ -1570,40 +1570,26 @@ export function registerSpRoutes(app: Express) {
       let totalCogs    = 0;
       let saleCount    = 0;
 
-      if (spPosProfitAccountId && spPosPayableAccountId) {
-        // Revenue: sum of credits to the profit account on Sales vouchers
-        const revenueRows = await db.execute(sql`
-          SELECT COALESCE(SUM(CAST(ve.credit_amount AS DECIMAL)), 0) AS total,
-                 COUNT(DISTINCT v.id)                                 AS cnt
-          FROM voucher_entries ve
-          JOIN vouchers v ON ve.voucher_id = v.id
-          WHERE ve.ledger_account_id = ${spPosProfitAccountId}
-            AND v.company_id         = ${companyId}
-            AND v.voucher_type       = 'Sales'
-            AND v.deleted_at IS NULL
-            ${startDate ? sql`AND v.voucher_date >= ${startDate}` : sql``}
-            ${endDate   ? sql`AND v.voucher_date <= ${endDate}`   : sql``}
-        `);
-        const revRow = ((revenueRows as any).rows ?? revenueRows)[0];
-        totalRevenue = parseNum(revRow?.total);
-        saleCount    = parseInt(String(revRow?.cnt ?? "0"), 10);
-
-        // COGS: sum of credits to the payable account on the same Sales vouchers
-        // (each sale posts Cr spPosPayableAccountId = supplier cost)
-        const cogsRows = await db.execute(sql`
-          SELECT COALESCE(SUM(CAST(ve.credit_amount AS DECIMAL)), 0) AS total
-          FROM voucher_entries ve
-          JOIN vouchers v ON ve.voucher_id = v.id
-          WHERE ve.ledger_account_id = ${spPosPayableAccountId}
-            AND v.company_id         = ${companyId}
-            AND v.voucher_type       = 'Sales'
-            AND v.deleted_at IS NULL
-            ${startDate ? sql`AND v.voucher_date >= ${startDate}` : sql``}
-            ${endDate   ? sql`AND v.voucher_date <= ${endDate}`   : sql``}
-        `);
-        const cogsRow = ((cogsRows as any).rows ?? cogsRows)[0];
-        totalCogs = parseNum(cogsRow?.total);
-      }
+      // Use salesItems as source of truth: totalSales/totalCost/profit are stored
+      // at sale time regardless of how the ledger accounts are configured.
+      // This correctly handles old sales and eliminates reliance on voucher-entry math.
+      const siRows = await db.execute(sql`
+        SELECT
+          COALESCE(SUM(CAST(si.total_sales AS DECIMAL)), 0) AS total_revenue,
+          COALESCE(SUM(CAST(si.total_cost  AS DECIMAL)), 0) AS total_cogs,
+          COUNT(DISTINCT v.id)                              AS cnt
+        FROM sales_items si
+        JOIN vouchers v ON si.voucher_id = v.id
+        WHERE v.company_id   = ${companyId}
+          AND v.voucher_type = 'Sales'
+          AND v.deleted_at   IS NULL
+          ${startDate ? sql`AND v.voucher_date >= ${startDate}` : sql``}
+          ${endDate   ? sql`AND v.voucher_date <= ${endDate}`   : sql``}
+      `);
+      const siRow = ((siRows as any).rows ?? siRows)[0];
+      totalRevenue = parseNum(siRow?.total_revenue);
+      totalCogs    = parseNum(siRow?.total_cogs);
+      saleCount    = parseInt(String(siRow?.cnt ?? "0"), 10);
 
       const grossProfit = totalRevenue - totalCogs;
 

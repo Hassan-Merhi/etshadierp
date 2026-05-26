@@ -534,6 +534,27 @@ export function registerStatsRoutes(app: Express) {
         ? "We have more than we owe" 
         : "We owe more than we have";
 
+      // SP companies: calculate realized POS profit from salesItems.profit
+      // (source of truth: totalSales − totalCost per line, stored at sale time).
+      // This is displayed as an informational P&L section — it is NOT added to
+      // forUsTotal because the balance-sheet entries (Dr Cash, Dr clearing,
+      // Cr Payable) already mathematically reflect the profit in the net position.
+      // Adding it again would double-count.
+      let spPosProfit = 0;
+      if (isSpCompany) {
+        const spProfitResult = await db.execute(sql`
+          SELECT COALESCE(SUM(CAST(si.profit AS DECIMAL)), 0) AS total
+          FROM sales_items si
+          JOIN vouchers v ON si.voucher_id = v.id
+          WHERE v.company_id  = ${companyId}
+            AND v.voucher_type = 'Sales'
+            AND v.deleted_at  IS NULL
+            ${toDate ? sql`AND v.voucher_date <= ${toDate}` : sql``}
+        `);
+        const spRow = ((spProfitResult as any).rows ?? spProfitResult)[0];
+        spPosProfit = round2(parseFloat(spRow?.total || "0"));
+      }
+
       // Owner's Capital for backward compatibility
       const profitAccounts = companyAccounts.filter(acc => acc.accountType === "Profit");
       let ownersCapital = 0;
@@ -572,6 +593,7 @@ export function registerStatsRoutes(app: Express) {
         totalIncome: incomeTotal,
         totalExpenses: expensesTotal,
         netProfit,
+        spPosProfit,
         forUs: {
           total: forUsTotal,
           breakdown: forUsBreakdown,
