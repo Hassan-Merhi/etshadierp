@@ -18,3 +18,9 @@ id = "_LL2_d-_A-vETH19SXfKB"
 uri = "file://README.md"
 type = "text"
 title = "README.md"
+
+[[outputs]]
+id = "_fkdWCHrsl7nREq_e6iFR"
+uri = "file://fix_mjs16003_inventory.sql.gz"
+type = "unspecified"
+title = "fix_mjs16003_inventory.sql.gz — Run this on Render to restore MJS16003 inventory"
