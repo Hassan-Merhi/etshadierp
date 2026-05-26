@@ -64,6 +64,7 @@ const AiValidationPage = lazy(() => import("@/pages/AiValidationPage"));
 const AICommandCenter  = lazy(() => import("@/pages/AICommandCenter"));
 const POSImport = lazy(() => import("@/pages/pos/POSImport"));
 const ContainerDetail = lazy(() => import("@/pages/ContainerDetail"));
+const ContainerDetailPage = lazy(() => import("@/pages/ContainerDetailPage"));
 const LocationInventory = lazy(() => import("@/pages/LocationInventory"));
 const FactoryLocationInventory = lazy(() => import("@/pages/factory/FactoryLocationInventory"));
 const FactoryLocationInventoryMockup = lazy(() => import("@/pages/factory/FactoryLocationInventoryMockup"));
@@ -317,7 +318,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/mock-git" component={GITMockup} />
       <Route path="/git" component={GITMockup} />
       <Route path="/containers" component={ContainersPage} />
-      <Route path="/containers/:id" component={ContainerDetail} />
+      <Route path="/containers/:id" component={ContainerDetailPage} />
       <Route path="/offloads/:id" component={OffloadDetail} />
       <Route path="/po-import" component={POImport} />
       <Route path="/ai-validation" component={AiValidationPage} />
