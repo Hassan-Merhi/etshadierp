@@ -41,7 +41,7 @@ const saleFormSchema = z.object({
   saleDate: z.string().min(1, "Sale date is required"),
 });
 
-export default function ContainerDetail({ id: idProp }: { id?: string }) {
+export default function ContainerDetail({ id: idProp, forceErp }: { id?: string; forceErp?: boolean }) {
   const { formatDisplayDate } = useDateFormat();
   const params = useParams();
   const containerId = idProp ?? params.id;
@@ -54,7 +54,8 @@ export default function ContainerDetail({ id: idProp }: { id?: string }) {
   const { selectedCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
   const companyId = selectedCompany?.id;
-  const isSupplierPartner = selectedCompany?.companyType === "supplier_partner";
+  // forceErp: when an SP company opens an ERP-sourced container, treat it as a regular ERP container
+  const isSupplierPartner = forceErp ? false : selectedCompany?.companyType === "supplier_partner";
   const printRef = useRef<HTMLDivElement>(null);
   
   // Check for auto-print query parameter

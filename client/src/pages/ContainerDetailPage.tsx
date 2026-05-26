@@ -80,7 +80,7 @@ export default function ContainerDetailPage() {
     new URLSearchParams(window.location.search).get("src") === "erp";
 
   if (!isSupplierPartner || srcErp) {
-    return <ContainerDetailERP id={id} />;
+    return <ContainerDetailERP id={id} forceErp={srcErp} />;
   }
 
   return <SpContainerDetailView />;
