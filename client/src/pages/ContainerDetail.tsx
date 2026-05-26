@@ -41,10 +41,10 @@ const saleFormSchema = z.object({
   saleDate: z.string().min(1, "Sale date is required"),
 });
 
-export default function ContainerDetail() {
+export default function ContainerDetail({ id: idProp }: { id?: string }) {
   const { formatDisplayDate } = useDateFormat();
   const params = useParams();
-  const containerId = params.id;
+  const containerId = idProp ?? params.id;
   const [showOffloadDialog, setShowOffloadDialog] = useState(false);
   const [showSellDialog, setShowSellDialog] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);

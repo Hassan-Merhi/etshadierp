@@ -70,6 +70,7 @@ const editSchema = z.object({
 type EditForm = z.infer<typeof editSchema>;
 
 export default function ContainerDetailPage() {
+  const { id } = useParams<{ id: string }>();
   const { selectedCompany } = useCompany();
   const isSupplierPartner = selectedCompany?.companyType === "supplier_partner";
 
@@ -79,7 +80,7 @@ export default function ContainerDetailPage() {
     new URLSearchParams(window.location.search).get("src") === "erp";
 
   if (!isSupplierPartner || srcErp) {
-    return <ContainerDetailERP />;
+    return <ContainerDetailERP id={id} />;
   }
 
   return <SpContainerDetailView />;
