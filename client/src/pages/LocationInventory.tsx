@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
-import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown, Globe, Eye, Pencil, FileSpreadsheet, MessageCircle, Check, Warehouse, TrendingUp, TrendingDown, ArrowUpDown, ArrowRight, Loader2 } from "lucide-react";
+import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X, ChevronDown, Globe, Eye, Pencil, FileSpreadsheet, MessageCircle, Check, Warehouse, TrendingUp, TrendingDown, ArrowUpDown, ArrowRight, ArrowLeft, Loader2 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
@@ -124,6 +124,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     locationName: string | null;
   } | null>(null);
   const [stockMovementPeriod, setStockMovementPeriod] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
+  const [drillMonth, setDrillMonth] = useState<{ year: number; month: number; monthName: string } | null>(null);
   const allStockTableRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
   const { setSelectedLocation } = useLocation();
@@ -673,6 +674,35 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       return { ...m, openingQty, openingValue, openingRate, inwardRate, outwardRate, closingRate };
     });
   }, [stockMovementData]);
+
+  // Add year to each smRow (months are sequential, year increments when month wraps)
+  const smRowsWithYear = useMemo(() => {
+    if (smRows.length === 0) return [];
+    const startDate = new Date(stockMovementPeriod.fromDate);
+    let year = startDate.getFullYear();
+    let prevMonth = startDate.getMonth() + 1;
+    return smRows.map((row: any, idx: number) => {
+      if (idx > 0 && row.month <= prevMonth) year++;
+      prevMonth = row.month;
+      return { ...row, year };
+    });
+  }, [smRows, stockMovementPeriod.fromDate]);
+
+  // Drill-down: individual transactions for a selected month
+  const smDrillApiUrl = stockMovementItem && drillMonth
+    ? stockMovementItem.locationId
+      ? `/api/locations/${stockMovementItem.locationId}/stock-items/${stockMovementItem.stockItemId}/vouchers/${drillMonth.year}/${drillMonth.month}`
+      : `/api/stock-items/${stockMovementItem.stockItemId}/vouchers/${drillMonth.year}/${drillMonth.month}`
+    : null;
+  const { data: smDrillData, isLoading: smDrillLoading } = useQuery<any>({
+    queryKey: smDrillApiUrl ? [smDrillApiUrl] : ["__disabled__"],
+    queryFn: async () => {
+      const res = await fetch(smDrillApiUrl!, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load transactions");
+      return res.json();
+    },
+    enabled: !!smDrillApiUrl && stockMovementOpen,
+  });
 
   // ── Keyboard navigation for All Stock table ────────────────────────────────
   useEffect(() => {
@@ -3555,144 +3585,338 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       </Dialog>
 
       {/* ── Stock Movement Dialog ────────────────────────────────────────────── */}
-      <Dialog open={stockMovementOpen} onOpenChange={(open) => { setStockMovementOpen(open); if (!open) setStockMovementItem(null); }}>
-        <DialogContent className="max-w-5xl w-full p-0 gap-0 overflow-hidden flex flex-col" style={{ maxHeight: "90vh" }} data-testid="dialog-stock-movement">
+      <Dialog
+        open={stockMovementOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDrillMonth(null);
+            setStockMovementOpen(false);
+            setStockMovementItem(null);
+          }
+        }}
+      >
+        <DialogContent
+          className="max-w-5xl w-full p-0 gap-0 overflow-hidden flex flex-col"
+          style={{ maxHeight: "90vh" }}
+          data-testid="dialog-stock-movement"
+          onEscapeKeyDown={(e) => {
+            if (drillMonth) {
+              e.preventDefault();
+              setDrillMonth(null);
+            }
+          }}
+        >
           {/* Header */}
           <div className="flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b flex-shrink-0">
-            <div>
-              <DialogTitle className="text-lg font-bold leading-tight">
-                Stock Movement — {stockMovementItem?.stockItemName}
-              </DialogTitle>
-              <DialogDescription className="flex items-center gap-1.5 mt-1 text-sm">
-                <Globe className="h-3.5 w-3.5" />
-                {stockMovementItem?.locationName ?? "All Locations"}
-              </DialogDescription>
+            <div className="flex items-center gap-3 min-w-0">
+              {drillMonth && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setDrillMonth(null)}
+                  data-testid="button-sm-back"
+                  className="shrink-0"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              )}
+              <div className="min-w-0">
+                <DialogTitle className="text-lg font-bold leading-tight">
+                  {drillMonth
+                    ? `${drillMonth.monthName} ${drillMonth.year} — ${stockMovementItem?.stockItemName}`
+                    : `Stock Movement — ${stockMovementItem?.stockItemName}`}
+                </DialogTitle>
+                <DialogDescription className="flex items-center gap-1.5 mt-1 text-sm flex-wrap">
+                  {drillMonth ? (
+                    <>
+                      <button
+                        className="text-primary hover:underline text-xs"
+                        onClick={() => setDrillMonth(null)}
+                      >
+                        Monthly summary
+                      </button>
+                      <span className="text-muted-foreground">/</span>
+                      <span className="text-xs">{drillMonth.monthName} {drillMonth.year}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Globe className="h-3.5 w-3.5" />
+                      {stockMovementItem?.locationName ?? "All Locations"}
+                    </>
+                  )}
+                </DialogDescription>
+              </div>
             </div>
-            <PeriodFilter value={stockMovementPeriod} onChange={setStockMovementPeriod} data-testid="sm-period-filter" />
+            {!drillMonth && (
+              <PeriodFilter value={stockMovementPeriod} onChange={(v) => { setStockMovementPeriod(v); setDrillMonth(null); }} data-testid="sm-period-filter" />
+            )}
           </div>
 
-          {/* Table */}
+          {/* Body — monthly summary OR drill-down transactions */}
           <div className="overflow-auto flex-1 min-h-0">
-            {stockMovementLoading ? (
-              <div className="p-6 space-y-2">
-                {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-8 w-full" />)}
-              </div>
-            ) : (
-              <table className="w-full text-sm border-collapse" style={{ minWidth: 860 }}>
-                <thead className="sticky top-0 z-20">
-                  <tr className="bg-muted border-b">
-                    <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r font-semibold w-28 whitespace-nowrap">Month</th>
-                    <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-muted-foreground text-xs">Opening</th>
-                    <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-green-700 dark:text-green-400 text-xs">Stock In</th>
-                    <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-red-700 dark:text-red-400 text-xs">Stock Out</th>
-                    <th colSpan={3} className="text-center px-2 py-1.5 font-semibold text-primary text-xs">Closing</th>
-                  </tr>
-                  <tr className="bg-muted/70 border-b text-xs">
-                    {["Qty","Rate","Value","Qty","Rate","Value","Qty","Rate","Value","Qty","Rate","Value"].map((h, i) => (
-                      <th key={i} className={cn(
-                        "text-right px-3 py-1.5 font-medium whitespace-nowrap",
-                        i < 3  ? "text-muted-foreground border-r" :
-                        i < 6  ? "text-green-700 dark:text-green-400 border-r" :
-                        i < 9  ? "text-red-700 dark:text-red-400 border-r" :
-                                 "text-primary"
-                      )}>
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {smRows.length === 0 && (
-                    <tr>
-                      <td colSpan={13} className="text-center py-12 text-muted-foreground">
-                        No stock movement for this period
-                      </td>
+            {drillMonth ? (
+              /* ── Drill-down: individual transactions for selected month ── */
+              smDrillLoading ? (
+                <div className="p-6 space-y-2">
+                  {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-8 w-full" />)}
+                </div>
+              ) : (
+                <table className="w-full text-sm border-collapse" style={{ minWidth: 820 }}>
+                  <thead className="sticky top-0 z-20">
+                    <tr className="bg-muted border-b">
+                      <th className="text-left px-4 py-2 border-r font-semibold whitespace-nowrap w-20">Date</th>
+                      <th className="text-left px-4 py-2 border-r font-semibold">Particulars</th>
+                      <th className="text-left px-4 py-2 border-r font-semibold text-xs w-32 whitespace-nowrap">Type</th>
+                      <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-green-700 dark:text-green-400 text-xs">Stock In</th>
+                      <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-red-700 dark:text-red-400 text-xs">Stock Out</th>
+                      <th colSpan={3} className="text-center px-2 py-1.5 font-semibold text-primary text-xs">Closing</th>
                     </tr>
-                  )}
-                  {smRows.map((m: any, idx: number) => {
-                    const hasActivity = m.inwardQty > 0 || m.outwardQty > 0 || m.openingQty !== 0 || m.closingQty !== 0;
-                    const fmtQ = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</>;
-                    const fmtR = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</>;
-                    const fmtV = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{formatAmount(n)}</>;
-                    return (
-                      <tr
-                        key={m.month}
-                        className={cn(
-                          "border-b transition-colors",
-                          hasActivity ? "" : "opacity-40",
-                          idx % 2 === 0 ? "bg-background" : "bg-muted/20"
-                        )}
-                      >
-                        <td className="px-4 py-2 font-semibold border-r whitespace-nowrap">{m.monthName}</td>
-                        {/* Opening */}
-                        <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtQ(m.openingQty)}</td>
-                        <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtR(m.openingRate)}</td>
-                        <td className="px-3 py-2 text-right font-mono text-muted-foreground border-r">{fmtV(m.openingValue)}</td>
-                        {/* Stock In */}
-                        <td className="px-3 py-2 text-right font-mono text-green-700 dark:text-green-400">{fmtQ(m.inwardQty)}</td>
-                        <td className="px-3 py-2 text-right font-mono text-green-700 dark:text-green-400">{fmtR(m.inwardRate)}</td>
-                        <td className="px-3 py-2 text-right font-mono text-green-700 dark:text-green-400 border-r">{fmtV(m.inwardValue)}</td>
-                        {/* Stock Out */}
-                        <td className="px-3 py-2 text-right font-mono text-red-700 dark:text-red-400">{fmtQ(m.outwardQty)}</td>
-                        <td className="px-3 py-2 text-right font-mono text-red-700 dark:text-red-400">{fmtR(m.outwardRate)}</td>
-                        <td className="px-3 py-2 text-right font-mono text-red-700 dark:text-red-400 border-r">{fmtV(m.outwardValue)}</td>
-                        {/* Closing */}
-                        <td className="px-3 py-2 text-right font-mono font-semibold text-primary">{fmtQ(m.closingQty)}</td>
-                        <td className="px-3 py-2 text-right font-mono font-semibold text-primary">{fmtR(m.closingRate)}</td>
-                        <td className="px-3 py-2 text-right font-mono font-semibold text-primary">{fmtV(m.closingValue)}</td>
+                    <tr className="bg-muted/70 border-b text-xs">
+                      <th className="px-4 py-1.5 border-r" />
+                      <th className="px-4 py-1.5 border-r" />
+                      <th className="px-4 py-1.5 border-r" />
+                      {["Qty","Rate","Value","Qty","Rate","Value","Qty","Rate","Value"].map((h, i) => (
+                        <th key={i} className={cn(
+                          "text-right px-3 py-1.5 font-medium whitespace-nowrap",
+                          i < 3 ? "text-green-700 dark:text-green-400 border-r" :
+                          i < 6 ? "text-red-700 dark:text-red-400 border-r" :
+                                  "text-primary"
+                        )}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(!smDrillData?.transactions || smDrillData.transactions.length === 0) && (
+                      <tr>
+                        <td colSpan={12} className="text-center py-12 text-muted-foreground">
+                          No transactions for {drillMonth.monthName} {drillMonth.year}
+                        </td>
                       </tr>
-                    );
-                  })}
-                  {/* Grand total row */}
-                  {smRows.length > 0 && stockMovementData?.grandTotal && (() => {
-                    const gt = stockMovementData.grandTotal;
-                    const fmtQ = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</>;
-                    const fmtR = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</>;
-                    const fmtV = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{formatAmount(n)}</>;
-                    const inRate  = gt.inwardQty  > 0 ? gt.inwardValue  / gt.inwardQty  : 0;
-                    const outRate = gt.outwardQty > 0 ? gt.outwardValue / gt.outwardQty : 0;
-                    const clsRate = gt.closingQty > 0 ? gt.closingValue / gt.closingQty : 0;
-                    return (
-                      <tr className="bg-muted/50 border-t-2 font-semibold text-sm">
-                        <td className="px-4 py-2.5 border-r">Total</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-muted-foreground">{fmtQ(smRows[0]?.openingQty ?? 0)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-muted-foreground">{fmtR(smRows[0]?.openingRate ?? 0)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-muted-foreground border-r">{fmtV(smRows[0]?.openingValue ?? 0)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-green-700 dark:text-green-400">{fmtQ(gt.inwardQty)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-green-700 dark:text-green-400">{fmtR(inRate)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-green-700 dark:text-green-400 border-r">{fmtV(gt.inwardValue)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-red-700 dark:text-red-400">{fmtQ(gt.outwardQty)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-red-700 dark:text-red-400">{fmtR(outRate)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-red-700 dark:text-red-400 border-r">{fmtV(gt.outwardValue)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-primary">{fmtQ(gt.closingQty)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-primary">{fmtR(clsRate)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-primary">{fmtV(gt.closingValue)}</td>
+                    )}
+                    {smDrillData?.transactions?.map((txn: any, idx: number) => {
+                      const fmtN = (n: number, dec = 2) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{n.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })}</>;
+                      const fmtA = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{formatAmount(n)}</>;
+                      const editUrl = (() => {
+                        if (txn.isOpeningBalance) return null;
+                        const vt = (txn.vchType || '').toLowerCase();
+                        if (vt === 'purchase import') return txn.poId ? `/purchase-orders/${txn.poId}/edit` : null;
+                        if (vt === 'production' || vt === 'consumption') return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
+                        if (vt.startsWith('pos') || vt.includes('pos')) return txn.voucherId ? `/pos/edit/${txn.voucherId}` : null;
+                        if (vt.startsWith('stock transfer')) return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
+                        if (vt === 'sales') return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
+                        return null;
+                      })();
+                      const dispDate = (() => {
+                        if (txn.isOpeningBalance) return "";
+                        try { return format(new Date(txn.date), "dd MMM"); } catch { return txn.date || ""; }
+                      })();
+                      return (
+                        <tr
+                          key={idx}
+                          data-testid={`row-drill-txn-${idx}`}
+                          className={cn("border-b", txn.isOpeningBalance ? "bg-muted/30 font-medium" : idx % 2 === 1 ? "bg-muted/10" : "")}
+                        >
+                          <td className="px-4 py-2 border-r tabular-nums text-muted-foreground text-xs whitespace-nowrap">{dispDate}</td>
+                          <td className="px-4 py-2 border-r">
+                            {editUrl ? (
+                              <button
+                                onClick={() => { navigate(editUrl); setStockMovementOpen(false); setDrillMonth(null); setStockMovementItem(null); }}
+                                className="text-left text-primary hover:underline"
+                                data-testid={`link-drill-particulars-${idx}`}
+                              >
+                                {txn.particulars}
+                              </button>
+                            ) : txn.particulars}
+                          </td>
+                          <td className="px-4 py-2 border-r text-xs text-muted-foreground whitespace-nowrap">{txn.vchType}</td>
+                          <td className="px-3 py-2 text-right font-mono text-green-700 dark:text-green-400">{fmtN(txn.inwardQty, 0)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-green-700 dark:text-green-400">{fmtA(txn.inwardRate)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-green-700 dark:text-green-400 border-r">{fmtA(txn.inwardValue)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-red-700 dark:text-red-400">{fmtN(txn.outwardQty, 0)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-red-700 dark:text-red-400">{fmtA(txn.isPOS && txn.posSellingRate ? txn.posSellingRate : txn.outwardRate)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-red-700 dark:text-red-400 border-r">{fmtA(txn.isPOS && txn.posSellingValue ? txn.posSellingValue : txn.outwardValue)}</td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-primary">{fmtN(txn.closingQty, 0)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-primary">{fmtA(txn.closingRate)}</td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-primary">{fmtA(txn.closingValue)}</td>
+                        </tr>
+                      );
+                    })}
+                    {/* Totals row */}
+                    {smDrillData?.totals && smDrillData.transactions?.length > 0 && (() => {
+                      const t = smDrillData.totals;
+                      const fmtN = (n: number, dec = 2) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{n.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })}</>;
+                      const fmtA = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{formatAmount(n)}</>;
+                      return (
+                        <tr className="bg-muted/50 border-t-2 font-semibold text-sm">
+                          <td colSpan={3} className="px-4 py-2.5 border-r">Totals</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-green-700 dark:text-green-400">{fmtN(t.inwardQty, 0)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-green-700 dark:text-green-400">{fmtA(t.inwardRate)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-green-700 dark:text-green-400 border-r">{fmtA(t.inwardValue)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-red-700 dark:text-red-400">{fmtN(t.outwardQty, 0)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-red-700 dark:text-red-400">{fmtA(t.outwardRate)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-red-700 dark:text-red-400 border-r">{fmtA(t.outwardValue)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-primary">{fmtN(t.closingQty, 0)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-primary">{fmtA(t.closingRate)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-primary">{fmtA(t.closingValue)}</td>
+                        </tr>
+                      );
+                    })()}
+                  </tbody>
+                </table>
+              )
+            ) : (
+              /* ── Monthly summary table ── */
+              stockMovementLoading ? (
+                <div className="p-6 space-y-2">
+                  {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-8 w-full" />)}
+                </div>
+              ) : (
+                <table className="w-full text-sm border-collapse" style={{ minWidth: 860 }}>
+                  <thead className="sticky top-0 z-20">
+                    <tr className="bg-muted border-b">
+                      <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r font-semibold w-28 whitespace-nowrap">Month</th>
+                      <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-muted-foreground text-xs">Opening</th>
+                      <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-green-700 dark:text-green-400 text-xs">Stock In</th>
+                      <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-red-700 dark:text-red-400 text-xs">Stock Out</th>
+                      <th colSpan={3} className="text-center px-2 py-1.5 font-semibold text-primary text-xs">Closing</th>
+                    </tr>
+                    <tr className="bg-muted/70 border-b text-xs">
+                      {["Qty","Rate","Value","Qty","Rate","Value","Qty","Rate","Value","Qty","Rate","Value"].map((h, i) => (
+                        <th key={i} className={cn(
+                          "text-right px-3 py-1.5 font-medium whitespace-nowrap",
+                          i < 3  ? "text-muted-foreground border-r" :
+                          i < 6  ? "text-green-700 dark:text-green-400 border-r" :
+                          i < 9  ? "text-red-700 dark:text-red-400 border-r" :
+                                   "text-primary"
+                        )}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {smRowsWithYear.length === 0 && (
+                      <tr>
+                        <td colSpan={13} className="text-center py-12 text-muted-foreground">
+                          No stock movement for this period
+                        </td>
                       </tr>
-                    );
-                  })()}
-                </tbody>
-              </table>
+                    )}
+                    {smRowsWithYear.map((m: any, idx: number) => {
+                      const hasActivity = m.inwardQty > 0 || m.outwardQty > 0 || m.openingQty !== 0 || m.closingQty !== 0;
+                      const fmtQ = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</>;
+                      const fmtR = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</>;
+                      const fmtV = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{formatAmount(n)}</>;
+                      return (
+                        <tr
+                          key={m.month}
+                          data-testid={`row-sm-month-${m.month}`}
+                          className={cn(
+                            "border-b transition-colors cursor-pointer hover-elevate",
+                            hasActivity ? "" : "opacity-40",
+                            idx % 2 === 0 ? "bg-background" : "bg-muted/20"
+                          )}
+                          onClick={() => setDrillMonth({ year: m.year, month: m.month, monthName: m.monthName })}
+                        >
+                          <td className="px-4 py-2 font-semibold border-r whitespace-nowrap">
+                            <span className="flex items-center gap-1">
+                              {m.monthName}
+                              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
+                            </span>
+                          </td>
+                          {/* Opening */}
+                          <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtQ(m.openingQty)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-muted-foreground">{fmtR(m.openingRate)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-muted-foreground border-r">{fmtV(m.openingValue)}</td>
+                          {/* Stock In */}
+                          <td className="px-3 py-2 text-right font-mono text-green-700 dark:text-green-400">{fmtQ(m.inwardQty)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-green-700 dark:text-green-400">{fmtR(m.inwardRate)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-green-700 dark:text-green-400 border-r">{fmtV(m.inwardValue)}</td>
+                          {/* Stock Out */}
+                          <td className="px-3 py-2 text-right font-mono text-red-700 dark:text-red-400">{fmtQ(m.outwardQty)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-red-700 dark:text-red-400">{fmtR(m.outwardRate)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-red-700 dark:text-red-400 border-r">{fmtV(m.outwardValue)}</td>
+                          {/* Closing */}
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-primary">{fmtQ(m.closingQty)}</td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-primary">{fmtR(m.closingRate)}</td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-primary">{fmtV(m.closingValue)}</td>
+                        </tr>
+                      );
+                    })}
+                    {/* Grand total row */}
+                    {smRowsWithYear.length > 0 && stockMovementData?.grandTotal && (() => {
+                      const gt = stockMovementData.grandTotal;
+                      const fmtQ = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</>;
+                      const fmtR = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</>;
+                      const fmtV = (n: number) => n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{formatAmount(n)}</>;
+                      const inRate  = gt.inwardQty  > 0 ? gt.inwardValue  / gt.inwardQty  : 0;
+                      const outRate = gt.outwardQty > 0 ? gt.outwardValue / gt.outwardQty : 0;
+                      const clsRate = gt.closingQty > 0 ? gt.closingValue / gt.closingQty : 0;
+                      return (
+                        <tr className="bg-muted/50 border-t-2 font-semibold text-sm">
+                          <td className="px-4 py-2.5 border-r">Total</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-muted-foreground">{fmtQ(smRowsWithYear[0]?.openingQty ?? 0)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-muted-foreground">{fmtR(smRowsWithYear[0]?.openingRate ?? 0)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-muted-foreground border-r">{fmtV(smRowsWithYear[0]?.openingValue ?? 0)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-green-700 dark:text-green-400">{fmtQ(gt.inwardQty)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-green-700 dark:text-green-400">{fmtR(inRate)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-green-700 dark:text-green-400 border-r">{fmtV(gt.inwardValue)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-red-700 dark:text-red-400">{fmtQ(gt.outwardQty)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-red-700 dark:text-red-400">{fmtR(outRate)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-red-700 dark:text-red-400 border-r">{fmtV(gt.outwardValue)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-primary">{fmtQ(gt.closingQty)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-primary">{fmtR(clsRate)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-primary">{fmtV(gt.closingValue)}</td>
+                        </tr>
+                      );
+                    })()}
+                  </tbody>
+                </table>
+              )
             )}
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-2 px-6 py-4 border-t flex-shrink-0">
-            <Button variant="outline" onClick={() => setStockMovementOpen(false)} data-testid="button-sm-close">
-              Close
-            </Button>
-            {stockMovementItem && (
-              <Button
-                onClick={() => {
-                  const locId = stockMovementItem.locationId ?? 0;
-                  navigate(`/locations/${locId}/stock-items/${stockMovementItem.stockItemId}/monthly-summary`);
-                  setStockMovementOpen(false);
-                }}
-                data-testid="button-sm-open-full"
-              >
-                <ArrowRight className="h-4 w-4 mr-1.5" />
-                Open full history
-              </Button>
-            )}
+          <div className="flex items-center justify-between gap-2 px-6 py-4 border-t flex-shrink-0">
+            <div>
+              {drillMonth && (
+                <span className="text-xs text-muted-foreground">Press Esc to return to monthly summary</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {drillMonth ? (
+                <Button variant="outline" onClick={() => setDrillMonth(null)} data-testid="button-sm-back-to-months">
+                  <ArrowLeft className="h-4 w-4 mr-1.5" />
+                  Back to months
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={() => setStockMovementOpen(false)} data-testid="button-sm-close">
+                  Close
+                </Button>
+              )}
+              {stockMovementItem && (
+                <Button
+                  onClick={() => {
+                    const locId = stockMovementItem.locationId ?? 0;
+                    if (drillMonth) {
+                      navigate(`/locations/${locId}/stock-items/${stockMovementItem.stockItemId}/vouchers/${drillMonth.year}/${drillMonth.month}`);
+                    } else {
+                      navigate(`/locations/${locId}/stock-items/${stockMovementItem.stockItemId}/monthly-summary`);
+                    }
+                    setDrillMonth(null);
+                    setStockMovementOpen(false);
+                    setStockMovementItem(null);
+                  }}
+                  data-testid="button-sm-open-full"
+                >
+                  <ArrowRight className="h-4 w-4 mr-1.5" />
+                  {drillMonth ? "Open in full view" : "Open full history"}
+                </Button>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
