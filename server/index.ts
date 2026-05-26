@@ -3997,11 +3997,16 @@ END $mig$`;
     server.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
       log(`serving on port ${port}`);
       // Warm up the pool first, then run schema migrations.
+      // Set RUN_STARTUP_MIGRATIONS=false in Render env vars to skip migrations
+      // entirely (emergency kill-switch if migrations are causing lock contention).
+      const migrationsEnabled = process.env.RUN_STARTUP_MIGRATIONS !== 'false';
       warmupDb().then(() =>
-        runMigrations().catch((err) => {
-          console.error("Migration error:", err);
-          migrationsDone = true;
-        })
+        migrationsEnabled
+          ? runMigrations().catch((err) => {
+              console.error("Migration error:", err);
+              migrationsDone = true;
+            })
+          : (console.log("⚠ Startup migrations DISABLED via RUN_STARTUP_MIGRATIONS=false"), Promise.resolve())
       ).then(async () => {
         // ── Post-migration startup diagnostic summary ───────────────────────────
         try {
