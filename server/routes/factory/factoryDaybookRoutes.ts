@@ -85,6 +85,11 @@ export function registerFactoryDaybookRoutes(app: Express) {
           'CONTRACT_REACTIVATED',
           'CONTRACT_ENDED'
         )`,
+        // Hide zero-amount payroll payment entries — no money moved, nothing to show
+        sql`NOT (
+          ${factoryDaybookEntries.txType} = 'PAYROLL_PAYMENT'
+          AND (${factoryDaybookEntries.amountCurrency} IS NULL OR ${factoryDaybookEntries.amountCurrency}::numeric = 0)
+        )`,
       ];
       // If user is restricted to own entries only, show their entries + unattributed ones (NULL createdBy)
       if (ownOnly && currentUserId) {
