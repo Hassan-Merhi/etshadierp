@@ -716,11 +716,5 @@ function SpPOS() {
 // ── Router entry: delegates to SpPOS or original POS ──────────────────────────
 
 export default function POSPage() {
-  const { selectedCompany } = useCompany();
-
-  if (selectedCompany?.companyType === "supplier_partner") {
-    return <SpPOS />;
-  }
-
   return <POSOriginal />;
 }

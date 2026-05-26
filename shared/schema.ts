@@ -1572,6 +1572,8 @@ export const companySettings = pgTable("company_settings", {
   netPositionAdjustment: decimal("net_position_adjustment", { precision: 15, scale: 2 }).default("0"),
   posExcelImportEnabled: boolean("pos_excel_import_enabled").default(false),
   timezone: text("timezone"),
+  spPosPayableAccountId: integer("sp_pos_payable_account_id"),
+  spPosProfitAccountId: integer("sp_pos_profit_account_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -1589,6 +1591,8 @@ export const insertCompanySettingsSchema = createInsertSchema(companySettings).o
   netPositionAdjustment: z.string().optional(),
   posExcelImportEnabled: z.boolean().optional(),
   timezone: z.string().optional(),
+  spPosPayableAccountId: z.number().nullable().optional(),
+  spPosProfitAccountId: z.number().nullable().optional(),
 });
 
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;

@@ -305,14 +305,13 @@ export function registerPosRoutes(app: Express) {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      // Block normal POS sales for supplier_partner companies (must use /api/sp/sales)
-      {
-        const [spCo] = await db.select({ companyType: companies.companyType })
-          .from(companies).where(eq(companies.id, req.session.currentCompanyId)).limit(1);
-        if (spCo?.companyType === "supplier_partner") {
-          return res.status(403).json({ message: "Supplier Partner companies must use SP Sales / SP Containers for this action." });
-        }
-      }
+      // Detect supplier_partner company — uses split accounting (Cr Payable + Cr Profit) instead of Cr Sales
+      const [currentCoRow] = await db
+        .select({ companyType: companies.companyType })
+        .from(companies)
+        .where(eq(companies.id, req.session.currentCompanyId!))
+        .limit(1);
+      const isSpCompany = currentCoRow?.companyType === "supplier_partner";
 
       const isPOSUser = req.user?.role === "POS";
 
@@ -739,6 +738,26 @@ export function registerPosRoutes(app: Express) {
         });
       }
 
+      // ── SP company: fetch configured POS accounts & pre-compute supplier cost ──
+      let spPosPayableAccountId: number | null = null;
+      let spPosProfitAccountId: number | null = null;
+      let totalSupplierCost = 0;
+      if (isSpCompany) {
+        const spSettings = await storage.getCompanySettings(req.session.currentCompanyId!);
+        spPosPayableAccountId = spSettings?.spPosPayableAccountId ?? null;
+        spPosProfitAccountId = spSettings?.spPosProfitAccountId ?? null;
+        if (!spPosPayableAccountId || !spPosProfitAccountId) {
+          return res.status(400).json({
+            message: "Supplier POS payable/profit accounts are not configured. Go to SP Setup to set them up.",
+          });
+        }
+        // Pre-compute total supplier cost from inventory averageRate (includes landed/offloading cost)
+        totalSupplierCost = inventoryValidation.reduce(
+          (sum, v) => sum + v.saleQty * v.currentRate,
+          0,
+        );
+      }
+
       // STEP 1b: Create accounting records, update inventory, and create sales items
       // All wrapped in a single DB transaction for atomicity
       let voucher: any;
@@ -813,13 +832,51 @@ export function registerPosRoutes(app: Express) {
         console.log("[POS Sale] Debit entry:", debitEntry);
         await tx.insert(voucherEntries).values(debitEntry);
 
-        await tx.insert(voucherEntries).values({
-          voucherId: txVoucher.id,
-          ledgerAccountId: salesAccount.id,
-          debitAmount: "0",
-          creditAmount: grandTotal.toFixed(2),
-          narration: creditSaleNarration,
-        });
+        if (!isSpCompany) {
+          // Normal ERP: credit the full sale amount to the Sales Revenue account
+          await tx.insert(voucherEntries).values({
+            voucherId: txVoucher.id,
+            ledgerAccountId: salesAccount.id,
+            debitAmount: "0",
+            creditAmount: grandTotal.toFixed(2),
+            narration: creditSaleNarration,
+          });
+        } else {
+          // Supplier Partner: split credit between Supplier Payable (cost) and Profit account
+          const grandTotalRounded = Number(grandTotal.toFixed(2));
+          const supplierCostRounded = Number(totalSupplierCost.toFixed(2));
+          const profitRounded = Number((grandTotalRounded - supplierCostRounded).toFixed(2));
+
+          // Cr Supplier Payable = total cost (what is owed to the supplier)
+          if (supplierCostRounded > 0) {
+            await tx.insert(voucherEntries).values({
+              voucherId: txVoucher.id,
+              ledgerAccountId: spPosPayableAccountId!,
+              debitAmount: "0",
+              creditAmount: supplierCostRounded.toFixed(2),
+              narration: `Supplier POS payable — ${voucherNumber}`,
+            });
+          }
+
+          // Cr/Dr Profit account = selling price minus supplier cost
+          if (profitRounded > 0) {
+            await tx.insert(voucherEntries).values({
+              voucherId: txVoucher.id,
+              ledgerAccountId: spPosProfitAccountId!,
+              debitAmount: "0",
+              creditAmount: profitRounded.toFixed(2),
+              narration: `Supplier POS profit — ${voucherNumber}`,
+            });
+          } else if (profitRounded < 0) {
+            await tx.insert(voucherEntries).values({
+              voucherId: txVoucher.id,
+              ledgerAccountId: spPosProfitAccountId!,
+              debitAmount: Math.abs(profitRounded).toFixed(2),
+              creditAmount: "0",
+              narration: `Supplier POS loss — ${voucherNumber}`,
+            });
+          }
+        }
 
         const txSaleItems: any[] = [];
 
@@ -981,6 +1038,28 @@ export function registerPosRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
+      // Detect supplier_partner for SP-specific accounting on edit
+      const [editCoRow] = await db
+        .select({ companyType: companies.companyType })
+        .from(companies)
+        .where(eq(companies.id, req.session.currentCompanyId!))
+        .limit(1);
+      const isSpCompanyEdit = editCoRow?.companyType === "supplier_partner";
+
+      // For SP companies fetch configured POS payable/profit accounts upfront
+      let editSpPayableAccountId: number | null = null;
+      let editSpProfitAccountId: number | null = null;
+      if (isSpCompanyEdit) {
+        const spSettings = await storage.getCompanySettings(req.session.currentCompanyId!);
+        editSpPayableAccountId = spSettings?.spPosPayableAccountId ?? null;
+        editSpProfitAccountId = spSettings?.spPosProfitAccountId ?? null;
+        if (!editSpPayableAccountId || !editSpProfitAccountId) {
+          return res.status(400).json({
+            message: "Supplier POS payable/profit accounts are not configured. Go to SP Setup to set them up.",
+          });
+        }
+      }
+
       const { description, items, paymentAccountType, paymentAccountId, isCreditSale, voucherDate, locationId: newLocationId } = req.body;
 
       if (!items || !Array.isArray(items) || items.length === 0) {
@@ -1097,6 +1176,7 @@ export function registerPosRoutes(app: Express) {
 
         // Create new sales items and apply new inventory movements
         let grandTotal = 0;
+        let totalSupplierCostEdit = 0;
         for (const item of items) {
           const { id, stockItemId, quantity, sellingPrice } = item;
 
@@ -1165,6 +1245,7 @@ export function registerPosRoutes(app: Express) {
           await adjustInventory(tx, targetLocationId, stockItemId, -sellQty, existingVoucher.companyId);
 
           grandTotal += totalSales;
+          totalSupplierCostEdit += totalCost;
         }
 
         // Update voucher description, total amount, location, and optionally date
@@ -1225,18 +1306,53 @@ export function registerPosRoutes(app: Express) {
         // Create new debit entry (payment account)
         await tx.insert(voucherEntries).values(newDebitEntry);
 
-        // Create new credit entry (sales revenue) - always preserve original
-        await tx.insert(voucherEntries).values({
-          voucherId,
-          ledgerAccountId: revenueEntry.ledgerAccountId,
-          bankAccountId: revenueEntry.bankAccountId,
-          supplierId: revenueEntry.supplierId,
-          employeeId: revenueEntry.employeeId,
-          fixedAssetId: revenueEntry.fixedAssetId,
-          debitAmount: "0",
-          creditAmount: grandTotal.toString(),
-          narration: revenueEntry.narration || "",
-        });
+        if (!isSpCompanyEdit) {
+          // Normal ERP: single credit to Sales Revenue account
+          await tx.insert(voucherEntries).values({
+            voucherId,
+            ledgerAccountId: revenueEntry.ledgerAccountId,
+            bankAccountId: revenueEntry.bankAccountId,
+            supplierId: revenueEntry.supplierId,
+            employeeId: revenueEntry.employeeId,
+            fixedAssetId: revenueEntry.fixedAssetId,
+            debitAmount: "0",
+            creditAmount: grandTotal.toString(),
+            narration: revenueEntry.narration || "",
+          });
+        } else {
+          // Supplier Partner: split credit between Supplier Payable (cost) and Profit account
+          const grandTotalRounded = Number(grandTotal.toFixed(2));
+          const supplierCostRounded = Number(totalSupplierCostEdit.toFixed(2));
+          const profitRounded = Number((grandTotalRounded - supplierCostRounded).toFixed(2));
+
+          if (supplierCostRounded > 0) {
+            await tx.insert(voucherEntries).values({
+              voucherId,
+              ledgerAccountId: editSpPayableAccountId!,
+              debitAmount: "0",
+              creditAmount: supplierCostRounded.toFixed(2),
+              narration: `Supplier POS payable`,
+            });
+          }
+
+          if (profitRounded > 0) {
+            await tx.insert(voucherEntries).values({
+              voucherId,
+              ledgerAccountId: editSpProfitAccountId!,
+              debitAmount: "0",
+              creditAmount: profitRounded.toFixed(2),
+              narration: `Supplier POS profit`,
+            });
+          } else if (profitRounded < 0) {
+            await tx.insert(voucherEntries).values({
+              voucherId,
+              ledgerAccountId: editSpProfitAccountId!,
+              debitAmount: Math.abs(profitRounded).toFixed(2),
+              creditAmount: "0",
+              narration: `Supplier POS loss`,
+            });
+          }
+        }
       });
 
       // Fetch updated data to return for print template

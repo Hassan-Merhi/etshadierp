@@ -1491,6 +1491,9 @@ let migrationsDone = false;
        ON proforma_stock_reservations (company_id, article_code)`,
     // Company-level timezone setting (Apr 2026)
     `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS timezone text`,
+    // SP POS accounting accounts (May 2026)
+    `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS sp_pos_payable_account_id integer`,
+    `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS sp_pos_profit_account_id integer`,
 
     // ── Tables added post-initial-deploy that may be missing on production ──
     `CREATE TABLE IF NOT EXISTS supplier_proformas (
