@@ -3002,11 +3002,15 @@ export class DbStorage implements IStorage {
 
   // Vouchers and Journal Entries
   async getAllVouchers(companyId: number): Promise<Voucher[]> {
-    // Filter out soft-deleted vouchers
+    // Filter out soft-deleted vouchers and SP internal accounting journals
+    // (OTW Reversal + Stock cost recognition — background double-entry, not user-facing)
     return await db.select().from(schema.vouchers).where(
       and(
         eq(schema.vouchers.companyId, companyId),
-        isNull(schema.vouchers.deletedAt)
+        isNull(schema.vouchers.deletedAt),
+        sql`${schema.vouchers.voucherNumber} NOT LIKE 'SP-OTW-REV-%'`,
+        sql`${schema.vouchers.voucherNumber} NOT LIKE 'SP-STOCK-%'`,
+        sql`${schema.vouchers.voucherNumber} NOT LIKE 'SP-OPNSTK-%'`,
       )
     ).orderBy(asc(schema.vouchers.voucherNumber));
   }
@@ -3018,6 +3022,7 @@ export class DbStorage implements IStorage {
 
   async getVouchersByDateRange(companyId: number, startDate: string, endDate: string): Promise<any[]> {
     // Filter by company and date range, excluding soft-deleted vouchers
+    // and SP internal accounting journals (background double-entry, not user-facing)
     const vouchers = await db
       .select()
       .from(schema.vouchers)
@@ -3026,7 +3031,10 @@ export class DbStorage implements IStorage {
           eq(schema.vouchers.companyId, companyId),
           sql`${schema.vouchers.voucherDate} >= ${startDate}`,
           sql`${schema.vouchers.voucherDate} <= ${endDate}`,
-          isNull(schema.vouchers.deletedAt)
+          isNull(schema.vouchers.deletedAt),
+          sql`${schema.vouchers.voucherNumber} NOT LIKE 'SP-OTW-REV-%'`,
+          sql`${schema.vouchers.voucherNumber} NOT LIKE 'SP-STOCK-%'`,
+          sql`${schema.vouchers.voucherNumber} NOT LIKE 'SP-OPNSTK-%'`,
         )
       );
     return vouchers;
