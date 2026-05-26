@@ -334,10 +334,29 @@ let migrationsDone = false;
     `CREATE INDEX IF NOT EXISTS login_history_user_idx ON login_history(user_id)`,
     `CREATE INDEX IF NOT EXISTS login_history_login_at_idx ON login_history(login_at)`,
     // ── Add missing columns to companies table ────────────────────────────────
-    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_type text NOT NULL DEFAULT 'erp'`,
-    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS base_currency varchar(10) DEFAULT 'USD'`,
-    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS display_currency varchar(10)`,
-    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS created_at timestamp NOT NULL DEFAULT now()`,
+    // Use DO blocks so we check information_schema first — if the column already
+    // exists we never attempt the ALTER TABLE, meaning no ACCESS EXCLUSIVE lock
+    // is ever requested and existing queries on `companies` are not blocked.
+    `DO $$ BEGIN
+       IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='companies' AND column_name='company_type') THEN
+         ALTER TABLE companies ADD COLUMN company_type text NOT NULL DEFAULT 'erp';
+       END IF;
+     END $$`,
+    `DO $$ BEGIN
+       IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='companies' AND column_name='base_currency') THEN
+         ALTER TABLE companies ADD COLUMN base_currency varchar(10) DEFAULT 'USD';
+       END IF;
+     END $$`,
+    `DO $$ BEGIN
+       IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='companies' AND column_name='display_currency') THEN
+         ALTER TABLE companies ADD COLUMN display_currency varchar(10);
+       END IF;
+     END $$`,
+    `DO $$ BEGIN
+       IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='companies' AND column_name='created_at') THEN
+         ALTER TABLE companies ADD COLUMN created_at timestamp NOT NULL DEFAULT now();
+       END IF;
+     END $$`,
     // ── Create exchange_rates table ────────────────────────────────────────────
     `CREATE TABLE IF NOT EXISTS exchange_rates (
       id serial PRIMARY KEY,
