@@ -19,8 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Plus, Trash2, FileText, TrendingDown, TrendingUp, Loader2 } from "lucide-react";
+import { Plus, Trash2, FileText, TrendingDown, TrendingUp, Loader2, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
@@ -36,6 +35,7 @@ const CHARGE_TYPES = [
   { value: "unpaid_payable",  label: "Unpaid Payable (Accrual)" },
   { value: "invoice_freight", label: "Invoice Freight (Cost Clearing)" },
   { value: "other",           label: "Other (Any Account)" },
+  { value: "parent_agent",    label: "Agent via HADI L'SHI" },
 ];
 
 interface ChargeLine {
@@ -45,6 +45,7 @@ interface ChargeLine {
   prepaidChargeId: string;
   creditBankAccountId: string;
   creditLedgerAccountId: string;
+  parentAgentAccountId: string;
 }
 
 interface SpOffloadDialogProps {
@@ -75,6 +76,11 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
     enabled: open,
   });
 
+  const { data: parentAgents = [] } = useQuery<any[]>({
+    queryKey: ["/api/sp/parent-agents"],
+    enabled: open,
+  });
+
   if (!container) return null;
 
   const discountFactor = 1 - parseFloat(container.discountPct || "0") / 100;
@@ -92,12 +98,16 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
   const stockAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_stock");
   const costClrAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_cost_clearing");
   const prepaidAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_prepaid");
+  const prepaidExpAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_prepaid_expenses");
+  const hadiIcAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_hadi_intercompany");
 
   const activeCharges = chargeLines.filter(c => parseFloat(c.amountUsd || "0") > 0);
+  const agentCharges = activeCharges.filter(c => c.chargeType === "parent_agent");
+  const totalAgentCharges = agentCharges.reduce((s, c) => s + parseFloat(c.amountUsd || "0"), 0);
 
   const addCharge = () => setChargeLines(prev => [
     ...prev,
-    { chargeType: "paid_now", description: "", amountUsd: "", prepaidChargeId: "", creditBankAccountId: "", creditLedgerAccountId: "" },
+    { chargeType: "paid_now", description: "", amountUsd: "", prepaidChargeId: "", creditBankAccountId: "", creditLedgerAccountId: "", parentAgentAccountId: "" },
   ]);
 
   const removeCharge = (idx: number) => setChargeLines(prev => prev.filter((_, i) => i !== idx));
@@ -181,7 +191,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
 
           {/* Landed Charges */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <div>
                 <p className="text-sm font-medium">Landed Charges</p>
                 <p className="text-xs text-muted-foreground">Added to base cost to compute final unit cost</p>
@@ -243,7 +253,9 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
 
                 {/* Credit account picker — varies by type */}
                 <div className="col-span-2">
-                  <Label className="text-xs">Credit Account</Label>
+                  <Label className="text-xs">
+                    {charge.chargeType === "parent_agent" ? "Agent" : "Credit Account"}
+                  </Label>
                   <div className="mt-1">
                     {charge.chargeType === "prepaid_used" ? (
                       <Select value={charge.prepaidChargeId} onValueChange={v => updateCharge(idx, "prepaidChargeId", v)}>
@@ -277,6 +289,19 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                         <SelectContent>
                           {(ledgerAccounts as any[]).map((a: any) => (
                             <SelectItem key={a.id} value={String(a.id)}>{a.code} — {a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : charge.chargeType === "parent_agent" ? (
+                      <Select value={charge.parentAgentAccountId} onValueChange={v => updateCharge(idx, "parentAgentAccountId", v)}>
+                        <SelectTrigger className="h-8 text-xs" data-testid={`select-sp-charge-agent-${idx}`}>
+                          <SelectValue placeholder="Select agent" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(parentAgents as any[]).map((a: any) => (
+                            <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
+                              {a.account_name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -332,7 +357,11 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
               <FileText className="h-4 w-4 text-muted-foreground" />
               <div>
                 <p className="text-sm font-medium">Accounting Preview</p>
-                <p className="text-xs text-muted-foreground">Two journal vouchers will be created on confirm</p>
+                <p className="text-xs text-muted-foreground">
+                  {agentCharges.length > 0
+                    ? "Three journal vouchers will be created: two in SP Test Co, one in HADI L'SHI"
+                    : "Two journal vouchers will be created on confirm"}
+                </p>
               </div>
             </div>
 
@@ -340,7 +369,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
             <div className="space-y-1">
               <div className="flex items-center gap-1.5">
                 <TrendingDown className="h-3.5 w-3.5 text-muted-foreground" />
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Voucher A — Goods OTW Reversal</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Voucher A — Goods OTW Reversal (SP Test Co)</p>
               </div>
               <div className="rounded-md border border-border bg-muted/20 p-3 space-y-1">
                 <div className="grid grid-cols-3 text-xs text-muted-foreground font-medium pb-1 border-b border-border/40">
@@ -365,7 +394,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
             <div className="space-y-1">
               <div className="flex items-center gap-1.5">
                 <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Voucher B — Stock Creation</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Voucher B — Stock Creation (SP Test Co)</p>
               </div>
               <div className="rounded-md border border-border bg-muted/20 p-3 space-y-1">
                 <div className="grid grid-cols-3 text-xs text-muted-foreground font-medium pb-1 border-b border-border/40">
@@ -396,6 +425,10 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                   } else if (c.chargeType === "unpaid_payable" || c.chargeType === "other") {
                     const a = (ledgerAccounts as any[]).find((x: any) => String(x.id) === c.creditLedgerAccountId);
                     creditLabel = a ? `${a.name}` : "Ledger Account";
+                  } else if (c.chargeType === "parent_agent") {
+                    creditLabel = prepaidExpAcct?.name ?? "Prepaid Expenses";
+                    const agent = (parentAgents as any[]).find((x: any) => String(x.ledger_account_id) === c.parentAgentAccountId);
+                    if (agent) creditLabel += ` (via ${agent.account_name})`;
                   } else {
                     creditLabel = `${costClrAcct?.name ?? "Cost Clearing"} — freight`;
                   }
@@ -416,6 +449,44 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                 )}
               </div>
             </div>
+
+            {/* Voucher C: HADI L'SHI Agent Journal — only if agent charges exist */}
+            {agentCharges.length > 0 && (
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Voucher C — Agent Charges (HADI L'SHI)
+                  </p>
+                </div>
+                <div className="rounded-md border border-border bg-muted/20 p-3 space-y-1">
+                  <div className="grid grid-cols-3 text-xs text-muted-foreground font-medium pb-1 border-b border-border/40">
+                    <span className="col-span-2">Account</span>
+                    <span className="text-right">Dr / Cr</span>
+                  </div>
+                  {agentCharges.map((c, idx) => {
+                    const agent = (parentAgents as any[]).find((x: any) => String(x.ledger_account_id) === c.parentAgentAccountId);
+                    return (
+                      <div key={idx} className="grid grid-cols-3 text-xs py-0.5">
+                        <span className="col-span-2 font-medium">
+                          {agent?.account_name ?? "Agent Account"}{" "}
+                          <Badge variant="secondary" className="text-xs ml-1">Dr</Badge>
+                          {c.description ? <span className="text-muted-foreground ml-1">— {c.description}</span> : null}
+                        </span>
+                        <span className="text-right tabular-nums font-semibold">{fmt2(parseFloat(c.amountUsd || "0"))}</span>
+                      </div>
+                    );
+                  })}
+                  <div className="grid grid-cols-3 text-xs py-0.5 text-muted-foreground border-t border-border/40 pt-1 mt-1">
+                    <span className="col-span-2 pl-4">
+                      {hadiIcAcct?.name ?? "SP Test Co — Intercompany"} (Cr)
+                      <Badge variant="outline" className="text-xs ml-1">excluded from Net Position</Badge>
+                    </span>
+                    <span className="text-right tabular-nums">{fmt2(totalAgentCharges)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Actions */}

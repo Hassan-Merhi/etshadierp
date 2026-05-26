@@ -54,16 +54,18 @@ function parseNum(v: any): number {
 // ── SP Chart of Accounts setup ───────────────────────────────────────────────
 
 const SP_ACCOUNTS = [
-  { code: "SP-OTW",     name: "Goods On The Way",              accountType: "Asset",          subType: "sp_goods_otw",      isHidden: false },
-  { code: "SP-OTWCLR",  name: "Goods OTW Clearing",            accountType: "Liability",       subType: "sp_otw_clearing",   isHidden: true  },
-  { code: "SP-PREPAID", name: "Prepaid Charges",               accountType: "Asset",          subType: "sp_prepaid",        isHidden: false },
-  { code: "SP-STOCK",   name: "Stock on Floor",                accountType: "Asset",          subType: "sp_stock",          isHidden: false },
-  { code: "SP-COSTCLR", name: "Stock Cost Payable Clearing",   accountType: "Liability",       subType: "sp_cost_clearing",  isHidden: true  },
-  { code: "SP-PAY",     name: "Supplier Cash Payable",         accountType: "Liability",       subType: "sp_payable",        isHidden: false },
-  { code: "SP-SALES",   name: "Sales",                         accountType: "Income",         subType: "sp_sales",          isHidden: false },
-  { code: "SP-COGS",    name: "Cost of Goods Sold",            accountType: "Direct Expense", subType: "sp_cogs",           isHidden: false },
-  { code: "SP-SHARED",  name: "Shared Charges",                accountType: "Direct Expense", subType: "sp_shared_charges", isHidden: false },
-  { code: "SP-OPNBAL",  name: "Opening Balance Clearing",      accountType: "Equity",         subType: "sp_opnbal",         isHidden: true  },
+  { code: "SP-OTW",     name: "Goods On The Way",              accountType: "Asset",          subType: "sp_goods_otw",          isHidden: false },
+  { code: "SP-OTWCLR",  name: "Goods OTW Clearing",            accountType: "Liability",       subType: "sp_otw_clearing",       isHidden: true  },
+  { code: "SP-PREPAID", name: "Prepaid Charges",               accountType: "Asset",          subType: "sp_prepaid",            isHidden: false },
+  { code: "SP-STOCK",   name: "Stock on Floor",                accountType: "Asset",          subType: "sp_stock",              isHidden: false },
+  { code: "SP-COSTCLR", name: "Stock Cost Payable Clearing",   accountType: "Liability",       subType: "sp_cost_clearing",      isHidden: true  },
+  { code: "SP-PAY",     name: "Supplier Cash Payable",         accountType: "Liability",       subType: "sp_payable",            isHidden: false },
+  { code: "SP-SALES",   name: "Sales",                         accountType: "Income",         subType: "sp_sales",              isHidden: false },
+  { code: "SP-COGS",    name: "Cost of Goods Sold",            accountType: "Direct Expense", subType: "sp_cogs",               isHidden: false },
+  { code: "SP-SHARED",  name: "Shared Charges",                accountType: "Direct Expense", subType: "sp_shared_charges",     isHidden: false },
+  { code: "SP-OPNBAL",  name: "Opening Balance Clearing",      accountType: "Equity",         subType: "sp_opnbal",             isHidden: true  },
+  { code: "SP-PREEXP",  name: "Prepaid Expenses",              accountType: "Asset",          subType: "sp_prepaid_expenses",   isHidden: false },
+  { code: "SP-HADI-IC", name: "HADI L'SHI — Intercompany",    accountType: "Intercompany",   subType: "sp_hadi_intercompany",  isHidden: false },
 ];
 
 // ── Route Registration ────────────────────────────────────────────────────────
@@ -648,6 +650,35 @@ export function registerSpRoutes(app: Express) {
     }
   });
 
+  // ── Parent Company Agents ────────────────────────────────────────────────
+
+  app.get("/api/sp/parent-agents", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = await requireSpCompany(req, res);
+      if (!companyId) return;
+
+      const parentRows = await db.execute(
+        sql`SELECT parent_company_id FROM companies WHERE id = ${companyId} LIMIT 1`
+      );
+      const parentRow = (parentRows as any).rows?.[0] ?? (parentRows as any)[0];
+      const parentId = parentRow?.parent_company_id ?? 1;
+
+      const agents = await db.execute(sql`
+        SELECT aa.id, aa.account_name, aa.account_id,
+               la.id AS ledger_account_id, la.name AS ledger_name, la.account_type
+        FROM agent_accounts aa
+        JOIN ledger_accounts la ON la.id = CAST(REPLACE(aa.account_id, 'ledger-', '') AS integer)
+        WHERE aa.company_id = ${parentId}
+          AND la.deleted_at IS NULL
+        ORDER BY aa.account_name
+      `);
+
+      res.json((agents as any).rows ?? agents);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ── Offload ───────────────────────────────────────────────────────────────
 
   app.post("/api/sp/offload", requireAuth, async (req: any, res: any) => {
@@ -860,6 +891,20 @@ export function registerSpRoutes(app: Express) {
               narration: `Other charge — ${charge.description || "charge"}`,
             });
 
+          } else if (charge.chargeType === "parent_agent") {
+            // Agent charge via parent company (HADI L'SHI) — Cr Prepaid Expenses in SP Test Co.
+            // The HADI L'SHI side (Dr Agent / Cr SP Intercompany) is posted after Voucher B.
+            const prepaidExpAcct = await getSpAccount(companyId, "sp_prepaid_expenses");
+            if (!prepaidExpAcct) throw new Error("Prepaid Expenses account (SP-PREEXP) not found. Run SP setup or contact admin.");
+
+            await tx.insert(voucherEntries).values({
+              voucherId: voucherB.id,
+              ledgerAccountId: prepaidExpAcct.id,
+              debitAmount: "0",
+              creditAmount: String(chargeAmt),
+              narration: `Agent charge via HADI L'SHI — ${charge.description || ""}`,
+            });
+
           } else {
             // invoice_freight or fallback → Cr Stock Cost Payable Clearing
             await tx.insert(voucherEntries).values({
@@ -895,10 +940,70 @@ export function registerSpRoutes(app: Express) {
               description: c.description || null,
               amountUsd: String(parseNum(c.amountUsd)),
               prepaidChargeId: c.prepaidChargeId ? parseInt(c.prepaidChargeId) : null,
-              creditLedgerAccountId: c.creditLedgerAccountId ? parseInt(c.creditLedgerAccountId) : null,
+              // For parent_agent: store the agent ledger id here for reference/traceability
+              creditLedgerAccountId: c.chargeType === "parent_agent" && c.parentAgentAccountId
+                ? parseInt(c.parentAgentAccountId)
+                : (c.creditLedgerAccountId ? parseInt(c.creditLedgerAccountId) : null),
               creditBankAccountId: c.creditBankAccountId ? parseInt(c.creditBankAccountId) : null,
             }))
           );
+        }
+
+        // ── Voucher C: HADI L'SHI agent journals (if any parent_agent charges) ──
+        const agentCharges = charges.filter(
+          c => c.chargeType === "parent_agent" && parseNum(c.amountUsd) > 0 && c.parentAgentAccountId
+        );
+        if (agentCharges.length > 0) {
+          // Lookup HADI L'SHI intercompany account (lives in HADI L'SHI, company_id=1)
+          const [hadiSpInterco] = await tx
+            .select()
+            .from(ledgerAccounts)
+            .where(
+              and(
+                eq(ledgerAccounts.companyId, 1),
+                eq(ledgerAccounts.subType, "hadi_sp_intercompany"),
+                isNull(ledgerAccounts.deletedAt)
+              )
+            );
+          if (!hadiSpInterco) {
+            throw new Error("HADI L'SHI intercompany account not found (SP-IC). Run startup migrations or contact admin.");
+          }
+
+          const totalAgentAmt = agentCharges.reduce((s: number, c: any) => s + parseNum(c.amountUsd), 0);
+
+          // Create Voucher C in HADI L'SHI (company_id=1)
+          const [voucherC] = await tx.insert(vouchers).values({
+            companyId: 1,
+            voucherType: "Journal",
+            voucherNumber: `SP-AGENT-${container.id}-${Date.now()}`,
+            voucherDate: offloadDate,
+            description: `Agent charges for SP offload — ${container.supplierName} inv ${container.invoiceNumber}`,
+            totalAmount: String(totalAgentAmt),
+            currency: "USD",
+            exchangeRate: "1",
+            sourceModule: "SP",
+          }).returning();
+
+          // Dr each agent account in HADI L'SHI
+          for (const ac of agentCharges) {
+            const agentLedgerId = parseInt(ac.parentAgentAccountId);
+            await tx.insert(voucherEntries).values({
+              voucherId: voucherC.id,
+              ledgerAccountId: agentLedgerId,
+              debitAmount: String(parseNum(ac.amountUsd)),
+              creditAmount: "0",
+              narration: `Agent charge for SP container #${container.id}${ac.description ? ` — ${ac.description}` : ""}`,
+            });
+          }
+
+          // Cr SP Test Co — Intercompany (excluded from Net Position by account type)
+          await tx.insert(voucherEntries).values({
+            voucherId: voucherC.id,
+            ledgerAccountId: hadiSpInterco.id,
+            debitAmount: "0",
+            creditAmount: String(totalAgentAmt),
+            narration: `SP offload agent charges total — container #${container.id}`,
+          });
         }
 
         // ── Insert stock movements + adjustInventory ──────────────────────────

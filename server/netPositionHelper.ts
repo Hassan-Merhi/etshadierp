@@ -64,7 +64,7 @@ export interface ClassifyResult {
 
 const assetDefaultDrTypes = ["Asset", "Current Asset", "Bank", "Cash", "Customer"];
 const liabilityAccountTypes = ["Liability", "Duty Agent", "Transporter Agent", "Loan"];
-const excludedAccountTypes = ["Income", "Profit", "Equity", "EQUITY", "Fixed Asset"];
+const excludedAccountTypes = ["Income", "Profit", "Equity", "EQUITY", "Fixed Asset", "Intercompany"];
 export const expenseTypes = ["Expense", "Direct Expense", "Indirect Expense"];
 const assetAccountTypes = ["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"];
 

@@ -3550,6 +3550,27 @@ let migrationsDone = false;
     )`,
     `CREATE INDEX IF NOT EXISTS ai_agent_approvals_task_idx    ON ai_agent_approvals(task_id)`,
     `CREATE INDEX IF NOT EXISTS ai_agent_approvals_company_idx ON ai_agent_approvals(company_id)`,
+
+    // ── SP ↔ HADI L'SHI Intercompany feature (May 2026) ──────────────────────
+    // Add parent_company_id to companies so SP companies know their parent.
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS parent_company_id integer`,
+    // SP Test Co (id=14) parent is HADI L'SHI (id=1)
+    `UPDATE companies SET parent_company_id = 1 WHERE id = 14 AND parent_company_id IS NULL`,
+
+    // Prepaid Expenses account in SP Test Co — opening $21,300 Dr
+    `INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, opening_balance, opening_balance_side, active, is_hidden)
+     SELECT 14, 'SP-PREEXP', 'Prepaid Expenses', 'Asset', 'sp_prepaid_expenses', 21300, 'Dr', true, false
+     WHERE NOT EXISTS (SELECT 1 FROM ledger_accounts WHERE company_id = 14 AND code = 'SP-PREEXP')`,
+
+    // HADI L'SHI — Intercompany tracking account in SP Test Co
+    `INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, active, is_hidden)
+     SELECT 14, 'SP-HADI-IC', 'HADI L''SHI — Intercompany', 'Intercompany', 'sp_hadi_intercompany', true, false
+     WHERE NOT EXISTS (SELECT 1 FROM ledger_accounts WHERE company_id = 14 AND code = 'SP-HADI-IC')`,
+
+    // SP Test Co — Intercompany tracking account in HADI L'SHI (company_id=1)
+    `INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, active, is_hidden)
+     SELECT 1, 'SP-IC', 'SP Test Co — Intercompany', 'Intercompany', 'hadi_sp_intercompany', true, false
+     WHERE NOT EXISTS (SELECT 1 FROM ledger_accounts WHERE company_id = 1 AND code = 'SP-IC')`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

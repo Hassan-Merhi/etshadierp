@@ -1,1 +1,2 @@
 - [SP container supplier linking](sp-container-supplier.md) — sp_containers needs supplierId FK to suppliers; voucher must have supplierId set for supplier balance to appear in ledger.
+- [SP Intercompany Agent Charges](sp-intercompany.md) — SP offload posts Voucher C in HADI L'SHI (Dr Agent / Cr SP-IC); "Intercompany" account type excluded from Net Position.
