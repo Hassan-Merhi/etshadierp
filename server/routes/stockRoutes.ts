@@ -2906,6 +2906,62 @@ export function registerStockRoutes(app: Express) {
     }
   });
 
+  // ── Historical restore: POST /api/stock-items/merge-logs/historical-restore ──
+  // Restores a historically merged item without a snapshot:
+  //   1. Sets item active=true, clears deletedAt, strips "[MERGED] " from name
+  //   2. Deletes the alias that was routing the old code → kept item
+  // Inventory is NOT touched — user must manually redistribute quantities.
+  app.post("/api/stock-items/merge-logs/historical-restore", requireAuth, requireNonPOS, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { mergedItemId, keptItemId } = req.body;
+      if (!mergedItemId || !keptItemId) {
+        return res.status(400).json({ message: "mergedItemId and keptItemId are required" });
+      }
+
+      // Load the soft-deleted merged item
+      const [mergedItem] = await db
+        .select()
+        .from(stockItems)
+        .where(and(
+          eq(stockItems.id, mergedItemId),
+          eq(stockItems.companyId, companyId),
+          eq(stockItems.active, false),
+        ))
+        .limit(1);
+
+      if (!mergedItem) {
+        return res.status(404).json({ message: "Merged item not found or already active" });
+      }
+
+      // Strip the [MERGED] prefix from the name
+      const restoredName = mergedItem.name.replace(/^\[MERGED\]\s*/i, "");
+
+      // Step 1 — Restore the merged item
+      await db.update(stockItems)
+        .set({ active: true, deletedAt: null, name: restoredName })
+        .where(and(eq(stockItems.id, mergedItemId), eq(stockItems.companyId, companyId)));
+
+      // Step 2 — Remove the alias that routed the old code → kept item
+      await db.delete(stockItemCodeAliases)
+        .where(and(
+          eq(stockItemCodeAliases.companyId, companyId),
+          eq(stockItemCodeAliases.stockItemId, keptItemId),
+          eq(stockItemCodeAliases.aliasCode, mergedItem.code),
+        ));
+
+      return res.json({
+        success: true,
+        restoredName,
+        message: `"${restoredName}" has been restored as a separate active item. Its code alias has been removed. Please manually adjust inventory quantities between this item and the kept item.`,
+      });
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  });
+
   // ── Unmerge: POST /api/stock-items/merge-logs/:logId/unmerge ─────────────
   // Reverses a previous merge using the saved snapshotBefore.
   // Restores: item active status, inventory quantities/values, and the main code alias.

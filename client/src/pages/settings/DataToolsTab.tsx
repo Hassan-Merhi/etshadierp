@@ -2002,6 +2002,8 @@ function MergeHistoryCard() {
   const { toast } = useToast();
   const [unmergeTarget, setUnmergeTarget] = useState<MergeLogEntry | null>(null);
   const [isUnmerging, setIsUnmerging] = useState(false);
+  const [historicalRestoreTarget, setHistoricalRestoreTarget] = useState<MergeLogEntry | null>(null);
+  const [isHistoricalRestoring, setIsHistoricalRestoring] = useState(false);
 
   const { data: logs = [], isLoading } = useQuery<MergeLogEntry[]>({
     queryKey: ["/api/stock-items/merge-logs"],
@@ -2031,6 +2033,27 @@ function MergeHistoryCard() {
       toast({ title: "Unmerge failed", description: err.message, variant: "destructive" });
     } finally {
       setIsUnmerging(false);
+    }
+  }
+
+  async function handleHistoricalRestore() {
+    if (!historicalRestoreTarget) return;
+    setIsHistoricalRestoring(true);
+    try {
+      const res = await apiRequest("POST", "/api/stock-items/merge-logs/historical-restore", {
+        mergedItemId: historicalRestoreTarget.mergedItemId,
+        keptItemId: historicalRestoreTarget.keptItemId,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Restore failed");
+      toast({ title: "Item restored", description: data.message });
+      setHistoricalRestoreTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/merge-logs/historical"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+    } catch (err: any) {
+      toast({ title: "Restore failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsHistoricalRestoring(false);
     }
   }
 
@@ -2093,7 +2116,15 @@ function MergeHistoryCard() {
                     </TableCell>
                     <TableCell>
                       {log.source === "historical" ? (
-                        <span className="text-xs text-muted-foreground">No snapshot</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setHistoricalRestoreTarget(log)}
+                          data-testid={`button-hist-restore-${log.mergedItemId}`}
+                        >
+                          <RotateCcw className="h-3 w-3 mr-1" />
+                          Restore
+                        </Button>
                       ) : (
                         <Button
                           variant="outline"
@@ -2141,6 +2172,41 @@ function MergeHistoryCard() {
               data-testid="button-unmerge-confirm"
             >
               {isUnmerging ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Unmerging…</> : "Yes, unmerge it"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Historical restore confirmation dialog */}
+      <AlertDialog open={!!historicalRestoreTarget} onOpenChange={(open) => { if (!open) setHistoricalRestoreTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restore this item?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  This will restore <strong>{historicalRestoreTarget?.mergedItemName}</strong> ({historicalRestoreTarget?.mergedItemCode}) as a separate active item.
+                </p>
+                <p className="text-sm">
+                  The item will reappear in your stock list with its original name and code. Its code alias (which was redirecting scans to <strong>{historicalRestoreTarget?.keptItemName}</strong>) will be removed.
+                </p>
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    Because this merge happened before history tracking was added, inventory quantities <strong>cannot be restored automatically</strong>. The item will come back with zero stock. You will need to manually adjust quantities between <strong>{historicalRestoreTarget?.mergedItemName}</strong> and <strong>{historicalRestoreTarget?.keptItemName}</strong>.
+                  </AlertDescription>
+                </Alert>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isHistoricalRestoring} data-testid="button-hist-restore-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleHistoricalRestore}
+              disabled={isHistoricalRestoring}
+              data-testid="button-hist-restore-confirm"
+            >
+              {isHistoricalRestoring ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Restoring…</> : "Yes, restore it"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
