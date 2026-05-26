@@ -216,11 +216,6 @@ export default function Containers() {
     enabled: !!selectedCompany?.id && !isSupplierPartner,
   });
 
-  const { data: spContainerList = [], isLoading: spListLoading } = useQuery<any[]>({
-    queryKey: ["/api/sp/containers", selectedCompany?.id],
-    queryFn: () => fetch("/api/sp/containers", { credentials: "include" }).then(r => r.json()),
-    enabled: !!selectedCompany?.id && isSupplierPartner,
-  });
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
@@ -847,98 +842,6 @@ export default function Containers() {
     );
   }
 
-  // ── Supplier Partner: SP container list ───────────────────────────────────
-  if (isSupplierPartner) {
-    return (
-      <div className="space-y-4 sm:space-y-6">
-        <PageHeader
-          title="Container Tracking"
-          subtitle="Track containers and manage offloading"
-        >
-          <Button
-            onClick={() => setAddDialogOpen(true)}
-            className="gap-2"
-            data-testid="button-add-container"
-          >
-            <Plus className="h-4 w-4" />
-            Import Container
-          </Button>
-        </PageHeader>
-
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice #</TableHead>
-                  <TableHead>Container #</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Total (USD)</TableHead>
-                  <TableHead className="text-center">Lines</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {spListLoading ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <TableRow key={i}>
-                      {Array.from({ length: 7 }).map((__, j) => (
-                        <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : spContainerList.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
-                      No containers yet. Click "Import Container" to add one.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  spContainerList.map((c: any) => (
-                    <TableRow
-                      key={c.id}
-                      className="cursor-pointer hover-elevate"
-                      onClick={() => setLocation(`/containers/${c.id}`)}
-                      data-testid={`row-sp-container-${c.id}`}
-                    >
-                      <TableCell className="font-mono text-sm">{c.invoiceNumber}</TableCell>
-                      <TableCell className="text-sm">
-                        {c.containerNumber || <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell className="text-sm">{c.supplierName}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{c.invoiceDate}</TableCell>
-                      <TableCell className="text-right font-semibold tabular-nums">
-                        {formatAmount(parseFloat(c.invoiceTotalUsd || "0"))}
-                      </TableCell>
-                      <TableCell className="text-center text-sm text-muted-foreground">
-                        {(c.lines || []).length}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={
-                            c.status === "offloaded"
-                              ? "text-green-600 border-green-600/40"
-                              : "text-blue-600 border-blue-600/40"
-                          }
-                          data-testid={`badge-sp-status-${c.id}`}
-                        >
-                          {c.status === "offloaded" ? "Offloaded" : "Open / OTW"}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <AddContainerDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} isSP />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -985,28 +888,37 @@ export default function Containers() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button className="gap-2" data-testid="button-add-dropdown">
+          {isSupplierPartner ? (
+            <Link href="/po-import">
+              <Button className="gap-2" data-testid="button-add-container">
                 <Plus className="h-4 w-4" />
-                Add
-                <ChevronDown className="h-4 w-4" />
+                Import Container
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setAddDialogOpen(true)} data-testid="button-add-container">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Container
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild data-testid="button-import-po">
-                <Link href="/po-import" className="flex items-center">
+            </Link>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="gap-2" data-testid="button-add-dropdown">
+                  <Plus className="h-4 w-4" />
+                  Add
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setAddDialogOpen(true)} data-testid="button-add-container">
                   <Plus className="h-4 w-4 mr-2" />
-                  Import PO
-                </Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  Add Container
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild data-testid="button-import-po">
+                  <Link href="/po-import" className="flex items-center">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Import PO
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </PageHeader>
 
