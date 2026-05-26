@@ -206,7 +206,7 @@ export default function Containers() {
 
   const { data: allContainers = [], isLoading } = useQuery<Container[]>({
     queryKey: ["/api/containers/active", selectedCompany?.id],
-    enabled: !!selectedCompany?.id && !isSupplierPartner,
+    enabled: !!selectedCompany?.id,
   });
 
   const { data: soldContainers = [], isLoading: isSoldLoading } = useQuery<
@@ -850,14 +850,49 @@ export default function Containers() {
 
   // ── SP Company view ───────────────────────────────────────────────────────
   if (isSupplierPartner) {
-    const spList: any[] = Array.isArray(spContainersList) ? spContainersList : [];
+    // Normalize sp_containers rows to a common display shape
+    const spNative: any[] = (Array.isArray(spContainersList) ? spContainersList : []).map(c => ({
+      _key: `sp-${c.id}`,
+      id: c.id,
+      _source: "sp",
+      displayName: c.invoiceNumber || c.containerNumber || `#${c.id}`,
+      subName: c.containerNumber && c.invoiceNumber ? c.containerNumber : null,
+      supplierName: c.supplierName ?? "",
+      statusLabel: c.status === "offloaded" ? "Offloaded" : "Open / OTW",
+      statusOffloaded: c.status === "offloaded",
+      date: c.invoiceDate,
+      dateLabel: "Invoice Date",
+      totalUsd: parseFloat(c.invoiceTotalUsd ?? "0"),
+    }));
+
+    // Normalize regular containers (from PO Import) to same shape
+    const erpNormalized: any[] = allContainers.map(c => {
+      const sup = suppliers.find((s: any) => s.id === c.supplierId);
+      const isOffloaded = c.status === "OFFLOADED";
+      return {
+        _key: `erp-${c.id}`,
+        id: c.id,
+        _source: "erp",
+        displayName: c.containerNumber,
+        subName: null,
+        supplierName: (sup as any)?.legalName ?? (sup as any)?.name ?? "",
+        statusLabel: isOffloaded ? "Offloaded" : c.status === "OTW" ? "On The Way" : c.status,
+        statusOffloaded: isOffloaded,
+        date: c.importDate,
+        dateLabel: "Import Date",
+        totalUsd: parseFloat(c.grandTotal ?? "0"),
+      };
+    });
+
     const spSearch = searchTerm.toLowerCase();
-    const filtered = spList.filter(c =>
+    const allSpItems = [...spNative, ...erpNormalized];
+    const filtered = allSpItems.filter(c =>
       !spSearch ||
-      (c.invoiceNumber ?? "").toLowerCase().includes(spSearch) ||
-      (c.containerNumber ?? "").toLowerCase().includes(spSearch) ||
+      (c.displayName ?? "").toLowerCase().includes(spSearch) ||
+      (c.subName ?? "").toLowerCase().includes(spSearch) ||
       (c.supplierName ?? "").toLowerCase().includes(spSearch)
     );
+    const isSpLoading = spContainersLoading || isLoading;
 
     return (
       <div className="space-y-4 sm:space-y-6">
@@ -892,7 +927,7 @@ export default function Containers() {
           )}
         </div>
 
-        {spContainersLoading ? (
+        {isSpLoading ? (
           <div className="space-y-3">
             {[1,2,3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
           </div>
@@ -900,43 +935,41 @@ export default function Containers() {
           <div className="text-center py-12">
             <Package className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
             <p className="text-sm text-muted-foreground">
-              {spList.length === 0 ? "No containers yet. Click Import Container to add one." : "No containers match your search."}
+              {allSpItems.length === 0 ? "No containers yet. Click Import Container to add one." : "No containers match your search."}
             </p>
           </div>
         ) : (
           <div className="space-y-2">
             {filtered.map((c: any) => (
               <div
-                key={c.id}
+                key={c._key}
                 className="flex items-center gap-4 p-4 rounded-md border border-border bg-card hover-elevate cursor-pointer"
                 onClick={() => setLocation(`/containers/${c.id}`)}
                 data-testid={`row-sp-container-${c.id}`}
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-sm">
-                      {c.invoiceNumber || c.containerNumber || `#${c.id}`}
-                    </span>
-                    {c.containerNumber && c.invoiceNumber && (
-                      <span className="text-xs text-muted-foreground font-mono">{c.containerNumber}</span>
+                    <span className="font-medium text-sm">{c.displayName}</span>
+                    {c.subName && (
+                      <span className="text-xs text-muted-foreground font-mono">{c.subName}</span>
                     )}
                     <Badge
                       variant="outline"
-                      className={c.status === "offloaded" ? "text-green-600 border-green-600/40" : "text-blue-600 border-blue-600/40"}
+                      className={c.statusOffloaded ? "text-green-600 border-green-600/40" : "text-blue-600 border-blue-600/40"}
                     >
-                      {c.status === "offloaded" ? "Offloaded" : "Open / OTW"}
+                      {c.statusLabel}
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">{c.supplierName}</p>
                 </div>
                 <div className="text-right hidden sm:block">
-                  <p className="text-xs text-muted-foreground">Invoice Date</p>
-                  <p className="text-sm font-mono">{formatDisplayDate(c.invoiceDate)}</p>
+                  <p className="text-xs text-muted-foreground">{c.dateLabel}</p>
+                  <p className="text-sm font-mono">{formatDisplayDate(c.date)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground hidden sm:block">Total (USD)</p>
                   <p className="text-sm font-mono font-semibold">
-                    ${parseFloat(c.invoiceTotalUsd ?? "0").toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${c.totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
                 <Link href={`/containers/${c.id}`} onClick={e => e.stopPropagation()}>

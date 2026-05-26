@@ -475,6 +475,7 @@ export function registerImportRoutes(app: Express) {
           await storage.createVoucherEntry({
             voucherId: voucher.id,
             ledgerAccountId: otwClrAcct.id,
+            supplierId: supplierId,
             debitAmount: "0",
             creditAmount: poGrandTotal.toFixed(2),
             narration: `PO ${poNumber} - Container ${containerNumber}`,
