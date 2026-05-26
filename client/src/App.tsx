@@ -233,10 +233,6 @@ const MySettings = lazy(() => import("@/pages/MySettings"));
 
 // ── Supplier Partner pages ────────────────────────────────────────────────────
 const SpSetup           = lazy(() => import("@/pages/sp/SpSetup"));
-const SpContainers      = lazy(() => import("@/pages/sp/SpContainers"));
-const SpContainerDetail = lazy(() => import("@/pages/sp/SpContainerDetail"));
-const SpOffload         = lazy(() => import("@/pages/sp/SpOffload"));
-const SpSales           = lazy(() => import("@/pages/sp/SpSales"));
 const SpReports         = lazy(() => import("@/pages/sp/SpReports"));
 const SpOpeningStock    = lazy(() => import("@/pages/sp/SpOpeningStock"));
 const SpAliases             = lazy(() => import("@/pages/sp/SpAliases"));
@@ -400,11 +396,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/account-transfer" component={AccountTransfer} />}
       <Route path="/my-settings" component={MySettings} />
       {/* Supplier Partner pages — available to all company types with SP features enabled */}
-      <Route path="/sp/containers/:id" component={SpContainerDetail} />
-      <Route path="/sp/containers" component={SpContainers} />
-      <Route path="/sp/offload/:containerId" component={SpOffload} />
       <Route path="/sp/opening-stock" component={SpOpeningStock} />
-      <Route path="/sp/sales" component={SpSales} />
       <Route path="/sp/reports" component={SpReports} />
       <Route path="/sp/aliases" component={SpAliases} />
       <Route path="/sp/migration" component={SpMigrationRehearsal} />
