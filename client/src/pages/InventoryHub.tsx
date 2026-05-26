@@ -4,7 +4,7 @@ import { MapPin, Ship, Layers, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import LocationInventory from "@/pages/LocationInventory";
 import StockOTW from "@/pages/StockOTW";
-import Containers from "@/pages/Containers";
+import Containers from "@/pages/ContainersPage";
 import CombinedInventory from "@/pages/CombinedInventory";
 
 const TABS = [
