@@ -95,6 +95,7 @@ export default function GcLshiMigration() {
   const [obAmount, setObAmount] = useState("");
   const [obDate, setObDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [obNarration, setObNarration] = useState("GC Opening Cash Balance");
+  const [obCashAccountId, setObCashAccountId] = useState<number | null>(null);
 
   // Rollback confirmation
   const [rollbackRunId, setRollbackRunId] = useState<string | null>(null);
@@ -128,6 +129,16 @@ export default function GcLshiMigration() {
 
   const { data: runsData, refetch: refetchRuns } = useQuery<{ runs: MigrationRun[] }>({
     queryKey: ["/api/sp/migration/runs"],
+  });
+
+  const { data: cashAccountsData } = useQuery<{ accounts: Array<{ id: number; code: string; name: string; account_type: string }> }>({
+    queryKey: ["/api/sp/migration/cash-accounts", targetCompanyId],
+    queryFn: async () => {
+      const r = await fetch(`/api/sp/migration/cash-accounts?targetCompanyId=${targetCompanyId}`);
+      if (!r.ok) { const e = await r.json(); throw new Error(e.message); }
+      return r.json();
+    },
+    enabled: !!targetCompanyId,
   });
 
   // ── Mutations ────────────────────────────────────────────────────────────
@@ -453,7 +464,27 @@ export default function GcLshiMigration() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+              <div className="space-y-1">
+                <Label>Cash / Bank Account</Label>
+                {(cashAccountsData?.accounts ?? []).length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No Cash or Bank accounts found in target company. Run the migration first to create SP accounts, or add a Cash account manually.
+                  </p>
+                ) : (
+                  <select
+                    className="w-full border rounded-md h-9 px-3 text-sm bg-background"
+                    value={obCashAccountId ?? ""}
+                    onChange={e => setObCashAccountId(e.target.value ? Number(e.target.value) : null)}
+                    data-testid="select-ob-cash-account"
+                  >
+                    <option value="">— select cash/bank account —</option>
+                    {(cashAccountsData?.accounts ?? []).map(a => (
+                      <option key={a.id} value={a.id}>{a.name} ({a.account_type})</option>
+                    ))}
+                  </select>
+                )}
+              </div>
               <div className="space-y-1">
                 <Label htmlFor="ob-amount">Amount (USD)</Label>
                 <Input
@@ -491,11 +522,12 @@ export default function GcLshiMigration() {
               className="mt-3"
               onClick={() => openingBalanceMutation.mutate({
                 targetCompanyId,
+                cashAccountId: obCashAccountId,
                 amount: obAmount,
                 date: obDate,
                 narration: obNarration,
               })}
-              disabled={!obAmount || !obDate || openingBalanceMutation.isPending}
+              disabled={!obCashAccountId || !obAmount || !obDate || openingBalanceMutation.isPending}
               data-testid="button-submit-opening-balance"
             >
               {openingBalanceMutation.isPending
