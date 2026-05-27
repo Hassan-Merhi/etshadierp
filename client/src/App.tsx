@@ -237,6 +237,7 @@ const SpReports         = lazy(() => import("@/pages/sp/SpReports"));
 const SpOpeningStock    = lazy(() => import("@/pages/sp/SpOpeningStock"));
 const SpAliases             = lazy(() => import("@/pages/sp/SpAliases"));
 const SpMigrationRehearsal  = lazy(() => import("@/pages/sp/SpMigrationRehearsal"));
+const GcLshiMigration       = lazy(() => import("@/pages/sp/GcLshiMigration"));
 
 import { CommandPalette } from "@/components/CommandPalette";
 import { AppTopBar } from "@/components/AppTopBar";
@@ -400,6 +401,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/sp/reports" component={SpReports} />
       <Route path="/sp/aliases" component={SpAliases} />
       <Route path="/sp/migration" component={SpMigrationRehearsal} />
+      <Route path="/sp/gc-migration" component={GcLshiMigration} />
       <Route path="/sp/setup" component={SpSetup} />
       <Route component={NotFound} />
     </Switch>
