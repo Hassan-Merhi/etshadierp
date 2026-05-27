@@ -78,7 +78,7 @@ export default function SpReports() {
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <CardTitle className="text-sm">Supplier Cash Payable</CardTitle>
-                    <CardDescription className="text-xs">Base supplier item cost only — from sale postings</CardDescription>
+                    <CardDescription className="text-xs">Full sale amount owed to supplier — from sale postings</CardDescription>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground">Closing Balance</p>
