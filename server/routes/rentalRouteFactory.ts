@@ -854,9 +854,13 @@ export function registerRentalRoutes(
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const { endDate, notes } = z.object({
+      const { endDate, notes, refundGuarantee, refundAmount, refundCashAccountId, refundNotes } = z.object({
         endDate: z.string().min(1),
         notes: z.string().optional(),
+        refundGuarantee: z.boolean().optional().default(false),
+        refundAmount: z.union([z.string(), z.number()]).transform(v => String(v)).optional(),
+        refundCashAccountId: z.number().nullable().optional(),
+        refundNotes: z.string().optional(),
       }).parse(req.body);
 
       const [contract] = await db.select().from(propertyContracts).where(and(
@@ -864,18 +868,77 @@ export function registerRentalRoutes(
       ));
       if (!contract) return res.status(404).json({ message: "Contract not found" });
 
-      await db.update(propertyContracts).set({
-        status: "ENDED", endDate: endDate as any,
-        notes: notes ? `${contract.notes ? contract.notes + "\n" : ""}END: ${notes}` : contract.notes,
-      }).where(eq(propertyContracts.id, id));
+      const [unit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, contract.unitId));
+      const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
+      const tenantPays = module === "ERP" || module === "FACTORY";
 
-      const end = new Date(endDate);
-      const ey = end.getUTCFullYear(), em = end.getUTCMonth() + 1;
-      await db.execute(sql`
-        DELETE FROM property_monthly_ledger
-        WHERE contract_id = ${id} AND paid_amount = 0
-          AND ((year > ${ey}) OR (year = ${ey} AND month > ${em}))
-      `);
+      await db.transaction(async (tx) => {
+        await tx.update(propertyContracts).set({
+          status: "ENDED", endDate: endDate as any,
+          notes: notes ? `${contract.notes ? contract.notes + "\n" : ""}END: ${notes}` : contract.notes,
+        }).where(eq(propertyContracts.id, id));
+
+        const end = new Date(endDate);
+        const ey = end.getUTCFullYear(), em = end.getUTCMonth() + 1;
+        await tx.execute(sql`
+          DELETE FROM property_monthly_ledger
+          WHERE contract_id = ${id} AND paid_amount = 0
+            AND ((year > ${ey}) OR (year = ${ey} AND month > ${em}))
+        `);
+
+        // ── Optional: refund remaining guarantee to tenant ──
+        if (refundGuarantee && refundAmount && parseFloat(refundAmount) > 0) {
+          const amt = refundAmount;
+          const dateStr = endDate;
+          const narration = refundNotes
+            ? `Guarantee refund on departure - ${unitLabel} - ${refundNotes}`
+            : `Guarantee refund on departure - ${unitLabel}`;
+
+          if (refundCashAccountId) {
+            if (tenantPays) {
+              // Tenant gets guarantee back: Dr Security Deposits Paid (asset↓) / Cr Cash (we return money)
+              // Actually: landlord returns money to tenant — Dr Cash reversal: Cr Cash / Dr Sec Dep Paid
+              // We PAID the guarantee as an asset (Sec Dep Paid debit). Refund: Dr Cash received back / Cr Sec Dep Paid cleared
+              const depositAccountId = await findOrCreateLedgerAccount(tx, companyId, "Security Deposits Paid", "Asset", "SEC-DEP-PAID");
+              const [v] = await tx.insert(vouchers).values({
+                companyId, voucherNumber: `GUAR-REFUND-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${id}`,
+                voucherType: "Receipt", voucherDate: dateStr as any,
+                description: narration, totalAmount: amt, currency: "USD", sourceModule: "ERP",
+              }).returning();
+              await tx.insert(voucherEntries).values([
+                { voucherId: v.id, ledgerAccountId: refundCashAccountId, debitAmount: amt,  creditAmount: "0",  narration },
+                { voucherId: v.id, ledgerAccountId: depositAccountId,    debitAmount: "0",  creditAmount: amt, narration },
+              ]);
+            } else {
+              // Landlord returns deposit to departing tenant: Dr Tenant Deposits (liability↓) / Cr Cash (we pay out)
+              const depositAccountId = await findOrCreateLedgerAccount(tx, companyId, "Tenant Deposits", "Liability", "TENANT-DEP");
+              const [v] = await tx.insert(vouchers).values({
+                companyId, voucherNumber: `GUAR-REFUND-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${id}`,
+                voucherType: "Payment", voucherDate: dateStr as any,
+                description: narration, totalAmount: amt, currency: "USD", sourceModule: "ERP",
+              }).returning();
+              await tx.insert(voucherEntries).values([
+                { voucherId: v.id, ledgerAccountId: depositAccountId,    debitAmount: amt,  creditAmount: "0",  narration },
+                { voucherId: v.id, ledgerAccountId: refundCashAccountId, debitAmount: "0",  creditAmount: amt, narration },
+              ]);
+            }
+          }
+
+          // Record in payments log as a guarantee activity (ledgerRowId: null so it shows in guarantee section)
+          await tx.insert(propertyPayments).values({
+            companyId, module, contractId: contract.id, unitId: contract.unitId,
+            ledgerRowId: null,
+            cashAccountId: refundCashAccountId ?? null,
+            voucherId: null,
+            amount: amt,
+            paymentDate: dateStr as any,
+            forYear: new Date(dateStr).getUTCFullYear(),
+            forMonth: new Date(dateStr).getUTCMonth() + 1,
+            notes: `[Guarantee refund] ${narration}`,
+          });
+        }
+      });
+
       await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "update", tableName: "property_contracts", recordId: id, recordIdentifier: `Contract#${id}`, changes: { status: { old: "ACTIVE", new: "ENDED" }, endDate: { old: null, new: endDate } } });
       res.json({ ok: true });
     } catch (e: any) {
