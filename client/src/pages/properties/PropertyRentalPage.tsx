@@ -40,6 +40,7 @@ type Contract = {
   tenantName: string;
   guaranteePeriod: string | null;
   guaranteeAmount: string;
+  guaranteePostedAmount: string | null;
   rentalAmount: string;
   startDate: string;
   status: string;
@@ -1172,6 +1173,12 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
   const { toast } = useToast();
   const tenantPays = apiBase.includes("/erp/") || apiBase.includes("/factory/");
 
+  // Computed balances
+  const totalGuarantee = parseFloat(contract.guaranteeAmount || "0");
+  const usedAmount = parseFloat(contract.guaranteePostedAmount || "0");
+  const remainingGuarantee = Math.max(0, totalGuarantee - usedAmount);
+  const monthlyRent = parseFloat(contract.rentalAmount || "0");
+
   // ── Post to Statement state ──
   const [postAmount, setPostAmount] = useState(contract.guaranteeAmount);
   const [postAccountId, setPostAccountId] = useState<string>("");
@@ -1179,15 +1186,18 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
   const [postNotes, setPostNotes] = useState("");
 
   // ── Move to Cash state ──
-  const [moveAmount, setMoveAmount] = useState(contract.guaranteeAmount);
+  const [moveAmount, setMoveAmount] = useState(remainingGuarantee.toFixed(2));
   const [moveAccountId, setMoveAccountId] = useState<string>("");
   const [moveDate, setMoveDate] = useState(new Date().toISOString().slice(0, 10));
   const [moveNotes, setMoveNotes] = useState("");
 
-  // ── Apply as Rent state ──
-  const [rentAmount, setRentAmount] = useState(contract.guaranteeAmount);
+  // ── Apply as Rent state ── default to 1 month's rent (or remaining if less)
+  const defaultRentChunk = Math.min(monthlyRent, remainingGuarantee).toFixed(2);
+  const [rentAmount, setRentAmount] = useState(defaultRentChunk);
   const [rentDate, setRentDate] = useState(new Date().toISOString().slice(0, 10));
   const [rentNotes, setRentNotes] = useState("");
+
+  const rentAmountNum = parseFloat(rentAmount || "0");
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
@@ -1235,25 +1245,43 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
   return (
     <div className="space-y-4 pt-3">
       {/* Info bar */}
-      <div className="bg-muted/40 rounded-md p-3 text-sm flex items-center gap-2 flex-wrap">
-        <span className="text-muted-foreground">Guarantee on file:</span>
-        <span className={`font-bold ${contract.guaranteePostedToStatement ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-          ${fmtMoney(contract.guaranteeAmount)}
-        </span>
-        <Badge variant={contract.guaranteePostedToStatement ? "default" : "destructive"} className="text-xs">
-          {contract.guaranteePostedToStatement ? "Paid" : "Not Paid"}
-        </Badge>
-        {contract.guaranteePostedToStatement && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="ml-auto text-xs"
-            disabled={resetGuarantee.isPending}
-            onClick={() => resetGuarantee.mutate()}
-            data-testid={`button-${testIdPrefix}-guarantee-reset`}
-          >
-            {resetGuarantee.isPending ? "Resetting…" : "Reset Status"}
-          </Button>
+      <div className="bg-muted/40 rounded-md p-3 space-y-2">
+        <div className="flex items-center gap-2 flex-wrap text-sm">
+          <span className="text-muted-foreground">Total guarantee:</span>
+          <span className="font-bold">{fmtMoneyCurrency(contract.guaranteeAmount, contract.currency)}</span>
+          <Badge variant={contract.guaranteePostedToStatement ? "default" : "destructive"} className="text-xs">
+            {contract.guaranteePostedToStatement ? "Active" : "Not Posted"}
+          </Badge>
+          {contract.guaranteePostedToStatement && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="ml-auto text-xs"
+              disabled={resetGuarantee.isPending}
+              onClick={() => resetGuarantee.mutate()}
+              data-testid={`button-${testIdPrefix}-guarantee-reset`}
+            >
+              {resetGuarantee.isPending ? "Resetting…" : "Reset Status"}
+            </Button>
+          )}
+        </div>
+        {usedAmount > 0 && (
+          <div className="grid grid-cols-3 gap-2 pt-1 border-t border-border/40 text-xs">
+            <div>
+              <p className="text-muted-foreground">Total</p>
+              <p className="font-semibold tabular-nums">{fmtMoneyCurrency(totalGuarantee, contract.currency)}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Used as rent</p>
+              <p className="font-semibold tabular-nums text-orange-600 dark:text-orange-400">{fmtMoneyCurrency(usedAmount, contract.currency)}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Remaining</p>
+              <p className={`font-semibold tabular-nums ${remainingGuarantee <= 0 ? "text-destructive" : "text-green-600 dark:text-green-400"}`}>
+                {fmtMoneyCurrency(remainingGuarantee, contract.currency)}
+              </p>
+            </div>
+          </div>
         )}
       </div>
 
@@ -1327,23 +1355,52 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
 
       {/* ── Section 3: Apply as Rent ── */}
       <div className="border rounded-md p-3 space-y-3">
-        <p className="text-sm font-semibold">Apply Guarantee as Rent</p>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <p className="text-sm font-semibold">Apply Guarantee as Rent</p>
+          {remainingGuarantee > 0 && (
+            <span className="text-xs text-muted-foreground">
+              Remaining to apply: <span className="font-semibold text-green-600 dark:text-green-400">{fmtMoneyCurrency(remainingGuarantee, contract.currency)}</span>
+            </span>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground">
           {tenantPays
-            ? "Uses the held deposit to cover outstanding rent — no cash moves. Posts: Dr Rent Expense / Cr Security Deposits Paid. Rent ledger marked paid."
-            : "Uses the held deposit to cover outstanding rent — no cash moves. Posts: Dr Tenant Deposits / Cr Rent Income. Rent ledger marked paid."
+            ? "Covers rent from the deposit — no cash moves. Dr Rent Expense / Cr Security Deposits Paid. Rent ledger marked paid."
+            : "Covers rent from the deposit — no cash moves. Dr Tenant Deposits / Cr Rent Income. Rent ledger marked paid."
           }
         </p>
+        {remainingGuarantee <= 0 && (
+          <p className="text-xs font-medium text-destructive">Guarantee fully used — nothing left to apply as rent.</p>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <Label>Amount ($)</Label>
+            <div className="flex items-center justify-between mb-1">
+              <Label>Amount</Label>
+              {remainingGuarantee > 0 && (
+                <button
+                  type="button"
+                  className="text-xs text-primary underline"
+                  onClick={() => setRentAmount(remainingGuarantee.toFixed(2))}
+                  data-testid={`button-${testIdPrefix}-guarantee-rent-max`}
+                >
+                  Use all remaining
+                </button>
+              )}
+            </div>
             <Input
               type="number"
               step="0.01"
+              min="0.01"
+              max={remainingGuarantee}
               value={rentAmount}
               onChange={e => setRentAmount(e.target.value)}
               data-testid={`input-${testIdPrefix}-guarantee-rent-amount`}
             />
+            {rentAmountNum > remainingGuarantee && remainingGuarantee > 0 && (
+              <p className="text-xs text-destructive mt-1">
+                Exceeds remaining balance of {fmtMoneyCurrency(remainingGuarantee, contract.currency)}
+              </p>
+            )}
           </div>
           <div>
             <Label>Apply from date</Label>
@@ -1351,6 +1408,7 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
               type="date"
               value={rentDate}
               onChange={e => setRentDate(e.target.value)}
+              className="mt-1"
               data-testid={`input-${testIdPrefix}-guarantee-rent-date`}
             />
           </div>
@@ -1368,7 +1426,7 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
         <div className="flex justify-end">
           <Button
             onClick={() => applyToRent.mutate()}
-            disabled={!rentAmount || !rentDate || applyToRent.isPending}
+            disabled={!rentAmount || !rentDate || applyToRent.isPending || remainingGuarantee <= 0 || rentAmountNum > remainingGuarantee}
             data-testid={`button-${testIdPrefix}-guarantee-apply-rent`}
           >
             {applyToRent.isPending ? "Applying…" : "Apply as Rent"}

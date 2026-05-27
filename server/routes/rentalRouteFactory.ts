@@ -1190,10 +1190,13 @@ export function registerRentalRoutes(
           `);
         }
 
-        // Mark guarantee as applied on the contract
-        await tx.update(propertyContracts)
-          .set({ guaranteePostedToStatement: true, guaranteePostedAmount: amount })
-          .where(eq(propertyContracts.id, id));
+        // Accumulate the applied amount (do NOT overwrite — support partial monthly usage)
+        await tx.execute(sql`
+          UPDATE property_contracts
+          SET guarantee_posted_amount = COALESCE(guarantee_posted_amount, 0) + ${amount}::numeric,
+              guarantee_posted_to_statement = true
+          WHERE id = ${id}
+        `);
       });
 
       res.json({ ok: true, allocations });
