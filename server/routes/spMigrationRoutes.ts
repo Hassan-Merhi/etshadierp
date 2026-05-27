@@ -161,11 +161,11 @@ export function registerSpMigrationRoutes(app: Express) {
         exists: existingSpSubTypes.has(a.subType),
       }));
 
-      // 4. Sales totals in source
+      // 4. Sales totals in source (support 'Sales' and legacy 'Sale')
       const salesRow = (await db.execute(sql`
         SELECT COUNT(*) AS cnt, COALESCE(SUM(total_amount), 0) AS total
         FROM vouchers
-        WHERE company_id = ${sourceId} AND voucher_type = 'Sale'
+        WHERE company_id = ${sourceId} AND voucher_type IN ('Sales', 'Sale')
           AND deleted_at IS NULL
       `)).rows[0] as any;
 
@@ -621,11 +621,11 @@ export function registerSpMigrationRoutes(app: Express) {
         totalValueUsd: pn(r.total_value), aliasExists: existingAliasCodes.has(r.code),
       }));
 
-      // Sale vouchers in source
+      // Sale vouchers in source (support 'Sales' and legacy 'Sale')
       const voucherRow = (await db.execute(sql`
         SELECT COUNT(*) AS cnt, COALESCE(SUM(total_amount), 0) AS total
         FROM vouchers
-        WHERE company_id = ${sourceId} AND voucher_type = 'Sale' AND deleted_at IS NULL
+        WHERE company_id = ${sourceId} AND voucher_type IN ('Sales', 'Sale') AND deleted_at IS NULL
       `)).rows[0] as any;
 
       // Already migrated vouchers in target
@@ -829,7 +829,25 @@ export function registerSpMigrationRoutes(app: Express) {
       summary.push(`Stock: ${aliasesCreated} aliases created, ${aliasesSkipped} skipped, ${movementsCreated} opening movements`);
 
       // 5. Build account mapping: source ledger_account_id → target ledger_account_id
-      //    Match by sub_type first, then accountType
+      //
+      // Resolution order (first match wins):
+      //   a) Exact sub_type match (handles SP accounts that exist on both sides)
+      //   b) Explicit ERP→SP equivalence table (derived from real sub_types in production)
+      //   c) Suspense — never fall back to account_type; that silently mis-maps entries
+      //
+      // Explicit ERP→SP sub_type equivalences (based on live DB schema):
+      //   ERP "Direct Income"       → sp_sales        (revenue line)
+      //   ERP "Direct Expense"      → sp_cogs         (cost of goods)
+      //   ERP "Indirect Expense"    → sp_shared_charges
+      //   ERP "hadi_sp_intercompany"→ sp_hadi_intercompany
+      //   Everything else           → gc_mig_suspense (held for manual review)
+      const ERP_TO_SP_SUBTYPE: Record<string, string> = {
+        "Direct Income":        "sp_sales",
+        "Direct Expense":       "sp_cogs",
+        "Indirect Expense":     "sp_shared_charges",
+        "hadi_sp_intercompany": "sp_hadi_intercompany",
+      };
+
       const sourceAccts = (await db.execute(sql`
         SELECT id, account_type, sub_type FROM ledger_accounts
         WHERE company_id = ${sourceId} AND deleted_at IS NULL
@@ -844,9 +862,7 @@ export function registerSpMigrationRoutes(app: Express) {
         if (ta.sub_type) targetBySubType.set(ta.sub_type, pn(ta.id));
       }
 
-      // Ensure suspense account exists — ALL entries without an exact sub_type match route here.
-      // This is intentional: a fallback to account_type would silently map entries to the
-      // wrong operational account and produce materially incorrect ledgers.
+      // Ensure suspense account exists for truly unresolvable entries
       let suspenseAccountId: number | null = null;
       const existingSuspense = (await db.execute(sql`
         SELECT id FROM ledger_accounts WHERE company_id = ${targetId} AND sub_type = 'gc_mig_suspense' AND deleted_at IS NULL LIMIT 1
@@ -864,24 +880,26 @@ export function registerSpMigrationRoutes(app: Express) {
         rowsCreated++;
       }
 
-      // Map source → target account by sub_type equivalence only.
-      // Entries with no matching sub_type in the target go to suspense — never to an arbitrary
-      // account of the same accountType, which would produce incorrect ledger entries.
       const accountMap = new Map<number, number | null>();
       for (const sa of sourceAccts) {
         const srcId = pn(sa.id);
+        // (a) Exact sub_type match
         if (sa.sub_type && targetBySubType.has(sa.sub_type)) {
           accountMap.set(srcId, targetBySubType.get(sa.sub_type)!);
+        // (b) Explicit ERP→SP equivalence lookup
+        } else if (sa.sub_type && ERP_TO_SP_SUBTYPE[sa.sub_type] && targetBySubType.has(ERP_TO_SP_SUBTYPE[sa.sub_type])) {
+          accountMap.set(srcId, targetBySubType.get(ERP_TO_SP_SUBTYPE[sa.sub_type])!);
+        // (c) Suspense — unrecognised account; held for manual review
         } else {
           accountMap.set(srcId, suspenseAccountId);
         }
       }
 
-      // 6. Copy sale vouchers (no artificial limit — processes all historical records)
+      // 6. Copy sale vouchers — support 'Sales' (current) and legacy 'Sale'; no row limit
       const saleVouchers = (await db.execute(sql`
         SELECT id, voucher_number, voucher_type, voucher_date, description, total_amount, currency, exchange_rate
         FROM vouchers
-        WHERE company_id = ${sourceId} AND voucher_type = 'Sale' AND deleted_at IS NULL
+        WHERE company_id = ${sourceId} AND voucher_type IN ('Sales', 'Sale') AND deleted_at IS NULL
         ORDER BY voucher_date ASC, id ASC
       `)).rows as any[];
 
