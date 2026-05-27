@@ -357,6 +357,34 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
 
   // ── 3. ENTRY sheet ────────────────────────────────────────────────────────
 
+  // Pre-sweep: nullify every sharedFormula slave cell in the profit column
+  // (baseCol+2 for each day) across ALL rows E_DATA_START–E_DATA_END.
+  //
+  // Why this is necessary:
+  //   The template stores profit/bag as a shared formula — row 5 is the master
+  //   (value: { formula: '=IF(G5=0,0,H5-$F5)' }) and rows 6–128 are slaves
+  //   (value: { sharedFormula: 'I5' }).  When the main loop below overwrites
+  //   the master cell with a plain number, ExcelJS removes the formula from
+  //   that cell.  But rows that are skipped (e.g. "Total …" rows) still carry
+  //   { sharedFormula: 'I5' }.  During wb.xlsx.writeBuffer() ExcelJS validates
+  //   every slave reference; finding a slave that points to a non-formula master
+  //   throws "Shared Formula master must exist above and or left of clone for
+  //   cell I<N>".  Nullifying slaves here breaks the reference safely before
+  //   we overwrite the master.
+  for (let r = E_DATA_START; r <= E_DATA_END; r++) {
+    const row = entryWs.getRow(r);
+    let rowChanged = false;
+    for (let d = 0; d < dayCount + 20; d++) {
+      const profitCell = row.getCell(E_DATE_START + d * 3 + 2);
+      const v = profitCell.value as any;
+      if (v && typeof v === 'object' && 'sharedFormula' in v) {
+        profitCell.value = null;
+        rowChanged = true;
+      }
+    }
+    if (rowChanged) row.commit();
+  }
+
   // 3a. Date row (row 3)
   // G3/H3/I3 are the only plain cells; J3 onward are formula/shared-formula.
   // isFormula() now correctly detects both, so only G3/H3/I3 get written.
