@@ -63,25 +63,24 @@ async function trackRow(runId: string, tableName: string, rowId: number) {
   `);
 }
 
-async function ensureSpAccounts(targetId: number): Promise<string[]> {
-  const created: string[] = [];
+async function ensureSpAccounts(targetId: number): Promise<{ names: string[]; newIds: number[] }> {
+  const names: string[] = [];
+  const newIds: number[] = [];
   for (const acct of SP_ACCOUNTS) {
     const existing = await db.select().from(ledgerAccounts)
       .where(and(eq(ledgerAccounts.companyId, targetId), eq(ledgerAccounts.subType, acct.subType), isNull(ledgerAccounts.deletedAt)));
     if (!existing.length) {
-      await db.insert(ledgerAccounts).values({
-        companyId: targetId,
-        code: acct.code,
-        name: acct.name,
-        accountType: acct.accountType,
-        subType: acct.subType,
-        isHidden: acct.subType.includes("clearing") || acct.subType === "sp_opnbal",
-        active: true,
-      });
-      created.push(acct.name);
+      const [row] = (await db.execute(sql`
+        INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, is_hidden, active)
+        VALUES (${targetId}, ${acct.code}, ${acct.name}, ${acct.accountType}, ${acct.subType},
+                ${acct.subType.includes("clearing") || acct.subType === "sp_opnbal"}, true)
+        RETURNING id
+      `)).rows as any[];
+      names.push(acct.name);
+      newIds.push(pn(row.id));
     }
   }
-  return created;
+  return { names, newIds };
 }
 
 // ── Route Registration ─────────────────────────────────────────────────────────
@@ -302,7 +301,7 @@ export function registerSpMigrationRoutes(app: Express) {
 
     try {
       // 1. Ensure SP chart of accounts in target
-      const createdAccounts = await ensureSpAccounts(targetId);
+      const { names: createdAccounts } = await ensureSpAccounts(targetId);
       if (createdAccounts.length) summary.push(`Created SP accounts: ${createdAccounts.join(", ")}`);
 
       // 2. Ensure default location in target
@@ -436,6 +435,10 @@ export function registerSpMigrationRoutes(app: Express) {
   // Removes ONLY rows created by a specific rehearsal run.
   // Never touches source (ERP) company.
   app.post("/api/sp/migration/rollback", requireAuth, async (req: any, res: any) => {
+    const role = req.session?.currentRole;
+    if (!["Admin", "Developer", "Owner"].includes(role)) {
+      return res.status(403).json({ message: "Rollback requires Admin, Developer, or Owner access." });
+    }
     const { runId } = req.body ?? {};
     if (!runId) return res.status(400).json({ message: "runId is required" });
 
@@ -555,6 +558,10 @@ export function registerSpMigrationRoutes(app: Express) {
   // ── POST /api/sp/migration/create-sp-company ─────────────────────────────
   // Creates a new supplier_partner company for the GC-LSHI migration.
   app.post("/api/sp/migration/create-sp-company", requireAuth, async (req: any, res: any) => {
+    const role = req.session?.currentRole;
+    if (!["Admin", "Developer", "Owner"].includes(role)) {
+      return res.status(403).json({ message: "Creating a company requires Admin, Developer, or Owner access." });
+    }
     try {
       const { name, code } = req.body ?? {};
       if (!name || !code) return res.status(400).json({ message: "name and code are required" });
@@ -686,6 +693,11 @@ export function registerSpMigrationRoutes(app: Express) {
   //   3. Stock items + aliases (same as rehearsal)
   //   4. Sale vouchers from ERP → SP (with account remapping)
   app.post("/api/sp/migration/gc-rehearsal", requireAuth, async (req: any, res: any) => {
+    const role = req.session?.currentRole;
+    if (!["Admin", "Developer", "Owner"].includes(role)) {
+      return res.status(403).json({ message: "GC migration requires Admin, Developer, or Owner access." });
+    }
+
     const { sourceCompanyId, targetCompanyId, companyNameConfirm, confirmation } = req.body ?? {};
 
     if (confirmation !== "MIGRATE") {
@@ -719,9 +731,13 @@ export function registerSpMigrationRoutes(app: Express) {
     const summary: string[] = [];
 
     try {
-      // 1. Standard SP accounts
-      const createdAccounts = await ensureSpAccounts(targetId);
-      if (createdAccounts.length) summary.push(`Created SP accounts: ${createdAccounts.join(", ")}`);
+      // 1. Standard SP accounts — track every newly-created row so rollback can remove them
+      const { names: createdAccountNames, newIds: createdAccountIds } = await ensureSpAccounts(targetId);
+      for (const id of createdAccountIds) {
+        await trackRow(runId, "ledger_accounts", id);
+        rowsCreated++;
+      }
+      if (createdAccountNames.length) summary.push(`Created SP accounts: ${createdAccountNames.join(", ")}`);
 
       // 2. GC profit accounts
       const GC_PROFIT_ACCOUNTS = [
@@ -824,13 +840,13 @@ export function registerSpMigrationRoutes(app: Express) {
       `)).rows as any[];
 
       const targetBySubType = new Map<string, number>();
-      const targetByAccountType = new Map<string, number>();
       for (const ta of targetAccts) {
         if (ta.sub_type) targetBySubType.set(ta.sub_type, pn(ta.id));
-        if (!targetByAccountType.has(ta.account_type)) targetByAccountType.set(ta.account_type, pn(ta.id));
       }
 
-      // Ensure suspense account exists for unmapped entries
+      // Ensure suspense account exists — ALL entries without an exact sub_type match route here.
+      // This is intentional: a fallback to account_type would silently map entries to the
+      // wrong operational account and produce materially incorrect ledgers.
       let suspenseAccountId: number | null = null;
       const existingSuspense = (await db.execute(sql`
         SELECT id FROM ledger_accounts WHERE company_id = ${targetId} AND sub_type = 'gc_mig_suspense' AND deleted_at IS NULL LIMIT 1
@@ -848,13 +864,14 @@ export function registerSpMigrationRoutes(app: Express) {
         rowsCreated++;
       }
 
+      // Map source → target account by sub_type equivalence only.
+      // Entries with no matching sub_type in the target go to suspense — never to an arbitrary
+      // account of the same accountType, which would produce incorrect ledger entries.
       const accountMap = new Map<number, number | null>();
       for (const sa of sourceAccts) {
         const srcId = pn(sa.id);
         if (sa.sub_type && targetBySubType.has(sa.sub_type)) {
           accountMap.set(srcId, targetBySubType.get(sa.sub_type)!);
-        } else if (targetByAccountType.has(sa.account_type)) {
-          accountMap.set(srcId, targetByAccountType.get(sa.account_type)!);
         } else {
           accountMap.set(srcId, suspenseAccountId);
         }
@@ -971,6 +988,10 @@ export function registerSpMigrationRoutes(app: Express) {
   // Creates a Journal voucher: Dr selected Cash/Bank account → Cr SP-OPNBAL
   // Requires cashAccountId — no silent auto-pick.
   app.post("/api/sp/migration/opening-balance", requireAuth, async (req: any, res: any) => {
+    const role = req.session?.currentRole;
+    if (!["Admin", "Developer", "Owner"].includes(role)) {
+      return res.status(403).json({ message: "Posting an opening balance requires Admin, Developer, or Owner access." });
+    }
     try {
       const { targetCompanyId, cashAccountId, amount, date, narration } = req.body ?? {};
       const targetId = parseInt(String(targetCompanyId ?? ""), 10);
