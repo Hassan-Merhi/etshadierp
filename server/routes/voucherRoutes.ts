@@ -444,17 +444,6 @@ export function registerVoucherRoutes(app: Express) {
       if (isPOS && voucherType !== "StockTransfer" && voucherType !== "Stock Transfer") {
         return res.status(403).json({ message: "Access denied: This resource is not available for POS users" });
       }
-      // Block unsafe ERP posting for supplier_partner companies
-      if (req.session.currentCompanyId) {
-        const [spCo] = await db.select({ companyType: companies.companyType })
-          .from(companies).where(eq(companies.id, req.session.currentCompanyId)).limit(1);
-        if (spCo?.companyType === "supplier_partner") {
-          const blockedForSP = ["Sales", "StockTransfer", "Stock Transfer", "Adjustment", "Purchase"];
-          if (blockedForSP.includes(voucherType)) {
-            return res.status(403).json({ message: "This voucher type is not available for Supplier Partner companies. Use SP Sales for sales transactions." });
-          }
-        }
-      }
       const companyId = req.session.currentCompanyId;
       const exchangeRate = companyId ? await getCurrentExchangeRate(companyId) : null;
       const voucher = await storage.createVoucher({ ...req.body, exchangeRate });
@@ -475,16 +464,6 @@ export function registerVoucherRoutes(app: Express) {
 
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        }
-
-        // Block unsafe ERP posting for supplier_partner companies
-        const [spCo] = await db.select({ companyType: companies.companyType })
-          .from(companies).where(eq(companies.id, req.session.currentCompanyId)).limit(1);
-        if (spCo?.companyType === "supplier_partner") {
-          const blockedForSP = ["Sales", "StockTransfer", "Stock Transfer", "Adjustment", "Purchase"];
-          if (blockedForSP.includes(voucher?.voucherType)) {
-            return res.status(403).json({ message: "This voucher type is not available for Supplier Partner companies. Use SP Sales for sales transactions." });
-          }
         }
 
         // Validate voucher data
