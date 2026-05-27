@@ -31,7 +31,7 @@ function addDays(d: Date, n: number): Date {
 export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promise<Buffer> {
   const { companyId, locationId, fromDate, toDate, locationName = '', supplierName = '' } = params;
 
-  const templatePath = path.join(__dirname, '../templates/supplier_partner_sales_form_template.xlsx');
+  const templatePath = path.join(process.cwd(), 'server', 'templates', 'supplier_partner_sales_form_template.xlsx');
   if (!fs.existsSync(templatePath)) {
     throw new Error(
       'Supplier partner sales form template not found. ' +
