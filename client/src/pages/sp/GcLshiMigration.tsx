@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -21,7 +22,7 @@ import {
 import {
   Building2, ChevronDown, ChevronRight, CheckCircle2, XCircle,
   AlertTriangle, RefreshCw, Play, RotateCcw, Plus, DollarSign,
-  Package, FileText, Layers,
+  Package, FileText, Layers, Lock,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -60,6 +61,12 @@ interface MigrationRun {
   target_name: string;
 }
 
+interface MigProgress {
+  pct: number;
+  step: string;
+  detail?: string;
+}
+
 // ── StatusBadge ────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
@@ -91,6 +98,11 @@ export default function GcLshiMigration() {
   const [showMigrateDialog, setShowMigrateDialog] = useState(false);
   const [migrateConfirmName, setMigrateConfirmName] = useState("");
 
+  // Live migration progress
+  const [migrating, setMigrating] = useState(false);
+  const [migProgress, setMigProgress] = useState<MigProgress | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
   // Opening balance
   const [obAmount, setObAmount] = useState("");
   const [obDate, setObDate] = useState(() => new Date().toISOString().split("T")[0]);
@@ -104,6 +116,12 @@ export default function GcLshiMigration() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [createName, setCreateName] = useState("GC-LSHI");
   const [createCode, setCreateCode] = useState("GC-LSHI-SP");
+
+  // ── Role gate ────────────────────────────────────────────────────────────
+
+  const { data: sessionRole, isLoading: roleLoading } = useQuery<{ role: string }>({
+    queryKey: ["/api/sp/migration/session-role"],
+  });
 
   // ── Queries ─────────────────────────────────────────────────────────────
 
@@ -156,19 +174,6 @@ export default function GcLshiMigration() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const migrateMutation = useMutation({
-    mutationFn: (body: object) => apiRequest("POST", "/api/sp/migration/gc-rehearsal", body),
-    onSuccess: async (data: any) => {
-      const result = await data.json();
-      toast({ title: "Migration complete", description: `${result.rowsCreated} rows created. Run ID: ${result.runId}` });
-      setShowMigrateDialog(false);
-      setMigrateConfirmName("");
-      refetchPreview();
-      refetchRuns();
-    },
-    onError: (e: any) => toast({ title: "Migration failed", description: e.message, variant: "destructive" }),
-  });
-
   const openingBalanceMutation = useMutation({
     mutationFn: (body: object) => apiRequest("POST", "/api/sp/migration/opening-balance", body),
     onSuccess: async (data: any) => {
@@ -190,14 +195,120 @@ export default function GcLshiMigration() {
     onError: (e: any) => toast({ title: "Rollback failed", description: e.message, variant: "destructive" }),
   });
 
+  // ── SSE migration runner ──────────────────────────────────────────────────
+
+  async function runMigration() {
+    if (!sourceCompanyId || !targetCompanyId || !migrateConfirmName) return;
+
+    setMigrating(true);
+    setMigProgress({ pct: 0, step: "Starting migration…" });
+    setShowMigrateDialog(false);
+
+    const abort = new AbortController();
+    abortRef.current = abort;
+
+    try {
+      const response = await fetch("/api/sp/migration/gc-rehearsal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceCompanyId,
+          targetCompanyId,
+          companyNameConfirm: migrateConfirmName,
+          confirmation: "MIGRATE",
+        }),
+        signal: abort.signal,
+        credentials: "include",
+      });
+
+      // Pre-SSE validation errors arrive as JSON (4xx/5xx)
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message ?? "Migration failed");
+      }
+
+      // Parse SSE events from the streaming response body
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // SSE messages are separated by double newline
+        const messages = buffer.split("\n\n");
+        buffer = messages.pop() ?? "";
+
+        for (const msg of messages) {
+          const dataLine = msg.split("\n").find(l => l.startsWith("data: "));
+          if (!dataLine) continue;
+          let event: any;
+          try { event = JSON.parse(dataLine.slice(6)); } catch { continue; }
+
+          if (event.type === "progress") {
+            setMigProgress({ pct: event.pct, step: event.step, detail: event.detail });
+          } else if (event.type === "done") {
+            setMigProgress({ pct: 100, step: "Complete!" });
+            setTimeout(() => {
+              setMigrating(false);
+              setMigProgress(null);
+              setMigrateConfirmName("");
+            }, 1200);
+            toast({
+              title: "Migration complete",
+              description: `${event.rowsCreated} rows created. Run ID: ${String(event.runId).slice(0, 8)}`,
+            });
+            refetchPreview();
+            refetchRuns();
+          } else if (event.type === "error") {
+            throw new Error(event.message ?? "Migration failed");
+          }
+        }
+      }
+    } catch (err: any) {
+      if (err.name === "AbortError") return;
+      setMigrating(false);
+      setMigProgress(null);
+      toast({ title: "Migration failed", description: err.message, variant: "destructive" });
+    }
+  }
+
   // ── Helpers ─────────────────────────────────────────────────────────────
 
   const sourceComp = erpCompanies.find(c => c.id === sourceCompanyId);
   const targetComp = spCompanies.find(c => c.id === targetCompanyId);
-  const gcRuns = (runsData?.runs ?? []).filter(r => r.action === "gc_migration");
   const allRuns = runsData?.runs ?? [];
 
   function fmt(n: number) { return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  // ── Role gate ────────────────────────────────────────────────────────────
+
+  if (roleLoading) {
+    return (
+      <div className="p-6 flex items-center gap-2 text-muted-foreground text-sm">
+        <RefreshCw className="h-4 w-4 animate-spin" /> Checking access…
+      </div>
+    );
+  }
+
+  if (sessionRole?.role !== "Developer") {
+    return (
+      <div className="p-6 max-w-md mx-auto mt-16 text-center space-y-4">
+        <div className="flex justify-center">
+          <div className="rounded-full bg-muted p-4">
+            <Lock className="h-8 w-8 text-muted-foreground" />
+          </div>
+        </div>
+        <h2 className="text-xl font-semibold">Developer access required</h2>
+        <p className="text-muted-foreground text-sm">
+          The GC Migration tool is restricted to the Developer role. Your current role is{" "}
+          <span className="font-medium">{sessionRole?.role ?? "unknown"}</span>.
+        </p>
+      </div>
+    );
+  }
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -213,6 +324,9 @@ export default function GcLshiMigration() {
         <p className="text-muted-foreground mt-1">
           Migrate an ERP company's stock, accounts, and historical sale vouchers into a new Supplier Partner company.
         </p>
+        <Badge variant="outline" className="mt-2 text-xs gap-1">
+          <Lock className="h-3 w-3" /> Developer only
+        </Badge>
       </div>
 
       {/* Step 1 — Company Selection */}
@@ -434,19 +548,34 @@ export default function GcLshiMigration() {
               Step 3 — Run Migration
             </CardTitle>
             <CardDescription>
-              Copies stock, accounts, GC profit accounts, and historical sale vouchers from {sourceComp?.name ?? "source"} into {targetComp?.name ?? "target"}.
+              Copies stock, accounts, GC profit accounts, and historical sale vouchers from{" "}
+              {sourceComp?.name ?? "source"} into {targetComp?.name ?? "target"}.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <Button
               onClick={() => setShowMigrateDialog(true)}
-              disabled={migrateMutation.isPending}
+              disabled={migrating}
               data-testid="button-run-migration"
             >
-              {migrateMutation.isPending
+              {migrating
                 ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Migrating…</>
                 : <><Play className="h-4 w-4 mr-2" />Run GC Migration</>}
             </Button>
+
+            {/* Live progress bar */}
+            {migrating && migProgress && (
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{migProgress.step}</span>
+                  <span>{migProgress.pct}%</span>
+                </div>
+                <Progress value={migProgress.pct} className="h-2" />
+                {migProgress.detail && (
+                  <p className="text-xs text-muted-foreground">{migProgress.detail}</p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -648,7 +777,7 @@ export default function GcLshiMigration() {
       </AlertDialog>
 
       {/* Migration Confirmation Dialog */}
-      <AlertDialog open={showMigrateDialog} onOpenChange={setShowMigrateDialog}>
+      <AlertDialog open={showMigrateDialog} onOpenChange={open => { if (!open && !migrating) setShowMigrateDialog(false); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm GC Migration</AlertDialogTitle>
@@ -671,16 +800,11 @@ export default function GcLshiMigration() {
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-migrate">Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => migrateMutation.mutate({
-                sourceCompanyId,
-                targetCompanyId,
-                companyNameConfirm: migrateConfirmName,
-                confirmation: "MIGRATE",
-              })}
-              disabled={migrateConfirmName !== sourceComp?.name || migrateMutation.isPending}
+              onClick={runMigration}
+              disabled={migrateConfirmName !== sourceComp?.name}
               data-testid="button-confirm-migrate"
             >
-              {migrateMutation.isPending ? "Running…" : "Run Migration"}
+              Run Migration
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

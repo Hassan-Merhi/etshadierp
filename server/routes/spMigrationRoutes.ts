@@ -727,11 +727,26 @@ export function registerSpMigrationRoutes(app: Express) {
       return res.status(500).json({ message: "Failed to create run log: " + logErr.message });
     }
 
+    // ── Switch to SSE streaming mode ──────────────────────────────────────
+    // All validation is done above; from here on we stream progress events.
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no"); // disable nginx/proxy buffering
+    res.flushHeaders();
+
+    const sendEvent = (type: string, data: object) => {
+      try { res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`); } catch {}
+    };
+    const progress = (pct: number, step: string, detail?: string) =>
+      sendEvent("progress", { pct, step, ...(detail ? { detail } : {}) });
+
     let rowsCreated = 0;
     const summary: string[] = [];
 
     try {
       // 1. Standard SP accounts — track every newly-created row so rollback can remove them
+      progress(5, "Creating SP accounts…");
       const { names: createdAccountNames, newIds: createdAccountIds } = await ensureSpAccounts(targetId);
       for (const id of createdAccountIds) {
         await trackRow(runId, "ledger_accounts", id);
@@ -740,6 +755,7 @@ export function registerSpMigrationRoutes(app: Express) {
       if (createdAccountNames.length) summary.push(`Created SP accounts: ${createdAccountNames.join(", ")}`);
 
       // 2. GC profit accounts
+      progress(15, "Creating GC profit accounts…");
       const GC_PROFIT_ACCOUNTS = [
         { code: "GC-OWNPFT", name: "GC Owner Profit",    accountType: "Equity", subType: "gc_owner_profit"    },
         { code: "GC-SUPPFT", name: "GC Supplier Profit", accountType: "Equity", subType: "gc_supplier_profit" },
@@ -762,6 +778,7 @@ export function registerSpMigrationRoutes(app: Express) {
       }
 
       // 3. Default location
+      progress(22, "Setting up warehouse location…");
       const locs = await db.select().from(locations).where(and(eq(locations.companyId, targetId), isNull(locations.deletedAt)));
       if (!locs.length) {
         const [locRow] = (await db.execute(sql`
@@ -775,6 +792,7 @@ export function registerSpMigrationRoutes(app: Express) {
       }
 
       // 4. Stock items
+      progress(28, "Loading stock items…");
       const stockRows = (await db.execute(sql`
         SELECT si.id AS stock_item_id, si.code, si.name, inv.quantity, inv.average_rate
         FROM stock_items si
@@ -783,6 +801,7 @@ export function registerSpMigrationRoutes(app: Express) {
         ORDER BY si.code
       `)).rows as any[];
 
+      progress(30, `Copying ${stockRows.length} stock items…`);
       let aliasesCreated = 0, aliasesSkipped = 0, movementsCreated = 0;
       for (const item of stockRows as any[]) {
         const stockItemId = pn(item.stock_item_id);
@@ -828,16 +847,17 @@ export function registerSpMigrationRoutes(app: Express) {
       }
       summary.push(`Stock: ${aliasesCreated} aliases created, ${aliasesSkipped} skipped, ${movementsCreated} opening movements`);
 
-      // 5. Build account mapping: source ledger_account_id → target ledger_account_id
-      //
+      // 5. Build account mapping
+      progress(44, "Building account mapping…");
+
       // Resolution order (first match wins):
       //   a) Exact sub_type match (handles SP accounts that exist on both sides)
       //   b) Explicit ERP→SP equivalence table (derived from real sub_types in production)
       //   c) Suspense — never fall back to account_type; that silently mis-maps entries
       //
       // Explicit ERP→SP sub_type equivalences (based on live DB schema):
-      //   ERP "Direct Income"       → sp_sales        (revenue line)
-      //   ERP "Direct Expense"      → sp_cogs         (cost of goods)
+      //   ERP "Direct Income"       → sp_sales
+      //   ERP "Direct Expense"      → sp_cogs
       //   ERP "Indirect Expense"    → sp_shared_charges
       //   ERP "hadi_sp_intercompany"→ sp_hadi_intercompany
       //   Everything else           → gc_mig_suspense (held for manual review)
@@ -883,19 +903,17 @@ export function registerSpMigrationRoutes(app: Express) {
       const accountMap = new Map<number, number | null>();
       for (const sa of sourceAccts) {
         const srcId = pn(sa.id);
-        // (a) Exact sub_type match
         if (sa.sub_type && targetBySubType.has(sa.sub_type)) {
           accountMap.set(srcId, targetBySubType.get(sa.sub_type)!);
-        // (b) Explicit ERP→SP equivalence lookup
         } else if (sa.sub_type && ERP_TO_SP_SUBTYPE[sa.sub_type] && targetBySubType.has(ERP_TO_SP_SUBTYPE[sa.sub_type])) {
           accountMap.set(srcId, targetBySubType.get(ERP_TO_SP_SUBTYPE[sa.sub_type])!);
-        // (c) Suspense — unrecognised account; held for manual review
         } else {
           accountMap.set(srcId, suspenseAccountId);
         }
       }
 
       // 6. Copy sale vouchers — support 'Sales' (current) and legacy 'Sale'; no row limit
+      progress(50, "Loading sale vouchers…");
       const saleVouchers = (await db.execute(sql`
         SELECT id, voucher_number, voucher_type, voucher_date, description, total_amount, currency, exchange_rate
         FROM vouchers
@@ -903,8 +921,19 @@ export function registerSpMigrationRoutes(app: Express) {
         ORDER BY voucher_date ASC, id ASC
       `)).rows as any[];
 
+      const totalVouchers = saleVouchers.length;
+      progress(52, `Copying ${totalVouchers} vouchers…`, `0 of ${totalVouchers} done`);
+
       let vouchersCreated = 0, entriesCreated = 0, vouchersSkipped = 0;
-      for (const v of saleVouchers as any[]) {
+      for (let vi = 0; vi < saleVouchers.length; vi++) {
+        const v = saleVouchers[vi];
+
+        // Emit progress every 50 vouchers (50–95% range)
+        if (vi > 0 && vi % 50 === 0) {
+          const pct = 52 + Math.round((vi / Math.max(totalVouchers, 1)) * 43);
+          progress(pct, `Copying vouchers…`, `${vi} of ${totalVouchers} done`);
+        }
+
         const newVoucherNumber = ("MIG-" + v.voucher_number).substring(0, 100);
 
         // Skip if already migrated
@@ -948,6 +977,7 @@ export function registerSpMigrationRoutes(app: Express) {
       }
       summary.push(`Vouchers: ${vouchersCreated} created, ${vouchersSkipped} skipped, ${entriesCreated} entries created`);
 
+      progress(97, "Finalizing…");
       const totalStockQty   = (stockRows as any[]).reduce((s: number, r: any) => s + pn(r.quantity), 0);
       const totalStockValue = (stockRows as any[]).reduce((s: number, r: any) => s + pn(r.quantity) * pn(r.average_rate), 0);
 
@@ -957,7 +987,7 @@ export function registerSpMigrationRoutes(app: Express) {
         WHERE id = ${runId}
       `);
 
-      return res.json({
+      sendEvent("done", {
         success: true, runId, rowsCreated, summary,
         reconciliation: {
           sourceCompany: sourceComp.name, targetCompany: targetComp.name,
@@ -973,6 +1003,7 @@ export function registerSpMigrationRoutes(app: Express) {
           "GC Owner Profit and GC Supplier Profit equity accounts have been created.",
         ],
       });
+      res.end();
     } catch (err: any) {
       await db.execute(sql`
         UPDATE sp_migration_rehearsal_runs
@@ -980,8 +1011,15 @@ export function registerSpMigrationRoutes(app: Express) {
         WHERE id = ${runId}
       `).catch(() => {});
       console.error("[SP Migration] gc-rehearsal error:", err);
-      return res.status(500).json({ message: err.message, runId });
+      sendEvent("error", { message: err.message, runId });
+      res.end();
     }
+  });
+
+  // ── GET /api/sp/migration/session-role ──────────────────────────────────
+  // Returns the current session's role — used by the frontend to gate the page.
+  app.get("/api/sp/migration/session-role", requireAuth, async (req: any, res: any) => {
+    return res.json({ role: req.session?.currentRole ?? null });
   });
 
   // ── GET /api/sp/migration/cash-accounts ─────────────────────────────────
