@@ -104,52 +104,67 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   //   sp_stock_movements        → actual SP stock (FIFO lots)
   const [salesRes, invRes, afterRes] = await Promise.all([
 
-    // 1. Daily SP sales within the export range
+    // 1. Daily SP sales within the export range.
+    //    article_code is normalized via stock_item_code_aliases → stock_items.code
+    //    so the resolved key matches ENTRY col C / col D template names.
     db.execute(sql`
       SELECT
-        sl.article_code,
+        COALESCE(si.code, sl.article_code)                   AS item_code,
         s.sale_date::text                                    AS sale_date,
         SUM(sl.qty_sold)::numeric                            AS qty,
         SUM(sl.qty_sold * sl.sale_price_per_unit)::numeric   AS total_sales,
         SUM(sl.qty_sold * sl.final_unit_cost_usd)::numeric   AS total_cost
-      FROM  sp_sale_lines sl
-      JOIN  sp_sales      s  ON sl.sale_id   = s.id
+      FROM  sp_sale_lines          sl
+      JOIN  sp_sales               s     ON sl.sale_id        = s.id
+      LEFT JOIN stock_item_code_aliases sica
+                                         ON sica.alias_code   = sl.article_code
+                                        AND sica.company_id   = sl.company_id
+      LEFT JOIN stock_items        si    ON si.id             = sica.stock_item_id
       WHERE sl.company_id = ${companyId}
         AND s.status      = 'posted'
         AND s.sale_date BETWEEN ${fromDate}::date AND ${toDate}::date
-      GROUP BY sl.article_code, s.sale_date
+      GROUP BY COALESCE(si.code, sl.article_code), s.sale_date
       ORDER BY s.sale_date
     `),
 
-    // 2. Current SP stock (all lots with qty_remaining > 0, weighted-avg cost)
+    // 2. Current SP stock (all lots with qty_remaining > 0, weighted-avg cost).
+    //    article_code normalized the same way as Query 1.
     db.execute(sql`
       SELECT
-        article_code,
-        SUM(qty_remaining)::numeric                                              AS qty,
-        CASE WHEN SUM(qty_remaining) > 0
-             THEN SUM(qty_remaining::numeric * final_unit_cost_usd::numeric)
-                  / SUM(qty_remaining)
+        COALESCE(si.code, sm.article_code)                                       AS item_code,
+        SUM(sm.qty_remaining)::numeric                                           AS qty,
+        CASE WHEN SUM(sm.qty_remaining) > 0
+             THEN SUM(sm.qty_remaining::numeric * sm.final_unit_cost_usd::numeric)
+                  / SUM(sm.qty_remaining)
              ELSE 0
         END::numeric                                                             AS avg_cost
-      FROM  sp_stock_movements
-      WHERE company_id   = ${companyId}
-        AND qty_remaining > 0
-      GROUP BY article_code
+      FROM  sp_stock_movements          sm
+      LEFT JOIN stock_item_code_aliases sica
+                                        ON sica.alias_code  = sm.article_code
+                                       AND sica.company_id  = sm.company_id
+      LEFT JOIN stock_items             si ON si.id          = sica.stock_item_id
+      WHERE sm.company_id   = ${companyId}
+        AND sm.qty_remaining > 0
+      GROUP BY COALESCE(si.code, sm.article_code)
     `),
 
-    // 3. SP sales AFTER fromDate → reconstruct opening stock at end of fromDate
+    // 3. SP sales AFTER fromDate → reconstruct opening stock at end of fromDate.
     //    openingQty = currentQty + qtySoldAfterFromDate
-    //    (accurate when no new stock arrived after fromDate; true for same-month exports)
+    //    article_code normalized identically to Query 1.
     db.execute(sql`
       SELECT
-        sl.article_code,
-        SUM(sl.qty_sold)::numeric AS qty_after
-      FROM  sp_sale_lines sl
-      JOIN  sp_sales      s  ON sl.sale_id   = s.id
+        COALESCE(si.code, sl.article_code)                   AS item_code,
+        SUM(sl.qty_sold)::numeric                            AS qty_after
+      FROM  sp_sale_lines          sl
+      JOIN  sp_sales               s     ON sl.sale_id        = s.id
+      LEFT JOIN stock_item_code_aliases sica
+                                         ON sica.alias_code   = sl.article_code
+                                        AND sica.company_id   = sl.company_id
+      LEFT JOIN stock_items        si    ON si.id             = sica.stock_item_id
       WHERE sl.company_id = ${companyId}
         AND s.status      = 'posted'
         AND s.sale_date   > ${fromDate}::date
-      GROUP BY sl.article_code
+      GROUP BY COALESCE(si.code, sl.article_code)
     `),
   ]);
 
@@ -159,10 +174,11 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
 
   // ── Build in-memory data structures ──────────────────────────────────────
 
-  // salesMap: articleCode → dateStr → DaySales
+  // salesMap: resolvedItemCode → dateStr → DaySales
+  // Keys are COALESCE(stock_items.code, article_code) — canonical codes matching ENTRY col C/D.
   const salesMap = new Map<string, Map<string, DaySales>>();
   for (const r of salesRows) {
-    const code = String(r.article_code ?? '').trim();
+    const code = String(r.item_code ?? '').trim();
     if (!code) continue;
     if (!salesMap.has(code)) salesMap.set(code, new Map());
     const dm   = salesMap.get(code)!;
@@ -175,18 +191,18 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     });
   }
 
-  // curInv: articleCode → { qty, avgCost }
+  // curInv: resolvedItemCode → { qty, avgCost }
   const curInv = new Map<string, { qty: number; avgCost: number }>();
   for (const r of invRows) {
-    curInv.set(String(r.article_code).trim(), {
+    curInv.set(String(r.item_code).trim(), {
       qty:     pn(r.qty),
       avgCost: pn(r.avg_cost),
     });
   }
 
-  // afterMap: articleCode → qty sold after fromDate
+  // afterMap: resolvedItemCode → qty sold after fromDate
   const afterMap = new Map<string, number>();
-  for (const r of afterRows) afterMap.set(String(r.article_code).trim(), pn(r.qty_after));
+  for (const r of afterRows) afterMap.set(String(r.item_code).trim(), pn(r.qty_after));
 
   /** Opening stock at end of fromDate.
    *  avgCost from current lots (FIFO cost is stable if no new arrivals after fromDate). */
