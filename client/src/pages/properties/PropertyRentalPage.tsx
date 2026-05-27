@@ -230,15 +230,18 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
   }, [units]);
 
   const totals = useMemo(() => {
-    let totalGuarantee = 0, totalOutstanding = 0, totalPaid = 0;
+    let totalGuarantee = 0, totalOutstanding = 0, totalPaid = 0, totalMonthlyRent = 0;
     units.forEach(u => {
       if (u.contract) {
         totalGuarantee += Number(u.contract.guaranteeAmount || 0);
         totalOutstanding += u.outstanding ?? 0;
         totalPaid += (u as any).totalPaid ?? 0;
+        if (u.contract.status === "ACTIVE" || !(u.contract as any).status) {
+          totalMonthlyRent += Number(u.contract.rentalAmount || 0);
+        }
       }
     });
-    return { totalGuarantee, totalOutstanding, totalPaid };
+    return { totalGuarantee, totalOutstanding, totalPaid, totalMonthlyRent };
   }, [units]);
 
   const runMonthly = useMutation({
@@ -328,10 +331,19 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
         </div>
 
         {/* Summary tiles */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL UNITS</CardTitle></CardHeader>
             <CardContent><div className="text-2xl font-bold" data-testid={`stat-${testIdPrefix}-total-units`}>{units.length}</div></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">RENT / MONTH</CardTitle></CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400" data-testid={`stat-${testIdPrefix}-monthly-rent`}>
+                ${fmtMoney(totals.totalMonthlyRent)}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">expected from active leases</p>
+            </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL GUARANTEE</CardTitle></CardHeader>
@@ -377,6 +389,7 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                         />
                       </th>
                       <th className="text-left px-3 py-2 font-semibold">Unit</th>
+                      <th className="text-left px-3 py-2 font-semibold">Dimensions</th>
                       <th className="text-left px-3 py-2 font-semibold">Tenant</th>
                       <th className="text-left px-3 py-2 font-semibold">Note</th>
                       <th className="text-right px-3 py-2 font-semibold">Monthly Rent</th>
@@ -406,7 +419,7 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                       return (
                       <>
                         <tr key={`grp-${group}`} className="border-t">
-                          <td colSpan={9} className="px-3 py-1.5 text-xs font-bold uppercase tracking-widest" style={{ backgroundColor: p.headerBg, color: p.headerText }}>{group}</td>
+                          <td colSpan={10} className="px-3 py-1.5 text-xs font-bold uppercase tracking-widest" style={{ backgroundColor: p.headerBg, color: p.headerText }}>{group}</td>
                         </tr>
                         {groupUnits.map((u, uIdx) => (
                           <tr
@@ -430,6 +443,13 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                               )}
                             </td>
                             <td className="px-3 py-2 font-mono text-xs font-bold" style={{ backgroundColor: unitNumBg, color: unitNumColor }}>{u.unitNumber}</td>
+                            <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
+                              {u.dimensions
+                                ? <span className="font-medium text-foreground">{u.dimensions}</span>
+                                : u.size
+                                  ? <span>{u.size}</span>
+                                  : <span>—</span>}
+                            </td>
                             <td className="px-3 py-2">
                               {u.contract
                                 ? <span className="font-medium flex items-center gap-1.5 flex-wrap">
@@ -1598,6 +1618,7 @@ function EditInfoForm({ contract, testIdPrefix, unitId, unit, unitType }: { cont
   const [guaranteeAmount, setGuaranteeAmount] = useState(contract.guaranteeAmount ?? "");
   const [guaranteePeriod, setGuaranteePeriod] = useState(contract.guaranteePeriod ?? "");
   const [unitNumber, setUnitNumber] = useState(unit.unitNumber);
+  const [dimensions, setDimensions] = useState(unit.dimensions ?? "");
   const [isInternal, setIsInternal] = useState(contract.isInternal ?? false);
 
   const saveContract = useMutation({
@@ -1613,7 +1634,7 @@ function EditInfoForm({ contract, testIdPrefix, unitId, unit, unitType }: { cont
   });
 
   const saveUnit = useMutation({
-    mutationFn: () => apiRequest("PATCH", `${apiBase}/units/${unitId}`, { unitNumber }),
+    mutationFn: () => apiRequest("PATCH", `${apiBase}/units/${unitId}`, { unitNumber, dimensions: dimensions || null }),
     onSuccess: () => {
       toast({ title: "Unit name updated" });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
@@ -1626,7 +1647,7 @@ function EditInfoForm({ contract, testIdPrefix, unitId, unit, unitType }: { cont
     guaranteeAmount !== (contract.guaranteeAmount ?? "") ||
     guaranteePeriod !== (contract.guaranteePeriod ?? "") ||
     isInternal !== (contract.isInternal ?? false);
-  const unitChanged = unitNumber !== unit.unitNumber;
+  const unitChanged = unitNumber !== unit.unitNumber || dimensions !== (unit.dimensions ?? "");
 
   return (
     <div className="space-y-5 pt-3">
@@ -1637,10 +1658,14 @@ function EditInfoForm({ contract, testIdPrefix, unitId, unit, unitType }: { cont
             <Label>Unit Name</Label>
             <Input value={unitNumber} onChange={e => setUnitNumber(e.target.value.toUpperCase())} data-testid={`input-${testIdPrefix}-edit-unit-number`} />
           </div>
+          <div>
+            <Label>Dimensions</Label>
+            <Input value={dimensions} onChange={e => setDimensions(e.target.value)} placeholder="e.g. 35 X 12" data-testid={`input-${testIdPrefix}-edit-dimensions`} />
+          </div>
         </div>
         <div className="flex justify-end">
           <Button onClick={() => saveUnit.mutate()} disabled={!unitChanged || !unitNumber || saveUnit.isPending} data-testid={`button-${testIdPrefix}-save-unit`}>
-            {saveUnit.isPending ? "Saving…" : "Rename Unit"}
+            {saveUnit.isPending ? "Saving…" : "Save Unit Info"}
           </Button>
         </div>
       </div>
