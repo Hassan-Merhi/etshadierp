@@ -53,6 +53,15 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
+const PAYABLE_CONTAINER_STATUSES = new Set([
+  "OFFLOADED",
+  "RECEIVED",
+  "PARTIALLY_RECEIVED",
+]);
+
+const isPayableContainer = (c: any) =>
+  PAYABLE_CONTAINER_STATUSES.has(String(c.status || "").toUpperCase());
+
 export function registerFactorySuppliersRoutes(app: Express) {
   app.get("/api/factory/suppliers", requireAuth, async (req: any, res: any) => {
     try {
@@ -732,8 +741,9 @@ export function registerFactorySuppliersRoutes(app: Express) {
 
       const linkedIds = linkedSuppliers.map((s: any) => s.id);
 
-      const allContainers = await db.select({
+      const allContainers = (await db.select({
         id: factoryContainers.id, supplierId: factoryContainers.supplierId,
+        status: factoryContainers.status,
         totalKg: factoryContainers.totalKg, actualReceivedKg: factoryContainers.actualReceivedKg,
         ratePerKg: factoryContainers.ratePerKg, freight: factoryContainers.freight,
         freightCurrencyCode: factoryContainers.freightCurrencyCode, currencyCode: factoryContainers.currencyCode,
@@ -743,7 +753,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
         eq(factoryContainers.companyId, companyId),
         inArray(factoryContainers.supplierId, linkedIds),
         eq(factoryContainers.currencyCode, currency)
-      ));
+      ))).filter(isPayableContainer);
 
       const allPayments = await db.select({ supplierId: factorySupplierPayments.supplierId, amount: factorySupplierPayments.amount })
         .from(factorySupplierPayments)
@@ -824,10 +834,11 @@ export function registerFactorySuppliersRoutes(app: Express) {
 
       const linkedIds = linkedSuppliers.map((s: any) => s.id);
 
-      // Get all containers for linked suppliers in the given currency
-      const allContainers = await db.select({
+      // Get all payable containers for linked suppliers in the given currency
+      const allContainers = (await db.select({
         id: factoryContainers.id,
         supplierId: factoryContainers.supplierId,
+        status: factoryContainers.status,
         totalKg: factoryContainers.totalKg,
         actualReceivedKg: factoryContainers.actualReceivedKg,
         ratePerKg: factoryContainers.ratePerKg,
@@ -845,7 +856,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
           inArray(factoryContainers.supplierId, linkedIds),
           eq(factoryContainers.currencyCode, fromCurrencyCode)
         ))
-        .orderBy(order === "newest" ? desc(factoryContainers.createdAt) : factoryContainers.createdAt);
+        .orderBy(order === "newest" ? desc(factoryContainers.createdAt) : factoryContainers.createdAt)
+      ).filter(isPayableContainer);
 
       // Get payments in this currency for linked suppliers
       const allPayments = await db.select({
@@ -1240,13 +1252,14 @@ export function registerFactorySuppliersRoutes(app: Express) {
       // Helper to compute stats for a single supplier record
       const computeStats = (s: any) => {
         const supplierContainers = containers.filter((c: any) => c.supplierId === s.id);
+        const payableContainers = supplierContainers.filter(isPayableContainer);
         const totalContainers = supplierContainers.length;
         const totalKg = supplierContainers.reduce((sum: number, c: any) => {
           return sum + (parseFloat(c.actualReceivedKg || c.totalKg || "0"));
         }, 0);
         // Sum container value including freight (agreed supplier charge) in USD.
         // Cross-currency freight (e.g. USD freight on AUD containers) is added directly in USD.
-        const containerValue = supplierContainers.reduce((sum: number, c: any) => {
+        const containerValue = payableContainers.reduce((sum: number, c: any) => {
           // Use totalKg (declared/agreed weight) not actualReceivedKg — weight differences
           // at offload affect inventory only, not what is owed to the supplier.
           const kg = parseFloat(c.totalKg || "0");
@@ -1261,7 +1274,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
         }, 0);
         // Commission accumulates under the supplier, EXCEPT:
         // if this supplier is linked to a broker (has parentId), USD commission flows to the broker.
-        const commissionValue = supplierContainers.reduce((sum: number, c: any) => {
+        const commissionValue = payableContainers.reduce((sum: number, c: any) => {
           const commAmt = parseFloat(c.commissionAmount || "0");
           if (commAmt <= 0) return sum;
           const commCurr = c.commissionCurrencyCode || c.currencyCode || "USD";
@@ -1297,7 +1310,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
         }
         // Other charges from containers where this supplier is the charge recipient.
         // Linked suppliers: USD other charges flow to the parent broker — exclude from own balance.
-        const otherChargesValue = containers.reduce((sum: number, c: any) => {
+        const otherChargesValue = containers.filter(isPayableContainer).reduce((sum: number, c: any) => {
           if (c.otherChargesSupplierId !== s.id) return sum;
           const oc = parseFloat(c.otherCharges || "0");
           if (oc <= 0) return sum;
@@ -1314,7 +1327,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
         // Always use totalKg (declared/agreed weight) — same as computeBalance — weight differences at offload
         // affect inventory only, not what is owed to the supplier.
         const byCurrency: Record<string, number> = {};
-        for (const c of supplierContainers) {
+        for (const c of payableContainers) {
           const cc = c.currencyCode || "USD";
           const baseVal = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
           const freightAmt = parseFloat(c.freight || "0");
@@ -1357,7 +1370,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
         // Other charges from other suppliers' containers attributed to this supplier
         // (e.g. broker-linked charges where other_charges_supplier_id = s.id)
         // Linked suppliers: USD other charges flow to the parent broker — skip in own currency bucket.
-        for (const c of containers) {
+        for (const c of containers.filter(isPayableContainer)) {
           if ((c as any).otherChargesSupplierId !== s.id) continue;
           const oc = parseFloat((c as any).otherCharges || "0");
           if (oc <= 0) continue;
@@ -1372,7 +1385,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
 
         // Due containers: offloaded >30 days ago and supplier still has a positive balance
         const now = new Date();
-        const dueContainers = balance > 0.01 ? supplierContainers
+        const dueContainers = balance > 0.01 ? payableContainers
           .filter((c: any) => {
             if (!c.offloadDate) return false;
             const offloadMs = new Date(c.offloadDate).getTime();
@@ -1388,7 +1401,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           })) : [];
 
         // Approx FX rate: weighted average rate across non-USD containers (for UI display)
-        const fxContainers = supplierContainers.filter((c: any) => (c.currencyCode || "USD") !== "USD" && parseFloat(c.fxRateToUsd || "0") > 0);
+        const fxContainers = payableContainers.filter((c: any) => (c.currencyCode || "USD") !== "USD" && parseFloat(c.fxRateToUsd || "0") > 0);
         const fxWeightedSum = fxContainers.reduce((s: number, c: any) => {
           const val = parseFloat(c.actualReceivedKg || c.totalKg || "0") * parseFloat(c.ratePerKg || "0") + parseFloat(c.freight || "0");
           return s + val * parseFloat(c.fxRateToUsd || "1");
@@ -1402,7 +1415,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
         // e.g. USD freight on an AUD container for a supplier whose parent is a broker.
         // This amount is "auto-settled" from the supplier's perspective — the broker absorbs it.
         const autoSettledFreightUsd = (s.parentId !== null && s.parentId !== undefined)
-          ? supplierContainers.reduce((sum: number, c: any) => {
+          ? payableContainers.reduce((sum: number, c: any) => {
               const freightCc = c.freightCurrencyCode || c.currencyCode || "USD";
               const containerCc = c.currencyCode || "USD";
               if (freightCc === "USD" && containerCc !== "USD") {
@@ -1629,7 +1642,10 @@ export function registerFactorySuppliersRoutes(app: Express) {
         currencyCode: c.otherChargesCurrencyCode || "USD",
       }))];
 
-      const statement = containers.map((c: any) => {
+      // Only include payable (offloaded/received) containers in financial statement rows and totals.
+      // OTW/PENDING/IN_TRANSIT containers are visible in the DB but must not affect balances.
+      const payableContainers = containers.filter(isPayableContainer);
+      const statement = payableContainers.map((c: any) => {
         // Use totalKg (declared/agreed weight) for the payable value shown to the supplier.
         // actualReceivedKg only affects inventory — not the agreed purchase amount.
         const kg = parseFloat(c.totalKg || "0");
@@ -2353,7 +2369,9 @@ export function registerFactorySuppliersRoutes(app: Express) {
     // Container rows
     // Always use totalKg (declared/agreed weight) — weight differences at offload affect inventory
     // only, not what is owed to the supplier. This matches computeBalance and computeStats.
-    for (const c of allContainers as any[]) {
+    // Only include payable (offloaded/received) containers — OTW/PENDING/IN_TRANSIT must not affect balances.
+    const payableContainers = (allContainers as any[]).filter(isPayableContainer);
+    for (const c of payableContainers) {
       const supplierName = supplierNameMap[c.supplierId] || "Unknown";
       const cc = c.currencyCode || "USD";
       const kg = parseFloat(c.totalKg || "0");
