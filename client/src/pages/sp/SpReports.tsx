@@ -29,7 +29,7 @@ export default function SpReports() {
     return d.toISOString().slice(0, 10);
   });
   const [exportTo, setExportTo] = useState(new Date().toISOString().slice(0, 10));
-  const [exportLocationId, setExportLocationId] = useState<string>("");
+  const [exportLocationId, setExportLocationId] = useState<string>("all");
   const [exporting, setExporting] = useState(false);
 
   const payableUrl = "/api/sp/report/payable";
@@ -69,7 +69,7 @@ export default function SpReports() {
     setExporting(true);
     try {
       const params = new URLSearchParams({ fromDate: exportFrom, toDate: exportTo });
-      if (exportLocationId) params.set("locationId", exportLocationId);
+      if (exportLocationId && exportLocationId !== "all") params.set("locationId", exportLocationId);
       const res = await fetch(`/api/sp/sales-form/export?${params}`, { credentials: "include" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: "Export failed" }));
@@ -283,7 +283,7 @@ export default function SpReports() {
                       <SelectValue placeholder="All locations" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All locations</SelectItem>
+                      <SelectItem value="all">All locations</SelectItem>
                       {locations.map((l: any) => (
                         <SelectItem key={l.id} value={String(l.id)} data-testid={`option-location-${l.id}`}>
                           {l.name}
