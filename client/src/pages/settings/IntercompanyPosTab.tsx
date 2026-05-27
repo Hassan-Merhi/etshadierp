@@ -135,6 +135,7 @@ export function IntercompanyPosTab() {
   const [sourceIntercoAccountId, setSourceIntercoAccountId] = useState<string>("");
   const [destIntercoAccountId, setDestIntercoAccountId] = useState<string>("");
   const [enabled, setEnabled] = useState(true);
+  const [skipSourceVoucher, setSkipSourceVoucher] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
   // Dest company accounts
@@ -156,6 +157,7 @@ export function IntercompanyPosTab() {
       setSourceIntercoAccountId(String(config.sourceIntercoAccountId ?? ""));
       setDestIntercoAccountId(String(config.destIntercoAccountId ?? ""));
       setEnabled(config.enabled ?? true);
+      setSkipSourceVoucher(config.skipSourceVoucher ?? false);
       setInitialized(true);
     }
     if (!config && !configLoading && !initialized) {
@@ -189,6 +191,7 @@ export function IntercompanyPosTab() {
           sourceIntercoAccountId: parseInt(sourceIntercoAccountId),
           destIntercoAccountId: parseInt(destIntercoAccountId),
           enabled,
+          skipSourceVoucher,
         }),
       });
       if (!res.ok) {
@@ -239,6 +242,22 @@ export function IntercompanyPosTab() {
                   data-testid="switch-interco-enabled"
                   checked={enabled}
                   onCheckedChange={setEnabled}
+                />
+              </div>
+
+              {/* Skip source voucher toggle */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium">Skip source company voucher</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Only create the mirror entry in the destination company. Use for SP companies so the intercompany
+                    credit does not reduce Cash in the source Net Position.
+                  </p>
+                </div>
+                <Switch
+                  data-testid="switch-interco-skip-source"
+                  checked={skipSourceVoucher}
+                  onCheckedChange={setSkipSourceVoucher}
                 />
               </div>
 
@@ -331,6 +350,7 @@ export function IntercompanyPosTab() {
               <p>Destination company ID: {config.destCompanyId}</p>
               <p>Source interco account ID: {config.sourceIntercoAccountId}</p>
               <p>Dest interco account ID: {config.destIntercoAccountId}</p>
+              <p>Skip source voucher: <span className={config.skipSourceVoucher ? "text-amber-600 font-medium" : "text-muted-foreground"}>{config.skipSourceVoucher ? "Yes (dest-only mode)" : "No"}</span></p>
             </div>
           </CardContent>
         </Card>

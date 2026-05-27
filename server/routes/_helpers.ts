@@ -320,21 +320,25 @@ export async function runIntercompanyPosTransfer(
     }
     const destCashAccount = destCashAccounts[0] ?? null;
 
-    const srcVoucherNum = `INTERCO-SRC-${sourceCompanyId}-${saleDateStr}`;
-    const srcNarration = `GC Cash transferred to ${dstCompanyName} – ${saleDateStr}`;
-    await upsertIntercompanyVoucher({
-      companyId: sourceCompanyId,
-      voucherNumber: srcVoucherNum,
-      date: saleDateStr,
-      narration: srcNarration,
-      debitAccountId: config.sourceIntercoAccountId,
-      creditAccountId: cashAccountId,
-      amount: saleAmount,
-    });
+    // Source voucher: Dr sourceIntercoAccount / Cr Cash (skipped for SP companies to avoid
+    // reducing Cash in Net Position — only the dest-side voucher is needed in that case)
+    if (!config.skipSourceVoucher) {
+      const srcVoucherNum = `INTERCO-SRC-${sourceCompanyId}-${saleDateStr}`;
+      const srcNarration = `Cash transferred to ${dstCompanyName} – ${saleDateStr}`;
+      await upsertIntercompanyVoucher({
+        companyId: sourceCompanyId,
+        voucherNumber: srcVoucherNum,
+        date: saleDateStr,
+        narration: srcNarration,
+        debitAccountId: config.sourceIntercoAccountId,
+        creditAccountId: cashAccountId,
+        amount: saleAmount,
+      });
+    }
 
     if (destCashAccount) {
       const dstVoucherNum = `INTERCO-DST-${config.destCompanyId}-${saleDateStr}`;
-      const dstNarration = `GC Cash transferred from ${srcCompanyName} – ${saleDateStr}`;
+      const dstNarration = `Cash received from ${srcCompanyName} – ${saleDateStr}`;
       await upsertIntercompanyVoucher({
         companyId: config.destCompanyId,
         voucherNumber: dstVoucherNum,

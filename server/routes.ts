@@ -1255,7 +1255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const { destCompanyId, sourceIntercoAccountId, destIntercoAccountId, enabled } = req.body;
+      const { destCompanyId, sourceIntercoAccountId, destIntercoAccountId, enabled, skipSourceVoucher } = req.body;
       if (!destCompanyId || !sourceIntercoAccountId || !destIntercoAccountId) {
         return res.status(400).json({ message: "destCompanyId, sourceIntercoAccountId, and destIntercoAccountId are required" });
       }
@@ -1266,6 +1266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sourceIntercoAccountId: parseInt(sourceIntercoAccountId),
           destIntercoAccountId: parseInt(destIntercoAccountId),
           enabled: enabled !== false,
+          skipSourceVoucher: skipSourceVoucher === true,
           updatedAt: new Date(),
         }).where(eq(intercompanyPosConfigs.sourceCompanyId, companyId)).returning();
         return res.json(updated);
@@ -1276,6 +1277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sourceIntercoAccountId: parseInt(sourceIntercoAccountId),
           destIntercoAccountId: parseInt(destIntercoAccountId),
           enabled: enabled !== false,
+          skipSourceVoucher: skipSourceVoucher === true,
         }).returning();
         return res.status(201).json(created);
       }

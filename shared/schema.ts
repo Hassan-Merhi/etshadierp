@@ -1457,6 +1457,7 @@ export const intercompanyPosConfigs = pgTable("intercompany_pos_configs", {
   sourceIntercoAccountId: integer("source_interco_account_id").notNull(),
   destIntercoAccountId: integer("dest_interco_account_id").notNull(),
   enabled: boolean("enabled").notNull().default(true),
+  skipSourceVoucher: boolean("skip_source_voucher").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

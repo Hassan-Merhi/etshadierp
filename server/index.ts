@@ -3585,6 +3585,9 @@ let migrationsDone = false;
     // SP: per-location supplier payable deduction per qty (silent payable reduction, not income/expense)
     `ALTER TABLE locations ADD COLUMN IF NOT EXISTS supplier_partner_payable_deduction_per_qty DECIMAL(20,4) NOT NULL DEFAULT 0`,
 
+    // Intercompany POS: allow skipping the source voucher so SP Net Position is unaffected
+    `ALTER TABLE intercompany_pos_configs ADD COLUMN IF NOT EXISTS skip_source_voucher boolean NOT NULL DEFAULT false`,
+
     // SP: seed hidden "Supplier Payable Deduction Clearing" account for all existing SP companies
     `INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, active, is_hidden)
      SELECT c.id, 'SP-PAYDDC', 'Supplier Payable Deduction Clearing', 'Liability', 'sp_pay_deduction_clearing', true, true
