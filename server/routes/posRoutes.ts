@@ -742,7 +742,15 @@ export function registerPosRoutes(app: Express) {
       let spPosPayableAccountId: number | null = null;
       let spPosProfitAccountId: number | null = null;
       let spPosCostClrAccountId: number | null = null;
+      let spPosDeductionClrAccountId: number | null = null;
       let totalSupplierCost = 0;
+      // Per-qty deduction that silently reduces Supplier Cash Payable (not income/expense)
+      const spPosDeductionPerQty = isSpCompany
+        ? (parseFloat(String((location as any).supplierPartnerPayableDeductionPerQty ?? "0")) || 0)
+        : 0;
+      const spPosTotalQtySold = isSpCompany
+        ? inventoryValidation.reduce((sum, v) => sum + v.saleQty, 0)
+        : 0;
       if (isSpCompany) {
         const spSettings = await storage.getCompanySettings(req.session.currentCompanyId!);
         spPosPayableAccountId = spSettings?.spPosPayableAccountId ?? null;
@@ -765,6 +773,19 @@ export function registerPosRoutes(app: Express) {
           )
           .limit(1);
         spPosCostClrAccountId = clrAcct?.id ?? null;
+        // Look up Supplier Payable Deduction Clearing account (sp_pay_deduction_clearing subType)
+        const [ddcAcct] = await db
+          .select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.companyId, req.session.currentCompanyId!),
+              eq(ledgerAccounts.subType, "sp_pay_deduction_clearing"),
+              isNull(ledgerAccounts.deletedAt),
+            ),
+          )
+          .limit(1);
+        spPosDeductionClrAccountId = ddcAcct?.id ?? null;
         // Pre-compute total supplier cost from inventory averageRate (includes landed/offloading cost)
         totalSupplierCost = inventoryValidation.reduce(
           (sum, v) => sum + v.saleQty * v.currentRate,
@@ -856,25 +877,66 @@ export function registerPosRoutes(app: Express) {
             narration: creditSaleNarration,
           });
         } else {
-          // Supplier Partner: simple accounting — Dr Cash / Cr Supplier Cash Payable = full sale amount.
-          // The supplier is owed everything collected. Profit is report-only (salesItems.totalSales − totalCost).
+          // Supplier Partner accounting:
+          //   Dr Cash                           = grandTotal  (debit entry already written above)
+          //   Cr Supplier Cash Payable          = grandTotal − deductionAmount
+          //   Cr Deduction Clearing (hidden)    = deductionAmount          (if deduction > 0)
+          //
+          // The deduction is a silent per-qty reduction to what is owed to the supplier
+          // (e.g. a warehouse loss charge). It is NOT income, profit, or an expense —
+          // it flows into a hidden clearing liability that is excluded from all reports.
           const grandTotalRounded = Number(grandTotal.toFixed(2));
+          const spDeductionAmount = Number((spPosTotalQtySold * spPosDeductionPerQty).toFixed(2));
+          // Guard: deduction cannot exceed the sale total
+          if (spDeductionAmount > Math.abs(grandTotalRounded)) {
+            throw new Error(
+              `Supplier payable deduction (${spDeductionAmount}) exceeds the sale total (${grandTotalRounded}). ` +
+              `Adjust the deduction per qty setting on this location.`
+            );
+          }
+          const spPayableAmount = Number((grandTotalRounded - spDeductionAmount).toFixed(2));
+
           if (grandTotalRounded > 0) {
-            await tx.insert(voucherEntries).values({
-              voucherId: txVoucher.id,
-              ledgerAccountId: spPosPayableAccountId!,
-              debitAmount: "0",
-              creditAmount: grandTotalRounded.toFixed(2),
-              narration: `Supplier Cash Payable — ${voucherNumber}`,
-            });
+            // Cr Supplier Cash Payable = reduced payable
+            if (spPayableAmount > 0) {
+              await tx.insert(voucherEntries).values({
+                voucherId: txVoucher.id,
+                ledgerAccountId: spPosPayableAccountId!,
+                debitAmount: "0",
+                creditAmount: spPayableAmount.toFixed(2),
+                narration: `Supplier Cash Payable — ${voucherNumber}`,
+              });
+            }
+            // Cr Deduction Clearing = deduction (keeps voucher balanced)
+            if (spDeductionAmount > 0 && spPosDeductionClrAccountId) {
+              await tx.insert(voucherEntries).values({
+                voucherId: txVoucher.id,
+                ledgerAccountId: spPosDeductionClrAccountId,
+                debitAmount: "0",
+                creditAmount: spDeductionAmount.toFixed(2),
+                narration: `Supplier Payable Deduction (${spPosTotalQtySold} qty × ${spPosDeductionPerQty}) — ${voucherNumber}`,
+              });
+            }
           } else if (grandTotalRounded < 0) {
-            await tx.insert(voucherEntries).values({
-              voucherId: txVoucher.id,
-              ledgerAccountId: spPosPayableAccountId!,
-              debitAmount: Math.abs(grandTotalRounded).toFixed(2),
-              creditAmount: "0",
-              narration: `Supplier Cash Payable reversal — ${voucherNumber}`,
-            });
+            // Reversal: Dr Supplier Cash Payable
+            if (spPayableAmount < 0) {
+              await tx.insert(voucherEntries).values({
+                voucherId: txVoucher.id,
+                ledgerAccountId: spPosPayableAccountId!,
+                debitAmount: Math.abs(spPayableAmount).toFixed(2),
+                creditAmount: "0",
+                narration: `Supplier Cash Payable reversal — ${voucherNumber}`,
+              });
+            }
+            if (spDeductionAmount > 0 && spPosDeductionClrAccountId) {
+              await tx.insert(voucherEntries).values({
+                voucherId: txVoucher.id,
+                ledgerAccountId: spPosDeductionClrAccountId,
+                debitAmount: spDeductionAmount.toFixed(2),
+                creditAmount: "0",
+                narration: `Supplier Payable Deduction reversal — ${voucherNumber}`,
+              });
+            }
           }
         }
 
@@ -1050,6 +1112,7 @@ export function registerPosRoutes(app: Express) {
       let editSpPayableAccountId: number | null = null;
       let editSpProfitAccountId: number | null = null;
       let editSpCostClrAccountId: number | null = null;
+      let editSpDeductionClrAccountId: number | null = null;
       if (isSpCompanyEdit) {
         const spSettings = await storage.getCompanySettings(req.session.currentCompanyId!);
         editSpPayableAccountId = spSettings?.spPosPayableAccountId ?? null;
@@ -1072,6 +1135,19 @@ export function registerPosRoutes(app: Express) {
           )
           .limit(1);
         editSpCostClrAccountId = clrAcct?.id ?? null;
+        // Look up Supplier Payable Deduction Clearing account (sp_pay_deduction_clearing subType)
+        const [ddcAcct] = await db
+          .select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.companyId, req.session.currentCompanyId!),
+              eq(ledgerAccounts.subType, "sp_pay_deduction_clearing"),
+              isNull(ledgerAccounts.deletedAt),
+            ),
+          )
+          .limit(1);
+        editSpDeductionClrAccountId = ddcAcct?.id ?? null;
       }
 
       const { description, items, paymentAccountType, paymentAccountId, isCreditSale, voucherDate, locationId: newLocationId } = req.body;
@@ -1133,6 +1209,17 @@ export function registerPosRoutes(app: Express) {
       const targetLocationId = newLocationId ? parseInt(newLocationId) : oldLocationId;
       const locationChanged = targetLocationId !== oldLocationId;
 
+      // SP edit: load target location's per-qty deduction rate
+      let editSpDeductionPerQty = 0;
+      if (isSpCompanyEdit) {
+        const [editTargetLoc] = await db
+          .select({ supplierPartnerPayableDeductionPerQty: locations.supplierPartnerPayableDeductionPerQty })
+          .from(locations)
+          .where(eq(locations.id, targetLocationId))
+          .limit(1);
+        editSpDeductionPerQty = parseFloat(String(editTargetLoc?.supplierPartnerPayableDeductionPerQty ?? "0")) || 0;
+      }
+
       // Validate new location belongs to company if changed
       if (locationChanged) {
         const [newLocation] = await db
@@ -1191,6 +1278,7 @@ export function registerPosRoutes(app: Express) {
         // Create new sales items and apply new inventory movements
         let grandTotal = 0;
         let totalSupplierCostEdit = 0;
+        let totalQtySoldEdit = 0;
         for (const item of items) {
           const { id, stockItemId, quantity, sellingPrice } = item;
 
@@ -1260,6 +1348,7 @@ export function registerPosRoutes(app: Express) {
 
           grandTotal += totalSales;
           totalSupplierCostEdit += totalCost;
+          totalQtySoldEdit += sellQty;
         }
 
         // Update voucher description, total amount, location, and optionally date
@@ -1334,25 +1423,58 @@ export function registerPosRoutes(app: Express) {
             narration: revenueEntry.narration || "",
           });
         } else {
-          // Supplier Partner: simple accounting — Cr Supplier Cash Payable = full sale amount.
-          // The supplier is owed everything collected. Profit is report-only (salesItems.totalSales − totalCost).
+          // Supplier Partner edit accounting (mirrors new-sale logic):
+          //   Dr Cash / Receivable              = grandTotal  (debit entry already written above)
+          //   Cr Supplier Cash Payable          = grandTotal − deductionAmount
+          //   Cr Deduction Clearing (hidden)    = deductionAmount          (if deduction > 0)
           const grandTotalRounded = Number(grandTotal.toFixed(2));
+          const editDeductionAmount = Number((totalQtySoldEdit * editSpDeductionPerQty).toFixed(2));
+          if (editDeductionAmount > Math.abs(grandTotalRounded)) {
+            throw new Error(
+              `Supplier payable deduction (${editDeductionAmount}) exceeds the sale total (${grandTotalRounded}). ` +
+              `Adjust the deduction per qty setting on this location.`
+            );
+          }
+          const editSpPayableAmount = Number((grandTotalRounded - editDeductionAmount).toFixed(2));
+
           if (grandTotalRounded > 0) {
-            await tx.insert(voucherEntries).values({
-              voucherId,
-              ledgerAccountId: editSpPayableAccountId!,
-              debitAmount: "0",
-              creditAmount: grandTotalRounded.toFixed(2),
-              narration: `Supplier Cash Payable`,
-            });
+            if (editSpPayableAmount > 0) {
+              await tx.insert(voucherEntries).values({
+                voucherId,
+                ledgerAccountId: editSpPayableAccountId!,
+                debitAmount: "0",
+                creditAmount: editSpPayableAmount.toFixed(2),
+                narration: `Supplier Cash Payable`,
+              });
+            }
+            if (editDeductionAmount > 0 && editSpDeductionClrAccountId) {
+              await tx.insert(voucherEntries).values({
+                voucherId,
+                ledgerAccountId: editSpDeductionClrAccountId,
+                debitAmount: "0",
+                creditAmount: editDeductionAmount.toFixed(2),
+                narration: `Supplier Payable Deduction (${totalQtySoldEdit} qty × ${editSpDeductionPerQty})`,
+              });
+            }
           } else if (grandTotalRounded < 0) {
-            await tx.insert(voucherEntries).values({
-              voucherId,
-              ledgerAccountId: editSpPayableAccountId!,
-              debitAmount: Math.abs(grandTotalRounded).toFixed(2),
-              creditAmount: "0",
-              narration: `Supplier Cash Payable reversal`,
-            });
+            if (editSpPayableAmount < 0) {
+              await tx.insert(voucherEntries).values({
+                voucherId,
+                ledgerAccountId: editSpPayableAccountId!,
+                debitAmount: Math.abs(editSpPayableAmount).toFixed(2),
+                creditAmount: "0",
+                narration: `Supplier Cash Payable reversal`,
+              });
+            }
+            if (editDeductionAmount > 0 && editSpDeductionClrAccountId) {
+              await tx.insert(voucherEntries).values({
+                voucherId,
+                ledgerAccountId: editSpDeductionClrAccountId,
+                debitAmount: editDeductionAmount.toFixed(2),
+                creditAmount: "0",
+                narration: `Supplier Payable Deduction reversal`,
+              });
+            }
           }
         }
       });

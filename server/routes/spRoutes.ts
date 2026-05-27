@@ -61,6 +61,9 @@ const SP_ACCOUNTS = [
   // inventory table and must NOT appear as a normal postable account in the Accounts UI.
   { code: "SP-STOCK",   name: "Stock on Floor",                accountType: "Asset",          subType: "sp_stock",              isHidden: true  },
   { code: "SP-COSTCLR", name: "Stock Cost Payable Clearing",   accountType: "Liability",       subType: "sp_cost_clearing",      isHidden: true  },
+  // Internal clearing account to keep vouchers balanced when a per-qty deduction
+  // silently reduces Supplier Cash Payable. Not income/expense — excluded from all reports.
+  { code: "SP-PAYDDC", name: "Supplier Payable Deduction Clearing", accountType: "Liability", subType: "sp_pay_deduction_clearing", isHidden: true },
   { code: "SP-PAY",     name: "Supplier Cash Payable",         accountType: "Liability",       subType: "sp_payable",            isHidden: false },
   { code: "SP-SALES",   name: "Sales",                         accountType: "Income",         subType: "sp_sales",              isHidden: false },
   { code: "SP-COGS",    name: "Cost of Goods Sold",            accountType: "Direct Expense", subType: "sp_cogs",               isHidden: false },

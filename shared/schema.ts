@@ -187,6 +187,10 @@ export const locations = pgTable("locations", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   whatsappGroupChatId: text("whatsapp_group_chat_id"),
   transferWaGroupChatId: text("transfer_wa_group_chat_id"),
+  // For supplier_partner companies: per-qty deduction from Supplier Cash Payable.
+  // This represents an internal payable adjustment (e.g. warehouse transfer loss) —
+  // NOT income, profit, gain, or expense. Excluded from reports and Net Position.
+  supplierPartnerPayableDeductionPerQty: decimal("supplier_partner_payable_deduction_per_qty", { precision: 20, scale: 4 }).notNull().default("0"),
 }, (t) => ({
   companyIdx: index("locations_company_idx").on(t.companyId),
 }));

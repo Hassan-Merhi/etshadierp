@@ -3581,6 +3581,16 @@ let migrationsDone = false;
     // causes confusion and apparent double-counting. isHidden=true removes it from
     // the Accounts page and voucher dropdowns while preserving all ledger history.
     `UPDATE ledger_accounts SET is_hidden = true WHERE sub_type = 'sp_stock' AND is_hidden = false`,
+
+    // SP: per-location supplier payable deduction per qty (silent payable reduction, not income/expense)
+    `ALTER TABLE locations ADD COLUMN IF NOT EXISTS supplier_partner_payable_deduction_per_qty DECIMAL(20,4) NOT NULL DEFAULT 0`,
+
+    // SP: seed hidden "Supplier Payable Deduction Clearing" account for all existing SP companies
+    `INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, active, is_hidden)
+     SELECT c.id, 'SP-PAYDDC', 'Supplier Payable Deduction Clearing', 'Liability', 'sp_pay_deduction_clearing', true, true
+     FROM companies c
+     WHERE c.company_type = 'supplier_partner'
+     AND NOT EXISTS (SELECT 1 FROM ledger_accounts la WHERE la.company_id = c.id AND la.code = 'SP-PAYDDC')`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useCursorNav } from "@/contexts/CursorNavContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "@/contexts/LocationContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useLocation as useRoute } from "wouter";
 import { cn } from "@/lib/utils";
@@ -55,6 +56,7 @@ interface Location {
   state: string | null;
   country: string | null;
   createdAt?: string;
+  supplierPartnerPayableDeductionPerQty?: string | null;
 }
 
 interface InventoryItem {
@@ -131,6 +133,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [_route, navigate] = useRoute();
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
+  const { selectedCompany } = useCompany();
+  const isSpCompany = selectedCompany?.companyType === "supplier_partner";
 
   // Import dialog state
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -163,6 +167,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renamingLocation, setRenamingLocation] = useState<Location | null>(null);
   const [renameInput, setRenameInput] = useState("");
+  const [renameDeductionInput, setRenameDeductionInput] = useState("");
 
   // WhatsApp group dialog state
   const [waGroupDialogOpen, setWaGroupDialogOpen] = useState(false);
@@ -185,8 +190,12 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
   // Rename location mutation
   const renameLocationMutation = useMutation({
-    mutationFn: async ({ id, name }: { id: number; name: string }) => {
-      const res = await apiRequest("PATCH", `/api/locations/${id}`, { name });
+    mutationFn: async ({ id, name, supplierPartnerPayableDeductionPerQty }: { id: number; name: string; supplierPartnerPayableDeductionPerQty?: number }) => {
+      const payload: Record<string, any> = { name };
+      if (supplierPartnerPayableDeductionPerQty !== undefined) {
+        payload.supplierPartnerPayableDeductionPerQty = supplierPartnerPayableDeductionPerQty;
+      }
+      const res = await apiRequest("PATCH", `/api/locations/${id}`, payload);
       return res.json();
     },
     onSuccess: (updated) => {
@@ -206,6 +215,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     e?.stopPropagation();
     setRenamingLocation(loc);
     setRenameInput(loc.name);
+    setRenameDeductionInput(
+      parseFloat(String(loc.supplierPartnerPayableDeductionPerQty ?? "0")).toString()
+    );
     setRenameDialogOpen(true);
   };
 
@@ -3546,24 +3558,51 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       <Dialog open={renameDialogOpen} onOpenChange={(open) => { if (!open) setRenameDialogOpen(false); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Rename Location</DialogTitle>
+            <DialogTitle>Edit Location</DialogTitle>
             <DialogDescription>
-              Enter a new name for <strong>{renamingLocation?.name}</strong>.
+              Update settings for <strong>{renamingLocation?.name}</strong>.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-2">
-            <Input
-              value={renameInput}
-              onChange={(e) => setRenameInput(e.target.value)}
-              placeholder="Location name"
-              data-testid="input-rename-location"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && renameInput.trim() && renamingLocation) {
-                  renameLocationMutation.mutate({ id: renamingLocation.id, name: renameInput.trim() });
-                }
-              }}
-              autoFocus
-            />
+          <div className="py-2 space-y-4">
+            <div className="space-y-1">
+              <Label htmlFor="input-rename-location">Name</Label>
+              <Input
+                id="input-rename-location"
+                value={renameInput}
+                onChange={(e) => setRenameInput(e.target.value)}
+                placeholder="Location name"
+                data-testid="input-rename-location"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && renameInput.trim() && renamingLocation) {
+                    const deductionVal = parseFloat(renameDeductionInput);
+                    renameLocationMutation.mutate({
+                      id: renamingLocation.id,
+                      name: renameInput.trim(),
+                      ...(isSpCompany && !isNaN(deductionVal) ? { supplierPartnerPayableDeductionPerQty: deductionVal } : {}),
+                    });
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+            {isSpCompany && (
+              <div className="space-y-1">
+                <Label htmlFor="input-deduction-per-qty">Payable Deduction Per Qty</Label>
+                <Input
+                  id="input-deduction-per-qty"
+                  type="number"
+                  min="0"
+                  step="0.0001"
+                  value={renameDeductionInput}
+                  onChange={(e) => setRenameDeductionInput(e.target.value)}
+                  placeholder="0"
+                  data-testid="input-deduction-per-qty"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Silently reduces Supplier Cash Payable by this amount per qty sold at this location. Set to 0 to disable.
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRenameDialogOpen(false)} data-testid="button-rename-cancel">
@@ -3572,13 +3611,18 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             <Button
               onClick={() => {
                 if (renameInput.trim() && renamingLocation) {
-                  renameLocationMutation.mutate({ id: renamingLocation.id, name: renameInput.trim() });
+                  const deductionVal = parseFloat(renameDeductionInput);
+                  renameLocationMutation.mutate({
+                    id: renamingLocation.id,
+                    name: renameInput.trim(),
+                    ...(isSpCompany && !isNaN(deductionVal) ? { supplierPartnerPayableDeductionPerQty: deductionVal } : {}),
+                  });
                 }
               }}
               disabled={!renameInput.trim() || renameLocationMutation.isPending}
               data-testid="button-rename-confirm"
             >
-              {renameLocationMutation.isPending ? "Saving..." : "Rename"}
+              {renameLocationMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>

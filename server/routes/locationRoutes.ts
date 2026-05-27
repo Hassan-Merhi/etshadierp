@@ -165,7 +165,7 @@ export function registerLocationRoutes(app: Express) {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const { name, whatsappGroupChatId, transferWaGroupChatId } = req.body;
+      const { name, whatsappGroupChatId, transferWaGroupChatId, supplierPartnerPayableDeductionPerQty } = req.body;
       if (!name || typeof name !== "string" || !name.trim()) {
         return res.status(400).json({ message: "name is required" });
       }
@@ -176,6 +176,13 @@ export function registerLocationRoutes(app: Express) {
       }
       if (transferWaGroupChatId !== undefined) {
         updatePayload.transferWaGroupChatId = transferWaGroupChatId || null;
+      }
+      if (supplierPartnerPayableDeductionPerQty !== undefined) {
+        const deductionVal = parseFloat(supplierPartnerPayableDeductionPerQty);
+        if (isNaN(deductionVal) || deductionVal < 0) {
+          return res.status(400).json({ message: "supplierPartnerPayableDeductionPerQty must be >= 0" });
+        }
+        updatePayload.supplierPartnerPayableDeductionPerQty = deductionVal.toFixed(4);
       }
 
       const [updated] = await db
