@@ -1184,6 +1184,11 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
   const [moveDate, setMoveDate] = useState(new Date().toISOString().slice(0, 10));
   const [moveNotes, setMoveNotes] = useState("");
 
+  // ── Apply as Rent state ──
+  const [rentAmount, setRentAmount] = useState(contract.guaranteeAmount);
+  const [rentDate, setRentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [rentNotes, setRentNotes] = useState("");
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
     queryClient.invalidateQueries({ queryKey: [apiBase + "/units", unitId, "detail"] });
@@ -1214,6 +1219,16 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
       notes: moveNotes,
     }),
     onSuccess: () => { toast({ title: "Guarantee moved to cash successfully" }); invalidate(); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const applyToRent = useMutation({
+    mutationFn: () => apiRequest("POST", `${apiBase}/contracts/${contract.id}/guarantee-to-rent`, {
+      amount: rentAmount,
+      paymentDate: rentDate,
+      notes: rentNotes,
+    }),
+    onSuccess: () => { toast({ title: "Guarantee applied to rent", description: "Rent ledger updated. No cash moved." }); invalidate(); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
@@ -1306,6 +1321,57 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
         <div className="flex justify-end">
           <Button onClick={() => moveToCash.mutate()} disabled={!moveAmount || !moveAccountId || moveToCash.isPending} data-testid={`button-${testIdPrefix}-guarantee-move-cash`}>
             {moveToCash.isPending ? (tenantPays ? "Recovering…" : "Moving…") : (tenantPays ? "Recover to Cash" : "Move to Cash")}
+          </Button>
+        </div>
+      </div>
+
+      {/* ── Section 3: Apply as Rent ── */}
+      <div className="border rounded-md p-3 space-y-3">
+        <p className="text-sm font-semibold">Apply Guarantee as Rent</p>
+        <p className="text-xs text-muted-foreground">
+          {tenantPays
+            ? "Uses the held deposit to cover outstanding rent — no cash moves. Posts: Dr Rent Expense / Cr Security Deposits Paid. Rent ledger marked paid."
+            : "Uses the held deposit to cover outstanding rent — no cash moves. Posts: Dr Tenant Deposits / Cr Rent Income. Rent ledger marked paid."
+          }
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Amount ($)</Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={rentAmount}
+              onChange={e => setRentAmount(e.target.value)}
+              data-testid={`input-${testIdPrefix}-guarantee-rent-amount`}
+            />
+          </div>
+          <div>
+            <Label>Apply from date</Label>
+            <Input
+              type="date"
+              value={rentDate}
+              onChange={e => setRentDate(e.target.value)}
+              data-testid={`input-${testIdPrefix}-guarantee-rent-date`}
+            />
+          </div>
+          <div className="col-span-2">
+            <Label>Notes (optional)</Label>
+            <Textarea
+              rows={2}
+              value={rentNotes}
+              onChange={e => setRentNotes(e.target.value)}
+              placeholder="e.g. Applied to cover arrears on departure"
+              data-testid={`input-${testIdPrefix}-guarantee-rent-notes`}
+            />
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <Button
+            onClick={() => applyToRent.mutate()}
+            disabled={!rentAmount || !rentDate || applyToRent.isPending}
+            data-testid={`button-${testIdPrefix}-guarantee-apply-rent`}
+          >
+            {applyToRent.isPending ? "Applying…" : "Apply as Rent"}
           </Button>
         </div>
       </div>

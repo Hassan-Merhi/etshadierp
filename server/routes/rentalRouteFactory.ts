@@ -1058,6 +1058,151 @@ export function registerRentalRoutes(
     }
   });
 
+  // ── APPLY GUARANTEE AS RENT ──
+  // No cash changes hands — Dr Tenant Deposits (or Sec Dep Paid) / Cr Rent Income (or Rent Expense)
+  app.post(`${urlPrefix}/contracts/:id/guarantee-to-rent`, requireAuth, async (req: Request, res: Response) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+
+      const { amount, paymentDate, notes } = z.object({
+        amount: z.union([z.string(), z.number()]).transform(v => String(v)),
+        paymentDate: z.string().min(1),
+        notes: z.string().optional(),
+      }).parse(req.body);
+
+      const [contract] = await db.select().from(propertyContracts).where(and(
+        eq(propertyContracts.id, id),
+        eq(propertyContracts.companyId, companyId),
+        eq(propertyContracts.module, module),
+      ));
+      if (!contract) return res.status(404).json({ message: "Contract not found" });
+
+      await ensureMonthlyLedgerRows(contract.id);
+
+      const pd = new Date(paymentDate);
+      const y = pd.getUTCFullYear(), m = pd.getUTCMonth() + 1;
+      const totalAmountNum = parseFloat(amount);
+      const rentalAmountNum = parseFloat(contract.rentalAmount as string);
+
+      const [unit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, contract.unitId));
+      const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
+      const isShop = unit?.unitType === "SHOP";
+      const tenantPays = module === "ERP" || module === "FACTORY";
+
+      const allocations = await buildAllocations(contract.id, y, m, totalAmountNum, rentalAmountNum);
+      if (!allocations.length) return res.status(400).json({ message: "No outstanding rent to apply the guarantee to for that period." });
+
+      await db.transaction(async (tx) => {
+        // Ensure a ledger row exists for every allocated month
+        for (const alloc of allocations) {
+          await tx.insert(propertyMonthlyLedger).values({
+            companyId, module, contractId: contract.id, unitId: contract.unitId,
+            year: alloc.year, month: alloc.month,
+            expectedAmount: contract.rentalAmount, paidAmount: "0",
+          }).onConflictDoNothing({
+            target: [propertyMonthlyLedger.contractId, propertyMonthlyLedger.year, propertyMonthlyLedger.month],
+          });
+        }
+
+        const monthSpan = allocations.length > 1
+          ? `${String(allocations[0].month).padStart(2,"0")}/${allocations[0].year} – ${String(allocations[allocations.length-1].month).padStart(2,"0")}/${allocations[allocations.length-1].year}`
+          : `${String(m).padStart(2,"0")}/${y}`;
+        const narration = notes
+          ? `Guarantee applied to rent - ${unitLabel} - ${monthSpan} - ${notes}`
+          : `Guarantee applied to rent - ${unitLabel} - ${monthSpan}`;
+
+        // Journal: no cash account involved
+        let voucherId: number;
+        if (tenantPays && isShop) {
+          // Tenant/shop pays rent: Dr Rent Expense - Shops (expense↑) / Cr Security Deposits Paid (asset↓)
+          const expenseAccountId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
+          const depositAccountId = await findOrCreateLedgerAccount(tx, companyId, "Security Deposits Paid", "Asset", "SEC-DEP-PAID");
+          const [v] = await tx.insert(vouchers).values({
+            companyId,
+            voucherNumber: `GUAR-RENT-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${id}`,
+            voucherType: "Journal",
+            voucherDate: paymentDate as any,
+            description: narration, totalAmount: amount, currency: "USD", sourceModule: "ERP",
+          }).returning();
+          voucherId = v.id;
+          await tx.insert(voucherEntries).values([
+            { voucherId: v.id, ledgerAccountId: expenseAccountId,  debitAmount: amount, creditAmount: "0",  narration },
+            { voucherId: v.id, ledgerAccountId: depositAccountId,  debitAmount: "0",  creditAmount: amount, narration },
+          ]);
+        } else if (tenantPays) {
+          // Non-shop tenant: Dr Rent Expense / Cr Security Deposits Paid
+          const expenseAccountId = await findOrCreateLedgerAccount(tx, companyId, incomeAccountName, "Indirect Expense", "RENT-EXP");
+          const depositAccountId = await findOrCreateLedgerAccount(tx, companyId, "Security Deposits Paid", "Asset", "SEC-DEP-PAID");
+          const [v] = await tx.insert(vouchers).values({
+            companyId,
+            voucherNumber: `GUAR-RENT-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${id}`,
+            voucherType: "Journal",
+            voucherDate: paymentDate as any,
+            description: narration, totalAmount: amount, currency: "USD", sourceModule: "ERP",
+          }).returning();
+          voucherId = v.id;
+          await tx.insert(voucherEntries).values([
+            { voucherId: v.id, ledgerAccountId: expenseAccountId, debitAmount: amount, creditAmount: "0",  narration },
+            { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: "0", creditAmount: amount, narration },
+          ]);
+        } else {
+          // Landlord: Dr Tenant Deposits (liability↓) / Cr Rent Income (income↑)
+          const depositAccountId = await findOrCreateLedgerAccount(tx, companyId, "Tenant Deposits", "Liability", "TENANT-DEP");
+          const incomeAccId = await findOrCreateLedgerAccount(tx, companyId, incomeAccountName, "Income", "RENT-INC", "Indirect Income");
+          const [v] = await tx.insert(vouchers).values({
+            companyId,
+            voucherNumber: `GUAR-RENT-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${id}`,
+            voucherType: "Journal",
+            voucherDate: paymentDate as any,
+            description: narration, totalAmount: amount, currency: "USD", sourceModule: "ERP",
+          }).returning();
+          voucherId = v.id;
+          await tx.insert(voucherEntries).values([
+            { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: amount, creditAmount: "0",  narration },
+            { voucherId: v.id, ledgerAccountId: incomeAccId,      debitAmount: "0",  creditAmount: amount, narration },
+          ]);
+        }
+
+        // Create one payment row per allocated month and update ledger
+        for (const alloc of allocations) {
+          const [row] = await tx.select().from(propertyMonthlyLedger).where(and(
+            eq(propertyMonthlyLedger.contractId, contract.id),
+            eq(propertyMonthlyLedger.year, alloc.year),
+            eq(propertyMonthlyLedger.month, alloc.month),
+          ));
+          await tx.insert(propertyPayments).values({
+            companyId, module, contractId: contract.id, unitId: contract.unitId,
+            ledgerRowId: row.id,
+            cashAccountId: null,
+            voucherId,
+            amount: alloc.chunk,
+            paymentDate: paymentDate as any,
+            forYear: alloc.year, forMonth: alloc.month,
+            notes: allocations.length > 1
+              ? `[Guarantee applied] ${narration} | Split from ${amount}`
+              : `[Guarantee applied] ${narration}`,
+          }).returning();
+          await tx.execute(sql`
+            UPDATE property_monthly_ledger SET paid_amount = paid_amount + ${alloc.chunk}::numeric WHERE id = ${row.id}
+          `);
+        }
+
+        // Mark guarantee as applied on the contract
+        await tx.update(propertyContracts)
+          .set({ guaranteePostedToStatement: true, guaranteePostedAmount: amount })
+          .where(eq(propertyContracts.id, id));
+      });
+
+      res.json({ ok: true, allocations });
+    } catch (e: any) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // ── RECORD PAYMENT ──
   app.post(`${urlPrefix}/payments`, requireAuth, async (req: Request, res: Response) => {
     try {
