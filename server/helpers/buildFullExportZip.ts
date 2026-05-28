@@ -1,7 +1,6 @@
 import archiver from "archiver";
 import { PassThrough } from "stream";
-import { fetchCompanyExportData } from "../services/exportDataService";
-import { buildCompanyWorkbook } from "../services/exportExcelService";
+import { streamCompanyWorkbookDirect } from "../services/exportExcelService";
 
 export interface ExportZipResult {
   zip:     Buffer;
@@ -13,10 +12,11 @@ export interface ExportZipResult {
  * Builds the canonical full-company export ZIP.
  * Includes one Excel workbook per company (all accounts, ledger, vouchers, etc.)
  *
- * Memory-safe approach: each company's workbook is streamed directly into the
- * archiver via a PassThrough — the full workbook buffer is never held in RAM.
- * Only one company is in flight at a time, so peak RAM usage is bounded to
- * roughly one workbook + the compressed ZIP output being accumulated.
+ * Memory-safe approach: each company's data is fetched one sheet at a time
+ * and streamed directly into the archiver via a PassThrough — no dataset is
+ * held in RAM while the next is fetched.  Peak RAM is bounded to roughly one
+ * sheet's worth of raw rows + the ExcelJS workbook being built (instead of
+ * ALL table data + workbook simultaneously, which caused OOM crashes).
  *
  * This is the single source of truth used by:
  *  - Manual "Export Now → Email / Download" (exportRoutes.ts)
@@ -49,23 +49,17 @@ export async function buildFullExportZip(
 
   for (const company of companies) {
     try {
-      log(`[${company.name}] Querying all data...`, "info");
-      const data = await fetchCompanyExportData(company.id, fromDate, toDate);
+      log(`[${company.name}] Building workbook (streaming, one sheet at a time)...`, "info");
 
-      log(`[${company.name}] Building Excel workbook...`, "info");
-
-      const safeName = company.name.replace(/[^a-zA-Z0-9_\- ]/g, "").trim();
+      const safeName  = company.name.replace(/[^a-zA-Z0-9_\- ]/g, "").trim();
       const entryName = `${safeName}_Export_${dateLabel}.xlsx`;
 
-      // Create a PassThrough that bridges ExcelJS → archiver.
-      // ExcelJS's wb.xlsx.write() ends the stream when it finishes writing.
-      // Archiver processes this entry fully before moving on (sequential), so
-      // at most one workbook's uncompressed data is in memory at once.
+      // Stream directly: streamCompanyWorkbookDirect fetches each sheet
+      // sequentially so only one dataset lives in RAM at a time.
       const pass = new PassThrough();
       arc.append(pass, { name: entryName });
 
-      await buildCompanyWorkbook(data, pass);
-      // ExcelJS ends the stream internally; ensure it is closed in case it does not.
+      await streamCompanyWorkbookDirect(company.id, fromDate, toDate, pass);
       if (!pass.destroyed) pass.end();
 
       names.push(company.name);
@@ -78,7 +72,6 @@ export async function buildFullExportZip(
   }
 
   if (names.length === 0) {
-    // Abort the archiver cleanly before rejecting
     arc.abort();
     const msg = `Export aborted — all ${companies.length} company/companies failed to generate workbooks. ZIP would be empty. Check server logs for per-company errors.`;
     log(msg, "error");
