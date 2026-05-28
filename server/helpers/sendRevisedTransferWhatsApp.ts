@@ -114,25 +114,19 @@ export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOpt
 
   for (const chatId of chatIds) {
     if (pngBuffer) {
-      const result = await sendWhatsAppFileToChatIdPos(chatId, pngBuffer, fileName, caption, "image/png");
+      const result = await sendWhatsAppFileToChatIdPos(chatId, pngBuffer, fileName, "", "image/png");
       if (result.success) {
         console.log(`[RevisedTransferWA] Sent ${voucherNumber} revised image to group ${chatId}`);
       } else {
-        console.warn(`[RevisedTransferWA] Image send failed for ${voucherNumber} → ${chatId}: ${result.error} — trying text fallback`);
-        const textResult = await sendWhatsAppTextToChatIdPos(chatId, caption);
-        if (textResult.success) {
-          console.log(`[RevisedTransferWA] Text fallback sent for ${voucherNumber} → ${chatId}`);
-        } else {
-          console.warn(`[RevisedTransferWA] Text fallback also failed for ${voucherNumber} → ${chatId}: ${textResult.error}`);
-        }
+        console.warn(`[RevisedTransferWA] Image send failed for ${voucherNumber} → ${chatId}: ${result.error}`);
       }
+    }
+    // Always send the text message (in addition to the image, or as the only message if image failed)
+    const textResult = await sendWhatsAppTextToChatIdPos(chatId, caption);
+    if (textResult.success) {
+      console.log(`[RevisedTransferWA] Text message sent for ${voucherNumber} → ${chatId}`);
     } else {
-      const textResult = await sendWhatsAppTextToChatIdPos(chatId, caption);
-      if (textResult.success) {
-        console.log(`[RevisedTransferWA] Text message sent for ${voucherNumber} → ${chatId}`);
-      } else {
-        console.warn(`[RevisedTransferWA] Text send failed for ${voucherNumber} → ${chatId}: ${textResult.error}`);
-      }
+      console.warn(`[RevisedTransferWA] Text send failed for ${voucherNumber} → ${chatId}: ${textResult.error}`);
     }
   }
 }
