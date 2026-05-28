@@ -1749,8 +1749,7 @@ function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onN
     mutationFn: () => apiRequest("POST", `/api/properties/repair/reallocate-payments/${contract.id}`, {}),
     onSuccess: (data: any) => {
       toast({ title: "Allocation fixed", description: data?.message ?? `${data?.fixed ?? 0} payment(s) reallocated to the correct months.` });
-      queryClient.invalidateQueries({ queryKey: [apiBase + "/contracts/" + contract.id] });
-      queryClient.invalidateQueries({ queryKey: [apiBase + "/ledger"] });
+      queryClient.invalidateQueries({ queryKey: [apiBase + "/units", unitId, "detail"] });
       onNoteUpdated?.();
     },
     onError: (err: any) => toast({ title: "Fix failed", description: err?.message ?? "Could not reallocate payments.", variant: "destructive" }),
