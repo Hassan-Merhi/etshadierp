@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useState, useRef, lazy, Suspense } from "react";
 import { useButtonClickFeedback } from "@/hooks/use-button-click-feedback";
 import { useServerRestart } from "@/hooks/use-server-restart";
+import { useDialogScrollFix } from "@/hooks/use-dialog-scroll-fix";
 import { Switch, Route, useLocation, Redirect } from "wouter";
 import { hasActiveEscapeHandler } from "@/hooks/use-escape-back";
 import { getParentRoute } from "@/lib/parent-routes";
@@ -413,6 +414,7 @@ function AuthenticatedApp() {
   usePresence();    // Track user presence
   useScreenFeed();  // Silently capture screen frames for admin Watch feature
   useWsInvalidation(); // Real-time cache invalidation via WebSocket
+  useDialogScrollFix(); // Global fix: prevent Radix dialogs from leaving body frozen after close
   const [location, setLocation] = useLocation();
   const [currentLocation] = useLocation();
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);

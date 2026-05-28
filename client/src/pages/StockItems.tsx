@@ -804,14 +804,12 @@ export default function StockItems() {
       )}
 
       {/* ── Dialogs: stock items ── */}
-      {selectedStockItemId && (
-        <StockItemDetailsDialog
-          open={detailsDialogOpen}
-          onOpenChange={setDetailsDialogOpen}
-          stockItemId={selectedStockItemId}
-          stockItemName={selectedStockItemName}
-        />
-      )}
+      <StockItemDetailsDialog
+        open={detailsDialogOpen && !!selectedStockItemId}
+        onOpenChange={setDetailsDialogOpen}
+        stockItemId={selectedStockItemId ?? 0}
+        stockItemName={selectedStockItemName}
+      />
       <StockItemEditDialog open={editDialogOpen} onOpenChange={setEditDialogOpen} stockItemId={editStockItemId} />
       <StockItemCreateDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
       <CombinedImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
