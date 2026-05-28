@@ -51,6 +51,57 @@ export function registerLedgerRoutes(app: Express) {
     }
   });
 
+  // Get all "empty" ledger accounts (no entries, zero OB, no children)
+  // Must be registered BEFORE /:id so Express doesn't swallow "empty" as an id param.
+  app.get(
+    "/api/ledger-accounts/empty",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+        const allAccounts = await db
+          .select()
+          .from(ledgerAccounts)
+          .where(and(eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt)));
+
+        const accountIds = allAccounts.map((a) => a.id);
+        if (accountIds.length === 0) return res.json([]);
+
+        // Accounts that have any voucher entries — scoped to this company only
+        const usedInEntries = await db
+          .selectDistinct({ accountId: voucherEntries.ledgerAccountId })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(and(
+            isNotNull(voucherEntries.ledgerAccountId),
+            eq(vouchers.companyId, companyId),
+            inArray(voucherEntries.ledgerAccountId, accountIds),
+          ));
+        const usedIds = new Set(usedInEntries.map((r: any) => r.accountId));
+
+        // Accounts that are parents to other accounts
+        const parentIds = new Set(
+          allAccounts.filter((a) => a.parentId !== null).map((a) => a.parentId as number)
+        );
+
+        const empty = allAccounts.filter((a) => {
+          if (usedIds.has(a.id)) return false;
+          if (parentIds.has(a.id)) return false;
+          const ob = parseFloat(a.openingBalance || "0");
+          if (Math.abs(ob) > 0.001) return false;
+          return true;
+        });
+
+        res.json(empty);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
   app.get("/api/ledger-accounts/:id", requireAuth, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
@@ -471,56 +522,6 @@ export function registerLedgerRoutes(app: Express) {
         res.json({ message: "Ledger account deleted successfully" });
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      }
-    },
-  );
-
-  // Get all "empty" ledger accounts (no entries, zero OB, no children)
-  app.get(
-    "/api/ledger-accounts/empty",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        const companyId = req.session.currentCompanyId;
-        if (!companyId) return res.status(400).json({ message: "No company selected" });
-
-        const allAccounts = await db
-          .select()
-          .from(ledgerAccounts)
-          .where(and(eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt)));
-
-        const accountIds = allAccounts.map((a) => a.id);
-        if (accountIds.length === 0) return res.json([]);
-
-        // Accounts that have any voucher entries — scoped to this company only
-        const usedInEntries = await db
-          .selectDistinct({ accountId: voucherEntries.ledgerAccountId })
-          .from(voucherEntries)
-          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-          .where(and(
-            isNotNull(voucherEntries.ledgerAccountId),
-            eq(vouchers.companyId, companyId),
-            inArray(voucherEntries.ledgerAccountId, accountIds),
-          ));
-        const usedIds = new Set(usedInEntries.map((r: any) => r.accountId));
-
-        // Accounts that are parents to other accounts
-        const parentIds = new Set(
-          allAccounts.filter((a) => a.parentId !== null).map((a) => a.parentId as number)
-        );
-
-        const empty = allAccounts.filter((a) => {
-          if (usedIds.has(a.id)) return false;
-          if (parentIds.has(a.id)) return false;
-          const ob = parseFloat(a.openingBalance || "0");
-          if (Math.abs(ob) > 0.001) return false;
-          return true;
-        });
-
-        res.json(empty);
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
       }
     },
   );
