@@ -72,6 +72,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, FEATURE_PAGE_INFO, type FeatureKey } from "@shared/schema";
   import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
   import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
+import { BulkRenameTab } from "./BulkRenameTab";
   import { useCompany } from "@/contexts/CompanyContext";
   import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
   import { formatNumber } from "@/lib/formatNumber";
@@ -167,6 +168,9 @@ export function DataToolsTab() {
   const [isSilentParsing, setIsSilentParsing] = useState(false);
   const [isSilentApplying, setIsSilentApplying] = useState(false);
   const [silentAppliedCount, setSilentAppliedCount] = useState(0);
+
+  // Bulk rename dialog state
+  const [bulkRenameOpen, setBulkRenameOpen] = useState(false);
 
 
   // Fetch locations for the current company
@@ -731,6 +735,32 @@ export function DataToolsTab() {
               >
                 <Package className="h-4 w-4 mr-2" />
                 Open Silent Production / Consumption
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Bulk Rename Stock Items — Admin/Owner/Developer */}
+        {appMode !== "factory" && ["Admin", "Owner", "Developer"].includes(dtCurrentUser?.role || "") && selectedCompany && (
+          <Card className="col-span-1 md:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Edit className="h-4 w-4" />
+                Bulk Rename Stock Items
+              </CardTitle>
+              <CardDescription>
+                Find and replace text across multiple stock item names at once.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setBulkRenameOpen(true)}
+                data-testid="button-open-bulk-rename"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Open Bulk Rename
               </Button>
             </CardContent>
           </Card>
@@ -1487,6 +1517,19 @@ export function DataToolsTab() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Rename Dialog */}
+      <Dialog open={bulkRenameOpen} onOpenChange={setBulkRenameOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Bulk Rename Stock Items</DialogTitle>
+            <DialogDescription>
+              Find and replace text across multiple stock item names.
+            </DialogDescription>
+          </DialogHeader>
+          <BulkRenameTab />
         </DialogContent>
       </Dialog>
     </div>
