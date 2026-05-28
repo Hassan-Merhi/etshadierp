@@ -119,6 +119,7 @@ export const ERP_NAV_SECTIONS: NavSection[] = [
   {
     label: "AI Tools",
     color: NAV_COLOR.analytics,
+    devOnly: true,
     items: [
       { title: "AI Command Center", url: "/ai-command-center", icon: Bot         },
       { title: "AI Validation",     url: "/ai-validation",     icon: ShieldCheck },
@@ -189,10 +190,12 @@ export function useErpVisibleSections(user?: any): {
     return true;
   };
 
+  const isDeveloper = user?.role === "Developer";
+
   const sections = ERP_NAV_SECTIONS.map(s => ({
     ...s,
     items: s.items.filter(isItemVisible),
-  })).filter(s => s.items.length > 0);
+  })).filter(s => s.items.length > 0 && (!s.devOnly || isDeveloper));
 
   return {
     sections,

@@ -132,6 +132,7 @@ const HUB_CATEGORIES: HubCategory[] = [
     keywords: ["active", "users", "watch", "screen", "live", "session", "presence", "monitor", "factory", "erp", "sessions"],
     firstSection: "sessions-hub",
     group: "controls",
+    devOnly: true,
   },
 ];
 
