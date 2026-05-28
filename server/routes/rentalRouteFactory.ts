@@ -477,8 +477,10 @@ export function registerRentalRoutes(
       // gracefully returns [] so owned units always load.
       let sharedResults: typeof ownedResults = [];
       try {
-        // No module filter here — shared contracts can come from a different company type
-        // (e.g. PROPERTIES → ERP). We filter by unitType on the unit instead.
+        // Shared contracts (rented FROM another company) always appear in the Shops view only.
+        // The owner may classify the unit differently in their system, so we ignore unitType
+        // and pin shared units to the SHOP view to avoid them leaking into Warehouses.
+        if (unitType === "SHOP") {
         const sharedContracts = await db.select().from(propertyContracts).where(and(
           eq(propertyContracts.linkedCompanyId, companyId),
           eq(propertyContracts.status, "ACTIVE"),
@@ -486,12 +488,10 @@ export function registerRentalRoutes(
 
         if (sharedContracts.length > 0) {
           const sharedUnitIds = sharedContracts.map(c => c.unitId);
-          // Filter by unitType so shops only show in Shops view, warehouses in Warehouses view
+          // No unitType filter — show all shared contracts in the Shops view regardless of
+          // how the owner classified the unit in their own system.
           const sharedUnits = await db.select().from(propertyUnits)
-            .where(and(
-              inArray(propertyUnits.id, sharedUnitIds),
-              eq(propertyUnits.unitType, unitType),
-            ));
+            .where(inArray(propertyUnits.id, sharedUnitIds));
           const sharedUnitMap = new Map(sharedUnits.map(u => [u.id, u]));
 
           const sharedContractIds = sharedContracts.map(c => c.id);
@@ -537,6 +537,7 @@ export function registerRentalRoutes(
             };
           }).filter(Boolean) as typeof ownedResults;
         }
+        } // end if (unitType === "SHOP")
       } catch (sharedErr: any) {
         // Column may not exist yet in production — owned units still load fine
         console.warn(`${tag} shared-units skipped:`, sharedErr.message?.split("\n")[0]);
