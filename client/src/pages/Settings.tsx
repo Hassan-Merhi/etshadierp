@@ -719,7 +719,6 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
         label: "System",
         items: [
           { key: "system", label: "System Tools", icon: Wrench },
-          { key: "offline", label: "Offline & Sync", icon: WifiOff, devOnly: true },
         ],
       },
     ];
@@ -2279,16 +2278,6 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
             );
           })()}
 
-          {activeSection === "offline" && (
-            <div className="space-y-6">
-              <Card>
-                <CardContent className="pt-5">
-                  <OfflinePrepPanel />
-                </CardContent>
-              </Card>
-              <OfflineSyncPanel />
-            </div>
-          )}
         </div>
 
         {/* Initialize Accounting Balances Dialog */}

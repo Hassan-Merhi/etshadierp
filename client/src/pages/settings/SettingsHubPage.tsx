@@ -88,11 +88,11 @@ const HUB_CATEGORIES: HubCategory[] = [
   {
     key: "data-tools",
     title: "Data Tools",
-    description: "File storage, bulk rename, offline sync, and data management",
+    description: "File storage, bulk rename, and data management",
     icon: Database,
     colorClass: "bg-purple-500/10",
     iconColorClass: "text-purple-500",
-    keywords: ["data", "files", "storage", "bulk", "rename", "offline", "sync", "backup"],
+    keywords: ["data", "files", "storage", "bulk", "rename", "backup"],
     firstSection: "files",
     group: "controls",
     devOnly: true,
