@@ -477,16 +477,21 @@ export function registerRentalRoutes(
       // gracefully returns [] so owned units always load.
       let sharedResults: typeof ownedResults = [];
       try {
+        // No module filter here — shared contracts can come from a different company type
+        // (e.g. PROPERTIES → ERP). We filter by unitType on the unit instead.
         const sharedContracts = await db.select().from(propertyContracts).where(and(
           eq(propertyContracts.linkedCompanyId, companyId),
-          eq(propertyContracts.module, module),
           eq(propertyContracts.status, "ACTIVE"),
         ));
 
         if (sharedContracts.length > 0) {
           const sharedUnitIds = sharedContracts.map(c => c.unitId);
+          // Filter by unitType so shops only show in Shops view, warehouses in Warehouses view
           const sharedUnits = await db.select().from(propertyUnits)
-            .where(inArray(propertyUnits.id, sharedUnitIds));
+            .where(and(
+              inArray(propertyUnits.id, sharedUnitIds),
+              eq(propertyUnits.unitType, unitType),
+            ));
           const sharedUnitMap = new Map(sharedUnits.map(u => [u.id, u]));
 
           const sharedContractIds = sharedContracts.map(c => c.id);
