@@ -81,6 +81,7 @@ const HUB_CATEGORIES: HubCategory[] = [
     colorClass: "bg-yellow-500/10",
     iconColorClass: "text-yellow-600",
     nonFactory: true,
+    devOnly: true,
     keywords: ["pos", "point of sale", "price", "groups", "receipt", "intercompany", "transfer"],
     firstSection: "pos-setup",
     group: "operations",

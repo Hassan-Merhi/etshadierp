@@ -706,7 +706,7 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
       {
         label: "POS",
         items: appMode !== "factory" ? [
-          { key: "pos-setup", label: "POS Setup", icon: ShoppingCart },
+          { key: "pos-setup", label: "POS Setup", icon: ShoppingCart, devOnly: true },
         ] : [],
       },
       {
@@ -1268,7 +1268,7 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
           {activeSection === "data-tools" && currentUser?.role === "Developer" && (
             <DataToolsTab />
           )}
-          {activeSection === "pos-setup" && (
+          {activeSection === "pos-setup" && currentUser?.role === "Developer" && (
             <PosSetupHub userRole={currentUser?.role} />
           )}
           {activeSection === "files-export" && (
