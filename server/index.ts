@@ -3966,6 +3966,122 @@ END $mig$`;
         console.error("[RentalFix] Migration error:", e.message);
       }
 
+      // ── Auto-reallocate misallocated property payments ───────────────────────
+      // For every active contract: re-processes rent payments in date order and
+      // assigns each to the oldest outstanding month, fixing cases where the
+      // payment was recorded against a future/wrong month while earlier months
+      // remained unpaid.  Safe to re-run — idempotent once data is correct.
+      try {
+        const contractsResult = await migrationClient.query(`
+          SELECT id, company_id, rental_amount::numeric AS rental_amount
+          FROM property_contracts
+          WHERE status = 'ACTIVE'
+        `);
+
+        let allocationTotalFixed = 0;
+
+        for (const contract of contractsResult.rows) {
+          const cid   = contract.id;
+          const compId = contract.company_id;
+
+          const paymentsResult = await migrationClient.query(`
+            SELECT id, amount::numeric AS amount, for_year, for_month
+            FROM property_payments
+            WHERE contract_id = $1 AND company_id = $2
+              AND ledger_row_id IS NOT NULL
+              AND (notes IS NULL OR notes NOT LIKE '%[Guarantee release]%')
+            ORDER BY payment_date, id
+          `, [cid, compId]);
+
+          if (paymentsResult.rows.length === 0) continue;
+
+          const ledgerResult = await migrationClient.query(`
+            SELECT id, year, month, expected_amount::numeric AS expected_amount
+            FROM property_monthly_ledger
+            WHERE contract_id = $1 AND company_id = $2
+            ORDER BY year, month
+          `, [cid, compId]);
+
+          if (ledgerResult.rows.length === 0) continue;
+
+          // Build in-memory ledger with paid=0 (full reset)
+          const lmap = new Map<string, { id: number; expected: number; paid: number }>();
+          for (const row of ledgerResult.rows) {
+            lmap.set(`${row.year}-${row.month}`, {
+              id: Number(row.id), expected: Number(row.expected_amount), paid: 0,
+            });
+          }
+
+          // Re-allocate each payment to the oldest outstanding month
+          const updates: Array<{ id: number; forYear: number; forMonth: number; origForYear: number; origForMonth: number; ledgerId: number }> = [];
+
+          for (const pmt of paymentsResult.rows) {
+            let remaining = Number(pmt.amount);
+            let firstAlloc = true;
+
+            while (remaining > 0.005) {
+              let target: { key: string; id: number; expected: number; paid: number; year: number; month: number } | null = null;
+              for (const [key, row] of lmap) {
+                if (row.expected - row.paid > 0.005) {
+                  const [y, m] = key.split("-").map(Number);
+                  target = { key, year: y, month: m, ...row };
+                  break;
+                }
+              }
+              if (!target) break;
+
+              const chunk = Math.min(remaining, target.expected - target.paid);
+              target.paid += chunk;
+              remaining = Math.round((remaining - chunk) * 100) / 100;
+              lmap.set(target.key, target);
+
+              if (firstAlloc) {
+                updates.push({
+                  id: Number(pmt.id),
+                  forYear: target.year, forMonth: target.month,
+                  origForYear: Number(pmt.for_year), origForMonth: Number(pmt.for_month),
+                  ledgerId: target.id,
+                });
+                firstAlloc = false;
+              }
+            }
+          }
+
+          // Write new ledger paidAmounts
+          for (const [, row] of lmap) {
+            await migrationClient.query(
+              `UPDATE property_monthly_ledger SET paid_amount = $1 WHERE id = $2`,
+              [row.paid.toFixed(2), row.id]
+            );
+          }
+
+          // Write payment forYear/forMonth only where changed
+          let contractFixed = 0;
+          for (const upd of updates) {
+            if (upd.origForYear !== upd.forYear || upd.origForMonth !== upd.forMonth) {
+              await migrationClient.query(
+                `UPDATE property_payments SET for_year = $1, for_month = $2, ledger_row_id = $3 WHERE id = $4`,
+                [upd.forYear, upd.forMonth, upd.ledgerId, upd.id]
+              );
+              contractFixed++;
+            }
+          }
+
+          if (contractFixed > 0) {
+            console.log(`[AllocationFix] contract=${cid} fixed ${contractFixed} payment(s)`);
+            allocationTotalFixed += contractFixed;
+          }
+        }
+
+        if (allocationTotalFixed > 0) {
+          console.log(`[AllocationFix] Auto-reallocated ${allocationTotalFixed} payment(s) across all contracts`);
+        } else {
+          console.log(`[AllocationFix] All contract allocations are correct`);
+        }
+      } catch (e: any) {
+        console.error("[AllocationFix] Error:", e.message);
+      }
+
       // ── Auto-fix orphaned RESERVED_FOR_ORDER bales ───────────────────────────
       // Bales stuck in RESERVED_FOR_ORDER with no active customer order referencing
       // them (order deleted / container row deleted) are returned to IN_STOCK.
