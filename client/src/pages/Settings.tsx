@@ -83,6 +83,7 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
 import { ParentCreditAccountSelect } from "./settings/ParentCreditAccountSelect";
 import { NetPositionAdjustmentCard } from "./settings/NetPositionAdjustmentCard";
 import { ActiveUsersSection } from "./settings/ActiveUsersSection";
+import { SessionsHub } from "./settings/SessionsHub";
 import { DataToolsTab } from "./settings/DataToolsTab";
 import { fmtDate, fieldLabel, fmtValue, getRecordLabel, getChangesSummary, tableShortName, AuditLogDialog, EditLogTable } from "./settings/AuditLog";
 import { PosSettingsTab } from "./settings/PosSettingsTab";
@@ -95,7 +96,6 @@ import { DailyAutoSendSection } from "./settings/DailyAutoSendSection";
 import { ExportCenter } from "./settings/ExportCenter";
 import { BulkRenameTab } from "./settings/BulkRenameTab";
 import { LoginHistoryTab } from "./settings/LoginHistoryTab";
-import { ActiveSessionsTab } from "./settings/ActiveSessionsTab";
 import { POSReceiptSettings, IntercompanyPosTab } from "./settings/IntercompanyPosTab";
 import { OfflineSyncPanel, formatRelativeTime } from "./settings/OfflineSyncPanel";
 import { PriceGroupsTab } from "./settings/PriceGroupsTab";
@@ -695,8 +695,7 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
         label: "Users & Access",
         items: [
           { key: "users-permissions", label: "Users & Permissions", icon: Users },
-          { key: "active-users", label: "Active Users (Watch)", icon: Activity, devOnly: true },
-          { key: "active-sessions", label: "Active Sessions", icon: Shield },
+          { key: "sessions-hub", label: "Sessions & Users", icon: Shield },
           { key: "users", label: "Users (legacy)", icon: Users, devOnly: true },
         ],
       },
@@ -1248,16 +1247,14 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
           )}
 
 
-          {/* Active Users Tab */}
-          {activeSection === "active-users" && currentUser?.role === "Developer" && (
-            <ActiveUsersSection />
+          {activeSection === "sessions-hub" && (
+            <SessionsHub
+              isAdmin={["Admin", "Owner", "Developer"].includes(currentUser?.role || "")}
+              isDev={currentUser?.role === "Developer"}
+            />
           )}
 
           {activeSection === "login-history" && currentUser?.role === "Developer" && <LoginHistoryTab />}
-
-          {activeSection === "active-sessions" && (
-            <ActiveSessionsTab isAdmin={["Admin", "Owner", "Developer"].includes(currentUser?.role || "")} />
-          )}
 
 
           {activeSection === "edit-log" && (
