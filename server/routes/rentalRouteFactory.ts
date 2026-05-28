@@ -473,61 +473,68 @@ export function registerRentalRoutes(
       });
 
       // ── Shared contracts: contracts from OTHER companies that link to this company ──
-      const sharedContracts = await db.select().from(propertyContracts).where(and(
-        eq(propertyContracts.linkedCompanyId, companyId),
-        eq(propertyContracts.module, module),
-        eq(propertyContracts.status, "ACTIVE"),
-      ));
-
+      // Wrapped in its own try/catch — if the column hasn't been migrated yet this
+      // gracefully returns [] so owned units always load.
       let sharedResults: typeof ownedResults = [];
-      if (sharedContracts.length > 0) {
-        const sharedUnitIds = sharedContracts.map(c => c.unitId);
-        const sharedUnits = await db.select().from(propertyUnits)
-          .where(inArray(propertyUnits.id, sharedUnitIds));
-        const sharedUnitMap = new Map(sharedUnits.map(u => [u.id, u]));
+      try {
+        const sharedContracts = await db.select().from(propertyContracts).where(and(
+          eq(propertyContracts.linkedCompanyId, companyId),
+          eq(propertyContracts.module, module),
+          eq(propertyContracts.status, "ACTIVE"),
+        ));
 
-        const sharedContractIds = sharedContracts.map(c => c.id);
-        const sharedLedgerRows = await db.select({
-          contractId: propertyMonthlyLedger.contractId,
-          expected: sql<string>`COALESCE(SUM(
-            CASE WHEN (
-              ${propertyMonthlyLedger.year} < EXTRACT(YEAR FROM NOW())
-              OR (
-                ${propertyMonthlyLedger.year} = EXTRACT(YEAR FROM NOW())
-                AND ${propertyMonthlyLedger.month} <= EXTRACT(MONTH FROM NOW())
-              )
-            ) THEN ${propertyMonthlyLedger.expectedAmount} ELSE 0 END
-          ), 0)`,
-          paid: sql<string>`COALESCE(SUM(${propertyMonthlyLedger.paidAmount}), 0)`,
-        }).from(propertyMonthlyLedger)
-          .where(inArray(propertyMonthlyLedger.contractId, sharedContractIds))
-          .groupBy(propertyMonthlyLedger.contractId);
-        const sharedOutstanding = new Map<number, number>();
-        const sharedPaid = new Map<number, number>();
-        sharedLedgerRows.forEach(r => {
-          sharedOutstanding.set(r.contractId, Number(r.expected) - Number(r.paid));
-          sharedPaid.set(r.contractId, Number(r.paid));
-        });
+        if (sharedContracts.length > 0) {
+          const sharedUnitIds = sharedContracts.map(c => c.unitId);
+          const sharedUnits = await db.select().from(propertyUnits)
+            .where(inArray(propertyUnits.id, sharedUnitIds));
+          const sharedUnitMap = new Map(sharedUnits.map(u => [u.id, u]));
 
-        // Fetch owner company names
-        const ownerCompanyIds = [...new Set(sharedContracts.map(c => c.companyId))];
-        const ownerCompanies = await db.select({ id: companies.id, name: companies.name })
-          .from(companies)
-          .where(inArray(companies.id, ownerCompanyIds));
-        const ownerNameMap = new Map(ownerCompanies.map(c => [c.id, c.name]));
+          const sharedContractIds = sharedContracts.map(c => c.id);
+          const sharedLedgerRows = await db.select({
+            contractId: propertyMonthlyLedger.contractId,
+            expected: sql<string>`COALESCE(SUM(
+              CASE WHEN (
+                ${propertyMonthlyLedger.year} < EXTRACT(YEAR FROM NOW())
+                OR (
+                  ${propertyMonthlyLedger.year} = EXTRACT(YEAR FROM NOW())
+                  AND ${propertyMonthlyLedger.month} <= EXTRACT(MONTH FROM NOW())
+                )
+              ) THEN ${propertyMonthlyLedger.expectedAmount} ELSE 0 END
+            ), 0)`,
+            paid: sql<string>`COALESCE(SUM(${propertyMonthlyLedger.paidAmount}), 0)`,
+          }).from(propertyMonthlyLedger)
+            .where(inArray(propertyMonthlyLedger.contractId, sharedContractIds))
+            .groupBy(propertyMonthlyLedger.contractId);
+          const sharedOutstanding = new Map<number, number>();
+          const sharedPaid = new Map<number, number>();
+          sharedLedgerRows.forEach(r => {
+            sharedOutstanding.set(r.contractId, Number(r.expected) - Number(r.paid));
+            sharedPaid.set(r.contractId, Number(r.paid));
+          });
 
-        sharedResults = sharedContracts.map(c => {
-          const u = sharedUnitMap.get(c.unitId);
-          if (!u) return null;
-          return {
-            ...u,
-            contract: c,
-            outstanding: sharedOutstanding.get(c.id) ?? 0,
-            totalPaid: sharedPaid.get(c.id) ?? 0,
-            isShared: true,
-            ownerCompanyName: ownerNameMap.get(c.companyId) ?? null,
-          };
-        }).filter(Boolean) as typeof ownedResults;
+          // Fetch owner company names
+          const ownerCompanyIds = [...new Set(sharedContracts.map(c => c.companyId))];
+          const ownerCompanies = await db.select({ id: companies.id, name: companies.name })
+            .from(companies)
+            .where(inArray(companies.id, ownerCompanyIds));
+          const ownerNameMap = new Map(ownerCompanies.map(c => [c.id, c.name]));
+
+          sharedResults = sharedContracts.map(c => {
+            const u = sharedUnitMap.get(c.unitId);
+            if (!u) return null;
+            return {
+              ...u,
+              contract: c,
+              outstanding: sharedOutstanding.get(c.id) ?? 0,
+              totalPaid: sharedPaid.get(c.id) ?? 0,
+              isShared: true,
+              ownerCompanyName: ownerNameMap.get(c.companyId) ?? null,
+            };
+          }).filter(Boolean) as typeof ownedResults;
+        }
+      } catch (sharedErr: any) {
+        // Column may not exist yet in production — owned units still load fine
+        console.warn(`${tag} shared-units skipped:`, sharedErr.message?.split("\n")[0]);
       }
 
       res.json([...ownedResults, ...sharedResults]);
@@ -1825,15 +1832,20 @@ export function registerRentalRoutes(
       ));
 
       // If unit doesn't belong to this company, check if it's shared with this company
+      // Wrapped in try/catch — gracefully skips if column not migrated yet in production
       if (!unit) {
-        const [sharedContract] = await db.select().from(propertyContracts).where(and(
-          eq(propertyContracts.unitId, unitId),
-          eq(propertyContracts.linkedCompanyId, companyId),
-          eq(propertyContracts.status, "ACTIVE"),
-        ));
-        if (sharedContract) {
-          const [ownerUnit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, unitId));
-          if (ownerUnit) { unit = ownerUnit; isShared = true; }
+        try {
+          const [sharedContract] = await db.select().from(propertyContracts).where(and(
+            eq(propertyContracts.unitId, unitId),
+            eq(propertyContracts.linkedCompanyId, companyId),
+            eq(propertyContracts.status, "ACTIVE"),
+          ));
+          if (sharedContract) {
+            const [ownerUnit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, unitId));
+            if (ownerUnit) { unit = ownerUnit; isShared = true; }
+          }
+        } catch (sharedErr: any) {
+          console.warn(`${tag} shared-detail skipped:`, sharedErr.message?.split("\n")[0]);
         }
       }
       if (!unit) return res.status(404).json({ message: "Unit not found" });
