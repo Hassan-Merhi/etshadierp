@@ -702,12 +702,13 @@ export function registerBalanceRepairRoutes(app: Express) {
         // ── Phase A2: remove orphaned prepaid rows ────────────────────────────
         // Delete ledger rows where expected_amount = 0 AND paid_amount = 0 —
         // these are empty "prepaid" rows left over after payments were deleted.
-        await db.execute(sql`
-          DELETE FROM property_monthly_ledger
-          WHERE contract_id = ${contractId}
-            AND (expected_amount IS NULL OR expected_amount::numeric = 0)
-            AND (paid_amount IS NULL OR paid_amount::numeric = 0)
-        `);
+        await db.delete(propertyMonthlyLedger)
+          .where(and(
+            eq(propertyMonthlyLedger.contractId, contractId),
+            eq(propertyMonthlyLedger.companyId, companyId),
+            sql`${propertyMonthlyLedger.expectedAmount}::numeric = 0`,
+            sql`${propertyMonthlyLedger.paidAmount}::numeric = 0`,
+          ));
 
         // ── Phase B: JS re-allocation ────────────────────────────────────────
         // Load all payments that are NOT guarantee-to-cash releases.
