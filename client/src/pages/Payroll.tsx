@@ -93,6 +93,11 @@ import ERPRunPayroll from "@/components/ERPRunPayroll";
 import ERPAdvancesTab from "@/components/ERPAdvancesTab";
 import type { DepositFormData, BonusFormData, WithdrawalFormData, BulkPaymentFormData, SalaryAdvanceFormData, DeductionFormData, WorkerFormData, EmployeeFormData, WorkerPayment, SalaryAdvance } from "./payroll/payrollSchemas";
 import { depositSchema, bonusSchema, withdrawalSchema, bulkPaymentSchema, salaryAdvanceSchema, deductionSchema, workerFormSchema, employeeFormSchema, getThisMonthRange, getEmpAvatarColor, getEmpInitials, EMP_AVATAR_COLORS } from "./payroll/payrollSchemas";
+import { DepositDialog } from "./payroll/DepositDialog";
+import { WithdrawalDialog } from "./payroll/WithdrawalDialog";
+import { BulkPaymentDialog } from "./payroll/BulkPaymentDialog";
+import { WorkerDialogs } from "./payroll/WorkerDialogs";
+import { AdvanceDialogs } from "./payroll/AdvanceDialogs";
 
 export default function Payroll() {
   const appMode = useAppMode();
@@ -2725,86 +2730,13 @@ export default function Payroll() {
       </div>
 
       {/* Employee Deposit Dialog */}
-      <Dialog open={depositDialogOpen} onOpenChange={setDepositDialogOpen}>
-        <DialogContent data-testid="dialog-deposit">
-          <DialogHeader>
-            <DialogTitle>Deposit Salary</DialogTitle>
-            <DialogDescription>
-              Add salary to {selectedEmployee?.firstName} {selectedEmployee?.lastName}'s balance account
-            </DialogDescription>
-          </DialogHeader>
-
-          <Form {...depositForm}>
-            <form noValidate onSubmit={depositForm.handleSubmit((data) => depositMutation.mutate(data))} className="space-y-4">
-              <FormField
-                control={depositForm.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Amount</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        {...field}
-                        data-testid="input-deposit-amount"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={depositForm.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} data-testid="input-deposit-date" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={depositForm.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notes (Optional)</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Additional notes..."
-                        {...field}
-                        data-testid="input-deposit-notes"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setDepositDialogOpen(false)}
-                  data-testid="button-cancel-deposit"
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={depositMutation.isPending} data-testid="button-submit-deposit">
-                  {depositMutation.isPending ? "Processing..." : "Deposit"}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+      <DepositDialog
+        open={depositDialogOpen}
+        onOpenChange={setDepositDialogOpen}
+        selectedEmployee={selectedEmployee}
+        form={depositForm}
+        mutation={depositMutation}
+      />
 
       {/* Employee Smart Bonus Dialog */}
       <Dialog open={bonusDialogOpen} onOpenChange={setBonusDialogOpen}>
@@ -3196,301 +3128,30 @@ export default function Payroll() {
       </Dialog>
 
       {/* Employee Withdrawal Dialog */}
-      <Dialog open={withdrawalDialogOpen} onOpenChange={setWithdrawalDialogOpen}>
-        <DialogContent data-testid="dialog-withdrawal">
-          <DialogHeader>
-            <DialogTitle>Withdraw Salary</DialogTitle>
-            <DialogDescription>
-              Withdraw from {selectedEmployee?.firstName} {selectedEmployee?.lastName}'s balance: {selectedEmployee?.currentBalance}
-            </DialogDescription>
-          </DialogHeader>
-
-          <Form {...withdrawalForm}>
-            <form noValidate onSubmit={withdrawalForm.handleSubmit((data) => withdrawalMutation.mutate(data))} className="space-y-4">
-              <FormField
-                control={withdrawalForm.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Amount</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        {...field}
-                        data-testid="input-withdrawal-amount"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={withdrawalForm.control}
-                name="paymentAccountType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment From</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-withdrawal-account-type">
-                          <SelectValue placeholder="Select account type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="bank">Bank Account</SelectItem>
-                        <SelectItem value="cash">Cash Account</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={withdrawalForm.control}
-                name="paymentAccountId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      {withdrawalForm.watch("paymentAccountType") === "cash" ? "Cash Account" : "Bank Account"}
-                    </FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-withdrawal-account">
-                          <SelectValue placeholder="Select account" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {withdrawalForm.watch("paymentAccountType") === "cash" ? (
-                          cashAccounts.length === 0 ? (
-                            <SelectItem value="none" disabled>
-                              No cash accounts available
-                            </SelectItem>
-                          ) : (
-                            cashAccounts.map((account) => (
-                              <SelectItem key={account.id} value={account.id.toString()}>
-                                {account.name}
-                              </SelectItem>
-                            ))
-                          )
-                        ) : bankAccountsLoading ? (
-                          <SelectItem value="loading" disabled>
-                            Loading...
-                          </SelectItem>
-                        ) : (
-                          bankAccounts?.map((account) => (
-                            <SelectItem key={account.id} value={account.id.toString()}>
-                              {account.name} ({account.accountNumber})
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={withdrawalForm.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} data-testid="input-withdrawal-date" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={withdrawalForm.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notes (Optional)</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Additional notes..."
-                        {...field}
-                        data-testid="input-withdrawal-notes"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setWithdrawalDialogOpen(false)}
-                  data-testid="button-cancel-withdrawal"
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={withdrawalMutation.isPending} data-testid="button-submit-withdrawal">
-                  {withdrawalMutation.isPending ? "Processing..." : "Withdraw"}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+      <WithdrawalDialog
+        open={withdrawalDialogOpen}
+        onOpenChange={setWithdrawalDialogOpen}
+        selectedEmployee={selectedEmployee}
+        form={withdrawalForm}
+        mutation={withdrawalMutation}
+        cashAccounts={cashAccounts}
+        bankAccounts={bankAccounts}
+        bankAccountsLoading={bankAccountsLoading}
+      />
 
       {/* Bulk Payment Dialog */}
-      <Dialog open={bulkPaymentDialogOpen} onOpenChange={setBulkPaymentDialogOpen}>
-        <DialogContent data-testid="dialog-bulk-payment" className="max-w-4xl w-[95vw]">
-          <DialogHeader>
-            <DialogTitle>Process Bulk Payment</DialogTitle>
-            <DialogDescription>
-              Pay {selectedPayments.length} workers - Total amount: {formatAmount(totalAmount)}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="border rounded-md p-4 mb-4 bg-muted/30 max-h-60 overflow-y-auto">
-            <h4 className="font-semibold mb-3">Payment Summary</h4>
-            <div className="space-y-2">
-              {selectedPayments.map((payment) => {
-                const worker = workerStaff.find(w => w.id === payment.workerId);
-                return (
-                  <div key={payment.workerId} className="flex justify-between text-sm">
-                    <span>{worker?.firstName} {worker?.lastName} ({worker?.code})</span>
-                    <span className="font-mono">{formatAmount(parseFloat(payment.amount))}</span>
-                  </div>
-                );
-              })}
-              <div className="pt-2 border-t mt-3 flex justify-between font-semibold">
-                <span>Total</span>
-                <span className="font-mono">{formatAmount(totalAmount)}</span>
-              </div>
-            </div>
-          </div>
-
-          <Form {...bulkPaymentForm}>
-            <form noValidate onSubmit={bulkPaymentForm.handleSubmit((data) => bulkPaymentMutation.mutate(data))} className="space-y-4">
-              <FormField
-                control={bulkPaymentForm.control}
-                name="paymentAccountType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment From</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-bulk-account-type">
-                          <SelectValue placeholder="Select account type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="bank">Bank Account</SelectItem>
-                        <SelectItem value="cash">Cash Account</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={bulkPaymentForm.control}
-                name="paymentAccountId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      {bulkPaymentForm.watch("paymentAccountType") === "cash" ? "Cash Account" : "Bank Account"}
-                    </FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-bulk-account">
-                          <SelectValue placeholder="Select account" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {bulkPaymentForm.watch("paymentAccountType") === "cash" ? (
-                          cashAccounts.length === 0 ? (
-                            <SelectItem value="none" disabled>
-                              No cash accounts available
-                            </SelectItem>
-                          ) : (
-                            cashAccounts.map((account) => (
-                              <SelectItem key={account.id} value={account.id.toString()}>
-                                {account.name}
-                              </SelectItem>
-                            ))
-                          )
-                        ) : bankAccountsLoading ? (
-                          <SelectItem value="loading" disabled>
-                            Loading...
-                          </SelectItem>
-                        ) : (
-                          bankAccounts?.map((account) => (
-                            <SelectItem key={account.id} value={account.id.toString()}>
-                              {account.name} ({account.accountNumber})
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={bulkPaymentForm.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} data-testid="input-bulk-date" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={bulkPaymentForm.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notes (Optional)</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Additional notes..."
-                        {...field}
-                        data-testid="input-bulk-notes"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setBulkPaymentDialogOpen(false)}
-                  data-testid="button-cancel-bulk"
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={bulkPaymentMutation.isPending} data-testid="button-submit-bulk">
-                  {bulkPaymentMutation.isPending ? "Processing..." : `Pay ${selectedPayments.length} Workers`}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+      <BulkPaymentDialog
+        open={bulkPaymentDialogOpen}
+        onOpenChange={setBulkPaymentDialogOpen}
+        selectedPayments={selectedPayments}
+        totalAmount={totalAmount}
+        workerStaff={workerStaff}
+        form={bulkPaymentForm}
+        mutation={bulkPaymentMutation}
+        cashAccounts={cashAccounts}
+        bankAccounts={bankAccounts}
+        bankAccountsLoading={bankAccountsLoading}
+      />
 
       {/* New Salary Advance Dialog */}
       <Dialog open={advanceDialogOpen} onOpenChange={setAdvanceDialogOpen}>
