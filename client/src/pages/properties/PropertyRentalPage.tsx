@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog, ChevronsUpDown, Trash2, ClipboardList, CreditCard, CalendarDays } from "lucide-react";
+import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog, ChevronsUpDown, Trash2, ClipboardList, CreditCard, CalendarDays, Wrench } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
@@ -1733,6 +1733,9 @@ function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onN
   const [draftNote, setDraftNote] = useState(contract.statementNote ?? "");
   const noteChanged = draftNote !== (contract.statementNote ?? "");
 
+  const { data: me } = useQuery<any>({ queryKey: ["/api/auth/me"], staleTime: 30 * 60 * 1000 });
+  const isAdmin = me?.role === "Admin" || me?.role === "Developer";
+
   const saveNote = useMutation({
     mutationFn: () => apiRequest("PATCH", `${apiBase}/contracts/${contract.id}/statement-note`, { statementNote: draftNote }),
     onSuccess: () => {
@@ -1740,6 +1743,17 @@ function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onN
       onNoteUpdated?.();
     },
     onError: () => toast({ title: "Failed to save note", variant: "destructive" }),
+  });
+
+  const fixAllocation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/properties/repair/reallocate-payments/${contract.id}`, {}),
+    onSuccess: (data: any) => {
+      toast({ title: "Allocation fixed", description: data?.message ?? `${data?.fixed ?? 0} payment(s) reallocated to the correct months.` });
+      queryClient.invalidateQueries({ queryKey: [apiBase + "/contracts/" + contract.id] });
+      queryClient.invalidateQueries({ queryKey: [apiBase + "/ledger"] });
+      onNoteUpdated?.();
+    },
+    onError: (err: any) => toast({ title: "Fix failed", description: err?.message ?? "Could not reallocate payments.", variant: "destructive" }),
   });
 
   const now = new Date();
@@ -1869,6 +1883,19 @@ function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onN
           </div>
         </div>
         <div className="flex gap-2 shrink-0">
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fixAllocation.mutate()}
+              disabled={fixAllocation.isPending}
+              data-testid="button-fix-allocation"
+              title="Re-allocate payments to oldest unpaid months first"
+            >
+              <Wrench className="h-4 w-4 mr-1" />
+              {fixAllocation.isPending ? "Fixing..." : "Fix Allocation"}
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={handleExcel} data-testid="button-export-excel">
             <Download className="h-4 w-4 mr-1" />Excel
           </Button>

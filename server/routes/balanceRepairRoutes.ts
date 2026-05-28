@@ -661,4 +661,108 @@ export function registerBalanceRepairRoutes(app: Express) {
       }
     },
   );
+
+  // ── POST /api/properties/repair/reallocate-payments/:contractId ────────────
+  // Re-processes all payments for a contract in date order, assigning each
+  // payment chunk to the oldest outstanding month — fixing any misallocation
+  // caused by the payment date being used as the start month instead of the
+  // oldest unpaid month.
+  app.post(
+    "/api/properties/repair/reallocate-payments/:contractId",
+    requireAuth,
+    requireRole("Admin"),
+    async (req: any, res: any) => {
+      try {
+        const companyId: number | undefined = req.session.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const contractId = parseInt(req.params.contractId, 10);
+        if (isNaN(contractId)) return res.status(400).json({ message: "Invalid contractId" });
+
+        const [contract] = await db.select().from(propertyContracts)
+          .where(and(eq(propertyContracts.id, contractId), eq(propertyContracts.companyId, companyId)));
+        if (!contract) return res.status(404).json({ message: "Contract not found" });
+
+        // 1. Load all payments sorted by date then id
+        const payments = await db.select().from(propertyPayments)
+          .where(and(eq(propertyPayments.contractId, contractId), eq(propertyPayments.companyId, companyId)))
+          .orderBy(propertyPayments.paymentDate, propertyPayments.id);
+
+        if (payments.length === 0) return res.json({ fixed: 0, message: "No payments found" });
+
+        // 2. Load all ledger rows sorted oldest first
+        const ledgerRows = await db.select().from(propertyMonthlyLedger)
+          .where(and(eq(propertyMonthlyLedger.contractId, contractId), eq(propertyMonthlyLedger.companyId, companyId)))
+          .orderBy(propertyMonthlyLedger.year, propertyMonthlyLedger.month);
+
+        if (ledgerRows.length === 0) return res.json({ fixed: 0, message: "No ledger rows found" });
+
+        // 3. Reset all ledger paidAmounts to 0 in memory
+        const ledgerMap = new Map<string, { id: number; expected: number; paid: number }>();
+        for (const row of ledgerRows) {
+          ledgerMap.set(`${row.year}-${row.month}`, {
+            id: row.id,
+            expected: parseNum(row.expectedAmount),
+            paid: 0,
+          });
+        }
+
+        // 4. Re-allocate each payment chunk to the oldest outstanding month
+        const paymentUpdates: Array<{ id: number; forYear: number; forMonth: number; ledgerRowId: number | null }> = [];
+
+        for (const payment of payments) {
+          let remaining = parseNum(payment.amount);
+          let firstAlloc = true;
+
+          while (remaining > 0.005) {
+            // Find the oldest ledger row with outstanding balance
+            let target: { key: string; year: number; month: number; id: number; expected: number; paid: number } | null = null;
+            for (const [key, row] of ledgerMap) {
+              const [y, m] = key.split("-").map(Number);
+              const outstanding = row.expected - row.paid;
+              if (outstanding > 0.005) {
+                target = { key, year: y, month: m, ...row };
+                break; // already sorted oldest first in Map iteration
+              }
+            }
+
+            if (!target) break; // no more outstanding months
+
+            const chunk = Math.min(remaining, target.expected - target.paid);
+            target.paid += chunk;
+            remaining = Math.round((remaining - chunk) * 100) / 100;
+            ledgerMap.set(target.key, target);
+
+            if (firstAlloc) {
+              paymentUpdates.push({ id: payment.id, forYear: target.year, forMonth: target.month, ledgerRowId: target.id });
+              firstAlloc = false;
+            }
+          }
+        }
+
+        // 5. Apply: update ledger paidAmounts + payment forYear/forMonth
+        let fixed = 0;
+        await db.transaction(async (tx) => {
+          for (const [, row] of ledgerMap) {
+            await tx.update(propertyMonthlyLedger)
+              .set({ paidAmount: row.paid.toFixed(2) })
+              .where(eq(propertyMonthlyLedger.id, row.id));
+          }
+          for (const upd of paymentUpdates) {
+            const original = payments.find(p => p.id === upd.id);
+            if (original && (original.forYear !== upd.forYear || original.forMonth !== upd.forMonth)) {
+              await tx.update(propertyPayments)
+                .set({ forYear: upd.forYear, forMonth: upd.forMonth, ledgerRowId: upd.ledgerRowId })
+                .where(eq(propertyPayments.id, upd.id));
+              fixed++;
+            }
+          }
+        });
+
+        res.json({ fixed, total: payments.length, message: `Reallocated ${fixed} payment(s) to the correct months.` });
+      } catch (err: any) {
+        console.error("[BalanceRepair] reallocate error:", err);
+        res.status(500).json({ message: err.message });
+      }
+    },
+  );
 }
