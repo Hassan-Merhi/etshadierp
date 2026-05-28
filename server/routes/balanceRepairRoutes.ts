@@ -663,10 +663,12 @@ export function registerBalanceRepairRoutes(app: Express) {
   );
 
   // ── POST /api/properties/repair/reallocate-payments/:contractId ────────────
-  // Re-processes all payments for a contract in date order, assigning each
-  // payment chunk to the oldest outstanding month — fixing any misallocation
-  // caused by the payment date being used as the start month instead of the
-  // oldest unpaid month.
+  // Two-phase fix:
+  //   Phase A (SQL, always runs): zeros out any ledger paid_amount whose sum
+  //     from linked payments doesn't match — catches ghost amounts from
+  //     guarantee-to-cash releases or deleted payments.
+  //   Phase B (JS, runs when rent payments exist): re-allocates each rent
+  //     payment to the oldest outstanding month in date order.
   app.post(
     "/api/properties/repair/reallocate-payments/:contractId",
     requireAuth,
@@ -682,9 +684,25 @@ export function registerBalanceRepairRoutes(app: Express) {
           .where(and(eq(propertyContracts.id, contractId), eq(propertyContracts.companyId, companyId)));
         if (!contract) return res.status(404).json({ message: "Contract not found" });
 
-        // 1. Load only rent payments (ledgerRowId IS NOT NULL) sorted by date then id.
-        //    Exclude guarantee-to-cash payments (ledgerRowId = null) — they never
-        //    affect the rent ledger and must not be re-allocated as rent.
+        // ── Phase A: SQL sync — ALWAYS runs first ────────────────────────────
+        // Sets each ledger row's paid_amount to the exact sum of property_payments
+        // that point to it (ledger_row_id = pml.id).  Payments with ledger_row_id
+        // IS NULL (guarantee-to-cash releases) are naturally excluded by the join
+        // condition, so ghost amounts from those are zeroed out here.
+        await db.execute(sql`
+          UPDATE property_monthly_ledger pml
+          SET paid_amount = COALESCE((
+            SELECT SUM(pp.amount::numeric)
+            FROM property_payments pp
+            WHERE pp.ledger_row_id = pml.id
+              AND pp.deleted_at IS NULL
+          ), 0)
+          WHERE pml.contract_id = ${contractId}
+        `);
+
+        // ── Phase B: JS re-allocation ────────────────────────────────────────
+        // Load only rent payments (ledgerRowId IS NOT NULL) — guarantee-to-cash
+        // payments have ledgerRowId = null and must not be treated as rent.
         const payments = await db.select().from(propertyPayments)
           .where(and(
             eq(propertyPayments.contractId, contractId),
@@ -693,16 +711,19 @@ export function registerBalanceRepairRoutes(app: Express) {
           ))
           .orderBy(propertyPayments.paymentDate, propertyPayments.id);
 
-        if (payments.length === 0) return res.json({ fixed: 0, message: "No payments found" });
+        if (payments.length === 0) {
+          return res.json({ fixed: 0, message: "Ledger amounts synced (no rent payments to reallocate)." });
+        }
 
-        // 2. Load all ledger rows sorted oldest first
         const ledgerRows = await db.select().from(propertyMonthlyLedger)
           .where(and(eq(propertyMonthlyLedger.contractId, contractId), eq(propertyMonthlyLedger.companyId, companyId)))
           .orderBy(propertyMonthlyLedger.year, propertyMonthlyLedger.month);
 
-        if (ledgerRows.length === 0) return res.json({ fixed: 0, message: "No ledger rows found" });
+        if (ledgerRows.length === 0) {
+          return res.json({ fixed: 0, message: "Ledger amounts synced (no ledger rows found)." });
+        }
 
-        // 3. Reset all ledger paidAmounts to 0 in memory
+        // Reset ledger paidAmounts to 0 in memory, then re-fill from payments
         const ledgerMap = new Map<string, { id: number; expected: number; paid: number }>();
         for (const row of ledgerRows) {
           ledgerMap.set(`${row.year}-${row.month}`, {
@@ -712,7 +733,6 @@ export function registerBalanceRepairRoutes(app: Express) {
           });
         }
 
-        // 4. Re-allocate each payment chunk to the oldest outstanding month
         const paymentUpdates: Array<{ id: number; forYear: number; forMonth: number; ledgerRowId: number | null }> = [];
 
         for (const payment of payments) {
@@ -720,18 +740,15 @@ export function registerBalanceRepairRoutes(app: Express) {
           let firstAlloc = true;
 
           while (remaining > 0.005) {
-            // Find the oldest ledger row with outstanding balance
             let target: { key: string; year: number; month: number; id: number; expected: number; paid: number } | null = null;
             for (const [key, row] of ledgerMap) {
               const [y, m] = key.split("-").map(Number);
-              const outstanding = row.expected - row.paid;
-              if (outstanding > 0.005) {
+              if (row.expected - row.paid > 0.005) {
                 target = { key, year: y, month: m, ...row };
-                break; // already sorted oldest first in Map iteration
+                break;
               }
             }
-
-            if (!target) break; // no more outstanding months
+            if (!target) break;
 
             const chunk = Math.min(remaining, target.expected - target.paid);
             target.paid += chunk;
@@ -745,7 +762,6 @@ export function registerBalanceRepairRoutes(app: Express) {
           }
         }
 
-        // 5. Apply: update ledger paidAmounts + payment forYear/forMonth
         let fixed = 0;
         await db.transaction(async (tx) => {
           for (const [, row] of ledgerMap) {
@@ -755,7 +771,7 @@ export function registerBalanceRepairRoutes(app: Express) {
           }
           for (const upd of paymentUpdates) {
             const original = payments.find(p => p.id === upd.id);
-            if (original && (original.forYear !== upd.forYear || original.forMonth !== upd.forMonth)) {
+            if (original && (Number(original.forYear) !== upd.forYear || Number(original.forMonth) !== upd.forMonth)) {
               await tx.update(propertyPayments)
                 .set({ forYear: upd.forYear, forMonth: upd.forMonth, ledgerRowId: upd.ledgerRowId })
                 .where(eq(propertyPayments.id, upd.id));
@@ -763,24 +779,6 @@ export function registerBalanceRepairRoutes(app: Express) {
             }
           }
         });
-
-        // 6. Phase 2 safety net: sync any ledger row whose paid_amount still
-        //    doesn't match the sum of payments pointing to it (catches orphaned
-        //    amounts left behind by guarantee-to-cash or deleted payments).
-        await db.execute(sql`
-          UPDATE property_monthly_ledger pml
-          SET paid_amount = COALESCE((
-            SELECT SUM(pp.amount::numeric)
-            FROM property_payments pp
-            WHERE pp.ledger_row_id = pml.id
-          ), 0)
-          WHERE pml.contract_id = ${contractId}
-            AND ABS(pml.paid_amount::numeric - COALESCE((
-              SELECT SUM(pp.amount::numeric)
-              FROM property_payments pp
-              WHERE pp.ledger_row_id = pml.id
-            ), 0)) > 0.01
-        `);
 
         res.json({ fixed, total: payments.length, message: `Reallocated ${fixed} payment(s) to the correct months.` });
       } catch (err: any) {
