@@ -1642,10 +1642,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
         currencyCode: c.otherChargesCurrencyCode || "USD",
       }))];
 
-      // Only include payable (offloaded/received) containers in financial statement rows and totals.
-      // OTW/PENDING/IN_TRANSIT containers are visible in the DB but must not affect balances.
-      const payableContainers = containers.filter(isPayableContainer);
-      const statement = payableContainers.map((c: any) => {
+      const statement = containers.map((c: any) => {
         // Use totalKg (declared/agreed weight) for the payable value shown to the supplier.
         // actualReceivedKg only affects inventory — not the agreed purchase amount.
         const kg = parseFloat(c.totalKg || "0");
@@ -2369,9 +2366,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
     // Container rows
     // Always use totalKg (declared/agreed weight) — weight differences at offload affect inventory
     // only, not what is owed to the supplier. This matches computeBalance and computeStats.
-    // Only include payable (offloaded/received) containers — OTW/PENDING/IN_TRANSIT must not affect balances.
-    const payableContainers = (allContainers as any[]).filter(isPayableContainer);
-    for (const c of payableContainers) {
+    for (const c of (allContainers as any[])) {
       const supplierName = supplierNameMap[c.supplierId] || "Unknown";
       const cc = c.currencyCode || "USD";
       const kg = parseFloat(c.totalKg || "0");
