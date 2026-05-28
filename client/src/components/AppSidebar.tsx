@@ -113,9 +113,7 @@ export const ERP_NAV_SECTIONS: NavSection[] = [
     label: "Rentals",
     color: NAV_COLOR.rentals,
     items: [
-      { title: "Warehouses",    url: "/erp/rental/warehouses", icon: Building2      },
       { title: "Shops",         url: "/erp/rental/shops",      icon: Store          },
-      { title: "Payments Log",  url: "/erp/rental/payments",   icon: ClipboardList  },
     ],
   },
   {
