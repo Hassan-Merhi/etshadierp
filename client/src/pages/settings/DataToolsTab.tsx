@@ -191,32 +191,10 @@ export function DataToolsTab() {
     enabled: !!silentProdLocId && silentProdOpen && silentImportMode,
   });
 
-  // Convert Bale to BL mutation
-  const updateUOMMutation = useMutation({
-    mutationFn: async () => {
-      return await modeApiRequest("POST", "/api/stock-items/bulk-update-uom", {});
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      toast({
-        title: "Success",
-        description: data.message || "UOM updated successfully",
-      });
-    },
-    onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update UOM",
-        variant: "destructive",
-      });
-    },
-  });
-
   // Fix Cost Prices mutation
   const recalculateCostsMutation = useMutation({
     mutationFn: async () => {
-      return modeApiRequest("POST", "/api/sales-report/recalculate-costs", {});
+      return apiRequest("POST", "/api/sales-report/recalculate-costs", {});
     },
     onSuccess: (data: any) => {
       toast({
@@ -718,31 +696,6 @@ export function DataToolsTab() {
             >
               <Upload className="h-4 w-4 mr-2" />
               Import Stock
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Convert Bale to BL Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <RefreshCw className="h-4 w-4" />
-              Convert Bale to BL
-            </CardTitle>
-            <CardDescription>
-              Update all stock items with "Bale" UOM to "BL"
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => updateUOMMutation.mutate()}
-              disabled={updateUOMMutation.isPending}
-              data-testid="button-convert-bale-bl"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${updateUOMMutation.isPending ? "animate-spin" : ""}`} />
-              {updateUOMMutation.isPending ? "Converting..." : "Convert Bale to BL"}
             </Button>
           </CardContent>
         </Card>
