@@ -686,18 +686,17 @@ export function registerBalanceRepairRoutes(app: Express) {
 
         // ── Phase A: SQL sync — ALWAYS runs first ────────────────────────────
         // Sets each ledger row's paid_amount to the exact sum of property_payments
-        // that point to it (ledger_row_id = pml.id).  Payments with ledger_row_id
+        // that point to it (ledger_row_id = id).  Payments with ledger_row_id
         // IS NULL (guarantee-to-cash releases) are naturally excluded by the join
         // condition, so ghost amounts from those are zeroed out here.
         await db.execute(sql`
-          UPDATE property_monthly_ledger pml
+          UPDATE property_monthly_ledger
           SET paid_amount = COALESCE((
             SELECT SUM(pp.amount::numeric)
             FROM property_payments pp
-            WHERE pp.ledger_row_id = pml.id
-              AND pp.deleted_at IS NULL
+            WHERE pp.ledger_row_id = property_monthly_ledger.id
           ), 0)
-          WHERE pml.contract_id = ${contractId}
+          WHERE contract_id = ${contractId}
         `);
 
         // ── Phase B: JS re-allocation ────────────────────────────────────────
