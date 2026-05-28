@@ -691,7 +691,7 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
         label: "Users & Access",
         items: [
           { key: "users-permissions", label: "Users & Permissions", icon: Users },
-          { key: "sessions-hub", label: "Sessions & Users", icon: Shield },
+          { key: "sessions-hub", label: "Sessions & Users", icon: Shield, devOnly: true },
         ],
       },
       {
@@ -1234,7 +1234,7 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
             />
           )}
 
-          {activeSection === "sessions-hub" && (
+          {activeSection === "sessions-hub" && currentUser?.role === "Developer" && (
             <SessionsHub
               isAdmin={["Admin", "Owner", "Developer"].includes(currentUser?.role || "")}
               isDev={currentUser?.role === "Developer"}
