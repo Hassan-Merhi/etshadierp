@@ -1308,7 +1308,7 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId, payments 
               <p className="font-semibold tabular-nums">{fmtMoneyCurrency(totalGuarantee, contract.currency)}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">Used as rent</p>
+              <p className="text-muted-foreground">{hasGuaranteeApplied ? "Applied as rent" : "Used / Posted"}</p>
               <p className="font-semibold tabular-nums text-orange-600 dark:text-orange-400">{fmtMoneyCurrency(usedAmount, contract.currency)}</p>
             </div>
             <div>
