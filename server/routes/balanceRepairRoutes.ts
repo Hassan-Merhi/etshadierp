@@ -700,13 +700,16 @@ export function registerBalanceRepairRoutes(app: Express) {
         `);
 
         // ── Phase B: JS re-allocation ────────────────────────────────────────
-        // Load only rent payments (ledgerRowId IS NOT NULL) — guarantee-to-cash
-        // payments have ledgerRowId = null and must not be treated as rent.
+        // Load all payments that are NOT guarantee-to-cash releases.
+        // Guarantee-to-cash payments are identified by notes containing
+        // "[Guarantee release]" or "[Guarantee applied]" — those must never
+        // be treated as rent payments.  Regular rent payments that have
+        // ledgerRowId = null (orphaned) are included so they get properly linked.
         const payments = await db.select().from(propertyPayments)
           .where(and(
             eq(propertyPayments.contractId, contractId),
             eq(propertyPayments.companyId, companyId),
-            sql`${propertyPayments.ledgerRowId} IS NOT NULL`,
+            sql`(${propertyPayments.notes} IS NULL OR (${propertyPayments.notes} NOT LIKE '%[Guarantee release]%' AND ${propertyPayments.notes} NOT LIKE '%[Guarantee applied]%'))`,
           ))
           .orderBy(propertyPayments.paymentDate, propertyPayments.id);
 
@@ -770,7 +773,7 @@ export function registerBalanceRepairRoutes(app: Express) {
           }
           for (const upd of paymentUpdates) {
             const original = payments.find(p => p.id === upd.id);
-            if (original && (Number(original.forYear) !== upd.forYear || Number(original.forMonth) !== upd.forMonth)) {
+            if (original && (Number(original.forYear) !== upd.forYear || Number(original.forMonth) !== upd.forMonth || original.ledgerRowId !== upd.ledgerRowId)) {
               await tx.update(propertyPayments)
                 .set({ forYear: upd.forYear, forMonth: upd.forMonth, ledgerRowId: upd.ledgerRowId })
                 .where(eq(propertyPayments.id, upd.id));
