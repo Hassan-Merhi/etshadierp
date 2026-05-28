@@ -838,7 +838,12 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       const filename = req.params.filename;
 
       // Try disk cache first
-      const diskPath = path.join(process.cwd(), "uploads", "shipping-invoice-docs", filename);
+      const base = path.resolve(process.cwd(), "uploads", "shipping-invoice-docs");
+      const diskPath = path.resolve(base, filename);
+      const relative = path.relative(base, diskPath);
+      if (relative.startsWith("..") || path.isAbsolute(relative)) {
+        return res.status(400).json({ message: "Invalid filename" });
+      }
       if (fs.existsSync(diskPath)) return res.sendFile(diskPath);
 
       // Fall back to DB

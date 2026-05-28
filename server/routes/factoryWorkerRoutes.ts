@@ -889,7 +889,14 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
   app.get("/api/factory/uploads/workers/docs/:filename", requireAuth, async (req: any, res: any) => {
     try {
       const filename = req.params.filename;
-      const filePath = path.join(process.cwd(), "uploads", "workers", "docs", filename);
+      const baseDir = path.resolve(process.cwd(), "uploads", "workers", "docs");
+      const filePath = path.resolve(baseDir, filename);
+      
+      // Validate that the resolved path is within the base directory
+      const relativePath = path.relative(baseDir, filePath);
+      if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+        return res.status(404).json({ message: "File not found" });
+      }
 
       if (fs.existsSync(filePath)) {
         return res.sendFile(filePath);
