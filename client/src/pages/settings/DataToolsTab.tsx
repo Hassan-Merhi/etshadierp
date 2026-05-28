@@ -742,13 +742,13 @@ export function DataToolsTab() {
 
         {/* Bulk Rename Stock Items — Admin/Owner/Developer */}
         {appMode !== "factory" && ["Admin", "Owner", "Developer"].includes(dtCurrentUser?.role || "") && selectedCompany && (
-          <Card className="col-span-1 md:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <Edit className="h-4 w-4" />
                 Bulk Rename Stock Items
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-xs">
                 Find and replace text across multiple stock item names at once.
               </CardDescription>
             </CardHeader>
@@ -2311,13 +2311,13 @@ function MergeStockItemsLauncher() {
 
   return (
     <>
-      <Card className="col-span-1 md:col-span-2">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
             <ArrowLeftRight className="h-4 w-4" />
             Merge Duplicate Stock Items
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs">
             Merge two items into one, run a bulk merge from Excel, or view and reverse past merges.
           </CardDescription>
         </CardHeader>

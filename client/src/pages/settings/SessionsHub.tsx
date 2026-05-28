@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Shield, Activity } from "lucide-react";
+import { Shield, Activity, History } from "lucide-react";
 import { ActiveUsersSection } from "./ActiveUsersSection";
 import { ActiveSessionsTab } from "./ActiveSessionsTab";
+import { LoginHistoryTab } from "./LoginHistoryTab";
 
 export function SessionsHub({ isAdmin, isDev }: { isAdmin: boolean; isDev: boolean }) {
   const [tab, setTab] = useState(isDev ? "watch" : "sessions");
@@ -15,7 +16,7 @@ export function SessionsHub({ isAdmin, isDev }: { isAdmin: boolean; isDev: boole
           Sessions & Users
         </h2>
         <p className="text-muted-foreground text-sm mt-1">
-          Monitor active user sessions and watch real-time user activity.
+          Monitor active sessions, login history, and watch real-time user activity.
         </p>
       </div>
 
@@ -24,6 +25,10 @@ export function SessionsHub({ isAdmin, isDev }: { isAdmin: boolean; isDev: boole
           <TabsTrigger value="sessions" className="flex items-center gap-1">
             <Shield className="h-3.5 w-3.5" />
             Active Sessions
+          </TabsTrigger>
+          <TabsTrigger value="login-history" className="flex items-center gap-1">
+            <History className="h-3.5 w-3.5" />
+            Login History
           </TabsTrigger>
           {isDev && (
             <TabsTrigger value="watch" className="flex items-center gap-1">
@@ -35,6 +40,9 @@ export function SessionsHub({ isAdmin, isDev }: { isAdmin: boolean; isDev: boole
 
         <TabsContent value="sessions" className="mt-4">
           <ActiveSessionsTab isAdmin={isAdmin} />
+        </TabsContent>
+        <TabsContent value="login-history" className="mt-4">
+          <LoginHistoryTab />
         </TabsContent>
         {isDev && (
           <TabsContent value="watch" className="mt-4">

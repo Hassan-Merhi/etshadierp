@@ -82,7 +82,6 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
 
 import { ParentCreditAccountSelect } from "./settings/ParentCreditAccountSelect";
 import { NetPositionAdjustmentCard } from "./settings/NetPositionAdjustmentCard";
-import { ActiveUsersSection } from "./settings/ActiveUsersSection";
 import { SessionsHub } from "./settings/SessionsHub";
 import { DataToolsTab } from "./settings/DataToolsTab";
 import { fmtDate, fieldLabel, fmtValue, getRecordLabel, getChangesSummary, tableShortName, AuditLogDialog, EditLogTable } from "./settings/AuditLog";
@@ -94,12 +93,9 @@ import { StockReportSection } from "./settings/StockReportSection";
 import { NetPositionExportSection } from "./settings/NetPositionExportSection";
 import { DailyAutoSendSection } from "./settings/DailyAutoSendSection";
 import { ExportCenter } from "./settings/ExportCenter";
-import { BulkRenameTab } from "./settings/BulkRenameTab";
-import { LoginHistoryTab } from "./settings/LoginHistoryTab";
 import { POSReceiptSettings, IntercompanyPosTab } from "./settings/IntercompanyPosTab";
 import { OfflineSyncPanel, formatRelativeTime } from "./settings/OfflineSyncPanel";
 import { PriceGroupsTab } from "./settings/PriceGroupsTab";
-import { UsersSection } from "./settings/UsersSection";
 import { SettingsHubPage } from "./settings/SettingsHubPage";
 import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
 
@@ -696,14 +692,12 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
         items: [
           { key: "users-permissions", label: "Users & Permissions", icon: Users },
           { key: "sessions-hub", label: "Sessions & Users", icon: Shield },
-          { key: "users", label: "Users (legacy)", icon: Users, devOnly: true },
         ],
       },
       {
         label: "Tools",
         items: [
           { key: "data-tools", label: "Data Tools", icon: Database, devOnly: true },
-          { key: "bulk-rename", label: "Bulk Rename", icon: Package, devOnly: true },
           { key: "edit-log", label: "Edit Log", icon: History },
           { key: "files-export", label: "Files & Export", icon: Upload },
           { key: "export-center", label: "Export Center", icon: Zap },
@@ -1240,21 +1234,12 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
             />
           )}
 
-          {/* Users Tab (legacy - dev only) */}
-          {activeSection === "users" && (
-            <UsersSection />
-          )}
-
-
           {activeSection === "sessions-hub" && (
             <SessionsHub
               isAdmin={["Admin", "Owner", "Developer"].includes(currentUser?.role || "")}
               isDev={currentUser?.role === "Developer"}
             />
           )}
-
-          {activeSection === "login-history" && currentUser?.role === "Developer" && <LoginHistoryTab />}
-
 
           {activeSection === "edit-log" && (
             <div className="space-y-4">
@@ -1282,9 +1267,6 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
 
           {activeSection === "data-tools" && currentUser?.role === "Developer" && (
             <DataToolsTab />
-          )}
-          {activeSection === "bulk-rename" && currentUser?.role === "Developer" && (
-            <BulkRenameTab />
           )}
           {activeSection === "pos-setup" && (
             <PosSetupHub userRole={currentUser?.role} />
