@@ -687,7 +687,7 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
               <ModifyRentForm contract={contract} testIdPrefix={testIdPrefix} unitId={unit.id} />
             </TabsContent>
             <TabsContent value="guarantee">
-              <GuaranteeForm contract={contract} cashAccounts={cashAccounts} testIdPrefix={testIdPrefix} unitId={unit.id} />
+              <GuaranteeForm contract={contract} cashAccounts={cashAccounts} testIdPrefix={testIdPrefix} unitId={unit.id} payments={detail?.payments ?? []} />
             </TabsContent>
             <TabsContent value="end">
               <EndContractForm contract={contract} cashAccounts={cashAccounts} testIdPrefix={testIdPrefix} onClose={onClose} unitId={unit.id} />
@@ -1188,7 +1188,7 @@ function ModifyRentForm({ contract, testIdPrefix, unitId }: { contract: Contract
 // ──────────────────────────────────────────────────────────
 // TAB 3: GUARANTEE TO STATEMENT
 // ──────────────────────────────────────────────────────────
-function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contract: Contract; cashAccounts: CashAccount[]; testIdPrefix: string; unitId: number }) {
+function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId, payments }: { contract: Contract; cashAccounts: CashAccount[]; testIdPrefix: string; unitId: number; payments: Payment[] }) {
   const apiBase = useApiBase();
   const { toast } = useToast();
   const tenantPays = apiBase.includes("/erp/") || apiBase.includes("/factory/");
@@ -1198,6 +1198,11 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
   const usedAmount = parseFloat(contract.guaranteePostedAmount || "0");
   const remainingGuarantee = Math.max(0, totalGuarantee - usedAmount);
   const monthlyRent = parseFloat(contract.rentalAmount || "0");
+
+  // Detect if any guarantee-applied payments exist (shows the undo section)
+  const guaranteeAppliedPayments = payments.filter(p => (p.notes ?? "").includes("[Guarantee applied]"));
+  const hasGuaranteeApplied = guaranteeAppliedPayments.length > 0;
+  const guaranteeAppliedTotal = guaranteeAppliedPayments.reduce((s, p) => s + parseFloat(String(p.amount || "0")), 0);
 
   // ── Post to Statement state ──
   const [postAmount, setPostAmount] = useState(contract.guaranteeAmount);
@@ -1216,6 +1221,7 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
   const [rentAmount, setRentAmount] = useState(defaultRentChunk);
   const [rentDate, setRentDate] = useState(new Date().toISOString().slice(0, 10));
   const [rentNotes, setRentNotes] = useState("");
+  const [undoConfirm, setUndoConfirm] = useState(false);
 
   const rentAmountNum = parseFloat(rentAmount || "0");
 
@@ -1260,6 +1266,16 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
     }),
     onSuccess: () => { toast({ title: "Guarantee applied to rent", description: "Rent ledger updated. No cash moved." }); invalidate(); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const undoGuaranteeAsRent = useMutation({
+    mutationFn: () => apiRequest("POST", `${apiBase}/contracts/${contract.id}/undo-guarantee-as-rent`, {}),
+    onSuccess: (data: any) => {
+      setUndoConfirm(false);
+      toast({ title: "Guarantee reversed", description: `${data.reversed} payment(s) removed. Rent months restored to unpaid.` });
+      invalidate();
+    },
+    onError: (e: any) => { setUndoConfirm(false); toast({ title: "Error", description: e.message, variant: "destructive" }); },
   });
 
   return (
@@ -1453,6 +1469,54 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId }: { contr
           </Button>
         </div>
       </div>
+
+      {/* ── Section 4: Undo Guarantee Applied as Rent (only if it was done) ── */}
+      {hasGuaranteeApplied && (
+        <div className="border border-destructive/40 rounded-md p-3 space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-semibold text-destructive">Undo: Guarantee Applied as Rent</p>
+            <Badge variant="destructive" className="text-xs">
+              {guaranteeAppliedPayments.length} payment{guaranteeAppliedPayments.length !== 1 ? "s" : ""} — ${guaranteeAppliedTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            The guarantee was applied toward rent on {guaranteeAppliedPayments.length} month{guaranteeAppliedPayments.length !== 1 ? "s" : ""}.
+            Clicking below will reverse all those payments, restore those months to unpaid, and reverse the accounting voucher entries.
+            The guarantee deposit itself remains intact.
+          </p>
+          {!undoConfirm ? (
+            <div className="flex justify-end">
+              <Button
+                variant="destructive"
+                onClick={() => setUndoConfirm(true)}
+                data-testid={`button-${testIdPrefix}-undo-guarantee-rent`}
+              >
+                Undo Guarantee as Rent
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-2 flex-wrap bg-destructive/10 rounded-md p-2">
+              <p className="text-xs font-medium text-destructive">
+                This will reverse {guaranteeAppliedPayments.length} payment(s) totalling ${guaranteeAppliedTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}. Are you sure?
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setUndoConfirm(false)} disabled={undoGuaranteeAsRent.isPending}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => undoGuaranteeAsRent.mutate()}
+                  disabled={undoGuaranteeAsRent.isPending}
+                  data-testid={`button-${testIdPrefix}-undo-guarantee-rent-confirm`}
+                >
+                  {undoGuaranteeAsRent.isPending ? "Reversing…" : "Yes, Reverse"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

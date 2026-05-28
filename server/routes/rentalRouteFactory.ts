@@ -1309,6 +1309,97 @@ export function registerRentalRoutes(
     }
   });
 
+  // ── UNDO GUARANTEE APPLIED AS RENT ──
+  // Reverses every "[Guarantee applied]" payment on a contract: restores ledger
+  // paid_amounts, soft-deletes accounting vouchers, removes inter-company
+  // transfers, and resets the contract's guaranteePostedAmount.
+  app.post(`${urlPrefix}/contracts/:id/undo-guarantee-as-rent`, requireAuth, async (req: Request, res: Response) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+
+      const [contract] = await db.select().from(propertyContracts).where(and(
+        eq(propertyContracts.id, id),
+        eq(propertyContracts.companyId, companyId),
+      ));
+      if (!contract) return res.status(404).json({ message: "Contract not found" });
+
+      // Find all guarantee-applied payments for this contract
+      const appliedPayments = await db.select().from(propertyPayments).where(and(
+        eq(propertyPayments.contractId, id),
+        eq(propertyPayments.companyId, companyId),
+        sql`${propertyPayments.notes} LIKE '%[Guarantee applied]%'`,
+      ));
+
+      if (appliedPayments.length === 0) {
+        return res.json({ ok: true, reversed: 0, message: "No guarantee-applied payments found" });
+      }
+
+      let totalReversed = 0;
+
+      await db.transaction(async tx => {
+        for (const payment of appliedPayments) {
+          // 1. Reverse the monthly ledger paid_amount
+          if (payment.ledgerRowId) {
+            await tx.execute(sql`
+              UPDATE property_monthly_ledger
+              SET paid_amount = GREATEST(0, paid_amount - ${payment.amount}::numeric)
+              WHERE id = ${payment.ledgerRowId}
+            `);
+          }
+
+          // 2. Soft-delete the voucher only if no other payment shares it
+          if (payment.voucherId) {
+            const siblings = await tx.select({ id: propertyPayments.id })
+              .from(propertyPayments)
+              .where(and(
+                eq(propertyPayments.voucherId, payment.voucherId),
+                sql`${propertyPayments.id} != ${payment.id}`,
+              ));
+            if (siblings.length === 0) {
+              await tx.execute(sql`UPDATE vouchers SET deleted_at = NOW() WHERE id = ${payment.voucherId}`);
+            }
+          }
+
+          // 3. Reverse any auto-transfers created for this payment
+          const linkedTransfers = await tx.select()
+            .from(interCompanyTransfers)
+            .where(eq(interCompanyTransfers.sourcePaymentId, payment.id));
+          for (const transfer of linkedTransfers) {
+            await tx.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, transfer.id));
+            if (transfer.fromVoucherId) {
+              await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, transfer.fromVoucherId));
+              await tx.delete(vouchers).where(eq(vouchers.id, transfer.fromVoucherId));
+            }
+            if (transfer.toVoucherId) {
+              await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, transfer.toVoucherId));
+              await tx.delete(vouchers).where(eq(vouchers.id, transfer.toVoucherId));
+            }
+          }
+
+          // 4. Delete the payment row
+          await tx.delete(propertyPayments).where(eq(propertyPayments.id, payment.id));
+          totalReversed++;
+        }
+
+        // 5. Reset guaranteePostedAmount — subtract what was applied as rent
+        //    (clamp to 0 in case of any rounding drift)
+        const totalApplied = appliedPayments.reduce((s, p) => s + parseFloat(String(p.amount)), 0);
+        await tx.execute(sql`
+          UPDATE property_contracts
+          SET guarantee_posted_amount = GREATEST(0, COALESCE(guarantee_posted_amount, 0) - ${totalApplied}::numeric)
+          WHERE id = ${id}
+        `);
+      });
+
+      res.json({ ok: true, reversed: totalReversed });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // ── RECORD PAYMENT ──
   app.post(`${urlPrefix}/payments`, requireAuth, async (req: Request, res: Response) => {
     try {
