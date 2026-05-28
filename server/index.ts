@@ -3318,6 +3318,10 @@ let migrationsDone = false;
     `ALTER TABLE property_payments ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'USD'`,
     `ALTER TABLE property_payments ADD COLUMN IF NOT EXISTS exchange_rate NUMERIC(20,6) NOT NULL DEFAULT 1`,
 
+    // ── Property Contracts: linked_company_id for cross-company read-only view (May 2026) ──
+    `ALTER TABLE property_contracts ADD COLUMN IF NOT EXISTS linked_company_id INTEGER`,
+    `DO $$ BEGIN ALTER TABLE property_contracts ADD CONSTRAINT property_contracts_linked_company_id_fkey FOREIGN KEY (linked_company_id) REFERENCES companies(id) ON DELETE SET NULL; EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+
     // ── Ground Scan — shared server-side session (May 2026) ──────────────────
     `CREATE TABLE IF NOT EXISTS factory_ground_scan_items (
       id                  serial PRIMARY KEY,

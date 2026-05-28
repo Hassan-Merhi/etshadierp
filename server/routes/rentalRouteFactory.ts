@@ -460,15 +460,77 @@ export function registerRentalRoutes(
         });
       }
 
-      res.json(units.map(u => {
+      const ownedResults = units.map(u => {
         const c = contractByUnit.get(u.id);
         return {
           ...u,
           contract: c ?? null,
           outstanding: c ? (outstandingByContract.get(c.id) ?? 0) : null,
           totalPaid: c ? (totalPaidByContract.get(c.id) ?? 0) : null,
+          isShared: false,
+          ownerCompanyName: null as string | null,
         };
-      }));
+      });
+
+      // ── Shared contracts: contracts from OTHER companies that link to this company ──
+      const sharedContracts = await db.select().from(propertyContracts).where(and(
+        eq(propertyContracts.linkedCompanyId, companyId),
+        eq(propertyContracts.module, module),
+        eq(propertyContracts.status, "ACTIVE"),
+      ));
+
+      let sharedResults: typeof ownedResults = [];
+      if (sharedContracts.length > 0) {
+        const sharedUnitIds = sharedContracts.map(c => c.unitId);
+        const sharedUnits = await db.select().from(propertyUnits)
+          .where(inArray(propertyUnits.id, sharedUnitIds));
+        const sharedUnitMap = new Map(sharedUnits.map(u => [u.id, u]));
+
+        const sharedContractIds = sharedContracts.map(c => c.id);
+        const sharedLedgerRows = await db.select({
+          contractId: propertyMonthlyLedger.contractId,
+          expected: sql<string>`COALESCE(SUM(
+            CASE WHEN (
+              ${propertyMonthlyLedger.year} < EXTRACT(YEAR FROM NOW())
+              OR (
+                ${propertyMonthlyLedger.year} = EXTRACT(YEAR FROM NOW())
+                AND ${propertyMonthlyLedger.month} <= EXTRACT(MONTH FROM NOW())
+              )
+            ) THEN ${propertyMonthlyLedger.expectedAmount} ELSE 0 END
+          ), 0)`,
+          paid: sql<string>`COALESCE(SUM(${propertyMonthlyLedger.paidAmount}), 0)`,
+        }).from(propertyMonthlyLedger)
+          .where(inArray(propertyMonthlyLedger.contractId, sharedContractIds))
+          .groupBy(propertyMonthlyLedger.contractId);
+        const sharedOutstanding = new Map<number, number>();
+        const sharedPaid = new Map<number, number>();
+        sharedLedgerRows.forEach(r => {
+          sharedOutstanding.set(r.contractId, Number(r.expected) - Number(r.paid));
+          sharedPaid.set(r.contractId, Number(r.paid));
+        });
+
+        // Fetch owner company names
+        const ownerCompanyIds = [...new Set(sharedContracts.map(c => c.companyId))];
+        const ownerCompanies = await db.select({ id: companies.id, name: companies.name })
+          .from(companies)
+          .where(inArray(companies.id, ownerCompanyIds));
+        const ownerNameMap = new Map(ownerCompanies.map(c => [c.id, c.name]));
+
+        sharedResults = sharedContracts.map(c => {
+          const u = sharedUnitMap.get(c.unitId);
+          if (!u) return null;
+          return {
+            ...u,
+            contract: c,
+            outstanding: sharedOutstanding.get(c.id) ?? 0,
+            totalPaid: sharedPaid.get(c.id) ?? 0,
+            isShared: true,
+            ownerCompanyName: ownerNameMap.get(c.companyId) ?? null,
+          };
+        }).filter(Boolean) as typeof ownedResults;
+      }
+
+      res.json([...ownedResults, ...sharedResults]);
     } catch (e: any) {
       console.error(`${tag} units:`, e);
       res.status(500).json({ message: e.message });
@@ -607,12 +669,13 @@ export function registerRentalRoutes(
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const { tenantName, startDate, guaranteeAmount, guaranteePeriod, isInternal } = z.object({
+      const { tenantName, startDate, guaranteeAmount, guaranteePeriod, isInternal, linkedCompanyId } = z.object({
         tenantName: z.string().min(1, "Tenant name required"),
         startDate: z.string().min(1, "Start date required"),
         guaranteeAmount: z.string().optional(),
         guaranteePeriod: z.string().optional(),
         isInternal: z.boolean().optional(),
+        linkedCompanyId: z.number().nullable().optional(),
       }).parse(req.body);
       const [contract] = await db.select().from(propertyContracts).where(and(
         eq(propertyContracts.id, id), eq(propertyContracts.companyId, companyId), eq(propertyContracts.module, module),
@@ -622,6 +685,7 @@ export function registerRentalRoutes(
       if (guaranteeAmount !== undefined) contractUpdates.guaranteeAmount = guaranteeAmount;
       if (guaranteePeriod !== undefined) contractUpdates.guaranteePeriod = guaranteePeriod;
       if (isInternal !== undefined) contractUpdates.isInternal = isInternal;
+      if (linkedCompanyId !== undefined) contractUpdates.linkedCompanyId = linkedCompanyId;
       await db.update(propertyContracts).set(contractUpdates).where(eq(propertyContracts.id, id));
 
       // Clean up ledger rows that are now before the new start date
@@ -1755,13 +1819,29 @@ export function registerRentalRoutes(
       const unitId = parseId(req.params.id);
       if (unitId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [unit] = await db.select().from(propertyUnits).where(and(
+      let isShared = false;
+      let [unit] = await db.select().from(propertyUnits).where(and(
         eq(propertyUnits.id, unitId), eq(propertyUnits.companyId, companyId), eq(propertyUnits.module, module),
       ));
+
+      // If unit doesn't belong to this company, check if it's shared with this company
+      if (!unit) {
+        const [sharedContract] = await db.select().from(propertyContracts).where(and(
+          eq(propertyContracts.unitId, unitId),
+          eq(propertyContracts.linkedCompanyId, companyId),
+          eq(propertyContracts.status, "ACTIVE"),
+        ));
+        if (sharedContract) {
+          const [ownerUnit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, unitId));
+          if (ownerUnit) { unit = ownerUnit; isShared = true; }
+        }
+      }
       if (!unit) return res.status(404).json({ message: "Unit not found" });
 
       const [contract] = await db.select().from(propertyContracts).where(and(
-        eq(propertyContracts.companyId, companyId),
+        isShared
+          ? eq(propertyContracts.linkedCompanyId, companyId)
+          : eq(propertyContracts.companyId, companyId),
         eq(propertyContracts.module, module),
         eq(propertyContracts.unitId, unitId),
         eq(propertyContracts.status, "ACTIVE"),
@@ -1796,7 +1876,7 @@ export function registerRentalRoutes(
         ))
         .orderBy(desc(propertyContracts.endDate));
 
-      res.json({ unit, contract: contract ?? null, ledger, payments: rentPayments, guaranteePayments, pastContracts });
+      res.json({ unit, contract: contract ?? null, ledger, payments: rentPayments, guaranteePayments, pastContracts, isShared });
     } catch (e: any) {
       console.error(`${tag} detail:`, e);
       res.status(500).json({ message: e.message });

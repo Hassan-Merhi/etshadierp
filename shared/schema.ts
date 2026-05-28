@@ -4888,6 +4888,7 @@ export const propertyContracts = pgTable("property_contracts", {
   guaranteePostedToStatement: boolean("guarantee_posted_to_statement").notNull().default(false),
   guaranteePostedAmount: decimal("guarantee_posted_amount", { precision: 20, scale: 2 }).default("0"),
   isInternal: boolean("is_internal").notNull().default(false),
+  linkedCompanyId: integer("linked_company_id"),
   currency: text("currency").notNull().default("USD"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({

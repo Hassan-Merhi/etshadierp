@@ -33,6 +33,8 @@ type Unit = {
   notes: string | null;
   contract: Contract | null;
   outstanding: number | null;
+  isShared?: boolean;
+  ownerCompanyName?: string | null;
 };
 type Contract = {
   id: number;
@@ -48,6 +50,7 @@ type Contract = {
   statementNote: string | null;
   guaranteePostedToStatement: boolean;
   isInternal: boolean;
+  linkedCompanyId?: number | null;
   currency: string;
 };
 type CashAccount = { id: number; name: string; code: string; accountType: string };
@@ -272,7 +275,7 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
   const [selectedContractIds, setSelectedContractIds] = useState<Set<number>>(new Set());
   const [bulkPayOpen, setBulkPayOpen] = useState(false);
 
-  const contractedUnits = useMemo(() => units.filter(u => u.contract), [units]);
+  const contractedUnits = useMemo(() => units.filter(u => u.contract && !u.isShared), [units]);
 
   const toggleSelect = (contractId: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -432,7 +435,7 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                             data-testid={`row-unit-${u.id}`}
                           >
                             <td className="px-3 py-2 w-8" onClick={e => e.stopPropagation()}>
-                              {u.contract && (
+                              {u.contract && !u.isShared && (
                                 <Checkbox
                                   checked={selectedContractIds.has(u.contract.id)}
                                   onCheckedChange={() => toggleSelect(u.contract!.id, { stopPropagation: () => {} } as any)}
@@ -455,6 +458,11 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                                 ? <span className="font-medium flex items-center gap-1.5 flex-wrap">
                                     {u.contract.tenantName}
                                     {u.contract.isInternal && <Badge className="text-xs bg-violet-600 text-white">Internal</Badge>}
+                                    {u.isShared && (
+                                      <Badge className="text-xs bg-sky-600 text-white" title={u.ownerCompanyName ? `From: ${u.ownerCompanyName}` : undefined}>
+                                        Shared
+                                      </Badge>
+                                    )}
                                   </span>
                                 : <Badge variant="secondary" className="text-xs">Vacant</Badge>}
                             </td>
@@ -483,15 +491,17 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                             </td>
                             <td className="px-2 py-2 text-right" onClick={e => e.stopPropagation()}>
                               <div className="flex items-center justify-end gap-1">
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="text-muted-foreground hover:text-destructive"
-                                  onClick={e => { e.stopPropagation(); setConfirmDeleteUnitId(u.id); }}
-                                  data-testid={`button-delete-unit-${u.id}`}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                {!u.isShared && (
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="text-muted-foreground hover:text-destructive"
+                                    onClick={e => { e.stopPropagation(); setConfirmDeleteUnitId(u.id); }}
+                                    data-testid={`button-delete-unit-${u.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
                                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
                               </div>
                             </td>
@@ -631,7 +641,7 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
   unit: Unit; cashAccounts: CashAccount[]; onClose: () => void; unitType: "WAREHOUSE" | "SHOP"; testIdPrefix: string;
 }) {
   const apiBase = useApiBase();
-  const { data: detail, isLoading } = useQuery<{ unit: Unit; contract: Contract | null; ledger: LedgerRow[]; payments: Payment[]; guaranteePayments: Payment[]; pastContracts: Contract[] }>({
+  const { data: detail, isLoading } = useQuery<{ unit: Unit; contract: Contract | null; ledger: LedgerRow[]; payments: Payment[]; guaranteePayments: Payment[]; pastContracts: Contract[]; isShared?: boolean }>({
     queryKey: [apiBase + "/units", unit.id, "detail"],
     queryFn: async () => {
       const res = await fetch(`${apiBase}/units/${unit.id}/detail`, { credentials: "include" });
@@ -641,6 +651,7 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
   });
 
   const contract = detail?.contract ?? unit.contract;
+  const isShared = unit.isShared || detail?.isShared;
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -650,13 +661,38 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
             <Badge variant="outline">{unit.unitNumber}</Badge>
             {contract && <span className="text-base font-normal text-muted-foreground">— {contract.tenantName}</span>}
             {!contract && <Badge variant="secondary">Vacant</Badge>}
+            {isShared && (
+              <Badge className="bg-sky-600 text-white text-xs">
+                Shared from {unit.ownerCompanyName ?? "another company"}
+              </Badge>
+            )}
           </DialogTitle>
         </DialogHeader>
 
         {isLoading ? (
           <div className="p-6 text-center text-muted-foreground">Loading…</div>
         ) : !contract ? (
-          <StartContractForm unitId={unit.id} testIdPrefix={testIdPrefix} onClose={onClose} unitType={unitType} />
+          isShared ? (
+            <div className="p-6 text-center text-muted-foreground text-sm">This is a read-only shared unit.</div>
+          ) : (
+            <StartContractForm unitId={unit.id} testIdPrefix={testIdPrefix} onClose={onClose} unitType={unitType} />
+          )
+        ) : isShared ? (
+          <Tabs defaultValue="ledger" className="w-full">
+            <TabsList className="grid w-full grid-cols-1">
+              <TabsTrigger value="ledger" data-testid={`tab-${testIdPrefix}-ledger`}>Statement (Read-only)</TabsTrigger>
+            </TabsList>
+            <TabsContent value="ledger">
+              <LedgerView
+                ledger={detail?.ledger ?? []}
+                payments={detail?.payments ?? []}
+                guaranteePayments={detail?.guaranteePayments ?? []}
+                contract={contract}
+                unitId={unit.id}
+                readOnly
+              />
+            </TabsContent>
+          </Tabs>
         ) : (
           <Tabs defaultValue="payment" className="w-full">
             <TabsList className="grid w-full grid-cols-6">
@@ -1684,10 +1720,20 @@ function EditInfoForm({ contract, testIdPrefix, unitId, unit, unitType }: { cont
   const [unitNumber, setUnitNumber] = useState(unit.unitNumber);
   const [dimensions, setDimensions] = useState(unit.dimensions ?? "");
   const [isInternal, setIsInternal] = useState(contract.isInternal ?? false);
+  const [linkedCompanyId, setLinkedCompanyId] = useState<number | null>(contract.linkedCompanyId ?? null);
+
+  const { data: allCompanies = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ["/api/companies"],
+    queryFn: async () => {
+      const res = await fetch("/api/companies", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load companies");
+      return res.json();
+    },
+  });
 
   const saveContract = useMutation({
     mutationFn: () => apiRequest("PATCH", `${apiBase}/contracts/${contract.id}/info`, {
-      tenantName, startDate, guaranteeAmount, guaranteePeriod, isInternal,
+      tenantName, startDate, guaranteeAmount, guaranteePeriod, isInternal, linkedCompanyId,
     }),
     onSuccess: () => {
       toast({ title: "Contract info updated" });
@@ -1710,7 +1756,8 @@ function EditInfoForm({ contract, testIdPrefix, unitId, unit, unitType }: { cont
     startDate !== (contract.startDate ? new Date(contract.startDate).toISOString().slice(0, 10) : "") ||
     guaranteeAmount !== (contract.guaranteeAmount ?? "") ||
     guaranteePeriod !== (contract.guaranteePeriod ?? "") ||
-    isInternal !== (contract.isInternal ?? false);
+    isInternal !== (contract.isInternal ?? false) ||
+    linkedCompanyId !== (contract.linkedCompanyId ?? null);
   const unitChanged = unitNumber !== unit.unitNumber || dimensions !== (unit.dimensions ?? "");
 
   return (
@@ -1774,6 +1821,27 @@ function EditInfoForm({ contract, testIdPrefix, unitId, unit, unitType }: { cont
             </div>
           </div>
         )}
+        <div className="rounded-md border p-3 bg-sky-50 dark:bg-sky-950/20 space-y-2 mt-2">
+          <div>
+            <Label className="font-semibold">Share with Company</Label>
+            <p className="text-xs text-muted-foreground mt-0.5">The selected company will see this contract as a read-only entry in their rental view.</p>
+          </div>
+          <Select
+            value={linkedCompanyId !== null ? String(linkedCompanyId) : "none"}
+            onValueChange={v => setLinkedCompanyId(v === "none" ? null : Number(v))}
+            data-testid={`select-${testIdPrefix}-linked-company`}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="No sharing" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No sharing</SelectItem>
+              {allCompanies.map(c => (
+                <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <DialogFooter>
           <Button
             onClick={() => saveContract.mutate()}
@@ -1791,7 +1859,7 @@ function EditInfoForm({ contract, testIdPrefix, unitId, unit, unitType }: { cont
 // ──────────────────────────────────────────────────────────
 // LEDGER VIEW / STATEMENT
 // ──────────────────────────────────────────────────────────
-function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onNoteUpdated }: { ledger: LedgerRow[]; payments: Payment[]; guaranteePayments: Payment[]; contract: Contract; unitId: number; onNoteUpdated?: () => void }) {
+function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onNoteUpdated, readOnly }: { ledger: LedgerRow[]; payments: Payment[]; guaranteePayments: Payment[]; contract: Contract; unitId: number; onNoteUpdated?: () => void; readOnly?: boolean }) {
   const apiBase = useApiBase();
   const { toast } = useToast();
   const [draftNote, setDraftNote] = useState(contract.statementNote ?? "");
@@ -1946,7 +2014,7 @@ function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onN
           </div>
         </div>
         <div className="flex gap-2 shrink-0">
-          {isAdmin && (
+          {isAdmin && !readOnly && (
             <Button
               variant="outline"
               size="sm"
@@ -2060,27 +2128,35 @@ function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onN
       )}
 
       {/* ── Statement note ── */}
-      <div className="border rounded-md p-3 space-y-2">
-        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Statement Note</div>
-        <Textarea
-          placeholder="Add a note that will appear on the printed statement and Excel export…"
-          value={draftNote}
-          onChange={e => setDraftNote(e.target.value)}
-          rows={3}
-          className="text-sm resize-none"
-          data-testid="textarea-statement-note"
-        />
-        <div className="flex justify-end">
-          <Button
-            size="sm"
-            onClick={() => saveNote.mutate()}
-            disabled={!noteChanged || saveNote.isPending}
-            data-testid="button-save-statement-note"
-          >
-            {saveNote.isPending ? "Saving…" : "Save Note"}
-          </Button>
+      {!readOnly && (
+        <div className="border rounded-md p-3 space-y-2">
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Statement Note</div>
+          <Textarea
+            placeholder="Add a note that will appear on the printed statement and Excel export…"
+            value={draftNote}
+            onChange={e => setDraftNote(e.target.value)}
+            rows={3}
+            className="text-sm resize-none"
+            data-testid="textarea-statement-note"
+          />
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={() => saveNote.mutate()}
+              disabled={!noteChanged || saveNote.isPending}
+              data-testid="button-save-statement-note"
+            >
+              {saveNote.isPending ? "Saving…" : "Save Note"}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
+      {readOnly && draftNote.trim() && (
+        <div className="border rounded-md p-3 space-y-1">
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Statement Note</div>
+          <p className="text-sm whitespace-pre-wrap">{draftNote.trim()}</p>
+        </div>
+      )}
     </div>
   );
 }
