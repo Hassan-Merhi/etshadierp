@@ -86,6 +86,7 @@ import { ActiveUsersSection } from "./settings/ActiveUsersSection";
 import { DataToolsTab } from "./settings/DataToolsTab";
 import { fmtDate, fieldLabel, fmtValue, getRecordLabel, getChangesSummary, tableShortName, AuditLogDialog, EditLogTable } from "./settings/AuditLog";
 import { PosSettingsTab } from "./settings/PosSettingsTab";
+import { PosSetupHub } from "./settings/PosSetupHub";
 import { FileStorageAndExport } from "./settings/FileStorageAndExport";
 import { DailyExportSection } from "./settings/DailyExportSection";
 import { StockReportSection } from "./settings/StockReportSection";
@@ -688,8 +689,6 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
         items: [
           { key: "companies", label: "Companies", icon: Building2 },
           { key: "preferences", label: "Preferences", icon: Settings2, devOnly: true },
-          { key: "fiscal", label: "Fiscal Period", icon: CalendarRange, devOnly: true },
-          { key: "exchange-rates", label: "Exchange Rates", icon: TrendingUp },
         ],
       },
       {
@@ -714,14 +713,7 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
       {
         label: "POS",
         items: appMode !== "factory" ? [
-          { key: "pos-settings", label: "POS Settings", icon: ShoppingCart, devOnly: true },
-          { key: "price-groups", label: "Price Groups", icon: Layers },
-        ] : [],
-      },
-      {
-        label: "Intercompany",
-        items: appMode !== "factory" ? [
-          { key: "intercompany", label: "POS Auto-Transfer", icon: ArrowLeftRight, devOnly: true },
+          { key: "pos-setup", label: "POS Setup", icon: ShoppingCart },
         ] : [],
       },
       {
@@ -1295,14 +1287,11 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
           {activeSection === "data-tools" && currentUser?.role === "Developer" && (
             <DataToolsTab />
           )}
-          {activeSection === "exchange-rates" && (
-            <ExchangeRateSettings />
-          )}
           {activeSection === "bulk-rename" && currentUser?.role === "Developer" && (
             <BulkRenameTab />
           )}
-          {activeSection === "pos-settings" && currentUser?.role === "Developer" && (
-            <PosSettingsTab />
+          {activeSection === "pos-setup" && (
+            <PosSetupHub userRole={currentUser?.role} />
           )}
           {activeSection === "files-export" && (
             <FileStorageAndExport />
@@ -1310,10 +1299,6 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
 
           {activeSection === "export-center" && (
             <ExportCenter />
-          )}
-
-          {activeSection === "fiscal" && (
-            <FiscalPeriodTab currentCompanyId={selectedCompany?.id} userRole={currentUser?.role} />
           )}
 
           {activeSection === "preferences" && (
@@ -1368,13 +1353,6 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
             </div>
           )}
 
-          {activeSection === "intercompany" && (
-            <IntercompanyPosTab />
-          )}
-
-          {activeSection === "price-groups" && (
-            <PriceGroupsTab />
-          )}
 
           {activeSection === "system" && (() => {
             const pfx = appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : "";
