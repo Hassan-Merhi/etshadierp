@@ -65,7 +65,7 @@ import { StockItemAutocomplete } from "@/components/StockItemAutocomplete";
   import { useAppMode } from "@/contexts/AppModeContext";
   import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
   import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, TrendingDown, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, FileSpreadsheet, FileDown, RotateCcw } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, TrendingDown, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, FileSpreadsheet, FileDown, RotateCcw, Search } from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -142,7 +142,8 @@ export function DataToolsTab() {
   const [silentProdOpen, setSilentProdOpen] = useState(false);
   const [silentProdType, setSilentProdType] = useState<"Production" | "Consumption">("Production");
   const [silentProdLocId, setSilentProdLocId] = useState("");
-  const [silentProdItems, setSilentProdItems] = useState<{ stockItemId: string; quantity: string; rate: string }[]>([{ stockItemId: "", quantity: "", rate: "" }]);
+  const [silentProdItems, setSilentProdItems] = useState<{ stockItemId: string; stockItemName: string; quantity: string; rate: string; currentQty: number }[]>([{ stockItemId: "", stockItemName: "", quantity: "", rate: "", currentQty: 0 }]);
+  const [silentProdSearchTerm, setSilentProdSearchTerm] = useState("");
   const [silentProdApplying, setSilentProdApplying] = useState(false);
   const [silentProdDone, setSilentProdDone] = useState(0);
 
@@ -180,15 +181,18 @@ export function DataToolsTab() {
     enabled: !!selectedCompany && dtCurrentUser?.role === "Developer",
   });
 
-  // Fetch location inventory for silent prod import preview
-  const { data: silentLocSummary } = useQuery<any>({
-    queryKey: ["/api/location-summary", silentProdLocId],
+  // Fetch location inventory for silent prod (manual + import modes)
+  const { data: silentLocInventory = [], isLoading: silentLocInventoryLoading } = useQuery<{
+    stockItemId: number; stockItemName: string; stockItemCode: string; quantity: string
+  }[]>({
+    queryKey: ["/api/inventory-by-location", silentProdLocId],
     queryFn: async () => {
-      const res = await fetch(`/api/location-summary?locationIds=${silentProdLocId}`, { credentials: "include" });
+      if (!silentProdLocId) return [];
+      const res = await fetch(`/api/inventory-by-location/${silentProdLocId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
-    enabled: !!silentProdLocId && silentProdOpen && silentImportMode,
+    enabled: !!silentProdLocId && silentProdOpen,
   });
 
   // Fix Cost Prices mutation
@@ -464,13 +468,8 @@ export function DataToolsTab() {
   };
 
   const getCurrentQty = (stockItemId: number): number => {
-    if (!silentLocSummary?.stockGroups) return 0;
-    const locId = parseInt(silentProdLocId);
-    for (const group of silentLocSummary.stockGroups) {
-      const item = group.items?.find((i: any) => i.id === stockItemId);
-      if (item?.locationData?.[locId]) return item.locationData[locId].quantity || 0;
-    }
-    return 0;
+    const locRow = silentLocInventory.find((inv: any) => inv.stockItemId === stockItemId);
+    return locRow ? parseFloat(locRow.quantity || "0") : 0;
   };
 
   const handleSilentImportFile = async (file: File) => {
@@ -765,7 +764,7 @@ export function DataToolsTab() {
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => { setSilentProdType("Production"); setSilentProdLocId(""); setSilentProdItems([{ stockItemId: "", quantity: "", rate: "" }]); setSilentProdDone(0); setSilentImportMode(false); setSilentImportPreview([]); setSilentProdOpen(true); }}
+                onClick={() => { setSilentProdType("Production"); setSilentProdLocId(""); setSilentProdItems([{ stockItemId: "", stockItemName: "", quantity: "", rate: "", currentQty: 0 }]); setSilentProdSearchTerm(""); setSilentProdDone(0); setSilentImportMode(false); setSilentImportPreview([]); setSilentProdOpen(true); }}
                 data-testid="button-open-silent-production"
               >
                 <Package className="h-4 w-4 mr-2" />
@@ -816,7 +815,7 @@ export function DataToolsTab() {
 
       {/* Silent Production / Consumption Dialog */}
       {dtCurrentUser?.role === "Developer" && appMode !== "factory" && (
-        <Dialog open={silentProdOpen} onOpenChange={(o) => { if (!silentProdApplying) setSilentProdOpen(o); }}>
+        <Dialog open={silentProdOpen} onOpenChange={(o) => { if (!silentProdApplying) { if (!o) setSilentProdSearchTerm(""); setSilentProdOpen(o); } }}>
           <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Silent Production / Consumption</DialogTitle>
@@ -879,33 +878,151 @@ export function DataToolsTab() {
                       <Button variant={silentProdType === "Consumption" ? "default" : "outline"} size="sm" onClick={() => setSilentProdType("Consumption")} data-testid="button-type-consumption">Consumption (−)</Button>
                     </div>
 
-                    {/* Items table */}
+                    {/* Items table — stock-transfer style with search */}
                     <div className="space-y-2">
                       <Label>Items</Label>
-                      <div className="space-y-2">
-                        {silentProdItems.map((item, idx) => (
-                          <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                            <div className="col-span-5">
-                              <Select value={item.stockItemId} onValueChange={(v) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, stockItemId: v } : r))}>
-                                <SelectTrigger data-testid={`select-prod-item-${idx}`}><SelectValue placeholder="Stock item..." /></SelectTrigger>
-                                <SelectContent>
-                                  {(allStockItems as any[]).map((si: any) => <SelectItem key={si.id} value={String(si.id)}>{si.name}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="col-span-3">
-                              <Input type="number" placeholder="Qty" value={item.quantity} onChange={(e) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, quantity: e.target.value } : r))} data-testid={`input-prod-qty-${idx}`} />
-                            </div>
-                            <div className="col-span-3">
-                              <Input type="number" placeholder={silentProdType === "Production" ? "Rate" : "Rate (opt)"} value={item.rate} onChange={(e) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, rate: e.target.value } : r))} data-testid={`input-prod-rate-${idx}`} />
-                            </div>
-                            <div className="col-span-1 flex justify-center">
-                              <Button size="icon" variant="ghost" onClick={() => setSilentProdItems(prev => prev.filter((_, i) => i !== idx))} disabled={silentProdItems.length === 1} data-testid={`button-remove-prod-row-${idx}`}><X className="h-4 w-4" /></Button>
-                            </div>
+
+                      {/* Searchable sidebar panel */}
+                      {silentProdLocId && (
+                        <div className="border rounded-md p-3 bg-muted/30 space-y-2">
+                          <div className="relative">
+                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              placeholder="Type item name or code to search…"
+                              value={silentProdSearchTerm}
+                              onChange={(e) => {
+                                setSilentProdSearchTerm(e.target.value);
+                              }}
+                              className="pl-8"
+                              data-testid="input-silent-prod-search"
+                            />
                           </div>
-                        ))}
+                          <div className="max-h-48 overflow-y-auto space-y-1">
+                            {(() => {
+                              const term = silentProdSearchTerm.toLowerCase();
+                              if (!term) {
+                                return (
+                                  <div className="text-center text-sm text-muted-foreground py-4">
+                                    {silentLocInventoryLoading ? "Loading items…" : "Type above to search items at this location"}
+                                  </div>
+                                );
+                              }
+                              const filtered = (allStockItems as any[]).filter((si: any) =>
+                                si.name.toLowerCase().includes(term) ||
+                                (si.code && si.code.toLowerCase().includes(term))
+                              );
+                              if (filtered.length === 0) return (
+                                <div className="text-center text-sm text-muted-foreground py-4">No items found</div>
+                              );
+                              return filtered.map((si: any) => {
+                                const locRow = silentLocInventory.find((inv: any) => inv.stockItemId === si.id);
+                                const currentQty = locRow ? parseFloat(locRow.quantity || "0") : 0;
+                                return (
+                                  <button
+                                    key={si.id}
+                                    className="w-full text-left px-2 py-1.5 rounded-md hover-elevate active-elevate-2 flex items-center justify-between gap-2"
+                                    onClick={() => {
+                                      // Add to rows if not already present
+                                      const existingIdx = silentProdItems.findIndex(r => String(r.stockItemId) === String(si.id));
+                                      if (existingIdx < 0) {
+                                        setSilentProdItems(prev => [
+                                          ...prev,
+                                          { stockItemId: String(si.id), stockItemName: si.name, quantity: "", rate: "", currentQty }
+                                        ]);
+                                      }
+                                      setSilentProdSearchTerm("");
+                                    }}
+                                    data-testid={`button-silent-prod-search-item-${si.id}`}
+                                  >
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-sm font-medium truncate">{si.name}</div>
+                                      {si.code && <div className="text-xs text-muted-foreground font-mono">{si.code}</div>}
+                                    </div>
+                                    <div className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                                      currentQty === 0
+                                        ? "bg-destructive/10 text-destructive"
+                                        : currentQty < 10
+                                        ? "bg-chart-3/10 text-chart-3"
+                                        : "bg-chart-2/10 text-chart-2"
+                                    }`}>
+                                      {currentQty.toFixed(0)}
+                                    </div>
+                                  </button>
+                                );
+                              });
+                            })()}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        {silentProdItems.map((item, idx) => {
+                          const qtyNum = parseFloat(item.quantity || "0") || 0;
+                          const delta = silentProdType === "Production" ? qtyNum : -qtyNum;
+                          const newQty = (item.currentQty || 0) + delta;
+                          return (
+                            <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                              <div className="col-span-5">
+                                <Input
+                                  readOnly
+                                  value={item.stockItemName || "Search above and click an item"}
+                                  placeholder="Search above and click an item"
+                                  className="w-full"
+                                  data-testid={`input-silent-prod-item-${idx}`}
+                                  onClick={() => {}}
+                                />
+                              </div>
+                              <div className="col-span-2">
+                                <div className="text-right text-sm text-muted-foreground font-mono" data-testid={`text-current-qty-${idx}`}>
+                                  {item.stockItemId ? (item.currentQty || 0).toFixed(0) : "-"}
+                                </div>
+                                <div className="text-right text-xs text-muted-foreground">Current</div>
+                              </div>
+                              <div className="col-span-2">
+                                <Input
+                                  type="number"
+                                  min="0.001"
+                                  step="0.001"
+                                  placeholder={silentProdType === "Production" ? "+Qty" : "−Qty"}
+                                  value={item.quantity}
+                                  onChange={(e) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, quantity: e.target.value } : r))}
+                                  data-testid={`input-silent-prod-qty-${idx}`}
+                                  className="text-right"
+                                />
+                              </div>
+                              <div className="col-span-2">
+                                <div className={`text-right text-sm font-mono font-semibold ${
+                                  newQty < 0 ? "text-destructive" : "text-foreground"
+                                }`} data-testid={`text-new-qty-${idx}`}>
+                                  {item.stockItemId && item.quantity ? newQty.toFixed(0) : "-"}
+                                </div>
+                                <div className="text-right text-xs text-muted-foreground">New</div>
+                              </div>
+                              <div className="col-span-1 flex justify-center">
+                                <Button size="icon" variant="ghost" onClick={() => setSilentProdItems(prev => prev.filter((_, i) => i !== idx))} disabled={silentProdItems.length === 1} data-testid={`button-remove-prod-row-${idx}`}><X className="h-4 w-4" /></Button>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => setSilentProdItems(prev => [...prev, { stockItemId: "", quantity: "", rate: "" }])} data-testid="button-add-prod-row">
+
+                      {/* Rate input shown for Production only */}
+                      {silentProdType === "Production" && silentProdItems.some(r => r.stockItemId) && (
+                        <div className="space-y-1">
+                          {silentProdItems.map((item, idx) => (
+                            item.stockItemId && (
+                              <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                                <div className="col-span-5 text-sm text-muted-foreground truncate" data-testid={`text-rate-item-${idx}`}>{item.stockItemName}</div>
+                                <div className="col-span-3 col-start-6">
+                                  <Input type="number" placeholder="Rate" value={item.rate} onChange={(e) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, rate: e.target.value } : r))} data-testid={`input-silent-prod-rate-${idx}`} />
+                                </div>
+                              </div>
+                            )
+                          ))}
+                        </div>
+                      )}
+
+                      <Button variant="outline" size="sm" onClick={() => setSilentProdItems(prev => [...prev, { stockItemId: "", stockItemName: "", quantity: "", rate: "", currentQty: 0 }])} data-testid="button-add-prod-row">
                         <Plus className="h-4 w-4 mr-1" />Add Item
                       </Button>
                     </div>
