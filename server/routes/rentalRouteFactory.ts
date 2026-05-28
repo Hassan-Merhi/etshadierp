@@ -435,6 +435,7 @@ export function registerRentalRoutes(
       const contractIds = contracts.map(c => c.id);
       const outstandingByContract = new Map<number, number>();
       const totalPaidByContract = new Map<number, number>();
+      const guaranteeAppliedByContract = new Map<number, number>();
       if (contractIds.length > 0) {
         // Only count expectedAmount for months up to the current calendar month.
         // All paidAmount is counted regardless of month so advance payments create
@@ -458,15 +459,32 @@ export function registerRentalRoutes(
           outstandingByContract.set(r.contractId, Number(r.expected) - Number(r.paid));
           totalPaidByContract.set(r.contractId, Number(r.paid));
         });
+
+        // Sum payments tagged [Guarantee applied] to compute remaining guarantee
+        const appliedRows = await db.select({
+          contractId: propertyPayments.contractId,
+          total: sql<string>`COALESCE(SUM(${propertyPayments.amount}), 0)`,
+        }).from(propertyPayments)
+          .where(and(
+            inArray(propertyPayments.contractId, contractIds),
+            sql`${propertyPayments.notes} LIKE '%[Guarantee applied]%'`,
+          ))
+          .groupBy(propertyPayments.contractId);
+        appliedRows.forEach(r => guaranteeAppliedByContract.set(r.contractId, Number(r.total)));
       }
 
       const ownedResults = units.map(u => {
         const c = contractByUnit.get(u.id);
+        const appliedAsRent = c ? (guaranteeAppliedByContract.get(c.id) ?? 0) : 0;
+        const guaranteeRemaining = c
+          ? Math.max(0, parseFloat(String(c.guaranteeAmount || "0")) - appliedAsRent)
+          : null;
         return {
           ...u,
           contract: c ?? null,
           outstanding: c ? (outstandingByContract.get(c.id) ?? 0) : null,
           totalPaid: c ? (totalPaidByContract.get(c.id) ?? 0) : null,
+          guaranteeRemaining,
           isShared: false,
           ownerCompanyName: null as string | null,
         };
@@ -524,14 +542,30 @@ export function registerRentalRoutes(
             .where(inArray(companies.id, ownerCompanyIds));
           const ownerNameMap = new Map(ownerCompanies.map(c => [c.id, c.name]));
 
+          // Sum [Guarantee applied] payments for shared contracts
+          const sharedGuaranteeApplied = new Map<number, number>();
+          const sharedAppliedRows = await db.select({
+            contractId: propertyPayments.contractId,
+            total: sql<string>`COALESCE(SUM(${propertyPayments.amount}), 0)`,
+          }).from(propertyPayments)
+            .where(and(
+              inArray(propertyPayments.contractId, sharedContractIds),
+              sql`${propertyPayments.notes} LIKE '%[Guarantee applied]%'`,
+            ))
+            .groupBy(propertyPayments.contractId);
+          sharedAppliedRows.forEach(r => sharedGuaranteeApplied.set(r.contractId, Number(r.total)));
+
           sharedResults = sharedContracts.map(c => {
             const u = sharedUnitMap.get(c.unitId);
             if (!u) return null;
+            const appliedAsRent = sharedGuaranteeApplied.get(c.id) ?? 0;
+            const guaranteeRemaining = Math.max(0, parseFloat(String(c.guaranteeAmount || "0")) - appliedAsRent);
             return {
               ...u,
               contract: c,
               outstanding: sharedOutstanding.get(c.id) ?? 0,
               totalPaid: sharedPaid.get(c.id) ?? 0,
+              guaranteeRemaining,
               isShared: true,
               ownerCompanyName: ownerNameMap.get(c.companyId) ?? null,
             };

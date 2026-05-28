@@ -52,6 +52,7 @@ type Contract = {
   isInternal: boolean;
   linkedCompanyId?: number | null;
   currency: string;
+  guaranteeRemaining?: number | null;
 };
 type CashAccount = { id: number; name: string; code: string; accountType: string };
 type LedgerRow = { id: number; year: number; month: number; expectedAmount: string; paidAmount: string; notes?: string | null };
@@ -236,7 +237,7 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
     let totalGuarantee = 0, totalOutstanding = 0, totalPaid = 0, totalMonthlyRent = 0;
     units.forEach(u => {
       if (u.contract) {
-        totalGuarantee += Number(u.contract.guaranteeAmount || 0);
+        totalGuarantee += (u as any).guaranteeRemaining ?? Number(u.contract.guaranteeAmount || 0);
         totalOutstanding += u.outstanding ?? 0;
         totalPaid += (u as any).totalPaid ?? 0;
         if (u.contract.status === "ACTIVE" || !(u.contract as any).status) {
@@ -481,7 +482,12 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                                   : "text-red-600 dark:text-red-400"
                                 : "text-muted-foreground"
                             }`}>
-                              {u.contract ? fmtMoneyCurrency(u.contract.guaranteeAmount, u.contract.currency) : "—"}
+                              {u.contract
+                                ? fmtMoneyCurrency(
+                                    (u as any).guaranteeRemaining ?? u.contract.guaranteeAmount,
+                                    u.contract.currency,
+                                  )
+                                : "—"}
                             </td>
                             <td className={`px-3 py-2 text-right tabular-nums font-semibold ${(u.outstanding ?? 0) > 0 ? "text-red-600 dark:text-red-400" : (u.outstanding ?? 0) < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
                               {u.outstanding !== null ? fmtMoneyCurrency(Math.abs(u.outstanding), u.contract?.currency) : "—"}
