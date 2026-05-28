@@ -3966,117 +3966,117 @@ END $mig$`;
         console.error("[RentalFix] Migration error:", e.message);
       }
 
-      // ── Auto-reallocate misallocated property payments ───────────────────────
-      // For every active contract: re-processes rent payments in date order and
-      // assigns each to the oldest outstanding month, fixing cases where the
-      // payment was recorded against a future/wrong month while earlier months
-      // remained unpaid.  Safe to re-run — idempotent once data is correct.
+      // ── Fix misallocated property payments ──────────────────────────────────────
+      // Phase 1 (JS): For each active contract, re-process payments in date order
+      // and assign each to the oldest outstanding month, updating ledger_row_id,
+      // for_year, and for_month on misallocated payment records.
+      // Phase 2 (SQL): After ledger_row_id is correct, sync each ledger row's
+      // paid_amount to the actual sum of payments pointing to it.
+      // Safe to re-run — idempotent once data is correct.
       try {
         const contractsResult = await migrationClient.query(`
-          SELECT id, company_id, rental_amount::numeric AS rental_amount
-          FROM property_contracts
-          WHERE status = 'ACTIVE'
+          SELECT pc.id, pc.company_id, pc.rental_amount::numeric AS rental_amount
+          FROM property_contracts pc
+          WHERE pc.status = 'ACTIVE'
         `);
 
-        let allocationTotalFixed = 0;
+        let pmtFixed = 0;
 
         for (const contract of contractsResult.rows) {
-          const cid   = contract.id;
-          const compId = contract.company_id;
+          const cid = Number(contract.id);
+          const compId = Number(contract.company_id);
 
-          const paymentsResult = await migrationClient.query(`
-            SELECT id, amount::numeric AS amount, for_year, for_month
+          // Load all payments that link to a ledger row (rent + guarantee-applied)
+          const pmts = (await migrationClient.query(`
+            SELECT id, amount::numeric AS amount, for_year, for_month, ledger_row_id
             FROM property_payments
             WHERE contract_id = $1 AND company_id = $2
               AND ledger_row_id IS NOT NULL
-              AND (notes IS NULL OR notes NOT LIKE '%[Guarantee release]%')
             ORDER BY payment_date, id
-          `, [cid, compId]);
+          `, [cid, compId])).rows;
+          if (!pmts.length) continue;
 
-          if (paymentsResult.rows.length === 0) continue;
-
-          const ledgerResult = await migrationClient.query(`
-            SELECT id, year, month, expected_amount::numeric AS expected_amount
+          // Load all ledger rows ordered oldest first
+          const ledger = (await migrationClient.query(`
+            SELECT id, year, month, expected_amount::numeric AS expected
             FROM property_monthly_ledger
             WHERE contract_id = $1 AND company_id = $2
             ORDER BY year, month
-          `, [cid, compId]);
+          `, [cid, compId])).rows;
+          if (!ledger.length) continue;
 
-          if (ledgerResult.rows.length === 0) continue;
-
-          // Build in-memory ledger with paid=0 (full reset)
+          // In-memory map: key="year-month", value={id, expected, paid(reset to 0)}
           const lmap = new Map<string, { id: number; expected: number; paid: number }>();
-          for (const row of ledgerResult.rows) {
-            lmap.set(`${row.year}-${row.month}`, {
-              id: Number(row.id), expected: Number(row.expected_amount), paid: 0,
-            });
+          for (const r of ledger) {
+            lmap.set(`${r.year}-${r.month}`, { id: Number(r.id), expected: Number(r.expected), paid: 0 });
           }
 
-          // Re-allocate each payment to the oldest outstanding month
-          const updates: Array<{ id: number; forYear: number; forMonth: number; origForYear: number; origForMonth: number; ledgerId: number }> = [];
+          // Re-allocate: each payment fills the oldest outstanding month
+          for (const pmt of pmts) {
+            let rem = Number(pmt.amount);
+            let firstChunk = true;
 
-          for (const pmt of paymentsResult.rows) {
-            let remaining = Number(pmt.amount);
-            let firstAlloc = true;
-
-            while (remaining > 0.005) {
-              let target: { key: string; id: number; expected: number; paid: number; year: number; month: number } | null = null;
+            while (rem > 0.005) {
+              // Find oldest month with remaining capacity
+              let tgt: { key: string; year: number; month: number; id: number; expected: number; paid: number } | null = null;
               for (const [key, row] of lmap) {
                 if (row.expected - row.paid > 0.005) {
                   const [y, m] = key.split("-").map(Number);
-                  target = { key, year: y, month: m, ...row };
+                  tgt = { key, year: y, month: m, ...row };
                   break;
                 }
               }
-              if (!target) break;
+              if (!tgt) break;
 
-              const chunk = Math.min(remaining, target.expected - target.paid);
-              target.paid += chunk;
-              remaining = Math.round((remaining - chunk) * 100) / 100;
-              lmap.set(target.key, target);
+              const chunk = Math.min(rem, tgt.expected - tgt.paid);
+              tgt.paid += chunk;
+              rem = Math.round((rem - chunk) * 100) / 100;
+              lmap.set(tgt.key, { ...tgt });
 
-              if (firstAlloc) {
-                updates.push({
-                  id: Number(pmt.id),
-                  forYear: target.year, forMonth: target.month,
-                  origForYear: Number(pmt.for_year), origForMonth: Number(pmt.for_month),
-                  ledgerId: target.id,
-                });
-                firstAlloc = false;
+              if (firstChunk) {
+                firstChunk = false;
+                // Update payment if it points to wrong ledger row
+                const origLedgerId = Number(pmt.ledger_row_id);
+                const origForYear  = Number(pmt.for_year);
+                const origForMonth = Number(pmt.for_month);
+                if (origLedgerId !== tgt.id || origForYear !== tgt.year || origForMonth !== tgt.month) {
+                  await migrationClient.query(`
+                    UPDATE property_payments
+                    SET ledger_row_id = $1, for_year = $2, for_month = $3
+                    WHERE id = $4
+                  `, [tgt.id, tgt.year, tgt.month, Number(pmt.id)]);
+                  pmtFixed++;
+                  console.log(`[AllocationFix] pmt=${pmt.id} contract=${cid} moved ${origForYear}/${origForMonth} → ${tgt.year}/${tgt.month}`);
+                }
               }
             }
           }
-
-          // Write new ledger paidAmounts
-          for (const [, row] of lmap) {
-            await migrationClient.query(
-              `UPDATE property_monthly_ledger SET paid_amount = $1 WHERE id = $2`,
-              [row.paid.toFixed(2), row.id]
-            );
-          }
-
-          // Write payment forYear/forMonth only where changed
-          let contractFixed = 0;
-          for (const upd of updates) {
-            if (upd.origForYear !== upd.forYear || upd.origForMonth !== upd.forMonth) {
-              await migrationClient.query(
-                `UPDATE property_payments SET for_year = $1, for_month = $2, ledger_row_id = $3 WHERE id = $4`,
-                [upd.forYear, upd.forMonth, upd.ledgerId, upd.id]
-              );
-              contractFixed++;
-            }
-          }
-
-          if (contractFixed > 0) {
-            console.log(`[AllocationFix] contract=${cid} fixed ${contractFixed} payment(s)`);
-            allocationTotalFixed += contractFixed;
-          }
         }
 
-        if (allocationTotalFixed > 0) {
-          console.log(`[AllocationFix] Auto-reallocated ${allocationTotalFixed} payment(s) across all contracts`);
+        if (pmtFixed > 0) {
+          console.log(`[AllocationFix] Phase 1 complete — reassigned ${pmtFixed} payment record(s)`);
+        }
+
+        // Phase 2: sync every ledger row's paid_amount to sum of its linked payments
+        const syncResult = await migrationClient.query(`
+          UPDATE property_monthly_ledger pml
+          SET paid_amount = COALESCE((
+            SELECT SUM(pp.amount::numeric)
+            FROM property_payments pp
+            WHERE pp.ledger_row_id = pml.id
+          ), 0)
+          WHERE ABS(pml.paid_amount::numeric - COALESCE((
+            SELECT SUM(pp.amount::numeric)
+            FROM property_payments pp
+            WHERE pp.ledger_row_id = pml.id
+          ), 0)) > 0.01
+        `);
+        const ledgerFixed = syncResult.rowCount ?? 0;
+
+        if (pmtFixed > 0 || ledgerFixed > 0) {
+          console.log(`[AllocationFix] Phase 2 complete — corrected ${ledgerFixed} ledger paid_amount(s)`);
         } else {
-          console.log(`[AllocationFix] All contract allocations are correct`);
+          console.log(`[AllocationFix] All payment allocations and ledger amounts are correct`);
         }
       } catch (e: any) {
         console.error("[AllocationFix] Error:", e.message);
