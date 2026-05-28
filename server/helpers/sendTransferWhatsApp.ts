@@ -117,11 +117,9 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
   } catch { /* keep raw string */ }
 
   const caption = [
-    `*Stock Transfer* — ${voucherNumber}`,
-    `Date: ${displayDate}`,
-    `From: ${sourceLocationName}`,
-    `To: ${destLocationName}`,
-    `Items: ${items.length}`,
+    `*Stock Transfer*`,
+    `${displayDate}  •  ${sourceLocationName} → ${destLocationName}`,
+    `${items.length} item${items.length !== 1 ? "s" : ""}`,
     ...imageItems.map((i) => `• ${i.name}: ${i.quantity} ${i.uom}`),
   ].join("\n");
 

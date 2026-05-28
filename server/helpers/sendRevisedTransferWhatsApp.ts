@@ -88,10 +88,8 @@ export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOpt
   try { displayDate = format(new Date(voucherDate), "dd MMM yyyy"); } catch { /* keep raw */ }
 
   const caption = [
-    `*Stock Transfer Revision* — ${voucherNumber}`,
-    `Date: ${displayDate}`,
-    `From: ${sourceLocationName}`,
-    `To: ${destLocationName}`,
+    `*Stock Transfer Revision*`,
+    `${displayDate}  •  ${sourceLocationName} → ${destLocationName}`,
     ...imageItems.map((i) => `• ${i.name}: ${i.before} → ${i.after} ${i.uom} (${i.delta >= 0 ? "+" : ""}${i.delta})`),
   ].join("\n");
 
