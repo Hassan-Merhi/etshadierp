@@ -1361,7 +1361,7 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
                   <h2 className="text-2xl font-semibold">System Tools</h2>
                   <Badge variant="secondary" className="text-xs">Admin Tools</Badge>
                 </div>
-                <p className="text-muted-foreground text-sm">Manage recovery, diagnostics, AI assistant access, and financial position insights.</p>
+                <p className="text-muted-foreground text-sm">Manage recovery, diagnostics, and financial position insights.</p>
               </div>
 
               {/* Admin notice */}
@@ -1387,26 +1387,6 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
                       </div>
                       <div className="flex items-center gap-1 text-sm font-medium text-primary">
                         Open <ChevronRight className="h-4 w-4" />
-                      </div>
-                    </div>
-                  </Card>
-                </Link>
-
-                <Link href={`${pfx}/chatbot-settings`}>
-                  <Card className="p-6 hover-elevate cursor-pointer h-full">
-                    <div className="flex flex-col gap-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="p-2.5 bg-primary/10 rounded-md">
-                          <Bot className="h-5 w-5 text-primary" />
-                        </div>
-                        <Badge variant="secondary" className="text-xs">AI Access</Badge>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold mb-1" data-testid="link-chatbot-settings">AI Chatbot Settings</h3>
-                        <p className="text-sm text-muted-foreground">Manage AI assistant access permissions and review conversation history.</p>
-                      </div>
-                      <div className="flex items-center gap-1 text-sm font-medium text-primary">
-                        Manage <ChevronRight className="h-4 w-4" />
                       </div>
                     </div>
                   </Card>
@@ -1471,6 +1451,26 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
 
                   {/* Nav-style dev tools grid */}
                   <div className="grid gap-4 md:grid-cols-2">
+                    <Link href={`${pfx}/chatbot-settings`}>
+                      <Card className="p-6 hover-elevate cursor-pointer h-full">
+                        <div className="flex flex-col gap-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="p-2.5 bg-primary/10 rounded-md">
+                              <Bot className="h-5 w-5 text-primary" />
+                            </div>
+                            <Badge variant="secondary" className="text-xs">AI Access</Badge>
+                          </div>
+                          <div>
+                            <h3 className="font-semibold mb-1" data-testid="link-chatbot-settings">AI Chatbot Settings</h3>
+                            <p className="text-sm text-muted-foreground">Manage AI assistant access permissions and review conversation history.</p>
+                          </div>
+                          <div className="flex items-center gap-1 text-sm font-medium text-primary">
+                            Manage <ChevronRight className="h-4 w-4" />
+                          </div>
+                        </div>
+                      </Card>
+                    </Link>
+
                     {appMode !== "factory" && (
                       <Link href={`${pfx}/account-groups`}>
                         <Card className="p-6 hover-elevate cursor-pointer h-full">
