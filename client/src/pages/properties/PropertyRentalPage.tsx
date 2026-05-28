@@ -1232,6 +1232,7 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId, payments 
   // Computed balances
   const totalGuarantee = parseFloat(contract.guaranteeAmount || "0");
   const usedAmount = parseFloat(contract.guaranteePostedAmount || "0");
+  // remainingGuarantee: used by "Post to Statement" / "Move to Cash" sections only
   const remainingGuarantee = Math.max(0, totalGuarantee - usedAmount);
   const monthlyRent = parseFloat(contract.rentalAmount || "0");
 
@@ -1239,6 +1240,10 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId, payments 
   const guaranteeAppliedPayments = payments.filter(p => (p.notes ?? "").includes("[Guarantee applied]"));
   const hasGuaranteeApplied = guaranteeAppliedPayments.length > 0;
   const guaranteeAppliedTotal = guaranteeAppliedPayments.reduce((s, p) => s + parseFloat(String(p.amount || "0")), 0);
+
+  // remainingForRent: independent of "Post to Statement" — tracks how much of the
+  // guarantee has actually been applied as rent via payment records.
+  const remainingForRent = Math.max(0, totalGuarantee - guaranteeAppliedTotal);
 
   // ── Post to Statement state ──
   const [postAmount, setPostAmount] = useState(contract.guaranteeAmount);
@@ -1253,7 +1258,7 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId, payments 
   const [moveNotes, setMoveNotes] = useState("");
 
   // ── Apply as Rent state ── default to 1 month's rent (or remaining if less)
-  const defaultRentChunk = Math.min(monthlyRent, remainingGuarantee).toFixed(2);
+  const defaultRentChunk = Math.min(monthlyRent, remainingForRent).toFixed(2);
   const [rentAmount, setRentAmount] = useState(defaultRentChunk);
   const [rentDate, setRentDate] = useState(new Date().toISOString().slice(0, 10));
   const [rentNotes, setRentNotes] = useState("");
@@ -1429,9 +1434,9 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId, payments 
       <div className="border rounded-md p-3 space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <p className="text-sm font-semibold">Apply Guarantee as Rent</p>
-          {remainingGuarantee > 0 && (
+          {remainingForRent > 0 && (
             <span className="text-xs text-muted-foreground">
-              Remaining to apply: <span className="font-semibold text-green-600 dark:text-green-400">{fmtMoneyCurrency(remainingGuarantee, contract.currency)}</span>
+              Remaining to apply: <span className="font-semibold text-green-600 dark:text-green-400">{fmtMoneyCurrency(remainingForRent, contract.currency)}</span>
             </span>
           )}
         </div>
@@ -1441,18 +1446,18 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId, payments 
             : "Covers rent from the deposit — no cash moves. Dr Tenant Deposits / Cr Rent Income. Rent ledger marked paid."
           }
         </p>
-        {remainingGuarantee <= 0 && (
-          <p className="text-xs font-medium text-destructive">Guarantee fully used — nothing left to apply as rent.</p>
+        {remainingForRent <= 0 && (
+          <p className="text-xs font-medium text-destructive">Guarantee fully applied as rent — nothing left to apply.</p>
         )}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <div className="flex items-center justify-between mb-1">
               <Label>Amount</Label>
-              {remainingGuarantee > 0 && (
+              {remainingForRent > 0 && (
                 <button
                   type="button"
                   className="text-xs text-primary underline"
-                  onClick={() => setRentAmount(remainingGuarantee.toFixed(2))}
+                  onClick={() => setRentAmount(remainingForRent.toFixed(2))}
                   data-testid={`button-${testIdPrefix}-guarantee-rent-max`}
                 >
                   Use all remaining
@@ -1463,14 +1468,14 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId, payments 
               type="number"
               step="0.01"
               min="0.01"
-              max={remainingGuarantee}
+              max={remainingForRent}
               value={rentAmount}
               onChange={e => setRentAmount(e.target.value)}
               data-testid={`input-${testIdPrefix}-guarantee-rent-amount`}
             />
-            {rentAmountNum > remainingGuarantee && remainingGuarantee > 0 && (
+            {rentAmountNum > remainingForRent && remainingForRent > 0 && (
               <p className="text-xs text-destructive mt-1">
-                Exceeds remaining balance of {fmtMoneyCurrency(remainingGuarantee, contract.currency)}
+                Exceeds remaining balance of {fmtMoneyCurrency(remainingForRent, contract.currency)}
               </p>
             )}
           </div>
@@ -1498,7 +1503,7 @@ function GuaranteeForm({ contract, cashAccounts, testIdPrefix, unitId, payments 
         <div className="flex justify-end">
           <Button
             onClick={() => applyToRent.mutate()}
-            disabled={!rentAmount || !rentDate || applyToRent.isPending || remainingGuarantee <= 0 || rentAmountNum > remainingGuarantee}
+            disabled={!rentAmount || !rentDate || applyToRent.isPending || remainingForRent <= 0 || rentAmountNum > remainingForRent}
             data-testid={`button-${testIdPrefix}-guarantee-apply-rent`}
           >
             {applyToRent.isPending ? "Applying…" : "Apply as Rent"}

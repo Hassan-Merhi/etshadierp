@@ -1369,13 +1369,8 @@ export function registerRentalRoutes(
           `);
         }
 
-        // Accumulate the applied amount (do NOT overwrite — support partial monthly usage)
-        await tx.execute(sql`
-          UPDATE property_contracts
-          SET guarantee_posted_amount = COALESCE(guarantee_posted_amount, 0) + ${amount}::numeric,
-              guarantee_posted_to_statement = true
-          WHERE id = ${id}
-        `);
+        // guarantee_posted_amount is only managed by "Post to Statement" / "Move to Cash".
+        // Applied-as-rent amounts are tracked via payment records ([Guarantee applied] notes).
       });
 
       res.json({ ok: true, allocations });
@@ -1460,14 +1455,8 @@ export function registerRentalRoutes(
           totalReversed++;
         }
 
-        // 5. Reset guaranteePostedAmount — subtract what was applied as rent
-        //    (clamp to 0 in case of any rounding drift)
-        const totalApplied = appliedPayments.reduce((s, p) => s + parseFloat(String(p.amount)), 0);
-        await tx.execute(sql`
-          UPDATE property_contracts
-          SET guarantee_posted_amount = GREATEST(0, COALESCE(guarantee_posted_amount, 0) - ${totalApplied}::numeric)
-          WHERE id = ${id}
-        `);
+        // guarantee_posted_amount is only managed by "Post to Statement" / "Move to Cash".
+        // Applied-as-rent amounts are tracked via payment records ([Guarantee applied] notes).
       });
 
       res.json({ ok: true, reversed: totalReversed });
