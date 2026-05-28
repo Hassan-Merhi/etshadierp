@@ -682,9 +682,15 @@ export function registerBalanceRepairRoutes(app: Express) {
           .where(and(eq(propertyContracts.id, contractId), eq(propertyContracts.companyId, companyId)));
         if (!contract) return res.status(404).json({ message: "Contract not found" });
 
-        // 1. Load all payments sorted by date then id
+        // 1. Load only rent payments (ledgerRowId IS NOT NULL) sorted by date then id.
+        //    Exclude guarantee-to-cash payments (ledgerRowId = null) — they never
+        //    affect the rent ledger and must not be re-allocated as rent.
         const payments = await db.select().from(propertyPayments)
-          .where(and(eq(propertyPayments.contractId, contractId), eq(propertyPayments.companyId, companyId)))
+          .where(and(
+            eq(propertyPayments.contractId, contractId),
+            eq(propertyPayments.companyId, companyId),
+            sql`${propertyPayments.ledgerRowId} IS NOT NULL`,
+          ))
           .orderBy(propertyPayments.paymentDate, propertyPayments.id);
 
         if (payments.length === 0) return res.json({ fixed: 0, message: "No payments found" });
@@ -757,6 +763,24 @@ export function registerBalanceRepairRoutes(app: Express) {
             }
           }
         });
+
+        // 6. Phase 2 safety net: sync any ledger row whose paid_amount still
+        //    doesn't match the sum of payments pointing to it (catches orphaned
+        //    amounts left behind by guarantee-to-cash or deleted payments).
+        await db.execute(sql`
+          UPDATE property_monthly_ledger pml
+          SET paid_amount = COALESCE((
+            SELECT SUM(pp.amount::numeric)
+            FROM property_payments pp
+            WHERE pp.ledger_row_id = pml.id
+          ), 0)
+          WHERE pml.contract_id = ${contractId}
+            AND ABS(pml.paid_amount::numeric - COALESCE((
+              SELECT SUM(pp.amount::numeric)
+              FROM property_payments pp
+              WHERE pp.ledger_row_id = pml.id
+            ), 0)) > 0.01
+        `);
 
         res.json({ fixed, total: payments.length, message: `Reallocated ${fixed} payment(s) to the correct months.` });
       } catch (err: any) {
