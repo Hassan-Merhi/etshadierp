@@ -231,6 +231,46 @@ async function ensureMonthlyLedgerRows(contractId: number) {
   });
 }
 
+// ── Oldest unpaid month finder ─────────────────────────────────────────────
+// Returns the earliest past-or-current month for this contract that still has
+// an outstanding balance.  Falls back to (fallbackYear, fallbackMonth) when
+// every recorded month is fully paid.
+async function findEarliestOutstandingMonth(
+  contractId: number,
+  fallbackYear: number,
+  fallbackMonth: number,
+): Promise<{ year: number; month: number }> {
+  const rows = await db
+    .select({
+      year:           propertyMonthlyLedger.year,
+      month:          propertyMonthlyLedger.month,
+      paidAmount:     propertyMonthlyLedger.paidAmount,
+      expectedAmount: propertyMonthlyLedger.expectedAmount,
+    })
+    .from(propertyMonthlyLedger)
+    .where(eq(propertyMonthlyLedger.contractId, contractId))
+    .orderBy(propertyMonthlyLedger.year, propertyMonthlyLedger.month);
+
+  const now = new Date();
+  const nowYear  = now.getUTCFullYear();
+  const nowMonth = now.getUTCMonth() + 1;
+
+  for (const row of rows) {
+    // Only consider past and current months (not future prepaid months)
+    const isPastOrCurrent =
+      row.year < nowYear || (row.year === nowYear && row.month <= nowMonth);
+    if (!isPastOrCurrent) continue;
+
+    const outstanding =
+      Math.max(0, parseFloat(row.expectedAmount as string) - parseFloat(row.paidAmount as string));
+    if (outstanding > 0.005) {
+      return { year: row.year, month: row.month };
+    }
+  }
+
+  return { year: fallbackYear, month: fallbackMonth };
+}
+
 // ── Smart allocation builder ───────────────────────────────────────────────
 // Builds the list of (year, month, chunk) allocations for a payment, starting
 // from (startYear, startMonth) but SKIPPING any month that is already fully
@@ -1293,17 +1333,17 @@ export function registerRentalRoutes(
 
       await ensureMonthlyLedgerRows(contract.id);
 
-      // Derive year/month from the payment date itself
       const pd = new Date(data.paymentDate);
-      let y = pd.getUTCFullYear(), m = pd.getUTCMonth() + 1;
+      const payYear = pd.getUTCFullYear(), payMonth = pd.getUTCMonth() + 1;
 
       const [unit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, contract.unitId));
 
       // ── Build monthly allocations ──────────────────────────────────────────
-      // Uses the smart allocator that skips months already fully paid/prepaid,
-      // cascading the payment to the next month that still has an outstanding balance.
+      // Always start from the oldest outstanding past/current month so that
+      // overdue months are filled before current or future months.
       const totalAmountNum = parseFloat(data.amount);
       const rentalAmountNum = parseFloat(contract.rentalAmount as string);
+      const { year: y, month: m } = await findEarliestOutstandingMonth(contract.id, payYear, payMonth);
       const allocations = await buildAllocations(contract.id, y, m, totalAmountNum, rentalAmountNum);
 
       const payments = await db.transaction(async (tx) => {
@@ -1432,11 +1472,13 @@ export function registerRentalRoutes(
         await ensureMonthlyLedgerRows(contract.id);
 
         const pd = new Date(data.paymentDate);
-        let y = pd.getUTCFullYear(), m = pd.getUTCMonth() + 1;
+        const payYear = pd.getUTCFullYear(), payMonth = pd.getUTCMonth() + 1;
         const [unit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, contract.unitId));
 
         const totalAmountNum = parseFloat(data.amount);
         const rentalAmountNum = parseFloat(contract.rentalAmount as string);
+        // Always start from the oldest outstanding past/current month
+        const { year: y, month: m } = await findEarliestOutstandingMonth(contract.id, payYear, payMonth);
         const allocations = await buildAllocations(contract.id, y, m, totalAmountNum, rentalAmountNum);
 
         const payments = await db.transaction(async (tx) => {
