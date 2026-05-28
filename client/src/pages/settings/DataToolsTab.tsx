@@ -64,7 +64,7 @@ import { StockItemAutocomplete } from "@/components/StockItemAutocomplete";
   import { queryClient, apiRequest } from "@/lib/queryClient";
   import { useAppMode } from "@/contexts/AppModeContext";
   import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
-  import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+  import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
   import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, TrendingDown, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, FileSpreadsheet, FileDown, RotateCcw, Search } from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
@@ -623,44 +623,6 @@ export function DataToolsTab() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Import Cost Prices Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Upload className="h-4 w-4" />
-              Import Cost Prices
-            </CardTitle>
-            <CardDescription>
-              Bulk update inventory cost prices from Excel file
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Select Location</Label>
-              <Select value={costPriceLocationId} onValueChange={setCostPriceLocationId}>
-                <SelectTrigger data-testid="select-location-cost-price">
-                  <SelectValue placeholder="Choose location..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations.map((loc: any) => (
-                    <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => setCostPriceImportOpen(true)}
-              disabled={!costPriceLocationId}
-              data-testid="button-open-cost-price-import"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Import Cost Prices
-            </Button>
-          </CardContent>
-        </Card>
-
         {/* Import Stock Card */}
         <Card>
           <CardHeader>
@@ -774,19 +736,9 @@ export function DataToolsTab() {
           </Card>
         )}
 
-        {/* Merge Duplicate Stock Items — ERP mode, Admin/Owner/Developer */}
+        {/* Merge Stock Items — Single card, dialog with tabs */}
         {appMode !== "factory" && ["Admin", "Owner", "Developer"].includes(dtCurrentUser?.role || "") && selectedCompany && (
-          <MergeStockItemsCard />
-        )}
-
-        {/* Bulk Merge via Excel — ERP mode, Developer only */}
-        {appMode !== "factory" && dtCurrentUser?.role === "Developer" && selectedCompany && (
-          <BulkMergeStockItemsCard />
-        )}
-
-        {/* Merge History / Unmerge — ERP mode, Admin/Owner/Developer */}
-        {appMode !== "factory" && ["Admin", "Owner", "Developer"].includes(dtCurrentUser?.role || "") && selectedCompany && (
-          <MergeHistoryCard />
+          <MergeStockItemsLauncher />
         )}
 
         {/* Merge Bale Products — factory mode, Admin/Owner/Developer */}
@@ -1475,69 +1427,6 @@ export function DataToolsTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Cost Price Import Dialog */}
-      <Dialog open={costPriceImportOpen} onOpenChange={handleCostPriceDialogClose}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Import Cost Prices from Excel</DialogTitle>
-            <DialogDescription>
-              Upload an Excel file with barcode and costPrice columns
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Button variant="outline" onClick={downloadCostPriceTemplate} size="sm" data-testid="button-download-cost-price-template">
-              <Download className="h-4 w-4 mr-2" />
-              Download Template
-            </Button>
-            <div className="space-y-2">
-              <Label htmlFor="cost-price-file">Select Excel File</Label>
-              <Input
-                id="cost-price-file"
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleCostPriceFileChange}
-                disabled={isImportingCostPrice || costPriceImportComplete}
-                data-testid="input-cost-price-file"
-              />
-              {costPriceFile && <p className="text-sm text-muted-foreground">Selected: {costPriceFile.name}</p>}
-            </div>
-            {costPriceErrors.length > 0 && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  <div className="font-semibold mb-2">{costPriceErrors.length} validation error(s):</div>
-                  <ul className="list-disc list-inside space-y-1">
-                    {costPriceErrors.slice(0, 5).map((err, i) => <li key={i} className="text-sm">{err}</li>)}
-                  </ul>
-                </AlertDescription>
-              </Alert>
-            )}
-            {costPricePreview.length > 0 && costPriceErrors.length === 0 && (
-              <Alert>
-                <Package className="h-4 w-4" />
-                <AlertDescription>{costPricePreview.length} records ready to import</AlertDescription>
-              </Alert>
-            )}
-            {costPriceImportComplete && (
-              <Alert>
-                <Package className="h-4 w-4" />
-                <AlertDescription>Cost prices imported successfully</AlertDescription>
-              </Alert>
-            )}
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={handleCostPriceDialogClose} disabled={isImportingCostPrice}>Close</Button>
-              <Button
-                onClick={handleCostPriceImport}
-                disabled={costPricePreview.length === 0 || costPriceErrors.length > 0 || isImportingCostPrice || costPriceImportComplete}
-                data-testid="button-submit-cost-price-import"
-              >
-                {isImportingCostPrice ? "Importing..." : "Import Cost Prices"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Stock Import Dialog */}
       <Dialog open={stockImportOpen} onOpenChange={handleStockDialogClose}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -1836,7 +1725,7 @@ type BulkMergeResult = {
   oldItemName?: string;
 };
 
-function BulkMergeStockItemsCard() {
+function BulkMergeStockItemsCard({ embedded }: { embedded?: boolean }) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parsedRows, setParsedRows] = useState<BulkMergePairRow[]>([]);
@@ -1913,18 +1802,8 @@ function BulkMergeStockItemsCard() {
   const skipped   = results?.filter(r => r.status === "skipped").length ?? 0;
   const errored   = results?.filter(r => r.status === "error").length ?? 0;
 
-  return (
-    <Card className="col-span-1 md:col-span-2">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileSpreadsheet className="h-4 w-4" />
-          Bulk Merge via Excel
-        </CardTitle>
-        <CardDescription>
-          Upload a two-column Excel file (old_code → keep_code) to merge many duplicate items at once. Each pair runs the same safe merge logic as the single-item merge above.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+  const bulkContent = (
+    <div className="space-y-4">
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={downloadTemplate} data-testid="button-bulk-merge-template">
             <FileDown className="h-4 w-4 mr-2" />
@@ -2048,6 +1927,24 @@ function BulkMergeStockItemsCard() {
             </Button>
           </div>
         )}
+    </div>
+  );
+
+  if (embedded) return bulkContent;
+
+  return (
+    <Card className="col-span-1 md:col-span-2">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FileSpreadsheet className="h-4 w-4" />
+          Bulk Merge via Excel
+        </CardTitle>
+        <CardDescription>
+          Upload a two-column Excel file (old_code → keep_code) to merge many duplicate items at once. Each pair runs the same safe merge logic as the single-item merge above.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {bulkContent}
       </CardContent>
     </Card>
   );
@@ -2068,7 +1965,7 @@ interface MergeLogEntry {
   source?: "historical";
 }
 
-function MergeHistoryCard() {
+function MergeHistoryCard({ embedded }: { embedded?: boolean }) {
   const { toast } = useToast();
   const [unmergeTarget, setUnmergeTarget] = useState<MergeLogEntry | null>(null);
   const [isUnmerging, setIsUnmerging] = useState(false);
@@ -2127,6 +2024,157 @@ function MergeHistoryCard() {
     }
   }
 
+  const historyContent = (
+    <>
+      {isLoading || historicalLoading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      ) : allLogs.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No merges recorded for this company yet.</p>
+      ) : (
+        <>
+          {historicalLogs.length > 0 && logs.length === 0 && (
+            <p className="text-xs text-muted-foreground mb-3">
+              These merges were done before history tracking was added. They were reconstructed from alias records — no snapshot is available so they cannot be unmerged automatically.
+            </p>
+          )}
+          {historicalLogs.length > 0 && logs.length > 0 && (
+            <p className="text-xs text-muted-foreground mb-3">
+              Entries marked <span className="font-medium">Historical</span> were done before history tracking was added and cannot be unmerged automatically.
+            </p>
+          )}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Kept item</TableHead>
+                <TableHead>Merged away</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead className="w-32"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {allLogs.map((log, idx) => (
+                <TableRow key={log.id ?? `hist-${idx}`} data-testid={`row-merge-log-${log.id ?? idx}`}>
+                  <TableCell>
+                    <p className="font-medium text-sm">{log.keptItemName}</p>
+                    <p className="text-xs text-muted-foreground">{log.keptItemCode}</p>
+                  </TableCell>
+                  <TableCell>
+                    <p className="font-medium text-sm">{log.mergedItemName}</p>
+                    <p className="text-xs text-muted-foreground">{log.mergedItemCode}</p>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                    {new Date(log.mergedAt).toLocaleDateString()}
+                    {log.source === "historical" && (
+                      <Badge variant="outline" className="ml-2 text-[10px]">Historical</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {log.source === "historical" ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setHistoricalRestoreTarget(log)}
+                        data-testid={`button-hist-restore-${log.mergedItemId}`}
+                      >
+                        <RotateCcw className="h-3 w-3 mr-1" />
+                        Restore
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setUnmergeTarget(log)}
+                        data-testid={`button-unmerge-${log.id}`}
+                      >
+                        <RotateCcw className="h-3 w-3 mr-1" />
+                        Unmerge
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </>
+      )}
+    </>
+  );
+
+  if (embedded) return (
+    <>
+      {historyContent}
+      {/* Unmerge confirmation dialog */}
+      <AlertDialog open={!!unmergeTarget} onOpenChange={(open) => { if (!open) setUnmergeTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unmerge this item?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  This will restore <strong>{unmergeTarget?.mergedItemName}</strong> as a separate active item and revert inventory quantities back to the pre-merge state.
+                </p>
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    Any selling prices that were deleted during the merge (because the kept item already had a price for that location) cannot be recovered automatically. You may need to re-enter them manually.
+                  </AlertDescription>
+                </Alert>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUnmerging} data-testid="button-unmerge-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleUnmerge}
+              disabled={isUnmerging}
+              data-testid="button-unmerge-confirm"
+            >
+              {isUnmerging ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Unmerging…</> : "Yes, unmerge it"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Historical restore confirmation dialog */}
+      <AlertDialog open={!!historicalRestoreTarget} onOpenChange={(open) => { if (!open) setHistoricalRestoreTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restore this item?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  This will restore <strong>{historicalRestoreTarget?.mergedItemName}</strong> ({historicalRestoreTarget?.mergedItemCode}) as a separate active item.
+                </p>
+                <p className="text-sm">
+                  The item will reappear in your stock list with its original name and code. Its code alias (which was redirecting scans to <strong>{historicalRestoreTarget?.keptItemName}</strong>) will be removed.
+                </p>
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    Because this merge happened before history tracking was added, inventory quantities <strong>cannot be restored automatically</strong>. The item will come back with zero stock. You will need to manually adjust quantities between <strong>{historicalRestoreTarget?.mergedItemName}</strong> and <strong>{historicalRestoreTarget?.keptItemName}</strong>.
+                  </AlertDescription>
+                </Alert>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isHistoricalRestoring} data-testid="button-hist-restore-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleHistoricalRestore}
+              disabled={isHistoricalRestoring}
+              data-testid="button-hist-restore-confirm"
+            >
+              {isHistoricalRestoring ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Restoring…</> : "Yes, restore it"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+
   return (
     <Card>
       <CardHeader>
@@ -2139,80 +2187,7 @@ function MergeHistoryCard() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoading || historicalLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        ) : allLogs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No merges recorded for this company yet.</p>
-        ) : (
-          <>
-            {historicalLogs.length > 0 && logs.length === 0 && (
-              <p className="text-xs text-muted-foreground mb-3">
-                These merges were done before history tracking was added. They were reconstructed from alias records — no snapshot is available so they cannot be unmerged automatically.
-              </p>
-            )}
-            {historicalLogs.length > 0 && logs.length > 0 && (
-              <p className="text-xs text-muted-foreground mb-3">
-                Entries marked <span className="font-medium">Historical</span> were done before history tracking was added and cannot be unmerged automatically.
-              </p>
-            )}
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Kept item</TableHead>
-                  <TableHead>Merged away</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="w-32"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {allLogs.map((log, idx) => (
-                  <TableRow key={log.id ?? `hist-${idx}`} data-testid={`row-merge-log-${log.id ?? idx}`}>
-                    <TableCell>
-                      <p className="font-medium text-sm">{log.keptItemName}</p>
-                      <p className="text-xs text-muted-foreground">{log.keptItemCode}</p>
-                    </TableCell>
-                    <TableCell>
-                      <p className="font-medium text-sm">{log.mergedItemName}</p>
-                      <p className="text-xs text-muted-foreground">{log.mergedItemCode}</p>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                      {new Date(log.mergedAt).toLocaleDateString()}
-                      {log.source === "historical" && (
-                        <Badge variant="outline" className="ml-2 text-[10px]">Historical</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {log.source === "historical" ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setHistoricalRestoreTarget(log)}
-                          data-testid={`button-hist-restore-${log.mergedItemId}`}
-                        >
-                          <RotateCcw className="h-3 w-3 mr-1" />
-                          Restore
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setUnmergeTarget(log)}
-                          data-testid={`button-unmerge-${log.id}`}
-                        >
-                          <RotateCcw className="h-3 w-3 mr-1" />
-                          Unmerge
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </>
-        )}
+        {historyContent}
       </CardContent>
 
       {/* Unmerge confirmation dialog */}
@@ -2282,6 +2257,68 @@ function MergeHistoryCard() {
         </AlertDialogContent>
       </AlertDialog>
     </Card>
+  );
+}
+
+// ── Merge Stock Items Launcher (unified dialog) ───────────────────────────────
+
+function MergeStockItemsLauncher() {
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState("single");
+
+  return (
+    <>
+      <Card className="col-span-1 md:col-span-2">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ArrowLeftRight className="h-4 w-4" />
+            Merge Duplicate Stock Items
+          </CardTitle>
+          <CardDescription>
+            Merge two items into one, run a bulk merge from Excel, or view and reverse past merges.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => { setTab("single"); setOpen(true); }}
+            data-testid="button-open-merge-launcher"
+          >
+            <ArrowLeftRight className="h-4 w-4 mr-2" />
+            Open Merge Tool
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Merge Duplicate Stock Items</DialogTitle>
+            <DialogDescription>
+              Choose a merge method below. Quantities and values are preserved exactly to the cent.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Tabs value={tab} onValueChange={setTab} className="mt-2">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="single" data-testid="tab-merge-single">Single Item</TabsTrigger>
+              <TabsTrigger value="bulk" data-testid="tab-merge-bulk">Bulk via Excel</TabsTrigger>
+              <TabsTrigger value="history" data-testid="tab-merge-history">History</TabsTrigger>
+            </TabsList>
+            <TabsContent value="single" className="mt-4">
+              <MergeStockItemsCard embedded />
+            </TabsContent>
+            <TabsContent value="bulk" className="mt-4">
+              <BulkMergeStockItemsCard embedded />
+            </TabsContent>
+            <TabsContent value="history" className="mt-4">
+              <MergeHistoryCard embedded />
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
