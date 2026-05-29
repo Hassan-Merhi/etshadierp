@@ -379,7 +379,7 @@ export default function FactoryOtwTrackingTab() {
   const trackNowMutation = useMutation({
     mutationFn: async (containerId: number) => {
       const res = await factoryApiRequest("POST", `/api/factory/container-tracking/${containerId}/track-now`, {});
-      return res.json();
+      return res as any;
     },
     onMutate: (id) => { setTrackingNowId(id); },
     onSuccess: (data) => {
