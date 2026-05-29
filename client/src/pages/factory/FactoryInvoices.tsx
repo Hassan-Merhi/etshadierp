@@ -208,7 +208,13 @@ export default function FactoryInvoices() {
   };
 
   // Column count for colspan calculations
-  const colCount = 8 - (hideProformaCol ? 1 : 0) - (hideTotalsUsd ? 1 : 0);
+  const colCount = 9 - (hideProformaCol ? 1 : 0) - (hideTotalsUsd ? 1 : 0);
+
+  const fmtKg = (val: string | number | null | undefined) => {
+    const n = parseFloat(String(val ?? "0"));
+    if (!n) return <span className="text-muted-foreground/40">—</span>;
+    return <>{n.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg</>;
+  };
 
   // Group orders by customer, preserving first-appearance order
   const customerGroups = (() => {
@@ -303,6 +309,7 @@ export default function FactoryInvoices() {
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Bales</TableHead>
+                <TableHead className="text-right">Weight</TableHead>
                 <TableHead className="text-right">Remaining</TableHead>
                 {!hideTotalsUsd && <TableHead className="text-right">Total</TableHead>}
                 <TableHead className="w-[120px]">Actions</TableHead>
@@ -361,6 +368,9 @@ export default function FactoryInvoices() {
                         <TableCell>{getStatusBadge(order.status)}</TableCell>
                         <TableCell className="text-right font-mono" data-testid={`text-total-bales-${order.id}`}>
                           {order.totalQtyBales ?? "-"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm" data-testid={`text-weight-${order.id}`}>
+                          {fmtKg(order.totalWeightKg)}
                         </TableCell>
                         <TableCell className="text-right font-mono" data-testid={`text-remaining-${order.id}`}>
                           {expected <= 0 ? (
@@ -458,6 +468,7 @@ export default function FactoryInvoices() {
 
                   // Multi-loading: summary row + expandable children
                   const totalBales = group.orders.reduce((s, o) => s + (o.totalQtyBales || 0), 0);
+                  const totalWeightKg = group.orders.reduce((s, o) => s + parseFloat(o.totalWeightKg || "0"), 0);
                   const totalRemaining = group.orders.reduce((s, o) => s + getRemainingBales(o), 0);
                   const totalOverloaded = group.orders.reduce((s, o) => {
                     const exp = parseFloat(o.proformaExpectedBales || "0");
@@ -493,6 +504,7 @@ export default function FactoryInvoices() {
                         <TableCell />
                         <TableCell />
                         <TableCell className="text-right font-mono">{totalBales}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">{fmtKg(totalWeightKg)}</TableCell>
                         <TableCell className="text-right font-mono">
                           {totalRemaining > 0 ? (
                             <span className="text-red-600 dark:text-red-400">{totalRemaining}</span>
