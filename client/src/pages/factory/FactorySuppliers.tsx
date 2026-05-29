@@ -2033,9 +2033,7 @@ export default function FactorySuppliers() {
                                     <span>{row.ref}</span>
                                     {row.status && <Badge variant={statusColor(row.status)} className="text-xs ml-1">{statusDisplayLabel(row.status)}</Badge>}
                                   </div>
-                                  {row.conversionNote && (
-                                    <span className="text-xs text-blue-600 dark:text-blue-400 font-normal">{row.conversionNote}</span>
-                                  )}
+
                                   {row.detail && (
                                     <span className="text-xs text-muted-foreground font-normal">{row.detail}</span>
                                   )}
