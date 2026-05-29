@@ -1692,10 +1692,6 @@ export function registerSpRoutes(app: Express) {
       if (!companyId) return;
 
       const { startDate, endDate } = req.query;
-      const dateFilter = `
-        ${startDate ? `AND s.sale_date >= '${startDate}'` : ""}
-        ${endDate   ? `AND s.sale_date <= '${endDate}'`   : ""}
-      `;
 
       // Per-article sales aggregation
       const salesRows = await db.execute(sql`
@@ -1711,7 +1707,8 @@ export function registerSpRoutes(app: Express) {
         FROM sp_sale_lines sl
         JOIN sp_sales s ON sl.sale_id = s.id
         WHERE sl.company_id = ${companyId} AND s.status = 'posted'
-        ${sql.raw(dateFilter)}
+        ${startDate ? sql`AND s.sale_date >= ${startDate}` : sql``}
+        ${endDate ? sql`AND s.sale_date <= ${endDate}` : sql``}
         GROUP BY sl.article_code
         ORDER BY sl.article_code ASC
       `);

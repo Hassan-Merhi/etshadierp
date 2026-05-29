@@ -52,7 +52,8 @@ const SOURCE_NAME_EXPECTED = "HADI L'SHI"; // exact name in DB for confirmation 
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 async function countTable(table: string, companyId: number): Promise<number> {
-  const r = (await db.execute(sql.raw(`SELECT COUNT(*) AS n FROM ${table} WHERE company_id = ${companyId}`))).rows[0] as any;
+  if (!/^[a-zA-Z0-9_]+$/.test(table)) throw new Error('Invalid input');
+  const r = (await db.execute(sql`SELECT COUNT(*) AS n FROM ${sql.raw(table)} WHERE company_id = ${companyId}`)).rows[0] as any;
   return pn(r.n);
 }
 
