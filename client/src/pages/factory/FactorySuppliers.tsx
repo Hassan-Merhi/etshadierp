@@ -209,6 +209,7 @@ export default function FactorySuppliers() {
     queryKey: ["/api/factory/suppliers/with-balances"],
   });
 
+  const [supplierIncludeOtw, setSupplierIncludeOtw] = useState(false);
   const { data: statementData, isLoading: statementLoading, isError: statementError } = useQuery<StatementResponse>({
     queryKey: ["/api/factory/suppliers", statementSupplierId, "statement", supplierIncludeOtw],
     queryFn: async () => {
@@ -242,7 +243,6 @@ export default function FactorySuppliers() {
   // Broker consolidated statement query (fires when viewing a broker's own statement)
   const isBrokerStatement = !!(statementData?.linkedSupplierGroups?.length);
   const [brokerIncludeOtw, setBrokerIncludeOtw] = useState(false);
-  const [supplierIncludeOtw, setSupplierIncludeOtw] = useState(false);
   const { data: brokerStatement, isLoading: brokerStatementLoading } = useQuery<any>({
     queryKey: ["/api/factory/suppliers", statementSupplierId, "broker-statement", brokerIncludeOtw],
     queryFn: async () => {
