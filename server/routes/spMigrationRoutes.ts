@@ -483,6 +483,7 @@ export function registerSpMigrationRoutes(app: Express) {
         "voucher_entries",
         "vouchers",
         "ledger_accounts",
+        "inventory",
         "sp_stock_movements",
         "stock_item_code_aliases",
         "locations",
@@ -516,6 +517,9 @@ export function registerSpMigrationRoutes(app: Express) {
           } else if (tbl === "ledger_accounts") {
             const [chk] = (await db.execute(sql`SELECT company_id FROM ledger_accounts WHERE id = ${id} LIMIT 1`)).rows as any[];
             verified = !!chk && pn(chk.company_id) === targetId;
+          } else if (tbl === "inventory") {
+            const [chk] = (await db.execute(sql`SELECT company_id FROM inventory WHERE id = ${id} LIMIT 1`)).rows as any[];
+            verified = !!chk && pn(chk.company_id) === targetId;
           }
 
           if (!verified) {
@@ -523,7 +527,9 @@ export function registerSpMigrationRoutes(app: Express) {
             continue;
           }
 
-          if (tbl === "sp_stock_movements") {
+          if (tbl === "inventory") {
+            await db.execute(sql`DELETE FROM inventory WHERE id = ${id}`);
+          } else if (tbl === "sp_stock_movements") {
             await db.execute(sql`DELETE FROM sp_stock_movements WHERE id = ${id}`);
           } else if (tbl === "stock_item_code_aliases") {
             await db.execute(sql`DELETE FROM stock_item_code_aliases WHERE id = ${id}`);
@@ -777,18 +783,23 @@ export function registerSpMigrationRoutes(app: Express) {
         }
       }
 
-      // 3. Default location
+      // 3. Default location — capture id for inventory rows
       progress(22, "Setting up warehouse location…");
       const locs = await db.select().from(locations).where(and(eq(locations.companyId, targetId), isNull(locations.deletedAt)));
+      let mainWarehouseLocationId: number;
       if (!locs.length) {
         const [locRow] = (await db.execute(sql`
           INSERT INTO locations (company_id, code, name, active)
           VALUES (${targetId}, 'SP-WH-001', 'Main Warehouse', true)
           RETURNING id
         `)).rows as any[];
-        await trackRow(runId, "locations", locRow.id);
+        mainWarehouseLocationId = pn(locRow.id);
+        await trackRow(runId, "locations", mainWarehouseLocationId);
         rowsCreated++;
         summary.push("Created default warehouse location");
+      } else {
+        mainWarehouseLocationId = pn(locs[0].id);
+        summary.push("Using existing warehouse location");
       }
 
       // 4. Stock items
@@ -844,6 +855,21 @@ export function registerSpMigrationRoutes(app: Express) {
         await trackRow(runId, "sp_stock_movements", pn(movRow.id));
         movementsCreated++;
         rowsCreated++;
+
+        // Populate inventory table so Location Inventory view shows stock.
+        // ON CONFLICT DO NOTHING: if a row already exists (re-run scenario), skip silently.
+        const totalVal = (qty * avgRate).toFixed(2);
+        const [invRow] = (await db.execute(sql`
+          INSERT INTO inventory (company_id, location_id, stock_item_id, quantity, average_rate, total_value)
+          VALUES (${targetId}, ${mainWarehouseLocationId}, ${stockItemId},
+                  ${qty.toFixed(3)}, ${avgRate.toFixed(2)}, ${totalVal})
+          ON CONFLICT (location_id, stock_item_id) DO NOTHING
+          RETURNING id
+        `)).rows as any[];
+        if (invRow) {
+          await trackRow(runId, "inventory", pn(invRow.id));
+          rowsCreated++;
+        }
       }
       summary.push(`Stock: ${aliasesCreated} aliases created, ${aliasesSkipped} skipped, ${movementsCreated} opening movements`);
 
@@ -851,16 +877,16 @@ export function registerSpMigrationRoutes(app: Express) {
       progress(44, "Building account mapping…");
 
       // Resolution order (first match wins):
-      //   a) Exact sub_type match (handles SP accounts that exist on both sides)
-      //   b) Explicit ERP→SP equivalence table (derived from real sub_types in production)
-      //   c) Suspense — never fall back to account_type; that silently mis-maps entries
+      //   a) Exact sub_type match (handles SP/intercompany accounts that exist on both sides)
+      //   b) ERP account_type → SP sub_type equivalence (e.g. "Direct Income" → sp_sales)
+      //   c) Suspense — for entries whose account has no meaningful SP equivalent
       //
-      // Explicit ERP→SP sub_type equivalences (based on live DB schema):
-      //   ERP "Direct Income"       → sp_sales
-      //   ERP "Direct Expense"      → sp_cogs
-      //   ERP "Indirect Expense"    → sp_shared_charges
-      //   ERP "hadi_sp_intercompany"→ sp_hadi_intercompany
-      //   Everything else           → gc_mig_suspense (held for manual review)
+      // ERP account_type → SP sub_type equivalences:
+      //   "Direct Income"       → sp_sales
+      //   "Direct Expense"      → sp_cogs
+      //   "Indirect Expense"    → sp_shared_charges
+      //   "hadi_sp_intercompany"→ sp_hadi_intercompany  (handled by sub_type branch above)
+      //   Everything else       → gc_mig_suspense (held for manual review)
       const ERP_TO_SP_SUBTYPE: Record<string, string> = {
         "Direct Income":        "sp_sales",
         "Direct Expense":       "sp_cogs",
@@ -904,10 +930,13 @@ export function registerSpMigrationRoutes(app: Express) {
       for (const sa of sourceAccts) {
         const srcId = pn(sa.id);
         if (sa.sub_type && targetBySubType.has(sa.sub_type)) {
+          // Branch a: exact sub_type match (handles intercompany and any SP account present on both sides)
           accountMap.set(srcId, targetBySubType.get(sa.sub_type)!);
-        } else if (sa.sub_type && ERP_TO_SP_SUBTYPE[sa.sub_type] && targetBySubType.has(ERP_TO_SP_SUBTYPE[sa.sub_type])) {
-          accountMap.set(srcId, targetBySubType.get(ERP_TO_SP_SUBTYPE[sa.sub_type])!);
+        } else if (sa.account_type && ERP_TO_SP_SUBTYPE[sa.account_type] && targetBySubType.has(ERP_TO_SP_SUBTYPE[sa.account_type])) {
+          // Branch b: map by ERP account_type (e.g. "Direct Income" → sp_sales)
+          accountMap.set(srcId, targetBySubType.get(ERP_TO_SP_SUBTYPE[sa.account_type])!);
         } else {
+          // Branch c: truly unmappable — route to suspense for manual review
           accountMap.set(srcId, suspenseAccountId);
         }
       }
