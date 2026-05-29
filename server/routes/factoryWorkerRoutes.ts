@@ -889,7 +889,13 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
   app.get("/api/factory/uploads/workers/docs/:filename", requireAuth, async (req: any, res: any) => {
     try {
       const filename = req.params.filename;
-      const filePath = path.join(process.cwd(), "uploads", "workers", "docs", filename);
+      const base = path.resolve(process.cwd(), "uploads", "workers", "docs");
+      const filePath = path.resolve(base, filename);
+      const relative = path.relative(base, filePath);
+
+      if (relative.startsWith("..") || path.isAbsolute(relative)) {
+        return res.status(400).json({ message: "Invalid file path" });
+      }
 
       if (fs.existsSync(filePath)) {
         return res.sendFile(filePath);
