@@ -72,6 +72,8 @@ interface SupplierWithBalance extends FactorySupplier {
   }>;
   /** Broker-only: aggregated exposure totals across all linked suppliers */
   exposureCurrencyBalances?: CurrencyBalance[];
+  /** OTW (pending/in-transit) container count per currency code, aggregated across broker + linked suppliers */
+  otwByCurrency?: Record<string, number>;
 }
 
 
@@ -939,6 +941,46 @@ export default function FactorySuppliers() {
                 </div>
               </CardContent>
             </Card>
+            {/* OTW card — only shown when there are pending containers */}
+            {parentSup.pendingContainers > 0 && (() => {
+              const byCC = parentSup.otwByCurrency || {};
+              const eurCount = byCC["EUR"] || 0;
+              const usdCount = byCC["USD"] || 0;
+              const otherCount = Object.entries(byCC)
+                .filter(([cc]) => cc !== "EUR" && cc !== "USD")
+                .reduce((s, [, n]) => s + n, 0);
+              const pills = [
+                { label: "EUR", count: eurCount },
+                { label: "USD", count: usdCount },
+                { label: "Other", count: otherCount },
+              ].filter(p => p.count > 0);
+              return (
+                <Card key="otw" data-testid="card-otw-containers">
+                  <CardContent className="p-4">
+                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      OTW Containers
+                    </div>
+                    <div className="text-2xl font-bold mt-1 text-amber-600 dark:text-amber-400 tabular-nums" data-testid="text-otw-total">
+                      {parentSup.pendingContainers}
+                    </div>
+                    {pills.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {pills.map(p => (
+                          <span
+                            key={p.label}
+                            className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                            data-testid={`text-otw-${p.label.toLowerCase()}`}
+                          >
+                            {p.label} {p.count}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })()}
             {brokerOverviewLoading ? (
               <Card>
                 <CardContent className="p-4">

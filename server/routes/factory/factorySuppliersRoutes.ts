@@ -1283,7 +1283,13 @@ export function registerFactorySuppliersRoutes(app: Express) {
           const commFx = parseFloat(c.fxRateToUsd || "1");
           return sum + (commCurr === "USD" ? commAmt : commAmt * commFx);
         }, 0);
-        const pendingContainers = supplierContainers.filter((c: any) => c.status === "PENDING" || c.status === "IN_TRANSIT").length;
+        const pendingConts = supplierContainers.filter((c: any) => c.status === "PENDING" || c.status === "IN_TRANSIT");
+        const pendingContainers = pendingConts.length;
+        const otwByCurrency: Record<string, number> = {};
+        for (const c of pendingConts) {
+          const cc = (c.currencyCode || "USD").toUpperCase();
+          otwByCurrency[cc] = (otwByCurrency[cc] || 0) + 1;
+        }
         const receivedContainers = supplierContainers.filter((c: any) => c.status === "RECEIVED" || c.status === "PARTIALLY_RECEIVED" || c.status === "OFFLOADED").length;
         const lastContainerDate = supplierContainers.length > 0
           ? supplierContainers.reduce((latest: string | null, c: any) => {
@@ -1425,7 +1431,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
             }, 0)
           : 0;
 
-        return { totalContainers, totalKg, containerValue, commissionValue, pendingContainers, receivedContainers, lastContainerDate, totalPaid, balance, currencyBalances, dueContainers, approxFxRate, autoSettledFreightUsd };
+        return { totalContainers, totalKg, containerValue, commissionValue, pendingContainers, otwByCurrency, receivedContainers, lastContainerDate, totalPaid, balance, currencyBalances, dueContainers, approxFxRate, autoSettledFreightUsd };
       };
 
       // First pass: compute each supplier's own stats
@@ -1450,6 +1456,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
             totalCommissionUsd: own.commissionValue.toFixed(2),
             approxFxRate: own.approxFxRate > 0 ? own.approxFxRate.toFixed(4) : null,
             pendingContainers: own.pendingContainers,
+            otwByCurrency: own.otwByCurrency,
             receivedContainers: own.receivedContainers,
             lastContainerDate: own.lastContainerDate,
             currencyBalances: own.currencyBalances,
@@ -1468,6 +1475,12 @@ export function registerFactorySuppliersRoutes(app: Express) {
         const aggContainers = own.totalContainers + childStats.reduce((n: number, cs: any) => n + cs.totalContainers, 0);
         const aggKg = own.totalKg + childStats.reduce((n: number, cs: any) => n + cs.totalKg, 0);
         const aggPending = own.pendingContainers + childStats.reduce((n: number, cs: any) => n + cs.pendingContainers, 0);
+        const aggOtwByCurrency: Record<string, number> = { ...own.otwByCurrency };
+        for (const cs of childStats) {
+          for (const [cc, n] of Object.entries(cs.otwByCurrency || {})) {
+            aggOtwByCurrency[cc] = (aggOtwByCurrency[cc] || 0) + (n as number);
+          }
+        }
         const aggReceived = own.receivedContainers + childStats.reduce((n: number, cs: any) => n + cs.receivedContainers, 0);
         const allDates = [own.lastContainerDate, ...childStats.map((cs: any) => cs.lastContainerDate)].filter(Boolean);
         const aggLastDate = allDates.length > 0 ? allDates.reduce((latest: string, d: string) => new Date(d) > new Date(latest) ? d : latest) : null;
@@ -1512,6 +1525,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           totalCommissionUsd: own.commissionValue.toFixed(2),
           approxFxRate: own.approxFxRate > 0 ? own.approxFxRate.toFixed(4) : null,
           pendingContainers: aggPending,
+          otwByCurrency: aggOtwByCurrency,
           receivedContainers: aggReceived,
           lastContainerDate: aggLastDate,
           // Broker's own per-currency balances (direct entries + FX-in only)
