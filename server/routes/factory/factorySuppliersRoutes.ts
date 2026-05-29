@@ -2244,7 +2244,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
   // Broker Consolidated Statement  (aggregates broker + all linked suppliers)
   // GET /api/factory/suppliers/:id/broker-statement[/export?format=excel]
   // ─────────────────────────────────────────────────────────────────────────
-  async function buildBrokerStatement(brokerId: number, companyId: number) {
+  async function buildBrokerStatement(brokerId: number, companyId: number, includeOtw = false) {
     // Fetch broker
     const [broker] = await db.select().from(factorySuppliers)
       .where(and(eq(factorySuppliers.id, brokerId), eq(factorySuppliers.companyId, companyId)));
@@ -2259,10 +2259,13 @@ export function registerFactorySuppliersRoutes(app: Express) {
     const supplierNameMap: Record<number, string> = {};
     for (const s of allSuppliers) supplierNameMap[(s as any).id] = (s as any).name;
 
-    // Containers
+    // Containers — exclude OTW unless caller opts in
+    const containersWhereClause = includeOtw
+      ? and(eq(factoryContainers.companyId, companyId), inArray(factoryContainers.supplierId, allSupplierIds))
+      : and(eq(factoryContainers.companyId, companyId), inArray(factoryContainers.supplierId, allSupplierIds), sql`${factoryContainers.status} != 'OTW'`);
     const allContainers = allSupplierIds.length > 0
       ? await db.select().from(factoryContainers)
-          .where(and(eq(factoryContainers.companyId, companyId), inArray(factoryContainers.supplierId, allSupplierIds)))
+          .where(containersWhereClause)
           .orderBy(factoryContainers.arrivalDate, factoryContainers.createdAt)
       : [];
 
@@ -2355,6 +2358,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
       amount: number;
       commissionAmount: number | null;
       commissionCurrency: string | null;
+      isOtw?: boolean;
     };
 
     const ledgerByCurrency: Record<string, LedgerRow[]> = {};
@@ -2389,6 +2393,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
         amount: mainAmt,
         commissionAmount: null,
         commissionCurrency: null,
+        isOtw: c.status === "OTW",
       });
 
       // Cross-currency freight: add as an individual ledger row in the freight currency section
@@ -2670,7 +2675,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const brokerId = parseId(req.params.id);
       if (brokerId === null) return res.status(400).json({ message: "Invalid id" });
-      const data = await buildBrokerStatement(brokerId, companyId);
+      const includeOtw = req.query.includeOtw === "true";
+      const data = await buildBrokerStatement(brokerId, companyId, includeOtw);
       if (!data) return res.status(404).json({ message: "Supplier not found" });
       return res.json(data);
     } catch (err: any) {
@@ -2685,7 +2691,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const brokerId = parseId(req.params.id);
       if (brokerId === null) return res.status(400).json({ message: "Invalid id" });
-      const data = await buildBrokerStatement(brokerId, companyId);
+      const includeOtw = req.query.includeOtw === "true";
+      const data = await buildBrokerStatement(brokerId, companyId, includeOtw);
       if (!data) return res.status(404).json({ message: "Supplier not found" });
 
       const ExcelJS = (await import("exceljs")).default;

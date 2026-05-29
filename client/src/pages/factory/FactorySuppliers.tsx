@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -238,10 +239,11 @@ export default function FactorySuppliers() {
 
   // Broker consolidated statement query (fires when viewing a broker's own statement)
   const isBrokerStatement = !!(statementData?.linkedSupplierGroups?.length);
+  const [brokerIncludeOtw, setBrokerIncludeOtw] = useState(false);
   const { data: brokerStatement, isLoading: brokerStatementLoading } = useQuery<any>({
-    queryKey: ["/api/factory/suppliers", statementSupplierId, "broker-statement"],
+    queryKey: ["/api/factory/suppliers", statementSupplierId, "broker-statement", brokerIncludeOtw],
     queryFn: async () => {
-      const res = await factoryApiRequest("GET", `/api/factory/suppliers/${statementSupplierId}/broker-statement`);
+      const res = await factoryApiRequest("GET", `/api/factory/suppliers/${statementSupplierId}/broker-statement?includeOtw=${brokerIncludeOtw}`);
       if (!res.ok) throw new Error("Failed to load broker statement");
       return res.json();
     },
@@ -1479,18 +1481,28 @@ export default function FactorySuppliers() {
                       Broker Activity Ledger
                       <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("brokerActivityLedger") ? "" : "rotate-180"}`} />
                     </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const url = `/api/factory/suppliers/${statementSupplierId}/broker-statement/export`;
-                        window.open(url, "_blank");
-                      }}
-                      data-testid="button-export-broker-statement"
-                    >
-                      <FileText className="h-3.5 w-3.5 mr-1.5" />
-                      Export Excel
-                    </Button>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <label className="flex items-center gap-2 cursor-pointer select-none" data-testid="label-broker-include-otw">
+                        <Switch
+                          checked={brokerIncludeOtw}
+                          onCheckedChange={setBrokerIncludeOtw}
+                          data-testid="switch-broker-include-otw"
+                        />
+                        <span className="text-xs font-normal text-muted-foreground">Include OTW</span>
+                      </label>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const url = `/api/factory/suppliers/${statementSupplierId}/broker-statement/export?includeOtw=${brokerIncludeOtw}`;
+                          window.open(url, "_blank");
+                        }}
+                        data-testid="button-export-broker-statement"
+                      >
+                        <FileText className="h-3.5 w-3.5 mr-1.5" />
+                        Export Excel
+                      </Button>
+                    </div>
                   </CardTitle>
                   {!collapsedStmtSections.has("brokerActivityLedger") && (
                     <p className="text-xs text-muted-foreground">
@@ -1579,8 +1591,15 @@ export default function FactorySuppliers() {
                                         {typeLabel[row.type] || row.type}
                                       </Badge>
                                     </TableCell>
-                                    <TableCell className="py-1.5 max-w-[220px] truncate font-medium">
-                                      {row.description}
+                                    <TableCell className="py-1.5 max-w-[260px] font-medium">
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        <span className="truncate">{row.description}</span>
+                                        {row.isOtw && (
+                                          <Badge variant="outline" className="text-[10px] py-0 px-1.5 shrink-0 text-amber-600 dark:text-amber-400 border-amber-400 dark:border-amber-600">
+                                            OTW
+                                          </Badge>
+                                        )}
+                                      </div>
                                     </TableCell>
                                     <TableCell className={`py-1.5 text-right tabular-nums font-medium ${typeColor(row.type)}`}>
                                       {row.amount < 0 ? "−" : ""}{section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(String(Math.abs(row.amount).toFixed(2)))}
