@@ -28,7 +28,7 @@ interface ContainerWithSupplier extends FactoryContainer {
   supplierName?: string | null;
 }
 
-const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
+const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED", "PARTIALLY_RECEIVED"]);
 
 const CONTAINER_STATUS_LABELS: Record<string, string> = {
   PENDING:            "Pending",
@@ -358,6 +358,7 @@ export default function FactoryOtwTrackingTab() {
   const [trackingNowId, setTrackingNowId] = useState<number | null>(null);
   const [timelineId, setTimelineId] = useState<number | null>(null);
   const [settingsContainer, setSettingsContainer] = useState<ContainerWithSupplier | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("PENDING");
 
   const { data: containers, isLoading } = useQuery<ContainerWithSupplier[]>({
     queryKey: ["/api/factory/containers"],
@@ -365,6 +366,9 @@ export default function FactoryOtwTrackingTab() {
 
   const today = new Date().toDateString();
   const otwContainers = (containers || []).filter((c) => STATUS_ACTIVE.has(c.status));
+  const filteredOtwContainers = statusFilter === "all"
+    ? otwContainers
+    : otwContainers.filter((c) => c.status === statusFilter);
   const checkedToday = otwContainers.filter((c) => {
     const fc = c as any;
     return fc.trackingLastCheckedAt && new Date(fc.trackingLastCheckedAt).toDateString() === today;
@@ -449,9 +453,32 @@ export default function FactoryOtwTrackingTab() {
 
       {/* ── Main table ── */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3 flex-wrap">
-          <CardTitle className="text-base">OTW Container Tracking</CardTitle>
-          <span className="text-sm text-muted-foreground">{otwContainers.length} container{otwContainers.length !== 1 ? "s" : ""}</span>
+        <CardHeader className="flex flex-col gap-2 pb-3">
+          <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="text-base">OTW Container Tracking</CardTitle>
+            <span className="text-sm text-muted-foreground">
+              {filteredOtwContainers.length} of {otwContainers.length} container{otwContainers.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <div className="flex gap-1 flex-wrap">
+            {([
+              { key: "all", label: "All", count: otwContainers.length },
+              { key: "PENDING", label: "Pending", count: otwContainers.filter(c => c.status === "PENDING").length },
+              { key: "IN_TRANSIT", label: "In Transit", count: otwContainers.filter(c => c.status === "IN_TRANSIT").length },
+              { key: "ARRIVED", label: "Arrived", count: otwContainers.filter(c => c.status === "ARRIVED").length },
+              { key: "PARTIALLY_RECEIVED", label: "Partially Offloaded", count: otwContainers.filter(c => c.status === "PARTIALLY_RECEIVED").length },
+            ] as const).filter(f => f.count > 0 || f.key === "all").map(({ key, label, count }) => (
+              <Button
+                key={key}
+                variant={statusFilter === key ? "default" : "outline"}
+                size="sm"
+                onClick={() => setStatusFilter(key)}
+                data-testid={`button-otw-filter-${key}`}
+              >
+                {label} {count > 0 && <span className="ml-1 text-xs opacity-70">({count})</span>}
+              </Button>
+            ))}
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -469,7 +496,7 @@ export default function FactoryOtwTrackingTab() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {otwContainers.map((c) => {
+                {filteredOtwContainers.map((c) => {
                   const fc = c as any;
                   const lastChecked: Date | null = fc.trackingLastCheckedAt ? new Date(fc.trackingLastCheckedAt) : null;
                   const isTracking = trackingNowId === c.id;

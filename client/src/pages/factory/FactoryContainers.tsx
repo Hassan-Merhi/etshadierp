@@ -60,7 +60,7 @@ interface ContainerWithSupplier extends FactoryContainer {
 // ── OTW Summary helpers ──────────────────────────────────────────────────────
 
 const OTW_NOTES_KEY = "factory-otw-notes";
-const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
+const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED", "PARTIALLY_RECEIVED"]);
 
 const CCY_SYMBOLS: Record<string, string> = {
   USD: "$", EUR: "€", GBP: "£", AUD: "A$", CAD: "C$",
@@ -484,11 +484,24 @@ interface OtwTrackingPanelProps {
   setTrackingNowId: (id: number | null) => void;
 }
 
+const OTW_FILTER_LABELS: Record<string, string> = {
+  all:               "All",
+  PENDING:           "Pending",
+  IN_TRANSIT:        "In Transit",
+  ARRIVED:           "Arrived",
+  PARTIALLY_RECEIVED:"Partially Offloaded",
+};
+
 function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrackingNowId }: OtwTrackingPanelProps) {
   const { toast } = useToast();
   const tqClient = useTQClient();
   const [timelineId, setTimelineId] = useState<number | null>(null);
   const [settingsContainer, setSettingsContainer] = useState<ContainerWithSupplier | null>(null);
+  const [otwStatusFilter, setOtwStatusFilter] = useState<string>("PENDING");
+
+  const filteredPanelContainers = otwStatusFilter === "all"
+    ? containers
+    : containers.filter((c) => c.status === otwStatusFilter);
 
   const today = new Date().toDateString();
   const checkedToday = containers.filter((c) => {
@@ -575,9 +588,30 @@ function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrackingNow
 
       {/* ── Main table ── */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3 flex-wrap">
-          <CardTitle className="text-base">OTW Container Tracking</CardTitle>
-          <span className="text-sm text-muted-foreground">{containers.length} container{containers.length !== 1 ? "s" : ""}</span>
+        <CardHeader className="flex flex-col gap-2 pb-3">
+          <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="text-base">OTW Container Tracking</CardTitle>
+            <span className="text-sm text-muted-foreground">
+              {filteredPanelContainers.length} of {containers.length} container{containers.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <div className="flex gap-1 flex-wrap">
+            {Object.entries(OTW_FILTER_LABELS).map(([key, label]) => {
+              const count = key === "all" ? containers.length : containers.filter(c => c.status === key).length;
+              if (count === 0 && key !== "all") return null;
+              return (
+                <Button
+                  key={key}
+                  variant={otwStatusFilter === key ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setOtwStatusFilter(key)}
+                  data-testid={`button-otw-filter-${key}`}
+                >
+                  {label} {count > 0 && <span className="ml-1 text-xs opacity-70">({count})</span>}
+                </Button>
+              );
+            })}
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -595,7 +629,7 @@ function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrackingNow
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {containers.map((c) => {
+                {filteredPanelContainers.map((c) => {
                   const fc = c as any;
                   const lastChecked: Date | null = fc.trackingLastCheckedAt ? new Date(fc.trackingLastCheckedAt) : null;
                   const isTracking = trackingNowId === c.id;
@@ -628,9 +662,7 @@ function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrackingNow
                         {(c as any).supplierName ?? <span className="text-muted-foreground/50">—</span>}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className="text-xs">
-                          {c.status ?? "PENDING"}
-                        </Badge>
+                        <ContainerStatusBadge status={c.status ?? "PENDING"} />
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         {isTracking ? (
@@ -735,6 +767,7 @@ function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrackingNow
 
 export default function FactoryContainers() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
+  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const [viewMode, setViewMode] = useState<"list" | "summary" | "tracking">("list");
   const [trackingNowId, setTrackingNowId] = useState<number | null>(null);
   const [openOtwGroups, setOpenOtwGroups] = useState<Set<string>>(new Set());
@@ -1456,37 +1489,30 @@ export default function FactoryContainers() {
               Delete Selected ({selectedIds.size})
             </Button>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" data-testid="button-import-export-menu">
-                <ArrowDown className="h-4 w-4 mr-2" />
-                Import / Export
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => exportContainers(containers || [])} data-testid="button-export-containers">
-                <Download className="h-4 w-4 mr-2" />
-                Export All
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => { setImportOpen(true); setImportPreview([]); setImportResult(null); }}
-                data-testid="button-import-containers"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Import Excel
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {currentUser?.role === "Developer" && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" data-testid="button-import-export-menu">
+                  <ArrowDown className="h-4 w-4 mr-2" />
+                  Import / Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => exportContainers(containers || [])} data-testid="button-export-containers">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export All
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => { setImportOpen(true); setImportPreview([]); setImportResult(null); }}
+                  data-testid="button-import-containers"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <div className="flex rounded-md border overflow-hidden">
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              className="rounded-none"
-              onClick={() => setViewMode("list")}
-              data-testid="button-view-list"
-            >
-              <LayoutList className="h-4 w-4 mr-2" />
-              List
-            </Button>
             <Button
               variant={viewMode === "summary" ? "default" : "ghost"}
               className="rounded-none"
