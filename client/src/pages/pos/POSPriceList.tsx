@@ -417,18 +417,23 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     e.target.value = "";
     setImportError(null);
     try {
-      const XLSX = await import("@/lib/excelHelper");
-      const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: "array" });
+      const { read, utils } = await import("@/lib/excelHelper");
+      const wb = await read(file);
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rawRows: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
-      if (rawRows.length === 0) { setImportError("The file has no data rows."); return; }
+      const rawRows: any[] = utils.sheet_to_json(ws, { defval: "" });
+      if (rawRows.length === 0) {
+        toast({ title: "Empty file", description: "The file has no data rows.", variant: "destructive" });
+        return;
+      }
 
       // Build locationName → locationId map from current masters
       const nameToId = new Map<string, number>();
       for (const m of masters) nameToId.set(m.name.toLowerCase().trim(), m.id);
       const locationCols = Object.keys(rawRows[0]).filter((col) => nameToId.has(col.toLowerCase().trim()));
-      if (locationCols.length === 0) { setImportError("No location columns found. Download the template first."); return; }
+      if (locationCols.length === 0) {
+        toast({ title: "No location columns found", description: "Make sure you're uploading the template downloaded from this page.", variant: "destructive" });
+        return;
+      }
 
       const preview: typeof importPreview = [];
       for (const row of rawRows) {
@@ -445,11 +450,14 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
         }
         if (changes.length > 0) preview.push({ barcode, name, changes });
       }
-      if (preview.length === 0) { setImportError("No valid price entries found in the file."); return; }
+      if (preview.length === 0) {
+        toast({ title: "No prices to update", description: "All price cells in the file are blank. Fill in at least one price and try again.", variant: "destructive" });
+        return;
+      }
       setImportPreview(preview);
       setImportDialogOpen(true);
-    } catch {
-      setImportError("Could not read the file. Make sure it is a valid .xlsx file.");
+    } catch (err: any) {
+      toast({ title: "Could not read file", description: err?.message || "Make sure it is a valid .xlsx file.", variant: "destructive" });
     }
   };
 
