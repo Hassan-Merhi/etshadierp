@@ -681,7 +681,18 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
           isShared ? (
             <div className="p-6 text-center text-muted-foreground text-sm">This is a read-only shared unit.</div>
           ) : (
-            <StartContractForm unitId={unit.id} testIdPrefix={testIdPrefix} onClose={onClose} unitType={unitType} />
+            <Tabs defaultValue="contract" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="info" data-testid={`tab-${testIdPrefix}-unit-info`}><UserCog className="h-4 w-4 mr-1" />Edit Info</TabsTrigger>
+                <TabsTrigger value="contract" data-testid={`tab-${testIdPrefix}-new-contract`}><Plus className="h-4 w-4 mr-1" />New Contract</TabsTrigger>
+              </TabsList>
+              <TabsContent value="info">
+                <VacantUnitInfoForm unit={unit} testIdPrefix={testIdPrefix} />
+              </TabsContent>
+              <TabsContent value="contract">
+                <StartContractForm unitId={unit.id} testIdPrefix={testIdPrefix} onClose={onClose} unitType={unitType} />
+              </TabsContent>
+            </Tabs>
           )
         ) : isShared ? (
           <Tabs defaultValue="ledger" className="w-full">
@@ -744,6 +755,44 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
 // ──────────────────────────────────────────────────────────
 // START CONTRACT (vacant unit)
 // ──────────────────────────────────────────────────────────
+function VacantUnitInfoForm({ unit, testIdPrefix }: { unit: Unit; testIdPrefix: string }) {
+  const apiBase = useApiBase();
+  const { toast } = useToast();
+  const [unitNumber, setUnitNumber] = useState(unit.unitNumber);
+  const [dimensions, setDimensions] = useState(unit.dimensions ?? "");
+
+  const saveUnit = useMutation({
+    mutationFn: () => apiRequest("PATCH", `${apiBase}/units/${unit.id}`, { unitNumber, dimensions: dimensions || null }),
+    onSuccess: () => {
+      toast({ title: "Unit info updated" });
+      queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const changed = unitNumber !== unit.unitNumber || dimensions !== (unit.dimensions ?? "");
+
+  return (
+    <div className="space-y-4 pt-3">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Unit Name</Label>
+          <Input value={unitNumber} onChange={e => setUnitNumber(e.target.value.toUpperCase())} data-testid={`input-${testIdPrefix}-vacant-unit-number`} />
+        </div>
+        <div>
+          <Label>Dimensions</Label>
+          <Input value={dimensions} onChange={e => setDimensions(e.target.value)} placeholder="e.g. 35 X 12" data-testid={`input-${testIdPrefix}-vacant-dimensions`} />
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <Button onClick={() => saveUnit.mutate()} disabled={!changed || !unitNumber || saveUnit.isPending} data-testid={`button-${testIdPrefix}-save-vacant-unit`}>
+          {saveUnit.isPending ? "Saving…" : "Save"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function StartContractForm({ unitId, testIdPrefix, onClose, unitType }: { unitId: number; testIdPrefix: string; onClose: () => void; unitType: "WAREHOUSE" | "SHOP" }) {
   const apiBase = useApiBase();
   const { toast } = useToast();
