@@ -895,7 +895,6 @@ export default function DailyProductionReport() {
   const { data: monthlySalarySummary } = useQuery<{
     currentDay: number;
     daysInMonth: number;
-    rangeStartDay: number;
     totalWorkerBaseSalary: number;
     totalWorkerTransport: number;
     totalWorkerPaid: number;
@@ -1161,20 +1160,18 @@ export default function DailyProductionReport() {
       {/* ── Salary Overview ── */}
       {(() => {
         const ms = monthlySalarySummary;
-        const startDay = ms?.rangeStartDay ?? 1;
-        const ratio = ms ? (ms.currentDay - startDay + 1) / ms.daysInMonth : 0;
+        const ratio = ms ? ms.currentDay / ms.daysInMonth : 0;
         const workerExpected    = ms ? ms.totalWorkerBaseSalary * ratio : null;
         const transportExpected = ms ? ms.totalWorkerTransport  * ratio : null;
         const workerTotal       = workerExpected !== null && transportExpected !== null ? workerExpected + transportExpected : null;
         const workerRemaining   = ms && workerTotal !== null ? workerTotal - ms.totalWorkerPaid : null;
-        const empExpected       = ms ? ms.totalEmployeeMonthlySalary * ratio : null;
+        // Employee expected: prorated salary minus already-credited balance (pre-payment aware)
+        const empExpected = ms
+          ? ms.employeeBreakdown.reduce((sum, e) => sum + Math.max(0, e.expected - Math.max(0, e.balance)), 0)
+          : null;
         const empBalance        = ms ? ms.totalEmployeeBalance : null;
         const presetLabel = presets.find(p => p.key === preset)?.label ?? (from && to && from !== to ? `${from} → ${to}` : from || "");
-        const dayRange = ms
-          ? startDay === ms.currentDay
-            ? `Day ${ms.currentDay} / ${ms.daysInMonth}`
-            : `Day ${startDay}–${ms.currentDay} / ${ms.daysInMonth}`
-          : "";
+        const dayRange = ms ? `Day ${ms.currentDay} / ${ms.daysInMonth}` : "";
 
         return (
           <div className="space-y-2">
@@ -1315,15 +1312,21 @@ export default function DailyProductionReport() {
                             <span className="text-right">Expected</span>
                             <span className="text-right">Balance</span>
                           </div>
-                          {ms.employeeBreakdown.map((e) => (
-                            <div key={e.id} className="grid grid-cols-3 gap-1 text-xs py-0.5">
-                              <span className="truncate text-foreground/90">{e.name}</span>
-                              <span className="text-right tabular-nums text-foreground">{fmtSalary(e.expected)}</span>
-                              <span className={`text-right tabular-nums ${e.balance > 0 ? "text-amber-600 dark:text-amber-400" : e.balance < 0 ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"}`}>
-                                {fmtSalary(Math.abs(e.balance))}{e.balance < 0 ? " cr" : ""}
-                              </span>
-                            </div>
-                          ))}
+                          {ms.employeeBreakdown.map((e) => {
+                            const adjExpected = Math.max(0, e.expected - Math.max(0, e.balance));
+                            return (
+                              <div key={e.id} className="grid grid-cols-3 gap-1 text-xs py-0.5">
+                                <span className="truncate text-foreground/90">{e.name}</span>
+                                <span className={`text-right tabular-nums ${adjExpected === 0 && e.expected > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
+                                  {fmtSalary(adjExpected)}
+                                  {adjExpected === 0 && e.expected > 0 && <span className="opacity-60 ml-1">covered</span>}
+                                </span>
+                                <span className={`text-right tabular-nums ${e.balance > 0 ? "text-amber-600 dark:text-amber-400" : e.balance < 0 ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"}`}>
+                                  {fmtSalary(Math.abs(e.balance))}{e.balance < 0 ? " cr" : ""}
+                                </span>
+                              </div>
+                            );
+                          })}
                           <div className="grid grid-cols-3 gap-1 text-xs pt-1.5 border-t mt-1">
                             <span className="font-medium text-muted-foreground">Total</span>
                             <span className="text-right tabular-nums font-semibold text-foreground">{fmtSalary(empExpected ?? 0)}</span>
