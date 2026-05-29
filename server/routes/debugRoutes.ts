@@ -40,7 +40,7 @@ import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositio
 
 
 export function registerDebugRoutes(app: Express) {
-  app.get("/api/debug/inventory/:stockItemId", requireAuth, async (req, res) => {
+  app.get("/api/debug/inventory/:stockItemId", requireAuth, requireRole("Admin", "Developer", "Owner"), async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
@@ -1462,7 +1462,7 @@ export function registerDebugRoutes(app: Express) {
   });
 
   // Toggle offload optional status — suspends/unsuspends inventory + vouchers without reversing permanently
-  app.post("/api/offloads/:id/toggle-optional", requireAuth, async (req, res) => {
+  app.post("/api/offloads/:id/toggle-optional", requireAuth, requireRole("Admin", "Developer", "Owner"), async (req, res) => {
     try {
       const offloadId = parseInt(req.params.id);
       if (isNaN(offloadId)) return res.status(400).json({ message: "Invalid offload ID" });
@@ -1588,7 +1588,7 @@ export function registerDebugRoutes(app: Express) {
   });
 
   // Container Offload Diagnostics - Analyze PO line items for potential issues
-  app.get("/api/containers/:id/offload-diagnostics", requireAuth, async (req, res) => {
+  app.get("/api/containers/:id/offload-diagnostics", requireAuth, requireRole("Admin", "Developer", "Owner"), async (req, res) => {
     try {
       const containerId = parseInt(req.params.id);
       if (isNaN(containerId)) {
