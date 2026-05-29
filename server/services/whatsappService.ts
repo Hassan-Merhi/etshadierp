@@ -132,8 +132,10 @@ async function sendGreenApiFileUpload({
   const form = new FormData();
   form.append("chatId", chatId);
   if (caption) form.append("caption", caption);
-  form.append("fileName", fileName);
-  form.append("file", new Blob([buffer], { type: mimeType }), fileName);
+  // Use File class (Node 20+) so the multipart part has a proper filename in Content-Disposition.
+  // Blob alone doesn't carry a name, so some APIs (like Green API) treat it as a text field.
+  const fileObj = new File([buffer], fileName, { type: mimeType });
+  form.append("file", fileObj);
 
   const response = await fetch(url, {
     method: "POST",
