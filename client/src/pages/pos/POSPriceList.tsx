@@ -162,9 +162,12 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
   const isItemUnpriced = (item: any): boolean => {
     if (isAllMode) {
-      const hasMasterPrice = item.masterPrices && Object.values(item.masterPrices).some((p: any) => p && parseFloat(p) > 0);
       const hasBase = item.baseSellingPrice && parseFloat(item.baseSellingPrice) > 0;
-      return !hasMasterPrice && !hasBase;
+      if (hasBase) return false; // base price covers all locations
+      const allMasterPrices = item.masterPrices ? Object.values(item.masterPrices) : [];
+      if (allMasterPrices.length === 0) return true;
+      const allHavePrice = allMasterPrices.every((p: any) => p && parseFloat(p) > 0);
+      return !allHavePrice; // unpriced until every location has a price
     }
     return !item.sellingPrice || parseFloat(item.sellingPrice) === 0;
   };
