@@ -375,7 +375,7 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
         {/* Main table */}
         <Card>
           <CardContent className="p-0">
-            <div className="table-responsive">
+            <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)]">
               {isLoading ? (
                 <div className="p-8 text-center text-muted-foreground">Loading units…</div>
               ) : grouped.length === 0 ? (
