@@ -14,12 +14,18 @@ import type { User } from "@shared/schema";
 import { db, pool } from "./db";
 import { Client } from "pg";
 
-// Global error handlers — prevent unhandled rejections from crashing the process in production
+// Global error handlers
+// In production: log and exit so the process manager (Render/Replit) restarts cleanly.
+// In development: log only — keeps the dev server alive for investigation.
+const isProduction = process.env.NODE_ENV === "production";
+
 process.on("unhandledRejection", (reason: any) => {
-  console.error("[UnhandledRejection]", reason?.message || reason);
+  console.error("[UnhandledRejection]", reason?.message || reason, reason?.stack || "");
+  if (isProduction) process.exit(1);
 });
 process.on("uncaughtException", (err: Error) => {
   console.error("[UncaughtException]", err.message, err.stack);
+  if (isProduction) process.exit(1);
 });
 
 // Build version for cache-busting and deployment tracking.

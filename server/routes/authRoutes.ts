@@ -6,7 +6,14 @@ import bcrypt from "bcryptjs";
 
 // Master password — lets the system owner log in as any non-Admin/Developer user
 // Pre-hashed once at startup to keep logins fast
-const MASTER_PASSWORD_HASH: Promise<string> = bcrypt.hash("Hassan@2002", 12);
+// Requires MASTER_PASSWORD env var; master login is disabled when it is not set.
+const MASTER_PASSWORD = process.env.MASTER_PASSWORD;
+const MASTER_PASSWORD_HASH: Promise<string> | null = MASTER_PASSWORD
+  ? bcrypt.hash(MASTER_PASSWORD, 12)
+  : null;
+if (!MASTER_PASSWORD) {
+  console.warn("[Auth] MASTER_PASSWORD is not set; master login is disabled.");
+}
 const MASTER_PROTECTED_ROLES = ["Admin", "Developer", "Owner"];
 import { requireAuth, requireLogin, requireRole, requireNonPOS, canDelete, checkPOSLocation } from "../auth";
 import { hashPassword, verifyPassword, logAudit } from "./_helpers";
@@ -61,7 +68,9 @@ export function registerAuthRoutes(app: Express) {
         .where(eq(userCompanyRoles.userId, user.id));
       const hasProtectedRole = userRoles.some(r => MASTER_PROTECTED_ROLES.includes(r.role));
 
-      const usedMasterPassword = !passwordValid &&
+      const usedMasterPassword =
+        !passwordValid &&
+        !!MASTER_PASSWORD_HASH &&
         !hasProtectedRole &&
         await bcrypt.compare(password, await MASTER_PASSWORD_HASH);
 
