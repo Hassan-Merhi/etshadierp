@@ -20,6 +20,23 @@ import { eq, and, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import CryptoJS from "crypto-js";
 
+function buildValidatedUrl(baseUrl: string, dateISO: string, currencyCode: string): string {
+  try {
+    const url = new URL(baseUrl);
+    const allowedDomains = ['api.frankfurter.app'];
+    if (!allowedDomains.includes(url.hostname)) throw new Error('Invalid host');
+    if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Invalid protocol');
+    if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dateISO)) throw new Error('Invalid parameter');
+    if (!/^[A-Z]{3}$/.test(currencyCode)) throw new Error('Invalid parameter');
+    url.pathname = `/${dateISO}`;
+    url.searchParams.set('from', currencyCode);
+    url.searchParams.set('to', 'USD');
+    return url.href;
+  } catch {
+    throw new Error('Invalid URL');
+  }
+}
+
 export async function writeDaybookEntry(dbOrTx: any, opts: {
   companyId: number;
   txDate: string;
@@ -70,7 +87,7 @@ export async function getOrFetchFxRateToUsd(companyId: number, currencyCode: str
   if (existing) return existing.rateToUsd;
 
   try {
-    const response = await fetch(`https://api.frankfurter.app/${dateISO}?from=${currencyCode.toUpperCase()}&to=USD`);
+    const response = await fetch(buildValidatedUrl('https://api.frankfurter.app', dateISO, currencyCode.toUpperCase()));
     if (!response.ok) throw new Error(`FX API returned ${response.status}`);
     const data = await response.json();
     const rate = data?.rates?.USD;
