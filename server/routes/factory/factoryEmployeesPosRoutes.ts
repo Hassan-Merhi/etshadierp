@@ -540,6 +540,35 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
             });
           }
 
+          // Deduct outstanding advance balances FIFO (same as ERP payroll)
+          if (deduction > 0) {
+            const outstanding = await tx.execute(sql`
+              SELECT * FROM employee_advances
+              WHERE company_id = ${companyId} AND employee_id = ${empId} AND fully_paid = false
+              ORDER BY advance_date ASC, id ASC
+            `);
+            let remaining = deduction;
+            for (const adv of outstanding.rows as any[]) {
+              if (remaining <= 0.001) break;
+              const bal = parseFloat(adv.remaining_balance || "0");
+              if (bal <= 0) continue;
+              const toDeduct = Math.min(remaining, bal);
+              const newBal = Math.max(0, bal - toDeduct);
+              const fullyPaid = newBal <= 0.01;
+
+              await tx.execute(sql`
+                INSERT INTO employee_advance_repayments (company_id, advance_id, employee_id, repayment_date, amount, cash_account_id, notes)
+                VALUES (${companyId}, ${adv.id}, ${empId}, ${date}, ${toDeduct.toFixed(2)}, NULL, ${`Payroll deduction — ${voucherNumber}`})
+              `);
+              await tx.execute(sql`
+                UPDATE employee_advances
+                SET remaining_balance = ${newBal.toFixed(2)}, fully_paid = ${fullyPaid}
+                WHERE id = ${adv.id}
+              `);
+              remaining -= toDeduct;
+            }
+          }
+
           // Update employee balance: net = salary - deduction (can go negative)
           const currentBal = parseFloat(emp.currentBalance || "0");
           const newBalance = currentBal + net;
@@ -686,6 +715,92 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       console.error("Error recalculating employee balance:", error);
       res.status(500).json({ message: error.message });
     }
+  });
+
+  // GET /api/factory/employee-payroll-preview?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+  // Returns attendance-based salary calculation for each active employee
+  app.get("/api/factory/employee-payroll-preview", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+      if (!startDate || !endDate) return res.status(400).json({ message: "startDate and endDate are required" });
+
+      const emps = await db.select()
+        .from(employees)
+        .where(and(eq(employees.companyId, companyId), eq(employees.employeeType, "Employee"), eq(employees.active, true), sql`${employees.deletedAt} IS NULL`))
+        .orderBy(employees.firstName);
+
+      if (emps.length === 0) return res.json({ preview: [] });
+
+      const empIds = emps.map((e: any) => e.id);
+      const attResult = await db.execute(sql`
+        SELECT employee_id, status, COUNT(*) as count
+        FROM employee_attendance
+        WHERE company_id = ${companyId}
+          AND employee_id = ANY(${sqlArray(empIds)})
+          AND attendance_date >= ${startDate}
+          AND attendance_date <= ${endDate}
+        GROUP BY employee_id, status
+      `);
+
+      // Build attendance map: employeeId -> { present: n, half: n, absent: n, late: n, leave: n }
+      const attMap: Record<number, Record<string, number>> = {};
+      for (const row of attResult.rows as any[]) {
+        const eid = Number(row.employee_id);
+        if (!attMap[eid]) attMap[eid] = {};
+        attMap[eid][(row.status as string).toLowerCase()] = Number(row.count);
+      }
+
+      // Get outstanding advance balances per employee
+      const advResult = await db.execute(sql`
+        SELECT employee_id, SUM(remaining_balance::numeric) as total_balance
+        FROM employee_advances
+        WHERE company_id = ${companyId} AND fully_paid = false
+          AND employee_id = ANY(${sqlArray(empIds)})
+        GROUP BY employee_id
+      `);
+      const advMap: Record<number, number> = {};
+      for (const row of advResult.rows as any[]) {
+        advMap[Number(row.employee_id)] = parseFloat(row.total_balance || "0");
+      }
+
+      // Days in the month (use startDate's month)
+      const monthStart = new Date(startDate + "T00:00:00");
+      const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
+
+      const preview = emps.map((emp: any) => {
+        const eid = emp.id;
+        const a = attMap[eid] || {};
+        const present = (a.present || 0) + (a.late || 0) + (a.leave || 0);
+        const half = (a["half day"] || 0) + (a.halfday || 0);
+        const absent = a.absent || 0;
+        const totalDays = present + half * 0.5 + absent;
+        const monthlySalary = parseFloat(emp.monthlySalary || "0");
+        const dailyRate = daysInMonth > 0 ? monthlySalary / daysInMonth : 0;
+        const calculatedPay = totalDays > 0 ? dailyRate * (present + half * 0.5) : monthlySalary; // fallback to full salary if no attendance
+        const outstandingAdvance = advMap[eid] || 0;
+        const deduction = Math.min(outstandingAdvance, calculatedPay);
+        const netPay = Math.max(0, calculatedPay - deduction);
+        return {
+          employeeId: eid,
+          employeeName: `${emp.firstName} ${emp.lastName}`.trim(),
+          department: emp.department,
+          monthlySalary: monthlySalary.toFixed(2),
+          daysInMonth,
+          presentDays: present,
+          halfDays: half,
+          absentDays: absent,
+          totalMarkedDays: totalDays,
+          calculatedPay: calculatedPay.toFixed(2),
+          outstandingAdvance: outstandingAdvance.toFixed(2),
+          deduction: deduction.toFixed(2),
+          netPay: netPay.toFixed(2),
+        };
+      });
+
+      res.json({ preview });
+    } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
   // ─── Employee Attendance ──────────────────────────────────────────────────────
