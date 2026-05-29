@@ -1502,6 +1502,8 @@ let migrationsDone = false;
     `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS parent_credit_account_id integer`,
     `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS net_position_adjustment decimal(15,2) DEFAULT 0`,
     `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS pos_excel_import_enabled boolean DEFAULT false`,
+    `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS created_at timestamp NOT NULL DEFAULT now()`,
+    `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS updated_at timestamp NOT NULL DEFAULT now()`,
 
     // ── Tables added post-initial-deploy that may be missing on production ──
     `CREATE TABLE IF NOT EXISTS supplier_proformas (
