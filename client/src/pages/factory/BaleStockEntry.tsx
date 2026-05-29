@@ -2351,8 +2351,10 @@ import DailyScan from "./DailyScan";
     const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
     const hiddenTabs = myAccess?.hiddenCostFields ?? [];
 
-    const showEntry   = settings?.stockEntryTabEntryEnabled   !== false && !hiddenTabs.includes("hide_tab_stockentry_entry");
-    const showHistory = settings?.stockEntryTabHistoryEnabled !== false && !hiddenTabs.includes("hide_tab_stockentry_history");
+    const showEntry      = settings?.stockEntryTabEntryEnabled   !== false && !hiddenTabs.includes("hide_tab_stockentry_entry");
+    const showHistory    = settings?.stockEntryTabHistoryEnabled !== false && !hiddenTabs.includes("hide_tab_stockentry_history");
+    const showGroundScan = !hiddenTabs.includes("hide_tab_stockentry_ground_scan");
+    const showDailyScan  = !hiddenTabs.includes("hide_tab_stockentry_daily_scan");
 
     const { data: productionSession, refetch: refetchSession } = useQuery<any>({
       queryKey: ["/api/factory/stock-entry/production-session", todayStr],
@@ -2406,14 +2408,18 @@ import DailyScan from "./DailyScan";
                 Stock Entry History
               </TabsTrigger>
             )}
-            <TabsTrigger value="ground-scan" data-testid="tab-ground-scan">
-              <ScanLine className="h-4 w-4 mr-1" />
-              Ground Scan
-            </TabsTrigger>
-            <TabsTrigger value="daily-scan" data-testid="tab-daily-scan">
-              <CalendarDays className="h-4 w-4 mr-1" />
-              Daily Scan
-            </TabsTrigger>
+            {showGroundScan && (
+              <TabsTrigger value="ground-scan" data-testid="tab-ground-scan">
+                <ScanLine className="h-4 w-4 mr-1" />
+                Ground Scan
+              </TabsTrigger>
+            )}
+            {showDailyScan && (
+              <TabsTrigger value="daily-scan" data-testid="tab-daily-scan">
+                <CalendarDays className="h-4 w-4 mr-1" />
+                Daily Scan
+              </TabsTrigger>
+            )}
           </TabsList>
           {showEntry && (
             <TabsContent value="entry" className="mt-4">
@@ -2427,12 +2433,16 @@ import DailyScan from "./DailyScan";
               />
             </TabsContent>
           )}
-          <TabsContent value="ground-scan" className="mt-0 p-0">
-            <GroundScan />
-          </TabsContent>
-          <TabsContent value="daily-scan" className="mt-0 p-0">
-            <DailyScan />
-          </TabsContent>
+          {showGroundScan && (
+            <TabsContent value="ground-scan" className="mt-0 p-0">
+              <GroundScan />
+            </TabsContent>
+          )}
+          {showDailyScan && (
+            <TabsContent value="daily-scan" className="mt-0 p-0">
+              <DailyScan />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     );

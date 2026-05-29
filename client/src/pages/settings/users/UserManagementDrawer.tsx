@@ -84,6 +84,8 @@ const FACTORY_TABS: { key: string; label: string; group: string }[] = [
   { key: "hide_tab_loadings_pending",         label: "Pending Loadings",        group: "Loadings Hub" },
   { key: "hide_tab_stockentry_entry",         label: "Stock Entry",             group: "Stock Entry" },
   { key: "hide_tab_stockentry_history",       label: "History",                 group: "Stock Entry" },
+  { key: "hide_tab_stockentry_ground_scan",   label: "Ground Scan",             group: "Stock Entry" },
+  { key: "hide_tab_stockentry_daily_scan",    label: "Daily Scan",              group: "Stock Entry" },
   { key: "hide_tab_advances_repayments",      label: "Repayments",              group: "Advances" },
   { key: "hide_tab_kpis_worker_performance",  label: "Worker Performance",      group: "KPIs" },
   { key: "hide_tab_kpis_mix_efficiency",      label: "Mix Efficiency",          group: "KPIs" },
