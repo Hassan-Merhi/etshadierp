@@ -510,7 +510,6 @@ export default function SalesReportDetail() {
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead className="w-6"></TableHead>
-                        <TableHead>Voucher #</TableHead>
                         <TableHead>Location</TableHead>
                         <TableHead className="text-right">Items</TableHead>
                         <TableHead className="text-right">Qty</TableHead>
@@ -540,7 +539,6 @@ export default function SalesReportDetail() {
                                   ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
                                   : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                               </TableCell>
-                              <TableCell className="py-2 font-mono text-sm">{vg.voucherNumber}</TableCell>
                               <TableCell className="py-2 text-sm text-muted-foreground">{vg.locationName}</TableCell>
                               <TableCell className="text-right font-mono py-2 text-muted-foreground">{vg.items.length}</TableCell>
                               <TableCell className="text-right font-mono py-2">{formatNumber(vg.totalQty)}</TableCell>
@@ -632,7 +630,6 @@ export default function SalesReportDetail() {
                                 {isExpanded
                                   ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
                                   : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                                <span className="font-mono font-medium text-sm">{vg.voucherNumber}</span>
                                 <Badge variant="secondary" className="text-xs font-normal">{vg.items.length} item{vg.items.length !== 1 ? "s" : ""}</Badge>
                               </div>
                               <span className="text-xs text-muted-foreground">{vg.locationName}</span>
