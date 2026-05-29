@@ -78,11 +78,6 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(currentUser?.role || "");
 
-  const visibleMasters = useMemo(() => {
-    if (!isAllMode) return masters;
-    return masters.filter((m) => !hiddenLocations.has(m.id));
-  }, [isAllMode, masters, hiddenLocations]);
-
   const { data: posAssignedLocations = [], isLoading: posLocationsLoading } = useQuery<Location[]>({
     queryKey: ["/api/my-locations"],
     enabled: !!posUser,
@@ -103,6 +98,11 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   }, [locations, selectedLocationId]);
 
   const isAllMode = selectedLocationId === ALL_LOCATIONS_ID;
+
+  const visibleMasters = useMemo(() => {
+    if (!isAllMode) return masters;
+    return masters.filter((m) => !hiddenLocations.has(m.id));
+  }, [isAllMode, masters, hiddenLocations]);
 
   // ── Single-location price list ──────────────────────────────────────────────
   const {
