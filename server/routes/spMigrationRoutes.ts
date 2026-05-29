@@ -683,7 +683,7 @@ export function registerSpMigrationRoutes(app: Express) {
         warnings: [
           pn(migratedRow.cnt) > 0 ? `${pn(migratedRow.cnt)} voucher(s) already migrated in target — re-running will create duplicates. Rollback first.` : null,
           "Open Goods-OTW containers must be recreated manually in the SP Containers screen.",
-          "Voucher account mapping uses sub_type matching. Unmapped entries will be routed to a suspense account.",
+          "Voucher account mapping uses account type matching. Unmapped entries will be routed to a suspense account.",
         ].filter(Boolean),
       });
     } catch (err: any) {
@@ -1027,7 +1027,7 @@ export function registerSpMigrationRoutes(app: Express) {
           vouchersCreated, vouchersSkipped, entriesCreated,
         },
         warnings: [
-          "Account mapping used sub_type matching. Verify entries routed to Migration Suspense account.",
+          "Account mapping used account type matching. Verify entries routed to Migration Suspense account.",
           "Goods-OTW containers must be recreated manually in the SP Containers screen.",
           "GC Owner Profit and GC Supplier Profit equity accounts have been created.",
         ],
