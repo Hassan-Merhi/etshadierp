@@ -210,9 +210,9 @@ export default function FactorySuppliers() {
   });
 
   const { data: statementData, isLoading: statementLoading, isError: statementError } = useQuery<StatementResponse>({
-    queryKey: ["/api/factory/suppliers", statementSupplierId, "statement"],
+    queryKey: ["/api/factory/suppliers", statementSupplierId, "statement", supplierIncludeOtw],
     queryFn: async () => {
-      const res = await factoryApiRequest("GET", `/api/factory/suppliers/${statementSupplierId}/statement`);
+      const res = await factoryApiRequest("GET", `/api/factory/suppliers/${statementSupplierId}/statement?includeOtw=${supplierIncludeOtw}`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: "Failed to load statement" }));
         throw new Error(err.message || "Failed to load statement");
@@ -242,6 +242,7 @@ export default function FactorySuppliers() {
   // Broker consolidated statement query (fires when viewing a broker's own statement)
   const isBrokerStatement = !!(statementData?.linkedSupplierGroups?.length);
   const [brokerIncludeOtw, setBrokerIncludeOtw] = useState(false);
+  const [supplierIncludeOtw, setSupplierIncludeOtw] = useState(false);
   const { data: brokerStatement, isLoading: brokerStatementLoading } = useQuery<any>({
     queryKey: ["/api/factory/suppliers", statementSupplierId, "broker-statement", brokerIncludeOtw],
     queryFn: async () => {
@@ -1135,6 +1136,16 @@ export default function FactorySuppliers() {
             </div>
             <p className="text-muted-foreground text-sm">Settlement Statement</p>
           </div>
+          {!isBrokerStatement && statementData && (
+            <label className="flex items-center gap-2 cursor-pointer select-none" data-testid="label-supplier-include-otw">
+              <Switch
+                checked={supplierIncludeOtw}
+                onCheckedChange={setSupplierIncludeOtw}
+                data-testid="switch-supplier-include-otw"
+              />
+              <span className="text-xs font-normal text-muted-foreground">Include OTW containers</span>
+            </label>
+          )}
         </div>
 
         {statementLoading ? (

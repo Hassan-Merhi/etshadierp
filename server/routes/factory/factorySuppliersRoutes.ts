@@ -1561,13 +1561,14 @@ export function registerFactorySuppliersRoutes(app: Express) {
 
       if (!supplier) return res.status(404).json({ message: "Supplier not found" });
 
+      const includeOtw = req.query.includeOtw === "true";
+      const containersWhere = includeOtw
+        ? and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.supplierId, supplierId))
+        : and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.supplierId, supplierId), sql`${factoryContainers.status} NOT IN ('PENDING', 'IN_TRANSIT')`);
       const containers = await db
         .select()
         .from(factoryContainers)
-        .where(and(
-          eq(factoryContainers.companyId, companyId),
-          eq(factoryContainers.supplierId, supplierId)
-        ))
+        .where(containersWhere)
         .orderBy(desc(factoryContainers.createdAt));
 
       // Containers where this supplier earns commission as a broker (commissionSupplierId = supplierId)
@@ -1879,6 +1880,15 @@ export function registerFactorySuppliersRoutes(app: Express) {
         if (t.toSupplierId === supplierId && t.fromSupplierId !== supplierId &&
             (t.sourceType === "commission" || t.sourceType === "both")) {
           paidByCurrency["USD"] = (paidByCurrency["USD"] || 0) + parseFloat(t.toAmountUsd || "0");
+        }
+      }
+
+      // Back-fill byCurrency from paidByCurrency so that currencies with only payments
+      // (e.g. a non-USD advance payment against an OTW container that was excluded) still
+      // appear in currencyGroups with their correct credit balance instead of vanishing.
+      for (const cc of Object.keys(paidByCurrency)) {
+        if (!byCurrency[cc]) {
+          byCurrency[cc] = { containers: [], totalKg: 0, totalValue: 0, totalCommission: 0, totalDirectCommission: 0, totalFreight: 0, totalOtherCharges: 0 };
         }
       }
 
@@ -2276,7 +2286,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
     // Containers — exclude OTW unless caller opts in
     const containersWhereClause = includeOtw
       ? and(eq(factoryContainers.companyId, companyId), inArray(factoryContainers.supplierId, allSupplierIds))
-      : and(eq(factoryContainers.companyId, companyId), inArray(factoryContainers.supplierId, allSupplierIds), sql`${factoryContainers.status} != 'OTW'`);
+      : and(eq(factoryContainers.companyId, companyId), inArray(factoryContainers.supplierId, allSupplierIds), sql`${factoryContainers.status} NOT IN ('PENDING', 'IN_TRANSIT')`);
     const allContainers = allSupplierIds.length > 0
       ? await db.select().from(factoryContainers)
           .where(containersWhereClause)
@@ -2409,7 +2419,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
         amount: mainAmt,
         commissionAmount: null,
         commissionCurrency: null,
-        isOtw: c.status === "OTW",
+        isOtw: c.status === "PENDING" || c.status === "IN_TRANSIT",
       });
 
       // Cross-currency freight: add as an individual ledger row in the freight currency section
