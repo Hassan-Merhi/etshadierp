@@ -129,17 +129,15 @@ async function sendGreenApiFileUpload({
 }): Promise<{ success: boolean; error?: string }> {
   const url = baseUrl(settings.instanceId, settings.apiToken, "sendFileByUpload");
 
-  const FormData = (await import("form-data")).default;
   const form = new FormData();
   form.append("chatId", chatId);
   if (caption) form.append("caption", caption);
   form.append("fileName", fileName);
-  form.append("file", buffer, { filename: fileName, contentType: mimeType });
+  form.append("file", new Blob([buffer], { type: mimeType }), fileName);
 
   const response = await fetch(url, {
-    method:  "POST",
-    headers: form.getHeaders(),
-    body:    form.getBuffer(),
+    method: "POST",
+    body: form,
   });
 
   if (!response.ok) {
