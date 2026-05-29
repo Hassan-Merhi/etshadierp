@@ -74,6 +74,10 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const [hiddenUnpricedGroups, setHiddenUnpricedGroups] = useState<Set<string>>(new Set());
   const [hiddenLocations, setHiddenLocations] = useState<Set<number>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
+  const editingItemRef = useRef(editingItem);
+  useEffect(() => { editingItemRef.current = editingItem; }, [editingItem]);
+  const lastSavedRef = useRef<{ stockItemId: number; locationId: number } | null>(null);
+  const skipBlurSaveRef = useRef(false);
 
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(currentUser?.role || "");
@@ -231,7 +235,12 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
         queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list", selectedLocationId] });
       }
       toast({ title: "Price updated" });
-      setEditingItem(null);
+      const current = editingItemRef.current;
+      const lastSaved = lastSavedRef.current;
+      if (current && lastSaved && current.stockItemId === lastSaved.stockItemId && current.locationId === lastSaved.locationId) {
+        setEditingItem(null);
+      }
+      lastSavedRef.current = null;
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -240,8 +249,32 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
   const startEdit = (stockItemId: number, locationId: number, currentPrice: string | null) => {
     if (posUser) return;
-    setEditingItem({ stockItemId, locationId, value: currentPrice ?? "" });
-    setTimeout(() => inputRef.current?.focus(), 30);
+    const hasValue = currentPrice && parseFloat(currentPrice) > 0;
+    setEditingItem({ stockItemId, locationId, value: hasValue ? currentPrice : "" });
+    setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 30);
+  };
+
+  const navigateEdit = (direction: "up" | "down") => {
+    const current = editingItemRef.current;
+    if (!current) return;
+    const items = filteredItems;
+    const idx = items.findIndex((i: any) => i.stockItemId === current.stockItemId);
+    if (idx === -1) return;
+    const nextIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (nextIdx < 0 || nextIdx >= items.length) return;
+    const nextItem = items[nextIdx];
+    const nextPrice = isAllMode
+      ? (nextItem.masterPrices?.[current.locationId] ?? nextItem.baseSellingPrice ?? null)
+      : nextItem.sellingPrice;
+    const hasValue = nextPrice && parseFloat(nextPrice) > 0;
+    setEditingItem({ stockItemId: nextItem.stockItemId, locationId: current.locationId, value: hasValue ? nextPrice : "" });
+    setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 30);
   };
 
   const commitEdit = () => {
@@ -261,8 +294,30 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const cancelEdit = () => setEditingItem(null);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") commitEdit();
-    if (e.key === "Escape") cancelEdit();
+    if (e.key === "Enter") { e.preventDefault(); commitEdit(); return; }
+    if (e.key === "Escape") { e.preventDefault(); cancelEdit(); return; }
+    if (e.key === "ArrowUp") { e.preventDefault(); skipBlurSaveRef.current = true; commitEdit(); navigateEdit("up"); return; }
+    if (e.key === "ArrowDown") { e.preventDefault(); skipBlurSaveRef.current = true; commitEdit(); navigateEdit("down"); return; }
+  };
+
+  const handleBlur = () => {
+    if (skipBlurSaveRef.current) {
+      skipBlurSaveRef.current = false;
+      return;
+    }
+    const current = editingItemRef.current;
+    if (!current) return;
+    const val = current.value.trim();
+    if (!val || isNaN(parseFloat(val))) {
+      cancelEdit();
+      return;
+    }
+    lastSavedRef.current = { stockItemId: current.stockItemId, locationId: current.locationId };
+    updatePriceMutation.mutate({
+      stockItemId: current.stockItemId,
+      locationId: current.locationId,
+      sellingPrice: val,
+    });
   };
 
   const canEdit = !posUser;
@@ -739,6 +794,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                                         value={editingItem.value}
                                         onChange={(e) => setEditingItem((prev) => prev ? { ...prev, value: e.target.value } : null)}
                                         onKeyDown={handleKeyDown}
+                                        onBlur={handleBlur}
                                         disabled={isSaving}
                                       />
                                       <Button size="icon" variant="ghost" onClick={commitEdit} disabled={isSaving} data-testid={`button-save-price-${item.stockItemId}-${m.id}`}>
@@ -782,6 +838,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                                         value={editingItem!.value}
                                         onChange={(e) => setEditingItem((prev) => prev ? { ...prev, value: e.target.value } : null)}
                                         onKeyDown={handleKeyDown}
+                                        onBlur={handleBlur}
                                         disabled={isSaving}
                                       />
                                       <Button size="icon" variant="ghost" data-testid={`button-save-price-${item.stockItemId}`} onClick={commitEdit} disabled={isSaving}>
