@@ -9,7 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, MapPin, Tag, AlertCircle, Check, X, Pencil, Layers, EyeOff, Eye, Download } from "lucide-react";
+import { Search, MapPin, Tag, AlertCircle, Check, X, Pencil, Layers, EyeOff, Eye, Download, Upload, FileSpreadsheet } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
@@ -380,6 +382,101 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
   const [exporting, setExporting] = useState(false);
 
+  // ── Import state ─────────────────────────────────────────────────────────────
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importPreview, setImportPreview] = useState<{ barcode: string; name: string; changes: { locationId: number; locationName: string; price: string }[] }[]>([]);
+  const [importError, setImportError] = useState<string | null>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
+
+  const downloadTemplate = async () => {
+    if (!isAllMode || masters.length === 0) return;
+    const XLSX = await import("@/lib/excelHelper");
+    const rows = masterItems.map((item: MasterItem) => {
+      const row: Record<string, any> = {
+        Code: item.code || "",
+        "Item Name": item.name,
+        Group: item.stockGroupName || "",
+      };
+      for (const m of masters) {
+        const price = item.masterPrices?.[m.id] ?? item.baseSellingPrice ?? null;
+        row[m.name] = price && parseFloat(price) > 0 ? parseFloat(price) : "";
+      }
+      return row;
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Price List");
+    const dateStr = new Date().toLocaleDateString("en-CA");
+    await XLSX.writeFile(wb, `price_list_template_${dateStr}.xlsx`);
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setImportError(null);
+    try {
+      const XLSX = await import("@/lib/excelHelper");
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rawRows: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      if (rawRows.length === 0) { setImportError("The file has no data rows."); return; }
+
+      // Build locationName → locationId map from current masters
+      const nameToId = new Map<string, number>();
+      for (const m of masters) nameToId.set(m.name.toLowerCase().trim(), m.id);
+      const locationCols = Object.keys(rawRows[0]).filter((col) => nameToId.has(col.toLowerCase().trim()));
+      if (locationCols.length === 0) { setImportError("No location columns found. Download the template first."); return; }
+
+      const preview: typeof importPreview = [];
+      for (const row of rawRows) {
+        const barcode = String(row["Code"] || "").trim();
+        const name = String(row["Item Name"] || "").trim();
+        if (!barcode) continue;
+        const changes: { locationId: number; locationName: string; price: string }[] = [];
+        for (const col of locationCols) {
+          const raw = row[col];
+          const parsed = parseFloat(String(raw));
+          if (!isNaN(parsed) && parsed > 0) {
+            changes.push({ locationId: nameToId.get(col.toLowerCase().trim())!, locationName: col, price: parsed.toFixed(2) });
+          }
+        }
+        if (changes.length > 0) preview.push({ barcode, name, changes });
+      }
+      if (preview.length === 0) { setImportError("No valid price entries found in the file."); return; }
+      setImportPreview(preview);
+      setImportDialogOpen(true);
+    } catch {
+      setImportError("Could not read the file. Make sure it is a valid .xlsx file.");
+    }
+  };
+
+  const handleImportSubmit = async () => {
+    if (importPreview.length === 0) return;
+    setImporting(true);
+    try {
+      const prices: { barcode: string; sellingPrice: string; locationId: number }[] = [];
+      for (const item of importPreview) {
+        for (const c of item.changes) {
+          prices.push({ barcode: item.barcode, sellingPrice: c.price, locationId: c.locationId });
+        }
+      }
+      const res = await apiRequest("POST", "/api/stock-items/bulk-update-prices", { prices });
+      const data = await res.json();
+      toast({ title: "Price list uploaded", description: data.message || `Updated ${importPreview.length} items.` });
+      setImportDialogOpen(false);
+      setImportPreview([]);
+      queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list-by-masters"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list", selectedLocationId] });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message || "Something went wrong.", variant: "destructive" });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const exportToExcel = async () => {
     if (filteredItems.length === 0) return;
     setExporting(true);
@@ -513,7 +610,40 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
             </Badge>
           ) : null}
           {selectedLocationId && (
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
+              {isAllMode && canEdit && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid="button-download-price-template"
+                    onClick={downloadTemplate}
+                    disabled={masters.length === 0}
+                    className="gap-1.5"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                    Template
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid="button-upload-price-list"
+                    onClick={() => { setImportError(null); importFileRef.current?.click(); }}
+                    className="gap-1.5"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    Upload
+                  </Button>
+                  <input
+                    ref={importFileRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    onChange={handleImportFile}
+                    data-testid="input-import-price-file"
+                  />
+                </>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -946,6 +1076,79 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
           )}
         </div>
       </div>
+
+      {/* ── Import preview dialog ── */}
+      <Dialog open={importDialogOpen} onOpenChange={(open) => { if (!importing) { setImportDialogOpen(open); if (!open) setImportPreview([]); } }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="w-4 h-4" />
+              Import Price List Preview
+            </DialogTitle>
+          </DialogHeader>
+
+          {importError && (
+            <Alert variant="destructive">
+              <AlertCircle className="w-4 h-4" />
+              <AlertDescription>{importError}</AlertDescription>
+            </Alert>
+          )}
+
+          {importPreview.length > 0 && (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Ready to update <span className="font-semibold text-foreground">{importPreview.length} items</span> across{" "}
+                <span className="font-semibold text-foreground">
+                  {new Set(importPreview.flatMap((r) => r.changes.map((c) => c.locationId))).size} location(s)
+                </span>.
+                Review the changes below before confirming.
+              </p>
+              <ScrollArea className="h-72 rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-28">Code</TableHead>
+                      <TableHead>Item Name</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead className="text-right">New Price</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {importPreview.slice(0, 200).flatMap((item) =>
+                      item.changes.map((c, i) => (
+                        <TableRow key={`${item.barcode}-${c.locationId}`}>
+                          {i === 0 ? (
+                            <>
+                              <TableCell className="font-mono text-xs" rowSpan={item.changes.length}>{item.barcode}</TableCell>
+                              <TableCell className="text-sm" rowSpan={item.changes.length}>{item.name}</TableCell>
+                            </>
+                          ) : null}
+                          <TableCell>
+                            <Badge variant="secondary" className="text-xs">{c.locationName}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold tabular-nums">{c.price}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+                {importPreview.length > 200 && (
+                  <p className="text-xs text-muted-foreground text-center py-2">Showing first 200 items…</p>
+                )}
+              </ScrollArea>
+            </>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setImportDialogOpen(false); setImportPreview([]); }} disabled={importing} data-testid="button-import-cancel">
+              Cancel
+            </Button>
+            <Button onClick={handleImportSubmit} disabled={importing || importPreview.length === 0} data-testid="button-import-confirm">
+              {importing ? "Uploading…" : `Confirm Upload (${importPreview.length} items)`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
