@@ -423,7 +423,7 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                       return (
                       <>
                         <tr key={`grp-${group}`} className="border-t">
-                          <td colSpan={10} className="px-3 py-1.5 text-xs font-bold uppercase tracking-widest" style={{ backgroundColor: p.headerBg, color: p.headerText }}>{group}</td>
+                          <td colSpan={10} className="px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-center" style={{ backgroundColor: p.headerBg, color: p.headerText }}>{group}</td>
                         </tr>
                         {groupUnits.map((u, uIdx) => (
                           <tr
