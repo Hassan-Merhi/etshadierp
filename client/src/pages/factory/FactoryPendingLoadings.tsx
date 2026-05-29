@@ -38,12 +38,19 @@ interface PendingLoad {
   customerName: string;
   orderDate: string;
   totalQtyBales: number;
+  totalWeightKg: string | null;
   proformaIdUsed: number | null;
   proformaName: string | null;
   locationId: number | null;
   loadingStartedAt: string | null;
   status: string;
   containerNotes: string | null;
+}
+
+function fmtKg(val: string | number | null | undefined): string {
+  const n = parseFloat(String(val ?? "0"));
+  if (!n) return "0 kg";
+  return `${n.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg`;
 }
 
 interface UndoItem {
@@ -348,6 +355,7 @@ export default function FactoryPendingLoadings() {
                         <Package className="inline h-3 w-3 mr-1" />
                         {load.totalQtyBales} bales scanned
                       </span>
+                      <span>{fmtKg(load.totalWeightKg)}</span>
                     </div>
 
                     {editingNoteId === load.id ? (
@@ -404,6 +412,7 @@ export default function FactoryPendingLoadings() {
               if (group.loads.length === 1) return renderLoadCard(group.loads[0]);
               const isExpanded = expandedCustomers.has(group.customerId);
               const totalBales = group.loads.reduce((s, l) => s + (l.totalQtyBales || 0), 0);
+              const totalWeightKg = group.loads.reduce((s, l) => s + parseFloat(l.totalWeightKg || "0"), 0);
               return (
                 <div key={`group-${group.customerId}`} className="space-y-2">
                   {/* Group header card */}
@@ -431,6 +440,7 @@ export default function FactoryPendingLoadings() {
                           <Package className="inline h-3 w-3 mr-1" />
                           {totalBales} bales total
                         </span>
+                        <span>{fmtKg(totalWeightKg)}</span>
                         <span className="text-xs text-muted-foreground">
                           {isExpanded ? "Click to collapse" : "Click to expand"}
                         </span>
