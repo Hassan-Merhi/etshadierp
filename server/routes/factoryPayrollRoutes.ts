@@ -2,7 +2,7 @@ import { parseId, parseOptionalId } from "../lib/parseId";
 import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { checkFactoryAdmin } from "./factory/_helpers";
-import { eq, and, sql, asc, gte, lte, desc, inArray, isNull } from "drizzle-orm";
+import { eq, and, sql, asc, gte, lte, desc, inArray } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import path from "path";
 import fs from "fs";
@@ -14,6 +14,7 @@ import {
   factoryDaybookEntries,
   factoryAttendance,
   factoryWorkerAdvances,
+  factoryAdvanceRepayments,
   vouchers,
   voucherEntries,
   companies,
@@ -141,20 +142,19 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         attendanceByWorker.set(att.workerId, existing);
       }
 
-      const undeductedAdvances = await db
+      // Outstanding salary-deduction advances (deduct from payroll)
+      const outstandingAdvances = await db
         .select()
         .from(factoryWorkerAdvances)
         .where(
           and(
             eq(factoryWorkerAdvances.companyId, companyId),
-            isNull(factoryWorkerAdvances.payrollId),
-            eq(factoryWorkerAdvances.repaymentType, "salary_deduction"),
-            gte(factoryWorkerAdvances.advanceDate, startDate),
-            lte(factoryWorkerAdvances.advanceDate, endDate)
+            eq(factoryWorkerAdvances.fullyPaid, false),
+            eq(factoryWorkerAdvances.repaymentType, "salary_deduction")
           )
         );
       const advancesByWorker = new Map<number, any[]>();
-      for (const adv of undeductedAdvances) {
+      for (const adv of outstandingAdvances) {
         const existing = advancesByWorker.get(adv.workerId) || [];
         existing.push(adv);
         advancesByWorker.set(adv.workerId, existing);
@@ -224,8 +224,14 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         const bonuses = 0;
         const deductions = 0;
         const workerAdvances = advancesByWorker.get(worker.id) || [];
-        const advances = workerAdvances.reduce((sum: number, a: any) => sum + parseFloat(a.amount || "0"), 0);
-        const netSalary = basePay + baleEarnings + kgEarnings + overtimePay + bonuses - deductions - advances;
+        // Deduct remaining balances (not original amounts) — but only up to the gross pay
+        const grossPay = basePay + baleEarnings + kgEarnings + overtimePay + bonuses;
+        let advancesRemaining = 0;
+        for (const a of workerAdvances) {
+          advancesRemaining += parseFloat(a.remainingBalance || "0");
+        }
+        const advances = Math.min(advancesRemaining, grossPay);
+        const netSalary = grossPay - deductions - advances;
 
         const [record] = await db.insert(factoryPayrolls).values({
           companyId,
@@ -249,11 +255,31 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
           status: "DRAFT",
         }).returning();
 
-        if (workerAdvances.length > 0) {
-          const advanceIds = workerAdvances.map((a: any) => a.id);
-          await db.update(factoryWorkerAdvances)
-            .set({ payrollId: record.id })
-            .where(inArray(factoryWorkerAdvances.id, advanceIds));
+        // Settle advances: reduce remaining balances, create repayment records
+        if (advances > 0) {
+          let toSettle = advances;
+          for (const adv of workerAdvances) {
+            if (toSettle <= 0) break;
+            const bal = parseFloat(adv.remainingBalance || "0");
+            const reduce = Math.min(bal, toSettle);
+            const newBal = bal - reduce;
+            await db.update(factoryWorkerAdvances)
+              .set({
+                remainingBalance: newBal.toFixed(2),
+                fullyPaid: newBal <= 0,
+              })
+              .where(eq(factoryWorkerAdvances.id, adv.id));
+            await db.insert(factoryAdvanceRepayments).values({
+              companyId,
+              advanceId: adv.id,
+              workerId: worker.id,
+              payrollId: record.id,
+              repaymentDate: startDate,
+              amount: reduce.toFixed(2),
+              notes: `Payroll deduction for ${startDate} – ${endDate}`,
+            });
+            toSettle -= reduce;
+          }
         }
 
         // Write a per-worker PAYROLL_GENERATED entry with referenceId so undo can clean it up
@@ -475,31 +501,30 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       if (!existing) return res.status(404).json({ message: "Payroll record not found" });
 
       await db.transaction(async (tx: any) => {
-        // 1. Restore advance balances that were settled at generate time
+        // 1. Reverse repayments tied to this payroll -> restore advance balances
         const advDeducted = parseFloat(existing.advances || "0");
         if (advDeducted > 0) {
-          const workerAdvances = await tx.select().from(factoryWorkerAdvances)
+          const repayments = await tx.select()
+            .from(factoryAdvanceRepayments)
             .where(and(
-              eq(factoryWorkerAdvances.companyId, companyId),
-              eq(factoryWorkerAdvances.workerId, existing.workerId),
-              eq(factoryWorkerAdvances.repaymentType, "salary_deduction"),
-            ))
-            .orderBy(desc(factoryWorkerAdvances.advanceDate));
-          let toRestore = advDeducted;
-          for (const adv of workerAdvances) {
-            if (toRestore <= 0) break;
-            const orig = parseFloat(adv.amount || "0");
+              eq(factoryAdvanceRepayments.companyId, companyId),
+              eq(factoryAdvanceRepayments.workerId, existing.workerId),
+              eq(factoryAdvanceRepayments.payrollId, id),
+            ));
+          for (const rep of repayments) {
+            const [adv] = await tx.select().from(factoryWorkerAdvances)
+              .where(eq(factoryWorkerAdvances.id, rep.advanceId));
+            if (!adv) continue;
             const curr = parseFloat(adv.remainingBalance || "0");
-            const canRestore = Math.min(toRestore, orig - curr);
-            if (canRestore > 0) {
-              const newBal = curr + canRestore;
-              await tx.update(factoryWorkerAdvances).set({
-                remainingBalance: newBal.toFixed(2),
-                fullyPaid: false,
-              }).where(eq(factoryWorkerAdvances.id, adv.id));
-              toRestore -= canRestore;
-            }
+            const repAmt = parseFloat(rep.amount || "0");
+            const newBal = curr + repAmt;
+            await tx.update(factoryWorkerAdvances).set({
+              remainingBalance: newBal.toFixed(2),
+              fullyPaid: false,
+            }).where(eq(factoryWorkerAdvances.id, adv.id));
           }
+          await tx.delete(factoryAdvanceRepayments)
+            .where(eq(factoryAdvanceRepayments.payrollId, id));
         }
 
         // 2. Delete all accounting/daybook entries linked to this payroll
@@ -572,32 +597,30 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         // Restore advance balances that were settled at generate time
         const advDeducted = parseFloat(existing.advances || "0");
         if (advDeducted > 0) {
-          // Get all salary-deduction advances for this worker (oldest first, including fully paid ones that might have been settled)
-          const workerAdvances = await tx.select().from(factoryWorkerAdvances)
+          const repayments = await tx.select()
+            .from(factoryAdvanceRepayments)
             .where(and(
-              eq(factoryWorkerAdvances.companyId, companyId),
-              eq(factoryWorkerAdvances.workerId, existing.workerId),
-              eq(factoryWorkerAdvances.repaymentType, "salary_deduction"),
-            ))
-            .orderBy(desc(factoryWorkerAdvances.advanceDate));
-          let toRestore = advDeducted;
-          for (const adv of workerAdvances) {
-            if (toRestore <= 0) break;
-            const orig = parseFloat(adv.amount || "0");
+              eq(factoryAdvanceRepayments.companyId, companyId),
+              eq(factoryAdvanceRepayments.workerId, existing.workerId),
+              eq(factoryAdvanceRepayments.payrollId, id),
+            ));
+          for (const rep of repayments) {
+            const [adv] = await tx.select().from(factoryWorkerAdvances)
+              .where(eq(factoryWorkerAdvances.id, rep.advanceId));
+            if (!adv) continue;
             const curr = parseFloat(adv.remainingBalance || "0");
-            const canRestore = Math.min(toRestore, orig - curr);
-            if (canRestore > 0) {
-              const newBal = curr + canRestore;
-              await tx.update(factoryWorkerAdvances).set({
-                remainingBalance: newBal.toFixed(2),
-                fullyPaid: false,
-              }).where(eq(factoryWorkerAdvances.id, adv.id));
-              toRestore -= canRestore;
-            }
+            const repAmt = parseFloat(rep.amount || "0");
+            const newBal = curr + repAmt;
+            await tx.update(factoryWorkerAdvances).set({
+              remainingBalance: newBal.toFixed(2),
+              fullyPaid: false,
+            }).where(eq(factoryWorkerAdvances.id, adv.id));
           }
+          await tx.delete(factoryAdvanceRepayments)
+            .where(eq(factoryAdvanceRepayments.payrollId, id));
         }
 
-        // Delete any daybook entries referencing this payroll (e.g. PAYROLL_GENERATED written at generate time)
+        // Delete any daybook entries referencing this payroll
         await tx.delete(factoryDaybookEntries).where(
           and(
             eq(factoryDaybookEntries.companyId, companyId),

@@ -517,6 +517,7 @@ let migrationsDone = false;
     `ALTER TABLE factory_worker_advances ADD COLUMN IF NOT EXISTS cash_account_id integer`,
     `ALTER TABLE factory_worker_advances ADD COLUMN IF NOT EXISTS fully_paid boolean NOT NULL DEFAULT false`,
     `ALTER TABLE factory_worker_advances ADD COLUMN IF NOT EXISTS repayment_type VARCHAR(30) NOT NULL DEFAULT 'salary_deduction'`,
+    `ALTER TABLE factory_advance_repayments ADD COLUMN IF NOT EXISTS payroll_id INTEGER`,
     `CREATE TABLE IF NOT EXISTS factory_advance_repayments (
       id serial PRIMARY KEY,
       company_id integer NOT NULL,

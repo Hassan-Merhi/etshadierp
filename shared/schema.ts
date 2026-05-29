@@ -4025,6 +4025,7 @@ export const factoryAdvanceRepayments = pgTable("factory_advance_repayments", {
   companyId: integer("company_id").notNull(),
   advanceId: integer("advance_id").notNull().references(() => factoryWorkerAdvances.id, { onDelete: "cascade" }),
   workerId: integer("worker_id").notNull(),
+  payrollId: integer("payroll_id"),
   repaymentDate: date("repayment_date").notNull(),
   amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
   cashAccountId: integer("cash_account_id").references(() => ledgerAccounts.id, { onDelete: "restrict" }),
@@ -4033,6 +4034,7 @@ export const factoryAdvanceRepayments = pgTable("factory_advance_repayments", {
 }, (t) => ({
   advanceIdx: index("factory_advance_repayments_advance_idx").on(t.advanceId),
   companyIdx: index("factory_advance_repayments_company_idx").on(t.companyId),
+  payrollIdx: index("factory_advance_repayments_payroll_idx").on(t.payrollId),
 }));
 
 export const insertFactoryAdvanceRepaymentSchema = createInsertSchema(factoryAdvanceRepayments).omit({
