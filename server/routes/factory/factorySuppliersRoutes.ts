@@ -2268,6 +2268,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
           .where(containersWhereClause)
           .orderBy(factoryContainers.arrivalDate, factoryContainers.createdAt)
       : [];
+    // Build a Set of the filtered container IDs so charge queries can be scoped to the same set.
+    const filteredContainerIdSet = new Set((allContainers as any[]).map((c: any) => c.id as number));
 
     // Payments (direct)
     const allPayments = allSupplierIds.length > 0
@@ -2533,6 +2535,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
 
     // Offload additional charge rows
     for (const oc of allOffloadCharges as any[]) {
+      // Skip charges tied to OTW containers when toggle is off
+      if (oc.containerId != null && !filteredContainerIdSet.has(oc.containerId)) continue;
       const cc = oc.currencyCode || "USD";
       const amt = parseFloat(oc.amount || "0");
       const supplierName = supplierNameMap[oc.supplierId] || "Unknown";
@@ -2550,6 +2554,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
 
     // Container-level other charge rows (linked via container → supplier)
     for (const oc of allContainerOtherCharges as any[]) {
+      // Skip charges tied to OTW containers when toggle is off
+      if (oc.containerId != null && !filteredContainerIdSet.has(oc.containerId)) continue;
       const cc = oc.chargeCurrencyCode || oc.containerCurrencyCode || "USD";
       const amt = parseFloat(oc.amount || "0");
       const dateVal = oc.createdAt ? new Date(oc.createdAt).toISOString().split("T")[0] : null;
@@ -2588,6 +2594,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
       : [];
 
     for (const c of containerColOtherCharges as any[]) {
+      // Skip charges tied to OTW containers when toggle is off
+      if (!filteredContainerIdSet.has(c.id)) continue;
       const cc = c.otherChargesCurrencyCode || "USD";
       const amt = parseFloat(c.otherCharges || "0");
       const chargeSupplierName = supplierNameMap[c.otherChargesSupplierId] || "Unknown";

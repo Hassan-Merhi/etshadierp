@@ -1488,7 +1488,7 @@ export default function FactorySuppliers() {
                           onCheckedChange={setBrokerIncludeOtw}
                           data-testid="switch-broker-include-otw"
                         />
-                        <span className="text-xs font-normal text-muted-foreground">Include OTW</span>
+                        <span className="text-xs font-normal text-muted-foreground">Include OTW containers</span>
                       </label>
                       <Button
                         variant="outline"
