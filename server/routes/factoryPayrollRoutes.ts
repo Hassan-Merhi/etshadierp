@@ -86,6 +86,23 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
     return total;
   }
 
+  // Compute monthly pay from actual attendance (Present/Late = 1 day, Half Day = 0.5)
+  function computeMonthlyPayFromAttendance(baseSalary: number, periodStart: string, attendanceRows: any[]): number {
+    const daysInMonth = (dateStr: string) => {
+      const d = new Date(dateStr);
+      return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    };
+    let attendedDays = 0;
+    for (const row of attendanceRows) {
+      const s = row.status || "Absent";
+      if (s === "Present" || s === "Late" || s === "Leave") attendedDays += 1;
+      else if (s === "Half Day") attendedDays += 0.5;
+    }
+    const daysInStartMonth = daysInMonth(periodStart);
+    const dailyRate = baseSalary / daysInStartMonth;
+    return attendedDays * dailyRate;
+  }
+
   app.post("/api/factory/payroll/generate", requireAuth, async (req: any, res: any) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
@@ -200,7 +217,11 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
         switch (worker.salaryType) {
           case "Monthly":
-            basePay = computeMonthlyPay(workerBaseSalary, startDate, endDate);
+            if (hasAttendance) {
+              basePay = computeMonthlyPayFromAttendance(workerBaseSalary, startDate, workerAttendance);
+            } else {
+              basePay = computeMonthlyPay(workerBaseSalary, startDate, endDate);
+            }
             break;
           case "Daily":
             if (hasAttendance) {
