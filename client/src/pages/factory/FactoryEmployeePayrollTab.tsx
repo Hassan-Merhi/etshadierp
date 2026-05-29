@@ -303,8 +303,8 @@ export default function FactoryEmployeePayrollTab() {
                     </div>
                     <div className="text-right text-xs text-muted-foreground">
                       {p ? (
-                        <span title={`Present: ${p.presentDays}, Half: ${p.halfDays}, Absent: ${p.absentDays}`}>
-                          {p.totalMarkedDays > 0 ? `${p.presentDays + p.halfDays * 0.5}/${p.daysInMonth}` : "no att"}
+                        <span title={`Effective: ${p.presentDays}, Half: ${p.halfDays}, Absent: ${p.absentDays}`}>
+                          {`${p.presentDays}/${p.daysInMonth}`}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">-</span>

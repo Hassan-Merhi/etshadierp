@@ -775,10 +775,16 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         const present = (a.present || 0) + (a.late || 0) + (a.leave || 0);
         const half = (a["half day"] || 0) + (a.halfday || 0);
         const absent = a.absent || 0;
-        const totalDays = present + half * 0.5 + absent;
+        const totalMarkedDays = present + half + absent;
         const monthlySalary = parseFloat(emp.monthlySalary || "0");
         const dailyRate = daysInMonth > 0 ? monthlySalary / daysInMonth : 0;
-        const calculatedPay = totalDays > 0 ? dailyRate * (present + half * 0.5) : monthlySalary; // fallback to full salary if no attendance
+
+        // Absence-deduction model: unmarked days within the period are treated as present.
+        // Only explicitly marked absences and half-days reduce pay.
+        const deductedDays = absent + half * 0.5;
+        const effectivePresentDays = Math.max(0, daysInMonth - deductedDays);
+        const calculatedPay = Math.max(0, monthlySalary - dailyRate * deductedDays);
+
         const outstandingAdvance = advMap[eid] || 0;
         const deduction = Math.min(outstandingAdvance, calculatedPay);
         const netPay = Math.max(0, calculatedPay - deduction);
@@ -788,10 +794,10 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           department: emp.department,
           monthlySalary: monthlySalary.toFixed(2),
           daysInMonth,
-          presentDays: present,
+          presentDays: effectivePresentDays,
           halfDays: half,
           absentDays: absent,
-          totalMarkedDays: totalDays,
+          totalMarkedDays,
           calculatedPay: calculatedPay.toFixed(2),
           outstandingAdvance: outstandingAdvance.toFixed(2),
           deduction: deduction.toFixed(2),
