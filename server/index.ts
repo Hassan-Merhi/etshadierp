@@ -2180,7 +2180,7 @@ let migrationsDone = false;
     `DO $$ BEGIN ALTER TABLE container_documents ADD CONSTRAINT container_documents_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE container_freight ADD CONSTRAINT container_freight_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     // container_freight_payments.container_id was missing from schema.ts (drift) — add defensively before FK so prod gets the column too
-    `ALTER TABLE container_freight_payments ADD COLUMN IF NOT EXISTS container_id integer;`,
+    `ALTER TABLE container_freight_payments ADD COLUMN IF NOT EXISTS container_id integer`,
     `DO $$ BEGIN ALTER TABLE container_freight_payments ADD CONSTRAINT container_freight_payments_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE container_offloads ADD CONSTRAINT container_offloads_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE container_sales ADD CONSTRAINT container_sales_container_id_fkey FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
