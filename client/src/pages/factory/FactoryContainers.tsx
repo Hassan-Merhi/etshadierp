@@ -768,7 +768,7 @@ function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrackingNow
 export default function FactoryContainers() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
-  const [viewMode, setViewMode] = useState<"list" | "summary" | "tracking">("list");
+  const [viewMode, setViewMode] = useState<"list" | "summary" | "tracking">("tracking");
   const [trackingNowId, setTrackingNowId] = useState<number | null>(null);
   const [openOtwGroups, setOpenOtwGroups] = useState<Set<string>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
