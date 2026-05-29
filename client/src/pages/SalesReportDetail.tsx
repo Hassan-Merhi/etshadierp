@@ -6,7 +6,7 @@ import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, TrendingUp, TrendingDown, LayoutList, ChevronDown, ChevronRight } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, LayoutList, ChevronDown, ChevronRight, Receipt } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { formatNumber } from "@/lib/formatNumber";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -70,6 +70,21 @@ interface ItemGroup {
   locationBreakdown: LocationSummary[];
 }
 
+interface VoucherGroup {
+  voucherId: number;
+  voucherNumber: string;
+  voucherDate: string;
+  createdAt: string;
+  locationName: string;
+  totalQty: number;
+  totalSales: number;
+  totalCost: number;
+  totalConfiguredCost: number;
+  costProfit: number;
+  configuredProfit: number;
+  items: SalesReportItem[];
+}
+
 const formatNumericValue = (value: string | number): string => {
   const num = typeof value === "string" ? parseFloat(value) : value;
   if (isNaN(num)) return "0";
@@ -98,6 +113,8 @@ export default function SalesReportDetail() {
   const [plBasis, setPlBasis] = useState<PLBasis>("config");
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [expandedLocations, setExpandedLocations] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<"items" | "bySale">("items");
+  const [expandedVouchers, setExpandedVouchers] = useState<Set<number>>(new Set());
   useEscapeToParent("/sales-report");
 
   const params = new URLSearchParams(window.location.search);
@@ -268,6 +285,71 @@ export default function SalesReportDetail() {
   const costProfit = totalSales - totalCost;
   const configuredProfit = totalSales - totalConfiguredCost;
 
+  // By-Sale view: group items by voucher, applying plFilter at the voucher level
+  const baseFilteredItems = items.filter((item) => {
+    if (isCreditSaleParam === "true" && !item.isCreditSale) return false;
+    if (isCreditSaleParam === "false" && item.isCreditSale) return false;
+    if (searchTerm) {
+      const lower = searchTerm.toLowerCase();
+      const matches =
+        (item.stockItemName || "").toLowerCase().includes(lower) ||
+        (item.locationName || "").toLowerCase().includes(lower);
+      if (!matches) return false;
+    }
+    return true;
+  });
+
+  const voucherGroupMap = new Map<number, VoucherGroup>();
+  baseFilteredItems.forEach((item) => {
+    if (!voucherGroupMap.has(item.voucherId)) {
+      voucherGroupMap.set(item.voucherId, {
+        voucherId: item.voucherId,
+        voucherNumber: item.voucherNumber,
+        voucherDate: item.voucherDate,
+        createdAt: item.createdAt,
+        locationName: item.locationName || "No Location",
+        totalQty: 0,
+        totalSales: 0,
+        totalCost: 0,
+        totalConfiguredCost: 0,
+        costProfit: 0,
+        configuredProfit: 0,
+        items: [],
+      });
+    }
+    const g = voucherGroupMap.get(item.voucherId)!;
+    g.totalQty += parseFloat(item.quantity);
+    g.totalSales += parseFloat(item.totalSales || "0");
+    g.totalCost += parseFloat(item.totalCost || "0");
+    g.totalConfiguredCost += item.totalConfiguredCost || 0;
+    g.costProfit += parseFloat(item.costProfit || "0");
+    g.configuredProfit += item.configuredProfit || 0;
+    g.items.push(item);
+    // Use the most common location name (set from first item, good enough)
+    if (g.items.length === 1) g.locationName = item.locationName || "No Location";
+  });
+
+  const allVoucherGroups = Array.from(voucherGroupMap.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
+  const voucherGroups = allVoucherGroups.filter((vg) => {
+    if (plFilter === "all") return true;
+    const value = plBasis === "cost" ? vg.costProfit : vg.configuredProfit;
+    if (plFilter === "gain") return value > 0;
+    if (plFilter === "loss") return value < 0;
+    return true;
+  });
+
+  const toggleVoucher = (id: number) => {
+    setExpandedVouchers((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   return (
     <div className="flex flex-col gap-4 p-3 sm:p-6 w-full min-w-0">
       <div className="flex flex-wrap items-center gap-3">
@@ -319,6 +401,17 @@ export default function SalesReportDetail() {
             >
               <TrendingDown className="h-3.5 w-3.5 mr-1" />
               Losing
+            </Button>
+            <div className="w-px h-5 bg-border mx-0.5" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className={viewMode === "bySale" ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
+              onClick={() => setViewMode(viewMode === "bySale" ? "items" : "bySale")}
+              data-testid="button-view-by-sale"
+            >
+              <Receipt className="h-3.5 w-3.5 mr-1" />
+              By Sale
             </Button>
           </div>
           {plFilter !== "all" && (
@@ -408,7 +501,181 @@ export default function SalesReportDetail() {
             </Card>
           </div>
 
+          {/* By-Sale table */}
+          {viewMode === "bySale" && (
+            <Card>
+              <CardContent className="p-0">
+                <div className="hidden md:block">
+                  <Table wrapperClassName="max-h-[calc(100vh-320px)]">
+                    <TableHeader className="sticky top-0 z-30 bg-background">
+                      <TableRow>
+                        <TableHead className="w-6"></TableHead>
+                        <TableHead>Voucher #</TableHead>
+                        <TableHead>Location</TableHead>
+                        <TableHead className="text-right">Items</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
+                        <TableHead className="text-right">Total Sales</TableHead>
+                        <TableHead className="text-right">Total Cost</TableHead>
+                        <TableHead className="text-right">Cost Profit</TableHead>
+                        <TableHead className="text-right">Cost %</TableHead>
+                        <TableHead className="text-right">Hassan's Profit</TableHead>
+                        <TableHead className="text-right">Hassan's %</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {voucherGroups.map((vg) => {
+                        const isExpanded = expandedVouchers.has(vg.voucherId);
+                        const costPct = vg.totalSales > 0 ? (vg.costProfit / vg.totalSales) * 100 : 0;
+                        const configPct = vg.totalConfiguredCost > 0 ? (vg.configuredProfit / vg.totalConfiguredCost) * 100 : 0;
+                        return (
+                          <>
+                            <TableRow
+                              key={`vr-${vg.voucherId}`}
+                              data-testid={`row-voucher-${vg.voucherId}`}
+                              className="cursor-pointer bg-muted/30 hover-elevate font-medium"
+                              onClick={() => toggleVoucher(vg.voucherId)}
+                            >
+                              <TableCell className="py-2 pr-0 w-6">
+                                {isExpanded
+                                  ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                  : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                              </TableCell>
+                              <TableCell className="py-2 font-mono text-sm">{vg.voucherNumber}</TableCell>
+                              <TableCell className="py-2 text-sm text-muted-foreground">{vg.locationName}</TableCell>
+                              <TableCell className="text-right font-mono py-2 text-muted-foreground">{vg.items.length}</TableCell>
+                              <TableCell className="text-right font-mono py-2">{formatNumber(vg.totalQty)}</TableCell>
+                              <TableCell className="text-right font-mono py-2">{formatAmount(vg.totalSales)}</TableCell>
+                              <TableCell className="text-right font-mono py-2">{formatAmount(vg.totalCost)}</TableCell>
+                              <TableCell className={`text-right font-mono py-2 ${profitColor(vg.costProfit)}`}>
+                                {formatAmount(Math.abs(vg.costProfit))}
+                              </TableCell>
+                              <TableCell className={`text-right font-mono text-sm py-2 ${profitColor(costPct)}`}>
+                                {Math.abs(costPct).toFixed(1)}%
+                              </TableCell>
+                              <TableCell className={`text-right font-mono py-2 ${profitColor(vg.configuredProfit)}`}>
+                                {formatAmount(Math.abs(vg.configuredProfit))}
+                              </TableCell>
+                              <TableCell className={`text-right font-mono text-sm py-2 ${profitColor(configPct)}`}>
+                                {Math.abs(configPct).toFixed(1)}%
+                              </TableCell>
+                            </TableRow>
+                            {isExpanded && vg.items.map((item) => {
+                              const itemCostPct = parseFloat(item.totalSales || "0") > 0
+                                ? (parseFloat(item.costProfit || "0") / parseFloat(item.totalSales || "0")) * 100 : 0;
+                              const itemConfigPct = (item.totalConfiguredCost || 0) > 0
+                                ? (item.configuredProfit / item.totalConfiguredCost) * 100 : 0;
+                              return (
+                                <TableRow key={item.id} data-testid={`row-vitem-${item.id}`} className="text-xs bg-muted/10">
+                                  <TableCell className="py-1 w-6"></TableCell>
+                                  <TableCell className="py-1 pl-6 text-muted-foreground" colSpan={2}>{item.stockItemName}</TableCell>
+                                  <TableCell></TableCell>
+                                  <TableCell className="text-right font-mono py-1">{formatNumericValue(item.quantity)}</TableCell>
+                                  <TableCell className="text-right font-mono py-1">{formatAmount(item.totalSales)}</TableCell>
+                                  <TableCell className="text-right font-mono py-1">{formatAmount(item.totalCost)}</TableCell>
+                                  <TableCell className={`text-right font-mono py-1 ${profitColor(parseFloat(item.costProfit))}`}>
+                                    {formatAmount(Math.abs(parseFloat(item.costProfit)))}
+                                  </TableCell>
+                                  <TableCell className={`text-right font-mono py-1 ${profitColor(itemCostPct)}`}>
+                                    {Math.abs(itemCostPct).toFixed(1)}%
+                                  </TableCell>
+                                  <TableCell className={`text-right font-mono py-1 ${profitColor(item.configuredProfit)}`}>
+                                    {formatAmount(Math.abs(item.configuredProfit))}
+                                  </TableCell>
+                                  <TableCell className={`text-right font-mono py-1 ${profitColor(itemConfigPct)}`}>
+                                    {Math.abs(itemConfigPct).toFixed(1)}%
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </>
+                        );
+                      })}
+                    </TableBody>
+                    <TableFooter className="sticky bottom-0 bg-background border-t">
+                      <TableRow className="font-semibold">
+                        <TableCell></TableCell>
+                        <TableCell colSpan={2}>
+                          Total ({voucherGroups.length} sale{voucherGroups.length !== 1 ? "s" : ""}
+                          {plFilter !== "all" ? `, ${plFilter === "gain" ? "gaining" : "losing"} only` : ""})
+                        </TableCell>
+                        <TableCell></TableCell>
+                        <TableCell className="text-right font-mono">{formatNumber(voucherGroups.reduce((s, v) => s + v.totalQty, 0))}</TableCell>
+                        <TableCell className="text-right font-mono">{formatAmount(voucherGroups.reduce((s, v) => s + v.totalSales, 0))}</TableCell>
+                        <TableCell className="text-right font-mono">{formatAmount(voucherGroups.reduce((s, v) => s + v.totalCost, 0))}</TableCell>
+                        <TableCell className={`text-right font-mono ${profitColor(voucherGroups.reduce((s, v) => s + v.costProfit, 0))}`}>
+                          {formatAmount(Math.abs(voucherGroups.reduce((s, v) => s + v.costProfit, 0)))}
+                        </TableCell>
+                        <TableCell></TableCell>
+                        <TableCell className={`text-right font-mono ${profitColor(voucherGroups.reduce((s, v) => s + v.configuredProfit, 0))}`}>
+                          {formatAmount(Math.abs(voucherGroups.reduce((s, v) => s + v.configuredProfit, 0)))}
+                        </TableCell>
+                        <TableCell></TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  </Table>
+                </div>
+
+                {/* Mobile: by-sale cards */}
+                <div className="md:hidden space-y-3 p-3">
+                  {voucherGroups.map((vg) => {
+                    const isExpanded = expandedVouchers.has(vg.voucherId);
+                    return (
+                      <div key={vg.voucherId}>
+                        <Card
+                          className={`cursor-pointer ${isExpanded ? "rounded-b-none border-b-0" : ""}`}
+                          onClick={() => toggleVoucher(vg.voucherId)}
+                          data-testid={`card-voucher-${vg.voucherId}`}
+                        >
+                          <CardContent className="p-3 space-y-2">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2">
+                                {isExpanded
+                                  ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                  : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                                <span className="font-mono font-medium text-sm">{vg.voucherNumber}</span>
+                                <Badge variant="secondary" className="text-xs font-normal">{vg.items.length} item{vg.items.length !== 1 ? "s" : ""}</Badge>
+                              </div>
+                              <span className="text-xs text-muted-foreground">{vg.locationName}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1 text-xs">
+                              <div><span className="text-muted-foreground">Qty: </span><span className="font-mono">{formatNumber(vg.totalQty)}</span></div>
+                              <div><span className="text-muted-foreground">Sales: </span><span className="font-mono">{formatAmount(vg.totalSales)}</span></div>
+                            </div>
+                            <div className="flex items-center justify-between gap-2 pt-1 border-t text-xs">
+                              <span className={`font-mono font-semibold ${profitColor(vg.costProfit)}`}>
+                                Cost P/L: {formatAmount(Math.abs(vg.costProfit))}
+                              </span>
+                              <span className={`font-mono font-semibold ${profitColor(vg.configuredProfit)}`}>
+                                Hassan's P/L: {formatAmount(Math.abs(vg.configuredProfit))}
+                              </span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        {isExpanded && (
+                          <div className="border border-t-0 rounded-b-md p-2 space-y-1 bg-muted/10">
+                            {vg.items.map((item) => (
+                              <div key={item.id} className="text-xs p-1 border-b last:border-b-0">
+                                <div className="font-medium">{item.stockItemName}</div>
+                                <div className="grid grid-cols-2 gap-1 mt-1">
+                                  <div><span className="text-muted-foreground">Qty: </span><span className="font-mono">{formatNumericValue(item.quantity)}</span></div>
+                                  <div><span className="text-muted-foreground">Sales: </span><span className="font-mono">{formatAmount(item.totalSales)}</span></div>
+                                  <div className={`font-mono ${profitColor(parseFloat(item.costProfit))}`}>Cost P/L: {formatAmount(Math.abs(parseFloat(item.costProfit)))}</div>
+                                  <div className={`font-mono ${profitColor(item.configuredProfit)}`}>Hassan's: {formatAmount(Math.abs(item.configuredProfit))}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Item-grouped table */}
+          {viewMode === "items" && (
           <Card>
             <CardContent className="p-0">
               <div className="hidden md:block">
@@ -749,6 +1016,7 @@ export default function SalesReportDetail() {
               </div>
             </CardContent>
           </Card>
+          )}
         </div>
       )}
     </div>
