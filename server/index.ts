@@ -1494,6 +1494,14 @@ let migrationsDone = false;
     // SP POS accounting accounts (May 2026)
     `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS sp_pos_payable_account_id integer`,
     `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS sp_pos_profit_account_id integer`,
+    // Backfill columns that exist in CREATE TABLE but may be absent on older deployed instances
+    `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS logo_url text`,
+    `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS logo_file_name text`,
+    `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS logo_updated_at timestamp`,
+    `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS invoice_footer text`,
+    `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS parent_credit_account_id integer`,
+    `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS net_position_adjustment decimal(15,2) DEFAULT 0`,
+    `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS pos_excel_import_enabled boolean DEFAULT false`,
 
     // ── Tables added post-initial-deploy that may be missing on production ──
     `CREATE TABLE IF NOT EXISTS supplier_proformas (
