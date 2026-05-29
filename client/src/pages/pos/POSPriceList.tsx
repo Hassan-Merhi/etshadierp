@@ -99,11 +99,6 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
   const isAllMode = selectedLocationId === ALL_LOCATIONS_ID;
 
-  const visibleMasters = useMemo(() => {
-    if (!isAllMode) return masters;
-    return masters.filter((m) => !hiddenLocations.has(m.id));
-  }, [isAllMode, masters, hiddenLocations]);
-
   // ── Single-location price list ──────────────────────────────────────────────
   const {
     data: priceList = [],
@@ -151,6 +146,11 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const isLoading = isAllMode ? mastersLoading : priceListLoading;
   const isError = isAllMode ? mastersError : priceListError;
   const error = isAllMode ? mastersErrorObj : priceListErrorObj;
+
+  const visibleMasters = useMemo(() => {
+    if (!isAllMode) return masters;
+    return masters.filter((m) => !hiddenLocations.has(m.id));
+  }, [isAllMode, masters, hiddenLocations]);
 
   const locationPricedList = useMemo(() => {
     if (isAllMode) return masterItems as any[];
