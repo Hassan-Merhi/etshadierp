@@ -3603,6 +3603,15 @@ let migrationsDone = false;
     // Intercompany POS: allow skipping the source voucher so SP Net Position is unaffected
     `ALTER TABLE intercompany_pos_configs ADD COLUMN IF NOT EXISTS skip_source_voucher boolean NOT NULL DEFAULT false`,
 
+    // Employee attendance: add missing unique constraint so ON CONFLICT works
+    `DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conrelid = 'employee_attendance'::regclass AND conname = 'employee_attendance_unique'
+      ) THEN
+        ALTER TABLE employee_attendance ADD CONSTRAINT employee_attendance_unique UNIQUE (employee_id, attendance_date);
+      END IF;
+    END $$;`,
+
     // SP: seed hidden "Supplier Payable Deduction Clearing" account for all existing SP companies
     `INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, active, is_hidden)
      SELECT c.id, 'SP-PAYDDC', 'Supplier Payable Deduction Clearing', 'Liability', 'sp_pay_deduction_clearing', true, true

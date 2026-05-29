@@ -825,7 +825,15 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         WHERE company_id = ${companyId} AND attendance_date = ${date}
         AND employee_id = ANY(${sqlArray(empIds)})
       `);
-      res.json({ employees: emps, attendance: existing.rows });
+      // Map snake_case raw SQL rows to camelCase for the frontend
+      const attendance = (existing.rows as any[]).map((r) => ({
+        id: r.id,
+        employeeId: r.employee_id,
+        attendanceDate: r.attendance_date,
+        status: r.status,
+        notes: r.notes,
+      }));
+      res.json({ employees: emps, attendance });
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
@@ -862,7 +870,15 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           AND attendance_date >= ${startDate} AND attendance_date <= ${endDate}
         ORDER BY attendance_date
       `);
-      res.json(rows.rows);
+      // Map snake_case raw SQL rows to camelCase for the frontend
+      const attendance = (rows.rows as any[]).map((r) => ({
+        id: r.id,
+        employeeId: r.employee_id,
+        attendanceDate: r.attendance_date,
+        status: r.status,
+        notes: r.notes,
+      }));
+      res.json(attendance);
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
