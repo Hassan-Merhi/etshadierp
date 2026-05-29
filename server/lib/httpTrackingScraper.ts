@@ -106,7 +106,27 @@ async function tryMsc(containerNumber: string): Promise<HttpScraperResult> {
       location: a.Location ?? a.location ?? "",
     }));
     const latest = events[0];
-    const etaRaw = data?.TrackingDetails?.ETA ?? data?.eta ?? null;
+    // Try dedicated ETA fields first, then scan activities for an ETA event.
+    let etaRaw: string | null =
+      data?.TrackingDetails?.ETA ??
+      data?.TrackingDetails?.VesselETA ??
+      data?.TrackingDetails?.EstimatedTimeOfArrival ??
+      data?.TrackingDetails?.EstimatedArrival ??
+      data?.eta ??
+      null;
+    if (!etaRaw) {
+      const etaActivity = activities.find((a: any) => {
+        const desc = ((a.ActivityDescription ?? a.description ?? "") as string).toLowerCase();
+        return (
+          desc.includes("estimated time of arrival") ||
+          desc.includes("estimated arrival") ||
+          desc === "eta"
+        );
+      });
+      if (etaActivity) {
+        etaRaw = etaActivity.ActivityDate ?? etaActivity.date ?? null;
+      }
+    }
     const shipment = toShipment(containerNumber, latest?.status ?? null, latest?.location ?? null, etaRaw, events);
     return { success: true, shipment, rawResponse: data };
   } catch (err: any) {

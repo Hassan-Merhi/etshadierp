@@ -446,8 +446,28 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
     }
   }
 
-  // No real ETA field found — return null so the caller can preserve
-  // whatever ETA is already stored in the DB. Never use state/event dates.
+  // Last-resort: when the latest event's status text explicitly describes
+  // an estimated arrival/ETA (e.g. "Estimated Time of Arrival, Vessel: …"),
+  // that event's own date IS the ETA.  We only use future (or today) dates
+  // to avoid mistaking past events for ETAs.
+  const latestState = shipment.states?.[0];
+  if (latestState?.date && latestState?.status) {
+    const sLower = latestState.status.toLowerCase();
+    const isEtaEvent =
+      sLower.includes("estimated time of arrival") ||
+      sLower.includes("estimated arrival") ||
+      (sLower === "eta") ||
+      sLower.startsWith("eta ");
+    if (isEtaEvent) {
+      const d = tryDate(latestState.date);
+      if (d && d >= todayStr) {
+        console.log(`[ParcelsApp] deriveEDD: using event status "${latestState.status}" date=${d} as ETA`);
+        return d;
+      }
+    }
+  }
+
+  // No ETA found — return null so the caller preserves whatever is in the DB.
   return null;
 }
 

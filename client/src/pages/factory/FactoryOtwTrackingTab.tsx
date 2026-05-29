@@ -63,8 +63,20 @@ function ContainerStatusBadge({ status }: { status: string }) {
   return <Badge variant="secondary" className="text-xs">{label}</Badge>;
 }
 
-function trackingStatusBadge(status: string | null | undefined) {
-  if (!status) return <Badge variant="secondary" className="text-xs">No data</Badge>;
+function trackingStatusBadge(
+  status: string | null | undefined,
+  opts?: { wasChecked?: boolean },
+) {
+  if (!status) {
+    if (opts?.wasChecked) {
+      return (
+        <Badge variant="secondary" className="text-xs text-muted-foreground/70">
+          No carrier data
+        </Badge>
+      );
+    }
+    return <Badge variant="secondary" className="text-xs">No data</Badge>;
+  }
   const s = status.toLowerCase();
   if (s.includes("transit") || s.includes("depart") || s.includes("vessel") || s.includes("at sea")) {
     return <Badge className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">{status}</Badge>;
@@ -497,14 +509,20 @@ export default function FactoryOtwTrackingTab() {
                           <TrackNowProgressLog containerId={c.id} />
                         ) : hasError ? (
                           <div className="flex flex-col gap-0.5">
-                            {trackingStatusBadge(fc.trackingLastStatus)}
-                            <span className="text-xs text-destructive flex items-center gap-1">
-                              <XCircle className="h-3 w-3" />
-                              {fc.trackingError?.slice(0, 60)}{fc.trackingError?.length > 60 ? "…" : ""}
-                            </span>
+                            {trackingStatusBadge(fc.trackingLastStatus, { wasChecked: !!lastChecked })}
+                            {(() => {
+                              const err: string = fc.trackingError ?? "";
+                              const isTimeout = err.toLowerCase().includes("timed out") || err.toLowerCase().includes("timeout");
+                              return (
+                                <span className={`text-xs flex items-center gap-1 ${isTimeout ? "text-amber-600 dark:text-amber-400" : "text-destructive"}`}>
+                                  {isTimeout ? <AlertTriangle className="h-3 w-3 shrink-0" /> : <XCircle className="h-3 w-3 shrink-0" />}
+                                  {isTimeout ? "Carrier did not respond — try again later" : err.slice(0, 60) + (err.length > 60 ? "…" : "")}
+                                </span>
+                              );
+                            })()}
                           </div>
                         ) : (
-                          trackingStatusBadge(fc.trackingLastStatus)
+                          trackingStatusBadge(fc.trackingLastStatus, { wasChecked: !!lastChecked })
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">
