@@ -2020,13 +2020,13 @@ export default function FactorySuppliers() {
                   ].sort((a, b) => {
                     const da = a.date ? new Date(a.date).getTime() : 0;
                     const db = b.date ? new Date(b.date).getTime() : 0;
-                    return db - da;
+                    return da - db;
                   });
 
                   // Compute per-row running balance in each row's native currency (oldest → newest)
                   const balanceByKey: Record<string, { cc: string; bal: number }> = {};
                   const currencyRunning: Record<string, number> = {};
-                  for (const r of [...allRows].reverse()) {
+                  for (const r of allRows) {
                     const cc = r.rowCc;
                     currencyRunning[cc] = (currencyRunning[cc] || 0) + r.rowNativeAmt;
                     balanceByKey[r.key] = { cc, bal: currencyRunning[cc] };
