@@ -701,8 +701,11 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       const filename = req.params.filename;
 
       // Try disk cache first
-      const diskPath = path.join(process.cwd(), "uploads", "shipping-container-docs", filename);
-      if (fs.existsSync(diskPath)) return res.sendFile(diskPath);
+      const base = path.resolve(process.cwd(), "uploads", "shipping-container-docs");
+      const target = path.resolve(base, filename);
+      const relative = path.relative(base, target);
+      if (relative.startsWith("..") || path.isAbsolute(relative)) return res.status(400).json({ message: "Invalid filename" });
+      if (fs.existsSync(target)) return res.sendFile(target);
 
       // Fall back to DB
       const [docRow] = await db
@@ -805,8 +808,11 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         // Remove disk cache (non-fatal)
         if (row.fileName) {
           try {
-            const diskPath = path.join(process.cwd(), "uploads", "shipping-invoice-docs", row.fileName);
-            if (fs.existsSync(diskPath)) fs.unlinkSync(diskPath);
+            const base = path.resolve(process.cwd(), "uploads", "shipping-invoice-docs");
+            const target = path.resolve(base, row.fileName);
+            const relative = path.relative(base, target);
+            if (relative.startsWith('..') || path.isAbsolute(relative)) return res.status(400).json({ message: "Invalid file path" });
+            if (fs.existsSync(target)) fs.unlinkSync(target);
           } catch {}
         }
 
