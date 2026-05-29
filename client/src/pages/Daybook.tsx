@@ -129,7 +129,7 @@ import type {
   VoucherEntry,
   ViewVoucherEntry,
 } from "./daybook/types";
-import { loadDaybookState, saveDaybookState, focusDaybookEditById } from "./daybook/state";
+import { loadDaybookState, saveDaybookState, focusDaybookEditById, DAYBOOK_STATE_KEY } from "./daybook/state";
 import type { DaybookUIState } from "./daybook/state";
 import { AccountCombobox } from "./daybook/AccountCombobox";
 
