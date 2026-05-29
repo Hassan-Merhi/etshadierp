@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, MapPin, Tag, AlertCircle, Check, X, Pencil, Layers, EyeOff, Download } from "lucide-react";
+import { Search, MapPin, Tag, AlertCircle, Check, X, Pencil, Layers, EyeOff, Eye, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
@@ -72,10 +72,16 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const [editingItem, setEditingItem] = useState<{ stockItemId: number; locationId: number; value: string } | null>(null);
   const [showUnpriced, setShowUnpriced] = useState(false);
   const [hiddenUnpricedGroups, setHiddenUnpricedGroups] = useState<Set<string>>(new Set());
+  const [hiddenLocations, setHiddenLocations] = useState<Set<number>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(currentUser?.role || "");
+
+  const visibleMasters = useMemo(() => {
+    if (!isAllMode) return masters;
+    return masters.filter((m) => !hiddenLocations.has(m.id));
+  }, [isAllMode, masters, hiddenLocations]);
 
   const { data: posAssignedLocations = [], isLoading: posLocationsLoading } = useQuery<Location[]>({
     queryKey: ["/api/my-locations"],
@@ -413,6 +419,57 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
           )}
         </div>
 
+        {isAllMode && selectedLocationId && (
+          <div className="flex flex-wrap items-center gap-1.5 px-4 py-2 border-b shrink-0 bg-muted/30">
+            <span className="text-xs text-muted-foreground shrink-0 mr-1">Locations:</span>
+            {masters.map((m) => {
+              const isHidden = hiddenLocations.has(m.id);
+              return (
+                <button
+                  key={m.id}
+                  data-testid={`chip-location-${m.id}`}
+                  onClick={() => {
+                    setHiddenLocations((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(m.id)) next.delete(m.id);
+                      else next.add(m.id);
+                      return next;
+                    });
+                  }}
+                  className={cn(
+                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-all",
+                    isHidden
+                      ? "bg-muted text-muted-foreground border-border line-through opacity-50"
+                      : "bg-background text-foreground border-border hover-elevate"
+                  )}
+                >
+                  {m.name}
+                </button>
+              );
+            })}
+            <div className="flex gap-1 ml-auto">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs px-2"
+                onClick={() => setHiddenLocations(new Set())}
+                data-testid="button-show-all-locations"
+              >
+                <Eye className="w-3 h-3 mr-1" />Show All
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs px-2"
+                onClick={() => setHiddenLocations(new Set(masters.map((m) => m.id)))}
+                data-testid="button-hide-all-locations"
+              >
+                <EyeOff className="w-3 h-3 mr-1" />Hide All
+              </Button>
+            </div>
+          </div>
+        )}
+
         {selectedLocationId && (
           <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b shrink-0">
             <div className="relative flex-1 min-w-[180px]">
@@ -610,8 +667,8 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                             <TableHead className="text-xs text-right hidden sm:table-cell w-32">Offloading Cost</TableHead>
                           )}
 
-                          {/* All-mode: one column per master */}
-                          {isAllMode && masters.map((m) => (
+                          {/* All-mode: one column per visible master */}
+                          {isAllMode && visibleMasters.map((m) => (
                             <TableHead key={m.id} className="text-xs text-right w-40">{m.name}</TableHead>
                           ))}
 
@@ -653,8 +710,8 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                               </TableCell>
                             )}
 
-                            {/* All-mode: editable price per master location */}
-                            {isAllMode && masters.map((m) => {
+                            {/* All-mode: editable price per visible master location */}
+                            {isAllMode && visibleMasters.map((m) => {
                               const price = item.masterPrices?.[m.id] ?? item.baseSellingPrice ?? null;
                               const isEditing = editingItem?.stockItemId === item.stockItemId && editingItem?.locationId === m.id;
                               const isSaving = updatePriceMutation.isPending && editingItem?.stockItemId === item.stockItemId && editingItem?.locationId === m.id;
