@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { Play, DollarSign, Users, Loader2, ChevronDown, ChevronRight, Minus, CalendarDays, Calculator } from "lucide-react";
+import { Play, DollarSign, Users, Loader2, ChevronDown, ChevronRight, Minus, CalendarDays, Calculator, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -68,6 +68,7 @@ export default function FactoryEmployeePayrollTab() {
   const [payNotes, setPayNotes] = useState("");
   const [amounts, setAmounts] = useState<Record<number, string>>({});
   const [deductions, setDeductions] = useState<Record<number, string>>({});
+  const [previewRows, setPreviewRows] = useState<Record<number, PayrollPreview>>({});
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
 
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
@@ -80,7 +81,7 @@ export default function FactoryEmployeePayrollTab() {
     },
   });
 
-  const { data: previewData, isLoading: previewLoading, refetch: refetchPreview } = useQuery<{ preview: PayrollPreview[] }>({
+  const { isLoading: previewLoading, refetch: refetchPreview } = useQuery<{ preview: PayrollPreview[] }>({
     queryKey: ["/api/factory/employee-payroll-preview", startDate, endDate],
     queryFn: async () => {
       const res = await fetch(`/api/factory/employee-payroll-preview?startDate=${startDate}&endDate=${endDate}`, { credentials: "include" });
@@ -90,19 +91,26 @@ export default function FactoryEmployeePayrollTab() {
     enabled: false,
   });
 
-  const openPayroll = async () => {
+  const loadPreview = async () => {
     const { data } = await refetchPreview();
     const preview = data?.preview || [];
     const initialAmounts: Record<number, string> = {};
     const initialDeductions: Record<number, string> = {};
+    const rows: Record<number, PayrollPreview> = {};
     for (const p of preview) {
+      rows[p.employeeId] = p;
       const pay = parseFloat(p.calculatedPay);
       const ded = parseFloat(p.deduction);
       initialAmounts[p.employeeId] = pay > 0 ? pay.toFixed(2) : "";
       initialDeductions[p.employeeId] = ded > 0 ? ded.toFixed(2) : "";
     }
+    setPreviewRows(rows);
     setAmounts(initialAmounts);
     setDeductions(initialDeductions);
+  };
+
+  const openPayroll = async () => {
+    await loadPreview();
     setPayrollOpen(true);
   };
 
@@ -161,11 +169,6 @@ export default function FactoryEmployeePayrollTab() {
     employees.reduce((s, e) => s + parseFloat(e.monthlySalary || "0"), 0)
   , [employees]);
 
-  const previewMap = useMemo(() => {
-    const map: Record<number, PayrollPreview> = {};
-    for (const p of (previewData?.preview || [])) map[p.employeeId] = p;
-    return map;
-  }, [previewData]);
 
   if (isLoading) {
     return <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>;
@@ -253,7 +256,7 @@ export default function FactoryEmployeePayrollTab() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end">
               <div>
                 <Label>Period Start</Label>
                 <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} data-testid="input-payroll-start" />
@@ -266,6 +269,9 @@ export default function FactoryEmployeePayrollTab() {
                 <Label>Payment Date</Label>
                 <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} data-testid="input-payroll-date" />
               </div>
+              <Button variant="outline" onClick={loadPreview} disabled={previewLoading} data-testid="button-recalculate-payroll" title="Recalculate salaries for selected period">
+                {previewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              </Button>
             </div>
             <div>
               <Label>Notes</Label>
@@ -285,7 +291,7 @@ export default function FactoryEmployeePayrollTab() {
 
             <div className="rounded-md border divide-y">
               {employees.map((emp) => {
-                const p = previewMap[emp.id];
+                const p = previewRows[emp.id];
                 const sal = parseFloat(amounts[emp.id] || "0") || 0;
                 const ded = parseFloat(deductions[emp.id] || "0") || 0;
                 const net = Math.max(0, sal - ded);
