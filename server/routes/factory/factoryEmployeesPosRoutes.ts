@@ -3703,11 +3703,30 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const dateParam = typeof req.query.date === "string" && req.query.date.match(/^\d{4}-\d{2}-\d{2}$/)
         ? req.query.date
         : null;
+      const startDateParam = typeof req.query.startDate === "string" && req.query.startDate.match(/^\d{4}-\d{2}-\d{2}$/)
+        ? req.query.startDate
+        : null;
       const now = dateParam ? new Date(dateParam + "T12:00:00") : new Date();
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, "0");
       const monthStart = `${year}-${month}-01`;
       const today = dateParam ?? now.toISOString().slice(0, 10);
+
+      const daysInMonth = new Date(year, now.getMonth() + 1, 0).getDate();
+      const currentDay  = now.getDate();
+
+      // Determine range start for ratio calculation
+      let rangeStartDay = 1;
+      let payrollRangeFrom = monthStart;
+      if (startDateParam) {
+        const startDate = new Date(startDateParam + "T12:00:00");
+        if (startDate.getFullYear() === year && startDate.getMonth() === now.getMonth()) {
+          rangeStartDay = startDate.getDate();
+          payrollRangeFrom = startDateParam;
+        }
+      }
+
+      const ratio = (currentDay - rangeStartDay + 1) / daysInMonth;
 
       // ── Workers (Monthly salary type only) ──
       const workers = await db
@@ -3741,7 +3760,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         .where(
           and(
             eq(factoryPayrolls.companyId, companyId),
-            gte(factoryPayrolls.periodStart, monthStart),
+            gte(factoryPayrolls.periodStart, payrollRangeFrom),
             lte(factoryPayrolls.periodStart, today),
           )
         );
@@ -3776,13 +3795,10 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         totalEmployeeBalance       += parseFloat(e.currentBalance ?? "0");
       }
 
-      const daysInMonth = new Date(year, now.getMonth() + 1, 0).getDate();
-      const currentDay  = now.getDate();
-      const ratio = currentDay / daysInMonth;
-
       res.json({
         currentDay,
         daysInMonth,
+        rangeStartDay,
         totalWorkerBaseSalary,
         totalWorkerTransport,
         totalWorkerPaid,

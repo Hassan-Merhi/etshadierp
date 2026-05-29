@@ -891,9 +891,11 @@ export default function DailyProductionReport() {
   });
 
   const payrollDateParam = to || todayStr();
+  const payrollStartParam = from || "";
   const { data: monthlySalarySummary } = useQuery<{
     currentDay: number;
     daysInMonth: number;
+    rangeStartDay: number;
     totalWorkerBaseSalary: number;
     totalWorkerTransport: number;
     totalWorkerPaid: number;
@@ -902,9 +904,11 @@ export default function DailyProductionReport() {
     workerBreakdown: { id: number; name: string; baseSalary: number; transport: number; expected: number; transportProrated: number; total: number }[];
     employeeBreakdown: { id: number; name: string; monthlySalary: number; expected: number; balance: number }[];
   }>({
-    queryKey: ["/api/factory/monthly-salary-summary", payrollDateParam],
+    queryKey: ["/api/factory/monthly-salary-summary", payrollDateParam, payrollStartParam],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/monthly-salary-summary?date=${payrollDateParam}`, { credentials: "include" });
+      const params = new URLSearchParams({ date: payrollDateParam });
+      if (payrollStartParam) params.set("startDate", payrollStartParam);
+      const res = await fetch(`/api/factory/monthly-salary-summary?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
@@ -1157,18 +1161,25 @@ export default function DailyProductionReport() {
       {/* ── Salary Overview ── */}
       {(() => {
         const ms = monthlySalarySummary;
-        const ratio = ms ? ms.currentDay / ms.daysInMonth : 0;
+        const startDay = ms?.rangeStartDay ?? 1;
+        const ratio = ms ? (ms.currentDay - startDay + 1) / ms.daysInMonth : 0;
         const workerExpected    = ms ? ms.totalWorkerBaseSalary * ratio : null;
         const transportExpected = ms ? ms.totalWorkerTransport  * ratio : null;
         const workerTotal       = workerExpected !== null && transportExpected !== null ? workerExpected + transportExpected : null;
         const workerRemaining   = ms && workerTotal !== null ? workerTotal - ms.totalWorkerPaid : null;
         const empExpected       = ms ? ms.totalEmployeeMonthlySalary * ratio : null;
         const empBalance        = ms ? ms.totalEmployeeBalance : null;
+        const presetLabel = presets.find(p => p.key === preset)?.label ?? (from && to && from !== to ? `${from} → ${to}` : from || "");
+        const dayRange = ms
+          ? startDay === ms.currentDay
+            ? `Day ${ms.currentDay} / ${ms.daysInMonth}`
+            : `Day ${startDay}–${ms.currentDay} / ${ms.daysInMonth}`
+          : "";
 
         return (
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 px-0.5">
-              Payroll Overview — Month to Day {ms ? `(Day ${ms.currentDay} / ${ms.daysInMonth})` : ""}
+              Payroll Overview — {presetLabel}{dayRange ? ` (${dayRange})` : ""}
             </p>
 
             {/* Row 1 — Workers (combined + collapsible) */}
