@@ -249,6 +249,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
   const startEdit = (stockItemId: number, locationId: number, currentPrice: string | null) => {
     if (posUser) return;
+    lastSavedRef.current = null; // prevent onSuccess from clearing a re-opened edit
     const hasValue = currentPrice && parseFloat(currentPrice) > 0;
     setEditingItem({ stockItemId, locationId, value: hasValue ? currentPrice : "" });
     setTimeout(() => {
@@ -277,6 +278,57 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     }, 30);
   };
 
+  const navigateHorizontal = (direction: "left" | "right") => {
+    const current = editingItemRef.current;
+    if (!current) return;
+    if (!isAllMode) {
+      // Single-location mode: left/right behaves like up/down
+      navigateEdit(direction === "left" ? "up" : "down");
+      return;
+    }
+    const items = filteredItems;
+    const idx = items.findIndex((i: any) => i.stockItemId === current.stockItemId);
+    if (idx === -1) return;
+    const masterIdx = visibleMasters.findIndex((m) => m.id === current.locationId);
+    if (masterIdx === -1) return;
+    if (direction === "left") {
+      if (masterIdx > 0) {
+        const prevMaster = visibleMasters[masterIdx - 1];
+        const price = items[idx].masterPrices?.[prevMaster.id] ?? items[idx].baseSellingPrice ?? null;
+        const hasValue = price && parseFloat(price) > 0;
+        setEditingItem({ stockItemId: current.stockItemId, locationId: prevMaster.id, value: hasValue ? price : "" });
+      } else if (idx > 0) {
+        const prevItem = items[idx - 1];
+        const lastMaster = visibleMasters[visibleMasters.length - 1];
+        const price = prevItem.masterPrices?.[lastMaster.id] ?? prevItem.baseSellingPrice ?? null;
+        const hasValue = price && parseFloat(price) > 0;
+        setEditingItem({ stockItemId: prevItem.stockItemId, locationId: lastMaster.id, value: hasValue ? price : "" });
+      } else {
+        return;
+      }
+    } else {
+      // direction === "right"
+      if (masterIdx < visibleMasters.length - 1) {
+        const nextMaster = visibleMasters[masterIdx + 1];
+        const price = items[idx].masterPrices?.[nextMaster.id] ?? items[idx].baseSellingPrice ?? null;
+        const hasValue = price && parseFloat(price) > 0;
+        setEditingItem({ stockItemId: current.stockItemId, locationId: nextMaster.id, value: hasValue ? price : "" });
+      } else if (idx < items.length - 1) {
+        const nextItem = items[idx + 1];
+        const firstMaster = visibleMasters[0];
+        const price = nextItem.masterPrices?.[firstMaster.id] ?? nextItem.baseSellingPrice ?? null;
+        const hasValue = price && parseFloat(price) > 0;
+        setEditingItem({ stockItemId: nextItem.stockItemId, locationId: firstMaster.id, value: hasValue ? price : "" });
+      } else {
+        return;
+      }
+    }
+    setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 30);
+  };
+
   const commitEdit = () => {
     if (!editingItem) return;
     const val = editingItem.value.trim();
@@ -284,6 +336,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       toast({ title: "Invalid price", description: "Enter a valid number.", variant: "destructive" });
       return;
     }
+    lastSavedRef.current = { stockItemId: editingItem.stockItemId, locationId: editingItem.locationId };
     updatePriceMutation.mutate({
       stockItemId: editingItem.stockItemId,
       locationId: editingItem.locationId,
@@ -298,6 +351,8 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     if (e.key === "Escape") { e.preventDefault(); cancelEdit(); return; }
     if (e.key === "ArrowUp") { e.preventDefault(); skipBlurSaveRef.current = true; commitEdit(); navigateEdit("up"); return; }
     if (e.key === "ArrowDown") { e.preventDefault(); skipBlurSaveRef.current = true; commitEdit(); navigateEdit("down"); return; }
+    if (e.key === "ArrowLeft") { e.preventDefault(); skipBlurSaveRef.current = true; commitEdit(); navigateHorizontal("left"); return; }
+    if (e.key === "ArrowRight") { e.preventDefault(); skipBlurSaveRef.current = true; commitEdit(); navigateHorizontal("right"); return; }
   };
 
   const handleBlur = () => {
