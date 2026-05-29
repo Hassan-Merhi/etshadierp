@@ -1771,10 +1771,11 @@ export function registerFactoryStockRoutes(app: Express) {
           stockEntryDate: factoryBales.stockEntryDate,
           finalizedAt: factoryBales.finalizedAt,
           workerName: factoryBales.workerName,
+          productionDate: factoryBales.finalizedAt,
         })
         .from(factoryBales)
         .where(and(...conditions))
-        .orderBy(factoryBales.referenceNumber);
+        .orderBy(asc(factoryBales.finalizedAt), asc(factoryBales.referenceNumber));
 
       // Filter out bales currently locked in an active LOADING order
       const baleIds = bales.map(b => b.id).filter((id): id is number => id != null);

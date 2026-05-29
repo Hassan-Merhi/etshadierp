@@ -15,8 +15,16 @@ interface StockBale {
   weightKg: string;
   stockEntryDate: string | null;
   finalizedAt: string | null;
+  productionDate: string | null;
   workerName: string | null;
   lockedInLoading: boolean;
+}
+
+function fmtDate(val: string | null | undefined): string {
+  if (!val) return "—";
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export default function FactoryStockBaleList() {
@@ -93,6 +101,7 @@ export default function FactoryStockBaleList() {
                   <th className="text-left px-3 py-2.5 font-medium border-b text-xs">Reference No.</th>
                   <th className="text-left px-3 py-2.5 font-medium border-b text-xs">Bale Code</th>
                   <th className="text-right px-3 py-2.5 font-medium border-b text-xs">Weight (kg)</th>
+                  <th className="text-left px-3 py-2.5 font-medium border-b text-xs">Production Date</th>
                   <th className="text-left px-3 py-2.5 font-medium border-b text-xs">Worker</th>
                   <th className="text-center px-3 py-2.5 font-medium border-b text-xs">Status</th>
                 </tr>
@@ -112,6 +121,9 @@ export default function FactoryStockBaleList() {
                     <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{bale.baleCode}</td>
                     <td className="px-3 py-2 font-mono text-xs text-right tabular-nums">
                       {parseFloat(bale.weightKg).toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 text-xs tabular-nums">
+                      {fmtDate(bale.productionDate ?? bale.finalizedAt)}
                     </td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">{bale.workerName || "—"}</td>
                     <td className="px-3 py-2 text-center">
