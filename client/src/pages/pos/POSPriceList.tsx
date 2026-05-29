@@ -78,6 +78,12 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const editingItemRef = useRef(editingItem);
   useEffect(() => { editingItemRef.current = editingItem; }, [editingItem]);
+  useEffect(() => {
+    if (editingItem) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editingItem?.stockItemId, editingItem?.locationId]);
   const lastSavedRef = useRef<{ stockItemId: number; locationId: number } | null>(null);
   const skipBlurSaveRef = useRef(false);
 
@@ -254,10 +260,6 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     lastSavedRef.current = null; // prevent onSuccess from clearing a re-opened edit
     const hasValue = currentPrice && parseFloat(currentPrice) > 0;
     setEditingItem({ stockItemId, locationId, value: hasValue ? currentPrice : "" });
-    setTimeout(() => {
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }, 30);
   };
 
   const navigateEdit = (direction: "up" | "down") => {
@@ -274,10 +276,6 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       : nextItem.sellingPrice;
     const hasValue = nextPrice && parseFloat(nextPrice) > 0;
     setEditingItem({ stockItemId: nextItem.stockItemId, locationId: current.locationId, value: hasValue ? nextPrice : "" });
-    setTimeout(() => {
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }, 30);
   };
 
   const navigateHorizontal = (direction: "left" | "right") => {
@@ -325,10 +323,6 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
         return;
       }
     }
-    setTimeout(() => {
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }, 30);
   };
 
   const commitEdit = () => {
