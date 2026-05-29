@@ -139,6 +139,25 @@ export function registerFactorySuppliersRoutes(app: Express) {
     }
   });
 
+  app.patch("/api/factory/suppliers/:id/reactivate", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+      const [updated] = await db
+        .update(factorySuppliers)
+        .set({ isActive: true, updatedAt: new Date() })
+        .where(and(eq(factorySuppliers.id, id), eq(factorySuppliers.companyId, companyId)))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Supplier not found" });
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error reactivating factory supplier:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Overwrite a factory supplier's opening balance
   app.patch("/api/factory/suppliers/:id/opening-balance", requireAuth, async (req: any, res: any) => {
     try {

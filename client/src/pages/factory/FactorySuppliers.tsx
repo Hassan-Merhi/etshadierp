@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/PageHeader";
 import {
   Plus, Pencil, Trash2, Users, Phone, Mail, MapPin,
   FileText, Package, Weight, Calendar, ArrowLeft,
-  ChevronRight, ChevronDown, Clock, X, GitBranch, DollarSign, ArrowRightLeft, BookOpen, Building2, Link2, Globe, MoreVertical, Layers, AlertTriangle, Info, Eye, TrendingUp,
+  ChevronRight, ChevronDown, Clock, X, GitBranch, DollarSign, ArrowRightLeft, BookOpen, Building2, Link2, Globe, MoreVertical, Layers, AlertTriangle, Info, Eye, EyeOff, TrendingUp,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -709,6 +709,44 @@ export default function FactorySuppliers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
       toast({ title: "Deleted", description: "Supplier permanently removed" });
+    },
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deactivateMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await factoryApiRequest("DELETE", `/api/factory/suppliers/${id}`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to deactivate supplier");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
+      toast({ title: "Supplier hidden", description: "Supplier moved to inactive. Use 'Show Inactive' to find it again." });
+    },
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const reactivateMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await factoryApiRequest("PATCH", `/api/factory/suppliers/${id}/reactivate`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to reactivate supplier");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
+      toast({ title: "Supplier restored", description: "Supplier is now active again." });
     },
     onError: (err: Error) => {
       if (err?._handledGlobally) return;
@@ -2582,6 +2620,23 @@ export default function FactorySuppliers() {
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator />
+                            {sup.isActive ? (
+                              <DropdownMenuItem
+                                onClick={() => wrapAdminAction(() => deactivateMutation.mutate(sup.id), "Hide Supplier")}
+                                data-testid={`button-deactivate-supplier-${sup.id}`}
+                              >
+                                <EyeOff className="h-4 w-4 mr-2" />
+                                Hide Supplier
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem
+                                onClick={() => reactivateMutation.mutate(sup.id)}
+                                data-testid={`button-reactivate-supplier-${sup.id}`}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                Restore Supplier
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
                               onClick={() => { wrapAdminAction(() => setPendingDelete(() => () => permanentDeleteMutation.mutate(sup.id)), "Delete Supplier"); }}
