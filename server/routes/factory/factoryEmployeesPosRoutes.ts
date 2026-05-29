@@ -3712,6 +3712,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const daysInMonth = new Date(year, now.getMonth() + 1, 0).getDate();
       const currentDay  = now.getDate();
       const ratio = currentDay / daysInMonth;
+      const monthEnd = `${year}-${month}-${String(daysInMonth).padStart(2, "0")}`;
 
       // ── Workers (Monthly salary type only) ──
       const workers = await db
@@ -3739,19 +3740,21 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       }
 
       // ── Worker payrolls paid this month ──
-      const payrollRows = await db
-        .select({ netSalary: factoryPayrolls.netSalary })
-        .from(factoryPayrolls)
-        .where(
-          and(
-            eq(factoryPayrolls.companyId, companyId),
-            gte(factoryPayrolls.periodStart, monthStart),
-            lte(factoryPayrolls.periodStart, today),
-          )
-        );
+      // Use overlap logic (same as attendance-report): any PAID payroll whose
+      // period overlaps the current month counts — handles advance-paid payrolls.
+      const payrollRows = await db.execute(
+        sql`SELECT net_salary AS "netSalary"
+            FROM factory_payrolls
+            WHERE company_id = ${companyId}
+              AND status = 'PAID'
+              AND period_start <= ${monthEnd}::date
+              AND period_end   >= ${monthStart}::date`
+      );
+      const payrollList: { netSalary: string }[] =
+        ((payrollRows as any).rows ?? (payrollRows as any[])).map((r: any) => ({ netSalary: r.netSalary ?? "0" }));
 
       let totalWorkerPaid = 0;
-      for (const p of payrollRows) {
+      for (const p of payrollList) {
         totalWorkerPaid += parseFloat(p.netSalary ?? "0");
       }
 
