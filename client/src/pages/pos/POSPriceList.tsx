@@ -554,15 +554,26 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 </button>
               );
             })}
-            {hiddenUnpricedGroups.size > 0 && (
-              <button
+            <div className="flex gap-1 ml-auto">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs px-2"
                 onClick={() => setHiddenUnpricedGroups(new Set())}
-                className="text-xs text-muted-foreground underline ml-1"
                 data-testid="button-show-all-unpriced-groups"
               >
-                show all
-              </button>
-            )}
+                <Eye className="w-3 h-3 mr-1" />Show All
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs px-2"
+                onClick={() => setHiddenUnpricedGroups(new Set(unpricedByGroup.map((g) => g.name)))}
+                data-testid="button-hide-all-unpriced-groups"
+              >
+                <EyeOff className="w-3 h-3 mr-1" />Hide All
+              </Button>
+            </div>
           </div>
         )}
 
