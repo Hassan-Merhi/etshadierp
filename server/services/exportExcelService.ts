@@ -541,8 +541,7 @@ export async function streamCompanyWorkbookDirect(
   companyId: number,
   fromDate: string | undefined,
   toDate: string | undefined,
-  outputStream: NodeJS.WritableStream,
-): Promise<void> {
+): Promise<Buffer> {
   const cid = Number(companyId);
   const df = (col: string): string => {
     const parts: string[] = [];
@@ -804,6 +803,5 @@ export async function streamCompanyWorkbookDirect(
     totalRow.getCell(2).numFmt = "#,##0";
   }
 
-  const buf2 = await wb.xlsx.writeBuffer();
-  outputStream.write(buf2 as Buffer);
+  return wb.xlsx.writeBuffer() as Promise<Buffer>;
 }

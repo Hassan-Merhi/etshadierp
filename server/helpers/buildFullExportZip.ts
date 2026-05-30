@@ -1,5 +1,4 @@
 import archiver from "archiver";
-import { PassThrough } from "stream";
 import { streamCompanyWorkbookDirect } from "../services/exportExcelService";
 
 export interface ExportZipResult {
@@ -54,13 +53,10 @@ export async function buildFullExportZip(
       const safeName  = company.name.replace(/[^a-zA-Z0-9_\- ]/g, "").trim();
       const entryName = `${safeName}_Export_${dateLabel}.xlsx`;
 
-      // Stream directly: streamCompanyWorkbookDirect fetches each sheet
-      // sequentially so only one dataset lives in RAM at a time.
-      const pass = new PassThrough();
-      arc.append(pass, { name: entryName });
-
-      await streamCompanyWorkbookDirect(company.id, fromDate, toDate, pass);
-      if (!pass.destroyed) pass.end();
+      // Build the workbook and get a Buffer, then append the buffer
+      // directly to the archiver — no PassThrough stream needed.
+      const xlsBuf = await streamCompanyWorkbookDirect(company.id, fromDate, toDate);
+      arc.append(xlsBuf, { name: entryName });
 
       names.push(company.name);
       log(`[${company.name}] workbook streamed into ZIP`, "success");
