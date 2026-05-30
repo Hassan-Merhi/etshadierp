@@ -1212,6 +1212,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
+      const includeOtw = req.query.includeOtw === "true";
+
       const suppliersList = await db
         .select()
         .from(factorySuppliers)
@@ -1270,9 +1272,11 @@ export function registerFactorySuppliersRoutes(app: Express) {
       }
 
       // Helper to compute stats for a single supplier record
-      const computeStats = (s: any) => {
+      const computeStats = (s: any, includeOtw: boolean = false) => {
         const supplierContainers = containers.filter((c: any) => c.supplierId === s.id);
-        const payableContainers = supplierContainers.filter(isPayableContainer);
+        const payableContainers = supplierContainers.filter((c: any) =>
+          isPayableContainer(c) || (includeOtw && (c.status === "PENDING" || c.status === "IN_TRANSIT"))
+        );
         const totalContainers = supplierContainers.length;
         const totalKg = supplierContainers.reduce((sum: number, c: any) => {
           return sum + (parseFloat(c.actualReceivedKg || c.totalKg || "0"));
@@ -1353,12 +1357,20 @@ export function registerFactorySuppliersRoutes(app: Express) {
         // Always use totalKg (declared/agreed weight) — same as computeBalance — weight differences at offload
         // affect inventory only, not what is owed to the supplier.
         const byCurrency: Record<string, number> = {};
+        const fxByCurrency: Record<string, { wSum: number; vSum: number }> = {};
         for (const c of payableContainers) {
           const cc = c.currencyCode || "USD";
           const baseVal = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
           const freightAmt = parseFloat(c.freight || "0");
           const freightCc = c.freightCurrencyCode || cc;
           byCurrency[cc] = (byCurrency[cc] || 0) + baseVal;
+          // Track weighted-average FX rate per currency
+          if (cc !== "USD" && parseFloat(c.fxRateToUsd || "0") > 0) {
+            const fx = parseFloat(c.fxRateToUsd || "1");
+            if (!fxByCurrency[cc]) fxByCurrency[cc] = { wSum: 0, vSum: 0 };
+            fxByCurrency[cc].wSum += baseVal * fx;
+            fxByCurrency[cc].vSum += baseVal;
+          }
           // Freight always shows in its own currency bucket
           if (freightAmt > 0) {
             byCurrency[freightCc] = (byCurrency[freightCc] || 0) + freightAmt;
@@ -1372,6 +1384,10 @@ export function registerFactorySuppliersRoutes(app: Express) {
               byCurrency[commCc] = (byCurrency[commCc] || 0) + commAmt;
             }
           }
+        }
+        const fxPerCurrency: Record<string, number> = {};
+        for (const [cc, d] of Object.entries(fxByCurrency)) {
+          fxPerCurrency[cc] = d.vSum > 0 ? d.wSum / d.vSum : 1;
         }
         // Subtract regular payments by currency
         for (const p of supplierPayments) {
@@ -1405,7 +1421,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           byCurrency[cc] = (byCurrency[cc] || 0) + oc;
         }
         const currencyBalances = Object.entries(byCurrency)
-          .map(([currencyCode, bal]) => ({ currencyCode, balance: bal }))
+          .map(([currencyCode, bal]) => ({ currencyCode, balance: bal, fxRateToUsd: fxPerCurrency[currencyCode] ?? 1 }))
           .filter(({ balance: bal }) => Math.abs(bal) > 0.001)
           .sort((a, b) => (a.currencyCode === "USD" ? 1 : -1)); // non-USD first
 
@@ -1457,7 +1473,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
       // First pass: compute each supplier's own stats
       const statsById: Record<number, ReturnType<typeof computeStats>> = {};
       for (const s of suppliersList as any[]) {
-        statsById[s.id] = computeStats(s);
+        statsById[s.id] = computeStats(s, includeOtw);
       }
 
       // Second pass: for parent suppliers, roll up children's stats
@@ -1519,6 +1535,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
         // the broker's own USD pool automatically — exclude it from the linked exposure aggregate
         // so it doesn't appear as an unresolved obligation.
         const exposureCurrencyMap: Record<string, number> = {};
+        const exposureFxMap: Record<string, { wSum: number; vSum: number }> = {};
         for (const cs of childStats) {
           const autoFreight = cs.autoSettledFreightUsd || 0;
           for (const cb of cs.currencyBalances) {
@@ -1527,11 +1544,22 @@ export function registerFactorySuppliersRoutes(app: Express) {
             const effectiveBal = cb.currencyCode === "USD" ? cb.balance - autoFreight : cb.balance;
             if (effectiveBal > 0) {
               exposureCurrencyMap[cb.currencyCode] = (exposureCurrencyMap[cb.currencyCode] || 0) + effectiveBal;
+              if (cb.currencyCode !== "USD" && cb.fxRateToUsd && cb.fxRateToUsd > 0) {
+                if (!exposureFxMap[cb.currencyCode]) exposureFxMap[cb.currencyCode] = { wSum: 0, vSum: 0 };
+                exposureFxMap[cb.currencyCode].wSum += effectiveBal * cb.fxRateToUsd;
+                exposureFxMap[cb.currencyCode].vSum += effectiveBal;
+              }
             }
           }
         }
         const exposureCurrencyBalances = Object.entries(exposureCurrencyMap)
-          .map(([currencyCode, bal]) => ({ currencyCode, balance: bal }))
+          .map(([currencyCode, bal]) => ({
+            currencyCode,
+            balance: bal,
+            fxRateToUsd: exposureFxMap[currencyCode]?.vSum > 0
+              ? exposureFxMap[currencyCode].wSum / exposureFxMap[currencyCode].vSum
+              : 1,
+          }))
           .filter(({ balance: bal }) => bal > 0.001)
           .sort((a, b) => (a.currencyCode === "USD" ? 1 : -1));
 

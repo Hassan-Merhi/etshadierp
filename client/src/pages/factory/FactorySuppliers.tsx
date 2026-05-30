@@ -40,6 +40,7 @@ import type { FactorySupplier } from "@shared/schema";
 interface CurrencyBalance {
   currencyCode: string;
   balance: number;
+  fxRateToUsd?: number;
 }
 
 interface CurrencyGroup {
@@ -205,8 +206,14 @@ export default function FactorySuppliers() {
   const [formRole, setFormRole] = useState<"broker" | "standalone" | "linked">("standalone");
   const { toast } = useToast();
 
+  const [listIncludeOtw, setListIncludeOtw] = useState(false);
   const { data: suppliers, isLoading } = useQuery<SupplierWithBalance[]>({
-    queryKey: ["/api/factory/suppliers/with-balances"],
+    queryKey: ["/api/factory/suppliers/with-balances", listIncludeOtw],
+    queryFn: async () => {
+      const res = await factoryApiRequest("GET", `/api/factory/suppliers/with-balances?includeOtw=${listIncludeOtw}`);
+      if (!res.ok) throw new Error("Failed to fetch suppliers");
+      return res.json();
+    },
   });
 
   const [supplierIncludeOtw, setSupplierIncludeOtw] = useState(false);
@@ -2401,20 +2408,30 @@ export default function FactorySuppliers() {
       </div>
 
       {/* Filter bar */}
-      <Select value={activeFilter} onValueChange={(v) => setActiveFilter(v as SupplierFilter)}>
-        <SelectTrigger className="w-44" data-testid="filter-dropdown">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All</SelectItem>
-          <SelectItem value="brokers">Brokers</SelectItem>
-          <SelectItem value="standalone">Standalone</SelectItem>
-          <SelectItem value="with-balance">With Balance</SelectItem>
-          <SelectItem value="zero-balance">Zero Balance</SelectItem>
-          <SelectItem value="has-foreign">Has Foreign Currency</SelectItem>
-          <SelectItem value="has-recent">Recent Activity</SelectItem>
-        </SelectContent>
-      </Select>
+      <div className="flex items-center gap-3 flex-wrap">
+        <Select value={activeFilter} onValueChange={(v) => setActiveFilter(v as SupplierFilter)}>
+          <SelectTrigger className="w-44" data-testid="filter-dropdown">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="brokers">Brokers</SelectItem>
+            <SelectItem value="standalone">Standalone</SelectItem>
+            <SelectItem value="with-balance">With Balance</SelectItem>
+            <SelectItem value="zero-balance">Zero Balance</SelectItem>
+            <SelectItem value="has-foreign">Has Foreign Currency</SelectItem>
+            <SelectItem value="has-recent">Recent Activity</SelectItem>
+          </SelectContent>
+        </Select>
+        <label className="flex items-center gap-2 cursor-pointer select-none" data-testid="label-list-include-otw">
+          <Switch
+            checked={listIncludeOtw}
+            onCheckedChange={setListIncludeOtw}
+            data-testid="switch-list-include-otw"
+          />
+          <span className="text-sm text-muted-foreground">Include OTW</span>
+        </label>
+      </div>
 
       <div className="grid grid-cols-3 gap-3">
         <Card>
@@ -2555,25 +2572,60 @@ export default function FactorySuppliers() {
 
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <div className="text-xs text-muted-foreground">{isParent ? "Pool Balance" : "Balance"}</div>
-                          {isParent ? (
-                            <div className="text-sm text-muted-foreground italic" data-testid={`text-supplier-balance-${sup.id}`}>
-                              Click to view
-                            </div>
-                          ) : isChild && sup.currencyBalances && sup.currencyBalances.length > 0 && sup.currencyBalances[0].currencyCode !== "USD" ? (
-                            <>
-                              <div className="text-lg font-bold tabular-nums" data-testid={`text-supplier-balance-${sup.id}`}>
-                                {sup.currencyBalances[0].currencyCode} {formatNum(sup.currencyBalances[0].balance.toFixed(2))}
-                              </div>
-                              <div className="text-xs text-muted-foreground">~${formatNum(sup.totalValue)} USD</div>
-                            </>
-                          ) : (
-                            <>
-                              <div className="text-lg font-bold tabular-nums" data-testid={`text-supplier-balance-${sup.id}`}>
-                                ${formatNum(sup.totalValue)}
-                              </div>
-                            </>
-                          )}
+                          <div className="text-xs text-muted-foreground">{isParent ? "Balance" : "Balance"}</div>
+                          {isParent ? (() => {
+                            const exposure = ((sup as any).exposureCurrencyBalances as CurrencyBalance[]) || [];
+                            const ownUsd = parseFloat(sup.totalValue || "0");
+                            const foreignExp = exposure.filter(e => e.currencyCode !== "USD" && e.balance > 0.001);
+                            const usdExp = exposure.find(e => e.currencyCode === "USD");
+                            const totalUsd = foreignExp.reduce((s, e) => s + e.balance * (e.fxRateToUsd ?? 1), 0)
+                              + (usdExp?.balance || 0) + ownUsd;
+                            return (
+                              <>
+                                <div className="text-lg font-bold tabular-nums" data-testid={`text-supplier-balance-${sup.id}`}>
+                                  ${formatNum(totalUsd.toFixed(2))}
+                                </div>
+                                {(foreignExp.length > 0 || Math.abs(ownUsd) > 0.01) && (
+                                  <div className="text-xs text-muted-foreground space-y-0.5 mt-0.5">
+                                    {foreignExp.map(e => (
+                                      <div key={e.currencyCode} className="tabular-nums">
+                                        {e.currencyCode} {formatNum(e.balance.toFixed(2))} × {(e.fxRateToUsd ?? 1).toFixed(4)}
+                                      </div>
+                                    ))}
+                                    {usdExp && usdExp.balance > 0.01 && (
+                                      <div className="tabular-nums">${formatNum(usdExp.balance.toFixed(2))} linked</div>
+                                    )}
+                                    {Math.abs(ownUsd) > 0.01 && (
+                                      <div className="tabular-nums">${formatNum(ownUsd.toFixed(2))} pool</div>
+                                    )}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })() : (() => {
+                            const nonUsd = (sup.currencyBalances || []).filter(cb => cb.currencyCode !== "USD" && Math.abs(cb.balance) > 0.001);
+                            const usdBal = (sup.currencyBalances || []).find(cb => cb.currencyCode === "USD");
+                            const totalUsd = parseFloat(sup.totalValue || "0");
+                            return (
+                              <>
+                                <div className="text-lg font-bold tabular-nums" data-testid={`text-supplier-balance-${sup.id}`}>
+                                  ${formatNum(totalUsd.toFixed(2))}
+                                </div>
+                                {nonUsd.length > 0 && (
+                                  <div className="text-xs text-muted-foreground space-y-0.5 mt-0.5">
+                                    {nonUsd.map(cb => (
+                                      <div key={cb.currencyCode} className="tabular-nums">
+                                        {cb.currencyCode} {formatNum(cb.balance.toFixed(2))} × {(cb.fxRateToUsd ?? 1).toFixed(4)}
+                                      </div>
+                                    ))}
+                                    {usdBal && Math.abs(usdBal.balance) > 0.01 && (
+                                      <div className="tabular-nums">${formatNum(usdBal.balance.toFixed(2))} USD</div>
+                                    )}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
