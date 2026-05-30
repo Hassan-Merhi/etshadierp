@@ -556,9 +556,20 @@ export async function streamCompanyWorkbookDirect(
 
   const summaryRows: [string, number][] = [];
 
+  // Create SUMMARY worksheet first so it is always the first tab in the workbook.
+  // ExcelJS has no ws.moveTo() API — sheet order is determined by creation order.
+  const summaryWs = wb.addWorksheet("SUMMARY");
+  summaryWs.getColumn(1).width = 38;
+  summaryWs.getColumn(2).width = 18;
+  // Content is written after all data sheets are fetched (summaryRows must be complete).
+
   async function fetch1(sheetName: string, sql: string): Promise<void> {
     const rows = await qStream(sql);
-    addSheet(wb, sheetName, rows);
+    try {
+      addSheet(wb, sheetName, rows);
+    } catch (sheetErr: any) {
+      console.warn(`[FullExport] Sheet failed: ${sheetName} - ${sheetErr.message}`);
+    }
     summaryRows.push([sheetName, rows.length]);
     // rows goes out of scope here — GC can reclaim it before next fetch
   }
@@ -776,28 +787,24 @@ export async function streamCompanyWorkbookDirect(
   await fetch1("Employee Txn Detail",    `SELECT TRIM(COALESCE(e.first_name,'') || ' ' || COALESCE(e.last_name,'')) AS employee_name, e.code AS employee_code, e.department, v.voucher_number, v.voucher_type, v.voucher_date, la.code AS account_code, la.name AS account_name, CASE WHEN COALESCE(ve.debit_amount,0) > 0 THEN 'DR' ELSE 'CR' END AS dr_cr, COALESCE(ve.debit_amount,0) AS debit_amount, COALESCE(ve.credit_amount,0) AS credit_amount, ve.narration, v.description AS voucher_narration FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id INNER JOIN employees e ON e.id = ve.employee_id LEFT JOIN ledger_accounts la ON la.id = ve.ledger_account_id WHERE v.company_id = ${cid} ${df("v.voucher_date")} ORDER BY e.first_name, v.voucher_date, ve.id`);
   await fetch1("Location Stock Detail",  `SELECT l.name AS location_name, sg.name AS stock_group, si.code AS item_code, si.name AS item_name, si.uom, i.quantity, i.average_rate AS rate, i.total_value, i.last_updated FROM inventory i INNER JOIN stock_items si ON si.id = i.stock_item_id INNER JOIN locations l ON l.id = i.location_id LEFT JOIN stock_groups sg ON sg.id = si.stock_group_id WHERE i.company_id = ${cid} AND i.quantity != 0 ORDER BY l.name, sg.name, si.code`);
 
-  // ── Summary sheet (added last so we have all counts) ─────────────────────
+  // ── Populate SUMMARY sheet (created first; filled here after all counts are known) ──
   {
-    const ws = wb.addWorksheet("SUMMARY");
-    ws.moveTo(1); // attempt to move to first position
-    ws.getColumn(1).width = 38;
-    ws.getColumn(2).width = 18;
     const [co] = await qStream(`SELECT name FROM companies WHERE id = ${cid}`);
-    const title = ws.addRow([`Full Data Export — ${co?.name || ""}`]);
+    const title = summaryWs.addRow([`Full Data Export — ${co?.name || ""}`]);
     title.getCell(1).font = { bold: true, size: 14, color: { argb: "FF1E3A5F" } };
-    ws.addRow(["Generated at", new Date().toISOString()]);
-    ws.addRow([]);
-    const headerRow = ws.addRow(["Data Category", "Record Count"]);
+    summaryWs.addRow(["Generated at", new Date().toISOString()]);
+    summaryWs.addRow([]);
+    const headerRow = summaryWs.addRow(["Data Category", "Record Count"]);
     headerRow.eachCell(cell => { cell.fill = HDR_FILL; cell.font = HDR_FONT; });
     headerRow.height = 18;
     const total = summaryRows.reduce((s, [, n]) => s + n, 0);
     summaryRows.forEach(([label, count], i) => {
-      const r = ws.addRow([label, count]);
+      const r = summaryWs.addRow([label, count]);
       r.getCell(2).numFmt = "#,##0";
       if (i % 2 === 1) r.eachCell(c => { c.fill = ALT_FILL; });
     });
-    ws.addRow([]);
-    const totalRow = ws.addRow(["TOTAL RECORDS", total]);
+    summaryWs.addRow([]);
+    const totalRow = summaryWs.addRow(["TOTAL RECORDS", total]);
     totalRow.getCell(1).font = { bold: true, size: 11 };
     totalRow.getCell(2).font = { bold: true, size: 11 };
     totalRow.getCell(2).numFmt = "#,##0";
