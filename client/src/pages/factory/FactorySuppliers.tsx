@@ -849,12 +849,12 @@ export default function FactorySuppliers() {
   };
 
   const statusColor = (status: string) => {
-    return status === "OFFLOADED" || status === "PARTIALLY_OFFLOADED" || status === "RECEIVED" || status === "PARTIALLY_RECEIVED" ? "default" : "secondary";
+    return status === "OFFLOADED" || status === "RECEIVED" || status === "PARTIALLY_RECEIVED" ? "default" : "secondary";
   };
 
   const statusDisplayLabel = (status: string) => {
     if (status === "OFFLOADED") return "Offloaded";
-    if (status === "PARTIALLY_OFFLOADED" || status === "PARTIALLY_RECEIVED") return "Partially Offloaded";
+    if (status === "PARTIALLY_RECEIVED") return "Partially Received";
     if (status === "RECEIVED") return "Received";
     return "Pending";
   };

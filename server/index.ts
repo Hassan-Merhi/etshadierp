@@ -3996,6 +3996,17 @@ END $mig$`;
         console.error("[RentalFix] Migration error:", e.message);
       }
 
+      // One-time: convert all PARTIALLY_OFFLOADED containers to OFFLOADED.
+      // "Partially offloaded" is no longer a distinct status — partial offloads
+      // are treated as fully OFFLOADED.
+      try {
+        await migrationClient.query(`
+          UPDATE factory_containers
+          SET status = 'OFFLOADED'
+          WHERE status = 'PARTIALLY_OFFLOADED'
+        `);
+      } catch { /* skip if table not ready */ }
+
       // ── Fix misallocated property payments ──────────────────────────────────────
       // Phase 1 (JS): For each active contract, re-process payments in date order
       // and assign each to the oldest outstanding month, updating ledger_row_id,
