@@ -87,7 +87,7 @@ export default function Suppliers() {
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearch = useDebounce(searchTerm, 300);
   const [dialogTab, setDialogTab] = useState<"transactions" | "purchase-orders">("transactions");
-  const [dateFilter, setDateFilter] = useState<"all" | "today" | "yesterday" | "this_month">("all");
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "yesterday" | "this_month" | "this_year">("all");
   const [supplierToDelete, setSupplierToDelete] = useState<{ id: number; name: string } | null>(null);
 
   useEscapeBack(selectedSupplier ? () => setSelectedSupplier(null) : null);
@@ -236,15 +236,20 @@ export default function Suppliers() {
   const filteredLedgerRows = dateFilter === "all" ? ledgerRows
     : dateFilter === "today" ? ledgerRows.filter((t: any) => t.date && format(new Date(t.date), "yyyy-MM-dd") === todayStr)
     : dateFilter === "yesterday" ? ledgerRows.filter((t: any) => t.date && format(new Date(t.date), "yyyy-MM-dd") === yesterdayStr)
-    : ledgerRows.filter((t: any) => {
+    : dateFilter === "this_month" ? ledgerRows.filter((t: any) => {
         if (!t.date) return false;
         const d = new Date(t.date);
         return d.getFullYear() === nowDate.getFullYear() && d.getMonth() === nowDate.getMonth();
+      })
+    : ledgerRows.filter((t: any) => {
+        if (!t.date) return false;
+        return new Date(t.date).getFullYear() === nowDate.getFullYear();
       });
 
   const txCount = filteredLedgerRows.length;
-  const totalPurchases = ledgerRows.reduce((s: number, t: any) => s + (parseFloat(t.credit) || 0), 0);
-  const totalPayments = ledgerRows.reduce((s: number, t: any) => s + (parseFloat(t.debit) || 0), 0);
+  const totalPurchases = filteredLedgerRows.reduce((s: number, t: any) => s + (parseFloat(t.credit) || 0), 0);
+  const totalPayments = filteredLedgerRows.reduce((s: number, t: any) => s + (parseFloat(t.debit) || 0), 0);
+  const totalPurchasesQty = filteredLedgerRows.filter((t: any) => t.voucherType === "Purchase").length;
   const currentBalance = unifiedLedger.length > 0 ? (unifiedLedger[unifiedLedger.length - 1]?.balance ?? 0) : 0;
 
   const typeBadgeClass: Record<string, string> = {
@@ -443,7 +448,7 @@ export default function Suppliers() {
             </div>
 
             {/* Row 2: KPI cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-3">
               <div className="rounded-lg border bg-muted/30 px-4 py-2.5">
                 <p className="text-xs text-muted-foreground mb-1">Total Purchases</p>
                 {ledgerLoading
@@ -457,10 +462,16 @@ export default function Suppliers() {
                   : <p className="font-mono font-semibold text-sm text-green-600 dark:text-green-400">{formatAmount(totalPayments)}</p>}
               </div>
               <div className="rounded-lg border bg-muted/30 px-4 py-2.5">
+                <p className="text-xs text-muted-foreground mb-1">Purchases Qty</p>
+                {ledgerLoading
+                  ? <Skeleton className="h-5 w-10" />
+                  : <p className="font-semibold text-sm">{totalPurchasesQty}</p>}
+              </div>
+              <div className="rounded-lg border bg-muted/30 px-4 py-2.5">
                 <p className="text-xs text-muted-foreground mb-1">Transactions</p>
                 {ledgerLoading
                   ? <Skeleton className="h-5 w-10" />
-                  : <p className="font-semibold text-sm">{ledgerRows.length}</p>}
+                  : <p className="font-semibold text-sm">{txCount}</p>}
               </div>
               <div className="rounded-lg border bg-muted/30 px-4 py-2.5">
                 <p className="text-xs text-muted-foreground mb-1">Balance</p>
@@ -472,7 +483,7 @@ export default function Suppliers() {
 
             {/* Row 3: date filter */}
             <div className="flex items-center gap-1.5 flex-wrap">
-              {(["all", "today", "yesterday", "this_month"] as const).map((f) => (
+              {(["all", "today", "yesterday", "this_month", "this_year"] as const).map((f) => (
                 <Button
                   key={f}
                   variant={dateFilter === f ? "default" : "outline"}
@@ -481,7 +492,7 @@ export default function Suppliers() {
                   onClick={() => setDateFilter(f)}
                   data-testid={`button-date-filter-${f}`}
                 >
-                  {f === "all" ? "All" : f === "today" ? "Today" : f === "yesterday" ? "Yesterday" : "This Month"}
+                  {f === "all" ? "All" : f === "today" ? "Today" : f === "yesterday" ? "Yesterday" : f === "this_month" ? "This Month" : "This Year"}
                 </Button>
               ))}
               {dateFilter !== "all" && (
