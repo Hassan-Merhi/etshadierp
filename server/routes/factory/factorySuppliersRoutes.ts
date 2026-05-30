@@ -1693,12 +1693,14 @@ export function registerFactorySuppliersRoutes(app: Express) {
         const containerCommissions = commissions.filter((cm: any) => cm.containerId === c.id);
         const totalCommission = containerCommissions.reduce((sum: number, cm: any) => sum + parseFloat(cm.commissionTotal || "0"), 0);
 
+        const hasRawStock = obRawStockWithCommission.some((r: any) => r.containerId === c.id);
+        const effectiveStatus = (c.status === "ARRIVED" && hasRawStock) ? "PARTIALLY_OFFLOADED" : c.status;
         return {
           id: c.id,
           containerNumber: c.containerNumber,
           date: c.arrivalDate || c.createdAt,
           origin: c.origin,
-          status: c.status,
+          status: effectiveStatus,
           currencyCode: containerCc,
           fxRateToUsd: c.fxRateToUsd || "1",
           declaredKg: c.declaredKg,
