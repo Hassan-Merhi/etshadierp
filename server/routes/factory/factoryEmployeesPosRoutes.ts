@@ -2904,26 +2904,25 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           continue;
         }
 
-        // Standalone (non-broker) suppliers: use existing USD-converted calculation
+        // Standalone (non-broker) suppliers: use configured FX rates (same as Suppliers page)
         const sc = allContainersF.filter((c: any) => c.supplierId === s.id);
         const containerValue = sc.reduce((sum: number, c: any) => {
           const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat(c.freight || "0");
-          const fx = parseFloat(c.fxRateToUsd || "1");
           const cc = c.currencyCode || "USD";
           const fcc = c.freightCurrencyCode || cc;
-          const freightInCC = fcc === cc ? freight : 0;
-          const freightUsd = fcc === "USD" && fcc !== cc ? freight : 0;
-          return sum + (kg * rate + freightInCC) * fx + freightUsd;
+          const fx = getConfigFx(cc);
+          const freightFx = getConfigFx(fcc);
+          const freightUsd = fcc === cc ? freight * fx : (fcc === "USD" ? freight : freight * freightFx);
+          return sum + (kg * rate) * fx + freightUsd;
         }, 0);
 
         const commission = sc.reduce((sum: number, c: any) => {
           const amt = parseFloat(c.commissionAmount || "0");
           if (amt <= 0) return sum;
           const commCc = c.commissionCurrencyCode || c.currencyCode || "USD";
-          const fx = parseFloat(c.fxRateToUsd || "1");
-          return sum + (commCc === "USD" ? amt : amt * fx);
+          return sum + (commCc === "USD" ? amt : amt * getConfigFx(commCc));
         }, 0);
 
         const otherCharges = allContainersF.reduce((sum: number, c: any) => {
@@ -2931,12 +2930,11 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           const oc = parseFloat(c.otherCharges || "0");
           if (oc <= 0) return sum;
           const ocCc = c.otherChargesCurrencyCode || "USD";
-          const fx = ocCc === "USD" ? 1 : parseFloat(c.fxRateToUsd || "1");
-          return sum + oc * fx;
+          return sum + oc * getConfigFx(ocCc);
         }, 0);
 
-        // Offload additional charges for this supplier (brokers include this; add for standalone too)
-        const approxFxRate = (cc: string) => cc === "USD" ? 1 : cc === "EUR" ? 1.17 : cc === "AUD" ? 0.75 : 1;
+        // Offload additional charges for this supplier — use configured rates
+        const approxFxRate = (cc: string) => getConfigFx(cc);
         const offloadChargesAmt = allOffloadChargesF
           .filter((oc: any) => oc.supplierId === s.id)
           .reduce((sum: number, oc: any) => {
