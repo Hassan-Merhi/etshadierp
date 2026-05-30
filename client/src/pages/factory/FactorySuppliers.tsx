@@ -958,7 +958,7 @@ export default function FactorySuppliers() {
             />
             <span className="text-xs font-normal text-muted-foreground">Include OTW containers</span>
           </label>
-          {parentSup && import.meta.env.DEV && (
+          {parentSup && (
             <Button
               variant="outline"
               size="sm"
