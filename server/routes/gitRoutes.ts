@@ -1,5 +1,6 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import multer from "multer";
+import path from "path";
 import XLSX from "xlsx";
 import ExcelJS from "exceljs";
 import { db } from "../db";
@@ -27,7 +28,24 @@ import {
   type EnrichedContainer,
 } from "../lib/gitHelpers";
 
-const gitUpload = multer({ storage: multer.memoryStorage() });
+const ALLOWED_EXCEL_MIME = [
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+];
+const ALLOWED_EXCEL_EXT = [".xlsx", ".xls"];
+
+const gitUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ALLOWED_EXCEL_MIME.includes(file.mimetype) && ALLOWED_EXCEL_EXT.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only Excel files (.xlsx, .xls) are allowed"));
+    }
+  },
+});
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -927,7 +945,15 @@ export function registerGitRoutes(app: Express) {
     "/api/git/containers/import-excel",
     requireAuth,
     requireRole("Admin", "Owner", "Developer"),
-    gitUpload.single("file"),
+    (req: Request, res: Response, next: NextFunction) => {
+      gitUpload.single("file")(req, res, (err: any) => {
+        if (!err) return next();
+        if (err.code === "LIMIT_FILE_SIZE") {
+          return res.status(413).json({ message: "File too large. Maximum allowed size is 10 MB." });
+        }
+        return res.status(400).json({ message: err.message || "Invalid file upload." });
+      });
+    },
     async (req: any, res: any) => {
       try {
         if (!req.file) return res.status(400).json({ message: "No file uploaded" });
