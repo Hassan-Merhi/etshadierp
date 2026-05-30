@@ -572,7 +572,7 @@ export default function FactoryNetPosition() {
   const { data: supplierWithBalances = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/suppliers/with-balances", "net-position-merge"],
     queryFn: async () => {
-      const res = await fetch("/api/factory/suppliers/with-balances?includeOtw=false", { credentials: "include" });
+      const res = await fetch("/api/factory/suppliers/with-balances?includeOtw=true", { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
