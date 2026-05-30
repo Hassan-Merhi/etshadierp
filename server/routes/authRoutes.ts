@@ -1928,4 +1928,34 @@ export function registerAuthRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
+
+  // ── Password re-confirmation (Phase 1) ───────────────────────────────────────
+  // Sets a short-lived session flag (5 min) so that dangerous routes guarded by
+  // requirePasswordConfirmation will pass without prompting again.
+  app.post("/api/auth/confirm-password", requireAuth, async (req, res) => {
+    try {
+      const { password } = req.body;
+      if (!password || typeof password !== "string") {
+        return res.status(400).json({ message: "Password is required" });
+      }
+      const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(401).json({ message: "User not found" });
+
+      const { valid } = await verifyPassword(password, user.password);
+      if (!valid) {
+        return res.status(403).json({ message: "Incorrect password" });
+      }
+
+      // Set the confirmation timestamp in the session (5-min window)
+      req.session.passwordConfirmedAt = Date.now();
+      await new Promise<void>((resolve, reject) =>
+        req.session.save((err) => (err ? reject(err) : resolve()))
+      );
+
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 }

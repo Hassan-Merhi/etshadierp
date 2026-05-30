@@ -135,6 +135,28 @@ const HUB_CATEGORIES: HubCategory[] = [
     group: "controls",
     devOnly: true,
   },
+  {
+    key: "approvals",
+    title: "Approval Requests",
+    description: "Review and action risky operations that need a second set of eyes before proceeding",
+    icon: Activity,
+    colorClass: "bg-violet-500/10",
+    iconColorClass: "text-violet-500",
+    keywords: ["approvals", "requests", "review", "pending", "action", "authorize", "sign off"],
+    firstSection: "approvals",
+    group: "controls",
+  },
+  {
+    key: "business-alerts",
+    title: "Business Alerts",
+    description: "Automated checks for negative stock, large withdrawals, pending approvals, and import errors",
+    icon: AlertTriangle,
+    colorClass: "bg-amber-500/10",
+    iconColorClass: "text-amber-500",
+    keywords: ["alerts", "warnings", "negative stock", "overdue", "checks", "business", "monitoring"],
+    firstSection: "business-alerts",
+    group: "controls",
+  },
 ];
 
 const QUICK_ACCESS_KEYS = ["users-permissions", "company", "notifications", "security"];

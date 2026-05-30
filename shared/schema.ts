@@ -5880,3 +5880,84 @@ export const aiAgentApprovals = pgTable("ai_agent_approvals", {
 }));
 
 export type AiAgentApproval = typeof aiAgentApprovals.$inferSelect;
+
+// ── Approval Requests ─────────────────────────────────────────────────────────
+// Human-in-the-loop approvals for risky / high-value actions.
+// status: pending → approved | rejected | cancelled; approved → executed
+export const approvalRequests = pgTable("approval_requests", {
+  id:                   serial("id").primaryKey(),
+  companyId:            integer("company_id").notNull(),
+  requestedByUserId:    varchar("requested_by_user_id", { length: 100 }).notNull(),
+  requestedByUsername:  text("requested_by_username").notNull(),
+  actionType:           text("action_type").notNull(),
+  targetTable:          text("target_table"),
+  targetRecordId:       integer("target_record_id"),
+  targetIdentifier:     text("target_identifier"),
+  payload:              jsonb("payload"),
+  oldValue:             jsonb("old_value"),
+  newValue:             jsonb("new_value"),
+  amountValue:          decimal("amount_value", { precision: 20, scale: 2 }),
+  status:               text("status").notNull().default("pending"),
+  requestedAt:          timestamp("requested_at").notNull().defaultNow(),
+  reviewedByUserId:     varchar("reviewed_by_user_id", { length: 100 }),
+  reviewedByUsername:   text("reviewed_by_username"),
+  reviewedAt:           timestamp("reviewed_at"),
+  reviewerNote:         text("reviewer_note"),
+  executedAt:           timestamp("executed_at"),
+}, (t) => ({
+  companyIdx: index("approval_requests_company_idx").on(t.companyId),
+  statusIdx:  index("approval_requests_status_idx").on(t.status),
+}));
+
+export type ApprovalRequest = typeof approvalRequests.$inferSelect;
+export const insertApprovalRequestSchema = createInsertSchema(approvalRequests).omit({ id: true, requestedAt: true });
+export type InsertApprovalRequest = z.infer<typeof insertApprovalRequestSchema>;
+
+// ── Business Alerts ───────────────────────────────────────────────────────────
+// Automated daily checks: negative stock, overdue balances, large withdrawals, etc.
+// severity: info | warning | critical
+// status: open | dismissed | resolved
+export const businessAlerts = pgTable("business_alerts", {
+  id:             serial("id").primaryKey(),
+  companyId:      integer("company_id").notNull(),
+  alertType:      text("alert_type").notNull(),
+  severity:       text("severity").notNull().default("warning"),
+  title:          text("title").notNull(),
+  message:        text("message").notNull(),
+  targetTable:    text("target_table"),
+  targetRecordId: integer("target_record_id"),
+  status:         text("status").notNull().default("open"),
+  createdAt:      timestamp("created_at").notNull().defaultNow(),
+  resolvedAt:     timestamp("resolved_at"),
+  dismissedBy:    varchar("dismissed_by", { length: 100 }),
+  metadata:       jsonb("metadata"),
+}, (t) => ({
+  companyIdx: index("business_alerts_company_idx").on(t.companyId),
+  statusIdx:  index("business_alerts_status_idx").on(t.status),
+}));
+
+export type BusinessAlert = typeof businessAlerts.$inferSelect;
+
+// ── Import Batches ────────────────────────────────────────────────────────────
+// Audit trail for every Excel / bulk import — who uploaded what, when, how many rows.
+export const importBatches = pgTable("import_batches", {
+  id:                  serial("id").primaryKey(),
+  companyId:           integer("company_id").notNull(),
+  importType:          text("import_type").notNull(),
+  fileName:            text("file_name").notNull(),
+  fileSize:            integer("file_size"),
+  uploadedByUserId:    varchar("uploaded_by_user_id", { length: 100 }).notNull(),
+  uploadedByUsername:  text("uploaded_by_username").notNull(),
+  status:              text("status").notNull().default("applied"),
+  totalRows:           integer("total_rows").notNull().default(0),
+  validRows:           integer("valid_rows").notNull().default(0),
+  invalidRows:         integer("invalid_rows").notNull().default(0),
+  createdRecords:      jsonb("created_records"),
+  updatedRecords:      jsonb("updated_records"),
+  errorSummary:        jsonb("error_summary"),
+  createdAt:           timestamp("created_at").notNull().defaultNow(),
+  appliedAt:           timestamp("applied_at"),
+  rolledBackAt:        timestamp("rolled_back_at"),
+}, (t) => ({
+  companyIdx: index("import_batches_company_idx").on(t.companyId),
+}));

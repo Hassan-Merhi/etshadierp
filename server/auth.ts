@@ -250,6 +250,28 @@ export async function checkPOSLocation(req: Request, res: Response, next: NextFu
   next();
 }
 
+// ── Password re-confirmation gate ─────────────────────────────────────────────
+// Routes protected by this middleware require the user to have successfully
+// called POST /api/auth/confirm-password within the last 5 minutes.
+// The frontend should show a ConfirmPasswordDialog before calling such routes.
+export function requirePasswordConfirmation(req: Request, res: Response, next: NextFunction) {
+  const confirmedAt = (req.session as any).passwordConfirmedAt as number | undefined;
+  const FIVE_MINUTES_MS = 5 * 60 * 1000;
+  if (!confirmedAt || Date.now() - confirmedAt > FIVE_MINUTES_MS) {
+    logDenied({
+      userId: req.session.userId ?? null,
+      username: req.session.username ?? null,
+      role: req.session.currentRole ?? null,
+      companyId: req.session.currentCompanyId ?? null,
+      method: req.method,
+      path: req.path,
+      reason: "Password confirmation required (expired or missing)",
+    });
+    return res.status(403).json({ message: "Password confirmation required" });
+  }
+  next();
+}
+
 // Block POS users from accessing sensitive routes
 export function requireNonPOS(req: Request, res: Response, next: NextFunction) {
   if (!req.user || !req.user.role) {

@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Check, X, MapPin, Zap } from "lucide-react";
+import { ConfirmPasswordDialog } from "@/components/ConfirmPasswordDialog";
+import { PermissionSummaryCard } from "./PermissionSummaryCard";
 
 const ROLE_OPTIONS = [
   "Admin", "Owner", "Manager", "POS", "Normal User",
@@ -72,8 +74,20 @@ export function InlineRoleEditor({
   const [daybookEditDays, setDaybookEditDays] = useState(0);
   const [canSellNegativeStock, setCanSellNegativeStock] = useState(false);
   const [canDeleteRecords, setCanDeleteRecords] = useState(false);
+  const [confirmPasswordOpen, setConfirmPasswordOpen] = useState(false);
 
   const isPOS = role === "POS";
+
+  // Determine if the current save action needs password re-confirmation
+  const isDangerousSave = role === "Admin" || canDeleteRecords;
+
+  const handleSave = () => {
+    if (isDangerousSave) {
+      setConfirmPasswordOpen(true);
+    } else {
+      saveMutation.mutate();
+    }
+  };
 
   const applyPreset = (values: RolePreset["values"]) => {
     if (values.daybookEditDays !== undefined) setDaybookEditDays(values.daybookEditDays);
@@ -461,6 +475,14 @@ export function InlineRoleEditor({
         </div>
       )}
 
+      {/* Permission preview */}
+      <PermissionSummaryCard
+        role={role}
+        canDeleteRecords={canDeleteRecords}
+        canSellNegativeStock={canSellNegativeStock}
+        daybookEditDays={daybookEditDays}
+      />
+
       {/* Footer */}
       <div className="flex items-center justify-end gap-2 border-t pt-3">
         <Button
@@ -477,7 +499,7 @@ export function InlineRoleEditor({
         <Button
           type="button"
           size="sm"
-          onClick={() => saveMutation.mutate()}
+          onClick={handleSave}
           disabled={saveMutation.isPending || (isPOS && selectedLocationIds.length === 0)}
           data-testid="button-save-role"
         >
@@ -485,6 +507,25 @@ export function InlineRoleEditor({
           {saveMutation.isPending ? "Saving…" : isEditing ? "Save Changes" : "Add Role"}
         </Button>
       </div>
+
+      <ConfirmPasswordDialog
+        open={confirmPasswordOpen}
+        onClose={() => setConfirmPasswordOpen(false)}
+        onConfirmed={() => {
+          setConfirmPasswordOpen(false);
+          saveMutation.mutate();
+        }}
+        action={
+          role === "Admin"
+            ? "Grant Admin access"
+            : "Enable delete / void permissions"
+        }
+        description={
+          role === "Admin"
+            ? "Admin role grants full system access including deletions, exports, and user management."
+            : "Delete permission allows this Manager to permanently remove records."
+        }
+      />
     </div>
   );
 }

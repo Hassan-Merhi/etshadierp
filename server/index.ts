@@ -93,6 +93,8 @@ declare module 'express-session' {
     daybookEditDays?: number;
     canAccessCustomers?: boolean;
     canDeleteRecords?: boolean;
+    /** Unix timestamp (ms) when user last confirmed their password via POST /api/auth/confirm-password */
+    passwordConfirmedAt?: number;
   }
 }
 
@@ -3624,6 +3626,73 @@ let migrationsDone = false;
      FROM companies c
      WHERE c.company_type = 'supplier_partner'
      AND NOT EXISTS (SELECT 1 FROM ledger_accounts la WHERE la.company_id = c.id AND la.code = 'SP-PAYDDC')`,
+
+    // ── Security / Control Phase Tables (May 2026) ─────────────────────────────
+    // Phase 2: Human-in-the-loop approval requests
+    `CREATE TABLE IF NOT EXISTS approval_requests (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      requested_by_user_id varchar(100) NOT NULL,
+      requested_by_username text NOT NULL,
+      action_type text NOT NULL,
+      target_table text,
+      target_record_id integer,
+      target_identifier text,
+      payload jsonb,
+      old_value jsonb,
+      new_value jsonb,
+      amount_value numeric(20,2),
+      status text NOT NULL DEFAULT 'pending',
+      requested_at timestamp NOT NULL DEFAULT now(),
+      reviewed_by_user_id varchar(100),
+      reviewed_by_username text,
+      reviewed_at timestamp,
+      reviewer_note text,
+      executed_at timestamp
+    )`,
+    `CREATE INDEX IF NOT EXISTS approval_requests_company_idx ON approval_requests(company_id)`,
+    `CREATE INDEX IF NOT EXISTS approval_requests_status_idx  ON approval_requests(status)`,
+
+    // Phase 3: Automated business alert checks
+    `CREATE TABLE IF NOT EXISTS business_alerts (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      alert_type text NOT NULL,
+      severity text NOT NULL DEFAULT 'warning',
+      title text NOT NULL,
+      message text NOT NULL,
+      target_table text,
+      target_record_id integer,
+      status text NOT NULL DEFAULT 'open',
+      created_at timestamp NOT NULL DEFAULT now(),
+      resolved_at timestamp,
+      dismissed_by varchar(100),
+      metadata jsonb
+    )`,
+    `CREATE INDEX IF NOT EXISTS business_alerts_company_idx ON business_alerts(company_id)`,
+    `CREATE INDEX IF NOT EXISTS business_alerts_status_idx  ON business_alerts(status)`,
+
+    // Phase 4: Import batch audit trail
+    `CREATE TABLE IF NOT EXISTS import_batches (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      import_type text NOT NULL,
+      file_name text NOT NULL,
+      file_size integer,
+      uploaded_by_user_id varchar(100) NOT NULL,
+      uploaded_by_username text NOT NULL,
+      status text NOT NULL DEFAULT 'applied',
+      total_rows integer NOT NULL DEFAULT 0,
+      valid_rows integer NOT NULL DEFAULT 0,
+      invalid_rows integer NOT NULL DEFAULT 0,
+      created_records jsonb,
+      updated_records jsonb,
+      error_summary jsonb,
+      created_at timestamp NOT NULL DEFAULT now(),
+      applied_at timestamp,
+      rolled_back_at timestamp
+    )`,
+    `CREATE INDEX IF NOT EXISTS import_batches_company_idx ON import_batches(company_id)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

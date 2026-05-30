@@ -83,6 +83,8 @@ import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
 import { ParentCreditAccountSelect } from "./settings/ParentCreditAccountSelect";
 import { NetPositionAdjustmentCard } from "./settings/NetPositionAdjustmentCard";
 import { SessionsHub } from "./settings/SessionsHub";
+import { ApprovalsPage } from "./settings/ApprovalsPage";
+import { BusinessAlertsPage } from "./settings/BusinessAlertsPage";
 import { DataToolsTab } from "./settings/DataToolsTab";
 import { fmtDate, fieldLabel, fmtValue, getRecordLabel, getChangesSummary, tableShortName, AuditLogDialog, EditLogTable } from "./settings/AuditLog";
 import { PosSettingsTab } from "./settings/PosSettingsTab";
@@ -710,6 +712,13 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
         ] : [],
       },
       {
+        label: "Controls",
+        items: [
+          { key: "approvals", label: "Approvals", icon: CheckCircle2 },
+          { key: "business-alerts", label: "Business Alerts", icon: AlertTriangle },
+        ],
+      },
+      {
         label: "System",
         items: [
           { key: "system", label: "System Tools", icon: Wrench },
@@ -1263,6 +1272,14 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
                 </CardContent>
               </Card>
             </div>
+          )}
+
+          {activeSection === "approvals" && (
+            <ApprovalsPage currentUser={currentUser} />
+          )}
+
+          {activeSection === "business-alerts" && (
+            <BusinessAlertsPage currentUser={currentUser} />
           )}
 
           {activeSection === "data-tools" && currentUser?.role === "Developer" && (
