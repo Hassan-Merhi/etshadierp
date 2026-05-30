@@ -1298,15 +1298,18 @@ export function registerFactorySuppliersRoutes(app: Express) {
         }, 0);
         // Sum container value including freight (agreed supplier charge) in USD.
         // Cross-currency freight (e.g. USD freight on AUD containers) is added directly in USD.
+        // Always prefer the user-configured FX rate; fall back to the per-container rate only
+        // when no configured rate exists for that currency.
         const containerValue = payableContainers.reduce((sum: number, c: any) => {
           // Use totalKg (declared/agreed weight) not actualReceivedKg — weight differences
           // at offload affect inventory only, not what is owed to the supplier.
           const kg = parseFloat(c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat(c.freight || "0");
-          const fx = parseFloat(c.fxRateToUsd || "1");
           const containerCc = c.currencyCode || "USD";
+          const fx = configuredFxRates[containerCc] ?? parseFloat(c.fxRateToUsd || "1");
           const freightCc = c.freightCurrencyCode || containerCc;
+          const freightFx = configuredFxRates[freightCc] ?? fx;
           const freightInContainerCurr = freightCc === containerCc ? freight : 0;
           const freightDirectUsd = freightCc === "USD" && freightCc !== containerCc ? freight : 0;
           return sum + (kg * rate + freightInContainerCurr) * fx + freightDirectUsd;
@@ -1319,7 +1322,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           const commCurr = c.commissionCurrencyCode || c.currencyCode || "USD";
           // Linked supplier: USD commission is absorbed by the parent broker — skip here
           if (s.parentId && commCurr === "USD") return sum;
-          const commFx = parseFloat(c.fxRateToUsd || "1");
+          const commFx = commCurr === "USD" ? 1 : (configuredFxRates[commCurr] ?? parseFloat(c.fxRateToUsd || "1"));
           return sum + (commCurr === "USD" ? commAmt : commAmt * commFx);
         }, 0);
         const pendingConts = supplierContainers.filter((c: any) => c.status === "PENDING" || c.status === "IN_TRANSIT");
@@ -1361,7 +1364,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           if (oc <= 0) return sum;
           const ocCcy = (c as any).otherChargesCurrencyCode || "USD";
           if (s.parentId && ocCcy === "USD") return sum;
-          const fx = ocCcy === "USD" ? 1 : parseFloat(c.fxRateToUsd || "1");
+          const fx = ocCcy === "USD" ? 1 : (configuredFxRates[ocCcy] ?? parseFloat(c.fxRateToUsd || "1"));
           return sum + oc * fx;
         }, 0);
         const balance = parseFloat(s.openingBalance || "0") + containerValue + commissionValue + otherChargesValue + fxNetUsd - totalPaid - voucherPaidUsd;
@@ -1385,7 +1388,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           const baseVal = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
           const freightAmt = parseFloat(c.freight || "0");
           const freightCc = c.freightCurrencyCode || cc;
-          const fx = parseFloat(c.fxRateToUsd || "1");
+          const fx = cc === "USD" ? 1 : (configuredFxRates[cc] ?? parseFloat(c.fxRateToUsd || "1"));
 
           byCurrencyNative[cc] = (byCurrencyNative[cc] || 0) + baseVal;
           byCurrencyUsd[cc] = (byCurrencyUsd[cc] || 0) + baseVal * (cc === "USD" ? 1 : fx);
@@ -1393,7 +1396,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           // Freight in its own currency bucket with its effective USD value
           if (freightAmt > 0) {
             // Same-cc freight converts at container fx; cross-cc USD freight stays as USD
-            const freightFx = freightCc === cc ? fx : 1;
+            const freightFx = freightCc === "USD" ? 1 : (configuredFxRates[freightCc] ?? (freightCc === cc ? fx : parseFloat(c.fxRateToUsd || "1")));
             byCurrencyNative[freightCc] = (byCurrencyNative[freightCc] || 0) + freightAmt;
             byCurrencyUsd[freightCc] = (byCurrencyUsd[freightCc] || 0) + freightAmt * (freightCc === "USD" ? 1 : freightFx);
           }
@@ -1403,7 +1406,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           if (commAmt > 0) {
             const commCc = c.commissionCurrencyCode || cc;
             if (!(s.parentId && commCc === "USD")) {
-              const commFx = commCc === cc ? fx : 1;
+              const commFx = commCc === "USD" ? 1 : (configuredFxRates[commCc] ?? (commCc === cc ? fx : parseFloat(c.fxRateToUsd || "1")));
               byCurrencyNative[commCc] = (byCurrencyNative[commCc] || 0) + commAmt;
               byCurrencyUsd[commCc] = (byCurrencyUsd[commCc] || 0) + commAmt * (commCc === "USD" ? 1 : commFx);
             }
@@ -1445,7 +1448,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           if (oc <= 0) continue;
           const cc = (c as any).otherChargesCurrencyCode || "USD";
           if (s.parentId && cc === "USD") continue;
-          const fx = cc === "USD" ? 1 : parseFloat(c.fxRateToUsd || "1");
+          const fx = cc === "USD" ? 1 : (configuredFxRates[cc] ?? parseFloat(c.fxRateToUsd || "1"));
           byCurrencyNative[cc] = (byCurrencyNative[cc] || 0) + oc;
           byCurrencyUsd[cc] = (byCurrencyUsd[cc] || 0) + oc * fx;
         }
