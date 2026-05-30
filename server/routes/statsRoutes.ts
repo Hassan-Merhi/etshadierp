@@ -101,17 +101,20 @@ export function registerStatsRoutes(app: Express) {
         }
       }
 
-      // Calculate supplier balances from voucher entries
+      // Calculate supplier balances from voucher entries.
+      // Only count pure-credit or pure-debit entries (matching /api/suppliers/stats logic)
+      // to avoid double-counting FX settlement entries that carry both debit and credit > 0.
       const supplierBalances = new Map<number, { debit: number; credit: number }>();
       for (const entry of companyEntries) {
         if (entry.supplierId) {
           const debit = parseFloat(entry.debitAmount || "0");
           const credit = parseFloat(entry.creditAmount || "0");
           const current = supplierBalances.get(entry.supplierId) || { debit: 0, credit: 0 };
-          supplierBalances.set(entry.supplierId, {
-            debit: current.debit + debit,
-            credit: current.credit + credit,
-          });
+          if (credit > 0 && debit === 0) {
+            supplierBalances.set(entry.supplierId, { debit: current.debit, credit: current.credit + credit });
+          } else if (debit > 0 && credit === 0) {
+            supplierBalances.set(entry.supplierId, { debit: current.debit + debit, credit: current.credit });
+          }
         }
       }
 
