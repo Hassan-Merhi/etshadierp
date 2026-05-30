@@ -568,11 +568,11 @@ export default function FactoryNetPosition() {
     refetchInterval: 30_000,
   });
 
-  // Authoritative supplier balances — same source as Factory Suppliers page (OTW excluded to match default view)
+  // Authoritative supplier balances — same source as Factory Suppliers page (OTW included)
   const { data: supplierWithBalances = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/suppliers/with-balances", "net-position-merge"],
     queryFn: async () => {
-      const res = await fetch("/api/factory/suppliers/with-balances?includeOtw=false", { credentials: "include" });
+      const res = await fetch("/api/factory/suppliers/with-balances?includeOtw=true", { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
