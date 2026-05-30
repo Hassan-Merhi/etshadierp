@@ -2918,68 +2918,72 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           continue;
         }
 
-        // Standalone (non-broker) suppliers: use configured FX rates (same as Suppliers page)
+        // Standalone (non-broker) suppliers: native-bucket approach — exact match to
+        // computeStats / Suppliers page. Accumulate all transactions in their native
+        // currency, multiply each bucket by the configured rate once at the end.
+        const byCurrencyNative: Record<string, number> = {};
+        const addNative = (cc: string, amt: number) => {
+          byCurrencyNative[cc] = (byCurrencyNative[cc] || 0) + amt;
+        };
+
+        // Opening balance (always USD-denominated)
+        const ob = parseFloat(s.openingBalance || "0");
+        if (ob !== 0) addNative("USD", ob);
+
+        // Containers: goods + freight + commission (native currency each)
         const sc = allContainersF.filter((c: any) => c.supplierId === s.id);
-        const containerValue = sc.reduce((sum: number, c: any) => {
-          // Use totalKg (declared/agreed weight) not actualReceivedKg — matches computeStats / Suppliers page.
+        for (const c of sc) {
+          const cc = c.currencyCode || "USD";
           const kg = parseFloat(c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
+          addNative(cc, kg * rate);
           const freight = parseFloat(c.freight || "0");
-          const cc = c.currencyCode || "USD";
-          const fcc = c.freightCurrencyCode || cc;
-          const fx = getConfigFx(cc);
-          // Same freight formula as computeStats: same-cc freight multiplied with goods; cross-cc USD freight added directly; other cross-cc freight ignored.
-          const freightInCC = fcc === cc ? freight : 0;
-          const freightDirectUsd = fcc === "USD" && fcc !== cc ? freight : 0;
-          return sum + (kg * rate + freightInCC) * fx + freightDirectUsd;
-        }, 0);
-
-        const commission = sc.reduce((sum: number, c: any) => {
-          const amt = parseFloat(c.commissionAmount || "0");
-          if (amt <= 0) return sum;
-          const commCc = c.commissionCurrencyCode || c.currencyCode || "USD";
-          return sum + (commCc === "USD" ? amt : amt * getConfigFx(commCc));
-        }, 0);
-
-        const otherCharges = allContainersF.reduce((sum: number, c: any) => {
-          if (c.otherChargesSupplierId !== s.id) return sum;
-          const oc = parseFloat(c.otherCharges || "0");
-          if (oc <= 0) return sum;
-          const ocCc = c.otherChargesCurrencyCode || "USD";
-          return sum + oc * getConfigFx(ocCc);
-        }, 0);
-
-        // Offload additional charges for this supplier — use configured rates
-        const approxFxRate = (cc: string) => getConfigFx(cc);
-        const offloadChargesAmt = allOffloadChargesF
-          .filter((oc: any) => oc.supplierId === s.id)
-          .reduce((sum: number, oc: any) => {
-            const cc = oc.currencyCode || "USD";
-            return sum + parseFloat(oc.amount || "0") * approxFxRate(cc);
-          }, 0);
-
-        // Container other-charges table for this supplier (brokers include this; add for standalone too)
-        const containerOtherChargesAmt = allContainerOtherChargesF
-          .filter((oc: any) => oc.supplierId === s.id)
-          .reduce((sum: number, oc: any) => {
-            const cc = oc.currencyCode || oc.containerCurrencyCode || "USD";
-            return sum + parseFloat(oc.amount || "0") * approxFxRate(cc);
-          }, 0);
-
-        let fxNet = 0;
-        for (const t of allFxTransfersF as any[]) {
-          if (t.toSupplierId === s.id) fxNet += parseFloat(t.toAmountUsd || "0");
-          if (t.fromSupplierId === s.id) fxNet -= parseFloat(t.toAmountUsd || "0");
+          if (freight > 0) {
+            const fcc = c.freightCurrencyCode || cc;
+            addNative(fcc, freight);
+          }
+          const commAmt = parseFloat(c.commissionAmount || "0");
+          if (commAmt > 0) {
+            const commCc = c.commissionCurrencyCode || cc;
+            addNative(commCc, commAmt);
+          }
         }
 
-        const payments = allPaymentsF
-          .filter((p: any) => p.supplierId === s.id)
-          .reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
+        // Column-level other charges (otherCharges / otherChargesSupplierId on containers)
+        for (const oc of allColOtherChargesF as any[]) {
+          if (oc.otherChargesSupplierId !== s.id) continue;
+          const ocAmt = parseFloat(oc.otherCharges || "0");
+          if (ocAmt <= 0) continue;
+          addNative(oc.otherChargesCurrencyCode || "USD", ocAmt);
+        }
 
-        const voucherPaid = voucherPaidBySupplier[s.id] || 0;
+        // Direct payments — use native amount (p.amount), not p.amountUsd
+        for (const p of allPaymentsF as any[]) {
+          if (p.supplierId !== s.id) continue;
+          addNative(p.currencyCode || "USD", -parseFloat(p.amount || "0"));
+        }
+
+        // Voucher payments — native amounts per currency
+        const voucherCurrMap = voucherPaidByCurrencyBySupplierId[s.id] || {};
+        for (const [cc, amt] of Object.entries(voucherCurrMap)) {
+          addNative(cc, -(amt as number));
+        }
+
+        // FX transfers — subtract native from-currency, credit USD to USD bucket
+        for (const t of allFxTransfersF as any[]) {
+          if (t.fromSupplierId === s.id) {
+            addNative(t.fromCurrencyCode || "USD", -parseFloat(t.fromAmount || "0"));
+          }
+          if (t.toSupplierId === s.id) {
+            addNative("USD", parseFloat(t.toAmountUsd || "0"));
+          }
+        }
+
+        // Balance: each currency bucket × configured rate (same formula as computeStats)
         const balance = round2(
-          parseFloat(s.openingBalance || "0") + containerValue + commission + otherCharges +
-          offloadChargesAmt + containerOtherChargesAmt + fxNet - payments - voucherPaid
+          Object.entries(byCurrencyNative).reduce((sum, [cc, native]) => {
+            return sum + native * getConfigFx(cc);
+          }, 0)
         );
 
         if (Math.abs(balance) > 0.01) {
