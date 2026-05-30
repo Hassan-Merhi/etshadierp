@@ -3216,35 +3216,9 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       }
       const rawMaterialStockValue = round2(rawTotal);
 
-      // ── 3b. Factory Stock OTW — containers in transit (PENDING / IN_TRANSIT / ARRIVED) ──
-      // Mirrors the FactoryStockOTW page formula: per-currency goods+freight+commission+other charges,
-      // then converted to approx USD via: USD + (AUD × 0.71) + (EUR × 1.16)
-      const otwStatuses = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
-      const otwCurrBuckets: Record<string, number> = {};
-      const otwAdd = (cc: string, amt: number) => {
-        if (amt > 0 && cc) otwCurrBuckets[cc] = (otwCurrBuckets[cc] || 0) + amt;
-      };
-      for (const c of allContainersF as any[]) {
-        if (!otwStatuses.has(c.status)) continue;
-        const containerCcy = c.currencyCode || "USD";
-        // Goods: confirmed finalPayableAmount takes priority, else ratePerKg × totalKg
-        const goods = parseFloat(c.finalPayableAmount || "0") > 0
-          ? parseFloat(c.finalPayableAmount)
-          : parseFloat(c.ratePerKg || "0") * parseFloat(c.totalKg || "0");
-        otwAdd(containerCcy, goods);
-        // Freight
-        const freightCcy = c.freightCurrencyCode || containerCcy;
-        otwAdd(freightCcy, parseFloat(c.freight || "0"));
-        // Commission
-        const commCcy = c.commissionCurrencyCode || "USD";
-        otwAdd(commCcy, parseFloat(c.commissionAmount || "0"));
-        // Other charges (treated as container currency, matching frontend)
-        otwAdd(containerCcy, parseFloat(c.otherCharges || "0"));
-      }
-      const otwUsd = otwCurrBuckets["USD"] || 0;
-      const otwEur = otwCurrBuckets["EUR"] || 0;
-      const otwAud = otwCurrBuckets["AUD"] || 0;
-      const stockOtwValue = round2(otwUsd + (otwAud * 0.71) + (otwEur * 1.16));
+      // Stock OTW intentionally excluded from net position (user decision: OTW
+      // containers are already captured in supplier liabilities; counting the
+      // incoming goods value here would double-count the liability side).
 
       // ── 3c. Balance on Table — material in process (mix batch input minus bale output) ──
       // Mirrors the production-value-report formula: all-time totals, no date filter.
@@ -3343,14 +3317,15 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const totalCustomerDr = round2(customerDrItems.reduce((s, c) => s + c.balanceUsd, 0));
       const totalCustomerCr = round2(customerCrItems.reduce((s, c) => s + Math.abs(c.balanceUsd), 0));
 
-      // forUsTotal: ledger assets + inventory + raw material + balance on table + stock OTW
+      // forUsTotal: ledger assets + inventory + raw material + balance on table
       //             + customer receivables (DR) + pending orders + verified orders + loading orders
       //             + overpaid suppliers (they owe us the overpayment back)
       //             (bales are reserved/excluded from baleInventoryValue — no double-count)
+      //             Stock OTW excluded — already captured in supplier liabilities.
       const totalSupplierOverpaymentsRounded = round2(totalSupplierOverpayments);
       const forUsTotal = round2(
         cleanLedgerForUsTotal + baleInventoryValue + rawMaterialStockValue + balanceOnTableValue +
-        stockOtwValue + totalCustomerDr + pendingTotal + verifiedTotal + loadingTotal +
+        totalCustomerDr + pendingTotal + verifiedTotal + loadingTotal +
         totalSupplierOverpaymentsRounded,
       );
       // ── Employee Salaries Payable — directly from employees.currentBalance ───────
@@ -3381,13 +3356,11 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const factoryInventoryEntry = { name: "Stock In Hand (Inventory)", code: "INVENTORY", value: baleInventoryValue, category: "Inventory" };
       const factoryRawMaterialEntry = { name: "Factory Raw Material Stock", code: "RAW_MATERIAL", value: rawMaterialStockValue, category: "Raw Material" };
       const factoryBalanceOnTableEntry = { name: "Balance on Table", code: "BALANCE_ON_TABLE", value: balanceOnTableValue, category: "Production" };
-      const factoryStockOtwEntry = { name: "Factory Stock OTW", code: "STOCK_OTW", value: stockOtwValue, category: "Stock OTW" };
 
       const forUsAccounts = [
         factoryInventoryEntry,
         factoryRawMaterialEntry,
         ...(balanceOnTableValue > 0 ? [factoryBalanceOnTableEntry] : []),
-        ...(stockOtwValue > 0 ? [factoryStockOtwEntry] : []),
         ...cleanLedgerForUs.sort((a, b) => b.value - a.value).map(a => ({ ...a, value: round2(a.value) })),
         ...customerDrItems
           .sort((a, b) => b.balanceUsd - a.balanceUsd)
