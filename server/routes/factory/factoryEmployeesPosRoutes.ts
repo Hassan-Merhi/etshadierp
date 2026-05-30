@@ -2510,6 +2510,20 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
 
       const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
+      // Load user-configured display FX rates (set in Settings → FX Rates)
+      const fxRateRows = await db.execute(sql`
+        SELECT DISTINCT ON (currency_code) currency_code, rate_to_usd
+        FROM factory_fx_rates
+        WHERE company_id = ${companyId}
+        ORDER BY currency_code, effective_date DESC
+      `);
+      const configFxRates: Record<string, number> = {};
+      for (const row of fxRateRows.rows as any[]) {
+        configFxRates[row.currency_code as string] = parseFloat(row.rate_to_usd as string);
+      }
+      // Fallback to legacy hardcoded values if no configured rate exists
+      const getConfigFx = (cc: string): number => configFxRates[cc] ?? (cc === "EUR" ? 1.17 : cc === "AUD" ? 0.75 : 1);
+
       // ── 1. Factory supplier balances (What We Owe) ──────────────────────
       const suppliersList = await db.select().from(factorySuppliers)
         .where(eq(factorySuppliers.companyId, companyId))
@@ -2698,12 +2712,10 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         }
 
         const usdBal = buckets["USD"] || 0;
-        const eurBal = buckets["EUR"] || 0;
-        const audBal = buckets["AUD"] || 0;
         const otherBal = Object.entries(buckets)
-          .filter(([cc]) => cc !== "USD" && cc !== "EUR" && cc !== "AUD")
-          .reduce((s, [, v]) => s + v, 0);
-        return usdBal + (eurBal * 1.17) + (audBal * 0.75) + otherBal;
+          .filter(([cc]) => cc !== "USD")
+          .reduce((s, [cc, v]) => s + v * getConfigFx(cc), 0);
+        return usdBal + otherBal;
       };
 
       // Extended broker calculation that returns both the total and a line-by-line breakdown
@@ -2853,19 +2865,18 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         }
 
         const usdBal = buckets["USD"] || 0;
-        const eurBal = buckets["EUR"] || 0;
-        const audBal = buckets["AUD"] || 0;
-        const otherEntries = Object.entries(buckets).filter(([cc]) => cc !== "USD" && cc !== "EUR" && cc !== "AUD");
-        const otherBal = otherEntries.reduce((s, [, v]) => s + v, 0);
-
-        if (Math.abs(eurBal) > 0.01) lines.push({ label: `EUR Net Balance × 1.17`, native: `${eurBal.toFixed(2)} EUR`, usd: eurBal * 1.17 });
-        if (Math.abs(audBal) > 0.01) lines.push({ label: `AUD Net Balance × 0.75`, native: `${audBal.toFixed(2)} AUD`, usd: audBal * 0.75 });
-        for (const [cc, val] of otherEntries) {
-          if (Math.abs(val) > 0.01) lines.push({ label: `${cc} Net Balance (rate 1)`, native: `${val.toFixed(2)} ${cc}`, usd: val });
+        const nonUsdEntries = Object.entries(buckets).filter(([cc]) => cc !== "USD");
+        let nonUsdTotal = 0;
+        for (const [cc, val] of nonUsdEntries) {
+          if (Math.abs(val) > 0.01) {
+            const fx = getConfigFx(cc);
+            lines.push({ label: `${cc} Net Balance × ${fx.toFixed(4)}`, native: `${val.toFixed(2)} ${cc}`, usd: val * fx });
+            nonUsdTotal += val * fx;
+          }
         }
         lines.push({ label: "USD Net Balance", native: `$${usdBal.toFixed(2)}`, usd: usdBal });
 
-        const total = usdBal + (eurBal * 1.17) + (audBal * 0.75) + otherBal;
+        const total = usdBal + nonUsdTotal;
         return { total, breakdown: lines };
       };
 

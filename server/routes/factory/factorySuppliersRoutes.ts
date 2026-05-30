@@ -1273,6 +1273,19 @@ export function registerFactorySuppliersRoutes(app: Express) {
         }
       }
 
+      // Load the user-configured display FX rates (e.g. EUR=1.18, AUD=0.75)
+      // These are the same rates shown on the Net Position page.
+      const fxRateRows = await db.execute(sql`
+        SELECT DISTINCT ON (currency_code) currency_code, rate_to_usd
+        FROM factory_fx_rates
+        WHERE company_id = ${companyId}
+        ORDER BY currency_code, effective_date DESC
+      `);
+      const configuredFxRates: Record<string, number> = {};
+      for (const row of fxRateRows.rows as any[]) {
+        configuredFxRates[row.currency_code] = parseFloat(row.rate_to_usd);
+      }
+
       // Helper to compute stats for a single supplier record
       const computeStats = (s: any, includeOtw: boolean = false) => {
         const supplierContainers = containers.filter((c: any) => c.supplierId === s.id);
@@ -1437,13 +1450,16 @@ export function registerFactorySuppliersRoutes(app: Express) {
           byCurrencyUsd[cc] = (byCurrencyUsd[cc] || 0) + oc * fx;
         }
 
-        // Effective fx = usdSum / nativeSum so that native × effectiveFx = USD contribution
+        // Use the user-configured display rate (from Net Position settings) if available,
+        // falling back to the effective rate derived from transactions.
         const currencyBalances = Object.entries(byCurrencyNative)
           .map(([currencyCode, native]) => {
             const usd = byCurrencyUsd[currencyCode] || 0;
             const effectiveFx = currencyCode === "USD" ? 1
               : (Math.abs(native) > 0.001 ? usd / native : 0);
-            return { currencyCode, balance: native, fxRateToUsd: effectiveFx };
+            const displayFx = currencyCode === "USD" ? 1
+              : (configuredFxRates[currencyCode] ?? effectiveFx);
+            return { currencyCode, balance: native, fxRateToUsd: displayFx };
           })
           .filter(({ balance: bal }) => Math.abs(bal) > 0.001)
           .sort((a, b) => (a.currencyCode === "USD" ? 1 : -1)); // non-USD first

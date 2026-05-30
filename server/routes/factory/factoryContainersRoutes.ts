@@ -1380,4 +1380,63 @@ export function registerFactoryContainersRoutes(app: Express) {
   // ───────────────────────────────────────────────
 
   registerFactoryRawStockRoutes(app);
+
+  // ───────────────────────────────────────────────
+  // 6. Factory FX Rates (Net Position display rates)
+  // ───────────────────────────────────────────────
+
+  // GET /api/factory/fx-rates — return the latest configured rate per currency
+  app.get("/api/factory/fx-rates", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const rows = await db.execute(sql`
+        SELECT DISTINCT ON (currency_code) currency_code AS "currencyCode", rate_to_usd AS "rateToUsd", effective_date AS "effectiveDate"
+        FROM factory_fx_rates
+        WHERE company_id = ${companyId}
+        ORDER BY currency_code, effective_date DESC
+      `);
+      res.json(rows.rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/factory/fx-rates — upsert (insert new row) a rate for a currency
+  app.post("/api/factory/fx-rates", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { currencyCode, rateToUsd } = req.body;
+      if (!currencyCode || !rateToUsd) return res.status(400).json({ message: "currencyCode and rateToUsd required" });
+      const rate = parseFloat(rateToUsd);
+      if (isNaN(rate) || rate <= 0) return res.status(400).json({ message: "Rate must be a positive number" });
+      const today = new Date().toISOString().split("T")[0];
+      await db.insert(factoryFxRates).values({
+        companyId,
+        currencyCode: currencyCode.toUpperCase().trim(),
+        rateToUsd: rate.toString(),
+        effectiveDate: today,
+      });
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // DELETE /api/factory/fx-rates/:currency — remove all stored rates for a currency
+  app.delete("/api/factory/fx-rates/:currency", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const currency = req.params.currency.toUpperCase().trim();
+      await db.delete(factoryFxRates).where(and(
+        eq(factoryFxRates.companyId, companyId),
+        eq(factoryFxRates.currencyCode, currency)
+      ));
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 }
