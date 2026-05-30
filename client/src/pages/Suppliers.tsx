@@ -476,14 +476,14 @@ export default function Suppliers() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="flex flex-col h-full overflow-hidden gap-3">
                   {openingEntry && (
-                    <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-4 py-2.5">
+                    <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-4 py-2.5 shrink-0">
                       <span className="text-xs font-medium text-muted-foreground">Opening Balance</span>
                       <span className="font-mono font-semibold text-sm">{formatAmount(openingEntry.balance)}</span>
                     </div>
                   )}
-                  <Table wrapperClassName="max-h-[calc(85vh-240px)]">
+                  <Table wrapperClassName="flex-1 overflow-auto min-h-0">
                       <TableHeader>
                         <TableRow className="bg-muted/40 hover:bg-muted/40">
                           <TableHead className="h-9 text-xs font-semibold">Date</TableHead>
