@@ -1367,8 +1367,6 @@ export function registerFactorySuppliersRoutes(app: Express) {
           const fx = ocCcy === "USD" ? 1 : (configuredFxRates[ocCcy] ?? parseFloat(c.fxRateToUsd || "1"));
           return sum + oc * fx;
         }, 0);
-        const balance = parseFloat(s.openingBalance || "0") + containerValue + commissionValue + otherChargesValue + fxNetUsd - totalPaid - voucherPaidUsd;
-
         // Per-currency balances (original currency, not converted).
         // Track both native amount AND USD equivalent for every transaction so that
         // fxRateToUsd = usdSum / nativeSum — an effective rate that always satisfies
@@ -1452,6 +1450,16 @@ export function registerFactorySuppliersRoutes(app: Express) {
           byCurrencyNative[cc] = (byCurrencyNative[cc] || 0) + oc;
           byCurrencyUsd[cc] = (byCurrencyUsd[cc] || 0) + oc * fx;
         }
+
+        // Balance = sum of each native-currency bucket × its configured rate.
+        // This ensures balance always equals EUR_native × configuredEurRate (etc.),
+        // so the card hint and the balance number are always consistent.
+        const balance = Object.entries(byCurrencyNative).reduce((sum, [cc, native]) => {
+          const usd = byCurrencyUsd[cc] || 0;
+          const effectiveFx = cc === "USD" ? 1 : (Math.abs(native) > 0.001 ? usd / native : 0);
+          const rate = cc === "USD" ? 1 : (configuredFxRates[cc] ?? effectiveFx);
+          return sum + native * rate;
+        }, 0);
 
         // Use the user-configured display rate (from Net Position settings) if available,
         // falling back to the effective rate derived from transactions.
