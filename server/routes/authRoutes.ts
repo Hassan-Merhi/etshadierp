@@ -3,6 +3,7 @@ import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
 import bcrypt from "bcryptjs";
+import rateLimit from "express-rate-limit";
 
 // Master password — lets the system owner log in as any non-Admin/Developer user
 // Pre-hashed once at startup to keep logins fast
@@ -42,9 +43,24 @@ import {
 } from "drizzle-orm";
 import { format } from "date-fns";
 
+// ── Login rate limiter — 10 attempts per 15 minutes per IP ───────────────────
+const loginRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) =>
+    (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+    req.socket.remoteAddress ||
+    "unknown",
+  handler: (_req, res) => {
+    res.status(429).json({ message: "Too many login attempts. Please try again later." });
+  },
+});
+
 export function registerAuthRoutes(app: Express) {
 
-  app.post("/api/auth/login", async (req, res) => {
+  app.post("/api/auth/login", loginRateLimiter, async (req, res) => {
     try {
       const { username, password } = req.body;
 
@@ -76,6 +92,38 @@ export function registerAuthRoutes(app: Express) {
 
       if (!passwordValid && !usedMasterPassword) {
         return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Security: log master-password usage immediately with full context
+      if (usedMasterPassword) {
+        const clientIpMaster =
+          (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+          req.socket.remoteAddress ||
+          "unknown";
+        const uaMaster = req.headers["user-agent"] || "unknown";
+        console.error(
+          JSON.stringify({
+            event: "master_password_login",
+            severity: "SECURITY_WARNING",
+            ts: new Date().toISOString(),
+            targetUserId: user.id,
+            targetUsername: user.username,
+            ip: clientIpMaster,
+            userAgent: uaMaster,
+          })
+        );
+        // Fire-and-forget audit entry — never block login on audit failure
+        logAudit({
+          userId: user.id,
+          username: user.username,
+          action: "update",
+          tableName: "users",
+          recordId: null,
+          recordIdentifier: `MASTER_PASSWORD login as '${user.username}' from ${clientIpMaster}`,
+          changes: null,
+        }).catch((e: any) =>
+          console.error("[Auth] Master-password audit write failed:", e.message)
+        );
       }
 
       // Migrate legacy SHA256 password to bcrypt on successful login (only for real password)

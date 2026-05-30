@@ -124,16 +124,20 @@ export function canDelete(req: Request, res: Response, next: NextFunction) {
     return res.status(403).json({ message: "POS users cannot delete records" });
   }
 
-  if (role === "Manager") {
-    if (req.session.canDeleteRecords !== true) {
-      logDenied({ userId, username, role, companyId, method, path, reason: "Manager without canDeleteRecords flag" });
-      return res.status(403).json({ message: "This manager account does not have delete permission" });
-    }
+  // Any role with canDeleteRecords explicitly granted: allowed
+  if (req.session.canDeleteRecords === true) {
     return next();
   }
 
-  // Normal User and any other future role: pass through
-  next();
+  // Manager without the flag: blocked
+  if (role === "Manager") {
+    logDenied({ userId, username, role, companyId, method, path, reason: "Manager without canDeleteRecords flag" });
+    return res.status(403).json({ message: "This manager account does not have delete permission" });
+  }
+
+  // Normal User, unknown/future roles — default deny
+  logDenied({ userId, username, role, companyId, method, path, reason: `Role '${role}' is not permitted to delete records` });
+  return res.status(403).json({ message: "You do not have permission to delete records" });
 }
 
 // Check if user can modify data from a specific date.
