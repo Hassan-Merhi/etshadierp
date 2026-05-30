@@ -180,6 +180,7 @@ export default function FactorySuppliers() {
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const [statementSupplierId, setStatementSupplierId] = useState<number | null>(null);
   const [statementReturnToParent, setStatementReturnToParent] = useState(false);
+  const [statDateFilter, setStatDateFilter] = useState<"all" | "today" | "yesterday" | "this_month" | "this_year">("all");
   const [parentViewSupplierId, setParentViewSupplierId] = useState<number | null>(null);
   useEscapeBack(
     statementSupplierId
@@ -2046,7 +2047,30 @@ export default function FactorySuppliers() {
                     return da - db;
                   });
 
-                  // Compute per-row running balance in each row's native currency (oldest → newest)
+                  // Date-filter helpers for the activity ledger
+                  const _sfToday = format(new Date(), "yyyy-MM-dd");
+                  const _sfYesterday = format(new Date(Date.now() - 86400000), "yyyy-MM-dd");
+                  const _sfNow = new Date();
+                  const displayedRows = statDateFilter === "all" ? allRows
+                    : statDateFilter === "today" ? allRows.filter(r => r.date && format(new Date(r.date), "yyyy-MM-dd") === _sfToday)
+                    : statDateFilter === "yesterday" ? allRows.filter(r => r.date && format(new Date(r.date), "yyyy-MM-dd") === _sfYesterday)
+                    : statDateFilter === "this_month" ? allRows.filter(r => {
+                        if (!r.date) return false;
+                        const d = new Date(r.date);
+                        return d.getFullYear() === _sfNow.getFullYear() && d.getMonth() === _sfNow.getMonth();
+                      })
+                    : allRows.filter(r => {
+                        if (!r.date) return false;
+                        return new Date(r.date).getFullYear() === _sfNow.getFullYear();
+                      });
+
+                  // KPIs from filtered rows
+                  const sfTotalPurchases = displayedRows.filter(r => r.type === "purchase").reduce((s, r) => s + r.rowNativeAmt, 0);
+                  const sfTotalPayments = displayedRows.filter(r => r.type === "payment").reduce((s, r) => s + Math.abs(r.rowNativeAmt), 0);
+                  const sfPurchasesQty = displayedRows.filter(r => r.type === "purchase").length;
+                  const sfTxCount = displayedRows.length;
+
+                  // Compute per-row running balance in each row's native currency (oldest → newest, using ALL rows so balance is always correct)
                   const balanceByKey: Record<string, { cc: string; bal: number }> = {};
                   const currencyRunning: Record<string, number> = {};
                   for (const r of allRows) {
@@ -2077,8 +2101,58 @@ export default function FactorySuppliers() {
                   const fmtCcAmt = (cc: string, amt: number) =>
                     cc !== "USD" ? `${cc} ${formatNum(String(Math.abs(amt).toFixed(2)))}` : `$${formatNum(String(Math.abs(amt).toFixed(2)))}`;
 
+                  // Final balance across all currencies (for Balance KPI)
+                  const finalBalanceStr = Object.entries(currencyTotals)
+                    .filter(([, v]) => Math.abs(v) > 0.005)
+                    .map(([cc, v]) => fmtCcAmt(cc, v) + (v > 0 ? " CR" : " DR"))
+                    .join(" / ") || "—";
+
                   return (
-                    <div className="table-responsive">
+                    <div className="space-y-3">
+                      {/* KPI cards */}
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        <div className="rounded-lg border bg-muted/30 px-3 py-2">
+                          <p className="text-xs text-muted-foreground mb-1">Total Purchases</p>
+                          <p className="font-mono font-semibold text-sm">{fmtCcAmt(primaryCc, sfTotalPurchases)}</p>
+                        </div>
+                        <div className="rounded-lg border bg-muted/30 px-3 py-2">
+                          <p className="text-xs text-muted-foreground mb-1">Total Payments</p>
+                          <p className="font-mono font-semibold text-sm text-green-600 dark:text-green-400">{fmtCcAmt(primaryCc, sfTotalPayments)}</p>
+                        </div>
+                        <div className="rounded-lg border bg-muted/30 px-3 py-2">
+                          <p className="text-xs text-muted-foreground mb-1">Purchases Qty</p>
+                          <p className="font-semibold text-sm">{sfPurchasesQty}</p>
+                        </div>
+                        <div className="rounded-lg border bg-muted/30 px-3 py-2">
+                          <p className="text-xs text-muted-foreground mb-1">Transactions</p>
+                          <p className="font-semibold text-sm">{sfTxCount}</p>
+                        </div>
+                        <div className="rounded-lg border bg-muted/30 px-3 py-2">
+                          <p className="text-xs text-muted-foreground mb-1">Balance</p>
+                          <p className="font-mono font-semibold text-sm tabular-nums">{finalBalanceStr}</p>
+                        </div>
+                      </div>
+
+                      {/* Date filter buttons */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {(["all", "today", "yesterday", "this_month", "this_year"] as const).map((f) => (
+                          <Button
+                            key={f}
+                            variant={statDateFilter === f ? "default" : "outline"}
+                            size="sm"
+                            className="text-xs"
+                            onClick={() => setStatDateFilter(f)}
+                            data-testid={`button-stat-date-filter-${f}`}
+                          >
+                            {f === "all" ? "All" : f === "today" ? "Today" : f === "yesterday" ? "Yesterday" : f === "this_month" ? "This Month" : "This Year"}
+                          </Button>
+                        ))}
+                        {statDateFilter !== "all" && (
+                          <span className="ml-1 text-xs text-muted-foreground">{sfTxCount} result{sfTxCount !== 1 ? "s" : ""}</span>
+                        )}
+                      </div>
+
+                      <div className="table-responsive">
                       <Table>
                         <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
@@ -2091,7 +2165,7 @@ export default function FactorySuppliers() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {allRows.map(row => {
+                          {displayedRows.map(row => {
                             const balEntry = balanceByKey[row.key];
                             const balCc = balEntry?.cc ?? row.rowCc;
                             const bal = balEntry?.bal ?? 0;
@@ -2162,6 +2236,7 @@ export default function FactorySuppliers() {
                           ))}
                         </div>
                       )}
+                    </div>
                     </div>
                   );
                 })()}
