@@ -534,7 +534,7 @@ export default function Analytics() {
       if (!response.ok) throw new Error("Failed to fetch stock movement");
       return response.json();
     },
-    enabled: false, // Manual trigger via Generate button
+    enabled: true,
   });
 
   // Fetch user's accessible companies for the Container Report company filter
@@ -621,7 +621,7 @@ export default function Analytics() {
       if (!res.ok) throw new Error("Failed to fetch factory container sales");
       return res.json();
     },
-    enabled: appMode === "factory" && false, // Manual trigger
+    enabled: appMode === "factory",
   });
 
 
@@ -1949,14 +1949,11 @@ export default function Analytics() {
 
         {activeSection === "containers" && appMode === "factory" && (
           <Card className="p-6">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex flex-wrap items-center gap-3 mb-4">
               <h3 className="text-lg font-medium flex items-center gap-2">
                 <ContainerIcon className="h-5 w-5" />
                 Container Report
               </h3>
-              <Button size="sm" onClick={() => refetchFactoryContainerSales()} disabled={loadingFactoryContainerSales}>
-                {loadingFactoryContainerSales ? "Loading..." : "Generate"}
-              </Button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -2083,7 +2080,7 @@ export default function Analytics() {
               <div className="flex flex-col items-center justify-center gap-3 py-14 text-muted-foreground">
                 <ContainerIcon className="h-10 w-10 opacity-25" />
                 <p className="text-sm font-medium">No data yet</p>
-                <p className="text-xs opacity-60">Set your filters above and click Generate to load the report</p>
+                <p className="text-xs opacity-60">Adjust the filters above to load the report</p>
               </div>
             )}
           </Card>
@@ -2098,13 +2095,6 @@ export default function Analytics() {
                 </div>
                 <h3 className="font-semibold text-base">Container Report</h3>
               </div>
-              <Button
-                size="sm"
-                onClick={() => refetchContainers()}
-                disabled={loadingContainers}
-              >
-                {loadingContainers ? "Loading..." : "Generate"}
-              </Button>
             </div>
 
             <div className="flex flex-wrap gap-4 mb-6 items-end">
@@ -2315,7 +2305,7 @@ export default function Analytics() {
               <div className="flex flex-col items-center justify-center gap-3 py-14 text-muted-foreground">
                 <ContainerIcon className="h-10 w-10 opacity-25" />
                 <p className="text-sm font-medium">No data yet</p>
-                <p className="text-xs opacity-60">Set your filters above and click Generate to load the report</p>
+                <p className="text-xs opacity-60">Adjust the filters above to load the report</p>
               </div>
             )}
           </Card>
