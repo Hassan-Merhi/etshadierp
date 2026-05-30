@@ -4242,26 +4242,21 @@ export class DbStorage implements IStorage {
         return account.id;
       };
 
-      // Get or create the adjustment accounts (only if not optional)
+      // Get or create a SINGLE unified adjustment account (only if not optional).
+      // Production entries credit it; Consumption entries debit it.
+      // Net balance = net consumption expense. One account per company.
       let productionAccountId: number | null = null;
       let consumptionAccountId: number | null = null;
-      
+
       if (!isOptional) {
-        // PRODUCTION_ADJUSTMENT: Liability account - credits offset inventory increases
-        productionAccountId = await findOrCreateAdjustmentAccount(
-          "PRODUCTION_ADJUSTMENT",
-          "Production Adjustment (Inventory Offset)",
-          "Liability",
-          "Cr"
-        );
-        
-        // CONSUMPTION_EXPENSE: Indirect Expense account - debits record consumption expenses
-        consumptionAccountId = await findOrCreateAdjustmentAccount(
-          consumptionAccountOverride?.code ?? "CONSUMPTION_EXPENSE", 
-          consumptionAccountOverride?.name ?? "Consumption Expense (Stock Adjustment)",
+        const adjustmentAccountId = await findOrCreateAdjustmentAccount(
+          "STOCK_ADJUSTMENT",
+          "Stock Adjustment (Production/Consumption)",
           "Indirect Expense",
           "Dr"
         );
+        productionAccountId = adjustmentAccountId;
+        consumptionAccountId = adjustmentAccountId;
       }
 
       // Track totals for voucher entries - use ACTUAL inventory value changes
@@ -4971,24 +4966,20 @@ export class DbStorage implements IStorage {
         return account.id;
       };
 
-      // Get or create the adjustment accounts (only if not optional)
+      // Get or create a SINGLE unified adjustment account (only if not optional).
+      // Production entries credit it; Consumption entries debit it.
       let productionAccountId: number | null = null;
       let consumptionAccountId: number | null = null;
-      
+
       if (!isOptional) {
-        productionAccountId = await findOrCreateAdjustmentAccount(
-          "PRODUCTION_ADJUSTMENT",
-          "Production Adjustment (Inventory Offset)",
-          "Liability",
-          "Cr"
-        );
-        
-        consumptionAccountId = await findOrCreateAdjustmentAccount(
-          "CONSUMPTION_EXPENSE", 
-          "Consumption Expense (Stock Adjustment)",
+        const adjustmentAccountId = await findOrCreateAdjustmentAccount(
+          "STOCK_ADJUSTMENT",
+          "Stock Adjustment (Production/Consumption)",
           "Indirect Expense",
           "Dr"
         );
+        productionAccountId = adjustmentAccountId;
+        consumptionAccountId = adjustmentAccountId;
       }
 
       // Track totals for voucher entries - use ACTUAL inventory value changes

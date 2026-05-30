@@ -4192,6 +4192,77 @@ END $mig$`;
         console.error("[AllocationFix] Error:", e.message);
       }
 
+      // ── Merge split Production/Consumption ledger accounts ───────────────────
+      // Old setup created two accounts per company: PRODUCTION_ADJUSTMENT (Liability)
+      // and CONSUMPTION_EXPENSE (Indirect Expense). Now a single STOCK_ADJUSTMENT
+      // account is used for both sides. This runs once per company and is idempotent.
+      try {
+        const companies = await migrationClient.query(
+          `SELECT id FROM companies`
+        );
+        let mergedCount = 0;
+        for (const { id: cid } of companies.rows) {
+          const oldAccts = await migrationClient.query(
+            `SELECT id, code FROM ledger_accounts
+             WHERE company_id = $1
+               AND code IN ('PRODUCTION_ADJUSTMENT', 'CONSUMPTION_EXPENSE')
+               AND deleted_at IS NULL`,
+            [cid]
+          );
+          if (oldAccts.rows.length === 0) continue;
+
+          // Find or create the unified account
+          let unifiedId: number;
+          const existing = await migrationClient.query(
+            `SELECT id FROM ledger_accounts
+             WHERE company_id = $1 AND code = 'STOCK_ADJUSTMENT' AND deleted_at IS NULL
+             LIMIT 1`,
+            [cid]
+          );
+          if (existing.rows.length > 0) {
+            unifiedId = existing.rows[0].id;
+          } else {
+            const created = await migrationClient.query(
+              `INSERT INTO ledger_accounts
+                 (company_id, code, name, account_type, sub_type,
+                  opening_balance, opening_balance_side, created_at)
+               VALUES
+                 ($1, 'STOCK_ADJUSTMENT', 'Stock Adjustment (Production/Consumption)',
+                  'Indirect Expense', 'Indirect Expense', '0', 'Dr', NOW())
+               RETURNING id`,
+              [cid]
+            );
+            unifiedId = created.rows[0].id;
+          }
+
+          // Re-point all voucher_entries from the old accounts to the unified one
+          const oldIds: number[] = oldAccts.rows.map((r: any) => Number(r.id));
+          if (oldIds.length > 0) {
+            const idList = oldIds.join(",");
+            await migrationClient.query(
+              `UPDATE voucher_entries
+               SET ledger_account_id = ${unifiedId}
+               WHERE ledger_account_id IN (${idList})`
+            );
+            // Soft-delete the now-empty old accounts
+            await migrationClient.query(
+              `UPDATE ledger_accounts
+               SET deleted_at = NOW()
+               WHERE id IN (${idList})`
+            );
+          }
+
+          mergedCount++;
+        }
+        if (mergedCount > 0) {
+          console.log(`[StockAdjFix] Merged Production/Consumption accounts → unified STOCK_ADJUSTMENT for ${mergedCount} company(ies)`);
+        } else {
+          console.log(`[StockAdjFix] All companies already use unified STOCK_ADJUSTMENT — nothing to merge`);
+        }
+      } catch (e: any) {
+        console.error("[StockAdjFix] Error:", e.message);
+      }
+
       // ── Auto-fix orphaned RESERVED_FOR_ORDER bales ───────────────────────────
       // Bales stuck in RESERVED_FOR_ORDER with no active customer order referencing
       // them (order deleted / container row deleted) are returned to IN_STOCK.
