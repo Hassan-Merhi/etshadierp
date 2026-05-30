@@ -1685,7 +1685,7 @@ export default function FactorySuppliers() {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {section.rows.map((row: any, idx: number) => {
+                                {section.rows.filter((row: any) => row.type !== "payment").map((row: any, idx: number) => {
                                   const balVal = row.runningBalance;
                                   const balPositive = balVal > 0;
                                   const balNegative = balVal < 0;
