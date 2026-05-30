@@ -60,6 +60,7 @@ interface SupplierWithBalance extends FactorySupplier {
   totalContainers: number;
   totalKg: string;
   totalValue: string;
+  brokerPoolUsd?: string;
   pendingContainers: number;
   receivedContainers: number;
   lastContainerDate: string | null;
@@ -2651,17 +2652,16 @@ export default function FactorySuppliers() {
                           <div className="text-xs text-muted-foreground">{isParent ? "Balance" : "Balance"}</div>
                           {isParent ? (() => {
                             const exposure = ((sup as any).exposureCurrencyBalances as CurrencyBalance[]) || [];
-                            const ownUsd = parseFloat(sup.totalValue || "0");
-                            const foreignExp = exposure.filter(e => e.currencyCode !== "USD" && e.balance > 0.001);
+                            const poolUsd = parseFloat(sup.brokerPoolUsd ?? "0");
+                            const foreignExp = exposure.filter(e => e.currencyCode !== "USD" && Math.abs(e.balance) > 0.001);
                             const usdExp = exposure.find(e => e.currencyCode === "USD");
-                            const totalUsd = foreignExp.reduce((s, e) => s + e.balance * (e.fxRateToUsd ?? 1), 0)
-                              + (usdExp?.balance || 0) + ownUsd;
+                            const totalUsd = parseFloat(sup.totalValue || "0");
                             return (
                               <>
                                 <div className="text-lg font-bold tabular-nums" data-testid={`text-supplier-balance-${sup.id}`}>
                                   ${formatNum(totalUsd.toFixed(2))}
                                 </div>
-                                {(foreignExp.length > 0 || Math.abs(ownUsd) > 0.01) && (
+                                {(foreignExp.length > 0 || Math.abs(poolUsd) > 0.01) && (
                                   <div className="text-xs text-muted-foreground space-y-0.5 mt-0.5">
                                     {foreignExp.map(e => (
                                       <div key={e.currencyCode} className="tabular-nums">
@@ -2671,8 +2671,8 @@ export default function FactorySuppliers() {
                                     {usdExp && usdExp.balance > 0.01 && (
                                       <div className="tabular-nums">${formatNum(usdExp.balance.toFixed(2))} linked</div>
                                     )}
-                                    {Math.abs(ownUsd) > 0.01 && (
-                                      <div className="tabular-nums">${formatNum(ownUsd.toFixed(2))} pool</div>
+                                    {Math.abs(poolUsd) > 0.01 && (
+                                      <div className="tabular-nums">${formatNum(poolUsd.toFixed(2))} pool</div>
                                     )}
                                   </div>
                                 )}

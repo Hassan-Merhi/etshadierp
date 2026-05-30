@@ -1526,6 +1526,21 @@ export function registerFactorySuppliersRoutes(app: Express) {
         statsById[s.id] = computeStats(s, includeOtw);
       }
 
+      // Pre-compute broker statements for each broker parent so the list card
+      // balance matches the detail page exactly (same data source).
+      const brokerParentIds = new Set<number>(
+        (suppliersList as any[])
+          .filter((s: any) => (suppliersList as any[]).some((c: any) => c.parentId === s.id))
+          .map((s: any) => s.id as number)
+      );
+      const brokerStmtMap: Record<number, any> = {};
+      for (const s of suppliersList as any[]) {
+        if (brokerParentIds.has(s.id)) {
+          const stmt = await buildBrokerStatement(s.id, companyId, includeOtw);
+          if (stmt) brokerStmtMap[s.id] = stmt;
+        }
+      }
+
       // Second pass: for parent suppliers, roll up children's stats
       const suppliersWithBalances = (suppliersList as any[]).map((s: any) => {
         const own = statsById[s.id];
@@ -1613,12 +1628,43 @@ export function registerFactorySuppliersRoutes(app: Express) {
           .filter(({ balance: bal }) => bal > 0.001)
           .sort((a, b) => (a.currencyCode === "USD" ? 1 : -1));
 
+        // Use broker-statement KPIs so the list card total matches the detail page.
+        // Formula: USD_pool + EUR × configuredRate + AUD × configuredRate = totalValue
+        const stmt = brokerStmtMap[s.id];
+        let brokerPoolUsd: number = own.balance;
+        let finalExposureCurrencyBalances = exposureCurrencyBalances;
+
+        if (stmt) {
+          const eurLedger = stmt.currencyLedgers.find((l: any) => l.currencyCode === "EUR");
+          const audLedger = stmt.currencyLedgers.find((l: any) => l.currencyCode === "AUD");
+          const usdLedger = stmt.currencyLedgers.find((l: any) => l.currencyCode === "USD");
+
+          const eurBal = eurLedger ? parseFloat(eurLedger.netBalance) : 0;
+          const audBal = audLedger ? parseFloat(audLedger.netBalance) : 0;
+          brokerPoolUsd = usdLedger ? parseFloat(usdLedger.netBalance) : own.balance;
+
+          const eurRate = configuredFxRates["EUR"] ?? 1;
+          const audRate = configuredFxRates["AUD"] ?? 1;
+
+          finalExposureCurrencyBalances = [
+            ...(Math.abs(eurBal) > 0.001 ? [{ currencyCode: "EUR", balance: eurBal, fxRateToUsd: eurRate }] : []),
+            ...(Math.abs(audBal) > 0.001 ? [{ currencyCode: "AUD", balance: audBal, fxRateToUsd: audRate }] : []),
+          ];
+        }
+
+        const grandTotal = brokerPoolUsd
+          + finalExposureCurrencyBalances.reduce((sum, e) => {
+              if (e.currencyCode === "USD") return sum + e.balance;
+              return sum + e.balance * (e.fxRateToUsd ?? 1);
+            }, 0);
+
         return {
           ...s,
           totalContainers: aggContainers,
           totalKg: aggKg.toFixed(3),
-          // Broker true balance = own balance ONLY (no child rollup)
-          totalValue: own.balance.toFixed(2),
+          // Grand total: USD_pool + EUR × rate + AUD × rate (matches detail page)
+          totalValue: grandTotal.toFixed(2),
+          brokerPoolUsd: brokerPoolUsd.toFixed(2),
           totalPaid: own.totalPaid.toFixed(2),
           totalCommissionUsd: own.commissionValue.toFixed(2),
           approxFxRate: own.approxFxRate > 0 ? own.approxFxRate.toFixed(4) : null,
@@ -1626,13 +1672,11 @@ export function registerFactorySuppliersRoutes(app: Express) {
           otwByCurrency: aggOtwByCurrency,
           receivedContainers: aggReceived,
           lastContainerDate: aggLastDate,
-          // Broker's own per-currency balances (direct entries + FX-in only)
           currencyBalances: own.currencyBalances,
           dueContainers: aggDueContainers,
           dueContainersCount: aggDueContainers.length,
-          // Linked supplier exposure (informational only — NOT broker-owned)
           linkedSupplierExposure,
-          exposureCurrencyBalances,
+          exposureCurrencyBalances: finalExposureCurrencyBalances,
         };
       });
 
