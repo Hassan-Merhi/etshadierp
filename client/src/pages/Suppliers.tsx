@@ -88,6 +88,7 @@ export default function Suppliers() {
   const debouncedSearch = useDebounce(searchTerm, 300);
   const [dialogTab, setDialogTab] = useState<"transactions" | "purchase-orders">("transactions");
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "yesterday" | "this_month" | "this_year">("all");
+  const [hidePayments, setHidePayments] = useState(false);
   const [supplierToDelete, setSupplierToDelete] = useState<{ id: number; name: string } | null>(null);
 
   useEscapeBack(selectedSupplier ? () => setSelectedSupplier(null) : null);
@@ -253,6 +254,11 @@ export default function Suppliers() {
     t.voucherType === "Purchase" || (t.voucherType === "Journal" && (parseFloat(t.credit) || 0) > 0)
   ).length;
   const currentBalance = unifiedLedger.length > 0 ? (unifiedLedger[unifiedLedger.length - 1]?.balance ?? 0) : 0;
+
+  // Display rows — optionally hide payment/debit rows from the table (KPIs are always full)
+  const isPaymentRow = (t: any) => t.debit > 0 || t.voucherType === "Payment" || t.voucherType === "Receipt";
+  const displayedLedgerRows = hidePayments ? filteredLedgerRows.filter((t: any) => !isPaymentRow(t)) : filteredLedgerRows;
+  const hiddenPaymentsCount = hidePayments ? filteredLedgerRows.filter((t: any) => isPaymentRow(t)).length : 0;
 
   const typeBadgeClass: Record<string, string> = {
     Payment: "bg-green-500/10 text-green-600 dark:text-green-400",
@@ -505,7 +511,7 @@ export default function Suppliers() {
 
           {/* ── Tabs ── */}
           <Tabs value={dialogTab} onValueChange={(v) => setDialogTab(v as "transactions" | "purchase-orders")} className="flex-1 flex flex-col overflow-hidden min-h-0">
-            <div className="px-6 pt-3 pb-0 shrink-0">
+            <div className="px-6 pt-3 pb-0 shrink-0 flex items-center gap-3 flex-wrap">
               <TabsList className="w-fit">
                 <TabsTrigger value="transactions" className="text-xs" data-testid="tab-transactions">
                   <DollarSign className="h-3.5 w-3.5 mr-1.5" />
@@ -516,6 +522,18 @@ export default function Suppliers() {
                   Purchase Orders {purchaseOrders.length > 0 && `(${purchaseOrders.length})`}
                 </TabsTrigger>
               </TabsList>
+              {dialogTab === "transactions" && (
+                <Button
+                  variant={hidePayments ? "default" : "outline"}
+                  size="sm"
+                  className="text-xs gap-1.5 ml-auto"
+                  onClick={() => setHidePayments(v => !v)}
+                  data-testid="button-hide-payments"
+                >
+                  <EyeOff className="h-3.5 w-3.5" />
+                  {hidePayments ? `Payments hidden (${hiddenPaymentsCount})` : "Hide Payments"}
+                </Button>
+              )}
             </div>
 
             {/* Transactions tab */}
@@ -562,13 +580,13 @@ export default function Suppliers() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredLedgerRows.length === 0 ? (
+                      {displayedLedgerRows.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={7} className="text-center py-10 text-sm text-muted-foreground">
-                            No transactions in this period
+                            {hidePayments && filteredLedgerRows.length > 0 ? "All transactions are payments — toggle off to show them." : "No transactions in this period"}
                           </TableCell>
                         </TableRow>
-                      ) : filteredLedgerRows.map((txn: any, idx: number) => {
+                      ) : displayedLedgerRows.map((txn: any, idx: number) => {
                         const isPayment = txn.voucherType === "Payment" || txn.debit > 0;
                         return (
                           <TableRow key={`${txn.type}-${txn.docNumber}-${idx}`} className="text-xs">
