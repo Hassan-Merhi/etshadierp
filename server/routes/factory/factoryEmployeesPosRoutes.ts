@@ -3,6 +3,7 @@ import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
+import { buildBrokerStatement } from "./factorySuppliersRoutes";
 import { adjustInventory } from "../../inventoryHelper";
 import {
   writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
@@ -2897,13 +2898,20 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         // Linked suppliers: their balances are rolled into their parent broker — skip individually
         if (linkedSupplierParent.has(s.id)) continue;
 
-        // Brokers: use consolidated multi-currency approximate USD balance
+        // Brokers: use buildBrokerStatement (same function as Suppliers page) for exact parity
         if (brokerIds.has(s.id) && !processedBrokers.has(s.id)) {
           processedBrokers.add(s.id);
-          const { total: approxUsd, breakdown } = calcBrokerDetail(s.id);
-          const rounded = round2(approxUsd);
+          const stmt = await buildBrokerStatement(s.id, companyId, true);
+          if (!stmt) continue;
+          let brokerUsd = 0;
+          for (const ledger of stmt.currencyLedgers as any[]) {
+            const cc = ledger.currencyCode as string;
+            const bal = parseFloat(ledger.netBalance || "0");
+            brokerUsd += cc === "USD" ? bal : bal * getConfigFx(cc);
+          }
+          const rounded = round2(brokerUsd);
           if (Math.abs(rounded) > 0.01) {
-            supplierItems.push({ name: s.name, balanceUsd: rounded, breakdown });
+            supplierItems.push({ name: s.name, balanceUsd: rounded });
             if (rounded > 0) totalSupplierLiabilities += rounded;
             else totalSupplierOverpayments += Math.abs(rounded);
           }
