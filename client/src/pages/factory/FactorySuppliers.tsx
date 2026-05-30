@@ -228,11 +228,14 @@ export default function FactorySuppliers() {
   const toggleStmtSection = (key: string) =>
     setCollapsedStmtSections(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
 
+  // Shared OTW toggle for broker overview + broker statement pages
+  const [brokerIncludeOtw, setBrokerIncludeOtw] = useState(false);
+
   // Broker overview pool balances query (fires when viewing broker overview page)
   const { data: brokerOverviewStatement, isLoading: brokerOverviewLoading } = useQuery<any>({
-    queryKey: ["/api/factory/suppliers", parentViewSupplierId, "broker-statement"],
+    queryKey: ["/api/factory/suppliers", parentViewSupplierId, "broker-statement", brokerIncludeOtw],
     queryFn: async () => {
-      const res = await factoryApiRequest("GET", `/api/factory/suppliers/${parentViewSupplierId}/broker-statement`);
+      const res = await factoryApiRequest("GET", `/api/factory/suppliers/${parentViewSupplierId}/broker-statement?includeOtw=${brokerIncludeOtw}`);
       if (!res.ok) throw new Error("Failed to load broker overview");
       return res.json();
     },
@@ -242,7 +245,6 @@ export default function FactorySuppliers() {
 
   // Broker consolidated statement query (fires when viewing a broker's own statement)
   const isBrokerStatement = !!(statementData?.linkedSupplierGroups?.length);
-  const [brokerIncludeOtw, setBrokerIncludeOtw] = useState(false);
   const { data: brokerStatement, isLoading: brokerStatementLoading } = useQuery<any>({
     queryKey: ["/api/factory/suppliers", statementSupplierId, "broker-statement", brokerIncludeOtw],
     queryFn: async () => {
@@ -948,6 +950,14 @@ export default function FactorySuppliers() {
               {children.length} linked supplier{children.length !== 1 ? "s" : ""}
             </p>
           </div>
+          <label className="flex items-center gap-2 cursor-pointer select-none" data-testid="label-broker-overview-include-otw">
+            <Switch
+              checked={brokerIncludeOtw}
+              onCheckedChange={setBrokerIncludeOtw}
+              data-testid="switch-broker-overview-include-otw"
+            />
+            <span className="text-xs font-normal text-muted-foreground">Include OTW containers</span>
+          </label>
           {parentSup && import.meta.env.DEV && (
             <Button
               variant="outline"
