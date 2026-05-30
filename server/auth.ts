@@ -95,9 +95,10 @@ export function requireRole(...roles: string[]) {
 
 // Permission check for delete/void/archive operations.
 // - Developer / Admin: always allowed.
-// - Manager: allowed only when the canDeleteRecords flag is enabled for that user.
+// - Any role with canDeleteRecords === true: allowed.
 // - Owner / POS: always blocked.
-// - Normal User: allowed (existing behaviour).
+// - Manager without canDeleteRecords: blocked.
+// - Normal User and unknown/future roles: blocked by default.
 export function canDelete(req: Request, res: Response, next: NextFunction) {
   if (!req.user) {
     return res.status(401).json({ message: "Unauthorized" });
