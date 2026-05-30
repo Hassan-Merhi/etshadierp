@@ -2700,7 +2700,10 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         const usdBal = buckets["USD"] || 0;
         const eurBal = buckets["EUR"] || 0;
         const audBal = buckets["AUD"] || 0;
-        return usdBal + (eurBal * 1.16) + (audBal * 0.71);
+        const otherBal = Object.entries(buckets)
+          .filter(([cc]) => cc !== "USD" && cc !== "EUR" && cc !== "AUD")
+          .reduce((s, [, v]) => s + v, 0);
+        return usdBal + (eurBal * 1.17) + (audBal * 0.75) + otherBal;
       };
 
       // Extended broker calculation that returns both the total and a line-by-line breakdown
@@ -2852,12 +2855,17 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         const usdBal = buckets["USD"] || 0;
         const eurBal = buckets["EUR"] || 0;
         const audBal = buckets["AUD"] || 0;
+        const otherEntries = Object.entries(buckets).filter(([cc]) => cc !== "USD" && cc !== "EUR" && cc !== "AUD");
+        const otherBal = otherEntries.reduce((s, [, v]) => s + v, 0);
 
-        if (Math.abs(eurBal) > 0.01) lines.push({ label: `EUR Net Balance × 1.16`, native: `${eurBal.toFixed(2)} EUR`, usd: eurBal * 1.16 });
-        if (Math.abs(audBal) > 0.01) lines.push({ label: `AUD Net Balance × 0.71`, native: `${audBal.toFixed(2)} AUD`, usd: audBal * 0.71 });
+        if (Math.abs(eurBal) > 0.01) lines.push({ label: `EUR Net Balance × 1.17`, native: `${eurBal.toFixed(2)} EUR`, usd: eurBal * 1.17 });
+        if (Math.abs(audBal) > 0.01) lines.push({ label: `AUD Net Balance × 0.75`, native: `${audBal.toFixed(2)} AUD`, usd: audBal * 0.75 });
+        for (const [cc, val] of otherEntries) {
+          if (Math.abs(val) > 0.01) lines.push({ label: `${cc} Net Balance (rate 1)`, native: `${val.toFixed(2)} ${cc}`, usd: val });
+        }
         lines.push({ label: "USD Net Balance", native: `$${usdBal.toFixed(2)}`, usd: usdBal });
 
-        const total = usdBal + (eurBal * 1.16) + (audBal * 0.71);
+        const total = usdBal + (eurBal * 1.17) + (audBal * 0.75) + otherBal;
         return { total, breakdown: lines };
       };
 
@@ -2917,7 +2925,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         }, 0);
 
         // Offload additional charges for this supplier (brokers include this; add for standalone too)
-        const approxFxRate = (cc: string) => cc === "USD" ? 1 : cc === "EUR" ? 1.16 : cc === "AUD" ? 0.71 : 1;
+        const approxFxRate = (cc: string) => cc === "USD" ? 1 : cc === "EUR" ? 1.17 : cc === "AUD" ? 0.75 : 1;
         const offloadChargesAmt = allOffloadChargesF
           .filter((oc: any) => oc.supplierId === s.id)
           .reduce((sum: number, oc: any) => {
