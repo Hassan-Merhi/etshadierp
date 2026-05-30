@@ -2921,15 +2921,17 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         // Standalone (non-broker) suppliers: use configured FX rates (same as Suppliers page)
         const sc = allContainersF.filter((c: any) => c.supplierId === s.id);
         const containerValue = sc.reduce((sum: number, c: any) => {
-          const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+          // Use totalKg (declared/agreed weight) not actualReceivedKg — matches computeStats / Suppliers page.
+          const kg = parseFloat(c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat(c.freight || "0");
           const cc = c.currencyCode || "USD";
           const fcc = c.freightCurrencyCode || cc;
           const fx = getConfigFx(cc);
-          const freightFx = getConfigFx(fcc);
-          const freightUsd = fcc === cc ? freight * fx : (fcc === "USD" ? freight : freight * freightFx);
-          return sum + (kg * rate) * fx + freightUsd;
+          // Same freight formula as computeStats: same-cc freight multiplied with goods; cross-cc USD freight added directly; other cross-cc freight ignored.
+          const freightInCC = fcc === cc ? freight : 0;
+          const freightDirectUsd = fcc === "USD" && fcc !== cc ? freight : 0;
+          return sum + (kg * rate + freightInCC) * fx + freightDirectUsd;
         }, 0);
 
         const commission = sc.reduce((sum: number, c: any) => {
