@@ -249,7 +249,9 @@ export default function Suppliers() {
   const txCount = filteredLedgerRows.length;
   const totalPurchases = filteredLedgerRows.reduce((s: number, t: any) => s + (parseFloat(t.credit) || 0), 0);
   const totalPayments = filteredLedgerRows.reduce((s: number, t: any) => s + (parseFloat(t.debit) || 0), 0);
-  const totalPurchasesQty = filteredLedgerRows.filter((t: any) => t.voucherType === "Purchase").length;
+  const totalPurchasesQty = filteredLedgerRows.filter((t: any) =>
+    t.voucherType === "Purchase" || (t.voucherType === "Journal" && (parseFloat(t.credit) || 0) > 0)
+  ).length;
   const currentBalance = unifiedLedger.length > 0 ? (unifiedLedger[unifiedLedger.length - 1]?.balance ?? 0) : 0;
 
   const typeBadgeClass: Record<string, string> = {
