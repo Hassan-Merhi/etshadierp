@@ -552,7 +552,7 @@ export function registerWhatsAppRoutes(app: Express) {
 
       // 1. Stock PDF
       console.log(`[WhatsApp] Generating stock PDF for ${company.name} (companyId=${companyId})…`);
-      const { buffer: pdfBuf, pageCount, rowCount } = await generateStockPdf(companyId, company.name);
+      const { buffer: pdfBuf, pageCount, rowCount } = await generateStockPdf(companyId, company.name, undefined, undefined, true);
       const maxExpectedPages = Math.ceil(rowCount / 20) + 5;
       console.log(`[WhatsApp] Stock PDF generated: companyId=${companyId} company="${company.name}" rowCount=${rowCount} pageCount=${pageCount} maxExpectedPages=${maxExpectedPages}`);
 

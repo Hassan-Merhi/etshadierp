@@ -463,7 +463,7 @@ export async function checkAndRunStockReport(): Promise<void> {
 
     // 1. Stock PDF
     const { buffer: pdfBuf, pageCount: pdfPageCount, rowCount: pdfRowCount } =
-      await generateStockPdf(row.company_id, company.name);
+      await generateStockPdf(row.company_id, company.name, undefined, undefined, true);
 
     // Safety guard: if PDF is absurdly over-paginated, skip send rather than
     // delivering a broken 100+ page file. Root cause: PDFKit ≥0.17 exposes

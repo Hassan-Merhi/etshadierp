@@ -4,7 +4,8 @@
  * Uses pdfkit's standard auto-flow mode (margin: 40) with pageAdded event
  * to reliably handle multi-page output without blank-page artifacts.
  *
- * Layout : A4, 4 columns — Particulars | Qty | Avg Rate | Total Value
+ * Layout : A4, 2 columns (POS) — Particulars | Qty
+ *          A4, 4 columns (cost) — Particulars | Qty | Avg Rate | Total Value
  * Negatives: red text + red background row
  *
  * IMPORTANT: In PDFKit ≥0.17, doc.page.maxY is a FUNCTION, not a number.
@@ -19,16 +20,6 @@ import { pool } from "../db";
 const X_LEFT    = 40;
 const X_RIGHT   = 555;
 const CONTENT_W = X_RIGHT - X_LEFT;   // 515 pt
-
-const COL_VAL_W  = 95;   // "Total Value" — rightmost
-const COL_RATE_W = 80;   // "Avg Rate"
-const COL_QTY_W  = 70;   // "Qty"
-// Particulars gets the rest: 515 − 95 − 80 − 70 = 270pt
-
-// Column X anchors (right edge of each column)
-const X_VAL   = X_RIGHT;
-const X_RATE  = X_VAL  - COL_VAL_W;
-const X_QTY   = X_RATE - COL_RATE_W;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtQty(n: number): string {
@@ -63,6 +54,7 @@ export async function generateStockPdf(
   companyName:   string,
   locationId?:   number,
   locationName?: string,
+  includeCost:   boolean = false,
 ): Promise<StockPdfResult> {
 
   // ── Fetch inventory ─────────────────────────────────────────────────────────
@@ -119,6 +111,15 @@ export async function generateStockPdf(
   const dateStr    = fmtDate(now);
   const printedStr = `${dateStr} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
   const mainTitle  = locationName ?? "Godown Summary";
+
+  // ── Column geometry (adapts to includeCost) ───────────────────────────────
+  const COL_QTY_W  = 70;
+  const COL_RATE_W = includeCost ? 80 : 0;
+  const COL_VAL_W  = includeCost ? 95 : 0;
+  // Column X anchors (right edge of each column)
+  const X_VAL   = X_RIGHT;
+  const X_RATE  = X_VAL  - COL_VAL_W;
+  const X_QTY   = X_RATE - COL_RATE_W;
 
   // ── Build PDF (margin: 40 — reliable auto-flow mode) ─────────────────────
   const PDFDocument = (await import("pdfkit")).default;
@@ -177,11 +178,12 @@ export async function generateStockPdf(
     // Qty — right-aligned over COL_QTY_W
     doc.text("Qty",          X_QTY - COL_QTY_W,   thY + 8, { width: COL_QTY_W, align: "right", lineBreak: false });
 
-    // Avg Rate — right-aligned over COL_RATE_W
-    doc.text("Avg Rate",     X_RATE - COL_RATE_W,  thY + 8, { width: COL_RATE_W, align: "right", lineBreak: false });
-
-    // Total Value — right-aligned over COL_VAL_W
-    doc.text("Total Value",  X_VAL - COL_VAL_W,    thY + 8, { width: COL_VAL_W,  align: "right", lineBreak: false });
+    if (includeCost) {
+      // Avg Rate — right-aligned over COL_RATE_W
+      doc.text("Avg Rate",     X_RATE - COL_RATE_W,  thY + 8, { width: COL_RATE_W, align: "right", lineBreak: false });
+      // Total Value — right-aligned over COL_VAL_W
+      doc.text("Total Value",  X_VAL - COL_VAL_W,    thY + 8, { width: COL_VAL_W,  align: "right", lineBreak: false });
+    }
 
     doc.y = thY + thH + 2;
     doc.fillColor("#000000");
@@ -229,7 +231,9 @@ export async function generateStockPdf(
     doc.font("Helvetica-Bold").fontSize(9.5).fillColor(isGroupNeg ? "#c2272d" : "#000000");
     doc.text(groupName,                          X_LEFT + 4,          gY + 4, { lineBreak: false });
     doc.text(`${fmtQty(groupQty)} ${firstUom}`, X_QTY - COL_QTY_W,   gY + 4, { width: COL_QTY_W, align: "right", lineBreak: false });
-    doc.text(fmtAmt(groupValue),                 X_VAL - COL_VAL_W,   gY + 4, { width: COL_VAL_W, align: "right", lineBreak: false });
+    if (includeCost) {
+      doc.text(fmtAmt(groupValue),               X_VAL - COL_VAL_W,   gY + 4, { width: COL_VAL_W, align: "right", lineBreak: false });
+    }
     doc.y = gY + gH;
 
     // Item rows
@@ -249,8 +253,10 @@ export async function generateStockPdf(
 
       doc.text(item.itemName,                         X_LEFT + 16,         iY + 6, { lineBreak: false });
       doc.text(`${fmtQty(item.qty)} ${item.uom}`,    X_QTY - COL_QTY_W,   iY + 6, { width: COL_QTY_W, align: "right", lineBreak: false });
-      doc.text(fmtAmt(item.rate),                     X_RATE - COL_RATE_W, iY + 6, { width: COL_RATE_W, align: "right", lineBreak: false });
-      doc.text(fmtAmt(item.totalValue),               X_VAL - COL_VAL_W,   iY + 6, { width: COL_VAL_W, align: "right", lineBreak: false });
+      if (includeCost) {
+        doc.text(fmtAmt(item.rate),                   X_RATE - COL_RATE_W, iY + 6, { width: COL_RATE_W, align: "right", lineBreak: false });
+        doc.text(fmtAmt(item.totalValue),             X_VAL - COL_VAL_W,   iY + 6, { width: COL_VAL_W, align: "right", lineBreak: false });
+      }
       doc.y = iY + iH;
     }
   }
@@ -269,7 +275,9 @@ export async function generateStockPdf(
   doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000");
   doc.text("Grand Total",                              X_LEFT + 4,          tY + 4, { lineBreak: false });
   doc.text(`${fmtQty(grandTotalQty)} ${uomFirst}`,    X_QTY - COL_QTY_W,   tY + 4, { width: COL_QTY_W, align: "right", lineBreak: false });
-  doc.text(fmtAmt(grandTotalValue),                    X_VAL - COL_VAL_W,   tY + 4, { width: COL_VAL_W, align: "right", lineBreak: false });
+  if (includeCost) {
+    doc.text(fmtAmt(grandTotalValue),                  X_VAL - COL_VAL_W,   tY + 4, { width: COL_VAL_W, align: "right", lineBreak: false });
+  }
 
   doc.end();
   const buffer = await pdfReady;
