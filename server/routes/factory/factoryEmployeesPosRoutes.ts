@@ -2738,13 +2738,15 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         if (obTotal !== 0) lines.push({ label: "Opening Balance", native: `$${obTotal.toFixed(2)}`, usd: obTotal });
 
         // Containers: goods + freight per currency + USD commission from children
+        // Always use totalKg (declared/agreed weight) — weight differences at offload affect
+        // inventory only, not what is owed to the supplier. Matches buildBrokerStatement.
         const containersByCurrency: Record<string, number> = {};
         let commTotal = 0;
         let usdFreightTotal = 0;
         for (const c of allContainersF as any[]) {
           if (!groupIds.includes(c.supplierId)) continue;
           const cc = c.currencyCode || "USD";
-          const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
+          const kg = parseFloat(c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
           const goodsAmt = kg * rate;
           add(cc, goodsAmt);
@@ -2757,12 +2759,16 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
             containersByCurrency[freightCc] = (containersByCurrency[freightCc] || 0) + freight;
           }
 
-          if (c.supplierId !== brokerId && linkedSupplierParent.has(c.supplierId) && linkedSupplierParent.get(c.supplierId) === brokerId) {
+          // Commission: include when this container's commission is designated for the broker.
+          // Matches buildBrokerStatement: commissionSupplierId === brokerId OR null (default).
+          const commSupplierId = c.commissionSupplierId ?? null;
+          const commForBroker = commSupplierId === brokerId || commSupplierId === null;
+          if (c.supplierId !== brokerId && commForBroker) {
             const commAmt = parseFloat(c.commissionAmount || "0");
             if (commAmt > 0 && (c.commissionCurrencyCode || "USD") === "USD") {
               add("USD", commAmt);
               commTotal += commAmt;
-              usdFreightTotal += 0; // tracked separately below
+              usdFreightTotal += 0;
             }
           }
         }
