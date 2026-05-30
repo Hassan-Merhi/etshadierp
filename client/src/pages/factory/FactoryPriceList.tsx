@@ -116,10 +116,10 @@ export default function FactoryPriceList() {
   const totalActive = products.filter((p) => p.active).length;
 
   return (
-    <div className="flex flex-col h-full p-6 space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="flex flex-col h-full p-3 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <PageHeader title="Factory Price List" subtitle="Set selling prices for all bale products. Changes apply immediately across all proformas." />
+          <PageHeader title="Factory Price List" subtitle="Set selling prices for bale products." />
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="secondary" data-testid="text-price-coverage">
@@ -128,11 +128,11 @@ export default function FactoryPriceList() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[160px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name or article code..."
+            placeholder="Search..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8"
@@ -140,7 +140,7 @@ export default function FactoryPriceList() {
           />
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[180px]" data-testid="select-category-filter">
+          <SelectTrigger className="w-[150px] sm:w-[180px]" data-testid="select-category-filter">
             <SelectValue placeholder="All Categories" />
           </SelectTrigger>
           <SelectContent>
@@ -157,7 +157,8 @@ export default function FactoryPriceList() {
           data-testid="button-show-zero-price-only"
         >
           <AlertCircle className="h-4 w-4" />
-          {showZeroOnly ? "Showing unpriced" : "Show unpriced"}
+          <span className="hidden sm:inline">{showZeroOnly ? "Showing unpriced" : "Show unpriced"}</span>
+          <span className="sm:hidden">Unpriced</span>
         </Button>
       </div>
 
@@ -177,12 +178,12 @@ export default function FactoryPriceList() {
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
-                  <TableHead>Article Code</TableHead>
-                  <TableHead>Product Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Kg / Bale</TableHead>
-                  <TableHead className="text-right">Selling Price ($)</TableHead>
-                  <TableHead className="text-right">Production Cost ($)</TableHead>
+                  <TableHead className="hidden sm:table-cell">Article Code</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead className="hidden sm:table-cell">Category</TableHead>
+                  <TableHead className="text-right hidden sm:table-cell">Kg / Bale</TableHead>
+                  <TableHead className="text-right">Sell Price</TableHead>
+                  <TableHead className="text-right hidden sm:table-cell">Prod. Cost</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -194,19 +195,31 @@ export default function FactoryPriceList() {
 
                   return (
                     <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
-                      <TableCell className="font-mono text-sm" data-testid={`text-article-code-${product.id}`}>
+                      <TableCell className="font-mono text-sm hidden sm:table-cell" data-testid={`text-article-code-${product.id}`}>
                         {product.articleCode || product.code || "—"}
                       </TableCell>
                       <TableCell className="font-medium" data-testid={`text-product-name-${product.id}`}>
-                        {product.name}
+                        <div>{product.name}</div>
+                        {/* Mobile-only: show article code + category inline */}
+                        <div className="sm:hidden flex flex-wrap items-center gap-1.5 mt-0.5">
+                          {(product.articleCode || product.code) && (
+                            <span className="font-mono text-xs text-muted-foreground">{product.articleCode || product.code}</span>
+                          )}
+                          {product.categoryId && (
+                            <Badge variant="outline" className="text-xs">{categoryMap.get(product.categoryId) || "—"}</Badge>
+                          )}
+                          {product.weightPerBaleKg && (
+                            <span className="text-xs text-muted-foreground">{parseFloat(product.weightPerBaleKg).toFixed(1)} kg/bale</span>
+                          )}
+                        </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         {product.categoryId
                           ? <Badge variant="outline">{categoryMap.get(product.categoryId) || "—"}</Badge>
                           : <span className="text-muted-foreground text-sm">—</span>
                         }
                       </TableCell>
-                      <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                      <TableCell className="text-right font-mono text-sm text-muted-foreground hidden sm:table-cell">
                         {product.weightPerBaleKg ? `${parseFloat(product.weightPerBaleKg).toFixed(1)} kg` : "—"}
                       </TableCell>
 
@@ -222,7 +235,7 @@ export default function FactoryPriceList() {
                               value={editingCell.value}
                               onChange={(e) => setEditingCell({ ...editingCell, value: e.target.value })}
                               onKeyDown={handleKeyDown}
-                              className="w-28 text-right font-mono"
+                              className="w-24 text-right font-mono"
                               data-testid={`input-selling-price-${product.id}`}
                             />
                             <Button
@@ -257,8 +270,8 @@ export default function FactoryPriceList() {
                         )}
                       </TableCell>
 
-                      {/* Production Cost Cell */}
-                      <TableCell className="text-right">
+                      {/* Production Cost Cell — hidden on mobile, tap sell price row to edit */}
+                      <TableCell className="text-right hidden sm:table-cell">
                         {productionIsEditing ? (
                           <div className="flex items-center justify-end gap-1">
                             <Input
@@ -269,7 +282,7 @@ export default function FactoryPriceList() {
                               value={editingCell.value}
                               onChange={(e) => setEditingCell({ ...editingCell, value: e.target.value })}
                               onKeyDown={handleKeyDown}
-                              className="w-28 text-right font-mono"
+                              className="w-24 text-right font-mono"
                               data-testid={`input-production-price-${product.id}`}
                             />
                             <Button
@@ -296,7 +309,7 @@ export default function FactoryPriceList() {
                             onClick={() => handleStartEdit(product, "productionPrice")}
                             data-testid={`cell-production-price-${product.id}`}
                           >
-                            <span className={`font-mono text-sm ${productionPrice > 0 ? "text-muted-foreground" : "text-muted-foreground"}`}>
+                            <span className={`font-mono text-sm text-muted-foreground`}>
                               {productionPrice > 0 ? `$${productionPrice.toFixed(2)}` : "—"}
                             </span>
                             <Pencil className="h-3 w-3 text-muted-foreground opacity-60 md:opacity-0 md:group-hover:opacity-100" />

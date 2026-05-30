@@ -536,11 +536,20 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     }
   };
 
+  const selectLocation = (id: number) => {
+    setSelectedLocationId(id);
+    setSearch("");
+    setGroupFilter("all");
+    setEditingItem(null);
+    setShowUnpriced(false);
+    setHiddenUnpricedGroups(new Set());
+  };
+
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="flex h-full overflow-hidden">
-      {/* ── Locations sidebar ── */}
-      <div className="w-52 shrink-0 border-r flex flex-col overflow-hidden bg-sidebar">
+      {/* ── Locations sidebar — desktop only ── */}
+      <div className="hidden sm:flex w-52 shrink-0 border-r flex-col overflow-hidden bg-sidebar">
         <div className="flex items-center gap-2 px-3 py-3 border-b">
           <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
           <span className="text-sm font-semibold text-sidebar-foreground">Locations</span>
@@ -562,7 +571,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
               {!posUser && (
                 <button
                   data-testid="button-location-all"
-                  onClick={() => { setSelectedLocationId(ALL_LOCATIONS_ID); setSearch(""); setGroupFilter("all"); setEditingItem(null); setShowUnpriced(false); setHiddenUnpricedGroups(new Set()); }}
+                  onClick={() => selectLocation(ALL_LOCATIONS_ID)}
                   className={cn(
                     "w-full text-left px-3 py-2 rounded-md text-sm transition-colors hover-elevate flex items-center gap-1.5",
                     selectedLocationId === ALL_LOCATIONS_ID
@@ -578,7 +587,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 <button
                   key={loc.id}
                   data-testid={`button-location-${loc.id}`}
-                  onClick={() => { setSelectedLocationId(loc.id); setSearch(""); setGroupFilter("all"); setEditingItem(null); setShowUnpriced(false); setHiddenUnpricedGroups(new Set()); }}
+                  onClick={() => selectLocation(loc.id)}
                   className={cn(
                     "w-full text-left px-3 py-2 rounded-md text-sm transition-colors hover-elevate flex items-center gap-2",
                     selectedLocationId === loc.id
@@ -597,6 +606,49 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
       {/* ── Main content ── */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+
+        {/* ── Mobile location selector (phones only) ── */}
+        <div className="sm:hidden border-b shrink-0 bg-sidebar">
+          {locationsLoading ? (
+            <div className="flex gap-2 px-3 py-2 overflow-x-auto">
+              {[1, 2, 3].map(i => <Skeleton key={i} className="h-8 w-24 shrink-0 rounded-md" />)}
+            </div>
+          ) : (
+            <div className="flex gap-2 px-3 py-2 overflow-x-auto">
+              {!posUser && (
+                <button
+                  data-testid="button-mobile-location-all"
+                  onClick={() => selectLocation(ALL_LOCATIONS_ID)}
+                  className={cn(
+                    "shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap",
+                    selectedLocationId === ALL_LOCATIONS_ID
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  All
+                </button>
+              )}
+              {locations.map(loc => (
+                <button
+                  key={loc.id}
+                  data-testid={`button-mobile-location-${loc.id}`}
+                  onClick={() => selectLocation(loc.id)}
+                  className={cn(
+                    "shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap",
+                    selectedLocationId === loc.id
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {loc.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0 flex-wrap">
           <Tag className="w-4 h-4 text-muted-foreground" />
           <PageHeader title="Price List" showBackButton={false} />
@@ -612,7 +664,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
             </Badge>
           ) : null}
           {selectedLocationId && (
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-1.5">
               {isAllMode && canEdit && (
                 <>
                   <Button
@@ -624,7 +676,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                     className="gap-1.5"
                   >
                     <FileSpreadsheet className="w-3.5 h-3.5" />
-                    Template
+                    <span className="hidden sm:inline">Template</span>
                   </Button>
                   <Button
                     variant="outline"
@@ -634,7 +686,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                     className="gap-1.5"
                   >
                     <Upload className="w-3.5 h-3.5" />
-                    Upload
+                    <span className="hidden sm:inline">Upload</span>
                   </Button>
                   <input
                     ref={importFileRef}
@@ -655,7 +707,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 className="gap-1.5"
               >
                 <Download className="w-3.5 h-3.5" />
-                {exporting ? "Exporting…" : "Export"}
+                <span className="hidden sm:inline">{exporting ? "Exporting…" : "Export"}</span>
               </Button>
             </div>
           )}
@@ -825,7 +877,8 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
               <MapPin className="w-12 h-12 opacity-25" />
               <div>
                 <p className="text-base font-medium">Select a location</p>
-                <p className="text-sm mt-1 opacity-70">Choose a location from the panel on the left to view and edit prices.</p>
+                <p className="text-sm mt-1 opacity-70 hidden sm:block">Choose a location from the panel on the left.</p>
+                <p className="text-sm mt-1 opacity-70 sm:hidden">Tap a location above to view prices.</p>
               </div>
             </div>
           )}
@@ -907,7 +960,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
               ) : filteredItems.length > 0 ? (
                 <>
                   <div className="rounded-xl border">
-                    <Table wrapperClassName="max-h-[calc(100vh-280px)]">
+                    <Table wrapperClassName="max-h-[calc(100vh-320px)] sm:max-h-[calc(100vh-280px)]">
                       <TableHeader>
                         <TableRow className="bg-muted/40 hover:bg-muted/40">
                           <TableHead className="w-28 text-xs">Code</TableHead>
