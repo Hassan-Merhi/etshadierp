@@ -1907,7 +1907,10 @@ export default function FactorySuppliers() {
                       }
                       return rows;
                     }),
-                    ...(statementData.payments || []).map((p: any) => {
+                    ...(statementData.payments || []).filter((p: any) => {
+                      const cc = p.currencyCode || "USD";
+                      return cc === primaryCc;
+                    }).map((p: any) => {
                       const cc = p.currencyCode || "USD";
                       const amt = parseFloat(p.amount || "0");
                       const fxRate = parseFloat(p.fxRateToUsd || "1") || 1;
