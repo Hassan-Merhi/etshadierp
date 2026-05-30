@@ -88,7 +88,7 @@ export default function Suppliers() {
   const debouncedSearch = useDebounce(searchTerm, 300);
   const [dialogTab, setDialogTab] = useState<"transactions" | "purchase-orders">("transactions");
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "yesterday" | "this_month" | "this_year">("all");
-  const [hidePayments, setHidePayments] = useState(false);
+  const [hidePayments, setHidePayments] = useState(true);
   const [supplierToDelete, setSupplierToDelete] = useState<{ id: number; name: string } | null>(null);
 
   useEscapeBack(selectedSupplier ? () => setSelectedSupplier(null) : null);
