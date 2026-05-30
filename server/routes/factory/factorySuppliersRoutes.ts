@@ -55,6 +55,7 @@ import fs from "fs";
 
 const PAYABLE_CONTAINER_STATUSES = new Set([
   "OFFLOADED",
+  "PARTIALLY_OFFLOADED",
   "RECEIVED",
   "PARTIALLY_RECEIVED",
 ]);
@@ -1309,7 +1310,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           const cc = (c.currencyCode || "USD").toUpperCase();
           otwByCurrency[cc] = (otwByCurrency[cc] || 0) + 1;
         }
-        const receivedContainers = supplierContainers.filter((c: any) => c.status === "RECEIVED" || c.status === "PARTIALLY_RECEIVED" || c.status === "OFFLOADED").length;
+        const receivedContainers = supplierContainers.filter((c: any) => c.status === "RECEIVED" || c.status === "PARTIALLY_RECEIVED" || c.status === "OFFLOADED" || c.status === "PARTIALLY_OFFLOADED").length;
         const lastContainerDate = supplierContainers.length > 0
           ? supplierContainers.reduce((latest: string | null, c: any) => {
               const d = c.arrivalDate || c.createdAt;

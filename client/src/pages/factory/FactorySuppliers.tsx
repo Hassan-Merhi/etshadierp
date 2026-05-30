@@ -840,11 +840,11 @@ export default function FactorySuppliers() {
   };
 
   const statusColor = (status: string) => {
-    return status === "OFFLOADED" ? "default" : "secondary";
+    return status === "OFFLOADED" || status === "PARTIALLY_OFFLOADED" ? "default" : "secondary";
   };
 
   const statusDisplayLabel = (status: string) => {
-    return status === "OFFLOADED" ? "Offloaded" : "Pending";
+    return status === "OFFLOADED" || status === "PARTIALLY_OFFLOADED" ? "Offloaded" : "Pending";
   };
 
   const allSuppliers = suppliers || [];
