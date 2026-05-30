@@ -554,8 +554,10 @@ function CustomNetPositionView({ data }: { data: NetPositionData }) {
   );
 }
 
+const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
 export default function FactoryNetPosition() {
-  const { data, isLoading, error, refetch, isFetching } = useQuery<NetPositionData>({
+  const { data: rawData, isLoading, error, refetch, isFetching } = useQuery<NetPositionData>({
     queryKey: ["/api/factory/net-position"],
     queryFn: async () => {
       const res = await fetch("/api/factory/net-position", { credentials: "include" });
@@ -565,6 +567,90 @@ export default function FactoryNetPosition() {
     staleTime: 30_000,
     refetchInterval: 30_000,
   });
+
+  // Authoritative supplier balances — same source as Factory Suppliers page
+  const { data: supplierWithBalances = [] } = useQuery<any[]>({
+    queryKey: ["/api/factory/suppliers/with-balances", "net-position-merge"],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/suppliers/with-balances?includeOtw=false", { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+    enabled: !!rawData,
+  });
+
+  // Merge: override supplier balances with the authoritative with-balances data,
+  // then recompute all affected totals so the page is fully consistent.
+  const data = useMemo((): NetPositionData | undefined => {
+    if (!rawData) return undefined;
+    if (!supplierWithBalances.length) return rawData;
+
+    // Each entry has id, name, totalValue (USD balance as string).
+    // Use every supplier individually — matches the Factory Suppliers page exactly.
+    const correctedItems = supplierWithBalances
+      .map((s: any) => ({ id: s.id as number, name: s.name as string, balanceUsd: parseFloat(s.totalValue || "0") }))
+      .filter(s => Math.abs(s.balanceUsd) > 0.01);
+
+    const correctedLiabilities = r2(correctedItems.filter(s => s.balanceUsd > 0).reduce((sum, s) => sum + s.balanceUsd, 0));
+    const correctedOverpayments = r2(correctedItems.filter(s => s.balanceUsd < 0).reduce((sum, s) => sum + Math.abs(s.balanceUsd), 0));
+
+    const liabilityDelta  = correctedLiabilities  - rawData.supplierLiabilities;
+    const overpaymentDelta = correctedOverpayments - (rawData.supplierOverpayments ?? 0);
+
+    const correctedOnUsTotal  = r2(rawData.onUs.total  + liabilityDelta);
+    const correctedForUsTotal = r2(rawData.forUs.total + overpaymentDelta);
+    const correctedNetPosition = r2(correctedForUsTotal - correctedOnUsTotal);
+
+    // Replace SUPPLIER accounts in onUs with corrected items
+    const nonSupplierOnUs = rawData.onUs.accounts.filter(a => a.code !== "SUPPLIER");
+    const correctedOnUsAccounts = [
+      ...correctedItems
+        .filter(s => s.balanceUsd > 0)
+        .sort((a, b) => b.balanceUsd - a.balanceUsd)
+        .map(s => ({ id: s.id, name: s.name, code: "SUPPLIER", value: r2(s.balanceUsd), category: "Supplier" })),
+      ...nonSupplierOnUs,
+    ];
+
+    // Replace SUPPLIER_OVERPAID accounts in forUs with corrected items
+    const nonSupplierForUs = rawData.forUs.accounts.filter(a => a.code !== "SUPPLIER_OVERPAID");
+    const correctedForUsAccounts = [
+      ...nonSupplierForUs,
+      ...correctedItems
+        .filter(s => s.balanceUsd < 0)
+        .sort((a, b) => a.balanceUsd - b.balanceUsd)
+        .map(s => ({ id: s.id, name: s.name, code: "SUPPLIER_OVERPAID", value: r2(Math.abs(s.balanceUsd)), category: "Supplier Overpayments" })),
+    ];
+
+    // Update onUs breakdown — replace or add "Suppliers" line
+    let correctedOnUsBreakdown = rawData.onUs.breakdown.map(b =>
+      b.name === "Suppliers" ? { ...b, value: correctedLiabilities } : b
+    );
+    if (correctedLiabilities > 0 && !correctedOnUsBreakdown.some(b => b.name === "Suppliers")) {
+      correctedOnUsBreakdown = [{ name: "Suppliers", value: correctedLiabilities }, ...correctedOnUsBreakdown];
+    }
+    // Remove "Suppliers" line if no liabilities
+    if (correctedLiabilities === 0) {
+      correctedOnUsBreakdown = correctedOnUsBreakdown.filter(b => b.name !== "Suppliers");
+    }
+
+    const correctedForUsBreakdown = rawData.forUs.breakdown.map(b =>
+      b.name === "Supplier Overpayments" ? { ...b, value: correctedOverpayments } : b
+    );
+
+    return {
+      ...rawData,
+      netPosition: correctedNetPosition,
+      netPositionLabel: correctedNetPosition >= 0 ? "We have more than we owe" : "We owe more than we have",
+      forUsTotal: correctedForUsTotal,
+      onUsTotal: correctedOnUsTotal,
+      supplierLiabilities: correctedLiabilities,
+      supplierOverpayments: correctedOverpayments,
+      forUs: { ...rawData.forUs, total: correctedForUsTotal, accounts: correctedForUsAccounts, breakdown: correctedForUsBreakdown },
+      onUs:  { ...rawData.onUs,  total: correctedOnUsTotal,  accounts: correctedOnUsAccounts,  breakdown: correctedOnUsBreakdown  },
+    };
+  }, [rawData, supplierWithBalances]);
 
   const isPositive = (data?.netPosition ?? 0) >= 0;
   const hasPendingVerified =
