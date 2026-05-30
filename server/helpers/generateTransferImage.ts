@@ -242,7 +242,7 @@ async function renderHtmlToPng(html: string, width: number, height: number): Pro
     const { default: puppeteer } = await import("puppeteer");
     const chromePath = getChromiumPath();
     browser = await puppeteer.launch({
-      headless: "new",
+      headless: true,
       ...(chromePath ? { executablePath: chromePath } : {}),
       args: [
         "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",

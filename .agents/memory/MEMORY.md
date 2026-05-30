@@ -1,2 +1,4 @@
 - [SP container supplier linking](sp-container-supplier.md) — sp_containers needs supplierId FK to suppliers; voucher must have supplierId set for supplier balance to appear in ledger.
 - [SP Intercompany Agent Charges](sp-intercompany.md) — SP offload posts Voucher C in HADI L'SHI (Dr Agent / Cr SP-IC); "Intercompany" account type excluded from Net Position.
+- [ExcelJS write-stream bug](exceljs-write-stream.md) — ExcelJS 3.x wb.xlsx.write(stream) throws "ea.results is not a Promise"; use writeBuffer() instead.
+- [Puppeteer headless API](puppeteer-headless.md) — Puppeteer 22+ dropped headless:"new"; use headless:true.

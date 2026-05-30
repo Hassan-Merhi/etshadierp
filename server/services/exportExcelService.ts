@@ -517,7 +517,8 @@ export async function buildCompanyWorkbook(
   addSheet(wb, "Employee Txn Detail", data.employeeTxnDetail);
   addSheet(wb, "Location Stock Detail", data.locationStockDetail);
 
-  await wb.xlsx.write(outputStream);
+  const buf1 = await wb.xlsx.writeBuffer();
+  outputStream.write(buf1 as Buffer);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -803,5 +804,6 @@ export async function streamCompanyWorkbookDirect(
     totalRow.getCell(2).numFmt = "#,##0";
   }
 
-  await wb.xlsx.write(outputStream);
+  const buf2 = await wb.xlsx.writeBuffer();
+  outputStream.write(buf2 as Buffer);
 }
