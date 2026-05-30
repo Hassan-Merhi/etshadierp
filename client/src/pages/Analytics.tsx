@@ -570,7 +570,7 @@ export default function Analytics() {
       if (!response.ok) throw new Error("Failed to fetch containers");
       return response.json();
     },
-    enabled: false, // Manual trigger via Generate button
+    enabled: !!selectedCompany,
   });
 
   // ── Factory Analytics Queries ───────────────────────────────────────────
