@@ -34,6 +34,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { enqueueRequest } from "@/lib/offlineQueue";
+import { format } from "date-fns";
 import { cacheBulkFxData, getCachedBulkFxData, computeBulkFxPreview } from "@/lib/bulkFxOffline";
 import type { FactorySupplier } from "@shared/schema";
 
