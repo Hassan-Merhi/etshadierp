@@ -1240,6 +1240,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
       const allSupplierIds = (suppliersList as any[]).map((s: any) => s.id);
       const voucherPaidBySupplier: Record<number, number> = {};
       const voucherPaidBySupplierCurrency: Record<number, Record<string, number>> = {};
+      const voucherPaidBySupplierCurrencyUsd: Record<number, Record<string, number>> = {};
       if (allSupplierIds.length > 0) {
         const voucherPaymentRows = await db
           .select({
@@ -1267,6 +1268,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
           voucherPaidBySupplier[suppId] = (voucherPaidBySupplier[suppId] || 0) + usdAmt;
           if (!voucherPaidBySupplierCurrency[suppId]) voucherPaidBySupplierCurrency[suppId] = {};
           voucherPaidBySupplierCurrency[suppId][curr] = (voucherPaidBySupplierCurrency[suppId][curr] || 0) + amt;
+          if (!voucherPaidBySupplierCurrencyUsd[suppId]) voucherPaidBySupplierCurrencyUsd[suppId] = {};
+          voucherPaidBySupplierCurrencyUsd[suppId][curr] = (voucherPaidBySupplierCurrencyUsd[suppId][curr] || 0) + usdAmt;
         }
       }
 
@@ -1351,76 +1354,97 @@ export function registerFactorySuppliersRoutes(app: Express) {
         const balance = parseFloat(s.openingBalance || "0") + containerValue + commissionValue + otherChargesValue + fxNetUsd - totalPaid - voucherPaidUsd;
 
         // Per-currency balances (original currency, not converted).
-        // Use kg * ratePerKg + freight + commission from own containers.
-        // Freight is tracked in its own currency (freightCurrencyCode) which may differ from the container currency.
-        // Always use totalKg (declared/agreed weight) — same as computeBalance — weight differences at offload
-        // affect inventory only, not what is owed to the supplier.
-        const byCurrency: Record<string, number> = {};
-        const fxByCurrency: Record<string, { wSum: number; vSum: number }> = {};
+        // Track both native amount AND USD equivalent for every transaction so that
+        // fxRateToUsd = usdSum / nativeSum — an effective rate that always satisfies
+        // native × effectiveFx = USD contribution, making the card hint accurate.
+        const byCurrencyNative: Record<string, number> = {};
+        const byCurrencyUsd: Record<string, number> = {};
+
+        // Opening balance is USD-denominated
+        const openingBal = parseFloat(s.openingBalance || "0");
+        if (Math.abs(openingBal) > 0.0001) {
+          byCurrencyNative["USD"] = (byCurrencyNative["USD"] || 0) + openingBal;
+          byCurrencyUsd["USD"] = (byCurrencyUsd["USD"] || 0) + openingBal;
+        }
+
         for (const c of payableContainers) {
           const cc = c.currencyCode || "USD";
           const baseVal = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
           const freightAmt = parseFloat(c.freight || "0");
           const freightCc = c.freightCurrencyCode || cc;
-          byCurrency[cc] = (byCurrency[cc] || 0) + baseVal;
-          // Track weighted-average FX rate per currency
-          if (cc !== "USD" && parseFloat(c.fxRateToUsd || "0") > 0) {
-            const fx = parseFloat(c.fxRateToUsd || "1");
-            if (!fxByCurrency[cc]) fxByCurrency[cc] = { wSum: 0, vSum: 0 };
-            fxByCurrency[cc].wSum += baseVal * fx;
-            fxByCurrency[cc].vSum += baseVal;
-          }
-          // Freight always shows in its own currency bucket
+          const fx = parseFloat(c.fxRateToUsd || "1");
+
+          byCurrencyNative[cc] = (byCurrencyNative[cc] || 0) + baseVal;
+          byCurrencyUsd[cc] = (byCurrencyUsd[cc] || 0) + baseVal * (cc === "USD" ? 1 : fx);
+
+          // Freight in its own currency bucket with its effective USD value
           if (freightAmt > 0) {
-            byCurrency[freightCc] = (byCurrency[freightCc] || 0) + freightAmt;
+            // Same-cc freight converts at container fx; cross-cc USD freight stays as USD
+            const freightFx = freightCc === cc ? fx : 1;
+            byCurrencyNative[freightCc] = (byCurrencyNative[freightCc] || 0) + freightAmt;
+            byCurrencyUsd[freightCc] = (byCurrencyUsd[freightCc] || 0) + freightAmt * (freightCc === "USD" ? 1 : freightFx);
           }
-          // Commission from own containers goes into supplier's currency bucket.
-          // Exception: linked suppliers' USD commission flows to the parent broker.
+
+          // Commission from own containers
           const commAmt = parseFloat(c.commissionAmount || "0");
           if (commAmt > 0) {
             const commCc = c.commissionCurrencyCode || cc;
             if (!(s.parentId && commCc === "USD")) {
-              byCurrency[commCc] = (byCurrency[commCc] || 0) + commAmt;
+              const commFx = commCc === cc ? fx : 1;
+              byCurrencyNative[commCc] = (byCurrencyNative[commCc] || 0) + commAmt;
+              byCurrencyUsd[commCc] = (byCurrencyUsd[commCc] || 0) + commAmt * (commCc === "USD" ? 1 : commFx);
             }
           }
         }
-        const fxPerCurrency: Record<string, number> = {};
-        for (const [cc, d] of Object.entries(fxByCurrency)) {
-          fxPerCurrency[cc] = d.vSum > 0 ? d.wSum / d.vSum : 1;
-        }
-        // Subtract regular payments by currency
+
+        // Subtract regular payments — use actual amountUsd for USD tracking
         for (const p of supplierPayments) {
           const cc = p.currencyCode || "USD";
-          byCurrency[cc] = (byCurrency[cc] || 0) - parseFloat(p.amount || "0");
+          byCurrencyNative[cc] = (byCurrencyNative[cc] || 0) - parseFloat(p.amount || "0");
+          byCurrencyUsd[cc] = (byCurrencyUsd[cc] || 0) - parseFloat(p.amountUsd || "0");
         }
-        // Subtract voucher-based payments by currency
+
+        // Subtract voucher-based payments — use actual USD amounts
         const voucherCurrMap = voucherPaidBySupplierCurrency[s.id] || {};
+        const voucherCurrMapUsd = voucherPaidBySupplierCurrencyUsd[s.id] || {};
         for (const [cc, amt] of Object.entries(voucherCurrMap)) {
-          byCurrency[cc] = (byCurrency[cc] || 0) - amt;
+          byCurrencyNative[cc] = (byCurrencyNative[cc] || 0) - amt;
+          byCurrencyUsd[cc] = (byCurrencyUsd[cc] || 0) - (voucherCurrMapUsd[cc] || 0);
         }
-        // FX transfers: sub-supplier loses fromCurrency, parent supplier gains USD
+
+        // FX transfers — use toAmountUsd as the settled USD value for both directions
         for (const t of allFxTransfers) {
           if (t.fromSupplierId === s.id) {
             const cc = t.fromCurrencyCode || "USD";
-            byCurrency[cc] = (byCurrency[cc] || 0) - parseFloat(t.fromAmount || "0");
+            byCurrencyNative[cc] = (byCurrencyNative[cc] || 0) - parseFloat(t.fromAmount || "0");
+            byCurrencyUsd[cc] = (byCurrencyUsd[cc] || 0) - parseFloat(t.toAmountUsd || "0");
           }
           if (t.toSupplierId === s.id) {
-            byCurrency["USD"] = (byCurrency["USD"] || 0) + parseFloat(t.toAmountUsd || "0");
+            byCurrencyNative["USD"] = (byCurrencyNative["USD"] || 0) + parseFloat(t.toAmountUsd || "0");
+            byCurrencyUsd["USD"] = (byCurrencyUsd["USD"] || 0) + parseFloat(t.toAmountUsd || "0");
           }
         }
-        // Other charges from other suppliers' containers attributed to this supplier
-        // (e.g. broker-linked charges where other_charges_supplier_id = s.id)
-        // Linked suppliers: USD other charges flow to the parent broker — skip in own currency bucket.
+
+        // Other charges attributed to this supplier
         for (const c of containers.filter(isPayableContainer)) {
           if ((c as any).otherChargesSupplierId !== s.id) continue;
           const oc = parseFloat((c as any).otherCharges || "0");
           if (oc <= 0) continue;
           const cc = (c as any).otherChargesCurrencyCode || "USD";
           if (s.parentId && cc === "USD") continue;
-          byCurrency[cc] = (byCurrency[cc] || 0) + oc;
+          const fx = cc === "USD" ? 1 : parseFloat(c.fxRateToUsd || "1");
+          byCurrencyNative[cc] = (byCurrencyNative[cc] || 0) + oc;
+          byCurrencyUsd[cc] = (byCurrencyUsd[cc] || 0) + oc * fx;
         }
-        const currencyBalances = Object.entries(byCurrency)
-          .map(([currencyCode, bal]) => ({ currencyCode, balance: bal, fxRateToUsd: fxPerCurrency[currencyCode] ?? 1 }))
+
+        // Effective fx = usdSum / nativeSum so that native × effectiveFx = USD contribution
+        const currencyBalances = Object.entries(byCurrencyNative)
+          .map(([currencyCode, native]) => {
+            const usd = byCurrencyUsd[currencyCode] || 0;
+            const effectiveFx = currencyCode === "USD" ? 1
+              : (Math.abs(native) > 0.001 ? usd / native : 0);
+            return { currencyCode, balance: native, fxRateToUsd: effectiveFx };
+          })
           .filter(({ balance: bal }) => Math.abs(bal) > 0.001)
           .sort((a, b) => (a.currencyCode === "USD" ? 1 : -1)); // non-USD first
 
