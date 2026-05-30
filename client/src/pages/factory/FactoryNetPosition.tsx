@@ -568,11 +568,11 @@ export default function FactoryNetPosition() {
     refetchInterval: 30_000,
   });
 
-  // Authoritative supplier balances — same source as Factory Suppliers page
+  // Authoritative supplier balances — same source as Factory Suppliers page (OTW excluded to match default view)
   const { data: supplierWithBalances = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/suppliers/with-balances", "net-position-merge"],
     queryFn: async () => {
-      const res = await fetch("/api/factory/suppliers/with-balances?includeOtw=true", { credentials: "include" });
+      const res = await fetch("/api/factory/suppliers/with-balances?includeOtw=false", { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
@@ -588,8 +588,11 @@ export default function FactoryNetPosition() {
     if (!supplierWithBalances.length) return rawData;
 
     // Each entry has id, name, totalValue (USD balance as string).
-    // Use every supplier individually — matches the Factory Suppliers page exactly.
+    // Skip broker children (parentId set) — their balances are already rolled into the
+    // broker parent's grand total via buildBrokerStatement, so including them separately
+    // would double-count their EUR/AUD exposure.
     const correctedItems = supplierWithBalances
+      .filter((s: any) => !s.parentId)
       .map((s: any) => ({ id: s.id as number, name: s.name as string, balanceUsd: parseFloat(s.totalValue || "0") }))
       .filter(s => Math.abs(s.balanceUsd) > 0.01);
 
