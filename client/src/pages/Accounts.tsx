@@ -398,6 +398,7 @@ export default function Accounts() {
   // Type comparison uses lowercase to match API response
   const baseAccounts = allAccounts.filter((account) => {
     const type = (account.type || "").toLowerCase();
+    if (type === "employee") return true;
     return (
       type === "ledger" &&
       account.code !== "PURCHASES" &&
