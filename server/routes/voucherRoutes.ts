@@ -1284,7 +1284,7 @@ export function registerVoucherRoutes(app: Express) {
           // Create entries
           for (const entry of entries) {
             const amount = entry.amount;
-            const narration = notes || null;
+            const narration = entry.narration || null;
 
             // Determine account field
             const accountField: any = {};
@@ -1502,7 +1502,7 @@ export function registerVoucherRoutes(app: Express) {
           // Create new entries
           for (const entry of entries) {
             const amount = entry.amount;
-            const narration = notes || null;
+            const narration = entry.narration || null;
 
             // Determine account field
             const accountField: any = {};

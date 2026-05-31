@@ -231,6 +231,7 @@ const journalEntrySchema = z.object({
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: "Amount must be a positive number",
     }),
+  narration: z.string().optional(),
 });
 
 const voucherFormSchema = z.object({
@@ -1831,6 +1832,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           accountId,
           accountName,
           amount,
+          narration: entry.narration || "",
         };
       });
 
@@ -3601,6 +3603,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           accountId: 0,
           accountName: "",
           amount: "",
+          narration: "",
         });
       }
       setTimeout(() => {
@@ -3622,6 +3625,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           accountId: 0,
           accountName: "",
           amount: "",
+          narration: "",
         });
         setTimeout(() => {
           const newRowInput = document.querySelector(`[data-testid="input-journal-type-${rowIndex + 1}"]`) as HTMLElement;
@@ -4316,6 +4320,26 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               </FormItem>
                             )}
                           />
+                          <FormField
+                            control={journalForm.control}
+                            name={`entries.${index}.narration`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-xs text-muted-foreground w-14 shrink-0">Narration</span>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      value={field.value ?? ""}
+                                      placeholder="Optional note for this entry"
+                                      className="text-sm"
+                                      data-testid={`input-journal-narration-mobile-${index}`}
+                                    />
+                                  </FormControl>
+                                </div>
+                              </FormItem>
+                            )}
+                          />
                         </div>
                       );
                     })}
@@ -4324,7 +4348,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => appendJournal({ type: "DR", accountType: "ledger", accountId: 0, accountName: "", amount: "" })}
+                        onClick={() => appendJournal({ type: "DR", accountType: "ledger", accountId: 0, accountName: "", amount: "", narration: "" })}
                         data-testid="button-journal-add-row-mobile"
                       >
                         <Plus className="h-4 w-4 mr-2" />
@@ -4347,10 +4371,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     <table className="w-full min-w-[500px]">
                       <thead className="bg-muted/40">
                         <tr className="h-9">
-                          <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[12%]">DR/CR</th>
-                          <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[50%]">Account</th>
-                          <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[25%]">Amount</th>
-                          <th className="w-[8%]"></th>
+                          <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[10%]">DR/CR</th>
+                          <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[35%]">Account</th>
+                          <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[20%]">Amount</th>
+                          <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[28%]">Narration</th>
+                          <th className="w-[7%]"></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -4590,6 +4615,25 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               />
                             </td>
                             <td className="p-2">
+                              <FormField
+                                control={journalForm.control}
+                                name={`entries.${index}.narration`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input
+                                        {...field}
+                                        value={field.value ?? ""}
+                                        placeholder="Optional note…"
+                                        className="text-sm h-8"
+                                        data-testid={`input-journal-narration-${index}`}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                            </td>
+                            <td className="p-2">
                               {journalFields.length > 1 && (
                                 <Button
                                   type="button"
@@ -4607,7 +4651,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                       </tbody>
                       <tfoot className="bg-muted/40 border-t">
                         <tr>
-                          <td colSpan={4} className="px-3 py-2">
+                          <td colSpan={5} className="px-3 py-2">
                             <Button
                               type="button"
                               variant="outline"
@@ -4619,6 +4663,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   accountId: 0,
                                   accountName: "",
                                   amount: "",
+                                  narration: "",
                                 })
                               }
                               data-testid="button-journal-add-row"
