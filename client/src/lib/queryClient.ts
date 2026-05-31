@@ -51,6 +51,12 @@ export function resetCsrfToken() {
   _csrfFetchPromise = null;
 }
 
+/* ── Capacitor API base URL ──────────────────────────────────────────────── */
+// Set VITE_API_BASE_URL at Capacitor build time, e.g. "https://your-server.com".
+// Empty string in all web builds — every code path below falls back unchanged.
+const _CAPACITOR_API_BASE: string =
+  ((import.meta as any).env?.VITE_API_BASE_URL as string) || "";
+
 /* ── Global fetch interceptor ────────────────────────────────────────────── */
 // Wraps window.fetch so that ALL state-changing requests to /api/* (including
 // raw fetch() calls in legacy pages, hooks, sync engines, dialogs, etc.) get

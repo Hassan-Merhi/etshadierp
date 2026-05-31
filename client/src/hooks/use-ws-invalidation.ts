@@ -38,11 +38,21 @@ export function useWsInvalidation() {
       }, 800);
     }
 
+    // Capacitor builds set VITE_WS_URL explicitly; web builds derive it from window.location.
+    const _CAPACITOR_WS_URL: string =
+      ((import.meta as any).env?.VITE_WS_URL as string) || "";
+
     function connect() {
       if (unmountedRef.current) return;
 
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+      let _wsTarget: string;
+      if (_CAPACITOR_WS_URL) {
+        _wsTarget = _CAPACITOR_WS_URL; // Capacitor build — env var set at build time
+      } else {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        _wsTarget = `${protocol}//${window.location.host}/ws`; // Web — existing logic unchanged
+      }
+      const ws = new WebSocket(_wsTarget);
       wsRef.current = ws;
 
       ws.onmessage = (event) => {

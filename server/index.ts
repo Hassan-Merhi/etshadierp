@@ -139,7 +139,10 @@ const sessionConfig: session.SessionOptions = {
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     path: '/',
-    sameSite: 'lax',
+    // SameSite=None is required for Capacitor WebView cross-origin requests.
+    // Origin guard + CSRF token remain primary CSRF protection.
+    // Set CAPACITOR_ENABLED=true on the server used by the Capacitor app.
+    sameSite: process.env.CAPACITOR_ENABLED === "true" ? 'none' : 'lax',
   },
 };
 
@@ -245,6 +248,17 @@ app.use((req, res, next) => {
   if (!sourceHost) return next();
 
   if (sourceHost === host) return next();
+
+  // Capacitor WebView origins — cannot be spoofed by web-based CSRF attacks.
+  // iOS:     capacitor://localhost
+  // Android: http://localhost or https://localhost (depending on androidScheme)
+  // Ionic:   ionic://localhost
+  if (originHeader && (
+    originHeader === "capacitor://localhost" ||
+    originHeader === "http://localhost"       ||
+    originHeader === "https://localhost"      ||
+    originHeader === "ionic://localhost"
+  )) return next();
 
   console.warn(`[OriginGuard] BLOCKED ${method} ${req.path} | host=${host} origin=${originHeader || "-"} referer=${refererHeader || "-"}`);
   return res.status(403).json({
