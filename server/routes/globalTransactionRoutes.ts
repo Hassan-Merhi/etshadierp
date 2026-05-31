@@ -18,6 +18,10 @@ import {
   suppliers,
   containers,
   customers,
+  bankAccounts,
+  employees,
+  fixedAssets,
+  factorySuppliers,
 } from "../../shared/schema";
 import {
   eq,
@@ -317,25 +321,47 @@ export function registerGlobalTransactionRoutes(
 
       const entriesRaw = await db
         .select({
-          id:            voucherEntries.id,
+          id:              voucherEntries.id,
           ledgerAccountId: voucherEntries.ledgerAccountId,
-          customerId:    voucherEntries.customerId,
-          accountName:   ledgerAccounts.name,
-          customerName:  customers.legalName,
-          debitAmount:   voucherEntries.debitAmount,
-          creditAmount:  voucherEntries.creditAmount,
-          narration:     voucherEntries.narration,
+          bankAccountId:   voucherEntries.bankAccountId,
+          fixedAssetId:    voucherEntries.fixedAssetId,
+          supplierId:      voucherEntries.supplierId,
+          employeeId:      voucherEntries.employeeId,
+          factorySupplierId: voucherEntries.factorySupplierId,
+          customerId:      voucherEntries.customerId,
+          ledgerName:      ledgerAccounts.name,
+          bankName:        bankAccounts.name,
+          fixedAssetName:  fixedAssets.name,
+          supplierName:    suppliers.legalName,
+          employeeFirst:   employees.firstName,
+          employeeLast:    employees.lastName,
+          factorySupplierName: factorySuppliers.name,
+          customerName:    customers.legalName,
+          debitAmount:     voucherEntries.debitAmount,
+          creditAmount:    voucherEntries.creditAmount,
+          narration:       voucherEntries.narration,
         })
         .from(voucherEntries)
         .leftJoin(ledgerAccounts, eq(ledgerAccounts.id, voucherEntries.ledgerAccountId))
+        .leftJoin(bankAccounts, eq(bankAccounts.id, voucherEntries.bankAccountId))
+        .leftJoin(fixedAssets, eq(fixedAssets.id, voucherEntries.fixedAssetId))
+        .leftJoin(suppliers, eq(suppliers.id, voucherEntries.supplierId))
+        .leftJoin(employees, eq(employees.id, voucherEntries.employeeId))
+        .leftJoin(factorySuppliers, eq(factorySuppliers.id, voucherEntries.factorySupplierId))
         .leftJoin(customers, eq(customers.id, voucherEntries.customerId))
         .where(eq(voucherEntries.voucherId, voucherId))
         .orderBy(voucherEntries.id);
 
-      const entries = entriesRaw.map(e => ({
-        ...e,
-        accountName: e.accountName || e.customerName || null,
-      }));
+      const entries = entriesRaw.map(e => {
+        const employeeName = e.employeeFirst && e.employeeLast
+          ? `${e.employeeFirst} ${e.employeeLast}`.trim()
+          : (e.employeeFirst || e.employeeLast || null);
+        return {
+          ...e,
+          accountName: e.ledgerName || e.bankName || e.fixedAssetName || e.supplierName
+            || employeeName || e.factorySupplierName || e.customerName || null,
+        };
+      });
 
       return res.json({ voucher, entries });
     } catch (err) {
@@ -360,13 +386,24 @@ export function registerGlobalTransactionRoutes(
 
       const type = voucher.voucherType;
 
-      // Always fetch base ledger entries
+      // Always fetch base ledger entries (resolve all account types)
       const rawEntries = await db
         .select({
           id:              voucherEntries.id,
           ledgerAccountId: voucherEntries.ledgerAccountId,
+          bankAccountId:   voucherEntries.bankAccountId,
+          fixedAssetId:    voucherEntries.fixedAssetId,
+          supplierId:      voucherEntries.supplierId,
+          employeeId:      voucherEntries.employeeId,
+          factorySupplierId: voucherEntries.factorySupplierId,
           customerId:      voucherEntries.customerId,
-          accountName:     ledgerAccounts.name,
+          ledgerName:      ledgerAccounts.name,
+          bankName:        bankAccounts.name,
+          fixedAssetName:  fixedAssets.name,
+          supplierName:    suppliers.legalName,
+          employeeFirst:   employees.firstName,
+          employeeLast:    employees.lastName,
+          factorySupplierName: factorySuppliers.name,
           customerName:    customers.legalName,
           debitAmount:     voucherEntries.debitAmount,
           creditAmount:    voucherEntries.creditAmount,
@@ -374,14 +411,25 @@ export function registerGlobalTransactionRoutes(
         })
         .from(voucherEntries)
         .leftJoin(ledgerAccounts, eq(ledgerAccounts.id, voucherEntries.ledgerAccountId))
+        .leftJoin(bankAccounts, eq(bankAccounts.id, voucherEntries.bankAccountId))
+        .leftJoin(fixedAssets, eq(fixedAssets.id, voucherEntries.fixedAssetId))
+        .leftJoin(suppliers, eq(suppliers.id, voucherEntries.supplierId))
+        .leftJoin(employees, eq(employees.id, voucherEntries.employeeId))
+        .leftJoin(factorySuppliers, eq(factorySuppliers.id, voucherEntries.factorySupplierId))
         .leftJoin(customers, eq(customers.id, voucherEntries.customerId))
         .where(eq(voucherEntries.voucherId, voucherId))
         .orderBy(voucherEntries.id);
 
-      const entries = rawEntries.map(e => ({
-        ...e,
-        accountName: e.accountName || e.customerName || null,
-      }));
+      const entries = rawEntries.map(e => {
+        const employeeName = e.employeeFirst && e.employeeLast
+          ? `${e.employeeFirst} ${e.employeeLast}`.trim()
+          : (e.employeeFirst || e.employeeLast || null);
+        return {
+          ...e,
+          accountName: e.ledgerName || e.bankName || e.fixedAssetName || e.supplierName
+            || employeeName || e.factorySupplierName || e.customerName || null,
+        };
+      });
 
       // Sales: return ledger entries + sales item rows
       if (type === "Sales" || type === "POS") {
