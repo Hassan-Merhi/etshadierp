@@ -35,28 +35,30 @@ async function findOrCreateLedgerAccount(
   codePrefix: string,
   subType?: string,
 ): Promise<number> {
-  const [existing] = await tx.select().from(ledgerAccounts).where(and(
+  // Race-safe: INSERT ... ON CONFLICT DO NOTHING, then SELECT.
+  // The unique index uq_ledger_accounts_company_name_active prevents duplicates
+  // even when multiple transactions run in parallel (e.g. page-load batch accruals).
+  const code = `${codePrefix}-${Date.now()}`;
+  await tx.execute(sql`
+    INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, active)
+    VALUES (${companyId}, ${code}, ${name}, ${accountType}, ${subType ?? null}, true)
+    ON CONFLICT (company_id, name) WHERE deleted_at IS NULL DO NOTHING
+  `);
+  const [account] = await tx.select().from(ledgerAccounts).where(and(
     eq(ledgerAccounts.companyId, companyId),
     eq(ledgerAccounts.name, name),
     isNull(ledgerAccounts.deletedAt),
   ));
-  if (existing) {
-    // Patch account type/subType if it was previously created with wrong values
-    const needsPatch =
-      existing.accountType !== accountType ||
-      (subType !== undefined && existing.subType !== subType);
-    if (needsPatch) {
-      await tx.update(ledgerAccounts)
-        .set({ accountType, ...(subType !== undefined ? { subType } : {}) })
-        .where(eq(ledgerAccounts.id, existing.id));
-    }
-    return existing.id;
+  // Patch type/subType if the existing row has stale values
+  const needsPatch =
+    account.accountType !== accountType ||
+    (subType !== undefined && account.subType !== subType);
+  if (needsPatch) {
+    await tx.update(ledgerAccounts)
+      .set({ accountType, ...(subType !== undefined ? { subType } : {}) })
+      .where(eq(ledgerAccounts.id, account.id));
   }
-  const code = `${codePrefix}-${Date.now()}`;
-  const [created] = await tx.insert(ledgerAccounts).values({
-    companyId, code, name, accountType, subType: subType ?? null, active: true,
-  }).returning();
-  return created.id;
+  return account.id;
 }
 
 // ── Auto-transfer helper ──────────────────────────────────────────────────────
@@ -518,10 +520,14 @@ export function registerRentalRoutes(
             eq(propertyContracts.status, "ACTIVE"),
             eq(propertyUnits.unitType, "SHOP"),
           ));
-        for (const c of shopContracts) {
-          postRentAccrualForContract(c.id, shopExpenseAccountName).catch(e =>
-            console.warn(`${tag} page-load accrual skipped contract ${c.id}:`, e.message?.split("\n")[0]));
-        }
+        // Run sequentially to avoid parallel INSERT races on shared accounts
+        // (fire-and-forget — does not block the HTTP response)
+        (async () => {
+          for (const c of shopContracts) {
+            await postRentAccrualForContract(c.id, shopExpenseAccountName).catch(e =>
+              console.warn(`${tag} page-load accrual skipped contract ${c.id}:`, e.message?.split("\n")[0]));
+          }
+        })();
       }
 
       const regularUnits = await db.select().from(propertyUnits)
