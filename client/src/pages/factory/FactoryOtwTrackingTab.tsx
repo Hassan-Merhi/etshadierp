@@ -407,7 +407,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   const [trackingNowId, setTrackingNowId]         = useState<number | null>(null);
   const [timelineId, setTimelineId]               = useState<number | null>(null);
   const [settingsContainer, setSettingsContainer] = useState<ContainerWithSupplier | null>(null);
-  const [statusFilter, setStatusFilter]           = useState<string>("all");
   const [supplierFilter, setSupplierFilter]       = useState<string>("all");
   const [freightFilter, setFreightFilter]         = useState<string>("all");
   const [docsFilter, setDocsFilter]               = useState<string>("all");
@@ -436,7 +435,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
 
   // Apply filters + sort
   let filtered = otwContainers.filter((c) => {
-    if (statusFilter !== "all" && c.status !== statusFilter) return false;
     if (supplierFilter !== "all" && String(c.supplierId ?? "none") !== supplierFilter) return false;
     if (freightFilter === "has_freight" && !(num(c.freight) > 0)) return false;
     if (freightFilter === "no_freight"  && num(c.freight) > 0)    return false;
@@ -452,8 +450,11 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     return true;
   });
 
-  // ETA sort
+  // Sort: supplier alphabetically (primary), then ETA (secondary)
   filtered = [...filtered].sort((a, b) => {
+    const sa = ((a as any).supplierName || "").toLowerCase();
+    const sb = ((b as any).supplierName || "").toLowerCase();
+    if (sa !== sb) return sa.localeCompare(sb);
     if (etaSort === "none") return 0;
     const da = a.arrivalDate ? new Date(a.arrivalDate).getTime() : (etaSort === "asc" ? Infinity : -Infinity);
     const db = b.arrivalDate ? new Date(b.arrivalDate).getTime() : (etaSort === "asc" ? Infinity : -Infinity);
@@ -523,12 +524,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   const docsReceived = filtered.filter((c) => docs[String(c.id)]).length;
   const timelineContainer = otwContainers.find((c) => c.id === timelineId) ?? null;
 
-  const STATUS_TABS = [
-    { key: "all",        label: "All" },
-    { key: "PENDING",    label: "Pending" },
-    { key: "IN_TRANSIT", label: "In Transit" },
-    { key: "ARRIVED",    label: "Arrived" },
-  ];
 
   const hasActiveFilters = search || supplierFilter !== "all" || freightFilter !== "all" || docsFilter !== "all";
 
@@ -582,24 +577,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
             </p>
           </CardContent>
         </Card>
-      </div>
-
-      {/* ── Status filter tabs ── */}
-      <div className="flex gap-1 flex-wrap">
-        {STATUS_TABS.filter((t) => t.key === "all" || (statusCounts[t.key] ?? 0) > 0).map(({ key, label }) => (
-          <Button
-            key={key}
-            variant={statusFilter === key ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStatusFilter(key)}
-            data-testid={`button-otw-filter-${key}`}
-          >
-            {label}
-            {(statusCounts[key] ?? 0) > 0 && (
-              <span className="ml-1 text-xs opacity-70">({statusCounts[key]})</span>
-            )}
-          </Button>
-        ))}
       </div>
 
       {/* ── Search + dropdown filters ── */}
@@ -684,7 +661,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                 <TableHead className="whitespace-nowrap">Container #</TableHead>
                 <TableHead className="whitespace-nowrap">Supplier</TableHead>
                 <TableHead className="whitespace-nowrap">Status</TableHead>
-                <TableHead className="whitespace-nowrap">Tracking</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Weight (kg)</TableHead>
                 <TableHead
                   className="whitespace-nowrap cursor-pointer select-none"
                   onClick={cycleEtaSort}
@@ -757,13 +734,11 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                       <ContainerStatusBadge status={c.status ?? "PENDING"} />
                     </TableCell>
 
-                    {/* Tracking status */}
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      {isTracking ? (
-                        <Badge variant="secondary" className="text-xs"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Tracking…</Badge>
-                      ) : (
-                        <TrackingStatusBadge status={fc.trackingLastStatus} />
-                      )}
+                    {/* Weight */}
+                    <TableCell className="text-right text-sm tabular-nums whitespace-nowrap">
+                      {c.totalKg
+                        ? <span>{Number(c.totalKg).toLocaleString(undefined, { maximumFractionDigits: 0 })} kg</span>
+                        : <span className="text-muted-foreground">—</span>}
                     </TableCell>
 
                     {/* ETA */}
