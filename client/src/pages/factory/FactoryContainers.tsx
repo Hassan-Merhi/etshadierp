@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { useQuery, useMutation, useQueryClient as useTQClient } from "@tanstack/react-query";
 import { useAdminOverride } from "@/hooks/use-admin-override";
+import FactoryOtwTrackingTab from "./FactoryOtwTrackingTab";
 import { Plus, Pencil, Container, Trash2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle2, Search, ArrowDown, AlertTriangle, RotateCcw, CheckSquare, ChevronDown, ChevronRight, Ship, Building2, StickyNote, Boxes, Package, LayoutList, GripHorizontal, Minus, PlusCircle, X, Info, Radio, RefreshCw, Loader2, Clock, CheckCircle, XCircle, Settings2, MapPin, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -2001,13 +2002,7 @@ export default function FactoryContainers() {
       )}
 
       {viewMode === "tracking" && (
-        <OtwTrackingPanel
-          containers={otwContainers}
-          suppliers={suppliers}
-          isLoading={isLoading}
-          trackingNowId={trackingNowId}
-          setTrackingNowId={setTrackingNowId}
-        />
+        <FactoryOtwTrackingTab />
       )}
 
       <Dialog open={createOpen || !!editingContainer} onOpenChange={(open) => {
