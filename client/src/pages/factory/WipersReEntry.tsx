@@ -30,8 +30,9 @@ import { buildZplBatch } from "@/lib/zplBuilder";
 import { LabelPrintSettings, getPaperFormat } from "@/components/LabelPrintSettings";
 import {
   generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml,
-  A4_DESIGN_OPTIONS, type LabelData, type A4DesignColor, formatLabelNum,
+  type LabelData, type A4DesignColor, formatLabelNum,
 } from "@/lib/labelHtml";
+import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
 import * as XLSX from "@/lib/excelHelper";
 
@@ -70,6 +71,7 @@ function isWipersBale(bale: any): boolean {
 export default function WipersReEntry() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { colors } = useLabelDesignColors();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
 
@@ -806,17 +808,18 @@ export default function WipersReEntry() {
             <DialogTitle>Choose A4 Label Design</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-2">
-            {A4_DESIGN_OPTIONS.map(opt => (
+            {colors.map(opt => (
               <Button
                 key={opt.value}
                 variant="outline"
                 onClick={() => {
                   setDesignPickerOpen(false);
-                  if (pendingLabels) openBrowserPrint(pendingLabels, "A4", opt.value as A4DesignColor);
+                  if (pendingLabels) openBrowserPrint(pendingLabels, "A4", opt.value);
                   setPendingLabels(null);
                 }}
                 data-testid={`button-design-${opt.value}`}
               >
+                <span className="inline-block h-2.5 w-2.5 rounded-full mr-2 flex-shrink-0 border border-border/50" style={{ background: opt.color }} />
                 {opt.label}
               </Button>
             ))}

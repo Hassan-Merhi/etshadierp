@@ -3763,6 +3763,23 @@ let migrationsDone = false;
       rolled_back_at timestamp
     )`,
     `CREATE INDEX IF NOT EXISTS import_batches_company_idx ON import_batches(company_id)`,
+    // label_design_colors — dynamic banner color registry seeded with 5 defaults
+    `CREATE TABLE IF NOT EXISTS label_design_colors (
+      id serial PRIMARY KEY,
+      slug text NOT NULL UNIQUE,
+      label text NOT NULL,
+      color_hex text NOT NULL,
+      sort_order integer NOT NULL DEFAULT 0,
+      is_default boolean NOT NULL DEFAULT false,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `INSERT INTO label_design_colors (slug, label, color_hex, sort_order, is_default) VALUES
+       ('purple', 'Purple (#1)',   '#5B21B6', 1, true),
+       ('green',  'Green (#2)',    '#047857', 2, true),
+       ('gold',   'Gold (#3)',     '#B8860B', 3, true),
+       ('white',  'White (#4)',    '#F5F5F5', 4, true),
+       ('red',    'HMD Intl (#5)', '#B91C1C', 5, true)
+     ON CONFLICT (slug) DO NOTHING`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

@@ -27,10 +27,10 @@ import {
   generateCombinedLabelsHtml,
   generateA5LabelsHtml,
   generateStickerLabelsHtml,
-  A4_DESIGN_OPTIONS,
   type LabelData,
   type A4DesignColor,
 } from "@/lib/labelHtml";
+import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 
 interface Location {
   id: number;
@@ -61,6 +61,7 @@ interface BaleRow {
 
 export default function FactoryReprintLabels() {
   const { toast } = useToast();
+  const { colors } = useLabelDesignColors();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
 
@@ -538,16 +539,17 @@ export default function FactoryReprintLabels() {
             <DialogDescription>Pick a color design for the A4 label sheet.</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-2 py-2">
-            {A4_DESIGN_OPTIONS.map((opt) => (
+            {colors.map((opt) => (
               <Button
                 key={opt.value}
                 variant="outline"
                 onClick={() => {
                   setDesignPickerOpen(false);
-                  openBrowserPrint(pendingLabels, opt.value as A4DesignColor);
+                  openBrowserPrint(pendingLabels, opt.value);
                 }}
                 data-testid={`button-design-${opt.value}`}
               >
+                <span className="inline-block h-2.5 w-2.5 rounded-full mr-2 flex-shrink-0 border border-border/50" style={{ background: opt.color }} />
                 {opt.label}
               </Button>
             ))}

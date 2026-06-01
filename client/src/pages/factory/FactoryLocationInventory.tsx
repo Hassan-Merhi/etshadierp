@@ -28,7 +28,8 @@ import { useEscapeBack } from "@/hooks/use-escape-back";
 import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
 import { buildZplBatch } from "@/lib/zplBuilder";
 import { getPaperFormat } from "@/components/LabelPrintSettings";
-import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, A4_DESIGN_OPTIONS, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
+import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
+import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 
 type SortField = "name" | "bales" | "kg" | "value";
 type SortDir = "asc" | "desc";
@@ -146,6 +147,7 @@ function StatCard({ icon, label, value, sub, accent }: StatCardProps) {
 }
 
 export default function FactoryLocationInventory() {
+  const { colors } = useLabelDesignColors();
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [locationSearch, setLocationSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("__all__");
@@ -2024,16 +2026,17 @@ export default function FactoryLocationInventory() {
             <DialogDescription>Pick a color design for the A4 label sheet.</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-2 py-2">
-            {A4_DESIGN_OPTIONS.map((opt) => (
+            {colors.map((opt) => (
               <Button
                 key={opt.value}
                 variant="outline"
                 onClick={() => {
                   setReprintDesignPickerOpen(false);
-                  openBrowserReprintLabels(reprintPendingLabels, opt.value as A4DesignColor);
+                  openBrowserReprintLabels(reprintPendingLabels, opt.value);
                 }}
                 data-testid={`button-inv-design-${opt.value}`}
               >
+                <span className="inline-block h-2.5 w-2.5 rounded-full mr-2 flex-shrink-0 border border-border/50" style={{ background: opt.color }} />
                 {opt.label}
               </Button>
             ))}

@@ -25,10 +25,10 @@ import {
   generateCombinedLabelsHtml,
   generateA5LabelsHtml,
   generateStickerLabelsHtml,
-  A4_DESIGN_OPTIONS,
   type A4DesignColor,
   type LabelData,
 } from "@/lib/labelHtml";
+import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 
 type Step = "upload" | "validate" | "done";
 
@@ -138,7 +138,8 @@ interface LabelPreviewCardProps {
 }
 
 function LabelPreviewCard({ item, designColor, printFormat }: LabelPreviewCardProps) {
-  const colorOpt = A4_DESIGN_OPTIONS.find((o) => o.value === designColor);
+  const { colors } = useLabelDesignColors();
+  const colorOpt = colors.find((o) => o.value === designColor);
   const accentColor = colorOpt?.color ?? "#6d28d9";
 
   if (printFormat === "STICKER") {
@@ -214,6 +215,7 @@ export default function FactoryBaleRelabeling() {
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
   const [printFormats, setPrintFormats] = useState<Set<"A4" | "A5" | "STICKER">>(new Set(["A4"]));
   const [designColor, setDesignColor] = useState<A4DesignColor>("purple");
+  const { colors } = useLabelDesignColors();
 
   const toggleFormat = (fmt: "A4" | "A5" | "STICKER") => {
     setPrintFormats((prev) => {
@@ -598,7 +600,7 @@ export default function FactoryBaleRelabeling() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {A4_DESIGN_OPTIONS.map((opt) => (
+                      {colors.map((opt) => (
                         <SelectItem key={opt.value} value={opt.value}>
                           <div className="flex items-center gap-2">
                             <div className="h-3 w-3 rounded-full border" style={{ backgroundColor: opt.color }} />

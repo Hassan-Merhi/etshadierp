@@ -31,7 +31,7 @@ import { Palette } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
-import { A4_DESIGN_OPTIONS } from "@/lib/labelHtml";
+import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 import type { FactoryCategory } from "@shared/schema";
 
 const formSchema = z.object({
@@ -59,6 +59,7 @@ export function CreateBaleProductDialog({
   onClose,
 }: CreateBaleProductDialogProps) {
   const { toast } = useToast();
+  const { colors } = useLabelDesignColors();
 
   const { data: categories } = useQuery<FactoryCategory[]>({
     queryKey: ["/api/factory/categories"],
@@ -308,7 +309,7 @@ export function CreateBaleProductDialog({
                     >
                       No Design
                     </button>
-                    {A4_DESIGN_OPTIONS.map((opt) => (
+                    {colors.map((opt) => (
                       <button
                         type="button"
                         key={opt.value}
@@ -324,7 +325,7 @@ export function CreateBaleProductDialog({
                     <p className="text-xs text-muted-foreground mt-1">
                       Labels will print with the{" "}
                       <span className="font-medium">
-                        {A4_DESIGN_OPTIONS.find(o => o.value === field.value)?.label}
+                        {colors.find(o => o.value === field.value)?.label}
                       </span>{" "}
                       design automatically.
                     </p>

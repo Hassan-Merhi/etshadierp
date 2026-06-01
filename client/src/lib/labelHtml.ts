@@ -85,24 +85,21 @@ const detailBlockCss = `
     .barcode-subtext { font-size: 8pt; font-weight: 900; margin-top: 0.5mm; text-transform: uppercase; letter-spacing: 1px; line-height: 1.1; word-break: break-word; -webkit-text-stroke: 0.4px #000; }
     `;
 
-export type A4DesignColor = "purple" | "green" | "gold" | "white" | "red";
+// A4DesignColor is now a plain string (slug) — kept as an alias for
+// backward-compatibility with existing type annotations.
+export type A4DesignColor = string;
 
-export const A4_DESIGN_OPTIONS: { value: A4DesignColor; label: string; color: string; previewUrl: string }[] = [
-  { value: "purple", label: "Purple (#1)", color: "#5B21B6", previewUrl: "/labels/hmd-purple.jpg" },
-  { value: "green", label: "Green (#2)", color: "#047857", previewUrl: "/labels/hmd-green.jpg" },
-  { value: "gold", label: "Gold (#3)", color: "#B8860B", previewUrl: "/labels/hmd-gold.jpg" },
-  { value: "white", label: "White (#4)", color: "#F5F5F5", previewUrl: "/labels/hmd-white.jpg" },
-  { value: "red", label: "HMD Intl (#5)", color: "#B91C1C", previewUrl: "/labels/hmd-red.jpg" },
+// Static fallback used when the API hasn't loaded yet and as seed data.
+export const A4_DESIGN_OPTIONS: { value: string; label: string; color: string; previewUrl: string }[] = [
+  { value: "purple", label: "Purple (#1)",   color: "#5B21B6", previewUrl: "/labels/hmd-purple.jpg" },
+  { value: "green",  label: "Green (#2)",    color: "#047857", previewUrl: "/labels/hmd-green.jpg"  },
+  { value: "gold",   label: "Gold (#3)",     color: "#B8860B", previewUrl: "/labels/hmd-gold.jpg"   },
+  { value: "white",  label: "White (#4)",    color: "#F5F5F5", previewUrl: "/labels/hmd-white.jpg"  },
+  { value: "red",    label: "HMD Intl (#5)", color: "#B91C1C", previewUrl: "/labels/hmd-red.jpg"    },
 ];
 
-function getDesignBannerUrl(design: A4DesignColor): string {
-  switch (design) {
-    case "purple": return "/labels/hmd-purple.jpg";
-    case "green": return "/labels/hmd-green.jpg";
-    case "gold": return "/labels/hmd-gold.jpg";
-    case "white": return "/labels/hmd-white.jpg";
-    case "red": return "/labels/hmd-red.jpg";
-  }
+function getDesignBannerUrl(design: string): string {
+  return `/labels/hmd-${design}.jpg`;
 }
 
 export function generateCombinedLabelsHtml(labels: LabelData[], designColor?: A4DesignColor) {
