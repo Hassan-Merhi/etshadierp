@@ -51,8 +51,6 @@ export default function LabelBannersSettings() {
   const [addFile, setAddFile] = useState<File | null>(null);
   const [addingColor, setAddingColor] = useState(false);
 
-  const { data: me } = useQuery<{ id: string }>({ queryKey: ["/api/auth/me"] });
-
   const { data: rawColors, isLoading } = useQuery<ColorRow[]>({
     queryKey: ["/api/factory/label-design-colors"],
     queryFn: () =>
@@ -293,7 +291,7 @@ export default function LabelBannersSettings() {
                   <div className="relative rounded-md overflow-hidden border bg-muted h-20 flex items-center justify-center">
                     <img
                       key={ts}
-                      src={`/labels/user-${me?.id}/hmd-${c.slug}.jpg?t=${ts}`}
+                      src={`/labels/hmd-${c.slug}.jpg?t=${ts}`}
                       alt={`${c.label} banner`}
                       className="w-full h-full object-cover"
                       onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
