@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog, ChevronsUpDown, Trash2, ClipboardList, CreditCard, CalendarDays, Wrench } from "lucide-react";
+import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog, ChevronsUpDown, Trash2, ClipboardList, CreditCard, CalendarDays, Wrench, BookOpen } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
@@ -55,7 +55,7 @@ type Contract = {
   guaranteeRemaining?: number | null;
 };
 type CashAccount = { id: number; name: string; code: string; accountType: string };
-type LedgerRow = { id: number; year: number; month: number; expectedAmount: string; paidAmount: string; notes?: string | null };
+type LedgerRow = { id: number; year: number; month: number; expectedAmount: string; paidAmount: string; notes?: string | null; accrualVoucherId?: number | null };
 type Payment = { id: number; amount: string; paymentDate: string; forYear: number; forMonth: number; cashAccountId: number | null; notes: string | null };
 
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -256,6 +256,19 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
     },
   });
 
+  const postAccrual = useMutation({
+    mutationFn: () => apiRequest("POST", apiBase + "/accrue"),
+    onSuccess: (data: any) => {
+      const n = data?.accrued ?? 0;
+      toast({
+        title: n > 0 ? `${n} accrual${n !== 1 ? "s" : ""} posted` : "Nothing to accrue",
+        description: n > 0 ? "Journal vouchers created: Dr Rent Expense / Cr Accrued Rent Payable" : "All due months are already accrued or paid.",
+      });
+      queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
+    },
+    onError: (e: any) => toast({ title: "Accrual failed", description: e.message, variant: "destructive" }),
+  });
+
   const deleteUnit = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `${apiBase}/units/${id}`),
     onSuccess: () => {
@@ -321,6 +334,12 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
               <Button variant="outline" size="sm" onClick={() => navigate(paymentsLogUrl)} data-testid={`button-${testIdPrefix}-payments-log`}>
                 <ClipboardList className="h-4 w-4 mr-1" />
                 Payments Log
+              </Button>
+            )}
+            {apiBase === "/api/erp/rental" && unitType === "SHOP" && (
+              <Button variant="outline" size="sm" onClick={() => postAccrual.mutate()} disabled={postAccrual.isPending} data-testid={`button-${testIdPrefix}-post-accrual`}>
+                <BookOpen className={`h-4 w-4 mr-1 ${postAccrual.isPending ? "animate-pulse" : ""}`} />
+                {postAccrual.isPending ? "Accruing…" : "Post Accrual"}
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={() => runMonthly.mutate()} disabled={runMonthly.isPending} data-testid={`button-${testIdPrefix}-run-monthly`}>
@@ -2116,8 +2135,15 @@ function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onN
               return (
                 <tr key={r.id} className="border-t" data-testid={`row-ledger-${r.year}-${r.month}`}>
                   <td className="px-3 py-1.5">
-                    {MONTH_NAMES[r.month]} {r.year}
-                    {isFutureRow && <span className="ml-1.5 text-[10px] text-muted-foreground italic">prepaid</span>}
+                    <span className="flex items-center gap-1.5 flex-wrap">
+                      <span>{MONTH_NAMES[r.month]} {r.year}</span>
+                      {isFutureRow && <span className="text-[10px] text-muted-foreground italic">prepaid</span>}
+                      {r.accrualVoucherId && (
+                        <Badge variant="secondary" className="text-[10px]" data-testid={`badge-accrued-${r.year}-${r.month}`}>
+                          Accrued
+                        </Badge>
+                      )}
+                    </span>
                   </td>
                   <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
                     {isFutureRow ? "—" : fmtMoneyCurrency(r.expectedAmount, contract.currency)}

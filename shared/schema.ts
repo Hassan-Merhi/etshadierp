@@ -4923,6 +4923,7 @@ export const propertyMonthlyLedger = pgTable("property_monthly_ledger", {
   expectedAmount: decimal("expected_amount", { precision: 20, scale: 2 }).notNull().default("0"),
   paidAmount: decimal("paid_amount", { precision: 20, scale: 2 }).notNull().default("0"),
   notes: text("notes"),
+  accrualVoucherId: integer("accrual_voucher_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   companyIdx: index("property_monthly_ledger_company_idx").on(t.companyId),

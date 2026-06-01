@@ -3354,6 +3354,8 @@ let migrationsDone = false;
     // ── Property Contracts: linked_company_id for cross-company read-only view (May 2026) ──
     `ALTER TABLE property_contracts ADD COLUMN IF NOT EXISTS linked_company_id INTEGER`,
     `DO $$ BEGIN ALTER TABLE property_contracts ADD CONSTRAINT property_contracts_linked_company_id_fkey FOREIGN KEY (linked_company_id) REFERENCES companies(id) ON DELETE SET NULL; EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+    // ── ERP Rent Accrual: track which ledger rows have had a journal accrual posted ──
+    `ALTER TABLE property_monthly_ledger ADD COLUMN IF NOT EXISTS accrual_voucher_id INTEGER`,
 
     // ── Ground Scan — shared server-side session (May 2026) ──────────────────
     `CREATE TABLE IF NOT EXISTS factory_ground_scan_items (
