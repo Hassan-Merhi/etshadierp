@@ -360,9 +360,9 @@ function SpPOS() {
         </PageHeader>
       </div>
 
-      <div className="flex flex-1 overflow-hidden gap-0">
+      <div className="flex flex-col md:flex-row flex-1 overflow-y-auto md:overflow-hidden gap-0">
         {/* ── Left: Item catalog ──────────────────────────────────────────── */}
-        <div className="flex flex-col w-72 flex-shrink-0 border-r overflow-hidden">
+        <div className="flex flex-col w-full md:w-72 md:flex-shrink-0 border-b md:border-b-0 md:border-r overflow-hidden">
           <div className="p-3 border-b">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -376,7 +376,7 @@ function SpPOS() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto">
+          <div className="overflow-y-auto max-h-48 md:max-h-none md:flex-1">
             {stockLoading ? (
               <div className="p-4 text-center text-sm text-muted-foreground">Loading stock…</div>
             ) : filteredItems.length === 0 ? (
@@ -421,14 +421,15 @@ function SpPOS() {
         </div>
 
         {/* ── Center: Cart ────────────────────────────────────────────────── */}
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex flex-col flex-1 md:overflow-hidden">
+          <div className="md:flex-1 md:overflow-y-auto p-4">
             {rows.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
                 <p className="text-sm">No items in cart.</p>
                 <p className="text-xs">Click an item on the left to add it.</p>
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-muted-foreground text-xs">
@@ -496,12 +497,13 @@ function SpPOS() {
                   })}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </div>
 
         {/* ── Right: Checkout panel ────────────────────────────────────────── */}
-        <div className="w-72 flex-shrink-0 border-l flex flex-col overflow-y-auto">
+        <div className="w-full md:w-72 md:flex-shrink-0 border-t md:border-t-0 md:border-l flex flex-col overflow-y-auto">
           <div className="p-4 space-y-4 flex-1">
             {/* Date */}
             <div>
