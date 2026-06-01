@@ -51,11 +51,15 @@ export default function LabelBannersSettings() {
   const [addFile, setAddFile] = useState<File | null>(null);
   const [addingColor, setAddingColor] = useState(false);
 
-  const { data: colors = [], isLoading } = useQuery<ColorRow[]>({
+  const { data: rawColors, isLoading } = useQuery<ColorRow[]>({
     queryKey: ["/api/factory/label-design-colors"],
     queryFn: () =>
-      fetch("/api/factory/label-design-colors", { credentials: "include" }).then(r => r.json()),
+      fetch("/api/factory/label-design-colors", { credentials: "include" }).then(async r => {
+        if (!r.ok) throw new Error(await r.text());
+        return r.json();
+      }),
   });
+  const colors: ColorRow[] = Array.isArray(rawColors) ? rawColors : [];
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/factory/label-design-colors"] });
