@@ -18,7 +18,7 @@ import {
   interCompanyTransfers,
   companies,
 } from "@shared/schema";
-import { eq, and, sql, desc, inArray, isNull } from "drizzle-orm";
+import { eq, and, sql, desc, inArray, isNull, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 
 type RentalModule = "PROPERTIES" | "ERP" | "FACTORY";
@@ -2330,7 +2330,7 @@ export function registerRentalRoutes(
         .from(propertyMonthlyLedger)
         .where(and(
           inArray(propertyMonthlyLedger.contractId, contractIds),
-          isNull(propertyMonthlyLedger.accrualVoucherId).not() as any,
+          isNotNull(propertyMonthlyLedger.accrualVoucherId),
           sql`${propertyMonthlyLedger.paidAmount}::numeric = 0`,
         ));
 
