@@ -21,6 +21,7 @@ import {
 import {
   Radio, RefreshCw, Loader2, CheckCircle, XCircle, AlertTriangle,
   Minus, AlertCircle, Settings2, MapPin, Activity, Search, X, Package,
+  Pencil, ArrowUp, ArrowDown, ChevronsUpDown,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { factoryApiRequest } from "@/lib/factoryApi";
@@ -39,6 +40,10 @@ function saveMap(key: string, map: Record<string, any>) {
 // ── Types ───────────────────────────────────────────────────────────────────
 interface ContainerWithSupplier extends FactoryContainer {
   supplierName?: string | null;
+}
+
+export interface OtwTrackingTabProps {
+  onEdit?: (container: ContainerWithSupplier) => void;
 }
 
 const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
@@ -74,6 +79,41 @@ function containerCost(c: ContainerWithSupplier): { symbol: string; amount: numb
     ? num(c.finalPayableAmount)
     : num(c.ratePerKg) * num(c.totalKg);
   return { symbol, amount };
+}
+
+// ── Colored status badges ────────────────────────────────────────────────────
+const CONTAINER_STATUS_LABELS: Record<string, string> = {
+  PENDING:            "Pending",
+  IN_TRANSIT:         "In Transit",
+  ARRIVED:            "Arrived",
+  OFFLOADED:          "Offloaded",
+  PARTIALLY_RECEIVED: "Partial",
+  RECEIVED:           "Received",
+};
+
+function ContainerStatusBadge({ status }: { status: string }) {
+  const label = CONTAINER_STATUS_LABELS[status] ?? status;
+  if (status === "OFFLOADED")
+    return <Badge className="text-xs bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/20">{label}</Badge>;
+  if (status === "PARTIALLY_RECEIVED")
+    return <Badge className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20">{label}</Badge>;
+  if (status === "IN_TRANSIT")
+    return <Badge className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">{label}</Badge>;
+  if (status === "ARRIVED")
+    return <Badge className="text-xs bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20">{label}</Badge>;
+  return <Badge variant="secondary" className="text-xs">{label}</Badge>;
+}
+
+function TrackingStatusBadge({ status }: { status: string | null | undefined }) {
+  if (!status) return <Badge variant="secondary" className="text-xs">No data</Badge>;
+  const s = status.toLowerCase();
+  if (s.includes("transit") || s.includes("depart") || s.includes("vessel") || s.includes("at sea"))
+    return <Badge className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">{status}</Badge>;
+  if (s.includes("discharg") || s.includes("arrival") || s.includes("arrived") || s.includes("port"))
+    return <Badge className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20">{status}</Badge>;
+  if (s.includes("deliver") || s.includes("final") || s.includes("complete"))
+    return <Badge className="text-xs bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/20">{status}</Badge>;
+  return <Badge variant="outline" className="text-xs">{status}</Badge>;
 }
 
 // ── Inline notes cell ────────────────────────────────────────────────────────
@@ -352,17 +392,27 @@ function TrackNowProgressLog({ containerId }: { containerId: number }) {
   );
 }
 
+// ── Sortable ETA header ──────────────────────────────────────────────────────
+type EtaSort = "none" | "asc" | "desc";
+function EtaSortIcon({ sort }: { sort: EtaSort }) {
+  if (sort === "asc")  return <ArrowUp className="h-3.5 w-3.5 ml-1 shrink-0" />;
+  if (sort === "desc") return <ArrowDown className="h-3.5 w-3.5 ml-1 shrink-0" />;
+  return <ChevronsUpDown className="h-3.5 w-3.5 ml-1 shrink-0 opacity-40" />;
+}
+
 // ── Main component ───────────────────────────────────────────────────────────
-export default function FactoryOtwTrackingTab() {
+export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = {}) {
   const { toast } = useToast();
   const tqClient = useTQClient();
-
-  const [trackingNowId, setTrackingNowId]       = useState<number | null>(null);
-  const [timelineId, setTimelineId]             = useState<number | null>(null);
+  const [trackingNowId, setTrackingNowId]         = useState<number | null>(null);
+  const [timelineId, setTimelineId]               = useState<number | null>(null);
   const [settingsContainer, setSettingsContainer] = useState<ContainerWithSupplier | null>(null);
-  const [statusFilter, setStatusFilter]         = useState<string>("all");
-  const [supplierFilter, setSupplierFilter]     = useState<string>("all");
-  const [search, setSearch]                     = useState("");
+  const [statusFilter, setStatusFilter]           = useState<string>("all");
+  const [supplierFilter, setSupplierFilter]       = useState<string>("all");
+  const [freightFilter, setFreightFilter]         = useState<string>("all");
+  const [docsFilter, setDocsFilter]               = useState<string>("all");
+  const [search, setSearch]                       = useState("");
+  const [etaSort, setEtaSort]                     = useState<EtaSort>("asc");
 
   const [notes, setNotes] = useState<Record<string, string>>(() => loadMap<string>(NOTES_KEY));
   const [docs,  setDocs]  = useState<Record<string, boolean>>(() => loadMap<boolean>(DOCS_KEY));
@@ -384,10 +434,14 @@ export default function FactoryOtwTrackingTab() {
     statusCounts[c.status] = (statusCounts[c.status] || 0) + 1;
   }
 
-  // Apply filters
-  const filtered = otwContainers.filter((c) => {
+  // Apply filters + sort
+  let filtered = otwContainers.filter((c) => {
     if (statusFilter !== "all" && c.status !== statusFilter) return false;
     if (supplierFilter !== "all" && String(c.supplierId ?? "none") !== supplierFilter) return false;
+    if (freightFilter === "has_freight" && !(num(c.freight) > 0)) return false;
+    if (freightFilter === "no_freight"  && num(c.freight) > 0)    return false;
+    if (docsFilter === "received"     && !docs[String(c.id)])  return false;
+    if (docsFilter === "not_received" && !!docs[String(c.id)]) return false;
     if (search.trim()) {
       const q = search.toLowerCase();
       if (
@@ -396,6 +450,14 @@ export default function FactoryOtwTrackingTab() {
       ) return false;
     }
     return true;
+  });
+
+  // ETA sort
+  filtered = [...filtered].sort((a, b) => {
+    if (etaSort === "none") return 0;
+    const da = a.arrivalDate ? new Date(a.arrivalDate).getTime() : (etaSort === "asc" ? Infinity : -Infinity);
+    const db = b.arrivalDate ? new Date(b.arrivalDate).getTime() : (etaSort === "asc" ? Infinity : -Infinity);
+    return etaSort === "asc" ? da - db : db - da;
   });
 
   // Totals
@@ -468,6 +530,12 @@ export default function FactoryOtwTrackingTab() {
     { key: "ARRIVED",    label: "Arrived" },
   ];
 
+  const hasActiveFilters = search || supplierFilter !== "all" || freightFilter !== "all" || docsFilter !== "all";
+
+  function cycleEtaSort() {
+    setEtaSort((s) => s === "none" ? "asc" : s === "asc" ? "desc" : "none");
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -534,9 +602,9 @@ export default function FactoryOtwTrackingTab() {
         ))}
       </div>
 
-      {/* ── Search + supplier filter ── */}
+      {/* ── Search + dropdown filters ── */}
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={search}
@@ -546,8 +614,10 @@ export default function FactoryOtwTrackingTab() {
             data-testid="input-otw-search"
           />
         </div>
+
+        {/* Supplier */}
         <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-          <SelectTrigger className="w-[200px]" data-testid="select-supplier-filter">
+          <SelectTrigger className="w-[170px]" data-testid="select-supplier-filter">
             <SelectValue placeholder="All suppliers" />
           </SelectTrigger>
           <SelectContent>
@@ -557,11 +627,42 @@ export default function FactoryOtwTrackingTab() {
             ))}
           </SelectContent>
         </Select>
-        {(search || supplierFilter !== "all") && (
-          <Button variant="ghost" size="icon" onClick={() => { setSearch(""); setSupplierFilter("all"); }} data-testid="button-clear-filters">
+
+        {/* Freight */}
+        <Select value={freightFilter} onValueChange={setFreightFilter}>
+          <SelectTrigger className="w-[150px]" data-testid="select-freight-filter">
+            <SelectValue placeholder="Freight" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All freight</SelectItem>
+            <SelectItem value="has_freight">Has freight</SelectItem>
+            <SelectItem value="no_freight">No freight</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Docs */}
+        <Select value={docsFilter} onValueChange={setDocsFilter}>
+          <SelectTrigger className="w-[150px]" data-testid="select-docs-filter">
+            <SelectValue placeholder="Docs" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All docs</SelectItem>
+            <SelectItem value="received">Docs received</SelectItem>
+            <SelectItem value="not_received">Docs pending</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {hasActiveFilters && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => { setSearch(""); setSupplierFilter("all"); setFreightFilter("all"); setDocsFilter("all"); }}
+            data-testid="button-clear-filters"
+          >
             <X className="h-4 w-4" />
           </Button>
         )}
+
         <span className="text-xs text-muted-foreground ml-auto">
           {filtered.length !== otwContainers.length ? `${filtered.length} of ${otwContainers.length}` : `${filtered.length}`} shown
           {" · "}{docsReceived} docs received
@@ -582,7 +683,17 @@ export default function FactoryOtwTrackingTab() {
                 <TableHead className="w-10 text-center">#</TableHead>
                 <TableHead className="whitespace-nowrap">Container #</TableHead>
                 <TableHead className="whitespace-nowrap">Supplier</TableHead>
-                <TableHead className="whitespace-nowrap">ETA</TableHead>
+                <TableHead className="whitespace-nowrap">Status</TableHead>
+                <TableHead className="whitespace-nowrap">Tracking</TableHead>
+                <TableHead
+                  className="whitespace-nowrap cursor-pointer select-none"
+                  onClick={cycleEtaSort}
+                  data-testid="th-eta-sort"
+                >
+                  <span className="flex items-center">
+                    ETA <EtaSortIcon sort={etaSort} />
+                  </span>
+                </TableHead>
                 <TableHead className="whitespace-nowrap text-right">Cost</TableHead>
                 <TableHead className="whitespace-nowrap text-right">Freight</TableHead>
                 <TableHead className="whitespace-nowrap text-right">Commission</TableHead>
@@ -593,16 +704,16 @@ export default function FactoryOtwTrackingTab() {
             </TableHeader>
             <TableBody>
               {filtered.map((c, idx) => {
-                const fc        = c as any;
-                const cost      = containerCost(c);
-                const frSym     = ccySym(c.freightCurrencyCode || c.currencyCode);
-                const commSym   = ccySym(c.commissionCurrencyCode || "USD");
-                const docDone   = !!docs[String(c.id)];
+                const fc         = c as any;
+                const cost       = containerCost(c);
+                const frSym      = ccySym(c.freightCurrencyCode || c.currencyCode);
+                const commSym    = ccySym(c.commissionCurrencyCode || "USD");
+                const docDone    = !!docs[String(c.id)];
                 const isTracking = trackingNowId === c.id;
-                const hasError  = !!fc.trackingError;
-                const isEnabled = fc.trackingEnabled !== false;
+                const hasError   = !!fc.trackingError;
+                const isEnabled  = fc.trackingEnabled !== false;
                 const isValidNum = /^[A-Z]{4}\d{7}$/.test((c.containerNumber || "").trim().toUpperCase());
-                const isOverdue = c.arrivalDate && new Date(c.arrivalDate) < new Date();
+                const isOverdue  = c.arrivalDate && new Date(c.arrivalDate) < new Date();
 
                 return (
                   <TableRow
@@ -629,8 +740,7 @@ export default function FactoryOtwTrackingTab() {
                             <XCircle className="h-3 w-3 shrink-0" />
                             {(() => {
                               const err: string = fc.trackingError ?? "";
-                              const isTimeout = err.toLowerCase().includes("timeout");
-                              return isTimeout ? "Carrier timeout" : err.slice(0, 40);
+                              return err.toLowerCase().includes("timeout") ? "Carrier timeout" : err.slice(0, 40);
                             })()}
                           </span>
                         )}
@@ -640,6 +750,20 @@ export default function FactoryOtwTrackingTab() {
                     {/* Supplier */}
                     <TableCell className="text-sm whitespace-nowrap">
                       {fc.supplierName ?? <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+
+                    {/* Status */}
+                    <TableCell>
+                      <ContainerStatusBadge status={c.status ?? "PENDING"} />
+                    </TableCell>
+
+                    {/* Tracking status */}
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      {isTracking ? (
+                        <Badge variant="secondary" className="text-xs"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Tracking…</Badge>
+                      ) : (
+                        <TrackingStatusBadge status={fc.trackingLastStatus} />
+                      )}
                     </TableCell>
 
                     {/* ETA */}
@@ -692,9 +816,29 @@ export default function FactoryOtwTrackingTab() {
                     {/* Actions */}
                     <TableCell className="pr-4" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
+                        {onEdit && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => onEdit(c)}
+                                data-testid={`button-otw-edit-${c.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Edit Container</TooltipContent>
+                          </Tooltip>
+                        )}
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={() => setSettingsContainer(c)} data-testid={`button-otw-settings-${c.id}`}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setSettingsContainer(c)}
+                              data-testid={`button-otw-settings-${c.id}`}
+                            >
                               <Settings2 className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>

@@ -2002,7 +2002,7 @@ export default function FactoryContainers() {
       )}
 
       {viewMode === "tracking" && (
-        <FactoryOtwTrackingTab />
+        <FactoryOtwTrackingTab onEdit={openEdit} />
       )}
 
       <Dialog open={createOpen || !!editingContainer} onOpenChange={(open) => {
