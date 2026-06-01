@@ -257,12 +257,18 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
   });
 
   const postAccrual = useMutation({
-    mutationFn: () => apiRequest("POST", apiBase + "/accrue"),
-    onSuccess: (data: any) => {
+    mutationFn: async () => {
+      const res = await apiRequest("POST", apiBase + "/accrue");
+      return res.json() as Promise<{ accrued: number; skipped: number }>;
+    },
+    onSuccess: (data) => {
       const n = data?.accrued ?? 0;
+      const s = data?.skipped ?? 0;
       toast({
-        title: n > 0 ? `${n} accrual${n !== 1 ? "s" : ""} posted` : "Nothing to accrue",
-        description: n > 0 ? "Journal vouchers created: Dr Rent Expense / Cr Accrued Rent Payable" : "All due months are already accrued or paid.",
+        title: n > 0 ? `${n} accrual${n !== 1 ? "s" : ""} posted` : "Nothing new to accrue",
+        description: n > 0
+          ? `Journal vouchers created (Dr Rent Expense / Cr Accrued Rent Payable)${s > 0 ? ` · ${s} month${s !== 1 ? "s" : ""} already done` : ""}`
+          : s > 0 ? `${s} month${s !== 1 ? "s" : ""} already accrued — nothing new to post.` : "All due months are already paid.",
       });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
     },

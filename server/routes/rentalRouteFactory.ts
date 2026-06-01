@@ -372,22 +372,23 @@ async function ensureMonthlyForCompany(companyId: number, module: RentalModule) 
  * Scoped to ERP module + SHOP unit type only. Safe to call for any contract —
  * it returns 0 immediately if the contract is not an ERP SHOP contract.
  *
- * Returns the number of rows that had an accrual posted.
+ * Returns { accrued, skipped } where accrued = newly-posted rows,
+ * skipped = due+unpaid rows that already had an accrual (nothing to do).
  */
 async function postRentAccrualForContract(
   contractId: number,
   shopExpenseAccountName: string,
-): Promise<number> {
+): Promise<{ accrued: number; skipped: number }> {
   // Load contract and verify it is an ERP contract
   const [contract] = await db.select().from(propertyContracts)
     .where(and(eq(propertyContracts.id, contractId), eq(propertyContracts.module, "ERP")));
-  if (!contract) return 0;
+  if (!contract) return { accrued: 0, skipped: 0 };
 
   // Verify the unit is SHOP type
   const [unit] = await db.select({ unitType: propertyUnits.unitType })
     .from(propertyUnits)
     .where(eq(propertyUnits.id, contract.unitId));
-  if (!unit || unit.unitType !== "SHOP") return 0;
+  if (!unit || unit.unitType !== "SHOP") return { accrued: 0, skipped: 0 };
 
   // Compute billing day from contract start date (day-of-month the tenant started)
   const billingDay = new Date(contract.startDate as any).getUTCDate();
@@ -415,7 +416,7 @@ async function postRentAccrualForContract(
     return false;
   });
 
-  if (dueRows.length === 0) return 0;
+  if (dueRows.length === 0) return { accrued: 0, skipped: 0 };
 
   let accrued = 0;
   const unitLabel = `${contract.companyId}-unit${contract.unitId}`;
@@ -470,7 +471,7 @@ async function postRentAccrualForContract(
       console.warn(`[ERP/rental] accrual skipped row ${row.id}:`, e.message?.split("\n")[0]);
     }
   }
-  return accrued;
+  return { accrued, skipped: dueRows.length - accrued };
 }
 
 export function registerRentalRoutes(
@@ -1722,9 +1723,7 @@ export function registerRentalRoutes(
             }).returning();
             voucherId = v.id;
 
-            const debitEntries: Parameters<typeof tx.insert>[0] extends never ? never : {
-              voucherId: number; ledgerAccountId: number; debitAmount: string; creditAmount: string; narration: string;
-            }[] = [];
+            const debitEntries: { voucherId: number; ledgerAccountId: number; debitAmount: string; creditAmount: string; narration: string }[] = [];
             if (accrualChunk > 0) {
               const liabilityId = await findOrCreateLedgerAccount(tx, companyId, "Accrued Rent Payable", "Liability", "ACCR-RENT-PAY");
               debitEntries.push({ voucherId: v.id, ledgerAccountId: liabilityId, debitAmount: String(accrualChunk), creditAmount: "0", narration });
@@ -1858,7 +1857,24 @@ export function registerRentalRoutes(
 
             const voucherCurrency = data.currency || "USD";
             if (isShop) {
-              const expenseAccountId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
+              // Mirror single-payment accrual-aware logic: split debit by whether each
+              // allocated month was previously accrued or not (same as /payments).
+              type BulkAllocRow = typeof allocations[0] & { isAccrued: boolean };
+              const allocRows: BulkAllocRow[] = [];
+              for (const alloc of allocations) {
+                const [existingRow] = await tx
+                  .select({ accrualVoucherId: propertyMonthlyLedger.accrualVoucherId })
+                  .from(propertyMonthlyLedger)
+                  .where(and(
+                    eq(propertyMonthlyLedger.contractId, contract.id),
+                    eq(propertyMonthlyLedger.year, alloc.year),
+                    eq(propertyMonthlyLedger.month, alloc.month),
+                  ));
+                allocRows.push({ ...alloc, isAccrued: !!(existingRow?.accrualVoucherId) });
+              }
+              const accrualChunk = allocRows.filter(a => a.isAccrued).reduce((s, a) => s + Number(a.chunk), 0);
+              const expenseChunk = allocRows.filter(a => !a.isAccrued).reduce((s, a) => s + Number(a.chunk), 0);
+
               const narration = `Rent paid - ${unitLabel} - ${monthSpan}`;
               const [v] = await tx.insert(vouchers).values({
                 companyId, voucherNumber: `RENT-${Date.now()}-${Math.random().toString(36).slice(2,7)}-${contract.id}`,
@@ -1866,8 +1882,17 @@ export function registerRentalRoutes(
                 description: narration, totalAmount: data.amount, currency: voucherCurrency, sourceModule: "ERP",
               }).returning();
               voucherId = v.id;
+              const bulkDebitEntries: { voucherId: number; ledgerAccountId: number; debitAmount: string; creditAmount: string; narration: string }[] = [];
+              if (accrualChunk > 0) {
+                const liabilityId = await findOrCreateLedgerAccount(tx, companyId, "Accrued Rent Payable", "Liability", "ACCR-RENT-PAY");
+                bulkDebitEntries.push({ voucherId: v.id, ledgerAccountId: liabilityId, debitAmount: String(accrualChunk), creditAmount: "0", narration });
+              }
+              if (expenseChunk > 0) {
+                const expenseId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
+                bulkDebitEntries.push({ voucherId: v.id, ledgerAccountId: expenseId, debitAmount: String(expenseChunk), creditAmount: "0", narration });
+              }
               await tx.insert(voucherEntries).values([
-                { voucherId: v.id, ledgerAccountId: expenseAccountId, debitAmount: data.amount, creditAmount: "0", narration },
+                ...bulkDebitEntries,
                 { voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: "0", creditAmount: data.amount, narration },
               ]);
             } else {
@@ -2179,13 +2204,16 @@ export function registerRentalRoutes(
           eq(propertyUnits.unitType, "SHOP"),
         ));
 
-      // accrued = total newly-posted ledger rows across all shop contracts
+      // accrued = newly-posted rows; skipped = due+unpaid rows already accrued in a prior run
       let accrued = 0;
+      let skipped = 0;
       for (const c of shopContracts) {
-        accrued += await postRentAccrualForContract(c.id, shopExpenseAccountName);
+        const result = await postRentAccrualForContract(c.id, shopExpenseAccountName);
+        accrued += result.accrued;
+        skipped += result.skipped;
       }
 
-      res.json({ accrued });
+      res.json({ accrued, skipped });
     } catch (e: any) {
       console.error(`${tag} accrue:`, e);
       res.status(500).json({ message: e.message });
