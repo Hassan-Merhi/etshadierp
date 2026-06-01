@@ -130,7 +130,7 @@ app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization,X-CSRF-Token,X-Requested-With");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization,X-CSRF-Token,X-Client-Date,X-Requested-With");
     res.setHeader("Access-Control-Max-Age", "86400"); // 24h preflight cache
     if (req.method === "OPTIONS") {
       res.sendStatus(204);
