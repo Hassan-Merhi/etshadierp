@@ -416,6 +416,7 @@ async function postRentAccrualForCompany(
     .select({
       id: propertyContracts.id,
       unitId: propertyContracts.unitId,
+      unitNumber: propertyUnits.unitNumber,
       startDate: propertyContracts.startDate,
       currency: propertyContracts.currency,
     })
@@ -431,6 +432,9 @@ async function postRentAccrualForCompany(
   if (shopContracts.length === 0) return { accrued: 0, skipped: 0 };
 
   const contractIds = shopContracts.map(c => c.id);
+
+  // Unit name (display label) keyed by unitId
+  const unitNameById = new Map(shopContracts.map(c => [c.unitId, c.unitNumber]));
 
   // Billing day (day-of-month) keyed by contractId
   const billingDayByContract = new Map(
@@ -537,7 +541,7 @@ async function postRentAccrualForCompany(
         ledgerAccountId:  expenseAccountId,
         debitAmount:      String(e.amount),
         creditAmount:     "0",
-        narration:        `Rent accrual - ${companyId}-unit${e.unitId} - ${String(e.month).padStart(2, "0")}/${e.year}`,
+        narration:        `Rent accrual - ${unitNameById.get(e.unitId) ?? `unit${e.unitId}`} - ${String(e.month).padStart(2, "0")}/${e.year}`,
       }));
 
       // One combined credit to Accrued Rent Payable
