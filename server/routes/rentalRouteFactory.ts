@@ -480,6 +480,11 @@ async function postRentAccrualForCompany(
   const pendingRows = allUnaccrued.filter(isDue);
   const alreadyDone = allAccruedForSkip.length; // count only — not filtered by isDue for simplicity
 
+  console.log(`[postRentAccrual] company=${companyId} unaccrued=${allUnaccrued.length} pendingDue=${pendingRows.length} alreadyDone=${alreadyDone} curYear=${curYear} curMonth=${curMonth} curDay=${curDay}`);
+  if (pendingRows.length > 0) {
+    console.log(`[postRentAccrual] pendingRows sample:`, JSON.stringify(pendingRows.slice(0, 3).map(r => ({ id: r.id, year: r.year, month: r.month, contractId: r.contractId, paid: r.paidAmount, expected: r.expectedAmount }))));
+  }
+
   if (pendingRows.length === 0) return { accrued: 0, skipped: alreadyDone };
 
   let accrued = 0;
@@ -584,7 +589,7 @@ async function postRentAccrualForCompany(
     console.warn(`[ERP/rental] batch accrual failed company ${companyId}:`, e.message?.split("\n")[0]);
   }
 
-  return { accrued, skipped: alreadyDone.length };
+  return { accrued, skipped: alreadyDone };
 }
 
 export function registerRentalRoutes(
@@ -2353,18 +2358,24 @@ export function registerRentalRoutes(
       const curYear  = now.getUTCFullYear();
       const curMonth = now.getUTCMonth() + 1;
 
-      const curMonthAccruedRows = await db
+      // Diagnostic: log all current-month rows (with and without accrualVoucherId)
+      const allCurMonthRows = await db
         .select({
           id:               propertyMonthlyLedger.id,
           accrualVoucherId: propertyMonthlyLedger.accrualVoucherId,
+          paidAmount:       propertyMonthlyLedger.paidAmount,
+          expectedAmount:   propertyMonthlyLedger.expectedAmount,
+          year:             propertyMonthlyLedger.year,
+          month:            propertyMonthlyLedger.month,
         })
         .from(propertyMonthlyLedger)
         .where(and(
           inArray(propertyMonthlyLedger.contractId, contractIds),
-          isNotNull(propertyMonthlyLedger.accrualVoucherId),
-          eq(propertyMonthlyLedger.year,  curYear),
-          eq(propertyMonthlyLedger.month, curMonth),
+          sql`${propertyMonthlyLedger.year} = ${curYear} AND ${propertyMonthlyLedger.month} = ${curMonth}`,
         ));
+      console.log(`[re-accrue] company=${companyId} ${curYear}-${curMonth} totalRows=${allCurMonthRows.length}`, JSON.stringify(allCurMonthRows));
+
+      const curMonthAccruedRows = allCurMonthRows.filter(r => r.accrualVoucherId !== null && r.accrualVoucherId !== undefined);
 
       const voucherIdsToDelete = [
         ...new Set(
@@ -2373,6 +2384,8 @@ export function registerRentalRoutes(
             .filter((id): id is number => id !== null && id !== undefined),
         ),
       ];
+
+      console.log(`[re-accrue] accrued rows=${curMonthAccruedRows.length} vouchersToDelete=${JSON.stringify(voucherIdsToDelete)}`);
 
       let reset = 0;
       if (voucherIdsToDelete.length > 0) {
@@ -2394,6 +2407,7 @@ export function registerRentalRoutes(
 
       // 3. Re-run the combined accrual
       const { accrued, skipped } = await postRentAccrualForCompany(companyId, shopExpenseAccountName);
+      console.log(`[re-accrue] result reset=${reset} accrued=${accrued} skipped=${skipped}`);
 
       res.json({ reset, accrued, skipped });
     } catch (e: any) {
