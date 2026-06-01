@@ -202,7 +202,7 @@ export default function Login() {
     : Fingerprint;
 
   return (
-    <div className="flex flex-col lg:flex-row lg:h-screen lg:overflow-hidden">
+    <div className="flex flex-col lg:flex-row lg:h-full lg:overflow-hidden">
 
       {/* ══════════════════════════════════════════
           LEFT — Branding panel (desktop only)

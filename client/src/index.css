@@ -698,17 +698,22 @@
   body {
     overflow-x: clip;
     /* clip (not hidden) preserves position:fixed descendants */
+    height: 100%;
   }
 
-  /* ── 2. Android WebView safe-area padding ───────────────────────────────
-     Adds padding for notch (top), gesture bar (bottom), and rounded corners
-     (left/right). Applied to the outermost scrolling container so the
-     content never sits under system UI chrome. */
-  body {
+  /* ── 2. Safe-area insets for notch / home-indicator / rounded corners ───
+     Applied to #root (not body) so that inner h-full layout shells
+     correctly fill the safe viewport without causing body overflow.
+     viewport-fit=cover in index.html makes these insets non-zero on iOS. */
+  #root {
+    height: 100dvh;
+    box-sizing: border-box;
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
+    display: flex;
+    flex-direction: column;
   }
 
   /* ── 3. Dialogs / modals fit within viewport ────────────────────────────

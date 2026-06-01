@@ -584,7 +584,7 @@ function AuthenticatedApp() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-full">
         <p className="text-muted-foreground">Loading...</p>
       </div>
     );
@@ -647,7 +647,7 @@ function AuthenticatedApp() {
     return (
       <>
         <SidebarProvider style={posStyle as React.CSSProperties}>
-          <div className="flex h-screen w-full">
+          <div className="flex h-full w-full">
             {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
             <Sidebar>
               <SidebarHeader className="p-3 border-b">
@@ -888,7 +888,7 @@ function AuthenticatedApp() {
     // through so the user gets the factory shell rather than a permanent blank screen.
     if (myAccessLoading) {
       return (
-        <div className="flex items-center justify-center h-screen">
+        <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground text-sm">Loading...</p>
         </div>
       );
