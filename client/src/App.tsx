@@ -568,6 +568,10 @@ function AuthenticatedApp() {
     try {
       await apiRequest("POST", "/api/auth/logout", {});
       queryClient.clear();
+      try {
+        const { clearBiometricCredentials } = await import("@/pages/Login");
+        await clearBiometricCredentials();
+      } catch {}
       window.location.href = "/login";
     } catch (error) {
       console.error("Logout failed:", error);

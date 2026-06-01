@@ -2,12 +2,31 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, BarChart3, ShoppingCart, Boxes, Factory } from "lucide-react";
+import { Eye, EyeOff, BarChart3, ShoppingCart, Boxes, Factory, ScanFace, Fingerprint } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, resetCsrfToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/components/ThemeProvider";
+import { Capacitor } from "@capacitor/core";
+import { Preferences } from "@capacitor/preferences";
+import { BiometricAuth, BiometryType } from "@aparajita/capacitor-biometric-auth";
+
+const CRED_KEY = "biometric_creds";
+
+export async function saveBiometricCredentials(username: string, password: string) {
+  await Preferences.set({ key: CRED_KEY, value: JSON.stringify({ username, password }) });
+}
+
+export async function clearBiometricCredentials() {
+  await Preferences.remove({ key: CRED_KEY });
+}
+
+async function loadBiometricCredentials(): Promise<{ username: string; password: string } | null> {
+  const { value } = await Preferences.get({ key: CRED_KEY });
+  if (!value) return null;
+  try { return JSON.parse(value); } catch { return null; }
+}
 
 const features = [
   { icon: Boxes,        title: "Inventory Management",  description: "Real-time stock tracking across all locations" },
@@ -79,6 +98,13 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isMobile, setIsMobile]         = useState(() => typeof window !== "undefined" && window.innerWidth < 1024);
 
+  const [biometryAvailable, setBiometryAvailable]   = useState(false);
+  const [biometryType, setBiometryType]             = useState<BiometryType | null>(null);
+  const [hasSavedCreds, setHasSavedCreds]           = useState(false);
+  const [biometryPending, setBiometryPending]       = useState(false);
+
+  const isNative = Capacitor.isNativePlatform();
+
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
     const handler = (e: MediaQueryListEvent) => setIsMobile(!e.matches);
@@ -86,10 +112,25 @@ export default function Login() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
+  useEffect(() => {
+    if (!isNative) return;
+    (async () => {
+      try {
+        const info = await BiometricAuth.checkBiometry();
+        if (info.isAvailable) {
+          setBiometryAvailable(true);
+          setBiometryType(info.biometryTypes?.[0] ?? null);
+          const creds = await loadBiometricCredentials();
+          setHasSavedCreds(!!creds);
+        }
+      } catch {
+        // biometrics not available
+      }
+    })();
+  }, [isNative]);
+
   const t = tk[theme as "light" | "dark"] ?? tk.light;
   const isLight = (theme as string) !== "dark";
-
-  // On mobile the background is always dark, so form tokens always use dark palette
   const ft = isMobile ? tk.dark : t;
 
   const [, navigate] = useLocation();
@@ -99,14 +140,13 @@ export default function Login() {
       const res = await apiRequest("POST", "/api/auth/login", credentials);
       return await res.json();
     },
-    onSuccess: (userData) => {
-      // Pre-seed the auth cache so App.tsx never sees a blank user on mount.
-      // This eliminates the race between navigate() and the /api/auth/me refetch,
-      // which would otherwise redirect back to /login if the network is slow.
+    onSuccess: async (userData, credentials) => {
       queryClient.setQueryData(["/api/auth/me"], userData);
-      // The server assigned a new CSRF token to the new session — clear the
-      // client-side cache so the next mutation fetches the fresh token.
       resetCsrfToken();
+      if (isNative && biometryAvailable) {
+        try { await saveBiometricCredentials(credentials.username, credentials.password); } catch {}
+        setHasSavedCreds(true);
+      }
       navigate("/");
     },
     onError: (error: any) => {
@@ -124,6 +164,43 @@ export default function Login() {
     loginMutation.mutate({ username, password });
   };
 
+  const handleBiometricLogin = async () => {
+    setBiometryPending(true);
+    try {
+      await BiometricAuth.authenticate({
+        reason: "Sign in to HMD ERP",
+        cancelTitle: "Use Password",
+        allowDeviceCredential: false,
+      });
+      const creds = await loadBiometricCredentials();
+      if (!creds) {
+        toast({ title: "No saved credentials", description: "Please sign in with your password first.", variant: "destructive" });
+        return;
+      }
+      loginMutation.mutate(creds);
+    } catch (err: any) {
+      if (err?.code !== "userCancel" && err?.code !== "systemCancel" && err?.code !== "appCancel") {
+        toast({ title: "Biometric failed", description: "Please sign in with your password.", variant: "destructive" });
+      }
+    } finally {
+      setBiometryPending(false);
+    }
+  };
+
+  const showBiometricButton = isNative && biometryAvailable && hasSavedCreds;
+
+  const biometricLabel = (() => {
+    if (biometryType === BiometryType.faceId) return "Face ID";
+    if (biometryType === BiometryType.touchId) return "Touch ID";
+    if (biometryType === BiometryType.faceAuthentication) return "Face Unlock";
+    if (biometryType === BiometryType.fingerprintAuthentication) return "Fingerprint";
+    return "Biometrics";
+  })();
+
+  const BiometricIcon = biometryType === BiometryType.faceId || biometryType === BiometryType.faceAuthentication
+    ? ScanFace
+    : Fingerprint;
+
   return (
     <div className="flex flex-col lg:flex-row lg:h-screen lg:overflow-hidden">
 
@@ -134,7 +211,6 @@ export default function Login() {
         className="hidden lg:flex lg:w-[46%] shrink-0 flex-col justify-between px-12 py-10 relative overflow-hidden"
         style={{ background: t.leftBg }}
       >
-        {/* Top glow */}
         <div className="pointer-events-none absolute top-0 left-0 right-0 h-[55%]"
           style={{ background: `radial-gradient(ellipse 80% 60% at 50% 10%, rgba(201,168,76,0.14) 0%, transparent 70%)` }} />
         <div className="pointer-events-none absolute -top-32 -right-20 w-80 h-80 rounded-full opacity-[0.06]"
@@ -142,7 +218,6 @@ export default function Login() {
         <div className="pointer-events-none absolute -bottom-20 -left-16 w-64 h-64 rounded-full opacity-[0.04]"
           style={{ background: GOLD, filter: "blur(40px)" }} />
 
-        {/* Logo */}
         <div className="relative z-10 flex flex-col items-start gap-4">
           <div className="relative">
             <div className="absolute inset-0 rounded-full"
@@ -155,7 +230,6 @@ export default function Login() {
             style={{ background: `linear-gradient(90deg, ${GOLD} 0%, transparent 100%)`, opacity: 0.45 }} />
         </div>
 
-        {/* Headline + features */}
         <div className="relative z-10 space-y-8">
           <div className="space-y-3">
             <h2 className="text-[2.1rem] font-extrabold leading-tight tracking-tight"
@@ -196,23 +270,15 @@ export default function Login() {
         className="flex flex-1 flex-col lg:overflow-y-auto relative"
         style={{ background: isMobile ? DARK_BG : t.rightBg }}
       >
-        {/* Desktop: left-edge gold bleed */}
         <div className="hidden lg:block pointer-events-none absolute top-0 left-0 bottom-0 w-32 z-0"
           style={{ background: t.bridge }} />
-
-        {/* Desktop: soft gold glow behind card */}
         <div className="pointer-events-none absolute inset-0 z-0"
           style={{ background: isMobile ? "radial-gradient(ellipse 80% 50% at 50% 100%, rgba(201,168,76,0.08) 0%, transparent 70%)" : t.cardGlow }} />
-
-        {/* Gold gradient accent stripe */}
         <div className="absolute top-0 left-0 right-0 h-[3px] z-10"
           style={{ background: t.stripe }} />
 
-        {/* ── MOBILE HERO (hidden on desktop) ── */}
-        <div
-          className="lg:hidden relative overflow-hidden flex flex-col items-center pb-8 pt-14 px-6"
-        >
-          {/* Top glow */}
+        {/* ── MOBILE HERO ── */}
+        <div className="lg:hidden relative overflow-hidden flex flex-col items-center pb-8 pt-14 px-6">
           <div className="pointer-events-none absolute top-0 left-0 right-0 h-64"
             style={{ background: `radial-gradient(ellipse 90% 70% at 50% 0%, rgba(201,168,76,0.18) 0%, transparent 70%)` }} />
           <div className="pointer-events-none absolute -top-20 -right-10 w-56 h-56 rounded-full opacity-[0.07]"
@@ -220,19 +286,13 @@ export default function Login() {
           <div className="pointer-events-none absolute -bottom-10 -left-10 w-40 h-40 rounded-full opacity-[0.05]"
             style={{ background: GOLD, filter: "blur(28px)" }} />
 
-          {/* Theme toggle — top right */}
           <div className="absolute top-5 right-5 z-10">
             <div className="rounded-lg border p-0.5"
-              style={{
-                background: "rgba(255,255,255,0.06)",
-                borderColor: "rgba(201,168,76,0.20)",
-                backdropFilter: "blur(8px)",
-              }}>
+              style={{ background: "rgba(255,255,255,0.06)", borderColor: "rgba(201,168,76,0.20)", backdropFilter: "blur(8px)" }}>
               <ThemeToggle />
             </div>
           </div>
 
-          {/* Logo */}
           <div className="relative z-10 mb-5">
             <div className="absolute inset-0 rounded-full"
               style={{ background: `radial-gradient(circle, rgba(201,168,76,0.22) 0%, transparent 70%)`, transform: "scale(1.25)", filter: "blur(16px)" }} />
@@ -241,7 +301,6 @@ export default function Login() {
               style={{ mixBlendMode: "screen" }} />
           </div>
 
-          {/* Brand text */}
           <div className="relative z-10 text-center space-y-1">
             <h1 className="text-[1.45rem] font-extrabold leading-tight tracking-tight"
               style={{ color: GOLD_LIGHT }}>
@@ -253,12 +312,11 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Gold wave divider */}
           <div className="relative z-10 mt-6 w-20 h-px"
             style={{ background: `linear-gradient(90deg, transparent, ${GOLD}, transparent)`, opacity: 0.5 }} />
         </div>
 
-        {/* Desktop: theme toggle top bar */}
+        {/* Desktop: theme toggle */}
         <div className="hidden lg:flex relative z-10 items-center justify-end px-6 pt-5 pb-2">
           <div className="rounded-lg border p-0.5"
             style={{
@@ -273,8 +331,6 @@ export default function Login() {
         {/* ── FORM ── */}
         <div className="relative z-10 flex flex-1 items-center justify-center px-6 py-8 lg:py-10">
           <div className="w-full max-w-[400px]">
-
-            {/* Card */}
             <div
               className="rounded-2xl p-7 sm:p-8 space-y-6"
               style={{
@@ -285,7 +341,6 @@ export default function Login() {
                 WebkitBackdropFilter: "blur(18px)",
               }}
             >
-              {/* Heading */}
               <div className="space-y-1">
                 <p className="text-[0.6rem] font-bold tracking-[0.3em] uppercase hidden lg:block"
                   style={{ color: isLight ? "hsl(200 55% 36%)" : "rgba(201,168,76,0.45)" }}>
@@ -299,11 +354,28 @@ export default function Login() {
                 </p>
               </div>
 
-              {/* Thin gold rule */}
               <div className="h-px w-full"
                 style={{ background: `linear-gradient(90deg, ${GOLD}44, ${GOLD}22, transparent)` }} />
 
-              {/* Form */}
+              {/* Biometric quick-sign-in button */}
+              {showBiometricButton && (
+                <button
+                  type="button"
+                  onClick={handleBiometricLogin}
+                  disabled={biometryPending || loginMutation.isPending}
+                  data-testid="button-biometric-login"
+                  className="w-full h-11 rounded-xl font-semibold text-sm flex items-center justify-center gap-2.5 disabled:opacity-60 transition-opacity"
+                  style={{
+                    background: "rgba(201,168,76,0.12)",
+                    border: `1px solid rgba(201,168,76,0.30)`,
+                    color: GOLD_LIGHT,
+                  }}
+                >
+                  <BiometricIcon className="h-5 w-5" />
+                  {biometryPending ? "Verifying…" : `Sign in with ${biometricLabel}`}
+                </button>
+              )}
+
               <form onSubmit={handleLogin} className="space-y-4" noValidate>
                 <div className="space-y-1.5">
                   <Label htmlFor="username" style={{ color: ft.labelColor }}>Username</Label>
@@ -347,7 +419,7 @@ export default function Login() {
                 <button
                   type="submit"
                   data-testid="button-login"
-                  disabled={loginMutation.isPending}
+                  disabled={loginMutation.isPending || biometryPending}
                   className="w-full h-10 rounded-md font-bold text-sm text-black hover:opacity-90 active:scale-[0.985] disabled:opacity-60 mt-1"
                   style={{
                     background: ft.btnBg,

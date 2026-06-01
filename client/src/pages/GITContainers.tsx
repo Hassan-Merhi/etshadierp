@@ -1478,7 +1478,7 @@ function MultiFilterSelect({
 }
 
 export default function GITContainers({ embedded = false }: { embedded?: boolean } = {}) {
-  const { data: user } = useQuery<AuthUser>({ queryKey: ["/api/auth/me"] });
+  const { data: user, isLoading: userLoading } = useQuery<AuthUser>({ queryKey: ["/api/auth/me"] });
 
   const [allCompanies, setAllCompanies] = useState(false);
   const [companyFilter, setCompanyFilter] = useState("ALL");
@@ -1770,6 +1770,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   }
 
   // ── Access denied ──
+  if (userLoading) return null;
   if (user && !isAllowed) {
     return (
       <div className="flex flex-col h-full overflow-hidden">
