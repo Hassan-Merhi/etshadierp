@@ -99,7 +99,16 @@ export default function Login() {
       const res = await apiRequest("POST", "/api/auth/login", credentials);
       return await res.json();
     },
-    onSuccess: () => { navigate("/"); },
+    onSuccess: (userData) => {
+      // Pre-seed the auth cache so App.tsx never sees a blank user on mount.
+      // This eliminates the race between navigate() and the /api/auth/me refetch,
+      // which would otherwise redirect back to /login if the network is slow.
+      queryClient.setQueryData(["/api/auth/me"], userData);
+      // The server assigned a new CSRF token to the new session — clear the
+      // client-side cache so the next mutation fetches the fresh token.
+      resetCsrfToken();
+      navigate("/");
+    },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;
       toast({ title: "Login Failed", description: error.message || "Invalid username or password", variant: "destructive" });

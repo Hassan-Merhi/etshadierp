@@ -434,7 +434,6 @@ function AuthenticatedApp() {
     queryFn: getQueryFn({ on401: "returnNull" }),
     retry: false,
     staleTime: 30 * 60 * 1000,
-    refetchOnMount: "always",
   });
 
   const navigateToParent = useCallback(() => {
