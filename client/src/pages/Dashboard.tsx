@@ -266,7 +266,7 @@ export default function Dashboard() {
       return res.json();
     },
     enabled: !!selectedCompany && isFactoryMode,
-    refetchInterval: 60000,
+    refetchInterval: 300000, // 5 min — KPIs don't need sub-minute freshness; was 60 s causing steady background load on Android
   });
 
   const { data: dashboardCashAccounts = [], error: cashAccountsError } = useQuery<DashboardCashAccount[]>(

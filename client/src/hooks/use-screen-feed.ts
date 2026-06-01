@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react";
 import html2canvas from "html2canvas";
 
-// How often to check if a Developer is watching us (cheap GET, no canvas)
-const POLL_INTERVAL_MS    = 2000;
+// How often to check if a Developer is watching us (cheap GET, no canvas).
+// Kept at 15 s to avoid saturating the Android WebView JS↔Java bridge with
+// constant background fetches (was 2 s, causing steady main-thread pressure).
+const POLL_INTERVAL_MS    = 15000;
 // How often to capture + upload a frame while being watched
 const CAPTURE_INTERVAL_MS = 3000;
 // Max time to wait for html2canvas before giving up on a frame.

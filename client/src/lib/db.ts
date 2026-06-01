@@ -311,6 +311,13 @@ export async function upsertGlobalSyncState(
   }
 }
 
+// Prune check runs every N writes instead of every write.
+// A full count() scan on every log write blocks the IDB thread on Android
+// WebView; throttling to 1-in-25 reduces that pressure ~25× at the cost of
+// letting the table grow to at most ~524 rows before the next prune.
+let _syncLogWriteCount = 0;
+const SYNC_LOG_PRUNE_EVERY = 25;
+
 export async function appendSyncLog(
   type: SyncLog["type"],
   message: string,
@@ -323,10 +330,13 @@ export async function appendSyncLog(
       message,
       metadata: metadata ? JSON.stringify(metadata) : null,
     });
-    const count = await db.syncLogs.count();
-    if (count > 500) {
-      const oldest = await db.syncLogs.orderBy("timestamp").limit(count - 500).primaryKeys();
-      await db.syncLogs.bulkDelete(oldest as number[]);
+    _syncLogWriteCount++;
+    if (_syncLogWriteCount % SYNC_LOG_PRUNE_EVERY === 0) {
+      const count = await db.syncLogs.count();
+      if (count > 500) {
+        const oldest = await db.syncLogs.orderBy("timestamp").limit(count - 500).primaryKeys();
+        await db.syncLogs.bulkDelete(oldest as number[]);
+      }
     }
   } catch {
     // Logs are best-effort; never throw
