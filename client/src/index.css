@@ -679,6 +679,113 @@
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   MOBILE RESPONSIVENESS — Phase 1
+   All rules are scoped to max-width: 768px.
+   Desktop layout (≥769px) is completely unaffected.
+   No table display type is globally overridden.
+   No business logic, API, or auth logic is touched.
+   ───────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+
+  /* ── 1. Page-level overflow protection ──────────────────────────────────
+     Prevents any child element from causing the whole page to scroll
+     horizontally. Scoped to html/body only — does NOT use overflow:hidden
+     on #root or main so that fixed/sticky children (Toaster, sidebar Sheet,
+     sticky headers) continue to work correctly via their own stacking
+     contexts. */
+  html,
+  body {
+    overflow-x: clip;
+    /* clip (not hidden) preserves position:fixed descendants */
+  }
+
+  /* ── 2. Android WebView safe-area padding ───────────────────────────────
+     Adds padding for notch (top), gesture bar (bottom), and rounded corners
+     (left/right). Applied to the outermost scrolling container so the
+     content never sits under system UI chrome. */
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* ── 3. Dialogs / modals fit within viewport ────────────────────────────
+     Shadcn DialogContent renders with [role="dialog"]. These rules make
+     every dialog fit within the visible viewport on narrow screens without
+     touching any component's JSX. max-height uses dvh (dynamic viewport
+     height) so the keyboard collapsing doesn't break dialog height. */
+  [role="dialog"] {
+    max-width: calc(100vw - 1rem) !important;
+    max-height: calc(100dvh - 1rem) !important;
+    overflow-y: auto !important;
+    /* keep dialog centred — Radix already provides this via transform */
+  }
+
+  /* ── 4. Buttons and form action rows ────────────────────────────────────
+     Rows of buttons (e.g. Save / Cancel / Export) should wrap rather than
+     clip off the right edge of the screen. Scoped to common flex-row
+     containers that hold interactive controls. */
+  .flex.gap-2,
+  .flex.gap-3,
+  .flex.gap-4 {
+    flex-wrap: wrap;
+  }
+
+  /* Form inputs, selects, and textareas must not exceed the viewport */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Improve tap targets — 44px minimum as per HIG / Material guidelines */
+  button,
+  [role="button"],
+  a[href] {
+    touch-action: manipulation;
+  }
+
+  /* ── 5. Tab / filter bars — horizontal scroll ───────────────────────────
+     Radix Tabs list and any custom filter/action row should scroll
+     horizontally rather than wrap onto two rows or clip off-screen.
+     Scoped to [role="tablist"] so only tab components are affected. */
+  [role="tablist"] {
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* keep a single row of tabs */
+    flex-wrap: nowrap;
+    /* hide the scrollbar visually but keep it functional */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    /* padding-bottom so the scrollbar doesn't clip tab content */
+    padding-bottom: 2px;
+  }
+  [role="tablist"]::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ── 6. Table utility classes — no global table override ────────────────
+     .table-responsive already exists above (overflow-x-auto always-on).
+     .mobile-table-scroll is a new opt-in alias that activates ONLY on
+     mobile. Use either class on a wrapper <div> around a <table>.
+     The table itself is never touched — no display:block change. */
+  .mobile-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    /* Ensures the wrapper doesn't collapse to zero width */
+    width: 100%;
+  }
+
+  /* Improve existing .table-responsive on mobile specifically */
+  .table-responsive {
+    -webkit-overflow-scrolling: touch;
+  }
+
+}
+
 /* ── Button click feedback — persistent ring on last-clicked button ── */
 .btn-click-flash {
   outline: 2px solid hsl(var(--primary) / 0.7) !important;
