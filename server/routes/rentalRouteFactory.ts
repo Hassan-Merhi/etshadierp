@@ -392,100 +392,177 @@ async function postRentAccrualForContract(
     .where(eq(propertyUnits.id, contract.unitId));
   if (!unit || unit.unitType !== "SHOP") return { accrued: 0, skipped: 0 };
 
-  // Compute billing day from contract start date (day-of-month the tenant started)
-  const billingDay = new Date(contract.startDate as any).getUTCDate();
-  const now = new Date();
-  const curYear = now.getUTCFullYear();
-  const curMonth = now.getUTCMonth() + 1;
-  const curDay = now.getUTCDate();
+  return postRentAccrualForCompany(contract.companyId, shopExpenseAccountName);
+}
 
-  // Fetch ALL due+unpaid rows for this contract — including those already accrued.
-  // We need both so we can correctly report "already done" (skipped) rows.
+/**
+ * Posts ONE combined accrual journal (Dr Rent Expense / Cr Accrued Rent Payable)
+ * for ALL active ERP SHOP contracts of the company that have due, unpaid, unaccrued
+ * ledger rows.
+ *
+ * All rows that are newly accrued point to the same voucher ID so the daybook
+ * shows a single journal entry instead of one per unit/month.
+ *
+ * Returns { accrued: N, skipped: M } where:
+ *   accrued = number of ledger rows newly stamped with the combined voucher
+ *   skipped = due+unpaid rows already accrued in a prior run
+ */
+async function postRentAccrualForCompany(
+  companyId: number,
+  shopExpenseAccountName: string,
+): Promise<{ accrued: number; skipped: number }> {
+  // Load all active ERP SHOP contracts for the company
+  const shopContracts = await db
+    .select({
+      id: propertyContracts.id,
+      unitId: propertyContracts.unitId,
+      startDate: propertyContracts.startDate,
+      currency: propertyContracts.currency,
+    })
+    .from(propertyContracts)
+    .innerJoin(propertyUnits, eq(propertyUnits.id, propertyContracts.unitId))
+    .where(and(
+      eq(propertyContracts.companyId, companyId),
+      eq(propertyContracts.module, "ERP"),
+      eq(propertyContracts.status, "ACTIVE"),
+      eq(propertyUnits.unitType, "SHOP"),
+    ));
+
+  if (shopContracts.length === 0) return { accrued: 0, skipped: 0 };
+
+  const contractIds = shopContracts.map(c => c.id);
+
+  // Billing day (day-of-month) keyed by contractId
+  const billingDayByContract = new Map(
+    shopContracts.map(c => [c.id, new Date(c.startDate as any).getUTCDate()])
+  );
+
+  const now = new Date();
+  const curYear  = now.getUTCFullYear();
+  const curMonth = now.getUTCMonth() + 1;
+  const curDay   = now.getUTCDate();
+
+  // Fetch ALL unpaid rows across all active SHOP contracts
   const allUnpaidRows = await db.select()
     .from(propertyMonthlyLedger)
     .where(and(
-      eq(propertyMonthlyLedger.contractId, contractId),
+      inArray(propertyMonthlyLedger.contractId, contractIds),
       sql`${propertyMonthlyLedger.paidAmount}::numeric < ${propertyMonthlyLedger.expectedAmount}::numeric`,
     ));
 
-  // Keep only months whose billing day has been reached.
-  // Past months: always due. Current month: only if today >= billing day. Future: never.
-  const isDue = (row: { year: number; month: number }) => {
+  const isDue = (row: { year: number; month: number; contractId: number }) => {
+    const billingDay = billingDayByContract.get(row.contractId) ?? 1;
     if (row.year < curYear) return true;
     if (row.year === curYear && row.month < curMonth) return true;
     if (row.year === curYear && row.month === curMonth && curDay >= billingDay) return true;
     return false;
   };
-  const allDueRows    = allUnpaidRows.filter(isDue);
-  const pendingRows   = allDueRows.filter(row => !row.accrualVoucherId); // not yet accrued
-  const alreadyDone   = allDueRows.filter(row =>  row.accrualVoucherId); // previously accrued
+
+  const allDueRows  = allUnpaidRows.filter(isDue);
+  const pendingRows = allDueRows.filter(row => !row.accrualVoucherId);
+  const alreadyDone = allDueRows.filter(row =>  row.accrualVoucherId);
 
   if (pendingRows.length === 0) return { accrued: 0, skipped: alreadyDone.length };
 
   let accrued = 0;
-  const unitLabel = `${contract.companyId}-unit${contract.unitId}`;
+  try {
+    await db.transaction(async (tx) => {
+      // Lock ALL pending rows in one shot — SKIP LOCKED guards against races
+      const pendingIds = pendingRows.map(r => r.id);
+      const lockResult = await tx.execute(sql`
+        SELECT id, expected_amount, paid_amount, unit_id, month, year
+        FROM property_monthly_ledger
+        WHERE id = ANY(${pendingIds}::int[])
+          AND accrual_voucher_id IS NULL
+          AND paid_amount::numeric < expected_amount::numeric
+        FOR UPDATE SKIP LOCKED
+      `);
 
-  for (const row of pendingRows) {
-    try {
-      let posted = false;
-      await db.transaction(async (tx) => {
-        // Lock the row and atomically re-read fresh values — guarding against:
-        //   (a) concurrent accrual (accrual_voucher_id already set), and
-        //   (b) concurrent payment (row now fully paid, no outstanding balance).
-        // SKIP LOCKED: don't wait on already-locked rows; prevents duplicate vouchers.
-        const lockResult = await tx.execute(sql`
-          SELECT id, expected_amount, paid_amount
-          FROM property_monthly_ledger
-          WHERE id = ${row.id}
-            AND accrual_voucher_id IS NULL
-            AND paid_amount::numeric < expected_amount::numeric
-          FOR UPDATE SKIP LOCKED
-        `);
-        if (!lockResult.rows || lockResult.rows.length === 0) return; // Already claimed or fully paid
+      if (!lockResult.rows || lockResult.rows.length === 0) return;
 
-        // Use fresh values from the locked row — not pre-transaction stale data.
-        const locked = lockResult.rows[0] as { id: number; expected_amount: string; paid_amount: string };
-        const amount = String(Number(locked.expected_amount) - Number(locked.paid_amount));
-        if (Number(amount) <= 0) return; // Nothing outstanding (shouldn't happen, but guard)
+      type LockedRow = {
+        id: number; expected_amount: string; paid_amount: string;
+        unit_id: number; month: number; year: number;
+      };
+      const lockedRows = lockResult.rows as LockedRow[];
 
-        const expenseAccountId = await findOrCreateLedgerAccount(
-          tx, contract.companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP",
-        );
-        const liabilityAccountId = await findOrCreateLedgerAccount(
-          tx, contract.companyId, "Accrued Rent Payable", "Liability", "ACCR-RENT-PAY",
-        );
+      type Entry = { id: number; amount: number; unitId: number; month: number; year: number };
+      const entries: Entry[] = [];
+      for (const locked of lockedRows) {
+        const amount = Number(locked.expected_amount) - Number(locked.paid_amount);
+        if (amount <= 0) continue;
+        entries.push({
+          id:     Number(locked.id),
+          amount,
+          unitId: Number(locked.unit_id),
+          month:  Number(locked.month),
+          year:   Number(locked.year),
+        });
+      }
+      if (entries.length === 0) return;
 
-        const monthStr = `${String(row.month).padStart(2, "0")}/${row.year}`;
-        const narration = `Rent accrual - ${unitLabel} - ${monthStr}`;
+      const totalAmount = entries.reduce((s, e) => s + e.amount, 0);
 
-        const [v] = await tx.insert(vouchers).values({
-          companyId: contract.companyId,
-          voucherNumber: `ACCR-RENT-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${contractId}`,
-          voucherType: "Journal",
-          voucherDate: new Date().toISOString().slice(0, 10) as any,
-          description: narration,
-          totalAmount: amount,
-          currency: contract.currency || "USD",
-          sourceModule: "ERP",
-        }).returning();
+      const expenseAccountId = await findOrCreateLedgerAccount(
+        tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP",
+      );
+      const liabilityAccountId = await findOrCreateLedgerAccount(
+        tx, companyId, "Accrued Rent Payable", "Liability", "ACCR-RENT-PAY",
+      );
 
-        await tx.insert(voucherEntries).values([
-          { voucherId: v.id, ledgerAccountId: expenseAccountId,  debitAmount: amount, creditAmount: "0", narration },
-          { voucherId: v.id, ledgerAccountId: liabilityAccountId, debitAmount: "0", creditAmount: amount, narration },
-        ]);
+      // Build a period label for the voucher description
+      const months = [...new Set(
+        entries.map(e => `${String(e.month).padStart(2, "0")}/${e.year}`)
+      )].sort();
+      const periodLabel = months.length === 1
+        ? months[0]
+        : `${months[0]}–${months[months.length - 1]}`;
+      const voucherDesc = `Rent accrual - ${companyId} - ${periodLabel}`;
 
-        await tx.update(propertyMonthlyLedger)
-          .set({ accrualVoucherId: v.id })
-          .where(eq(propertyMonthlyLedger.id, row.id));
+      // ONE voucher for all rows
+      const [v] = await tx.insert(vouchers).values({
+        companyId,
+        voucherNumber: `ACCR-RENT-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        voucherType:  "Journal",
+        voucherDate:  new Date().toISOString().slice(0, 10) as any,
+        description:  voucherDesc,
+        totalAmount:  String(totalAmount),
+        currency:     "USD",
+        sourceModule: "ERP",
+      }).returning();
 
-        posted = true;
-      });
-      if (posted) accrued++;
-    } catch (e: any) {
-      console.warn(`[ERP/rental] accrual skipped row ${row.id}:`, e.message?.split("\n")[0]);
-    }
+      // One debit entry per row so the journal is traceable by unit + month
+      const debitEntries = entries.map(e => ({
+        voucherId:        v.id,
+        ledgerAccountId:  expenseAccountId,
+        debitAmount:      String(e.amount),
+        creditAmount:     "0",
+        narration:        `Rent accrual - ${companyId}-unit${e.unitId} - ${String(e.month).padStart(2, "0")}/${e.year}`,
+      }));
+
+      // One combined credit to Accrued Rent Payable
+      await tx.insert(voucherEntries).values([
+        ...debitEntries,
+        {
+          voucherId:       v.id,
+          ledgerAccountId: liabilityAccountId,
+          debitAmount:     "0",
+          creditAmount:    String(totalAmount),
+          narration:       voucherDesc,
+        },
+      ]);
+
+      // Stamp every locked row with the single voucher ID
+      await tx.update(propertyMonthlyLedger)
+        .set({ accrualVoucherId: v.id })
+        .where(inArray(propertyMonthlyLedger.id, entries.map(e => e.id)));
+
+      accrued = entries.length;
+    });
+  } catch (e: any) {
+    console.warn(`[ERP/rental] batch accrual failed company ${companyId}:`, e.message?.split("\n")[0]);
   }
-  // skipped = due+unpaid rows that already had an accrual before this run
+
   return { accrued, skipped: alreadyDone.length };
 }
 
@@ -508,26 +585,11 @@ export function registerRentalRoutes(
       await ensureMonthlyForCompany(companyId, module);
 
       // For ERP SHOP view: silently post any pending rent accruals on page load.
+      // All due rows are combined into ONE journal voucher per run.
       // Fire-and-forget (errors are logged but do not block the response).
       if (module === "ERP" && unitType === "SHOP") {
-        const shopContracts = await db
-          .select({ id: propertyContracts.id })
-          .from(propertyContracts)
-          .innerJoin(propertyUnits, eq(propertyUnits.id, propertyContracts.unitId))
-          .where(and(
-            eq(propertyContracts.companyId, companyId),
-            eq(propertyContracts.module, "ERP"),
-            eq(propertyContracts.status, "ACTIVE"),
-            eq(propertyUnits.unitType, "SHOP"),
-          ));
-        // Run sequentially to avoid parallel INSERT races on shared accounts
-        // (fire-and-forget — does not block the HTTP response)
-        (async () => {
-          for (const c of shopContracts) {
-            await postRentAccrualForContract(c.id, shopExpenseAccountName).catch(e =>
-              console.warn(`${tag} page-load accrual skipped contract ${c.id}:`, e.message?.split("\n")[0]));
-          }
-        })();
+        postRentAccrualForCompany(companyId, shopExpenseAccountName).catch(e =>
+          console.warn(`${tag} page-load accrual failed:`, e.message?.split("\n")[0]));
       }
 
       const regularUnits = await db.select().from(propertyUnits)
@@ -2212,25 +2274,8 @@ export function registerRentalRoutes(
 
       await ensureMonthlyForCompany(companyId, module);
 
-      const shopContracts = await db
-        .select({ id: propertyContracts.id })
-        .from(propertyContracts)
-        .innerJoin(propertyUnits, eq(propertyUnits.id, propertyContracts.unitId))
-        .where(and(
-          eq(propertyContracts.companyId, companyId),
-          eq(propertyContracts.module, "ERP"),
-          eq(propertyContracts.status, "ACTIVE"),
-          eq(propertyUnits.unitType, "SHOP"),
-        ));
-
-      // accrued = newly-posted rows; skipped = due+unpaid rows already accrued in a prior run
-      let accrued = 0;
-      let skipped = 0;
-      for (const c of shopContracts) {
-        const result = await postRentAccrualForContract(c.id, shopExpenseAccountName);
-        accrued += result.accrued;
-        skipped += result.skipped;
-      }
+      // Post all due, unaccrued rows as ONE combined journal voucher
+      const { accrued, skipped } = await postRentAccrualForCompany(companyId, shopExpenseAccountName);
 
       res.json({ accrued, skipped });
     } catch (e: any) {
