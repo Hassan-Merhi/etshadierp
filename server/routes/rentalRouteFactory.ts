@@ -446,12 +446,27 @@ async function postRentAccrualForCompany(
   const curMonth = now.getUTCMonth() + 1;
   const curDay   = now.getUTCDate();
 
-  // Fetch ALL unpaid rows across all active SHOP contracts
-  const allUnpaidRows = await db.select()
+  // Fetch ALL rows that have no accrual voucher yet (paid OR unpaid).
+  // Using expectedAmount (full rent) as the accrual amount is correct: the
+  // payment entries (Dr AP / Cr Cash) already exist; the accrual creates the
+  // matching Dr Rent Expense / Cr AP so the AP account nets to the outstanding
+  // balance (Cr AP accrual − Dr AP payment = remaining owed). This also
+  // repairs rows whose original combined voucher was accidentally deleted but
+  // whose payment entries are still in place.
+  const allUnaccrued = await db.select()
     .from(propertyMonthlyLedger)
     .where(and(
       inArray(propertyMonthlyLedger.contractId, contractIds),
-      sql`${propertyMonthlyLedger.paidAmount}::numeric < ${propertyMonthlyLedger.expectedAmount}::numeric`,
+      isNull(propertyMonthlyLedger.accrualVoucherId),
+      sql`${propertyMonthlyLedger.expectedAmount}::numeric > 0`,
+    ));
+
+  // Separately count already-accrued due rows so the caller can report "skipped"
+  const allAccruedForSkip = await db.select({ id: propertyMonthlyLedger.id })
+    .from(propertyMonthlyLedger)
+    .where(and(
+      inArray(propertyMonthlyLedger.contractId, contractIds),
+      isNotNull(propertyMonthlyLedger.accrualVoucherId),
     ));
 
   const isDue = (row: { year: number; month: number; contractId: number }) => {
@@ -462,11 +477,10 @@ async function postRentAccrualForCompany(
     return false;
   };
 
-  const allDueRows  = allUnpaidRows.filter(isDue);
-  const pendingRows = allDueRows.filter(row => !row.accrualVoucherId);
-  const alreadyDone = allDueRows.filter(row =>  row.accrualVoucherId);
+  const pendingRows = allUnaccrued.filter(isDue);
+  const alreadyDone = allAccruedForSkip.length; // count only — not filtered by isDue for simplicity
 
-  if (pendingRows.length === 0) return { accrued: 0, skipped: alreadyDone.length };
+  if (pendingRows.length === 0) return { accrued: 0, skipped: alreadyDone };
 
   let accrued = 0;
   try {
@@ -478,7 +492,7 @@ async function postRentAccrualForCompany(
         FROM property_monthly_ledger
         WHERE id = ANY(${pendingIds}::int[])
           AND accrual_voucher_id IS NULL
-          AND paid_amount::numeric < expected_amount::numeric
+          AND expected_amount::numeric > 0
         FOR UPDATE SKIP LOCKED
       `);
 
@@ -493,7 +507,10 @@ async function postRentAccrualForCompany(
       type Entry = { id: number; amount: number; unitId: number; month: number; year: number };
       const entries: Entry[] = [];
       for (const locked of lockedRows) {
-        const amount = Number(locked.expected_amount) - Number(locked.paid_amount);
+        // Accrue the FULL expected amount — not the remainder (expectedAmount − paidAmount).
+        // The payment's Dr AP entry already reduces the net AP balance; the accrual
+        // must record the full expense so the P&L is correct even for paid months.
+        const amount = Number(locked.expected_amount);
         if (amount <= 0) continue;
         entries.push({
           id:     Number(locked.id),
@@ -2325,46 +2342,41 @@ export function registerRentalRoutes(
 
       const contractIds = shopContracts.map(c => c.id);
 
-      // 2. Fetch ALL accrued rows for these contracts (regardless of payment status).
-      //    We need the full picture to avoid deleting a combined voucher that
-      //    partially covers already-paid months — doing so would destroy the
-      //    rent expense record for those paid months and unbalance Accrued Rent Payable.
-      const allAccruedRows = await db
+      // 2. Full reset for the current month: find ALL accrual vouchers whose
+      //    ledger rows fall in the current billing month and delete them all.
+      //    This is safe because postRentAccrualForCompany (step 3) will
+      //    immediately recreate ONE combined voucher using the full expectedAmount
+      //    for every unit — paid, partially-paid, and unpaid alike.  The net
+      //    effect on Accrued Rent Payable is unchanged:
+      //      Cr AP (new accrual, full rent) − Dr AP (existing payment) = outstanding balance.
+      const now = new Date();
+      const curYear  = now.getUTCFullYear();
+      const curMonth = now.getUTCMonth() + 1;
+
+      const curMonthAccruedRows = await db
         .select({
           id:               propertyMonthlyLedger.id,
           accrualVoucherId: propertyMonthlyLedger.accrualVoucherId,
-          paidAmount:       propertyMonthlyLedger.paidAmount,
         })
         .from(propertyMonthlyLedger)
         .where(and(
           inArray(propertyMonthlyLedger.contractId, contractIds),
           isNotNull(propertyMonthlyLedger.accrualVoucherId),
+          eq(propertyMonthlyLedger.year,  curYear),
+          eq(propertyMonthlyLedger.month, curMonth),
         ));
 
-      // A voucher is safe to delete ONLY if every ledger row pointing to it
-      // has paidAmount = 0. If any row has a payment, deleting the voucher
-      // would orphan that payment's Accrued Rent Payable debit.
-      const voucherHasPaid = new Map<number, boolean>();
-      for (const row of allAccruedRows) {
-        const vid = row.accrualVoucherId as number;
-        if (!voucherHasPaid.has(vid)) voucherHasPaid.set(vid, false);
-        if (Number(row.paidAmount) > 0) voucherHasPaid.set(vid, true);
-      }
-      const voucherIdsToDelete = [...voucherHasPaid.entries()]
-        .filter(([, hasPaid]) => !hasPaid)
-        .map(([vid]) => vid);
-
-      // Only de-stamp rows whose voucher is actually being deleted.
-      // Do NOT blanket-clear all contract rows — that would de-stamp rows
-      // whose vouchers we're keeping, causing duplicate accruals on re-run.
-      const rowIdsToDeStamp = allAccruedRows
-        .filter(r => voucherIdsToDelete.includes(r.accrualVoucherId as number))
-        .map(r => r.id);
+      const voucherIdsToDelete = [
+        ...new Set(
+          curMonthAccruedRows
+            .map(r => r.accrualVoucherId)
+            .filter((id): id is number => id !== null && id !== undefined),
+        ),
+      ];
 
       let reset = 0;
       if (voucherIdsToDelete.length > 0) {
         await db.transaction(async (tx) => {
-          // Delete entries first (FK child), then the vouchers
           await tx.delete(voucherEntries)
             .where(inArray(voucherEntries.voucherId, voucherIdsToDelete));
           await tx.delete(vouchers)
@@ -2372,10 +2384,10 @@ export function registerRentalRoutes(
               inArray(vouchers.id, voucherIdsToDelete),
               eq(vouchers.companyId, companyId),
             ));
-          // Clear the stamp only on rows whose voucher was just deleted
+          // De-stamp only the current-month rows — historical months are untouched
           await tx.update(propertyMonthlyLedger)
             .set({ accrualVoucherId: null })
-            .where(inArray(propertyMonthlyLedger.id, rowIdsToDeStamp));
+            .where(inArray(propertyMonthlyLedger.id, curMonthAccruedRows.map(r => r.id)));
         });
         reset = voucherIdsToDelete.length;
       }
