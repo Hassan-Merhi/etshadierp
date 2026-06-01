@@ -8,6 +8,7 @@
  */
 
 import { pool } from "../db";
+import FormDataLib from "form-data";
 
 export interface WaSettings {
   instanceId: string;
@@ -111,6 +112,11 @@ export async function fetchGreenApiChats(
  * Uses the `form-data` npm package (not native Web FormData / Blob).
  * form.getBuffer() + form.getHeaders() is the correct pattern for node-fetch
  * and produces well-formed multipart/form-data that Green API accepts.
+ *
+ * NOTE: Native Web FormData + File was tried but silently fails with Green API
+ * because the boundary isn't propagated to the Content-Type header when using
+ * native fetch + native FormData in Node 20 — resulting in a malformed upload
+ * that Green API rejects, causing the text fallback to fire instead of the image.
  */
 async function sendGreenApiFileUpload({
   settings,
@@ -129,17 +135,20 @@ async function sendGreenApiFileUpload({
 }): Promise<{ success: boolean; error?: string }> {
   const url = baseUrl(settings.instanceId, settings.apiToken, "sendFileByUpload");
 
-  const form = new FormData();
+  // Use the `form-data` npm package — its getBuffer()+getHeaders() pattern
+  // produces a well-formed multipart body with correct Content-Disposition
+  // (including filename=) and a matching Content-Type boundary that Green API
+  // requires. Native Web FormData in Node 20 does not propagate the boundary
+  // correctly through native fetch, causing Green API to reject the upload.
+  const form = new FormDataLib();
   form.append("chatId", chatId);
   if (caption) form.append("caption", caption);
-  // Use File class (Node 20+) so the multipart part has a proper filename in Content-Disposition.
-  // Blob alone doesn't carry a name, so some APIs (like Green API) treat it as a text field.
-  const fileObj = new File([buffer], fileName, { type: mimeType });
-  form.append("file", fileObj);
+  form.append("file", buffer, { filename: fileName, contentType: mimeType });
 
   const response = await fetch(url, {
     method: "POST",
-    body: form,
+    body: form.getBuffer(),
+    headers: form.getHeaders(),
   });
 
   if (!response.ok) {
