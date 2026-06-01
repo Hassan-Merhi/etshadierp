@@ -397,41 +397,54 @@ async function postRentAccrualForContract(
   const curMonth = now.getUTCMonth() + 1;
   const curDay = now.getUTCDate();
 
-  // Find unpaid ledger rows with no accrual yet
-  const pendingRows = await db.select()
+  // Fetch ALL due+unpaid rows for this contract — including those already accrued.
+  // We need both so we can correctly report "already done" (skipped) rows.
+  const allUnpaidRows = await db.select()
     .from(propertyMonthlyLedger)
     .where(and(
       eq(propertyMonthlyLedger.contractId, contractId),
-      sql`${propertyMonthlyLedger.accrualVoucherId} IS NULL`,
       sql`${propertyMonthlyLedger.paidAmount}::numeric < ${propertyMonthlyLedger.expectedAmount}::numeric`,
     ));
 
-  // Filter to only months whose billing day has actually been reached.
-  // Past months are always due; the current month is only due if today >= billing day.
-  // Future months are never eligible.
-  const dueRows = pendingRows.filter(row => {
+  // Keep only months whose billing day has been reached.
+  // Past months: always due. Current month: only if today >= billing day. Future: never.
+  const isDue = (row: { year: number; month: number }) => {
     if (row.year < curYear) return true;
     if (row.year === curYear && row.month < curMonth) return true;
     if (row.year === curYear && row.month === curMonth && curDay >= billingDay) return true;
     return false;
-  });
+  };
+  const allDueRows    = allUnpaidRows.filter(isDue);
+  const pendingRows   = allDueRows.filter(row => !row.accrualVoucherId); // not yet accrued
+  const alreadyDone   = allDueRows.filter(row =>  row.accrualVoucherId); // previously accrued
 
-  if (dueRows.length === 0) return { accrued: 0, skipped: 0 };
+  if (pendingRows.length === 0) return { accrued: 0, skipped: alreadyDone.length };
 
   let accrued = 0;
   const unitLabel = `${contract.companyId}-unit${contract.unitId}`;
 
-  for (const row of dueRows) {
+  for (const row of pendingRows) {
     try {
       let posted = false;
       await db.transaction(async (tx) => {
-        // Lock the row and re-verify it is still un-accrued (concurrency guard).
-        // SKIP LOCKED: if another transaction already holds a lock on this row,
-        // skip it rather than waiting — prevents duplicate accrual vouchers.
-        const lockResult = await tx.execute(
-          sql`SELECT id FROM property_monthly_ledger WHERE id = ${row.id} AND accrual_voucher_id IS NULL FOR UPDATE SKIP LOCKED`
-        );
-        if (!lockResult.rows || lockResult.rows.length === 0) return; // Already claimed
+        // Lock the row and atomically re-read fresh values — guarding against:
+        //   (a) concurrent accrual (accrual_voucher_id already set), and
+        //   (b) concurrent payment (row now fully paid, no outstanding balance).
+        // SKIP LOCKED: don't wait on already-locked rows; prevents duplicate vouchers.
+        const lockResult = await tx.execute(sql`
+          SELECT id, expected_amount, paid_amount
+          FROM property_monthly_ledger
+          WHERE id = ${row.id}
+            AND accrual_voucher_id IS NULL
+            AND paid_amount::numeric < expected_amount::numeric
+          FOR UPDATE SKIP LOCKED
+        `);
+        if (!lockResult.rows || lockResult.rows.length === 0) return; // Already claimed or fully paid
+
+        // Use fresh values from the locked row — not pre-transaction stale data.
+        const locked = lockResult.rows[0] as { id: number; expected_amount: string; paid_amount: string };
+        const amount = String(Number(locked.expected_amount) - Number(locked.paid_amount));
+        if (Number(amount) <= 0) return; // Nothing outstanding (shouldn't happen, but guard)
 
         const expenseAccountId = await findOrCreateLedgerAccount(
           tx, contract.companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP",
@@ -442,7 +455,6 @@ async function postRentAccrualForContract(
 
         const monthStr = `${String(row.month).padStart(2, "0")}/${row.year}`;
         const narration = `Rent accrual - ${unitLabel} - ${monthStr}`;
-        const amount = String(Number(row.expectedAmount) - Number(row.paidAmount));
 
         const [v] = await tx.insert(vouchers).values({
           companyId: contract.companyId,
@@ -471,7 +483,8 @@ async function postRentAccrualForContract(
       console.warn(`[ERP/rental] accrual skipped row ${row.id}:`, e.message?.split("\n")[0]);
     }
   }
-  return { accrued, skipped: dueRows.length - accrued };
+  // skipped = due+unpaid rows that already had an accrual before this run
+  return { accrued, skipped: alreadyDone.length };
 }
 
 export function registerRentalRoutes(
