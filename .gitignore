@@ -21,6 +21,11 @@ attached_assets/
 *.key
 secrets/
 
+# Android signing — never commit
+android/app/*.jks
+android/app/*.keystore
+android/keystore.properties
+
 # Backup files
 *.backup*
 *.bak
