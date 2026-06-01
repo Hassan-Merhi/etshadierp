@@ -92,12 +92,14 @@ export default function Login() {
   // On mobile the background is always dark, so form tokens always use dark palette
   const ft = isMobile ? tk.dark : t;
 
+  const [, navigate] = useLocation();
+
   const loginMutation = useMutation({
     mutationFn: async (credentials: { username: string; password: string }) => {
       const res = await apiRequest("POST", "/api/auth/login", credentials);
       return await res.json();
     },
-    onSuccess: () => { window.location.href = "/"; },
+    onSuccess: () => { navigate("/"); },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;
       toast({ title: "Login Failed", description: error.message || "Invalid username or password", variant: "destructive" });

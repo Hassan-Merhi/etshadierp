@@ -82,6 +82,12 @@ if (typeof window !== "undefined" && !((window as any).__csrfFetchPatched)) {
     isRetry = false,
   ): Promise<Response> {
     try {
+      // Capacitor: prefix relative /api/* paths with the remote server base URL.
+      // No-op when VITE_API_BASE_URL is unset (all web builds — zero behavior change).
+      if (_CAPACITOR_API_BASE && typeof input === "string" && input.startsWith("/")) {
+        input = `${_CAPACITOR_API_BASE}${input}`;
+      }
+
       // Resolve the URL pathname for /api/* matching
       let pathname: string | null = null;
       try {
@@ -217,7 +223,9 @@ export async function apiRequest(
     const isStateChanging = upMethod !== "GET" && upMethod !== "HEAD" && upMethod !== "OPTIONS";
     const csrfToken = isStateChanging ? await ensureCsrfToken() : null;
 
-    const res = await fetch(url, {
+    // Capacitor: resolve to absolute URL when VITE_API_BASE_URL is set; no-op on web.
+    const _apiUrl = _CAPACITOR_API_BASE && url.startsWith("/") ? `${_CAPACITOR_API_BASE}${url}` : url;
+    const res = await fetch(_apiUrl, {
       method,
       headers: {
         ...(data ? { "Content-Type": "application/json" } : {}),
@@ -289,7 +297,9 @@ export const getQueryFn: <T>(options: {
     querySignal?.addEventListener("abort", () => controller.abort(), { once: true });
 
     try {
-      const res = await fetch(url, {
+      // Capacitor: resolve to absolute URL when VITE_API_BASE_URL is set; no-op on web.
+      const _apiUrl = _CAPACITOR_API_BASE && url.startsWith("/") ? `${_CAPACITOR_API_BASE}${url}` : url;
+      const res = await fetch(_apiUrl, {
         credentials: "include",
         signal: controller.signal,
         headers: { "X-Client-Date": getAppDate() },

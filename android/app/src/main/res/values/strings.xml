@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ERP Warehouse</string>
+    <string name="title_activity_main">ERP Warehouse</string>
+    <string name="package_name">com.erp.warehouse</string>
+    <string name="custom_url_scheme">com.erp.warehouse</string>
+</resources>
