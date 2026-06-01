@@ -113,6 +113,33 @@ app.use(express.urlencoded({ extended: false, limit: "2mb" }));
 // as both run behind reverse proxies
 app.set("trust proxy", 1);
 
+// ── Capacitor / Mobile CORS ─────────────────────────────────────────────────
+// Browser WebViews (iOS Capacitor, Android Capacitor, Ionic) send these origins
+// when calling the production API. They cannot be spoofed by web-based CSRF
+// attacks. We must echo the exact origin back (not "*") so that the browser
+// also honours Access-Control-Allow-Credentials: true.
+const CAPACITOR_ORIGINS = new Set([
+  "capacitor://localhost",
+  "ionic://localhost",
+  "https://localhost",
+  "http://localhost",
+]);
+app.use((req, res, next) => {
+  const origin = req.headers.origin as string | undefined;
+  if (origin && CAPACITOR_ORIGINS.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization,X-CSRF-Token,X-Requested-With");
+    res.setHeader("Access-Control-Max-Age", "86400"); // 24h preflight cache
+    if (req.method === "OPTIONS") {
+      res.sendStatus(204);
+      return;
+    }
+  }
+  next();
+});
+
 // Disable ETag generation globally so Express never sends ETags for API responses.
 // ETags cause 304 "Not Modified" responses which prevent balance/data from refreshing.
 app.set("etag", false);
