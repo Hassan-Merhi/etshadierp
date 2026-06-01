@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog, ChevronsUpDown, Trash2, ClipboardList, CreditCard, CalendarDays, Wrench, BookOpen } from "lucide-react";
+import { Plus, DollarSign, FileEdit, Send, XCircle, ChevronRight, RefreshCw, Pencil, Check, X, Printer, Download, UserCog, ChevronsUpDown, Trash2, ClipboardList, CreditCard, CalendarDays, Wrench, BookOpen, RotateCcw } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
@@ -1972,6 +1972,19 @@ function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onN
     onError: (err: any) => toast({ title: "Fix failed", description: err?.message ?? "Could not reallocate payments.", variant: "destructive" }),
   });
 
+  const reverseAccrual = useMutation({
+    mutationFn: async (rowId: number) => {
+      const res = await apiRequest("DELETE", `${apiBase}/ledger/${rowId}/accrual`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Accrual reversed", description: "Reversal journal posted. Month is now eligible to re-accrue." });
+      queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
+      onNoteUpdated?.();
+    },
+    onError: (e: any) => toast({ title: "Reversal failed", description: e.message, variant: "destructive" }),
+  });
+
   const now = new Date();
   const nowYear = now.getFullYear();
   const nowMonth = now.getMonth() + 1; // 1-based
@@ -2145,9 +2158,23 @@ function LedgerView({ ledger, payments, guaranteePayments, contract, unitId, onN
                       <span>{MONTH_NAMES[r.month]} {r.year}</span>
                       {isFutureRow && <span className="text-[10px] text-muted-foreground italic">prepaid</span>}
                       {r.accrualVoucherId && (
-                        <Badge variant="secondary" className="text-[10px]" data-testid={`badge-accrued-${r.year}-${r.month}`}>
-                          Accrued
-                        </Badge>
+                        <>
+                          <Badge variant="secondary" className="text-[10px]" data-testid={`badge-accrued-${r.year}-${r.month}`}>
+                            Accrued
+                          </Badge>
+                          {isAdmin && apiBase.includes("/erp/") && Number(r.paidAmount) === 0 && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="Reverse this accrual (posts Dr Accrued Rent Payable / Cr Rent Expense)"
+                              onClick={(e) => { e.stopPropagation(); reverseAccrual.mutate(r.id); }}
+                              disabled={reverseAccrual.isPending && reverseAccrual.variables === r.id}
+                              data-testid={`button-reverse-accrual-${r.year}-${r.month}`}
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </>
                       )}
                     </span>
                   </td>

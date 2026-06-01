@@ -2233,6 +2233,86 @@ export function registerRentalRoutes(
     }
   });
 
+  // ── REVERSE ACCRUAL (ERP SHOP only) ──────────────────────────────────────
+  // Posts the mirror-image Journal voucher for an accrued ledger row and clears
+  // accrualVoucherId so the month can be re-accrued if needed.
+  // Blocked if any payment has already been applied to that month (payment would
+  // have debited Accrued Rent Payable; reversing the original accrual would then
+  // leave the books inconsistent — void the payment first).
+  app.delete(`${urlPrefix}/ledger/:rowId/accrual`, requireAuth, async (req: Request, res: Response) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (module !== "ERP") return res.status(400).json({ message: "Accrual reversal is only available for ERP module" });
+
+      const rowId = parseId(req.params.rowId);
+      if (rowId === null) return res.status(400).json({ message: "Invalid row id" });
+
+      // Load ledger row and verify company ownership
+      const [row] = await db.select().from(propertyMonthlyLedger).where(and(
+        eq(propertyMonthlyLedger.id, rowId),
+        eq(propertyMonthlyLedger.companyId, companyId),
+        eq(propertyMonthlyLedger.module, "ERP"),
+      ));
+      if (!row) return res.status(404).json({ message: "Ledger row not found" });
+      if (!row.accrualVoucherId) return res.status(400).json({ message: "This month has no posted accrual to reverse" });
+
+      // Verify unit is SHOP type
+      const [unit] = await db.select({ unitType: propertyUnits.unitType, unitNumber: propertyUnits.unitNumber })
+        .from(propertyUnits).where(eq(propertyUnits.id, row.unitId));
+      if (!unit || unit.unitType !== "SHOP") return res.status(400).json({ message: "Accrual reversal is only available for SHOP units" });
+
+      // Block if payments have already been applied (they debited Accrued Rent Payable).
+      if (Number(row.paidAmount) > 0) {
+        return res.status(400).json({
+          message: `Cannot reverse: ${row.paidAmount} has already been paid against this month. Void the payment first.`,
+        });
+      }
+
+      const amount = String(Number(row.expectedAmount) - Number(row.paidAmount));
+
+      const reversalVoucherId = await db.transaction(async (tx) => {
+        const liabilityAccountId = await findOrCreateLedgerAccount(tx, companyId, "Accrued Rent Payable", "Liability", "ACCR-RENT-PAY");
+        const expenseAccountId   = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
+
+        const monthStr  = `${String(row.month).padStart(2, "0")}/${row.year}`;
+        const unitLabel = `unit${row.unitId}${unit.unitNumber ? `-${unit.unitNumber}` : ""}`;
+        const narration = `Accrual reversal - ${unitLabel} - ${monthStr}`;
+
+        const [v] = await tx.insert(vouchers).values({
+          companyId,
+          voucherNumber: `ACCR-REV-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${rowId}`,
+          voucherType: "Journal",
+          voucherDate:  new Date().toISOString().slice(0, 10) as any,
+          description:  narration,
+          totalAmount:  amount,
+          currency:     "USD",
+          sourceModule: "ERP",
+        }).returning();
+
+        // Mirror image of the original accrual:
+        //   Original:  Dr Rent Expense  /  Cr Accrued Rent Payable
+        //   Reversal:  Dr Accrued Rent Payable  /  Cr Rent Expense
+        await tx.insert(voucherEntries).values([
+          { voucherId: v.id, ledgerAccountId: liabilityAccountId, debitAmount: amount, creditAmount: "0", narration },
+          { voucherId: v.id, ledgerAccountId: expenseAccountId,   debitAmount: "0",   creditAmount: amount, narration },
+        ]);
+
+        // Clear the stamp — month is now clean and eligible to be re-accrued
+        await tx.update(propertyMonthlyLedger)
+          .set({ accrualVoucherId: null })
+          .where(eq(propertyMonthlyLedger.id, rowId));
+
+        return v.id;
+      });
+
+      res.json({ ok: true, reversalVoucherId });
+    } catch (e: any) {
+      console.error(`${tag} reverse-accrual:`, e);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // ── AUTO-TRANSFER CONFIG ───────────────────────────────────────────────────
 
   // GET — return current config for this company+module (or null), enriched with names
