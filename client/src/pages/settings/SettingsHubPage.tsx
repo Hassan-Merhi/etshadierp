@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Users, Building2, Settings2, Wrench, ShoppingCart, Download,
   MessageCircle, Database, Shield, ChevronRight, Search,
-  TrendingUp, AlertTriangle, Zap, Factory, Activity,
+  TrendingUp, AlertTriangle, Zap, Factory, Activity, ImageIcon,
 } from "lucide-react";
 
 interface HubCategory {
@@ -18,6 +19,7 @@ interface HubCategory {
   iconColorClass: string;
   keywords: string[];
   firstSection: string;
+  href?: string;
   adminOnly?: boolean;
   devOnly?: boolean;
   dangerous?: boolean;
@@ -155,6 +157,21 @@ const HUB_CATEGORIES: HubCategory[] = [
     iconColorClass: "text-amber-500",
     keywords: ["alerts", "warnings", "negative stock", "overdue", "checks", "business", "monitoring"],
     firstSection: "business-alerts",
+    group: "controls",
+  },
+  {
+    key: "label-banners",
+    title: "Label Banner Images",
+    description: "Add custom color slots, upload banner images, and manage the design picker for A4 bale labels",
+    icon: ImageIcon,
+    colorClass: "bg-purple-500/10",
+    iconColorClass: "text-purple-500",
+    adminOnly: true,
+    keywords: ["label", "banner", "image", "color", "bale", "design", "print", "factory", "upload", "purple", "green", "gold"],
+    firstSection: "label-banners",
+    href: "/factory/label-banners",
+    factoryOnly: true,
+    badge: "Admin",
     group: "controls",
   },
 ];
@@ -379,10 +396,11 @@ function QuickCard({
   onNavigate: (s: string) => void;
 }) {
   const Icon = cat.icon;
+  const [, setLocation] = useLocation();
   return (
     <Card
       className="p-4 cursor-pointer hover-elevate transition-shadow group flex flex-col gap-3"
-      onClick={() => onNavigate(cat.firstSection)}
+      onClick={() => cat.href ? setLocation(cat.href) : onNavigate(cat.firstSection)}
       data-testid={`card-quick-${cat.key}`}
     >
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${cat.colorClass}`}>
@@ -404,10 +422,11 @@ function SettingsCard({
   onNavigate: (s: string) => void;
 }) {
   const Icon = cat.icon;
+  const [, setLocation] = useLocation();
   return (
     <Card
       className="p-5 cursor-pointer hover-elevate transition-shadow group"
-      onClick={() => onNavigate(cat.firstSection)}
+      onClick={() => cat.href ? setLocation(cat.href) : onNavigate(cat.firstSection)}
       data-testid={`card-settings-${cat.key}`}
     >
       <div className="flex items-start gap-4">
