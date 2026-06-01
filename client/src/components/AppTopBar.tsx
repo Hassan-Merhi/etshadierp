@@ -33,7 +33,7 @@ export function AppTopBar({
   extraActions,
 }: AppTopBarProps) {
   return (
-    <header className="relative flex items-center justify-between px-3 sm:px-4 min-h-14 gap-2 sm:gap-3 no-print">
+    <header className="relative flex flex-nowrap items-center justify-between px-3 sm:px-4 min-h-14 gap-2 sm:gap-3 no-print">
       {/* Gradient bottom border — replaces plain border-b */}
       <div
         className="absolute bottom-0 left-0 right-0 h-px pointer-events-none"
@@ -49,7 +49,7 @@ export function AppTopBar({
       </div>
 
       {/* Right zone */}
-      <div className="flex items-center gap-1 sm:gap-1.5 ml-auto">
+      <div className="flex flex-nowrap items-center gap-1 sm:gap-1.5 ml-auto min-w-0">
 
         {/* Extra actions slot (e.g. "Switch to ERP") */}
         {extraActions}
@@ -108,7 +108,7 @@ export function AppTopBar({
         {/* Divider */}
         <div className="hidden sm:block h-5 w-px bg-border/60 mx-1" />
 
-        <CurrencyToggle />
+        <span className="hidden sm:block"><CurrencyToggle /></span>
         <CompanySelector />
         <ThemeToggle />
       </div>

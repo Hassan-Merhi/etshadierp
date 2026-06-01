@@ -716,7 +716,10 @@
      every dialog fit within the visible viewport on narrow screens without
      touching any component's JSX. max-height uses dvh (dynamic viewport
      height) so the keyboard collapsing doesn't break dialog height. */
-  [role="dialog"] {
+  /* Sidebar SheetContent also carries [role="dialog"] (verified: data-sidebar="sidebar"
+     is set on the SheetContent element in sidebar.tsx line 187). Exclude it so the
+     full-height drawer is not clipped by the max-height rule. */
+  [role="dialog"]:not([data-sidebar="sidebar"]) {
     max-width: calc(100vw - 1rem) !important;
     max-height: calc(100dvh - 1rem) !important;
     overflow-y: auto !important;

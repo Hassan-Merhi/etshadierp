@@ -999,8 +999,8 @@ function AuthenticatedApp() {
                 extraActions={
                   !isFactoryCompany && hasErpAccess ? (
                     <Button variant="outline" size="sm" onClick={() => setLocation("/")} data-testid="button-switch-erp">
-                      <Package className="h-4 w-4 mr-1" />
-                      Switch to ERP
+                      <Package className="h-4 w-4 sm:mr-1" />
+                      <span className="hidden sm:inline">Switch to ERP</span>
                     </Button>
                   ) : undefined
                 }
