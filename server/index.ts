@@ -162,7 +162,7 @@ const sessionConfig: session.SessionOptions = {
   saveUninitialized: false,
   rolling: true,
   cookie: {
-    secure: process.env.NODE_ENV === "production" || !!process.env.REPL_ID,
+    secure: process.env.NODE_ENV === "production" || !!process.env.REPL_ID || process.env.CAPACITOR_ENABLED === "true",
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     path: '/',
