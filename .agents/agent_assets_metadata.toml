@@ -36,3 +36,9 @@ id = "YJJh7Wr4OSgUo3b07KwN_"
 uri = "file://fix_mjs16003_tableplus.sql.gz"
 type = "unspecified"
 title = "fix_mjs16003_tableplus.sql.gz — Paste into TablePlus Query tab"
+
+[[outputs]]
+id = "wbBfDp84BaWjrNOs86Dit"
+uri = "file://app-debug.zip"
+type = "unspecified"
+title = "HMD ERP — Debug APK (app-debug.apk inside)"
