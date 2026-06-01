@@ -1,5 +1,17 @@
 apply plugin: 'com.android.application'
 
+// Kotlin 1.8+ merges jdk7/jdk8 into the main stdlib.
+// Force all three artifacts to the same version so Gradle doesn't
+// also pull in the older separate jdk7-1.6.x / jdk8-1.6.x jars,
+// which causes "Duplicate class" errors at checkDuplicateClasses.
+configurations.all {
+    resolutionStrategy {
+        force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+    }
+}
+
 android {
     namespace "com.erp.warehouse"
     compileSdk rootProject.ext.compileSdkVersion
