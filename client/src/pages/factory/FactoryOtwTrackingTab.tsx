@@ -41,7 +41,7 @@ interface ContainerWithSupplier extends FactoryContainer {
   supplierName?: string | null;
 }
 
-const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED", "RECEIVED", "PARTIALLY_RECEIVED"]);
+const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
 
 // ── Currency helpers ────────────────────────────────────────────────────────
 const CCY_SYMBOLS: Record<string, string> = {
@@ -462,11 +462,10 @@ export default function FactoryOtwTrackingTab() {
   const timelineContainer = otwContainers.find((c) => c.id === timelineId) ?? null;
 
   const STATUS_TABS = [
-    { key: "all",                 label: "All" },
-    { key: "PENDING",             label: "Pending" },
-    { key: "IN_TRANSIT",         label: "In Transit" },
-    { key: "ARRIVED",            label: "Arrived" },
-    { key: "PARTIALLY_RECEIVED", label: "Partially Offloaded" },
+    { key: "all",        label: "All" },
+    { key: "PENDING",    label: "Pending" },
+    { key: "IN_TRANSIT", label: "In Transit" },
+    { key: "ARRIVED",    label: "Arrived" },
   ];
 
   if (isLoading) {
