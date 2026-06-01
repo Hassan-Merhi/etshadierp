@@ -784,6 +784,7 @@ export default function SalesReport() {
           {" · "}Click any row to drill in
         </p>
         <div className="border rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -878,6 +879,7 @@ export default function SalesReport() {
               )}
             </TableBody>
           </Table>
+          </div>
         </div>
       </div>
 

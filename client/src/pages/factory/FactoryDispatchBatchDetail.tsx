@@ -447,6 +447,7 @@ export default function FactoryDispatchBatchDetail() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
+                  <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b">
@@ -475,6 +476,7 @@ export default function FactoryDispatchBatchDetail() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </CardContent>
               </Card>
             )}

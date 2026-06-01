@@ -289,7 +289,8 @@ function CategoryProductBreakdown({
   }, [products]);
 
   return (
-    <div className="space-y-1">
+    <div className="overflow-x-auto">
+    <div className="space-y-1 min-w-[420px]">
       {/* Header row */}
       <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 px-2 pb-1 border-b items-center">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category</span>
@@ -372,6 +373,7 @@ function CategoryProductBreakdown({
         <span className="text-sm font-mono font-bold text-right w-24">{fmtKg(totalWeightKg)}</span>
         <span className="text-sm font-mono font-bold text-right w-24">{fmtMoney(totalValue)}</span>
       </div>
+    </div>
     </div>
   );
 }
@@ -751,6 +753,7 @@ function LedgerSection({ title, subtitle, icon, badgeColor, rows, total, default
                             <TableRow key={`${rowKey}-detail`} className="bg-muted/20">
                               <TableCell colSpan={colSpan} className="py-0 px-0">
                                 <div className="pl-8 pr-3 py-2">
+                                  <div className="overflow-x-auto">
                                   <table className="w-full text-xs">
                                     <thead className="sticky top-0 z-30 bg-muted/50">
                                       <tr className="border-b border-border/50">
@@ -782,6 +785,7 @@ function LedgerSection({ title, subtitle, icon, badgeColor, rows, total, default
                                       )}
                                     </tbody>
                                   </table>
+                                  </div>
                                 </div>
                               </TableCell>
                             </TableRow>
