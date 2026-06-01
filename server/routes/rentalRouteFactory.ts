@@ -490,16 +490,20 @@ async function postRentAccrualForCompany(
   let accrued = 0;
   try {
     await db.transaction(async (tx) => {
-      // Lock ALL pending rows in one shot — SKIP LOCKED guards against races
+      // Lock ALL pending rows in one shot — SKIP LOCKED guards against races.
+      // Use IN (...) with a literal id list (all values are trusted integers from
+      // the DB) rather than ANY($n::int[]) — Drizzle does not serialize a JS
+      // array through the sql`` tag in a way pg accepts with ::int[] casting.
       const pendingIds = pendingRows.map(r => r.id);
-      const lockResult = await tx.execute(sql`
-        SELECT id, expected_amount, paid_amount, unit_id, month, year
-        FROM property_monthly_ledger
-        WHERE id = ANY(${pendingIds}::int[])
-          AND accrual_voucher_id IS NULL
-          AND expected_amount::numeric > 0
-        FOR UPDATE SKIP LOCKED
-      `);
+      const idListSql = pendingIds.join(","); // safe: all are DB integers
+      const lockResult = await tx.execute(sql.raw(
+        `SELECT id, expected_amount, paid_amount, unit_id, month, year
+         FROM property_monthly_ledger
+         WHERE id IN (${idListSql})
+           AND accrual_voucher_id IS NULL
+           AND expected_amount::numeric > 0
+         FOR UPDATE SKIP LOCKED`,
+      ));
 
       if (!lockResult.rows || lockResult.rows.length === 0) return;
 
@@ -586,7 +590,10 @@ async function postRentAccrualForCompany(
       accrued = entries.length;
     });
   } catch (e: any) {
-    console.warn(`[ERP/rental] batch accrual failed company ${companyId}:`, e.message?.split("\n")[0]);
+    // Log the full error — Drizzle formats errors as "Failed query:\n<SQL>\n<pg error>",
+    // so split("\n")[0] always shows the useless header.  Log all lines instead.
+    const detail = (e.message ?? String(e)).replace(/\n/g, " | ");
+    console.error(`[ERP/rental] batch accrual failed company ${companyId}: ${detail}`);
   }
 
   return { accrued, skipped: alreadyDone };
