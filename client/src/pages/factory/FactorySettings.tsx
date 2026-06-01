@@ -1281,6 +1281,30 @@ export default function FactorySettings() {
         </CardContent>
       </Card>
 
+      {/* ── Label Banner Images ──────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Images className="h-5 w-5 text-muted-foreground" />
+            Label Banner Images
+          </CardTitle>
+          <CardDescription>
+            Replace the colored HMD header banners printed on A4 bale labels. Upload your own image for each of the 5 design colors (purple, green, gold, white, red).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <Button
+            variant="outline"
+            onClick={() => window.location.href = "/factory/label-banners"}
+            data-testid="button-open-label-banners"
+          >
+            <Images className="h-4 w-4 mr-2" />
+            Manage Label Banners
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* ── Product Images ───────────────────────────────────── */}
       <Card>
         <CardHeader>

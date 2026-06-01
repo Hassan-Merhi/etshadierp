@@ -161,6 +161,7 @@ const FactoryBaleRelabeling = lazy(() => import("@/pages/factory/FactoryBaleRela
 const MergeBaleProducts = lazy(() => import("@/pages/factory/MergeBaleProducts"));
 const BaleProductImages = lazy(() => import("@/pages/factory/BaleProductImages"));
 const CustomerLogosSettings = lazy(() => import("@/pages/factory/CustomerLogosSettings"));
+const LabelBannersSettings = lazy(() => import("@/pages/factory/LabelBannersSettings"));
 const WipersReEntry = lazy(() => import("@/pages/factory/WipersReEntry"));
 const FactoryUsers = lazy(() => import("@/pages/factory/FactoryUsers"));
 const FactoryWorkersHub = lazy(() => import("@/pages/factory/FactoryWorkersHub"));
@@ -1080,6 +1081,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/merge-bale-products" component={MergeBaleProducts} />
                     <Route path="/factory/bale-product-images" component={BaleProductImages} />
                     <Route path="/factory/customer-logos" component={CustomerLogosSettings} />
+                    <Route path="/factory/label-banners" component={LabelBannersSettings} />
                     <Route path="/factory/bale-relabeling/wipers-re-entry" component={WipersReEntry} />
                     <Route path="/factory/users"><Redirect to="/factory/settings" /></Route>
                     <Route path="/factory/ledger-monthly/:accountId" component={LedgerMonthlySummary} />
