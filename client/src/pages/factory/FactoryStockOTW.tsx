@@ -1,50 +1,28 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Textarea } from "@/components/ui/textarea";
-import { Ship, Package, Boxes, Building2, ChevronDown, StickyNote } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Ship, Search, X, Package } from "lucide-react";
 import { useLocation } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
 
-const NOTES_KEY = "factory-otw-notes";
+// ── localStorage helpers ────────────────────────────────────────────────────
+const NOTES_KEY = "factory-otw-row-notes";
+const DOCS_KEY  = "factory-otw-row-docs";
 
-function OTWNotes() {
-  const [value, setValue] = useState(() => localStorage.getItem(NOTES_KEY) ?? "");
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    setValue(e.target.value);
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      localStorage.setItem(NOTES_KEY, e.target.value);
-    }, 600);
-  }
-
-  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
-
-  return (
-    <Card>
-      <CardContent className="pt-3 pb-3">
-        <div className="flex items-center gap-2 mb-2">
-          <StickyNote className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Notes</span>
-        </div>
-        <Textarea
-          value={value}
-          onChange={handleChange}
-          placeholder="Write anything here…"
-          className="min-h-[80px] resize-y text-sm border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 p-0"
-          data-testid="textarea-otw-notes"
-        />
-      </CardContent>
-    </Card>
-  );
+function loadMap(key: string): Record<string, string | boolean> {
+  try { return JSON.parse(localStorage.getItem(key) ?? "{}"); } catch { return {}; }
+}
+function saveMap(key: string, map: Record<string, any>) {
+  localStorage.setItem(key, JSON.stringify(map));
 }
 
+// ── Types ───────────────────────────────────────────────────────────────────
 interface FactoryContainer {
   id: number;
   containerNumber: string;
@@ -69,90 +47,103 @@ interface FactoryContainer {
   preRegisteredChargesSum: string | null;
 }
 
-interface SupplierGroup {
-  supplierId: number | null;
-  supplierName: string;
-  containers: FactoryContainer[];
-  totalKg: number;
-  totalsByCurrency: Record<string, number>;
-}
-
-function num(v: string | null | undefined): number {
-  if (!v) return 0;
-  const n = parseFloat(v);
-  return isNaN(n) ? 0 : n;
-}
+// ── Helpers ─────────────────────────────────────────────────────────────────
+const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED", "RECEIVED", "PARTIALLY_RECEIVED"]);
 
 const CCY_SYMBOLS: Record<string, string> = {
   USD: "$", EUR: "€", GBP: "£", AUD: "A$", CAD: "C$",
   CHF: "CHF", JPY: "¥", CNY: "¥", AED: "AED", SAR: "SAR", LBP: "LL",
 };
 
-function ccySymbol(code: string | null | undefined): string {
+function ccySym(code: string | null | undefined): string {
   if (!code) return "$";
   return CCY_SYMBOLS[code] || code;
 }
 
-function fmtCcy(symbol: string, amount: number | null | undefined): string {
-  if (amount == null || isNaN(amount)) return `${symbol} 0.00`;
+function num(v: string | null | undefined): number {
+  const n = parseFloat(v ?? "");
+  return isNaN(n) ? 0 : n;
+}
+
+function fmtAmt(symbol: string, amount: number): string {
+  if (amount === 0) return "—";
   return `${symbol} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function addToCurrency(map: Record<string, number>, ccy: string, amount: number) {
-  if (amount > 0 && ccy) {
-    map[ccy] = (map[ccy] || 0) + amount;
-  }
+function fmtDate(d: string | null | undefined): string {
+  if (!d) return "—";
+  const plain = d.slice(0, 10);
+  const [y, m, day] = plain.split("-");
+  if (!y || !m || !day) return "—";
+  return `${day}/${m}/${y.slice(2)}`;
 }
 
-function computeContainerByCurrency(c: FactoryContainer): Record<string, number> {
-  const amounts: Record<string, number> = {};
-  const containerCcy = c.currencyCode || "USD";
-  const goodsValue = num(c.finalPayableAmount) > 0
+function containerCost(c: FactoryContainer): { symbol: string; amount: number } {
+  const ccy = c.currencyCode || "USD";
+  const symbol = ccySym(ccy);
+  const amount = num(c.finalPayableAmount) > 0
     ? num(c.finalPayableAmount)
     : num(c.ratePerKg) * num(c.totalKg);
-  addToCurrency(amounts, containerCcy, goodsValue);
-  addToCurrency(amounts, c.freightCurrencyCode || containerCcy, num(c.freight));
-  addToCurrency(amounts, c.commissionCurrencyCode || "USD", num(c.commissionAmount));
-  addToCurrency(amounts, containerCcy, num(c.otherCharges));
-  addToCurrency(amounts, containerCcy, num(c.additionalChargesSum));
-  addToCurrency(amounts, containerCcy, num(c.preRegisteredChargesSum));
-  return amounts;
+  return { symbol, amount };
 }
 
-function mergeCurrencyMaps(target: Record<string, number>, source: Record<string, number>) {
-  for (const [ccy, amt] of Object.entries(source)) {
-    target[ccy] = (target[ccy] || 0) + amt;
+// ── Inline editable notes cell ───────────────────────────────────────────────
+function NotesCell({ containerId, notes, onSave }: {
+  containerId: number;
+  notes: Record<string, string>;
+  onSave: (id: number, val: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const current = notes[String(containerId)] ?? "";
+
+  function startEdit() {
+    setDraft(current);
+    setEditing(true);
   }
-}
 
-function CurrencyInline({ amounts }: { amounts: Record<string, number> }) {
-  const entries = Object.entries(amounts).filter(([, v]) => v > 0);
-  if (entries.length === 0) return <span className="text-muted-foreground">—</span>;
+  function commit() {
+    onSave(containerId, draft);
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <Input
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") setEditing(false);
+        }}
+        className="h-7 text-xs min-w-[140px]"
+        data-testid={`input-notes-${containerId}`}
+      />
+    );
+  }
+
   return (
-    <div className="flex flex-col items-end gap-0.5">
-      {entries.map(([ccy, amt]) => (
-        <span key={ccy} className="font-mono text-sm font-semibold whitespace-nowrap">
-          {fmtCcy(ccySymbol(ccy), amt)}
-        </span>
-      ))}
-    </div>
+    <span
+      className={`text-xs cursor-pointer rounded px-1 py-0.5 hover-elevate ${current ? "text-foreground" : "text-muted-foreground italic"}`}
+      onClick={startEdit}
+      data-testid={`text-notes-${containerId}`}
+      title="Click to edit"
+    >
+      {current || "Add note…"}
+    </span>
   );
 }
 
-const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED", "RECEIVED", "PARTIALLY_RECEIVED"]);
-
-const STATUS_LABEL: Record<string, string> = {
-  PENDING:            "Pending",
-  IN_TRANSIT:         "Pending",
-  ARRIVED:            "Pending",
-  OFFLOADED:          "Offloaded",
-  PARTIALLY_RECEIVED: "Pending",
-  RECEIVED:           "Pending",
-};
-
+// ── Main component ───────────────────────────────────────────────────────────
 export default function FactoryStockOTW() {
   const [, navigate] = useLocation();
-  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
+  const [supplierFilter, setSupplierFilter] = useState<string>("all");
+
+  const [notes, setNotes]   = useState<Record<string, string>>(() => loadMap(NOTES_KEY) as Record<string, string>);
+  const [docs,  setDocs]    = useState<Record<string, boolean>>(() => loadMap(DOCS_KEY) as Record<string, boolean>);
 
   const { data: containers = [], isLoading } = useQuery<FactoryContainer[]>({
     queryKey: ["/api/factory/containers"],
@@ -163,241 +154,282 @@ export default function FactoryStockOTW() {
     [containers],
   );
 
-  const supplierGroups = useMemo<SupplierGroup[]>(() => {
-    const map = new Map<string, SupplierGroup>();
+  const suppliers = useMemo(() => {
+    const seen = new Map<string, string>();
     for (const c of otwContainers) {
       const key = String(c.supplierId ?? "none");
-      if (!map.has(key)) {
-        map.set(key, {
-          supplierId: c.supplierId,
-          supplierName: c.supplierName || "No Supplier",
-          containers: [],
-          totalKg: 0,
-          totalsByCurrency: {},
-        });
-      }
-      const group = map.get(key)!;
-      group.containers.push(c);
-      group.totalKg += num(c.totalKg);
-      mergeCurrencyMaps(group.totalsByCurrency, computeContainerByCurrency(c));
+      if (!seen.has(key)) seen.set(key, c.supplierName || "No Supplier");
     }
-    return Array.from(map.values()).sort((a, b) => a.supplierName.localeCompare(b.supplierName));
+    return Array.from(seen.entries()).sort((a, b) => a[1].localeCompare(b[1]));
   }, [otwContainers]);
 
-  const grandTotals = useMemo(() => {
-    const totalsByCurrency: Record<string, number> = {};
-    let count = 0;
-    let kg = 0;
-    for (const g of supplierGroups) {
-      count += g.containers.length;
-      kg += g.totalKg;
-      mergeCurrencyMaps(totalsByCurrency, g.totalsByCurrency);
+  const filtered = useMemo(() => {
+    let rows = otwContainers;
+    if (supplierFilter !== "all") {
+      rows = rows.filter((c) => String(c.supplierId ?? "none") === supplierFilter);
     }
-    return { containers: count, kg, totalsByCurrency };
-  }, [supplierGroups]);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      rows = rows.filter((c) =>
+        c.containerNumber?.toLowerCase().includes(q) ||
+        c.supplierName?.toLowerCase().includes(q) ||
+        c.origin?.toLowerCase().includes(q),
+      );
+    }
+    return rows;
+  }, [otwContainers, supplierFilter, search]);
 
-  const fmtKg = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  const totals = useMemo(() => {
+    const costByCcy: Record<string, number> = {};
+    const freightByCcy: Record<string, number> = {};
+    const commByCcy: Record<string, number> = {};
+    for (const c of filtered) {
+      const { symbol, amount } = containerCost(c);
+      if (amount) costByCcy[symbol] = (costByCcy[symbol] || 0) + amount;
+      const freightSym = ccySym(c.freightCurrencyCode || c.currencyCode);
+      const fr = num(c.freight);
+      if (fr) freightByCcy[freightSym] = (freightByCcy[freightSym] || 0) + fr;
+      const commSym = ccySym(c.commissionCurrencyCode || "USD");
+      const comm = num(c.commissionAmount);
+      if (comm) commByCcy[commSym] = (commByCcy[commSym] || 0) + comm;
+    }
+    return { costByCcy, freightByCcy, commByCcy };
+  }, [filtered]);
 
-  function toggleGroup(key: string) {
-    setOpenGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
+  const saveNote = useCallback((id: number, val: string) => {
+    setNotes((prev) => {
+      const next = { ...prev, [String(id)]: val };
+      saveMap(NOTES_KEY, next);
       return next;
     });
+  }, []);
+
+  const toggleDoc = useCallback((id: number, checked: boolean) => {
+    setDocs((prev) => {
+      const next = { ...prev, [String(id)]: checked };
+      saveMap(DOCS_KEY, next);
+      return next;
+    });
+  }, []);
+
+  function fmtTotals(map: Record<string, number>): string {
+    const entries = Object.entries(map).filter(([, v]) => v > 0);
+    if (!entries.length) return "—";
+    return entries.map(([sym, amt]) =>
+      `${sym} ${amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    ).join(" · ");
   }
 
-  if (isLoading) {
-    return (
-      <div className="p-6 space-y-3">
-        <Skeleton className="h-8 w-64" />
-        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
-      </div>
-    );
-  }
+  const docsReceived = filtered.filter((c) => docs[String(c.id)]).length;
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center gap-3">
-        <Ship className="h-6 w-6 text-muted-foreground" />
-        <div>
-          <PageHeader title="Stock On The Way" subtitle="Containers currently in transit — grouped by supplier" />
-        </div>
-        <Badge variant="outline" className="ml-auto" data-testid="badge-total-containers">
-          {otwContainers.length} container{otwContainers.length !== 1 ? "s" : ""} OTW
+    <div className="flex flex-col gap-4 p-6">
+      {/* Header */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <Ship className="h-5 w-5 text-muted-foreground shrink-0" />
+        <PageHeader title="OTW Container Tracking" subtitle="Containers currently in transit" />
+        <Badge variant="outline" className="ml-auto shrink-0" data-testid="badge-total-count">
+          {otwContainers.length} container{otwContainers.length !== 1 ? "s" : ""}
         </Badge>
       </div>
 
-      <OTWNotes />
-
-      {otwContainers.length === 0 ? (
-        <Card>
-          <CardContent className="py-16 text-center">
-            <Ship className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-40" />
-            <p className="text-muted-foreground">No containers currently on the way.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <Card>
-            {supplierGroups.map((group, idx) => {
-              const key = String(group.supplierId ?? "none");
-              const isOpen = openGroups.has(key);
-              const isLast = idx === supplierGroups.length - 1;
-
-              return (
-                <Collapsible key={key} open={isOpen} onOpenChange={() => toggleGroup(key)}>
-                  <CollapsibleTrigger asChild>
-                    <div
-                      className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover-elevate transition-colors
-                        ${!isLast ? "border-b" : ""}
-                        ${isOpen ? "bg-muted/30" : ""}`}
-                      data-testid={`row-supplier-${key}`}
-                    >
-                      {/* Supplier name */}
-                      <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="font-medium text-sm flex-1 min-w-0 truncate">
-                        {group.supplierName}
-                      </span>
-
-                      {/* Container count */}
-                      <Badge variant="secondary" className="text-xs shrink-0">
-                        {group.containers.length} ctr{group.containers.length !== 1 ? "s" : ""}
-                      </Badge>
-
-                      {/* Total KG */}
-                      <span className="text-sm font-mono text-muted-foreground shrink-0 hidden sm:block w-28 text-right">
-                        {fmtKg(group.totalKg)} kg
-                      </span>
-
-                      {/* Total value */}
-                      <div className="shrink-0 min-w-[100px] text-right">
-                        <CurrencyInline amounts={group.totalsByCurrency} />
-                      </div>
-
-                      {/* Chevron */}
-                      <ChevronDown
-                        className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-                      />
-                    </div>
-                  </CollapsibleTrigger>
-
-                  <CollapsibleContent>
-                    <div className={`border-t bg-muted/10 ${!isLast ? "border-b" : ""}`}>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Container</TableHead>
-                            <TableHead>Origin</TableHead>
-                            <TableHead className="text-right">KG</TableHead>
-                            <TableHead className="text-right">Value</TableHead>
-                            <TableHead>Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {group.containers.map((c) => {
-                            const byCurrency = computeContainerByCurrency(c);
-                            const isEstimated = num(c.finalPayableAmount) === 0 && num(c.ratePerKg) > 0;
-                            return (
-                              <TableRow
-                                key={c.id}
-                                className="cursor-pointer hover-elevate"
-                                onClick={() => navigate(`/containers/${c.id}`)}
-                                data-testid={`row-container-${c.id}`}
-                              >
-                                <TableCell className="font-mono text-sm font-medium">
-                                  {c.containerNumber}
-                                </TableCell>
-                                <TableCell className="text-sm text-muted-foreground">
-                                  {c.origin || "—"}
-                                </TableCell>
-                                <TableCell className="text-right font-mono text-sm">
-                                  {fmtKg(num(c.totalKg))}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <div className="flex flex-col items-end gap-0.5">
-                                    <CurrencyInline amounts={byCurrency} />
-                                    {isEstimated && (
-                                      <span className="text-xs text-muted-foreground italic">est.</span>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className="text-xs">
-                                    {STATUS_LABEL[c.status] || c.status}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                        <tfoot>
-                          <TableRow className="bg-muted/30 font-medium">
-                            <TableCell colSpan={2} className="text-sm text-muted-foreground">
-                              Supplier total
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm">
-                              {fmtKg(group.totalKg)} kg
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <CurrencyInline amounts={group.totalsByCurrency} />
-                            </TableCell>
-                            <TableCell />
-                          </TableRow>
-                        </tfoot>
-                      </Table>
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              );
-            })}
-          </Card>
-
-          {/* Grand total bar */}
-          <div
-            className="sticky bottom-0 z-50 rounded-md border bg-background shadow-md"
-            data-testid="div-grand-total"
+      {/* Filters */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search container #, supplier…"
+            className="pl-8"
+            data-testid="input-search"
+          />
+        </div>
+        <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+          <SelectTrigger className="w-[200px]" data-testid="select-supplier-filter">
+            <SelectValue placeholder="All suppliers" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All suppliers</SelectItem>
+            {suppliers.map(([key, name]) => (
+              <SelectItem key={key} value={key}>{name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {(search || supplierFilter !== "all") && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => { setSearch(""); setSupplierFilter("all"); }}
+            data-testid="button-clear-filters"
           >
-            <div className="flex flex-wrap items-center gap-6 p-4">
-              <div className="flex items-center gap-2">
-                <Package className="h-4 w-4 text-muted-foreground shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Containers</p>
-                  <p className="text-lg font-bold font-mono" data-testid="text-grand-containers">
-                    {grandTotals.containers}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Boxes className="h-4 w-4 text-muted-foreground shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Total KG</p>
-                  <p className="text-lg font-bold font-mono" data-testid="text-grand-kg">
-                    {fmtKg(grandTotals.kg)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2 flex-1">
-                <div className="w-full">
-                  <p className="text-xs text-muted-foreground mb-1">Total Value by Currency</p>
-                  <div className="flex flex-wrap gap-x-6 gap-y-1" data-testid="text-grand-totals">
-                    {Object.entries(grandTotals.totalsByCurrency)
-                      .filter(([, v]) => v > 0)
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([ccy, amt]) => (
-                        <div key={ccy} className="flex flex-col">
-                          <span className="text-xs text-muted-foreground">{ccy}</span>
-                          <span className="text-lg font-bold font-mono whitespace-nowrap">
-                            {fmtCcy(ccySymbol(ccy), amt)}
-                          </span>
-                        </div>
-                      ))}
-                  </div>
-                </div>
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+        <span className="text-xs text-muted-foreground ml-auto">
+          {filtered.length !== otwContainers.length
+            ? `${filtered.length} of ${otwContainers.length}`
+            : `${filtered.length}`}{" "}
+          shown · {docsReceived} docs received
+        </span>
+      </div>
+
+      {/* Table */}
+      {isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-2">
+          <Ship className="h-12 w-12 opacity-30" />
+          <p className="text-sm">
+            {otwContainers.length === 0
+              ? "No containers currently in transit."
+              : "No containers match your search."}
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-md border overflow-x-auto">
+          <Table>
+            <TableHeader className="sticky top-0 z-20 bg-background">
+              <TableRow>
+                <TableHead className="w-10 text-center">#</TableHead>
+                <TableHead className="whitespace-nowrap">Container #</TableHead>
+                <TableHead className="whitespace-nowrap">Supplier</TableHead>
+                <TableHead className="whitespace-nowrap">ETA</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Cost</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Freight</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Commission</TableHead>
+                <TableHead className="whitespace-nowrap text-center">Docs</TableHead>
+                <TableHead className="whitespace-nowrap min-w-[160px]">Notes</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((c, idx) => {
+                const cost    = containerCost(c);
+                const frSym   = ccySym(c.freightCurrencyCode || c.currencyCode);
+                const commSym = ccySym(c.commissionCurrencyCode || "USD");
+                const docDone = !!docs[String(c.id)];
+
+                return (
+                  <TableRow
+                    key={c.id}
+                    className="hover-elevate"
+                    data-testid={`row-container-${c.id}`}
+                  >
+                    {/* # */}
+                    <TableCell className="text-center text-muted-foreground text-sm">
+                      {idx + 1}
+                    </TableCell>
+
+                    {/* Container # — clickable */}
+                    <TableCell
+                      className="font-mono font-semibold text-sm whitespace-nowrap cursor-pointer hover:underline"
+                      onClick={() => navigate(`/containers/${c.id}`)}
+                      data-testid={`text-container-num-${c.id}`}
+                    >
+                      {c.containerNumber || "—"}
+                    </TableCell>
+
+                    {/* Supplier */}
+                    <TableCell className="text-sm whitespace-nowrap" data-testid={`text-supplier-${c.id}`}>
+                      {c.supplierName ?? <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+
+                    {/* ETA */}
+                    <TableCell className="text-sm whitespace-nowrap font-medium" data-testid={`text-eta-${c.id}`}>
+                      {c.arrivalDate
+                        ? <span>{fmtDate(c.arrivalDate)}</span>
+                        : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+
+                    {/* Cost */}
+                    <TableCell className="text-right text-sm tabular-nums whitespace-nowrap" data-testid={`text-cost-${c.id}`}>
+                      {cost.amount > 0
+                        ? <span className="font-medium">{fmtAmt(cost.symbol, cost.amount)}</span>
+                        : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+
+                    {/* Freight */}
+                    <TableCell className="text-right text-sm tabular-nums whitespace-nowrap" data-testid={`text-freight-${c.id}`}>
+                      {num(c.freight) > 0
+                        ? fmtAmt(frSym, num(c.freight))
+                        : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+
+                    {/* Commission */}
+                    <TableCell className="text-right text-sm tabular-nums whitespace-nowrap" data-testid={`text-commission-${c.id}`}>
+                      {num(c.commissionAmount) > 0
+                        ? fmtAmt(commSym, num(c.commissionAmount))
+                        : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+
+                    {/* Docs checkbox */}
+                    <TableCell className="text-center" data-testid={`cell-docs-${c.id}`}>
+                      <Checkbox
+                        checked={docDone}
+                        onCheckedChange={(v) => toggleDoc(c.id, !!v)}
+                        data-testid={`checkbox-docs-${c.id}`}
+                        aria-label="Docs received"
+                      />
+                    </TableCell>
+
+                    {/* Notes — inline editable */}
+                    <TableCell data-testid={`cell-notes-${c.id}`}>
+                      <NotesCell containerId={c.id} notes={notes} onSave={saveNote} />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Sticky totals bar */}
+      {filtered.length > 0 && (
+        <div
+          className="sticky bottom-0 z-50 rounded-md border bg-background shadow-md"
+          data-testid="div-totals-bar"
+        >
+          <div className="flex flex-wrap items-center gap-6 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">Containers</p>
+                <p className="text-base font-bold tabular-nums" data-testid="text-total-count">
+                  {filtered.length}
+                </p>
               </div>
             </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Total Cost</p>
+              <p className="text-base font-bold tabular-nums whitespace-nowrap" data-testid="text-total-cost">
+                {fmtTotals(totals.costByCcy)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Total Freight</p>
+              <p className="text-base font-bold tabular-nums whitespace-nowrap" data-testid="text-total-freight">
+                {fmtTotals(totals.freightByCcy)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Total Commission</p>
+              <p className="text-base font-bold tabular-nums whitespace-nowrap" data-testid="text-total-commission">
+                {fmtTotals(totals.commByCcy)}
+              </p>
+            </div>
+            <div className="ml-auto">
+              <p className="text-xs text-muted-foreground">Docs Received</p>
+              <p className="text-base font-bold tabular-nums" data-testid="text-docs-received">
+                {docsReceived} / {filtered.length}
+              </p>
+            </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
