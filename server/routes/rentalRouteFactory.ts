@@ -2347,13 +2347,32 @@ export function registerRentalRoutes(
 
       const contractIds = shopContracts.map(c => c.id);
 
-      // 2. Full reset for the current month: find ALL accrual vouchers whose
-      //    ledger rows fall in the current billing month and delete them all.
-      //    This is safe because postRentAccrualForCompany (step 3) will
-      //    immediately recreate ONE combined voucher using the full expectedAmount
-      //    for every unit — paid, partially-paid, and unpaid alike.  The net
-      //    effect on Accrued Rent Payable is unchanged:
-      //      Cr AP (new accrual, full rent) − Dr AP (existing payment) = outstanding balance.
+      // 2a. Dangling-reference sweep (ALL months):
+      //     If the user manually deleted vouchers through the UI the voucher rows
+      //     are soft-deleted (deletedAt IS NOT NULL) or hard-deleted, but the
+      //     accrualVoucherId stamp on the ledger rows still has the old ID.
+      //     postRentAccrualForCompany queries WHERE accrualVoucherId IS NULL, so
+      //     those rows would never be picked up.  Clear every stale reference now
+      //     so the normal flow can proceed unblocked.
+      const danglingCleared = await db
+        .update(propertyMonthlyLedger)
+        .set({ accrualVoucherId: null })
+        .where(and(
+          inArray(propertyMonthlyLedger.contractId, contractIds),
+          isNotNull(propertyMonthlyLedger.accrualVoucherId),
+          sql`${propertyMonthlyLedger.accrualVoucherId} NOT IN (
+            SELECT id FROM vouchers WHERE deleted_at IS NULL
+          )`,
+        ));
+      console.log(`[re-accrue] dangling stamp sweep cleared rows`);
+
+      // 2b. Full reset for the current month: find ALL accrual vouchers whose
+      //     ledger rows fall in the current billing month and delete them all.
+      //     This is safe because postRentAccrualForCompany (step 3) will
+      //     immediately recreate ONE combined voucher using the full expectedAmount
+      //     for every unit — paid, partially-paid, and unpaid alike.  The net
+      //     effect on Accrued Rent Payable is unchanged:
+      //       Cr AP (new accrual, full rent) − Dr AP (existing payment) = outstanding balance.
       const now = new Date();
       const curYear  = now.getUTCFullYear();
       const curMonth = now.getUTCMonth() + 1;
