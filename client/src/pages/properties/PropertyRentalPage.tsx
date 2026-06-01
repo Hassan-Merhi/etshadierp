@@ -275,6 +275,25 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
     onError: (e: any) => toast({ title: "Accrual failed", description: e.message, variant: "destructive" }),
   });
 
+  const resetAccrual = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", apiBase + "/re-accrue");
+      return res.json() as Promise<{ reset: number; accrued: number; skipped: number }>;
+    },
+    onSuccess: (data) => {
+      const r = data?.reset ?? 0;
+      const n = data?.accrued ?? 0;
+      toast({
+        title: r > 0 ? `Reset ${r} old journal${r !== 1 ? "s" : ""} → 1 combined journal` : "Nothing to reset",
+        description: n > 0
+          ? `${n} month${n !== 1 ? "s" : ""} accrued into one journal entry.`
+          : "No new rows to accrue after reset.",
+      });
+      queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
+    },
+    onError: (e: any) => toast({ title: "Re-accrual failed", description: e.message, variant: "destructive" }),
+  });
+
   const deleteUnit = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `${apiBase}/units/${id}`),
     onSuccess: () => {
@@ -343,10 +362,16 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
               </Button>
             )}
             {apiBase === "/api/erp/rental" && unitType === "SHOP" && (
-              <Button variant="outline" size="sm" onClick={() => postAccrual.mutate()} disabled={postAccrual.isPending} data-testid={`button-${testIdPrefix}-post-accrual`}>
-                <BookOpen className={`h-4 w-4 mr-1 ${postAccrual.isPending ? "animate-pulse" : ""}`} />
-                {postAccrual.isPending ? "Accruing…" : "Post Accrual"}
-              </Button>
+              <>
+                <Button variant="outline" size="sm" onClick={() => postAccrual.mutate()} disabled={postAccrual.isPending || resetAccrual.isPending} data-testid={`button-${testIdPrefix}-post-accrual`}>
+                  <BookOpen className={`h-4 w-4 mr-1 ${postAccrual.isPending ? "animate-pulse" : ""}`} />
+                  {postAccrual.isPending ? "Accruing…" : "Post Accrual"}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => resetAccrual.mutate()} disabled={postAccrual.isPending || resetAccrual.isPending} data-testid={`button-${testIdPrefix}-re-accrue`}>
+                  <BookOpen className={`h-4 w-4 mr-1 ${resetAccrual.isPending ? "animate-pulse" : ""}`} />
+                  {resetAccrual.isPending ? "Resetting…" : "Re-accrue"}
+                </Button>
+              </>
             )}
             <Button variant="outline" size="sm" onClick={() => runMonthly.mutate()} disabled={runMonthly.isPending} data-testid={`button-${testIdPrefix}-run-monthly`}>
               <RefreshCw className={`h-4 w-4 mr-1 ${runMonthly.isPending ? "animate-spin" : ""}`} />

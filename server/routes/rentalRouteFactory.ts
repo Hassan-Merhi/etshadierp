@@ -2288,6 +2288,90 @@ export function registerRentalRoutes(
     }
   });
 
+  // ── RESET + RE-ACCRUE (ERP SHOP only) ────────────────────────────────────
+  // Deletes all existing individual accrual vouchers (where no payment has been
+  // applied yet) and then immediately re-runs the combined accrual so the daybook
+  // shows ONE journal instead of one-per-unit.
+  //
+  // Safe guard: rows where paidAmount > 0 are left alone — their accrual is already
+  // partially settled and reversing it would leave the books inconsistent.
+  //
+  // Returns { reset: N, accrued: M } where:
+  //   reset   = number of old individual vouchers deleted
+  //   accrued = number of rows stamped with the new combined voucher
+  app.post(`${urlPrefix}/re-accrue`, requireAuth, async (req: Request, res: Response) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (module !== "ERP") return res.status(400).json({ message: "Re-accrual is only available for ERP module" });
+
+      await ensureMonthlyForCompany(companyId, module);
+
+      // 1. Find all active SHOP contract IDs for this company
+      const shopContracts = await db
+        .select({ id: propertyContracts.id })
+        .from(propertyContracts)
+        .innerJoin(propertyUnits, eq(propertyUnits.id, propertyContracts.unitId))
+        .where(and(
+          eq(propertyContracts.companyId, companyId),
+          eq(propertyContracts.module, "ERP"),
+          eq(propertyContracts.status, "ACTIVE"),
+          eq(propertyUnits.unitType, "SHOP"),
+        ));
+
+      if (shopContracts.length === 0) {
+        return res.json({ reset: 0, accrued: 0, skipped: 0 });
+      }
+
+      const contractIds = shopContracts.map(c => c.id);
+
+      // 2. Find ledger rows that have an existing accrual AND no payment applied yet
+      const accrualedRows = await db.select()
+        .from(propertyMonthlyLedger)
+        .where(and(
+          inArray(propertyMonthlyLedger.contractId, contractIds),
+          isNull(propertyMonthlyLedger.accrualVoucherId).not() as any,
+          sql`${propertyMonthlyLedger.paidAmount}::numeric = 0`,
+        ));
+
+      // Collect the distinct voucher IDs to delete
+      const voucherIdsToDelete = [
+        ...new Set(
+          accrualedRows
+            .map(r => r.accrualVoucherId)
+            .filter((id): id is number => id !== null && id !== undefined),
+        ),
+      ];
+
+      let reset = 0;
+      if (voucherIdsToDelete.length > 0) {
+        await db.transaction(async (tx) => {
+          // Delete entries first (FK child), then the vouchers
+          await tx.delete(voucherEntries)
+            .where(inArray(voucherEntries.voucherId, voucherIdsToDelete));
+          await tx.delete(vouchers)
+            .where(and(
+              inArray(vouchers.id, voucherIdsToDelete),
+              eq(vouchers.companyId, companyId),
+            ));
+          // Clear the stamp on every affected ledger row
+          await tx.update(propertyMonthlyLedger)
+            .set({ accrualVoucherId: null })
+            .where(inArray(propertyMonthlyLedger.contractId, contractIds));
+        });
+        reset = voucherIdsToDelete.length;
+      }
+
+      // 3. Re-run the combined accrual
+      const { accrued, skipped } = await postRentAccrualForCompany(companyId, shopExpenseAccountName);
+
+      res.json({ reset, accrued, skipped });
+    } catch (e: any) {
+      console.error(`${tag} re-accrue:`, e);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // ── REVERSE ACCRUAL (ERP SHOP only) ──────────────────────────────────────
   // Posts the mirror-image Journal voucher for an accrued ledger row and clears
   // accrualVoucherId so the month can be re-accrued if needed.
