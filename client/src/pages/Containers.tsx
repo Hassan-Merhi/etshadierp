@@ -107,6 +107,8 @@ export default function Containers() {
   const [otwTransporterFilter, setOtwTransporterFilter] = useState("ALL");
   const [otwTruckFilter, setOtwTruckFilter] = useState("ALL");
   const [otwDocReceivedFilter, setOtwDocReceivedFilter] = useState("ALL");
+  const [otwFreightStatusFilter, setOtwFreightStatusFilter] = useState("ALL");
+  const [otwNotesFilter, setOtwNotesFilter] = useState("ALL");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingNumberId, setEditingNumberId] = useState<number | null>(null);
   const [editingNumberValue, setEditingNumberValue] = useState("");
@@ -371,6 +373,18 @@ export default function Containers() {
       const docValue = c.docReceived === true;
       if (otwDocReceivedFilter === "YES" && !docValue) return false;
       if (otwDocReceivedFilter === "NO" && docValue) return false;
+    }
+    // Freight status filter
+    if (otwFreightStatusFilter !== "ALL") {
+      const fs = (c.freightStatus || "").trim();
+      if (otwFreightStatusFilter === "NONE" && fs !== "") return false;
+      if (otwFreightStatusFilter !== "NONE" && fs !== otwFreightStatusFilter) return false;
+    }
+    // Notes filter
+    if (otwNotesFilter !== "ALL") {
+      const hasNotes = !!(c.trackingDescription || "").trim();
+      if (otwNotesFilter === "WITH" && !hasNotes) return false;
+      if (otwNotesFilter === "WITHOUT" && hasNotes) return false;
     }
     return true;
   });
@@ -1401,6 +1415,34 @@ export default function Containers() {
                 <SelectItem value="ALL">All Docs</SelectItem>
                 <SelectItem value="YES">Doc Received</SelectItem>
                 <SelectItem value="NO">No Doc</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={otwFreightStatusFilter}
+              onValueChange={setOtwFreightStatusFilter}
+            >
+              <SelectTrigger className="w-full sm:w-[120px]" data-testid="select-otw-freight">
+                <SelectValue placeholder="Freight" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Freight</SelectItem>
+                <SelectItem value="Yes">Freight Yes</SelectItem>
+                <SelectItem value="No">Freight No</SelectItem>
+                <SelectItem value="Pending">Pending</SelectItem>
+                <SelectItem value="NONE">Not Set</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={otwNotesFilter}
+              onValueChange={setOtwNotesFilter}
+            >
+              <SelectTrigger className="w-full sm:w-[110px]" data-testid="select-otw-notes">
+                <SelectValue placeholder="Notes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Notes</SelectItem>
+                <SelectItem value="WITH">Has Notes</SelectItem>
+                <SelectItem value="WITHOUT">No Notes</SelectItem>
               </SelectContent>
             </Select>
           </div>
