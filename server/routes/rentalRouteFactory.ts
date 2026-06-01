@@ -2325,23 +2325,41 @@ export function registerRentalRoutes(
 
       const contractIds = shopContracts.map(c => c.id);
 
-      // 2. Find ledger rows that have an existing accrual AND no payment applied yet
-      const accrualedRows = await db.select()
+      // 2. Fetch ALL accrued rows for these contracts (regardless of payment status).
+      //    We need the full picture to avoid deleting a combined voucher that
+      //    partially covers already-paid months — doing so would destroy the
+      //    rent expense record for those paid months and unbalance Accrued Rent Payable.
+      const allAccruedRows = await db
+        .select({
+          id:               propertyMonthlyLedger.id,
+          accrualVoucherId: propertyMonthlyLedger.accrualVoucherId,
+          paidAmount:       propertyMonthlyLedger.paidAmount,
+        })
         .from(propertyMonthlyLedger)
         .where(and(
           inArray(propertyMonthlyLedger.contractId, contractIds),
           isNotNull(propertyMonthlyLedger.accrualVoucherId),
-          sql`${propertyMonthlyLedger.paidAmount}::numeric = 0`,
         ));
 
-      // Collect the distinct voucher IDs to delete
-      const voucherIdsToDelete = [
-        ...new Set(
-          accrualedRows
-            .map(r => r.accrualVoucherId)
-            .filter((id): id is number => id !== null && id !== undefined),
-        ),
-      ];
+      // A voucher is safe to delete ONLY if every ledger row pointing to it
+      // has paidAmount = 0. If any row has a payment, deleting the voucher
+      // would orphan that payment's Accrued Rent Payable debit.
+      const voucherHasPaid = new Map<number, boolean>();
+      for (const row of allAccruedRows) {
+        const vid = row.accrualVoucherId as number;
+        if (!voucherHasPaid.has(vid)) voucherHasPaid.set(vid, false);
+        if (Number(row.paidAmount) > 0) voucherHasPaid.set(vid, true);
+      }
+      const voucherIdsToDelete = [...voucherHasPaid.entries()]
+        .filter(([, hasPaid]) => !hasPaid)
+        .map(([vid]) => vid);
+
+      // Only de-stamp rows whose voucher is actually being deleted.
+      // Do NOT blanket-clear all contract rows — that would de-stamp rows
+      // whose vouchers we're keeping, causing duplicate accruals on re-run.
+      const rowIdsToDeStamp = allAccruedRows
+        .filter(r => voucherIdsToDelete.includes(r.accrualVoucherId as number))
+        .map(r => r.id);
 
       let reset = 0;
       if (voucherIdsToDelete.length > 0) {
@@ -2354,10 +2372,10 @@ export function registerRentalRoutes(
               inArray(vouchers.id, voucherIdsToDelete),
               eq(vouchers.companyId, companyId),
             ));
-          // Clear the stamp on every affected ledger row
+          // Clear the stamp only on rows whose voucher was just deleted
           await tx.update(propertyMonthlyLedger)
             .set({ accrualVoucherId: null })
-            .where(inArray(propertyMonthlyLedger.contractId, contractIds));
+            .where(inArray(propertyMonthlyLedger.id, rowIdsToDeStamp));
         });
         reset = voucherIdsToDelete.length;
       }
