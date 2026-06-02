@@ -41,8 +41,15 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown, ChevronRight, ChevronUp, MapPin, Package, Trash2, Check, AlertCircle, ArrowRight, Settings2, CalendarIcon, FileDown, List, GitBranch, Upload, FileSpreadsheet, TrendingUp, TrendingDown, ExternalLink } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, MapPin, Package, Trash2, Check, AlertCircle, ArrowRight, Settings2, CalendarIcon, FileDown, List, GitBranch, Upload, FileSpreadsheet, TrendingUp, TrendingDown, ExternalLink, Plus, Search } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -205,6 +212,13 @@ export default function StockTransferOrder() {
   const [importPreview, setImportPreview] = useState<ImportPreviewRow[]>([]);
   const [importLoading, setImportLoading] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
+
+  // Mobile sheet state
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const [mobileSearchTerm, setMobileSearchTerm] = useState("");
+  const [mobileSourceLocationId, setMobileSourceLocationId] = useState<number | null>(null);
+  const [mobileQty, setMobileQty] = useState("");
+  const [mobileSelectedItemId, setMobileSelectedItemId] = useState<number | null>(null);
 
   // History dialog state
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
@@ -654,6 +668,69 @@ export default function StockTransferOrder() {
 
   const removeFromOrder = async (index: number) => {
     setOrderItems(orderItems.filter((_, i) => i !== index));
+  };
+
+  const handleMobileAddItem = () => {
+    if (!mobileSelectedItemId || !mobileSourceLocationId) {
+      toast({ title: "Select a stock item and source location", variant: "destructive" });
+      return;
+    }
+    const qty = parseFloat(mobileQty);
+    if (isNaN(qty) || qty <= 0) {
+      toast({ title: "Enter a valid quantity", variant: "destructive" });
+      return;
+    }
+    const stockItem = stockItems.find((s) => s.id === mobileSelectedItemId);
+    const srcLoc = locations.find((l) => l.id === mobileSourceLocationId);
+    if (!stockItem || !srcLoc) return;
+
+    let rate = 0;
+    let availableQty = qty;
+    if (summaryData) {
+      for (const group of summaryData.stockGroups) {
+        const found = group.items.find((i) => i.id === mobileSelectedItemId);
+        if (found) {
+          const locData = found.locationData[mobileSourceLocationId];
+          if (locData) {
+            rate = locData.rate || 0;
+            availableQty = locData.quantity || qty;
+          }
+          break;
+        }
+      }
+    }
+
+    const existingIdx = orderItems.findIndex(
+      (item) => item.stockItemId === mobileSelectedItemId && item.sourceLocationId === mobileSourceLocationId
+    );
+    let updatedItems: OrderItem[];
+    if (existingIdx >= 0) {
+      updatedItems = [...orderItems];
+      updatedItems[existingIdx] = {
+        ...updatedItems[existingIdx],
+        quantity: updatedItems[existingIdx].quantity + qty,
+      };
+    } else {
+      updatedItems = [
+        ...orderItems,
+        {
+          stockItemId: stockItem.id,
+          stockItemName: stockItem.name,
+          stockItemCode: stockItem.code,
+          uom: stockItem.uom,
+          sourceLocationId: srcLoc.id,
+          sourceLocationName: srcLoc.name,
+          quantity: qty,
+          availableQty,
+          rate,
+        },
+      ];
+    }
+    setOrderItems(sortOrderItems(updatedItems));
+    setMobileQty("");
+    setMobileSelectedItemId(null);
+    setMobileSheetOpen(false);
+    toast({ title: "Added to Order", description: `${formatNumber(qty, 0)} ${stockItem.uom} of ${stockItem.name}` });
   };
 
   const validateOrder = (): string[] => {
@@ -1422,7 +1499,7 @@ export default function StockTransferOrder() {
       )}
 
       <div className="flex flex-col lg:flex-row gap-4">
-        <Card className="lg:flex-[3]">
+        <Card className="hidden lg:block lg:flex-[3]">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2">
@@ -1557,6 +1634,113 @@ export default function StockTransferOrder() {
         </Card>
 
         <div className="flex-1 flex flex-col gap-4 lg:min-w-[300px]">
+          {/* Mobile-only: Add Item Sheet */}
+          <div className="lg:hidden">
+            <Sheet open={mobileSheetOpen} onOpenChange={setMobileSheetOpen}>
+              <Button
+                className="w-full"
+                onClick={() => setMobileSheetOpen(true)}
+                data-testid="button-mobile-add-item"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Item
+              </Button>
+              <SheetContent side="bottom" className="h-[85vh] flex flex-col">
+                <SheetHeader className="border-b pb-3 shrink-0">
+                  <SheetTitle>Add Item to Order</SheetTitle>
+                </SheetHeader>
+                <div className="flex-1 overflow-y-auto py-4 space-y-4">
+                  {/* Stock item search */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Stock Item</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        className="pl-9"
+                        placeholder="Search stock items..."
+                        value={mobileSearchTerm}
+                        onChange={(e) => setMobileSearchTerm(e.target.value)}
+                        data-testid="input-mobile-search"
+                      />
+                    </div>
+                    <ScrollArea className="h-48 border rounded-md">
+                      <div className="p-1 space-y-0.5">
+                        {stockItems
+                          .filter((s) =>
+                            mobileSearchTerm.trim() === "" ||
+                            s.name.toLowerCase().includes(mobileSearchTerm.toLowerCase()) ||
+                            s.code.toLowerCase().includes(mobileSearchTerm.toLowerCase())
+                          )
+                          .map((s) => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              className={cn(
+                                "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
+                                mobileSelectedItemId === s.id
+                                  ? "bg-primary text-primary-foreground"
+                                  : "hover:bg-muted"
+                              )}
+                              onClick={() => setMobileSelectedItemId(s.id)}
+                              data-testid={`mobile-item-option-${s.id}`}
+                            >
+                              <span className="font-medium">{s.name}</span>
+                              <span className="ml-2 text-xs opacity-70">{s.code}</span>
+                            </button>
+                          ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+
+                  {/* Source location */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Source Location</Label>
+                    <Select
+                      value={mobileSourceLocationId?.toString() || ""}
+                      onValueChange={(v) => setMobileSourceLocationId(parseInt(v))}
+                    >
+                      <SelectTrigger data-testid="select-mobile-source">
+                        <SelectValue placeholder="Pick source location" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(selectedLocations.length > 0 ? selectedLocations : locations).map((loc) => (
+                          <SelectItem key={loc.id} value={loc.id.toString()} data-testid={`mobile-source-option-${loc.id}`}>
+                            {loc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Quantity */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Quantity</Label>
+                    <Input
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      placeholder="0"
+                      value={mobileQty}
+                      onChange={(e) => setMobileQty(e.target.value)}
+                      className="font-mono"
+                      data-testid="input-mobile-qty"
+                    />
+                  </div>
+                </div>
+                <SheetFooter className="border-t pt-3 shrink-0">
+                  <Button
+                    className="w-full"
+                    onClick={handleMobileAddItem}
+                    data-testid="button-mobile-confirm-add"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add to Order
+                  </Button>
+                </SheetFooter>
+              </SheetContent>
+            </Sheet>
+          </div>
+
           {destinationLocationId && (
             <Card className="bg-primary/5 border-primary/20">
               <CardContent className="py-3">
@@ -1596,7 +1780,8 @@ export default function StockTransferOrder() {
               {orderItems.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Click on quantities or use arrow keys + spacebar to add / Enter to view history</p>
+                  <p className="text-sm hidden lg:block">Click on quantities or use arrow keys + spacebar to add items</p>
+                  <p className="text-sm lg:hidden">Tap "Add Item" above to add items to the order</p>
                 </div>
               ) : (
                 <>
