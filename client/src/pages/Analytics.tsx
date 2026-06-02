@@ -1574,9 +1574,9 @@ export default function Analytics() {
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Customer</TableHead>
-                        <TableHead className="text-right">Containers</TableHead>
-                        <TableHead className="text-right">Total Value</TableHead>
-                        <TableHead className="text-right">Paid</TableHead>
+                        <TableHead className="text-right hidden sm:table-cell">Containers</TableHead>
+                        <TableHead className="text-right hidden sm:table-cell">Total Value</TableHead>
+                        <TableHead className="text-right hidden sm:table-cell">Paid</TableHead>
                         <TableHead className="text-right">Outstanding</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1584,9 +1584,9 @@ export default function Analytics() {
                       {factorySalesByCustomer.map((row: any) => (
                         <TableRow key={row.customerId ?? "null"}>
                           <TableCell className="font-medium">{row.customerName || `Customer #${row.customerId}`}</TableCell>
-                          <TableCell className="text-right">{row.containers}</TableCell>
-                          <TableCell className="text-right font-mono">{formatAmount(parseFloat(row.totalAmount))}</TableCell>
-                          <TableCell className="text-right font-mono text-green-600 dark:text-green-400">{formatAmount(parseFloat(row.paidAmount))}</TableCell>
+                          <TableCell className="text-right hidden sm:table-cell">{row.containers}</TableCell>
+                          <TableCell className="text-right font-mono hidden sm:table-cell">{formatAmount(parseFloat(row.totalAmount))}</TableCell>
+                          <TableCell className="text-right font-mono text-green-600 dark:text-green-400 hidden sm:table-cell">{formatAmount(parseFloat(row.paidAmount))}</TableCell>
                           <TableCell className="text-right font-mono text-amber-600 dark:text-amber-400">
                             {formatAmount(parseFloat(row.totalAmount) - parseFloat(row.paidAmount))}
                           </TableCell>
@@ -1596,9 +1596,9 @@ export default function Analytics() {
                     <TableBody className="font-semibold border-t-2">
                       <TableRow>
                         <TableCell>Total</TableCell>
-                        <TableCell className="text-right">{factorySalesByCustomer.reduce((s: number, r: any) => s + Number(r.containers), 0)}</TableCell>
-                        <TableCell className="text-right font-mono">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.totalAmount), 0))}</TableCell>
-                        <TableCell className="text-right font-mono">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.paidAmount), 0))}</TableCell>
+                        <TableCell className="text-right hidden sm:table-cell">{factorySalesByCustomer.reduce((s: number, r: any) => s + Number(r.containers), 0)}</TableCell>
+                        <TableCell className="text-right font-mono hidden sm:table-cell">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.totalAmount), 0))}</TableCell>
+                        <TableCell className="text-right font-mono hidden sm:table-cell">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.paidAmount), 0))}</TableCell>
                         <TableCell className="text-right font-mono">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.totalAmount) - parseFloat(r.paidAmount), 0))}</TableCell>
                       </TableRow>
                     </TableBody>
@@ -1623,22 +1623,22 @@ export default function Analytics() {
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Customer</TableHead>
-                        <TableHead className="text-right">Transactions</TableHead>
+                        <TableHead className="text-right hidden sm:table-cell">Transactions</TableHead>
                         <TableHead className="text-right">Total Sales</TableHead>
-                        <TableHead className="text-right">Cash Sales</TableHead>
-                        <TableHead className="text-right">Credit Sales</TableHead>
-                        <TableHead className="text-right">Deposit Collected</TableHead>
+                        <TableHead className="text-right hidden sm:table-cell">Cash Sales</TableHead>
+                        <TableHead className="text-right hidden sm:table-cell">Credit Sales</TableHead>
+                        <TableHead className="text-right hidden sm:table-cell">Deposit Collected</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {(factoryPosSummary.byCustomer ?? []).map((row: any, idx: number) => (
                         <TableRow key={row.customerId ?? idx}>
                           <TableCell className="font-medium">{row.customerName}</TableCell>
-                          <TableCell className="text-right">{row.sales}</TableCell>
+                          <TableCell className="text-right hidden sm:table-cell">{row.sales}</TableCell>
                           <TableCell className="text-right font-mono">{formatAmount(parseFloat(row.totalAmount))}</TableCell>
-                          <TableCell className="text-right font-mono text-green-600 dark:text-green-400">{formatAmount(parseFloat(row.cashSales))}</TableCell>
-                          <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400">{formatAmount(parseFloat(row.creditSales))}</TableCell>
-                          <TableCell className="text-right font-mono">{formatAmount(parseFloat(row.depositAmount))}</TableCell>
+                          <TableCell className="text-right font-mono text-green-600 dark:text-green-400 hidden sm:table-cell">{formatAmount(parseFloat(row.cashSales))}</TableCell>
+                          <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400 hidden sm:table-cell">{formatAmount(parseFloat(row.creditSales))}</TableCell>
+                          <TableCell className="text-right font-mono hidden sm:table-cell">{formatAmount(parseFloat(row.depositAmount))}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -1646,11 +1646,11 @@ export default function Analytics() {
                       <TableBody className="font-semibold border-t-2">
                         <TableRow>
                           <TableCell>Total</TableCell>
-                          <TableCell className="text-right">{factoryPosSummary.grand.sales}</TableCell>
+                          <TableCell className="text-right hidden sm:table-cell">{factoryPosSummary.grand.sales}</TableCell>
                           <TableCell className="text-right font-mono">{formatAmount(parseFloat(factoryPosSummary.grand.totalAmount))}</TableCell>
-                          <TableCell className="text-right font-mono text-green-600 dark:text-green-400">{formatAmount(parseFloat(factoryPosSummary.grand.cashSales))}</TableCell>
-                          <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400">{formatAmount(parseFloat(factoryPosSummary.grand.creditSales))}</TableCell>
-                          <TableCell className="text-right font-mono">{formatAmount(parseFloat(factoryPosSummary.grand.depositAmount))}</TableCell>
+                          <TableCell className="text-right font-mono text-green-600 dark:text-green-400 hidden sm:table-cell">{formatAmount(parseFloat(factoryPosSummary.grand.cashSales))}</TableCell>
+                          <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400 hidden sm:table-cell">{formatAmount(parseFloat(factoryPosSummary.grand.creditSales))}</TableCell>
+                          <TableCell className="text-right font-mono hidden sm:table-cell">{formatAmount(parseFloat(factoryPosSummary.grand.depositAmount))}</TableCell>
                         </TableRow>
                       </TableBody>
                     )}

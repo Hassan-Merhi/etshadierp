@@ -96,20 +96,20 @@ export default function OpeningStockSummary() {
       <Card className="overflow-hidden">
         {/* Header */}
         <div className="bg-primary text-primary-foreground">
-          <div className="grid grid-cols-4 sm:grid-cols-7 p-2 sm:p-3 font-semibold text-xs sm:text-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-7 p-2 sm:p-3 font-semibold text-xs sm:text-sm">
             <div className="col-span-1">Particulars</div>
-            <div className="col-span-3 text-center border-l border-primary-foreground/30">
+            <div className="col-span-1 sm:col-span-3 text-center border-l border-primary-foreground/30">
               Opening Balance
             </div>
             <div className="hidden sm:block col-span-3 text-center border-l border-primary-foreground/30">
               Closing Balance
             </div>
           </div>
-          <div className="grid grid-cols-4 sm:grid-cols-7 px-2 sm:px-3 pb-2 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-7 px-2 sm:px-3 pb-2 text-xs">
             <div></div>
-            <div className="text-right">Quantity</div>
-            <div className="text-right">Rate</div>
-            <div className="text-right">Value</div>
+            <div className="text-right border-l border-primary-foreground/30 pl-2">Quantity</div>
+            <div className="hidden sm:block text-right">Rate</div>
+            <div className="hidden sm:block text-right">Value</div>
             <div className="hidden sm:block text-right border-l border-primary-foreground/30 pl-2">Quantity</div>
             <div className="hidden sm:block text-right">Rate</div>
             <div className="hidden sm:block text-right">Value</div>
@@ -129,7 +129,7 @@ export default function OpeningStockSummary() {
               {data.stockGroups.map((group) => (
                 <div
                   key={group.id}
-                  className="grid grid-cols-4 sm:grid-cols-7 p-2 sm:p-3 cursor-pointer hover-elevate"
+                  className="grid grid-cols-2 sm:grid-cols-7 p-2 sm:p-3 cursor-pointer hover-elevate"
                   onClick={() => handleGroupClick(group.id, group.name)}
                   data-testid={`row-stock-group-${group.id}`}
                 >
@@ -141,10 +141,10 @@ export default function OpeningStockSummary() {
                   <div className="text-right font-mono text-sm">
                     {formatQty(group.opening.quantity)}
                   </div>
-                  <div className="text-right font-mono text-sm">
+                  <div className="hidden sm:block text-right font-mono text-sm">
                     {group.opening.rate === 0 ? "" : formatAmount(group.opening.rate)}
                   </div>
-                  <div className="text-right font-mono text-sm">
+                  <div className="hidden sm:block text-right font-mono text-sm">
                     {group.opening.value === 0 ? "" : formatAmount(group.opening.value)}
                   </div>
                   {/* Closing Balance */}
@@ -170,16 +170,16 @@ export default function OpeningStockSummary() {
         {/* Grand Total */}
         {data?.grandTotal && (
           <div className="bg-muted/50 border-t-2 border-primary">
-            <div className="grid grid-cols-4 sm:grid-cols-7 p-2 sm:p-3 font-bold">
+            <div className="grid grid-cols-2 sm:grid-cols-7 p-2 sm:p-3 font-bold">
               <div className="text-xs sm:text-sm">Grand Total</div>
               {/* Opening Total */}
               <div className="text-right font-mono">
                 {formatNumber(data.grandTotal.opening.quantity)} BL
               </div>
-              <div className="text-right font-mono">
+              <div className="hidden sm:block text-right font-mono">
                 {openingRate === 0 ? "" : formatAmount(openingRate)}
               </div>
-              <div className="text-right font-mono">
+              <div className="hidden sm:block text-right font-mono">
                 {data.grandTotal.opening.value === 0 ? "" : formatAmount(data.grandTotal.opening.value)}
               </div>
               {/* Closing Total */}

@@ -214,7 +214,7 @@ export default function LedgerVouchers() {
                         <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow className="bg-muted/50">
                             <TableHead className="w-28">Date</TableHead>
-                            <TableHead className="w-28 hidden sm:table-cell">Type</TableHead>
+                            <TableHead className="w-28">Type</TableHead>
                             <TableHead className="hidden sm:table-cell">Particulars</TableHead>
                             <TableHead className="text-right w-32">Debit</TableHead>
                             <TableHead className="text-right w-32">Credit</TableHead>
@@ -248,7 +248,7 @@ export default function LedgerVouchers() {
                                 <TableCell className="font-mono text-sm whitespace-nowrap">
                                   {formatShortDate(voucher.date)}
                                 </TableCell>
-                                <TableCell className="hidden sm:table-cell">
+                                <TableCell>
                                   <Badge
                                     variant="secondary"
                                     className={`text-xs ${voucherTypeColors[voucher.voucherType] || ""}`}
