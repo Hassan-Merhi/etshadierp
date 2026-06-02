@@ -821,9 +821,13 @@ export function registerCustomerRoutes(app: Express) {
     try {
       const companyId = parseInt(req.params.companyId);
       const userId = req.session.userId!;
-      const userRoles = await storage.getUserCompaniesWithRoles(userId);
-      const hasAccess = userRoles.some((r: any) => r.companyId === companyId);
-      if (!hasAccess) return res.status(403).json({ message: "No access to this company" });
+      // Allow access if the user is currently operating as this company (session), or has an explicit role.
+      const isCurrentCompany = req.session.currentCompanyId === companyId;
+      if (!isCurrentCompany) {
+        const userRoles = await storage.getUserCompaniesWithRoles(userId);
+        const hasAccess = userRoles.some((r: any) => r.companyId === companyId);
+        if (!hasAccess) return res.status(403).json({ message: "No access to this company" });
+      }
       const accounts = await storage.getAllLedgerAccounts(companyId, true);
       res.json(accounts);
     } catch (error: any) {
