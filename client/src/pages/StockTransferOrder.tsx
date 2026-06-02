@@ -685,30 +685,55 @@ export default function StockTransferOrder() {
     if (!stockItem || !srcLoc) return;
 
     let rate = 0;
-    let availableQty = qty;
+    let availableQty = 0;
+    let hasAvailabilityData = false;
+
     if (summaryData) {
+      let itemFound = false;
       for (const group of summaryData.stockGroups) {
-        const found = group.items.find((i) => i.id === mobileSelectedItemId);
-        if (found) {
-          const locData = found.locationData[mobileSourceLocationId];
-          if (locData) {
-            rate = locData.rate || 0;
-            availableQty = locData.quantity || qty;
+        const matrixItem = group.items.find((i) => i.id === mobileSelectedItemId);
+        if (matrixItem) {
+          itemFound = true;
+          const locData = matrixItem.locationData[mobileSourceLocationId];
+          if (locData != null) {
+            rate = locData.rate ?? 0;
+            availableQty = locData.quantity ?? 0;
           }
           break;
         }
+      }
+      hasAvailabilityData = itemFound;
+      if (itemFound && availableQty <= 0) {
+        toast({
+          title: "No Stock",
+          description: `${stockItem.name} has no available stock at ${srcLoc.name}`,
+          variant: "destructive",
+        });
+        return;
       }
     }
 
     const existingIdx = orderItems.findIndex(
       (item) => item.stockItemId === mobileSelectedItemId && item.sourceLocationId === mobileSourceLocationId
     );
+    const currentAllocated = existingIdx >= 0 ? orderItems[existingIdx].quantity : 0;
+    const totalAfterAdd = currentAllocated + qty;
+
+    if (hasAvailabilityData && totalAfterAdd > availableQty) {
+      toast({
+        title: "Exceeds Available Stock",
+        description: `Can add up to ${formatNumber(availableQty - currentAllocated, 0)} more. Available: ${formatNumber(availableQty, 0)}, In order: ${formatNumber(currentAllocated, 0)}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     let updatedItems: OrderItem[];
     if (existingIdx >= 0) {
       updatedItems = [...orderItems];
       updatedItems[existingIdx] = {
         ...updatedItems[existingIdx],
-        quantity: updatedItems[existingIdx].quantity + qty,
+        quantity: totalAfterAdd,
       };
     } else {
       updatedItems = [
@@ -721,7 +746,7 @@ export default function StockTransferOrder() {
           sourceLocationId: srcLoc.id,
           sourceLocationName: srcLoc.name,
           quantity: qty,
-          availableQty,
+          availableQty: hasAvailabilityData ? availableQty : qty,
           rate,
         },
       ];
@@ -1695,21 +1720,27 @@ export default function StockTransferOrder() {
                   {/* Source location */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Source Location</Label>
-                    <Select
-                      value={mobileSourceLocationId?.toString() || ""}
-                      onValueChange={(v) => setMobileSourceLocationId(parseInt(v))}
-                    >
-                      <SelectTrigger data-testid="select-mobile-source">
-                        <SelectValue placeholder="Pick source location" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(selectedLocations.length > 0 ? selectedLocations : locations).map((loc) => (
-                          <SelectItem key={loc.id} value={loc.id.toString()} data-testid={`mobile-source-option-${loc.id}`}>
-                            {loc.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {selectedLocations.length === 0 ? (
+                      <div className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
+                        No source locations selected. Close this sheet and tap "Source Locations" to add some.
+                      </div>
+                    ) : (
+                      <Select
+                        value={mobileSourceLocationId?.toString() || ""}
+                        onValueChange={(v) => setMobileSourceLocationId(parseInt(v))}
+                      >
+                        <SelectTrigger data-testid="select-mobile-source">
+                          <SelectValue placeholder="Pick source location" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {selectedLocations.map((loc) => (
+                            <SelectItem key={loc.id} value={loc.id.toString()} data-testid={`mobile-source-option-${loc.id}`}>
+                              {loc.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
                   {/* Quantity */}
