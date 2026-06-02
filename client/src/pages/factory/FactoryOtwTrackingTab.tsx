@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient as useTQClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -21,8 +19,10 @@ import {
 import {
   Radio, RefreshCw, Loader2, CheckCircle, XCircle, AlertTriangle,
   Minus, AlertCircle, Settings2, MapPin, Activity, Search, X, Package,
-  Pencil, ArrowUp, ArrowDown, ChevronsUpDown,
+  Pencil, ArrowUp, ArrowDown, ChevronsUpDown, Ship, Truck, CheckCircle2,
+  DollarSign, Clock, Filter, ChevronDown,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import type { FactoryContainer } from "@shared/schema";
@@ -80,8 +80,38 @@ function containerCost(c: ContainerWithSupplier): { symbol: string; amount: numb
     : num(c.ratePerKg) * num(c.totalKg);
   return { symbol, amount };
 }
+function calcDelayDays(c: ContainerWithSupplier): number {
+  if (!c.arrivalDate) return 0;
+  const eta = new Date(c.arrivalDate); eta.setHours(0, 0, 0, 0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const diff = Math.floor((today.getTime() - eta.getTime()) / 86400000);
+  return diff > 0 ? diff : 0;
+}
+function isOverdue(c: ContainerWithSupplier): boolean {
+  return calcDelayDays(c) > 0;
+}
 
-// ── Colored status badges ────────────────────────────────────────────────────
+// ── Summary Card (mirrors ERP SummaryCard) ───────────────────────────────────
+function SummaryCard({ label, value, icon, accent }: {
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+  accent?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3 min-w-0">
+      <div className={cn("flex items-center justify-center h-9 w-9 rounded-md shrink-0", accent ?? "bg-muted")}>
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs text-muted-foreground font-medium leading-none mb-1 whitespace-nowrap">{label}</p>
+        <p className="text-xl font-bold leading-none tracking-tight whitespace-nowrap">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+// ── Status badge ─────────────────────────────────────────────────────────────
 const CONTAINER_STATUS_LABELS: Record<string, string> = {
   PENDING:            "Pending",
   IN_TRANSIT:         "In Transit",
@@ -90,30 +120,15 @@ const CONTAINER_STATUS_LABELS: Record<string, string> = {
   PARTIALLY_RECEIVED: "Partial",
   RECEIVED:           "Received",
 };
-
 function ContainerStatusBadge({ status }: { status: string }) {
   const label = CONTAINER_STATUS_LABELS[status] ?? status;
   if (status === "OFFLOADED")
     return <Badge className="text-xs bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/20">{label}</Badge>;
-  if (status === "PARTIALLY_RECEIVED")
-    return <Badge className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20">{label}</Badge>;
   if (status === "IN_TRANSIT")
     return <Badge className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">{label}</Badge>;
   if (status === "ARRIVED")
     return <Badge className="text-xs bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20">{label}</Badge>;
   return <Badge variant="secondary" className="text-xs">{label}</Badge>;
-}
-
-function TrackingStatusBadge({ status }: { status: string | null | undefined }) {
-  if (!status) return <Badge variant="secondary" className="text-xs">No data</Badge>;
-  const s = status.toLowerCase();
-  if (s.includes("transit") || s.includes("depart") || s.includes("vessel") || s.includes("at sea"))
-    return <Badge className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">{status}</Badge>;
-  if (s.includes("discharg") || s.includes("arrival") || s.includes("arrived") || s.includes("port"))
-    return <Badge className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20">{status}</Badge>;
-  if (s.includes("deliver") || s.includes("final") || s.includes("complete"))
-    return <Badge className="text-xs bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/20">{status}</Badge>;
-  return <Badge variant="outline" className="text-xs">{status}</Badge>;
 }
 
 // ── Inline notes cell ────────────────────────────────────────────────────────
@@ -155,10 +170,10 @@ function NotesCell({ containerId, notes, onSave }: {
   }
   return (
     <span
-      className={`text-xs cursor-pointer rounded px-1 py-0.5 hover-elevate ${current ? "text-foreground" : "text-muted-foreground italic"}`}
+      className={`text-xs cursor-pointer rounded px-1 py-0.5 hover-elevate max-w-[140px] truncate block ${current ? "text-foreground" : "text-muted-foreground italic"}`}
       onClick={startEdit}
       data-testid={`text-notes-${containerId}`}
-      title="Click to edit"
+      title={current || "Click to add note"}
     >
       {current || "Add note…"}
     </span>
@@ -174,7 +189,6 @@ interface TrackingEvent {
   status: string | null;
   provider: string | null;
 }
-
 function EventTimelineSheet({ containerId, containerNumber, open, onClose }: {
   containerId: number | null;
   containerNumber: string;
@@ -345,7 +359,7 @@ function TrackingSettingsSheet({ container, open, onClose }: {
   );
 }
 
-// ── Track-now progress steps ─────────────────────────────────────────────────
+// ── Track-now progress log ────────────────────────────────────────────────────
 interface ProgressStep {
   provider: string;
   status: "running" | "success" | "fail" | "skip" | "blocked";
@@ -392,14 +406,6 @@ function TrackNowProgressLog({ containerId }: { containerId: number }) {
   );
 }
 
-// ── Sortable ETA header ──────────────────────────────────────────────────────
-type EtaSort = "none" | "asc" | "desc";
-function EtaSortIcon({ sort }: { sort: EtaSort }) {
-  if (sort === "asc")  return <ArrowUp className="h-3.5 w-3.5 ml-1 shrink-0" />;
-  if (sort === "desc") return <ArrowDown className="h-3.5 w-3.5 ml-1 shrink-0" />;
-  return <ChevronsUpDown className="h-3.5 w-3.5 ml-1 shrink-0 opacity-40" />;
-}
-
 // ── Main component ───────────────────────────────────────────────────────────
 export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = {}) {
   const { toast } = useToast();
@@ -410,8 +416,10 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   const [supplierFilter, setSupplierFilter]       = useState<string>("all");
   const [freightFilter, setFreightFilter]         = useState<string>("all");
   const [docsFilter, setDocsFilter]               = useState<string>("all");
+  const [delayedFilter, setDelayedFilter]         = useState<string>("all");
+  const [sortOrder, setSortOrder]                 = useState<string>("DEFAULT");
   const [search, setSearch]                       = useState("");
-  const [etaSort, setEtaSort]                     = useState<EtaSort>("asc");
+  const [showFilters, setShowFilters]             = useState(false);
 
   const [notes, setNotes] = useState<Record<string, string>>(() => loadMap<string>(NOTES_KEY));
   const [docs,  setDocs]  = useState<Record<string, boolean>>(() => loadMap<boolean>(DOCS_KEY));
@@ -427,12 +435,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     new Map(otwContainers.map((c) => [String(c.supplierId ?? "none"), (c as any).supplierName || "No Supplier"])).entries()
   ).sort((a, b) => a[1].localeCompare(b[1]));
 
-  // Status tab counts
-  const statusCounts: Record<string, number> = { all: otwContainers.length };
-  for (const c of otwContainers) {
-    statusCounts[c.status] = (statusCounts[c.status] || 0) + 1;
-  }
-
   // Apply filters + sort
   let filtered = otwContainers.filter((c) => {
     if (supplierFilter !== "all" && String(c.supplierId ?? "none") !== supplierFilter) return false;
@@ -440,6 +442,8 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     if (freightFilter === "no_freight"  && num(c.freight) > 0)    return false;
     if (docsFilter === "received"     && !docs[String(c.id)])  return false;
     if (docsFilter === "not_received" && !!docs[String(c.id)]) return false;
+    if (delayedFilter === "delayed"  && calcDelayDays(c) === 0) return false;
+    if (delayedFilter === "overdue"  && !isOverdue(c))          return false;
     if (search.trim()) {
       const q = search.toLowerCase();
       if (
@@ -450,46 +454,51 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     return true;
   });
 
-  // Sort: supplier alphabetically (primary), then ETA (secondary)
+  // Sort
   filtered = [...filtered].sort((a, b) => {
+    if (sortOrder === "ETA_ASC" || sortOrder === "ETA_DESC") {
+      const da = a.arrivalDate ? new Date(a.arrivalDate).getTime() : (sortOrder === "ETA_ASC" ? Infinity : -Infinity);
+      const db = b.arrivalDate ? new Date(b.arrivalDate).getTime() : (sortOrder === "ETA_ASC" ? Infinity : -Infinity);
+      if (da !== db) return sortOrder === "ETA_ASC" ? da - db : db - da;
+    }
     const sa = ((a as any).supplierName || "").toLowerCase();
     const sb = ((b as any).supplierName || "").toLowerCase();
-    if (sa !== sb) return sa.localeCompare(sb);
-    if (etaSort === "none") return 0;
-    const da = a.arrivalDate ? new Date(a.arrivalDate).getTime() : (etaSort === "asc" ? Infinity : -Infinity);
-    const db = b.arrivalDate ? new Date(b.arrivalDate).getTime() : (etaSort === "asc" ? Infinity : -Infinity);
-    return etaSort === "asc" ? da - db : db - da;
+    return sa.localeCompare(sb);
   });
 
-  // Totals
-  const totals = filtered.reduce(
-    (acc, c) => {
-      const cost = containerCost(c);
-      acc.cost[cost.symbol] = (acc.cost[cost.symbol] || 0) + cost.amount;
-      const frSym = ccySym(c.freightCurrencyCode || c.currencyCode);
-      const fr = num(c.freight);
-      if (fr) acc.freight[frSym] = (acc.freight[frSym] || 0) + fr;
-      const commSym = ccySym(c.commissionCurrencyCode || "USD");
-      const comm = num(c.commissionAmount);
-      if (comm) acc.comm[commSym] = (acc.comm[commSym] || 0) + comm;
-      return acc;
-    },
-    { cost: {} as Record<string, number>, freight: {} as Record<string, number>, comm: {} as Record<string, number> }
-  );
+  // Summary stats
+  const pending   = otwContainers.filter((c) => c.status === "PENDING").length;
+  const inTransit = otwContainers.filter((c) => c.status === "IN_TRANSIT").length;
+  const arrived   = otwContainers.filter((c) => c.status === "ARRIVED").length;
+  const delayed   = otwContainers.filter((c) => calcDelayDays(c) > 0).length;
+  const withErrors = otwContainers.filter((c) => !!(c as any).trackingError).length;
+  const today = new Date().toDateString();
+  const checkedToday = otwContainers.filter((c) => {
+    const fc = c as any;
+    return fc.trackingLastCheckedAt && new Date(fc.trackingLastCheckedAt).toDateString() === today;
+  }).length;
 
-  function fmtTotals(map: Record<string, number>): string {
-    const entries = Object.entries(map).filter(([, v]) => v > 0);
-    if (!entries.length) return "—";
-    return entries.map(([sym, amt]) =>
-      `${sym} ${amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    ).join(" · ");
-  }
+  // Total cost (USD equivalent)
+  const totalCostUsd = filtered.reduce((s, c) => {
+    const cost = containerCost(c);
+    const fx = num((c as any).fxRateToUsd) || 1;
+    return s + cost.amount * fx;
+  }, 0);
+
+  const docsReceived = filtered.filter((c) => docs[String(c.id)]).length;
+  const timelineContainer = otwContainers.find((c) => c.id === timelineId) ?? null;
+  const trackingEnabledCount = otwContainers.filter((c) => (c as any).trackingEnabled !== false).length;
+
+  const hasActiveFilters = search || supplierFilter !== "all" || freightFilter !== "all" || docsFilter !== "all" || delayedFilter !== "all" || sortOrder !== "DEFAULT";
 
   function saveNote(id: number, val: string) {
     setNotes((prev) => { const next = { ...prev, [String(id)]: val }; saveMap(NOTES_KEY, next); return next; });
   }
   function toggleDoc(id: number, checked: boolean) {
     setDocs((prev) => { const next = { ...prev, [String(id)]: checked }; saveMap(DOCS_KEY, next); return next; });
+  }
+  function clearFilters() {
+    setSearch(""); setSupplierFilter("all"); setFreightFilter("all"); setDocsFilter("all"); setDelayedFilter("all"); setSortOrder("DEFAULT");
   }
 
   const trackNowMutation = useMutation({
@@ -515,73 +524,86 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     },
   });
 
-  const today = new Date().toDateString();
-  const checkedToday = otwContainers.filter((c) => {
-    const fc = c as any;
-    return fc.trackingLastCheckedAt && new Date(fc.trackingLastCheckedAt).toDateString() === today;
-  }).length;
-  const withErrors = otwContainers.filter((c) => !!(c as any).trackingError).length;
-  const docsReceived = filtered.filter((c) => docs[String(c.id)]).length;
-  const timelineContainer = otwContainers.find((c) => c.id === timelineId) ?? null;
+  const [bulkTracking, setBulkTracking] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
 
-
-  const hasActiveFilters = search || supplierFilter !== "all" || freightFilter !== "all" || docsFilter !== "all";
-
-  function cycleEtaSort() {
-    setEtaSort((s) => s === "none" ? "asc" : s === "asc" ? "desc" : "none");
+  async function trackAll() {
+    const eligible = otwContainers.filter((c) => {
+      const fc = c as any;
+      return fc.trackingEnabled !== false && /^[A-Z]{4}\d{7}$/.test((c.containerNumber || "").trim().toUpperCase());
+    });
+    if (eligible.length === 0) {
+      toast({ title: "No eligible containers", description: "All containers have tracking disabled or invalid numbers." });
+      return;
+    }
+    setBulkTracking(true);
+    setBulkProgress({ done: 0, total: eligible.length });
+    let succeeded = 0; let failed = 0;
+    for (let i = 0; i < eligible.length; i++) {
+      const c = eligible[i];
+      try {
+        const res = await factoryApiRequest("POST", `/api/factory/container-tracking/${c.id}/track-now`, {});
+        const data = res.ok ? await res.json() : null;
+        if (data?.success) succeeded++; else failed++;
+      } catch { failed++; }
+      setBulkProgress({ done: i + 1, total: eligible.length });
+    }
+    tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+    setBulkTracking(false);
+    setBulkProgress(null);
+    toast({
+      title: `Track All complete — ${succeeded} updated${failed > 0 ? `, ${failed} failed` : ""}`,
+    });
   }
 
   if (isLoading) {
     return (
-      <div className="space-y-3">
-        <div className="grid grid-cols-3 gap-3">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 rounded-lg" />)}
+      <div className="space-y-4 p-4">
+        <div className="flex flex-wrap gap-2">
+          {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-16 w-36 rounded-lg border bg-muted animate-pulse" />)}
         </div>
-        <Skeleton className="h-48 rounded-lg" />
+        <div className="h-48 rounded-lg border bg-muted animate-pulse" />
       </div>
     );
   }
 
   if (otwContainers.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-16 text-center">
-          <Radio className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-40" />
-          <p className="text-muted-foreground">No containers currently on the way.</p>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
+        <Radio className="h-12 w-12 opacity-20" />
+        <p className="text-sm">No containers currently on the way.</p>
+      </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* ── Summary cards ── */}
-      <div className="grid grid-cols-3 gap-3">
-        <Card>
-          <CardContent className="py-4 px-5">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1">OTW Containers</p>
-            <p className="text-2xl font-bold tabular-nums">{otwContainers.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-4 px-5">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1">Checked Today</p>
-            <p className="text-2xl font-bold tabular-nums text-green-600 dark:text-green-400">{checkedToday}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-4 px-5">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1">With Errors</p>
-            <p className={`text-2xl font-bold tabular-nums ${withErrors > 0 ? "text-destructive" : "text-muted-foreground"}`}>
-              {withErrors}
-            </p>
-          </CardContent>
-        </Card>
+    <div className="flex flex-col gap-4 p-4">
+
+      {/* ── Summary Cards (ERP-style) ── */}
+      <div className="flex flex-wrap gap-2">
+        <SummaryCard label="Active" value={otwContainers.length} icon={<Package className="h-4 w-4 text-primary" />} accent="bg-primary/10" />
+        {pending > 0 && <SummaryCard label="Pending" value={pending} icon={<Ship className="h-4 w-4 text-blue-600" />} accent="bg-blue-100 dark:bg-blue-900/30" />}
+        {inTransit > 0 && <SummaryCard label="In Transit" value={inTransit} icon={<Truck className="h-4 w-4 text-indigo-600" />} accent="bg-indigo-100 dark:bg-indigo-900/30" />}
+        {arrived > 0 && <SummaryCard label="Arrived" value={arrived} icon={<CheckCircle2 className="h-4 w-4 text-green-600" />} accent="bg-green-100 dark:bg-green-900/30" />}
+        {delayed > 0 && <SummaryCard label="Delayed" value={delayed} icon={<Clock className="h-4 w-4 text-red-600" />} accent="bg-red-100 dark:bg-red-900/30" />}
+        {withErrors > 0 && <SummaryCard label="With Errors" value={withErrors} icon={<AlertTriangle className="h-4 w-4 text-amber-600" />} accent="bg-amber-100 dark:bg-amber-900/30" />}
+        <SummaryCard
+          label="Checked Today"
+          value={checkedToday}
+          icon={<CheckCircle className="h-4 w-4 text-green-600" />}
+          accent="bg-green-100 dark:bg-green-900/30"
+        />
+        <SummaryCard
+          label="Total Cost (USD)"
+          value={`$${Math.round(totalCostUsd).toLocaleString()}`}
+          icon={<DollarSign className="h-4 w-4 text-emerald-600" />}
+          accent="bg-emerald-100 dark:bg-emerald-900/30"
+        />
       </div>
 
-      {/* ── Search + dropdown filters ── */}
+      {/* ── Search + Filters Toggle + Track All ── */}
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
+        <div className="relative flex-1 min-w-48">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={search}
@@ -591,289 +613,319 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
             data-testid="input-otw-search"
           />
         </div>
-
-        {/* Supplier */}
-        <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-          <SelectTrigger className="w-[170px]" data-testid="select-supplier-filter">
-            <SelectValue placeholder="All suppliers" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All suppliers</SelectItem>
-            {suppliers.map(([key, name]) => (
-              <SelectItem key={key} value={key}>{name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* Freight */}
-        <Select value={freightFilter} onValueChange={setFreightFilter}>
-          <SelectTrigger className="w-[150px]" data-testid="select-freight-filter">
-            <SelectValue placeholder="Freight" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All freight</SelectItem>
-            <SelectItem value="has_freight">Has freight</SelectItem>
-            <SelectItem value="no_freight">No freight</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {/* Docs */}
-        <Select value={docsFilter} onValueChange={setDocsFilter}>
-          <SelectTrigger className="w-[150px]" data-testid="select-docs-filter">
-            <SelectValue placeholder="Docs" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All docs</SelectItem>
-            <SelectItem value="received">Docs received</SelectItem>
-            <SelectItem value="not_received">Docs pending</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => { setSearch(""); setSupplierFilter("all"); setFreightFilter("all"); setDocsFilter("all"); }}
-            data-testid="button-clear-filters"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        )}
-
-        <span className="text-xs text-muted-foreground ml-auto">
-          {filtered.length !== otwContainers.length ? `${filtered.length} of ${otwContainers.length}` : `${filtered.length}`} shown
-          {" · "}{docsReceived} docs received
-        </span>
+        <Button
+          variant="outline"
+          onClick={() => setShowFilters((v) => !v)}
+          data-testid="button-otw-filters"
+        >
+          <Filter className="h-4 w-4 mr-1" />
+          Filters
+          <ChevronDown className={cn("h-3.5 w-3.5 ml-1 transition-transform", showFilters && "rotate-180")} />
+        </Button>
+        <Button
+          variant="outline"
+          onClick={trackAll}
+          disabled={bulkTracking || otwContainers.length === 0}
+          data-testid="button-track-all-now"
+        >
+          {bulkTracking
+            ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            : <RefreshCw className="h-4 w-4 mr-1.5" />}
+          {bulkTracking
+            ? bulkProgress ? `Tracking… ${bulkProgress.done}/${bulkProgress.total}` : "Tracking…"
+            : `Track All${trackingEnabledCount > 0 ? ` (${trackingEnabledCount})` : ""}`}
+        </Button>
       </div>
 
-      {/* ── Table ── */}
+      {/* ── Expandable Filters Panel ── */}
+      {showFilters && (
+        <div className="flex flex-wrap gap-3 rounded-md border bg-muted/30 p-3">
+          <div className="flex flex-col gap-1 min-w-[160px] flex-1">
+            <p className="text-xs text-muted-foreground">Supplier</p>
+            <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+              <SelectTrigger className="h-8 text-xs" data-testid="select-supplier-filter">
+                <SelectValue placeholder="All suppliers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All suppliers</SelectItem>
+                {suppliers.map(([key, name]) => (
+                  <SelectItem key={key} value={key}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-[130px] flex-1">
+            <p className="text-xs text-muted-foreground">Freight</p>
+            <Select value={freightFilter} onValueChange={setFreightFilter}>
+              <SelectTrigger className="h-8 text-xs" data-testid="select-freight-filter">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All freight</SelectItem>
+                <SelectItem value="has_freight">Has freight</SelectItem>
+                <SelectItem value="no_freight">No freight</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-[130px] flex-1">
+            <p className="text-xs text-muted-foreground">Docs</p>
+            <Select value={docsFilter} onValueChange={setDocsFilter}>
+              <SelectTrigger className="h-8 text-xs" data-testid="select-docs-filter">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All docs</SelectItem>
+                <SelectItem value="received">Docs received</SelectItem>
+                <SelectItem value="not_received">Docs pending</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-[130px] flex-1">
+            <p className="text-xs text-muted-foreground">Delay / Overdue</p>
+            <Select value={delayedFilter} onValueChange={setDelayedFilter}>
+              <SelectTrigger className="h-8 text-xs" data-testid="select-delayed-filter">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="delayed">Delayed only</SelectItem>
+                <SelectItem value="overdue">Overdue</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-[120px] flex-1">
+            <p className="text-xs text-muted-foreground">Sort by ETA</p>
+            <Select value={sortOrder} onValueChange={setSortOrder}>
+              <SelectTrigger className="h-8 text-xs" data-testid="select-sort-order">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="DEFAULT">Default</SelectItem>
+                <SelectItem value="ETA_ASC">Oldest first</SelectItem>
+                <SelectItem value="ETA_DESC">Newest first</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-end">
+            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={clearFilters} data-testid="button-clear-filters">
+              Clear All
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Results count + Legend ── */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="text-xs text-muted-foreground">
+          Showing {filtered.length} of {otwContainers.length} active containers — click a row to edit
+        </p>
+        <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-3 h-3 rounded-sm bg-red-200 dark:bg-red-900/40" />
+            Overdue
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-3 h-3 rounded-sm bg-amber-200 dark:bg-amber-900/40" />
+            Tracking Error
+          </span>
+          <span className="text-muted-foreground">{docsReceived} docs received</span>
+        </div>
+      </div>
+
+      {/* ── Main Table ── */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
           <Radio className="h-10 w-10 opacity-30" />
           <p className="text-sm">No containers match your filters.</p>
         </div>
       ) : (
-        <div className="rounded-md border overflow-x-auto">
-          <Table>
-            <TableHeader className="sticky top-0 z-20 bg-background">
-              <TableRow>
-                <TableHead className="w-10 text-center">#</TableHead>
-                <TableHead className="whitespace-nowrap">Container #</TableHead>
-                <TableHead className="whitespace-nowrap">Supplier</TableHead>
-                <TableHead className="whitespace-nowrap">Status</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Weight (kg)</TableHead>
-                <TableHead
-                  className="whitespace-nowrap cursor-pointer select-none"
-                  onClick={cycleEtaSort}
-                  data-testid="th-eta-sort"
+        <Table className="text-xs whitespace-nowrap" wrapperClassName="max-h-[calc(100vh-340px)]">
+          <TableHeader className="sticky top-0 z-10">
+            <TableRow className="!bg-amber-100 dark:!bg-amber-900/40">
+              <TableHead className="w-8">#</TableHead>
+              <TableHead>Container #</TableHead>
+              <TableHead>Supplier</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>ETA</TableHead>
+              <TableHead className="text-right">Cost</TableHead>
+              <TableHead className="text-right">Freight</TableHead>
+              <TableHead className="text-right">Commission</TableHead>
+              <TableHead className="text-right">Duty</TableHead>
+              <TableHead>Location</TableHead>
+              <TableHead>Weight (kg)</TableHead>
+              <TableHead>Delayed</TableHead>
+              <TableHead>Docs</TableHead>
+              <TableHead className="min-w-[140px]">Notes</TableHead>
+              <TableHead className="w-24 text-right pr-3">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.map((c, idx) => {
+              const fc         = c as any;
+              const cost       = containerCost(c);
+              const frSym      = ccySym(c.freightCurrencyCode || c.currencyCode);
+              const commSym    = ccySym(c.commissionCurrencyCode || "USD");
+              const dutySym    = ccySym(c.currencyCode);
+              const docDone    = !!docs[String(c.id)];
+              const isTracking = trackingNowId === c.id;
+              const hasError   = !!fc.trackingError;
+              const isEnabled  = fc.trackingEnabled !== false;
+              const isValidNum = /^[A-Z]{4}\d{7}$/.test((c.containerNumber || "").trim().toUpperCase());
+              const delayDays  = calcDelayDays(c);
+              const overdue    = isOverdue(c);
+              const location   = fc.trackingLastLocation || c.destination || null;
+
+              const rowBg = overdue
+                ? "bg-red-50/50 dark:bg-red-950/20"
+                : hasError
+                ? "bg-amber-50/50 dark:bg-amber-950/20"
+                : "";
+
+              return (
+                <TableRow
+                  key={c.id}
+                  className={cn("cursor-pointer", rowBg)}
+                  onClick={() => setTimelineId(c.id)}
+                  data-testid={`row-otw-container-${c.id}`}
                 >
-                  <span className="flex items-center">
-                    ETA <EtaSortIcon sort={etaSort} />
-                  </span>
-                </TableHead>
-                <TableHead className="whitespace-nowrap text-right">Cost</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Freight</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Commission</TableHead>
-                <TableHead className="whitespace-nowrap text-center">Docs</TableHead>
-                <TableHead className="whitespace-nowrap min-w-[150px]">Notes</TableHead>
-                <TableHead className="whitespace-nowrap text-right pr-4">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((c, idx) => {
-                const fc         = c as any;
-                const cost       = containerCost(c);
-                const frSym      = ccySym(c.freightCurrencyCode || c.currencyCode);
-                const commSym    = ccySym(c.commissionCurrencyCode || "USD");
-                const docDone    = !!docs[String(c.id)];
-                const isTracking = trackingNowId === c.id;
-                const hasError   = !!fc.trackingError;
-                const isEnabled  = fc.trackingEnabled !== false;
-                const isValidNum = /^[A-Z]{4}\d{7}$/.test((c.containerNumber || "").trim().toUpperCase());
-                const isOverdue  = c.arrivalDate && new Date(c.arrivalDate) < new Date();
+                  {/* # */}
+                  <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
 
-                return (
-                  <TableRow
-                    key={c.id}
-                    className="cursor-pointer hover-elevate"
-                    onClick={() => setTimelineId(c.id)}
-                    data-testid={`row-otw-container-${c.id}`}
-                  >
-                    {/* # */}
-                    <TableCell className="text-center text-muted-foreground text-sm">{idx + 1}</TableCell>
-
-                    {/* Container # */}
-                    <TableCell className="font-mono font-semibold text-sm whitespace-nowrap">
-                      <div className="flex flex-col gap-0.5">
-                        <span>{c.containerNumber || "—"}</span>
-                        {!isValidNum && (
-                          <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                            <AlertTriangle className="h-3 w-3" />Invalid format
-                          </span>
-                        )}
-                        {isTracking && <TrackNowProgressLog containerId={c.id} />}
-                        {!isTracking && hasError && (
-                          <span className="text-xs text-destructive flex items-center gap-1">
-                            <XCircle className="h-3 w-3 shrink-0" />
-                            {(() => {
-                              const err: string = fc.trackingError ?? "";
-                              return err.toLowerCase().includes("timeout") ? "Carrier timeout" : err.slice(0, 40);
-                            })()}
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-
-                    {/* Supplier */}
-                    <TableCell className="text-sm whitespace-nowrap">
-                      {fc.supplierName ?? <span className="text-muted-foreground">—</span>}
-                    </TableCell>
-
-                    {/* Status */}
-                    <TableCell>
-                      <ContainerStatusBadge status={c.status ?? "PENDING"} />
-                    </TableCell>
-
-                    {/* Weight */}
-                    <TableCell className="text-right text-sm tabular-nums whitespace-nowrap">
-                      {c.totalKg
-                        ? <span>{Number(c.totalKg).toLocaleString(undefined, { maximumFractionDigits: 0 })} kg</span>
-                        : <span className="text-muted-foreground">—</span>}
-                    </TableCell>
-
-                    {/* ETA */}
-                    <TableCell className="text-sm whitespace-nowrap font-medium">
-                      {c.arrivalDate ? (
-                        <span className={isOverdue ? "text-amber-600 dark:text-amber-400" : ""}>
-                          {fmtDate(c.arrivalDate)}
+                  {/* Container # */}
+                  <TableCell className="font-mono font-medium">
+                    <div className="flex flex-col gap-0.5">
+                      <span>{c.containerNumber || "—"}</span>
+                      {isTracking && <TrackNowProgressLog containerId={c.id} />}
+                      {!isTracking && hasError && (
+                        <span className="text-xs text-destructive flex items-center gap-1">
+                          <XCircle className="h-3 w-3 shrink-0" />
+                          {(() => {
+                            const err: string = fc.trackingError ?? "";
+                            return err.toLowerCase().includes("timeout") ? "Carrier timeout" : err.slice(0, 35);
+                          })()}
                         </span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
                       )}
-                    </TableCell>
+                      {!isValidNum && (
+                        <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />Invalid format
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
 
-                    {/* Cost */}
-                    <TableCell className="text-right text-sm tabular-nums whitespace-nowrap">
-                      {cost.amount > 0
-                        ? <span className="font-medium">{fmtAmt(cost.symbol, cost.amount)}</span>
-                        : <span className="text-muted-foreground">—</span>}
-                    </TableCell>
+                  {/* Supplier */}
+                  <TableCell>
+                    {fc.supplierName ?? <span className="text-muted-foreground">—</span>}
+                  </TableCell>
 
-                    {/* Freight */}
-                    <TableCell className="text-right text-sm tabular-nums whitespace-nowrap">
-                      {num(c.freight) > 0
-                        ? fmtAmt(frSym, num(c.freight))
-                        : <span className="text-muted-foreground">—</span>}
-                    </TableCell>
+                  {/* Status */}
+                  <TableCell>
+                    <ContainerStatusBadge status={c.status ?? "PENDING"} />
+                  </TableCell>
 
-                    {/* Commission */}
-                    <TableCell className="text-right text-sm tabular-nums whitespace-nowrap">
-                      {num(c.commissionAmount) > 0
-                        ? fmtAmt(commSym, num(c.commissionAmount))
-                        : <span className="text-muted-foreground">—</span>}
-                    </TableCell>
+                  {/* ETA */}
+                  <TableCell className={cn("font-medium", overdue && "text-red-600 dark:text-red-400")}>
+                    {fmtDate(c.arrivalDate)}
+                  </TableCell>
 
-                    {/* Docs */}
-                    <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={docDone}
-                        onCheckedChange={(v) => toggleDoc(c.id, !!v)}
-                        data-testid={`checkbox-docs-${c.id}`}
-                        aria-label="Docs received"
-                      />
-                    </TableCell>
+                  {/* Cost */}
+                  <TableCell className="text-right font-medium">
+                    {cost.amount > 0 ? fmtAmt(cost.symbol, cost.amount) : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
 
-                    {/* Notes */}
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <NotesCell containerId={c.id} notes={notes} onSave={saveNote} />
-                    </TableCell>
+                  {/* Freight */}
+                  <TableCell className="text-right text-muted-foreground">
+                    {num(c.freight) > 0 ? fmtAmt(frSym, num(c.freight)) : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
 
-                    {/* Actions */}
-                    <TableCell className="pr-4" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-1">
-                        {onEdit && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => onEdit(c)}
-                                data-testid={`button-otw-edit-${c.id}`}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Edit Container</TooltipContent>
-                          </Tooltip>
-                        )}
+                  {/* Commission */}
+                  <TableCell className="text-right text-muted-foreground">
+                    {num(c.commissionAmount) > 0 ? fmtAmt(commSym, num(c.commissionAmount)) : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+
+                  {/* Duty */}
+                  <TableCell className="text-right text-muted-foreground">
+                    {num(c.dutyAmount) > 0 ? fmtAmt(dutySym, num(c.dutyAmount)) : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+
+                  {/* Location */}
+                  <TableCell>
+                    {location ?? <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+
+                  {/* Weight */}
+                  <TableCell className="text-muted-foreground">
+                    {c.totalKg
+                      ? Number(c.totalKg).toLocaleString(undefined, { maximumFractionDigits: 0 })
+                      : <span>—</span>}
+                  </TableCell>
+
+                  {/* Delayed */}
+                  <TableCell>
+                    {delayDays > 0
+                      ? <span className="text-red-600 dark:text-red-400 font-medium">-{delayDays}d</span>
+                      : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+
+                  {/* Docs */}
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={docDone}
+                      onCheckedChange={(v) => toggleDoc(c.id, !!v)}
+                      data-testid={`checkbox-docs-${c.id}`}
+                      aria-label="Docs received"
+                    />
+                  </TableCell>
+
+                  {/* Notes */}
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <NotesCell containerId={c.id} notes={notes} onSave={saveNote} />
+                  </TableCell>
+
+                  {/* Actions */}
+                  <TableCell className="pr-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-end gap-0.5">
+                      {onEdit && (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setSettingsContainer(c)}
-                              data-testid={`button-otw-settings-${c.id}`}
-                            >
-                              <Settings2 className="h-4 w-4" />
+                            <Button variant="ghost" size="icon" onClick={() => onEdit(c)} data-testid={`button-otw-edit-${c.id}`}>
+                              <Pencil className="h-3.5 w-3.5" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Tracking Settings</TooltipContent>
+                          <TooltipContent>Edit Container</TooltipContent>
                         </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              disabled={isTracking || !isEnabled || !isValidNum}
-                              onClick={() => trackNowMutation.mutate(c.id)}
-                              data-testid={`button-otw-track-now-${c.id}`}
-                            >
-                              {isTracking ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {!isEnabled ? "Tracking disabled" : !isValidNum ? "Invalid container # format" : "Track Now"}
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-
-      {/* ── Sticky totals bar ── */}
-      {filtered.length > 0 && (
-        <div className="sticky bottom-0 z-50 rounded-md border bg-background shadow-md" data-testid="div-totals-bar">
-          <div className="flex flex-wrap items-center gap-6 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <Package className="h-4 w-4 text-muted-foreground shrink-0" />
-              <div>
-                <p className="text-xs text-muted-foreground">Containers</p>
-                <p className="text-base font-bold tabular-nums">{filtered.length}</p>
-              </div>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Total Cost</p>
-              <p className="text-base font-bold tabular-nums whitespace-nowrap">{fmtTotals(totals.cost)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Total Freight</p>
-              <p className="text-base font-bold tabular-nums whitespace-nowrap">{fmtTotals(totals.freight)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Total Commission</p>
-              <p className="text-base font-bold tabular-nums whitespace-nowrap">{fmtTotals(totals.comm)}</p>
-            </div>
-            <div className="ml-auto">
-              <p className="text-xs text-muted-foreground">Docs Received</p>
-              <p className="text-base font-bold tabular-nums">{docsReceived} / {filtered.length}</p>
-            </div>
-          </div>
-        </div>
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" onClick={() => setSettingsContainer(c)} data-testid={`button-otw-settings-${c.id}`}>
+                            <Settings2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Tracking Settings</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled={isTracking || !isEnabled || !isValidNum}
+                            onClick={() => trackNowMutation.mutate(c.id)}
+                            data-testid={`button-otw-track-now-${c.id}`}
+                          >
+                            {isTracking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {!isEnabled ? "Tracking disabled" : !isValidNum ? "Invalid container # format" : "Track Now"}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       )}
 
       {/* ── Sheets ── */}
