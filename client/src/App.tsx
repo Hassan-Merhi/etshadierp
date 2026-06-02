@@ -751,7 +751,7 @@ function AuthenticatedApp() {
     return (
       <AppModeProvider mode="properties">
         <SidebarProvider style={style as React.CSSProperties}>
-          <div className="flex h-screen w-full">
+          <div className="flex h-full w-full">
             <PropertiesSidebar user={user} />
             <div className="flex flex-col flex-1 overflow-hidden">
               <AppTopBar
@@ -980,7 +980,7 @@ function AuthenticatedApp() {
     return (
       <AppModeProvider mode="factory">
         <SidebarProvider style={style as React.CSSProperties}>
-          <div ref={factoryContainerRef} className="flex h-screen w-full">
+          <div ref={factoryContainerRef} className="flex h-full w-full">
             {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
             <FactorySidebar user={user} />
             <div className="flex flex-col flex-1 overflow-hidden">
@@ -1150,7 +1150,7 @@ function AuthenticatedApp() {
   return (
     <AppModeProvider mode="erp">
       <SidebarProvider style={style as React.CSSProperties}>
-        <div className="flex h-screen w-full">
+        <div className="flex h-full w-full">
           {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
           <AppSidebar user={user} />
           <div className="flex flex-col flex-1 overflow-hidden">
