@@ -44,12 +44,12 @@ const DARK_BG = "linear-gradient(160deg, #0D0D0D 0%, #111118 55%, #0A0A16 100%)"
 const tk = {
   light: {
     leftBg:     DARK_BG,
-    rightBg:    "linear-gradient(145deg, hsl(210 45% 94%) 0%, hsl(196 35% 95%) 45%, hsl(200 25% 97%) 100%)",
-    bridge:     "linear-gradient(to right, rgba(201,168,76,0.14) 0%, transparent 100%)",
-    cardGlow:   "radial-gradient(ellipse 65% 55% at 50% 50%, rgba(201,168,76,0.09) 0%, transparent 70%)",
-    cardBg:     "rgba(255,255,255,0.82)",
-    cardBorder: "rgba(201,168,76,0.32)",
-    cardShadow: "0 12px 48px rgba(10,8,0,0.14), 0 2px 6px rgba(10,8,0,0.08)",
+    rightBg:    "linear-gradient(150deg, hsl(222 28% 82%) 0%, hsl(215 24% 86%) 40%, hsl(220 20% 89%) 100%)",
+    bridge:     "linear-gradient(to right, rgba(201,168,76,0.18) 0%, transparent 100%)",
+    cardGlow:   "radial-gradient(ellipse 70% 60% at 50% 50%, rgba(201,168,76,0.10) 0%, transparent 70%)",
+    cardBg:     "rgba(255,255,255,0.96)",
+    cardBorder: "rgba(201,168,76,0.40)",
+    cardShadow: "0 20px 60px rgba(10,8,30,0.22), 0 4px 12px rgba(10,8,30,0.12)",
     headline:   GOLD_LIGHT,
     body:       "rgba(240,197,71,0.52)",
     fTitle:     "#F5E8B0",
@@ -61,9 +61,9 @@ const tk = {
     stripe:     `linear-gradient(90deg, ${GOLD_DARK} 0%, ${GOLD_LIGHT} 45%, ${GOLD_DARK} 100%)`,
     btnBg:      `linear-gradient(135deg, ${GOLD_DARK} 0%, ${GOLD_LIGHT} 50%, ${GOLD_DARK} 100%)`,
     btnShadow:  "0 4px 22px rgba(201,168,76,0.40)",
-    formHeading: "#1a1a2e",
+    formHeading: "#12122a",
     formSub:    "#4a4a6a",
-    labelColor: "#2a2a3e",
+    labelColor: "#1e1e38",
   },
   dark: {
     leftBg:     "linear-gradient(160deg, #080808 0%, #0D0D12 55%, #080812 100%)",
@@ -343,7 +343,7 @@ export default function Login() {
             >
               <div className="space-y-1">
                 <p className="text-[0.6rem] font-bold tracking-[0.3em] uppercase hidden lg:block"
-                  style={{ color: isLight ? "hsl(200 55% 36%)" : "rgba(201,168,76,0.45)" }}>
+                  style={{ color: isLight ? "rgba(138,110,32,0.75)" : "rgba(201,168,76,0.45)" }}>
                   HMD International Group
                 </p>
                 <h2 className="text-2xl font-bold leading-tight" style={{ color: ft.formHeading }}>
