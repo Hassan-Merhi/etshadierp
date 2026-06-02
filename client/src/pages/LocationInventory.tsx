@@ -3103,27 +3103,47 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             </div>
           )}
 
-          {/* Search bar */}
-          <div className="screen-only flex items-center gap-2 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search items by name or code..."
-                value={itemSearchTerm}
-                onChange={(e) => setItemSearchTerm(e.target.value)}
-                className="pl-10"
-                data-testid="input-all-stock-items-search"
-              />
+          {/* Search + category filter bar */}
+          <div className="screen-only flex flex-col sm:flex-row gap-2 mb-4">
+            <div className="relative flex-1 flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search items by name or code..."
+                  value={itemSearchTerm}
+                  onChange={(e) => setItemSearchTerm(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-all-stock-items-search"
+                />
+              </div>
+              {itemSearchTerm && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setItemSearchTerm("")}
+                  data-testid="button-clear-all-stock-search"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
-            {itemSearchTerm && (
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setItemSearchTerm("")}
-                data-testid="button-clear-all-stock-search"
+            {categoriesList.length > 0 && (
+              <Select
+                value={itemCategoryFilter || "__all__"}
+                onValueChange={(v) => setItemCategoryFilter(v === "__all__" ? "" : v)}
               >
-                <X className="h-4 w-4" />
-              </Button>
+                <SelectTrigger className="w-full sm:w-48" data-testid="select-view-all-stock-category">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Categories</SelectItem>
+                  {categoriesList.map((cat) => (
+                    <SelectItem key={cat.id} value={String(cat.id)}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           </div>
 
@@ -3282,10 +3302,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             ) : (
               <div className="space-y-6 w-full">
                 {(() => {
-                  // Group items by stock group, applying search filter
+                  // Group items by stock group, applying search + category filter
                   const searchLower = itemSearchTerm.toLowerCase();
                   const sortedInventory = [...inventory]
                     .filter((item) => {
+                      if (itemCategoryFilter) {
+                        const catId = itemCategoryFilter === "none" ? null : parseInt(itemCategoryFilter, 10);
+                        const matches = catId === null ? item.categoryId == null : item.categoryId === catId;
+                        if (!matches) return false;
+                      }
                       if (!searchLower) return true;
                       return (
                         (item.stockItemName ?? "").toLowerCase().includes(searchLower) ||
