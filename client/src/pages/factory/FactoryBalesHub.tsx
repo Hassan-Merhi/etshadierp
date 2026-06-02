@@ -36,8 +36,8 @@ export default function FactoryBalesHub() {
   return (
     <div className="flex flex-col h-full">
       <Tabs defaultValue={defaultTab} onValueChange={handleTabChange} className="flex flex-col h-full">
-        <div className="border-b px-4 pt-3 flex-shrink-0 flex items-end gap-4">
-          <TabsList>
+        <div className="border-b px-4 pt-3 flex-shrink-0 flex items-end gap-4 overflow-x-auto">
+          <TabsList className="flex-nowrap">
             <TabsTrigger value="history" data-testid="tab-bales-history">Bales</TabsTrigger>
             {showBarcode && (
               <TabsTrigger value="barcode" data-testid="tab-barcode-lookup">Barcode Lookup</TabsTrigger>

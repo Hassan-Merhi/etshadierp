@@ -441,7 +441,7 @@ export default function FactoryReprintLabels() {
               </div>
 
               {/* Desktop table */}
-              <div className="hidden md:block rounded-md border table-responsive">
+              <div className="hidden sm:block rounded-md border overflow-x-auto">
                 <table className="text-sm w-full">
                   <thead className="sticky top-0 z-30 bg-muted/50">
                     <tr className="h-10">
@@ -490,7 +490,7 @@ export default function FactoryReprintLabels() {
               </div>
 
               {/* Mobile cards */}
-              <div className="md:hidden space-y-2">
+              <div className="sm:hidden space-y-2">
                 {filteredBales.map((row) => {
                   const checked = selectedIds.has(row.bale.id);
                   const articleCode = row.product?.articleCode || row.bale.articleCode || row.bale.category || "-";

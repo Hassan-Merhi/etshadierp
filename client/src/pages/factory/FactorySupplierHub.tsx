@@ -39,8 +39,8 @@ export default function FactorySupplierHub() {
         onValueChange={handleSectionChange}
         className="flex flex-col h-full overflow-hidden"
       >
-        <div className="border-b px-4 pt-3 flex-shrink-0">
-          <TabsList>
+        <div className="border-b px-4 pt-3 flex-shrink-0 overflow-x-auto">
+          <TabsList className="flex-nowrap">
             <TabsTrigger value="report" data-testid="tab-supplier-hub-report">
               <FileText className="h-4 w-4 mr-2" />
               Supplier Report

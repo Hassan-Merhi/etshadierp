@@ -410,7 +410,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <DialogContent
-        className="max-w-[98vw] w-[98vw] h-[96vh] flex flex-col p-0 gap-0"
+        className="max-w-[98vw] w-[98vw] h-[85dvh] sm:h-[96dvh] flex flex-col p-0 gap-0"
         data-testid="dialog-create-proforma-v5"
       >
         <DialogHeader className="px-5 py-4 border-b shrink-0">

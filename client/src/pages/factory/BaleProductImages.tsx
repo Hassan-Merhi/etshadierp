@@ -4,7 +4,7 @@ import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Upload, Trash2, ImagePlus, Search, Images } from "lucide-react";
+import { Loader2, Upload, Trash2, ImagePlus, Search, Images, ChevronLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { FactoryBaleProductImage } from "@shared/schema";
 import { PageHeader } from "@/components/PageHeader";
@@ -22,6 +22,7 @@ export default function BaleProductImages() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<BaleProduct | null>(null);
+  const [showList, setShowList] = useState(true);
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -103,9 +104,9 @@ export default function BaleProductImages() {
   const images = imagesQuery.data ?? [];
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex flex-col md:flex-row h-full min-h-0">
       {/* ── Left: Product List ─────────────────────────────────── */}
-      <div className="w-72 flex-shrink-0 border-r flex flex-col">
+      <div className={`flex-shrink-0 flex-col md:w-72 md:border-r ${showList ? "flex border-b md:border-b-0" : "hidden md:flex"}`}>
         <div className="p-4 border-b">
           <h2 className="text-lg font-semibold mb-3" data-testid="text-product-list-title">Bale Products</h2>
           <div className="relative">
@@ -135,7 +136,7 @@ export default function BaleProductImages() {
                   className={`w-full text-left px-4 py-3 hover-elevate transition-colors ${
                     selectedProduct?.id === p.id ? "bg-accent text-accent-foreground" : ""
                   }`}
-                  onClick={() => setSelectedProduct(p)}
+                  onClick={() => { setSelectedProduct(p); setShowList(false); }}
                   data-testid={`button-product-${p.id}`}
                 >
                   <div className="font-medium text-sm truncate">{p.name}</div>
@@ -148,7 +149,7 @@ export default function BaleProductImages() {
       </div>
 
       {/* ── Right: Image Manager ───────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+      <div className={`flex-1 flex-col min-w-0 overflow-y-auto ${!showList ? "flex" : "hidden md:flex"}`}>
         {!selectedProduct ? (
           <div className="flex flex-col items-center justify-center flex-1 text-center p-8 text-muted-foreground">
             <Images className="h-12 w-12 mb-4 opacity-30" />
@@ -156,6 +157,13 @@ export default function BaleProductImages() {
           </div>
         ) : (
           <div className="p-6 space-y-6">
+            {/* Mobile back button */}
+            <div className="md:hidden -mb-2">
+              <Button variant="ghost" size="sm" onClick={() => setShowList(true)} data-testid="button-back-to-products">
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Back to Products
+              </Button>
+            </div>
             {/* Header */}
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>

@@ -443,7 +443,7 @@ export default function FactoryBrokerVisualStatement() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="table-responsive">
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow className="bg-muted/50 text-xs">

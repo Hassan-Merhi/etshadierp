@@ -39,8 +39,8 @@ export default function FactoryPayrollHub() {
         onValueChange={handleSectionChange}
         className="flex flex-col h-full overflow-hidden"
       >
-        <div className="border-b px-4 pt-3 flex-shrink-0">
-          <TabsList>
+        <div className="border-b px-4 pt-3 flex-shrink-0 overflow-x-auto">
+          <TabsList className="flex-nowrap">
             <TabsTrigger value="workers" data-testid="tab-payroll-workers">
               <HardHat className="h-4 w-4 mr-2" />
               Workers

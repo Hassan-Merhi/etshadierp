@@ -41,8 +41,8 @@ export default function FactoryFinancialHub() {
         onValueChange={handleSectionChange}
         className="flex flex-col h-full overflow-hidden"
       >
-        <div className="border-b px-4 pt-3 flex-shrink-0">
-          <TabsList>
+        <div className="border-b px-4 pt-3 flex-shrink-0 overflow-x-auto">
+          <TabsList className="flex-nowrap">
             <TabsTrigger value="net-profit" data-testid="tab-financial-hub-net-profit">
               <BarChart3 className="h-4 w-4 mr-2" />
               Net Profit
