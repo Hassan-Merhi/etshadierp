@@ -5946,13 +5946,15 @@ export type BusinessAlert = typeof businessAlerts.$inferSelect;
 // The 5 built-in colors are seeded at startup (is_default = true).
 // Admins can add custom colors from the Label Banners settings page.
 export const labelDesignColors = pgTable("label_design_colors", {
-  id:        serial("id").primaryKey(),
-  slug:      text("slug").notNull().unique(),
-  label:     text("label").notNull(),
-  colorHex:  text("color_hex").notNull(),
-  sortOrder: integer("sort_order").notNull().default(0),
-  isDefault: boolean("is_default").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  id:             serial("id").primaryKey(),
+  slug:           text("slug").notNull().unique(),
+  label:          text("label").notNull(),
+  colorHex:       text("color_hex").notNull(),
+  sortOrder:      integer("sort_order").notNull().default(0),
+  isDefault:      boolean("is_default").notNull().default(false),
+  createdAt:      timestamp("created_at").notNull().defaultNow(),
+  imageData:      text("image_data"),
+  imageUpdatedAt: timestamp("image_updated_at"),
 });
 
 export type LabelDesignColor = typeof labelDesignColors.$inferSelect;

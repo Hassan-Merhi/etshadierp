@@ -3780,6 +3780,9 @@ let migrationsDone = false;
        ('white',  'White (#4)',    '#F5F5F5', 4, true),
        ('red',    'HMD Intl (#5)', '#B91C1C', 5, true)
      ON CONFLICT (slug) DO NOTHING`,
+    // label_design_colors — add image storage columns (DB-backed, survives restarts)
+    `ALTER TABLE label_design_colors ADD COLUMN IF NOT EXISTS image_data text`,
+    `ALTER TABLE label_design_colors ADD COLUMN IF NOT EXISTS image_updated_at timestamp`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
