@@ -3,7 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
-import { ArrowLeft, MapPin, Globe, Eye, TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowLeft, MapPin, Globe, Eye, TrendingUp, TrendingDown, ArrowDownToLine, ArrowUpFromLine, Package, DollarSign, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -254,8 +254,74 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
         </div>
       </div>
 
+      {/* KPI Summary Cards */}
+      {data?.grandTotal && (
+        <div className="flex flex-wrap gap-3 items-stretch">
+          <div className="flex-1 min-w-[140px] rounded-xl border bg-card p-4 flex flex-col gap-1">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium uppercase tracking-wide">
+              <ArrowDownToLine className="h-3.5 w-3.5 text-emerald-500" />
+              Total Stock In
+            </div>
+            <div className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
+              {fmtQty(data.grandTotal.inwardQty)} <span className="text-sm font-normal text-muted-foreground">{uom}</span>
+            </div>
+            {!posUser && <div className="text-xs font-mono text-muted-foreground">{fmtVal(data.grandTotal.inwardValue)}</div>}
+          </div>
+
+          <div className="flex items-center self-center text-muted-foreground/40">
+            <ArrowRight className="h-4 w-4" />
+          </div>
+
+          <div className="flex-1 min-w-[140px] rounded-xl border bg-card p-4 flex flex-col gap-1">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium uppercase tracking-wide">
+              <ArrowUpFromLine className="h-3.5 w-3.5 text-rose-500" />
+              Total Stock Out
+            </div>
+            <div className="text-xl font-bold font-mono text-rose-600 dark:text-rose-400">
+              {fmtQty(data.grandTotal.outwardQty)} <span className="text-sm font-normal text-muted-foreground">{uom}</span>
+            </div>
+            {!posUser && <div className="text-xs font-mono text-muted-foreground">{fmtVal(data.grandTotal.outwardValue)}</div>}
+          </div>
+
+          <div className="flex items-center self-center text-muted-foreground/40">
+            <ArrowRight className="h-4 w-4" />
+          </div>
+
+          <div className="flex-1 min-w-[140px] rounded-xl border bg-card p-4 flex flex-col gap-1">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium uppercase tracking-wide">
+              <Package className="h-3.5 w-3.5 text-primary" />
+              Closing Stock
+            </div>
+            <div className={`text-xl font-bold font-mono ${data.grandTotal.closingQty < 0 ? "text-rose-600 dark:text-rose-400" : "text-foreground"}`}>
+              {fmtQty(data.grandTotal.closingQty)} <span className="text-sm font-normal text-muted-foreground">{uom}</span>
+            </div>
+            {!posUser && <div className="text-xs font-mono text-muted-foreground">{fmtVal(data.grandTotal.closingValue)}</div>}
+          </div>
+
+          {!posUser && (
+            <>
+              <div className="flex items-center self-center text-muted-foreground/40">
+                <ArrowRight className="h-4 w-4" />
+              </div>
+              <div className="flex-1 min-w-[140px] rounded-xl border bg-primary/5 p-4 flex flex-col gap-1">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                  <DollarSign className="h-3.5 w-3.5 text-primary" />
+                  Closing Value
+                </div>
+                <div className="text-xl font-bold font-mono text-primary">
+                  {fmtVal(data.grandTotal.closingValue)}
+                </div>
+                <div className="text-xs font-mono text-muted-foreground">
+                  avg {fmtRate(data.grandTotal.closingRate)} / {uom}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Tally-style Stock Movement Table */}
-      <Card className="overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 220px)' }}>
+      <Card className="overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 340px)' }}>
         <CardHeader className="pb-2 flex-shrink-0">
           <CardTitle className="text-base">
             Monthly Stock Movement

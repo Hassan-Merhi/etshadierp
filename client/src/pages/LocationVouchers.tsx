@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
-import { ArrowLeft, MapPin, Eye } from "lucide-react";
+import { ArrowLeft, MapPin, Eye, ArrowDownToLine, ArrowUpFromLine, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -242,6 +242,23 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
     return () => clearCursorNav();
   }, [selectedRowIndex, navigableRows]);
 
+  const getVchTypeBadge = (vchType: string) => {
+    const t = (vchType || "").toLowerCase();
+    if (t === "pos")
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300";
+    if (t === "po offload" || t === "purchase import")
+      return "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300";
+    if (t === "stock transfer" || t === "stocktransfer" || t === "st")
+      return "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300";
+    if (t === "production")
+      return "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300";
+    if (t === "consumption")
+      return "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300";
+    if (t === "sales")
+      return "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300";
+    return "bg-muted text-muted-foreground";
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-6 space-y-6">
@@ -254,7 +271,7 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
   const colSpanFull = posUser ? 6 : 12;
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-6 space-y-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4">
           <Button
@@ -303,9 +320,51 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
         </div>
       </div>
 
-      <Card className="overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 250px)' }}>
+      {/* KPI Summary Cards */}
+      {filteredTransactions.length > 0 && (
+        <div className="flex flex-wrap gap-3 items-stretch">
+          <div className="flex-1 min-w-[130px] rounded-xl border bg-card p-3 flex flex-col gap-0.5">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium uppercase tracking-wide">
+              <ArrowDownToLine className="h-3.5 w-3.5 text-emerald-500" />
+              Total In
+            </div>
+            <div className="text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400">
+              {calculatedTotals.inwardQty > 0 ? calculatedTotals.inwardQty.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "—"}
+            </div>
+            {!posUser && calculatedTotals.inwardValue > 0 && (
+              <div className="text-xs font-mono text-muted-foreground">{formatAmount(calculatedTotals.inwardValue)}</div>
+            )}
+          </div>
+          <div className="flex-1 min-w-[130px] rounded-xl border bg-card p-3 flex flex-col gap-0.5">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium uppercase tracking-wide">
+              <ArrowUpFromLine className="h-3.5 w-3.5 text-rose-500" />
+              Total Out
+            </div>
+            <div className="text-lg font-bold font-mono text-rose-600 dark:text-rose-400">
+              {calculatedTotals.outwardQty > 0 ? calculatedTotals.outwardQty.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "—"}
+            </div>
+            {!posUser && calculatedTotals.outwardValue > 0 && (
+              <div className="text-xs font-mono text-muted-foreground">{formatAmount(calculatedTotals.outwardValue)}</div>
+            )}
+          </div>
+          <div className="flex-1 min-w-[130px] rounded-xl border bg-primary/5 p-3 flex flex-col gap-0.5">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium uppercase tracking-wide">
+              <Layers className="h-3.5 w-3.5 text-primary" />
+              Closing
+            </div>
+            <div className={`text-lg font-bold font-mono ${calculatedTotals.closingQty < 0 ? "text-rose-600 dark:text-rose-400" : "text-foreground"}`}>
+              {calculatedTotals.closingQty.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            </div>
+            {!posUser && (
+              <div className="text-xs font-mono text-muted-foreground">{formatAmount(calculatedTotals.closingValue)}</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <Card className="overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 270px)' }}>
         <CardHeader className="pb-2 flex-shrink-0">
-          <CardTitle className="text-lg">
+          <CardTitle className="text-base">
             {showAllMonths
               ? `All Transactions — ${year}`
               : `Transactions — ${'monthName' in ((data as any) ?? {}) ? (data as any).monthName : ''} ${year}`}
@@ -313,25 +372,31 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
         </CardHeader>
         <CardContent className="overflow-auto flex-1 p-0" ref={tableScrollContainer}>
           <table className="w-full text-sm border-collapse">
-            <thead className="sticky top-0 z-30 bg-muted">
+            <thead className="sticky top-0 z-30">
               <tr className="bg-muted border-b">
-                <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r w-[100px] bg-muted font-medium">Date</th>
+                <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r bg-muted font-medium w-[100px]">Date</th>
                 <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r bg-muted font-medium">Particulars</th>
-                <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r w-[120px] bg-muted font-medium">Vch Type</th>
-                <th colSpan={posUser ? 1 : 3} className="text-center px-4 py-2 border-r bg-muted font-medium">Inwards</th>
-                <th colSpan={posUser ? 1 : 3} className="text-center px-4 py-2 border-r bg-muted font-medium">Outwards</th>
-                <th colSpan={posUser ? 1 : 3} className="text-center px-4 py-2 bg-muted font-medium">Closing</th>
+                <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r bg-muted font-medium w-[110px]">Vch Type</th>
+                <th colSpan={posUser ? 1 : 3} className="text-center px-3 py-1.5 border-r font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border-t-2 border-t-emerald-500">
+                  <span className="flex items-center justify-center gap-1"><ArrowDownToLine className="h-3.5 w-3.5" />Inwards</span>
+                </th>
+                <th colSpan={posUser ? 1 : 3} className="text-center px-3 py-1.5 border-r font-semibold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 border-t-2 border-t-rose-500">
+                  <span className="flex items-center justify-center gap-1"><ArrowUpFromLine className="h-3.5 w-3.5" />Outwards</span>
+                </th>
+                <th colSpan={posUser ? 1 : 3} className="text-center px-3 py-1.5 font-semibold text-primary bg-primary/5 border-t-2 border-t-primary">
+                  <span className="flex items-center justify-center gap-1"><Layers className="h-3.5 w-3.5" />Closing</span>
+                </th>
               </tr>
-              <tr className="bg-muted/80 border-b">
-                <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium border-r">Qty</th>
-                {!posUser && <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Rate</th>}
-                {!posUser && <th className="text-right px-2 py-2 border-r w-[80px] bg-muted/80 font-medium">Value</th>}
-                <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium border-r">Qty</th>
-                {!posUser && <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Rate</th>}
-                {!posUser && <th className="text-right px-2 py-2 border-r w-[80px] bg-muted/80 font-medium">Value</th>}
-                <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Qty</th>
-                {!posUser && <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Rate</th>}
-                {!posUser && <th className="text-right px-2 py-2 w-[80px] bg-muted/80 font-medium">Value</th>}
+              <tr className="border-b text-xs">
+                <th className="text-right px-2 py-1.5 font-medium border-r bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 w-[55px]">Qty</th>
+                {!posUser && <th className="text-right px-2 py-1.5 font-medium bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 w-[60px]">Rate</th>}
+                {!posUser && <th className="text-right px-2 py-1.5 border-r font-medium bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 w-[75px]">Value</th>}
+                <th className="text-right px-2 py-1.5 font-medium border-r bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 w-[55px]">Qty</th>
+                {!posUser && <th className="text-right px-2 py-1.5 font-medium bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 w-[60px]">Rate</th>}
+                {!posUser && <th className="text-right px-2 py-1.5 border-r font-medium bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 w-[75px]">Value</th>}
+                <th className="text-right px-2 py-1.5 font-medium bg-primary/5 text-primary w-[55px]">Qty</th>
+                {!posUser && <th className="text-right px-2 py-1.5 font-medium bg-primary/5 text-primary w-[60px]">Rate</th>}
+                {!posUser && <th className="text-right px-2 py-1.5 font-medium bg-primary/5 text-primary w-[75px]">Value</th>}
               </tr>
             </thead>
             <tbody>
@@ -356,13 +421,13 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
                   <tr
                     key={idx}
                     data-testid={`row-txn-${idx}`}
-                    className={`border-b ${txn.isOpeningBalance ? "bg-muted/30 font-medium" : isSelected ? "ring-2 ring-primary bg-blue-200 dark:bg-blue-900" : ""}`}
+                    className={`border-b transition-colors ${txn.isOpeningBalance ? "bg-muted/30 font-medium" : isSelected ? "bg-primary/10 ring-1 ring-inset ring-primary" : "hover:bg-muted/30"}`}
                     data-row-index={navIndex >= 0 ? navIndex : undefined}
                   >
-                    <td className="px-4 py-3 border-r tabular-nums">
+                    <td className="px-4 py-2.5 border-r tabular-nums text-muted-foreground text-xs">
                       {txn.isOpeningBalance ? "" : formatDate(txn.date)}
                     </td>
-                    <td className={`px-4 py-3 border-r ${txn.isOpeningBalance ? "font-semibold" : ""}`}>
+                    <td className={`px-4 py-2.5 border-r ${txn.isOpeningBalance ? "font-semibold" : ""}`}>
                       {getTransactionEditUrl(txn) ? (
                         <button
                           onClick={() => handleParticularsClick(txn)}
@@ -373,24 +438,32 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
                         </button>
                       ) : txn.particulars}
                     </td>
-                    <td className="px-4 py-3 border-r text-xs">{txn.vchType}</td>
-                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(txn.inwardQty, 0)}</td>
-                    {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(txn.inwardRate)}</td>}
-                    {!posUser && <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(txn.inwardValue)}</td>}
-                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(txn.outwardQty, 0)}</td>
+                    <td className="px-4 py-2.5 border-r">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getVchTypeBadge(txn.vchType)}`}>
+                        {txn.vchType}
+                      </span>
+                    </td>
+                    <td className="text-right px-2 py-2.5 tabular-nums border-r font-medium text-emerald-700 dark:text-emerald-400">
+                      {formatNumber(txn.inwardQty, 0)}
+                    </td>
+                    {!posUser && <td className="text-right px-2 py-2.5 tabular-nums text-muted-foreground">{formatAmount(txn.inwardRate)}</td>}
+                    {!posUser && <td className="text-right px-2 py-2.5 tabular-nums border-r text-muted-foreground">{formatAmount(txn.inwardValue)}</td>}
+                    <td className="text-right px-2 py-2.5 tabular-nums border-r font-medium text-rose-700 dark:text-rose-400">
+                      {formatNumber(txn.outwardQty, 0)}
+                    </td>
                     {!posUser && (
-                      <td className="text-right px-2 py-3 tabular-nums">
+                      <td className="text-right px-2 py-2.5 tabular-nums text-muted-foreground">
                         {formatAmount(txn.isPOS && txn.posSellingRate ? txn.posSellingRate : txn.outwardRate)}
                       </td>
                     )}
                     {!posUser && (
-                      <td className="text-right px-2 py-3 tabular-nums border-r">
+                      <td className="text-right px-2 py-2.5 tabular-nums border-r text-muted-foreground">
                         {formatAmount(txn.isPOS && txn.posSellingValue ? txn.posSellingValue : txn.outwardValue)}
                       </td>
                     )}
-                    <td className="text-right px-2 py-3 tabular-nums font-medium">{formatNumber(txn.closingQty, 0)}</td>
-                    {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(txn.closingRate)}</td>}
-                    {!posUser && <td className="text-right px-2 py-3 tabular-nums font-medium">{formatAmount(txn.closingValue)}</td>}
+                    <td className="text-right px-2 py-2.5 tabular-nums font-semibold text-foreground">{formatNumber(txn.closingQty, 0)}</td>
+                    {!posUser && <td className="text-right px-2 py-2.5 tabular-nums text-muted-foreground">{formatAmount(txn.closingRate)}</td>}
+                    {!posUser && <td className="text-right px-2 py-2.5 tabular-nums font-medium">{formatAmount(txn.closingValue)}</td>}
                   </tr>
                 );
               })}
@@ -404,17 +477,17 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
               )}
 
               {filteredTransactions.length > 0 && (
-                <tr className="bg-muted/50 font-bold border-t">
-                  <td colSpan={3} className="px-4 py-3 border-r">Totals</td>
-                  <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(calculatedTotals.inwardQty, 0)}</td>
-                  {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.inwardRate)}</td>}
-                  {!posUser && <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(calculatedTotals.inwardValue)}</td>}
-                  <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(calculatedTotals.outwardQty, 0)}</td>
-                  {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.outwardRate)}</td>}
-                  {!posUser && <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(calculatedTotals.outwardValue)}</td>}
-                  <td className="text-right px-2 py-3 tabular-nums">{formatNumber(calculatedTotals.closingQty, 0)}</td>
-                  {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.closingRate)}</td>}
-                  {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.closingValue)}</td>}
+                <tr className="bg-muted font-bold border-t-2">
+                  <td colSpan={3} className="px-4 py-2.5 border-r text-sm">Totals</td>
+                  <td className="text-right px-2 py-2.5 tabular-nums border-r text-emerald-700 dark:text-emerald-400">{formatNumber(calculatedTotals.inwardQty, 0)}</td>
+                  {!posUser && <td className="text-right px-2 py-2.5 tabular-nums text-muted-foreground">{formatAmount(calculatedTotals.inwardRate)}</td>}
+                  {!posUser && <td className="text-right px-2 py-2.5 tabular-nums border-r text-muted-foreground">{formatAmount(calculatedTotals.inwardValue)}</td>}
+                  <td className="text-right px-2 py-2.5 tabular-nums border-r text-rose-700 dark:text-rose-400">{formatNumber(calculatedTotals.outwardQty, 0)}</td>
+                  {!posUser && <td className="text-right px-2 py-2.5 tabular-nums text-muted-foreground">{formatAmount(calculatedTotals.outwardRate)}</td>}
+                  {!posUser && <td className="text-right px-2 py-2.5 tabular-nums border-r text-muted-foreground">{formatAmount(calculatedTotals.outwardValue)}</td>}
+                  <td className="text-right px-2 py-2.5 tabular-nums text-foreground">{formatNumber(calculatedTotals.closingQty, 0)}</td>
+                  {!posUser && <td className="text-right px-2 py-2.5 tabular-nums text-muted-foreground">{formatAmount(calculatedTotals.closingRate)}</td>}
+                  {!posUser && <td className="text-right px-2 py-2.5 tabular-nums text-primary">{formatAmount(calculatedTotals.closingValue)}</td>}
                 </tr>
               )}
             </tbody>
