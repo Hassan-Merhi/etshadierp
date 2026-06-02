@@ -823,6 +823,7 @@ export default function FactoryStatusBuilder() {
   const totalRow = activeSheet ? calcTotal(localSheets, activeSheet) : [];
 
   return (
+    <>
     <div className="flex flex-col flex-1 min-h-0 bg-background">
 
       {/* Link dialog */}
@@ -1166,7 +1167,7 @@ export default function FactoryStatusBuilder() {
       )}
     </div>
 
-    <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
+    <AlertDialog open={!!pendingDelete} onOpenChange={(isOpen) => { if (!isOpen) setPendingDelete(null); }}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
@@ -1196,5 +1197,6 @@ export default function FactoryStatusBuilder() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+    </>
   );
 }
