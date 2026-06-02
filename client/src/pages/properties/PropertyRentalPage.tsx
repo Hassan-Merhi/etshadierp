@@ -751,7 +751,7 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
               <TabsTrigger value="ledger" data-testid={`tab-${testIdPrefix}-ledger`}>Statement</TabsTrigger>
             </TabsList>
             <TabsContent value="payment">
-              <PaymentForm contract={contract} cashAccounts={cashAccounts} testIdPrefix={testIdPrefix} unitId={unit.id} />
+              <PaymentForm contract={contract} cashAccounts={cashAccounts} testIdPrefix={testIdPrefix} unitId={unit.id} ledger={detail?.ledger} />
             </TabsContent>
             <TabsContent value="ledger">
               <LedgerView
@@ -775,7 +775,7 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
               <TabsTrigger value="end" data-testid={`tab-${testIdPrefix}-end`}><XCircle className="h-4 w-4 mr-1" />End Contract</TabsTrigger>
             </TabsList>
             <TabsContent value="payment">
-              <PaymentForm contract={contract} cashAccounts={cashAccounts} testIdPrefix={testIdPrefix} unitId={unit.id} />
+              <PaymentForm contract={contract} cashAccounts={cashAccounts} testIdPrefix={testIdPrefix} unitId={unit.id} ledger={detail?.ledger} />
             </TabsContent>
             <TabsContent value="ledger">
               <LedgerView
@@ -1156,13 +1156,52 @@ function buildPaymentAllocations(
   totalAmount: number,
   rentalAmount: number,
   paymentDate: string,
+  ledger?: Array<{ year: number; month: number; expectedAmount: string; paidAmount: string }>,
 ): Array<{ year: number; month: number; chunk: number }> {
   if (!totalAmount || !rentalAmount || !paymentDate) return [];
-  const pd = new Date(paymentDate);
-  let ay = pd.getUTCFullYear(), am = pd.getUTCMonth() + 1;
+
+  const now = new Date();
+  const nowYear = now.getFullYear(), nowMonth = now.getMonth() + 1;
+
+  // Build ledger map for skipping already-paid months
+  const ledgerMap = new Map<string, { paid: number; expected: number }>();
+  if (ledger) {
+    for (const r of ledger) {
+      ledgerMap.set(`${r.year}-${r.month}`, { paid: parseFloat(r.paidAmount), expected: parseFloat(r.expectedAmount) });
+    }
+  }
+
+  // Find earliest outstanding past/current month — mirrors server findEarliestOutstandingMonth
+  let ay: number, am: number;
+  if (ledger && ledger.length > 0) {
+    const sorted = [...ledger].sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
+    const earliest = sorted.find(r => {
+      const isPastOrCurrent = r.year < nowYear || (r.year === nowYear && r.month <= nowMonth);
+      if (!isPastOrCurrent) return false;
+      return Math.max(0, parseFloat(r.expectedAmount) - parseFloat(r.paidAmount)) > 0.005;
+    });
+    if (earliest) { ay = earliest.year; am = earliest.month; }
+    else { const pd = new Date(paymentDate); ay = pd.getUTCFullYear(); am = pd.getUTCMonth() + 1; }
+  } else {
+    const pd = new Date(paymentDate); ay = pd.getUTCFullYear(); am = pd.getUTCMonth() + 1;
+  }
+
   const allocations: Array<{ year: number; month: number; chunk: number }> = [];
   let remaining = totalAmount;
+  let skipped = 0;
   while (remaining > 0.005) {
+    const key = `${ay}-${am}`;
+    const existing = ledgerMap.get(key);
+    const isFuture = ay > nowYear || (ay === nowYear && am > nowMonth);
+    const alreadyPaid = existing
+      ? (isFuture ? existing.paid >= rentalAmount : existing.paid >= existing.expected)
+      : false;
+    if (alreadyPaid) {
+      am++; if (am > 12) { am = 1; ay++; }
+      if (++skipped > 120) break;
+      continue;
+    }
+    skipped = 0;
     const chunk = rentalAmount > 0 ? Math.min(remaining, rentalAmount) : remaining;
     allocations.push({ year: ay, month: am, chunk: Math.round(chunk * 100) / 100 });
     remaining = Math.round((remaining - chunk) * 100) / 100;
@@ -1172,7 +1211,7 @@ function buildPaymentAllocations(
   return allocations;
 }
 
-function PaymentForm({ contract, cashAccounts, testIdPrefix, unitId }: { contract: Contract; cashAccounts: CashAccount[]; testIdPrefix: string; unitId: number }) {
+function PaymentForm({ contract, cashAccounts, testIdPrefix, unitId, ledger }: { contract: Contract; cashAccounts: CashAccount[]; testIdPrefix: string; unitId: number; ledger?: LedgerRow[] }) {
   const apiBase = useApiBase();
   const { toast } = useToast();
   const [form, setForm] = useState({
@@ -1207,8 +1246,8 @@ function PaymentForm({ contract, cashAccounts, testIdPrefix, unitId }: { contrac
     const total = parseFloat(form.amount);
     const monthly = parseFloat(contract.rentalAmount);
     if (!total || !monthly || total <= 0) return [];
-    return buildPaymentAllocations(total, monthly, form.paymentDate);
-  }, [form.amount, form.paymentDate, contract.rentalAmount]);
+    return buildPaymentAllocations(total, monthly, form.paymentDate, ledger);
+  }, [form.amount, form.paymentDate, contract.rentalAmount, ledger]);
 
   const isMultiMonth = allocations.length > 1;
 
