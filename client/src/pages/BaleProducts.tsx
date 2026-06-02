@@ -39,7 +39,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import { A4_DESIGN_OPTIONS } from "@/lib/labelHtml";
+import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 import { CreateBaleProductDialog } from "../components/CreateBaleProductDialog";
 import { AdminAuthDialog } from "@/components/AdminAuthDialog";
 import type { FactoryBaleProduct, FactoryCategory } from "@shared/schema";
@@ -65,6 +65,7 @@ interface GroupedProduct {
 }
 
 export default function BaleProducts() {
+  const { colors: designColors } = useLabelDesignColors();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [adminAuthOpen, setAdminAuthOpen] = useState(false);
   const [pendingAdminAuth, setPendingAdminAuth] = useState<{ username: string; password: string } | null>(null);
@@ -1350,7 +1351,7 @@ export default function BaleProducts() {
                                     >
                                       <X className="w-3 h-3 text-muted-foreground" />
                                     </button>
-                                    {A4_DESIGN_OPTIONS.map((opt) => (
+                                    {designColors.map((opt) => (
                                       <button
                                         key={opt.value}
                                         title={opt.label}
@@ -1447,7 +1448,7 @@ export default function BaleProducts() {
                             >
                               <X className="w-3 h-3 text-muted-foreground" />
                             </button>
-                            {A4_DESIGN_OPTIONS.map((opt) => (
+                            {designColors.map((opt) => (
                               <button
                                 key={opt.value}
                                 title={opt.label}
@@ -1694,7 +1695,7 @@ export default function BaleProducts() {
                 >
                   No Design
                 </button>
-                {A4_DESIGN_OPTIONS.map((opt) => (
+                {designColors.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
@@ -1708,7 +1709,7 @@ export default function BaleProducts() {
               </div>
               {editForm.labelDesignColor && (
                 <p className="text-xs text-muted-foreground">
-                  Labels for this product will print with the <span className="font-medium">{A4_DESIGN_OPTIONS.find(o => o.value === editForm.labelDesignColor)?.label}</span> design automatically.
+                  Labels for this product will print with the <span className="font-medium">{designColors.find(o => o.value === editForm.labelDesignColor)?.label}</span> design automatically.
                 </p>
               )}
               {!editForm.labelDesignColor && (

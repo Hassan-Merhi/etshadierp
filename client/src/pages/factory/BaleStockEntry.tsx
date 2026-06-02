@@ -47,7 +47,8 @@ import GroundScan from "./GroundScan";
 import DailyScan from "./DailyScan";
   import { AdminAuthDialog } from "@/components/AdminAuthDialog";
   import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
-  import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, formatLabelNum, A4_DESIGN_OPTIONS, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
+  import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, formatLabelNum, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
+  import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
   import { consumeRef } from "@/lib/refPool";
   import { enqueueRequest } from "@/lib/offlineQueue";
 
@@ -157,6 +158,7 @@ import DailyScan from "./DailyScan";
     const appMode = useAppMode();
     const modeApiRequest = getApiRequest(appMode);
     const { selectedCompany } = useCompany();
+    const { colors: designColors } = useLabelDesignColors();
 
     const { hasDraft: hasCartDraft, draftAge: cartDraftAge, draft: cartDraft, scheduleSave: scheduleCartSave, discardDraft: discardCartDraft } = useFormDraft({
       entityType: "factory-stock-entry-cart",
@@ -1209,7 +1211,7 @@ import DailyScan from "./DailyScan";
               <DialogDescription>Select a brand color for the A4 label header banner.</DialogDescription>
             </DialogHeader>
             <div className="grid grid-cols-2 gap-3 py-2">
-              {A4_DESIGN_OPTIONS.map((opt) => (
+              {designColors.map((opt) => (
                 <button
                   key={opt.value}
                   data-testid={`button-design-${opt.value}`}
@@ -1273,6 +1275,7 @@ import DailyScan from "./DailyScan";
     const [printWorkerBale, setPrintWorkerBale] = useState<any | null>(null);
     const [printWorkerIdSelected, setPrintWorkerIdSelected] = useState<string>("");
     const [assigningWorker, setAssigningWorker] = useState(false);
+    const { colors: designColors } = useLabelDesignColors();
     const [importingNames, setImportingNames] = useState(false);
     const [reimporting, setReimporting] = useState(false);
     const namesFileRef = useRef<HTMLInputElement>(null);
@@ -1925,7 +1928,7 @@ import DailyScan from "./DailyScan";
               <DialogDescription>Select a brand color for the A4 label header banner.</DialogDescription>
             </DialogHeader>
             <div className="grid grid-cols-2 gap-3 py-2">
-              {A4_DESIGN_OPTIONS.map((opt) => (
+              {designColors.map((opt) => (
                 <button
                   key={opt.value}
                   data-testid={`button-design-${opt.value}`}

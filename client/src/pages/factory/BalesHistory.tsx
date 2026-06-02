@@ -39,7 +39,8 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
 import { buildZplBatch } from "@/lib/zplBuilder";
 import { LabelPrintSettings, getPaperFormat } from "@/components/LabelPrintSettings";
-import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, formatLabelNum, A4_DESIGN_OPTIONS, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
+import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, formatLabelNum, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
+import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 import type { FactoryMixBatch, FactoryBaleProduct } from "@shared/schema";
 
 
@@ -60,6 +61,7 @@ export default function BalesHistory() {
   const [exportFrom, setExportFrom] = useState("");
   const [exportTo, setExportTo] = useState("");
   const [exportLoading, setExportLoading] = useState(false);
+  const { colors: designColors } = useLabelDesignColors();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [batchFilter, setBatchFilter] = useState("all");
@@ -903,7 +905,7 @@ export default function BalesHistory() {
             <DialogDescription>Select a brand color for the A4 label header banner.</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3 py-2">
-            {A4_DESIGN_OPTIONS.map((opt) => (
+            {designColors.map((opt) => (
               <button
                 key={opt.value}
                 data-testid={`button-design-${opt.value}`}
