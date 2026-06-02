@@ -444,6 +444,11 @@ export default function Suppliers() {
                     <div className="font-medium text-sm leading-tight" data-testid={`button-supplier-name-mobile-${supplier.id}`}>
                       {supplier.legalName}
                     </div>
+                    {supplier.phone && (
+                      <div className="text-xs text-muted-foreground mt-0.5" data-testid={`text-phone-mobile-${supplier.id}`}>
+                        {supplier.phone}
+                      </div>
+                    )}
                     {!supplier.active && (
                       <Badge variant="secondary" className="text-xs mt-1">Inactive</Badge>
                     )}

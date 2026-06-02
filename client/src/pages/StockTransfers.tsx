@@ -364,9 +364,16 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
                   </div>
                   <div className="text-right shrink-0">
                     <div className="font-mono text-sm font-medium">{formatAmount(t.totalAmount)}</div>
-                    <Badge variant={t.inventoryApplied ? "default" : "secondary"} className="text-xs mt-1">
-                      {t.inventoryApplied ? "Applied" : "Pending"}
-                    </Badge>
+                    <div className="flex items-center justify-end gap-1 mt-1">
+                      {t.itemCount > 0 && (
+                        <span className="text-xs text-muted-foreground" data-testid={`text-item-count-mobile-${t.transferId}`}>
+                          {t.itemCount} {t.itemCount === 1 ? "item" : "items"}
+                        </span>
+                      )}
+                      <Badge variant={t.inventoryApplied ? "default" : "secondary"} className="text-xs">
+                        {t.inventoryApplied ? "Applied" : "Pending"}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
                 {((t.stockItemNames ?? []).length > 0 || (!hideVoucherNotes && t.notes)) && (
