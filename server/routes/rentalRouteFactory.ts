@@ -1780,7 +1780,6 @@ export function registerRentalRoutes(
         const [sharedContract] = await db.select().from(propertyContracts).where(and(
           eq(propertyContracts.id, data.contractId),
           eq(propertyContracts.linkedCompanyId, companyId),
-          eq(propertyContracts.module, module),
           eq(propertyContracts.status, "ACTIVE"),
         ));
         if (sharedContract) { contract = sharedContract; isSharedPayment = true; }
@@ -2212,7 +2211,8 @@ export function registerRentalRoutes(
         isShared
           ? eq(propertyContracts.linkedCompanyId, companyId)
           : eq(propertyContracts.companyId, companyId),
-        eq(propertyContracts.module, module),
+        // Shared contracts may live in any module on the owner's side; skip module filter
+        ...(isShared ? [] : [eq(propertyContracts.module, module)]),
         eq(propertyContracts.unitId, unitId),
         eq(propertyContracts.status, "ACTIVE"),
       ));
