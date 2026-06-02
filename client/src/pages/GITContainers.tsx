@@ -1512,7 +1512,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const printRef     = useRef<HTMLDivElement>(null);
   const queryClient  = useQueryClient();
 
-  const allowedRoles = ["Admin", "Developer", "Owner"];
+  const allowedRoles = ["Admin", "Developer"];
   const isAllowed = allowedRoles.includes(user?.currentRole ?? "") || allowedRoles.includes(user?.role ?? "");
   const isDevMode = import.meta.env.DEV;
 

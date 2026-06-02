@@ -300,10 +300,12 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
     );
   }
 
+  const isAdminOrDev = user?.role === "Admin" || user?.role === "Developer";
+
   // All other users see full interface
   return (
     <Switch>
-      <Route path="/" component={ContainersOTW} />
+      <Route path="/">{() => isAdminOrDev ? <ContainersOTW /> : <Redirect to="/tracking" />}</Route>
       <Route path="/tracking" component={TrackingHub} />
       <Route path="/financial-overview" component={Dashboard} />
       <Route path="/pos">{() => <POSPage />}</Route>
@@ -313,8 +315,8 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/location-inventory"><Redirect to="/inventory?tab=by-location" /></Route>
       <Route path="/stock-items"><Redirect to="/stock?tab=items" /></Route>
       <Route path="/stock-otw"><Redirect to="/inventory?tab=on-the-way" /></Route>
-      <Route path="/mock-containers-otw" component={ContainersOTW} />
-      <Route path="/containers-otw" component={ContainersOTW} />
+      {isAdminOrDev && <Route path="/mock-containers-otw" component={ContainersOTW} />}
+      {isAdminOrDev && <Route path="/containers-otw" component={ContainersOTW} />}
       <Route path="/mock-git" component={GITMockup} />
       <Route path="/git" component={GITMockup} />
       <Route path="/containers" component={ContainersPage} />
