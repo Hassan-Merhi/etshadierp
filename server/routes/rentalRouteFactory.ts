@@ -1819,8 +1819,9 @@ export function registerRentalRoutes(
         // Create ONE voucher for the full payment total
         let voucherId: number | null = null;
         if (data.cashAccountId) {
-          // Shared contracts are always treated as tenant-paying (expense/AP debit, cash credit)
-          const isShop = isSharedPayment || unit?.unitType === "SHOP";
+          // Shared ERP contracts: HADI L'SHI collects FROM the tenant (receipt — Dr Cash, Cr Income).
+          // Non-shared SHOP units: HADI is the tenant paying outward (expense — Dr Expense, Cr Cash).
+          const isShop = !isSharedPayment && unit?.unitType === "SHOP";
           const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
           const monthSpan = allocations.length > 1
             ? `${String(allocations[0].month).padStart(2,"0")}/${allocations[0].year} – ${String(allocations[allocations.length-1].month).padStart(2,"0")}/${allocations[allocations.length-1].year}`
