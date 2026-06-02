@@ -516,10 +516,20 @@ async function postRentAccrualForCompany(
       type Entry = { id: number; amount: number; unitId: number; month: number; year: number };
       const entries: Entry[] = [];
       for (const locked of lockedRows) {
-        // Accrue the FULL expected amount — not the remainder (expectedAmount − paidAmount).
-        // The payment's Dr AP entry already reduces the net AP balance; the accrual
-        // must record the full expense so the P&L is correct even for paid months.
-        const amount = Number(locked.expected_amount);
+        // Accrue only the UNPAID portion (expectedAmount − paidAmount).
+        //
+        // When payment is made AFTER accrual the flow is:
+        //   Accrual:  Dr Rent Expense / Cr Accrued Rent Payable  (full expected)
+        //   Payment:  Dr Accrued Rent Payable / Cr Cash           (full paid)
+        // → at accrual time paid_amount = 0, so we accrue the full expected amount ✓
+        //
+        // When payment is made BEFORE accrual the flow is:
+        //   Payment:  Dr Rent Expense / Cr Cash  (isAccrued=false path, no AP entry)
+        //   Accrual:  should only record the REMAINING unpaid portion
+        // → using (expected − paid) avoids creating phantom AP balance ✓
+        const expected = Number(locked.expected_amount);
+        const paid     = Number(locked.paid_amount || "0");
+        const amount   = expected - paid;
         if (amount <= 0) continue;
         entries.push({
           id:     Number(locked.id),
@@ -2347,6 +2357,150 @@ export function registerRentalRoutes(
           eq(propertyContracts.status, "ACTIVE"),
           eq(propertyUnits.unitType, "SHOP"),
         ));
+
+      // 1b. Phantom-accrual repair (ALL months, historical + current).
+      //
+      // Problem: when a payment is recorded BEFORE the accrual runs, the payment
+      // posts  Dr Rent Expense / Cr Cash  (no AP entry).  If the accrual is run
+      // later it posts  Dr Rent Expense / Cr AP  using the FULL expectedAmount,
+      // leaving a phantom AP credit with no matching debit — inflating the
+      // liability by exactly the pre-paid amount.
+      //
+      // Fix: for every accrued ledger row whose payment voucher(s) never debited
+      // Accrued Rent Payable, post a correcting journal:
+      //   Dr Accrued Rent Payable  paid_amount
+      //   Cr Rent Expense          paid_amount
+      //
+      // This removes the phantom AP and the duplicate expense entry in one shot
+      // without touching the original accrual or payment vouchers.
+      //
+      // Net result for a fully-pre-paid row (paid = expected):
+      //   Dr Expense = old_accrual + payment − correction = expected ✓
+      //   Cr AP      = old_accrual − correction           = 0        ✓
+      //
+      // Net result for a partially-pre-paid row (paid < expected):
+      //   Cr AP      = old_accrual − correction = expected − paid    ✓ (outstanding)
+      //   Dr Expense = old_accrual + payment − correction = expected ✓
+      if (shopContracts.length > 0) {
+        const contractIds = shopContracts.map(c => c.id);
+
+        // Find AP account for this company
+        const [apAcct] = await db
+          .select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(and(
+            eq(ledgerAccounts.companyId, companyId),
+            eq(ledgerAccounts.code, "ACCR-RENT-PAY"),
+          ));
+
+        const [expAcct] = await db
+          .select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(and(
+            eq(ledgerAccounts.companyId, companyId),
+            eq(ledgerAccounts.code, "SHOP-RENT-EXP"),
+          ));
+
+        if (apAcct && expAcct) {
+          // All accrued rows with some payment (candidates for phantom)
+          const candidateRows = await db
+            .select({
+              id:             propertyMonthlyLedger.id,
+              expectedAmount: propertyMonthlyLedger.expectedAmount,
+              paidAmount:     propertyMonthlyLedger.paidAmount,
+            })
+            .from(propertyMonthlyLedger)
+            .where(and(
+              inArray(propertyMonthlyLedger.contractId, contractIds),
+              isNotNull(propertyMonthlyLedger.accrualVoucherId),
+              sql`${propertyMonthlyLedger.paidAmount}::numeric > 0`,
+            ));
+
+          // For each candidate, check whether any payment voucher debited AP
+          // (= post-accrual payment, already correct).  If no AP debit found,
+          // the payment was pre-accrual and the phantom fix is needed.
+          let phantomFixTotal = 0;
+          type PhantomRow = { id: number; correction: number };
+          const phantomRows: PhantomRow[] = [];
+
+          for (const row of candidateRows) {
+            const paid = Number(row.paidAmount);
+            if (paid <= 0) continue;
+
+            // Find payment voucher IDs for this ledger row
+            const paymentVouchers = await db
+              .select({ voucherId: propertyPayments.voucherId })
+              .from(propertyPayments)
+              .where(eq(propertyPayments.ledgerRowId, row.id));
+
+            const payVoucherIds = paymentVouchers
+              .map(p => p.voucherId)
+              .filter((id): id is number => id !== null && id !== undefined);
+
+            if (payVoucherIds.length === 0) continue;
+
+            // Check if any of those vouchers have a debit to AP
+            const [apDebitEntry] = await db
+              .select({ id: voucherEntries.id })
+              .from(voucherEntries)
+              .where(and(
+                inArray(voucherEntries.voucherId, payVoucherIds),
+                eq(voucherEntries.ledgerAccountId, apAcct.id),
+                sql`${voucherEntries.debitAmount}::numeric > 0`,
+              ))
+              .limit(1);
+
+            if (!apDebitEntry) {
+              // No AP debit in any payment → pre-accrual payment → phantom
+              const correction = Math.min(paid, Number(row.expectedAmount));
+              phantomRows.push({ id: row.id, correction });
+              phantomFixTotal += correction;
+            }
+          }
+
+          if (phantomRows.length > 0) {
+            console.log(`[re-accrue] phantom fix: ${phantomRows.length} rows, total correction=${phantomFixTotal}`);
+            await db.transaction(async (tx) => {
+              const [corrV] = await tx.insert(vouchers).values({
+                companyId,
+                voucherNumber: `PHANTOM-FIX-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                voucherType:  "Journal",
+                voucherDate:  new Date().toISOString().slice(0, 10) as any,
+                description:  `Phantom accrual correction — Dr AP / Cr Rent Expense (${phantomRows.length} rows)`,
+                totalAmount:  String(phantomFixTotal),
+                currency:     "USD",
+                sourceModule: "ERP",
+              }).returning();
+
+              const corrEntries: {
+                voucherId: number; ledgerAccountId: number;
+                debitAmount: string; creditAmount: string; narration: string;
+              }[] = [];
+
+              for (const p of phantomRows) {
+                corrEntries.push({
+                  voucherId:        corrV.id,
+                  ledgerAccountId:  apAcct.id,
+                  debitAmount:      String(p.correction),
+                  creditAmount:     "0",
+                  narration:        `Phantom accrual correction — ledger row ${p.id}`,
+                });
+                corrEntries.push({
+                  voucherId:        corrV.id,
+                  ledgerAccountId:  expAcct.id,
+                  debitAmount:      "0",
+                  creditAmount:     String(p.correction),
+                  narration:        `Phantom accrual correction — ledger row ${p.id}`,
+                });
+              }
+              await tx.insert(voucherEntries).values(corrEntries);
+            });
+            console.log(`[re-accrue] phantom fix voucher posted, total corrected=${phantomFixTotal}`);
+          } else {
+            console.log(`[re-accrue] no phantom accruals detected`);
+          }
+        }
+      }
 
       if (shopContracts.length === 0) {
         return res.json({ reset: 0, accrued: 0, skipped: 0 });
