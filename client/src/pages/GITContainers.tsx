@@ -1512,7 +1512,8 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const printRef     = useRef<HTMLDivElement>(null);
   const queryClient  = useQueryClient();
 
-  const isAllowed = !!user;
+  const role = user?.currentRole || user?.role;
+  const isAllowed = !!role && ["Admin", "Developer", "Owner"].includes(role);
   const isDevMode = import.meta.env.DEV;
 
   const queryUrl = allCompanies
@@ -1777,9 +1778,9 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center space-y-2">
             <AlertTriangle className="h-8 w-8 text-muted-foreground mx-auto" />
-            <p className="text-sm font-medium">Not logged in</p>
+            <p className="text-sm font-medium">Access Restricted</p>
             <p className="text-xs text-muted-foreground">
-              Please log in to view this page.
+              This page is available to Admin, Developer, and Owner roles only.
             </p>
           </div>
         </div>
