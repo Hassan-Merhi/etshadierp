@@ -491,6 +491,8 @@ export default function FactoryStatusBuilder() {
     sourceSheetId: "", sourceRowId: "", sourceColId: "",
   });
 
+  const [pendingDelete, setPendingDelete] = useState<{ type: "row" | "col"; idx: number; label: string } | null>(null);
+
   const fmtLabel = useCallback((label: string): string => {
     if (/^\d{4}-\d{2}-\d{2}$/.test(label)) return formatDisplayDate(label);
     return label;
@@ -928,7 +930,7 @@ export default function FactoryStatusBuilder() {
                             />
                             <button
                               data-testid={`sb-button-remove-col-${ci}`}
-                              onClick={() => removeColumn(ci)}
+                              onClick={() => setPendingDelete({ type: "col", idx: ci, label: col.label || `Column ${ci + 1}` })}
                               className="text-muted-foreground hover:text-destructive shrink-0 transition-colors"
                             >
                               <X className="h-3 w-3" />
@@ -960,7 +962,7 @@ export default function FactoryStatusBuilder() {
                         />
                         <button
                           data-testid={`sb-button-remove-row-${ri}`}
-                          onClick={() => removeRow(ri)}
+                          onClick={() => setPendingDelete({ type: "row", idx: ri, label: fmtLabel(row.label) || `Row ${ri + 1}` })}
                           className="text-muted-foreground hover:text-destructive shrink-0 transition-colors opacity-0 group-hover:opacity-100"
                           style={{ visibility: "visible" }}
                         >
@@ -1163,5 +1165,36 @@ export default function FactoryStatusBuilder() {
         </div>
       )}
     </div>
+
+    <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            Delete {pendingDelete?.type === "row" ? "Row" : "Column"}?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete{" "}
+            <span className="font-medium">"{pendingDelete?.label}"</span>?
+            {pendingDelete?.type === "row"
+              ? " All data in this row will be lost."
+              : " All data in this column will be lost."}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => {
+              if (!pendingDelete) return;
+              if (pendingDelete.type === "row") removeRow(pendingDelete.idx);
+              else removeColumn(pendingDelete.idx);
+              setPendingDelete(null);
+            }}
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
