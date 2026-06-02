@@ -1769,12 +1769,26 @@ export function registerRentalRoutes(
         exchangeRate: z.union([z.string(), z.number()]).transform(v => String(v)).optional().default("1"),
       }).parse(req.body);
 
-      const [contract] = await db.select().from(propertyContracts).where(and(
+      let isSharedPayment = false;
+      let [contract] = await db.select().from(propertyContracts).where(and(
         eq(propertyContracts.id, data.contractId),
         eq(propertyContracts.companyId, companyId),
         eq(propertyContracts.module, module),
       ));
+      // If not found as owner, check if it's a shared contract linked to this company
+      if (!contract) {
+        const [sharedContract] = await db.select().from(propertyContracts).where(and(
+          eq(propertyContracts.id, data.contractId),
+          eq(propertyContracts.linkedCompanyId, companyId),
+          eq(propertyContracts.module, module),
+          eq(propertyContracts.status, "ACTIVE"),
+        ));
+        if (sharedContract) { contract = sharedContract; isSharedPayment = true; }
+      }
       if (!contract) return res.status(404).json({ message: "Contract not found" });
+      // For shared contracts, ledger/payment rows use the source company's ID;
+      // vouchers use the caller's companyId (the tenant paying cash).
+      const contractCompanyId = isSharedPayment ? contract.companyId : companyId;
 
       await ensureMonthlyLedgerRows(contract.id);
 
@@ -1795,7 +1809,7 @@ export function registerRentalRoutes(
         // Ensure a ledger row exists for every allocated month
         for (const alloc of allocations) {
           await tx.insert(propertyMonthlyLedger).values({
-            companyId, module, contractId: contract.id, unitId: contract.unitId,
+            companyId: contractCompanyId, module, contractId: contract.id, unitId: contract.unitId,
             year: alloc.year, month: alloc.month,
             expectedAmount: contract.rentalAmount, paidAmount: "0",
           }).onConflictDoNothing({
@@ -1806,7 +1820,8 @@ export function registerRentalRoutes(
         // Create ONE voucher for the full payment total
         let voucherId: number | null = null;
         if (data.cashAccountId) {
-          const isShop = unit?.unitType === "SHOP";
+          // Shared contracts are always treated as tenant-paying (expense/AP debit, cash credit)
+          const isShop = isSharedPayment || unit?.unitType === "SHOP";
           const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
           const monthSpan = allocations.length > 1
             ? `${String(allocations[0].month).padStart(2,"0")}/${allocations[0].year} – ${String(allocations[allocations.length-1].month).padStart(2,"0")}/${allocations[allocations.length-1].year}`
@@ -1886,7 +1901,7 @@ export function registerRentalRoutes(
           ));
 
           const [p] = await tx.insert(propertyPayments).values({
-            companyId, module, contractId: contract.id, unitId: contract.unitId,
+            companyId: contractCompanyId, module, contractId: contract.id, unitId: contract.unitId,
             ledgerRowId: row.id,
             cashAccountId: data.cashAccountId ?? null,
             // All split rows share the same voucherId (one financial transaction)

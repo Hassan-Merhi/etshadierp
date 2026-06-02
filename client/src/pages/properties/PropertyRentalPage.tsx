@@ -745,10 +745,14 @@ function UnitActionDialog({ unit, cashAccounts, onClose, unitType, testIdPrefix 
             </Tabs>
           )
         ) : isShared ? (
-          <Tabs defaultValue="ledger" className="w-full">
-            <TabsList className="grid w-full grid-cols-1">
-              <TabsTrigger value="ledger" data-testid={`tab-${testIdPrefix}-ledger`}>Statement (Read-only)</TabsTrigger>
+          <Tabs defaultValue="payment" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="payment" data-testid={`tab-${testIdPrefix}-payment`}><DollarSign className="h-4 w-4 mr-1" />Payment</TabsTrigger>
+              <TabsTrigger value="ledger" data-testid={`tab-${testIdPrefix}-ledger`}>Statement</TabsTrigger>
             </TabsList>
+            <TabsContent value="payment">
+              <PaymentForm contract={contract} cashAccounts={cashAccounts} testIdPrefix={testIdPrefix} unitId={unit.id} />
+            </TabsContent>
             <TabsContent value="ledger">
               <LedgerView
                 ledger={detail?.ledger ?? []}
