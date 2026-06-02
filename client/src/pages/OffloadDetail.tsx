@@ -202,7 +202,7 @@ export default function OffloadDetail() {
 
   return (
     <div className="w-full p-4 sm:p-8 space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3 flex-wrap">
         <Button
           variant="ghost"
           size="icon"
@@ -211,7 +211,7 @@ export default function OffloadDetail() {
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline" className="text-amber-600 border-amber-500 bg-amber-500/10 gap-1">
               <Package className="w-3 h-3" />

@@ -224,12 +224,12 @@ export default function LedgerMonthlySummary() {
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow className="bg-muted/50">
                         <TableHead>Particulars</TableHead>
-                        <TableHead className="text-right">Transactions</TableHead>
-                        <TableHead></TableHead>
+                        <TableHead className="text-right hidden sm:table-cell">Transactions</TableHead>
+                        <TableHead className="hidden sm:table-cell"></TableHead>
                         <TableHead className="text-right">Closing Balance</TableHead>
                         <TableHead className="w-8"></TableHead>
                       </TableRow>
-                      <TableRow className="bg-muted/30 text-xs">
+                      <TableRow className="bg-muted/30 text-xs hidden sm:table-row">
                         <TableHead></TableHead>
                         <TableHead className="text-right">Debit</TableHead>
                         <TableHead className="text-right">Credit</TableHead>
@@ -243,8 +243,8 @@ export default function LedgerMonthlySummary() {
                         <TableCell className="font-medium">
                           Opening Balance
                         </TableCell>
-                        <TableCell></TableCell>
-                        <TableCell></TableCell>
+                        <TableCell className="hidden sm:table-cell"></TableCell>
+                        <TableCell className="hidden sm:table-cell"></TableCell>
                         <TableCell className="text-right font-mono">
                           {formatAmount(Math.abs(data.openingBalance))}{" "}
                           {data.openingBalance >= 0 ? "Cr" : "Dr"}
@@ -265,10 +265,10 @@ export default function LedgerMonthlySummary() {
                             <TableCell className="font-medium">
                               {month.monthName}
                             </TableCell>
-                            <TableCell className="text-right font-mono">
+                            <TableCell className="text-right font-mono hidden sm:table-cell">
                               {month.debit > 0 ? formatAmount(month.debit) : ""}
                             </TableCell>
-                            <TableCell className="text-right font-mono">
+                            <TableCell className="text-right font-mono hidden sm:table-cell">
                               {month.credit > 0 ? formatAmount(month.credit) : ""}
                             </TableCell>
                             <TableCell className="text-right font-mono">
@@ -285,10 +285,10 @@ export default function LedgerMonthlySummary() {
                       {/* Grand Total */}
                       <TableRow className="bg-primary/10 font-bold border-t-2">
                         <TableCell>Grand Total</TableCell>
-                        <TableCell className="text-right font-mono">
+                        <TableCell className="text-right font-mono hidden sm:table-cell">
                           {formatAmount(data.grandTotal.debit)}
                         </TableCell>
-                        <TableCell className="text-right font-mono">
+                        <TableCell className="text-right font-mono hidden sm:table-cell">
                           {formatAmount(data.grandTotal.credit)}
                         </TableCell>
                         <TableCell className="text-right font-mono">

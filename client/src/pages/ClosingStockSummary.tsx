@@ -204,17 +204,18 @@ export default function ClosingStockSummary() {
 
       <Card className="overflow-hidden">
         <div className="bg-primary text-primary-foreground">
-          <div className="grid grid-cols-4 p-2 sm:p-3 font-semibold text-xs sm:text-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-4 p-2 sm:p-3 font-semibold text-xs sm:text-sm">
             <div className="col-span-1">Particulars</div>
-            <div className="col-span-3 text-center border-l border-primary-foreground/30">
+            <div className="hidden sm:block col-span-3 text-center border-l border-primary-foreground/30">
               Closing Balance
             </div>
+            <div className="sm:hidden text-right border-l border-primary-foreground/30 pl-2">Quantity</div>
           </div>
-          <div className="grid grid-cols-4 px-2 sm:px-3 pb-2 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 px-2 sm:px-3 pb-2 text-xs">
             <div></div>
-            <div className="text-right">Quantity</div>
-            <div className="text-right">Rate</div>
-            <div className="text-right">Value</div>
+            <div className="hidden sm:block text-right border-l border-primary-foreground/30 pl-2">Quantity</div>
+            <div className="hidden sm:block text-right">Rate</div>
+            <div className="hidden sm:block text-right">Value</div>
           </div>
         </div>
 
@@ -230,7 +231,7 @@ export default function ClosingStockSummary() {
               {data.stockGroups.map((group) => (
                 <div
                   key={group.id}
-                  className="grid grid-cols-4 p-2 sm:p-3 cursor-pointer hover-elevate"
+                  className="grid grid-cols-2 sm:grid-cols-4 p-2 sm:p-3 cursor-pointer hover-elevate"
                   onClick={() => handleGroupClick(group.id, group.name)}
                   data-testid={`row-stock-group-${group.id}`}
                 >
@@ -241,10 +242,10 @@ export default function ClosingStockSummary() {
                   <div className="text-right font-mono text-sm">
                     {formatQty(group.closing.quantity)}
                   </div>
-                  <div className="text-right font-mono text-sm">
+                  <div className="hidden sm:block text-right font-mono text-sm">
                     {group.closing.rate > 0 ? formatAmount(group.closing.rate) : ""}
                   </div>
-                  <div className="text-right font-mono text-sm">
+                  <div className="hidden sm:block text-right font-mono text-sm">
                     {group.closing.value > 0 ? formatAmount(group.closing.value) : ""}
                   </div>
                 </div>
@@ -259,15 +260,15 @@ export default function ClosingStockSummary() {
 
         {data?.grandTotal && (
           <div className="bg-muted/50 border-t-2 border-primary">
-            <div className="grid grid-cols-4 p-2 sm:p-3 font-bold">
+            <div className="grid grid-cols-2 sm:grid-cols-4 p-2 sm:p-3 font-bold">
               <div className="text-xs sm:text-sm">Grand Total</div>
               <div className="text-right font-mono">
                 {formatNumber(data.grandTotal.quantity)} BL
               </div>
-              <div className="text-right font-mono">
+              <div className="hidden sm:block text-right font-mono">
                 {formatAmount(data.grandTotal.rate)}
               </div>
-              <div className="text-right font-mono">
+              <div className="hidden sm:block text-right font-mono">
                 {formatAmount(data.grandTotal.value)}
               </div>
             </div>

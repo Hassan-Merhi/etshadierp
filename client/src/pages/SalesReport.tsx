@@ -789,13 +789,13 @@ export default function SalesReport() {
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
                 <TableHead className="text-xs h-9 font-semibold">Date</TableHead>
-                <TableHead className="text-xs h-9 font-semibold text-right">Items</TableHead>
+                <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">Items</TableHead>
                 <TableHead className="text-xs h-9 font-semibold text-right">Qty</TableHead>
                 <TableHead className="text-xs h-9 font-semibold text-right">Total Sales</TableHead>
-                <TableHead className="text-xs h-9 font-semibold text-right">Cost Price</TableHead>
-                <TableHead className="text-xs h-9 font-semibold text-right">Cost Profit</TableHead>
-                <TableHead className="text-xs h-9 font-semibold text-right">Config. Price</TableHead>
-                <TableHead className="text-xs h-9 font-semibold text-right">Config. Profit</TableHead>
+                <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">Cost Price</TableHead>
+                <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">Cost Profit</TableHead>
+                <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">Config. Price</TableHead>
+                <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">Config. Profit</TableHead>
                 <TableHead className="text-xs h-9 w-8"></TableHead>
               </TableRow>
             </TableHeader>
@@ -804,13 +804,13 @@ export default function SalesReport() {
                 [...Array(6)].map((_, i) => (
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
+                    <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-10 ml-auto" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                    <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                    <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                    <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                    <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                     <TableCell></TableCell>
                   </TableRow>
                 ))
@@ -843,15 +843,15 @@ export default function SalesReport() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="py-3 text-right font-mono text-sm">{formatNumber(group.itemCount, 0)}</TableCell>
+                      <TableCell className="py-3 text-right font-mono text-sm hidden sm:table-cell">{formatNumber(group.itemCount, 0)}</TableCell>
                       <TableCell className="py-3 text-right font-mono text-sm">{formatNumber(group.totalQty, 0)}</TableCell>
                       <TableCell className="py-3 text-right font-mono text-sm">{formatAmount(group.totalSales)}</TableCell>
-                      <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground">{formatAmount(group.totalCost)}</TableCell>
-                      <TableCell className={`py-3 text-right font-mono text-sm font-semibold ${group.costProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                      <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground hidden sm:table-cell">{formatAmount(group.totalCost)}</TableCell>
+                      <TableCell className={`py-3 text-right font-mono text-sm font-semibold hidden sm:table-cell ${group.costProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                         {group.costProfit < 0 ? "-" : ""}{formatAmount(Math.abs(group.costProfit))}
                       </TableCell>
-                      <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground">{formatAmount(group.totalConfiguredCost)}</TableCell>
-                      <TableCell className={`py-3 text-right font-mono text-sm font-semibold ${group.configuredProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                      <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground hidden sm:table-cell">{formatAmount(group.totalConfiguredCost)}</TableCell>
+                      <TableCell className={`py-3 text-right font-mono text-sm font-semibold hidden sm:table-cell ${group.configuredProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                         {group.configuredProfit < 0 ? "-" : ""}{formatAmount(Math.abs(group.configuredProfit))}
                       </TableCell>
                       <TableCell className="py-3">
@@ -862,15 +862,15 @@ export default function SalesReport() {
                   {/* Totals Row */}
                   <TableRow className="bg-muted/40 hover:bg-muted/40 font-semibold">
                     <TableCell className="py-3 text-xs uppercase tracking-wide text-muted-foreground">Total</TableCell>
-                    <TableCell className="py-3 text-right font-mono text-sm">{formatNumber(salesData.length, 0)}</TableCell>
+                    <TableCell className="py-3 text-right font-mono text-sm hidden sm:table-cell">{formatNumber(salesData.length, 0)}</TableCell>
                     <TableCell className="py-3 text-right font-mono text-sm">{formatNumber(totals.totalQty, 0)}</TableCell>
                     <TableCell className="py-3 text-right font-mono text-sm">{formatAmount(totals.totalSales)}</TableCell>
-                    <TableCell className="py-3 text-right font-mono text-sm">{formatAmount(totals.totalCost)}</TableCell>
-                    <TableCell className={`py-3 text-right font-mono text-sm ${totals.costProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                    <TableCell className="py-3 text-right font-mono text-sm hidden sm:table-cell">{formatAmount(totals.totalCost)}</TableCell>
+                    <TableCell className={`py-3 text-right font-mono text-sm hidden sm:table-cell ${totals.costProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                       {totals.costProfit < 0 ? "-" : ""}{formatAmount(Math.abs(totals.costProfit))}
                     </TableCell>
-                    <TableCell className="py-3 text-right font-mono text-sm">{formatAmount(totals.totalConfiguredCost)}</TableCell>
-                    <TableCell className={`py-3 text-right font-mono text-sm ${totals.configuredProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                    <TableCell className="py-3 text-right font-mono text-sm hidden sm:table-cell">{formatAmount(totals.totalConfiguredCost)}</TableCell>
+                    <TableCell className={`py-3 text-right font-mono text-sm hidden sm:table-cell ${totals.configuredProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                       {totals.configuredProfit < 0 ? "-" : ""}{formatAmount(Math.abs(totals.configuredProfit))}
                     </TableCell>
                     <TableCell></TableCell>
