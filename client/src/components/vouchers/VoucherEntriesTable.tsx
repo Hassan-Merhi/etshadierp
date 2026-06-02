@@ -87,9 +87,12 @@ export function VoucherEntriesTable({
     if (mobileEditOpen && mobileEditIndex !== null) {
       const current = form.getValues(`entries.${mobileEditIndex}.amount`) || "";
       setMobileAmountStr(current);
-      setMobileSearch("");
-      setSidebarSearchValue("");
+      // Call onRowFocus first to set activeRowIndex (needed for account selection routing),
+      // then immediately clear sidebarSearchValue so the list shows all accounts (not pre-filtered
+      // by the existing account name). React 18 batches both — last write wins.
       onRowFocus(mobileEditIndex, "account");
+      setSidebarSearchValue("");
+      setMobileSearch("");
       setTimeout(() => mobileSearchInputRef.current?.focus(), 150);
     }
     if (!mobileEditOpen) {
@@ -123,14 +126,15 @@ export function VoucherEntriesTable({
   const handleMobileDone = () => {
     if (mobileEditIndex !== null) {
       const numVal = parseFloat(mobileAmountStr);
-      if (!isNaN(numVal) && numVal > 0) {
-        const finalAmount =
-          selectedCurrency !== "USD"
-            ? convertToUSD(numVal).toFixed(2)
-            : numVal.toFixed(2);
-        form.setValue(`entries.${mobileEditIndex}.amount`, finalAmount);
-        if (onAmountCommit) onAmountCommit(mobileEditIndex);
-      }
+      const isPositive = !isNaN(numVal) && numVal > 0;
+      // Always write back — even blank/0 — so clearing an amount actually clears the form field.
+      const finalAmount = isPositive
+        ? selectedCurrency !== "USD"
+          ? convertToUSD(numVal).toFixed(2)
+          : numVal.toFixed(2)
+        : "";
+      form.setValue(`entries.${mobileEditIndex}.amount`, finalAmount);
+      if (isPositive && onAmountCommit) onAmountCommit(mobileEditIndex);
     }
     setMobileEditOpen(false);
   };
