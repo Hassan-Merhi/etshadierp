@@ -6,7 +6,7 @@
  */
 
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useLocation } from "wouter";
+import { Redirect } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
@@ -1482,7 +1482,6 @@ function MultiFilterSelect({
 
 export default function GITContainers({ embedded = false }: { embedded?: boolean } = {}) {
   const { data: user, isLoading: userLoading } = useQuery<AuthUser>({ queryKey: ["/api/auth/me"] });
-  const [, navigate] = useLocation();
 
   const [allCompanies, setAllCompanies] = useState(false);
   const [companyFilter, setCompanyFilter] = useState("ALL");
@@ -1785,8 +1784,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     </div>
   );
   if (!isAllowed) {
-    navigate("/");
-    return null;
+    return <Redirect to="/" />;
   }
 
   // ── Loading ──
