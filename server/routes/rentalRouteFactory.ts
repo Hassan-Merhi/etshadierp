@@ -31,7 +31,7 @@ async function findOrCreateLedgerAccount(
   tx: any,
   companyId: number,
   name: string,
-  accountType: "Income" | "Liability" | "Indirect Expense" | "Indirect Income",
+  accountType: "Income" | "Liability" | "Indirect Expense" | "Indirect Income" | "Intercompany" | "Asset",
   codePrefix: string,
   subType?: string,
 ): Promise<number> {
@@ -1888,6 +1888,75 @@ export function registerRentalRoutes(
               { voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: data.amount, creditAmount: "0", narration },
               { voucherId: v.id, ledgerAccountId: incomeAccountId, debitAmount: "0", creditAmount: data.amount, narration },
             ]);
+
+            // ── Intercompany mirror voucher for the source (Properties) company ──
+            // When HADI L'SHI collects rent on a shared unit, Hassan Properties also
+            // books the income with a matching intercompany payable:
+            //
+            //   Hassan Properties journal:
+            //     Dr  HADI L'SHI — Intercompany  (Properties owes HADI the cash it collected)
+            //     Cr  Rental Income - Properties
+            //
+            //   HADI L'SHI journal (separate, so HADI's receipt stays balanced):
+            //     Dr  Hassan Properties — Intercompany  (HADI is owed by Properties)
+            //     Cr  Rental Income - ERP  (reclass: the income belongs to Properties, not HADI)
+            //
+            // The two intercompany accounts net to zero across both companies.
+            if (isSharedPayment) {
+              const sourceCompanyId = contract.companyId; // Hassan Properties (13)
+
+              // ── HADI L'SHI intercompany account (Asset — Properties owes HADI) ──
+              const hadiIntercoId = await findOrCreateLedgerAccount(
+                tx, companyId,
+                "Hassan Properties — Intercompany",
+                "Intercompany",
+                "PROP-IC",
+                "hadi_prop_intercompany",
+              );
+              // ── Hassan Properties intercompany account (Liability — owes HADI) ──
+              const propIntercoId = await findOrCreateLedgerAccount(
+                tx, sourceCompanyId,
+                "HADI L'SHI — Intercompany",
+                "Intercompany",
+                "HADI-IC",
+                "prop_hadi_intercompany",
+              );
+              // ── Hassan Properties rental income account ──
+              const propIncomeId = await findOrCreateLedgerAccount(
+                tx, sourceCompanyId,
+                "Rental Income - Properties",
+                "Income",
+                "RENT-INC",
+                "Indirect Income",
+              );
+
+              const icNarration = `Rent collected by HADI L'SHI - ${unitLabel} - ${monthSpan}`;
+
+              // HADI reclass journal: Dr Rental Income (reverse HADI's own income) / Cr Interco (HADI is owed by Properties)
+              // This leaves HADI with: Dr Cash / Cr Interco Receivable — a clean collection on behalf of Properties.
+              const [hadiIcV] = await tx.insert(vouchers).values({
+                companyId,
+                voucherNumber: `RENT-IC-H-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`,
+                voucherType: "Journal", voucherDate: data.paymentDate as any,
+                description: icNarration, totalAmount: data.amount, currency: voucherCurrency, sourceModule: "ERP",
+              }).returning();
+              await tx.insert(voucherEntries).values([
+                { voucherId: hadiIcV.id, ledgerAccountId: incomeAccountId, debitAmount: data.amount, creditAmount: "0", narration: icNarration },
+                { voucherId: hadiIcV.id, ledgerAccountId: hadiIntercoId,   debitAmount: "0", creditAmount: data.amount, narration: icNarration },
+              ]);
+
+              // Hassan Properties income journal: Dr Interco (liability) / Cr Rental Income
+              const [propV] = await tx.insert(vouchers).values({
+                companyId: sourceCompanyId,
+                voucherNumber: `RENT-IC-P-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`,
+                voucherType: "Journal", voucherDate: data.paymentDate as any,
+                description: icNarration, totalAmount: data.amount, currency: voucherCurrency, sourceModule: "PROPERTIES",
+              }).returning();
+              await tx.insert(voucherEntries).values([
+                { voucherId: propV.id, ledgerAccountId: propIntercoId, debitAmount: data.amount, creditAmount: "0", narration: icNarration },
+                { voucherId: propV.id, ledgerAccountId: propIncomeId,  debitAmount: "0", creditAmount: data.amount, narration: icNarration },
+              ]);
+            }
           }
         }
 
