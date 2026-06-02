@@ -43,10 +43,12 @@ import {
   FileDown,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   ArrowUpCircle,
   ArrowDownCircle,
   AlertCircle,
   BookOpen,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AccountAutocomplete } from "@/components/AccountAutocomplete";
@@ -141,8 +143,12 @@ export function PaymentReceiptTab({
     return typeof existingNotes === "string" && existingNotes.trim().length > 0;
   });
 
-  // Mobile account drawer
+  // Mobile account drawer (entry rows → AccountSidebar)
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  // Mobile Pay From sheet
+  const [payFromSheetOpen, setPayFromSheetOpen] = useState(false);
+  const [payFromSearch, setPayFromSearch] = useState("");
 
   // Track whether the Pay From / Receive Into autocomplete is the active target
   const [payFromActive, setPayFromActive] = useState(false);
@@ -427,35 +433,41 @@ export function PaymentReceiptTab({
                     <FormItem className="min-w-0">
                       <FormLabel>{accountLabel}</FormLabel>
                       <FormControl>
-                        {/* onFocus on the wrapper detects when the pay-from autocomplete is active */}
-                        <div
-                          className="w-full min-w-0"
-                          onFocus={() => {
-                            setPayFromActive(true);
-                            onAccountPickerOpen?.();
-                          }}
-                        >
-                          <AccountAutocomplete
-                            value={
-                              paymentAccountId > 0
-                                ? {
-                                    type: paymentAccountType,
-                                    id: paymentAccountId,
-                                    name: paymentAccountName,
-                                  }
-                                : null
-                            }
-                            onChange={(type, id, name) => {
-                              form.setValue("paymentAccountType", type);
-                              form.setValue("paymentAccountId", id);
-                              form.setValue("paymentAccountName", name);
-                            }}
-                            allAccounts={allAccounts}
-                            rowIndex={-1}
-                            placeholder={accountPlaceholder}
-                            testId={accountTestId}
-                            onSearchChange={onAccountSearchChange}
-                          />
+                        <div className="w-full min-w-0">
+                          {/* Mobile: tappable card → opens Pay From sheet */}
+                          <div
+                            className="sm:hidden w-full rounded-md border bg-card px-3 py-2.5 flex items-center justify-between gap-2 cursor-pointer hover-elevate active-elevate-2 min-h-9"
+                            onClick={() => { setPayFromSearch(""); setPayFromSheetOpen(true); }}
+                            data-testid={`${accountTestId}-mobile-card`}
+                          >
+                            <span className={cn("text-sm truncate", paymentAccountId > 0 ? "font-medium" : "text-muted-foreground")}>
+                              {paymentAccountId > 0 ? paymentAccountName : accountPlaceholder}
+                            </span>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                          </div>
+                          {/* Desktop: AccountAutocomplete */}
+                          <div
+                            className="hidden sm:block w-full min-w-0"
+                            onFocus={() => { setPayFromActive(true); onAccountPickerOpen?.(); }}
+                          >
+                            <AccountAutocomplete
+                              value={
+                                paymentAccountId > 0
+                                  ? { type: paymentAccountType, id: paymentAccountId, name: paymentAccountName }
+                                  : null
+                              }
+                              onChange={(type, id, name) => {
+                                form.setValue("paymentAccountType", type);
+                                form.setValue("paymentAccountId", id);
+                                form.setValue("paymentAccountName", name);
+                              }}
+                              allAccounts={allAccounts}
+                              rowIndex={-1}
+                              placeholder={accountPlaceholder}
+                              testId={accountTestId}
+                              onSearchChange={onAccountSearchChange}
+                            />
+                          </div>
                         </div>
                       </FormControl>
 
@@ -706,7 +718,7 @@ export function PaymentReceiptTab({
         <AccountSidebar {...sidebarProps} />
       </div>
 
-      {/* ── Mobile Account Drawer (Sheet) ── */}
+      {/* ── Mobile Account Drawer (Sheet) — entry rows ── */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent
           side="right"
@@ -722,6 +734,78 @@ export function PaymentReceiptTab({
           </SheetHeader>
           <div className="flex-1 overflow-hidden">
             <AccountSidebar {...sidebarProps} />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* ── Mobile Pay From / Receive Into Sheet ── */}
+      <Sheet open={payFromSheetOpen} onOpenChange={(isOpen) => { setPayFromSheetOpen(isOpen); if (!isOpen) setPayFromSearch(""); }}>
+        <SheetContent side="bottom" className="flex flex-col p-0" style={{ height: "auto", maxHeight: "88vh" }}>
+          <SheetHeader className="px-4 pt-4 pb-3 border-b shrink-0">
+            <SheetTitle className="text-base">{accountLabel}</SheetTitle>
+            <div className="relative mt-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                autoFocus
+                placeholder={`Search ${accountLabel.toLowerCase()}...`}
+                value={payFromSearch}
+                onChange={(e) => setPayFromSearch(e.target.value)}
+                className="pl-9"
+                data-testid="input-pay-from-mobile-search"
+              />
+            </div>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {(() => {
+              const search = payFromSearch.toLowerCase().replace(/[\s.-]/g, "");
+              const filtered = sidebarAccounts.filter((a) => {
+                if (!payFromSearch) return true;
+                return a.name.toLowerCase().replace(/[\s.-]/g, "").includes(search);
+              });
+              if (filtered.length === 0) {
+                return (
+                  <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                    {payFromSearch ? "No accounts match your search" : "No accounts available"}
+                  </div>
+                );
+              }
+              return filtered.slice(0, 40).map((account) => {
+                const isSelected =
+                  account.id === paymentAccountId && account.type === paymentAccountType;
+                const bal = typeof account.balance === "string"
+                  ? parseFloat(account.balance)
+                  : (account.balance ?? null);
+                return (
+                  <button
+                    key={`${account.type}-${account.id}`}
+                    type="button"
+                    className={cn(
+                      "w-full text-left px-4 py-3 border-b border-muted/40 flex items-center justify-between gap-3 active-elevate-2",
+                      isSelected && "bg-accent"
+                    )}
+                    onClick={() => {
+                      form.setValue("paymentAccountType", account.type);
+                      form.setValue("paymentAccountId", account.id);
+                      form.setValue("paymentAccountName", account.name);
+                      setPayFromSheetOpen(false);
+                    }}
+                    data-testid={`pay-from-mobile-option-${account.id}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{account.name}</div>
+                      {bal != null && (
+                        <div className="text-xs text-muted-foreground font-mono mt-0.5">
+                          {formatAmount(bal)}
+                        </div>
+                      )}
+                    </div>
+                    {isSelected && (
+                      <div className="h-2 w-2 rounded-full bg-primary shrink-0" />
+                    )}
+                  </button>
+                );
+              });
+            })()}
           </div>
         </SheetContent>
       </Sheet>
