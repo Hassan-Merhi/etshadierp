@@ -3784,14 +3784,14 @@ let migrationsDone = false;
     `ALTER TABLE label_design_colors ADD COLUMN IF NOT EXISTS image_data text`,
     `ALTER TABLE label_design_colors ADD COLUMN IF NOT EXISTS image_updated_at timestamp`,
     `CREATE TABLE IF NOT EXISTS passkey_credentials (
-      id          SERIAL PRIMARY KEY,
-      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      id            SERIAL PRIMARY KEY,
+      user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       credential_id TEXT NOT NULL UNIQUE,
-      public_key  TEXT NOT NULL,
-      counter     BIGINT NOT NULL DEFAULT 0,
-      device_name TEXT,
-      transports  TEXT NOT NULL DEFAULT '[]',
-      created_at  TIMESTAMP NOT NULL DEFAULT NOW()
+      public_key    TEXT NOT NULL,
+      counter       BIGINT NOT NULL DEFAULT 0,
+      device_name   TEXT,
+      transports    TEXT NOT NULL DEFAULT '[]',
+      created_at    TIMESTAMP NOT NULL DEFAULT NOW()
     )`,
     `CREATE INDEX IF NOT EXISTS passkey_credentials_user_id_idx ON passkey_credentials(user_id)`,
     ];
