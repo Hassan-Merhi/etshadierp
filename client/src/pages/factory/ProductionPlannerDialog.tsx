@@ -253,7 +253,7 @@ export default function ProductionPlannerDialog() {
               <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading plan…
             </div>
           ) : (
-            <div className="border rounded-md overflow-hidden">
+            <div className="border rounded-md overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-muted/50 border-b">
                   <tr>

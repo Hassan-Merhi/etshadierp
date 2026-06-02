@@ -137,7 +137,7 @@ function AccountBreakdown({
         </div>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="ml-6 mb-2 border rounded-md overflow-hidden">
+        <div className="ml-6 mb-2 border rounded-md overflow-x-auto">
           {active.length === 0 ? (
             <p className="text-xs text-muted-foreground italic p-3">No transactions in this period.</p>
           ) : (

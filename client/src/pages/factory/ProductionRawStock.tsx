@@ -258,6 +258,7 @@ function AdjustmentsHistoryCard({ onDeleteRequest }: {
             <Skeleton className="h-10 w-full" />
           </div>
         ) : adjustments && adjustments.length > 0 ? (
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -308,6 +309,7 @@ function AdjustmentsHistoryCard({ onDeleteRequest }: {
               ))}
             </TableBody>
           </Table>
+          </div>
         ) : (
           <p className="text-center text-muted-foreground py-6 text-sm">No manual adjustments recorded yet.</p>
         )}
@@ -1596,6 +1598,7 @@ export default function ProductionRawStock() {
               <Skeleton className="h-12 w-full" />
             </div>
           ) : rawStock && rawStock.length > 0 ? (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
@@ -1891,6 +1894,7 @@ export default function ProductionRawStock() {
                 })()}
               </TableBody>
             </Table>
+            </div>
           ) : (
             <div className="text-center py-12">
               <Container className="mx-auto h-12 w-12 text-muted-foreground" />

@@ -555,7 +555,7 @@ function AdvancesView() {
       </div>
 
       {/* Table */}
-      <div className="border rounded-xl overflow-hidden">
+      <div className="border rounded-xl overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -745,7 +745,7 @@ function AdvancesView() {
                   </Button>
                 </div>
               </div>
-              <div className="border rounded-md overflow-hidden">
+              <div className="border rounded-md overflow-x-auto">
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
@@ -1855,6 +1855,7 @@ function RepaymentsView() {
 
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
@@ -1897,6 +1898,7 @@ function RepaymentsView() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

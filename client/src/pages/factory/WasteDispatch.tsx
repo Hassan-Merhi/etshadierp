@@ -418,6 +418,7 @@ export default function WasteDispatch() {
                 <p className="text-xs mt-1">Only bales with Garbage or Wiper category are eligible.</p>
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40">
@@ -541,6 +542,7 @@ export default function WasteDispatch() {
                   </TableRow>
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>

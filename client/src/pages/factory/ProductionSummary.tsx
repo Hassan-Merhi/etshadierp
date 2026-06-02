@@ -281,6 +281,7 @@ export default function ProductionSummary() {
         </CardHeader>
         <CardContent>
           {activeBatches.length > 0 ? (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
@@ -324,6 +325,7 @@ export default function ProductionSummary() {
                 })}
               </TableBody>
             </Table>
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-6" data-testid="text-no-active-batches">
               No active batches
@@ -341,6 +343,7 @@ export default function ProductionSummary() {
         </CardHeader>
         <CardContent>
           {allRawStock.length > 0 ? (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
@@ -378,6 +381,7 @@ export default function ProductionSummary() {
                 })}
               </TableBody>
             </Table>
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-6" data-testid="text-no-raw-stock">
               No raw stock entries

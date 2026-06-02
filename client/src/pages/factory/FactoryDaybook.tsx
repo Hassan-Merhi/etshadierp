@@ -474,7 +474,7 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
             {viewEntries.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">No entries found</p>
             ) : (
-              <div className="rounded-md border overflow-hidden">
+              <div className="rounded-md border overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/40">
@@ -596,7 +596,7 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
 
           {/* Cost breakdown table */}
           {c && (
-            <div className="rounded-md border overflow-hidden">
+            <div className="rounded-md border overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-muted/40 border-b">
@@ -703,7 +703,7 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
               </div>
 
               {/* Account flow: From → To */}
-              <div className="rounded-md border overflow-hidden">
+              <div className="rounded-md border overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-muted/40 border-b">
@@ -724,7 +724,7 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
               </div>
 
               {/* Earnings breakdown */}
-              <div className="rounded-md border overflow-hidden">
+              <div className="rounded-md border overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-muted/40 border-b">
@@ -910,7 +910,7 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
             {mixBatchSources.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4 rounded-md border">No source records found</p>
             ) : (
-              <div className="rounded-md border overflow-hidden">
+              <div className="rounded-md border overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-muted/40 border-b">
@@ -1111,7 +1111,7 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
 
               {/* Financial summary */}
               {(grandTotal > 0 || freightAmount > 0) && (
-                <div className="rounded-md border overflow-hidden">
+                <div className="rounded-md border overflow-x-auto">
                   <table className="w-full text-sm">
                     <tbody>
                       {subtotalBales > 0 && (
@@ -2228,7 +2228,7 @@ export default function FactoryDaybook() {
               </div>
 
               {/* Desktop table */}
-              <div className="hidden md:block w-full">
+              <div className="hidden md:block w-full overflow-x-auto">
                 <Table className="w-full table-fixed" wrapperClassName="overflow-visible">
                   <colgroup>
                     <col className="w-[12%]" />

@@ -391,7 +391,7 @@ export default function DailyScan() {
                   Unverified — {unscanned.length} bale{unscanned.length !== 1 ? "s" : ""} remaining
                 </span>
               </div>
-              <div className="rounded-md border">
+              <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -455,7 +455,7 @@ export default function DailyScan() {
               </button>
 
               {showScanned && (
-                <div className="rounded-md border opacity-80">
+                <div className="rounded-md border opacity-80 overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>

@@ -705,7 +705,7 @@ export default function GroundScan() {
           <p className="text-sm">Scan a bale to add it to the list</p>
         </div>
       ) : (
-        <div className="rounded-md border overflow-hidden">
+        <div className="rounded-md border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>

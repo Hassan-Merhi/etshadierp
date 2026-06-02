@@ -291,6 +291,7 @@ export default function FactoryUsers() {
         </CardHeader>
         <CardContent>
           {factoryUsers && factoryUsers.length > 0 ? (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
@@ -400,6 +401,7 @@ export default function FactoryUsers() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />

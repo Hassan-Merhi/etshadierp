@@ -217,6 +217,7 @@ export default function FactoryEmployeePayrollTab() {
                 </button>
                 {isExpanded && (
                   <CardContent className="p-0 pb-2">
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
@@ -239,6 +240,7 @@ export default function FactoryEmployeePayrollTab() {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   </CardContent>
                 )}
               </Card>

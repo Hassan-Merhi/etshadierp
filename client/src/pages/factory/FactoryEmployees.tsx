@@ -286,7 +286,7 @@ export default function FactoryEmployees() {
       </div>
 
       {/* Table */}
-      <div className="border rounded-xl overflow-hidden">
+      <div className="border rounded-xl overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
