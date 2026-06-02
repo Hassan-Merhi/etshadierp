@@ -150,7 +150,7 @@ export default function FactoryLocationInventory() {
   const { colors } = useLabelDesignColors();
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [locationSearch, setLocationSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("__all__");
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [productSearch, setProductSearch] = useState("");
   const [prodSortField, setProdSortField] = useState<SortField>("name");
   const [prodSortDir, setProdSortDir] = useState<SortDir>("asc");
@@ -608,7 +608,7 @@ export default function FactoryLocationInventory() {
     return applySortProducts(
       activeInventoryData.filter((p) => {
         const matchesSearch = !q || p.productName.toLowerCase().includes(q) || p.articleCode.toLowerCase().includes(q);
-        const matchesCat = categoryFilter === "__all__" || p.category === categoryFilter;
+        const matchesCat = categoryFilter.length === 0 || categoryFilter.includes(p.category ?? "Uncategorized");
         const hideZero = proformaMode ? hideZeroAvailable : !showZeroStock;
         if (hideZero && (p.baleCount - (p.loadingCount ?? 0)) <= 0) return false;
         if (proformaMode && showSelectedOnly) return matchesSearch && matchesCat && selections.has(p.productId);
@@ -625,14 +625,14 @@ export default function FactoryLocationInventory() {
   const handleLocationClick = (location: Location) => {
     setSelectedLocation(location);
     setProductSearch("");
-    setCategoryFilter("__all__");
+    setCategoryFilter([]);
   };
 
   const handleBackToLocations = () => {
     setSelectedLocation(null);
     setLocationSearch("");
     setProductSearch("");
-    setCategoryFilter("__all__");
+    setCategoryFilter([]);
     setProformaMode(false);
     setSelections(new Map());
   };
@@ -1588,17 +1588,33 @@ export default function FactoryLocationInventory() {
             />
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Select value={categoryFilter} onValueChange={setCategoryFilter} data-testid="select-category-filter">
-              <SelectTrigger className="w-[160px]" data-testid="select-category-filter-trigger">
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All Categories</SelectItem>
-                {allCategoryNames.map((name) => (
-                  <SelectItem key={name} value={name}>{name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-1.5 flex-wrap" data-testid="category-filter-buttons">
+              <Badge
+                variant={categoryFilter.length === 0 ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => setCategoryFilter([])}
+                data-testid="badge-category-all"
+              >
+                All
+              </Badge>
+              {allCategoryNames.map((name) => (
+                <Badge
+                  key={name}
+                  variant={categoryFilter.includes(name) ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() =>
+                    setCategoryFilter((prev) =>
+                      prev.includes(name)
+                        ? prev.filter((c) => c !== name)
+                        : [...prev, name]
+                    )
+                  }
+                  data-testid={`badge-category-${name}`}
+                >
+                  {name}
+                </Badge>
+              ))}
+            </div>
             <Select value={prodSortField} onValueChange={(v) => setProdSortField(v as SortField)} data-testid="select-sort-field">
               <SelectTrigger className="w-[120px]" data-testid="select-sort-trigger">
                 <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
@@ -1643,7 +1659,7 @@ export default function FactoryLocationInventory() {
           <div className="md:hidden space-y-3">
             {regularProducts.length === 0 && specialProducts.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground" data-testid="text-no-products">
-                No products found{productSearch || categoryFilter !== "__all__" ? " matching your filters" : " at this location"}
+                No products found{productSearch || categoryFilter.length > 0 ? " matching your filters" : " at this location"}
               </div>
             ) : (
               <>
@@ -1721,7 +1737,7 @@ export default function FactoryLocationInventory() {
                   {regularProducts.length === 0 && specialProducts.length === 0 ? (
                     <tr>
                       <td colSpan={colSpan} className="text-center py-8 text-muted-foreground" data-testid="text-no-products-desktop">
-                        No products found{productSearch || categoryFilter !== "__all__" ? " matching your filters" : " at this location"}
+                        No products found{productSearch || categoryFilter.length > 0 ? " matching your filters" : " at this location"}
                       </td>
                     </tr>
                   ) : (
