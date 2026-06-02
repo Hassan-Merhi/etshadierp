@@ -3372,6 +3372,11 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                         {item.stockItemActive === false && <Badge variant="outline" className="text-xs">Inactive</Badge>}
                                       </span>
                                     </button>
+                                    {item.categoryName && (
+                                      <div className="mb-2">
+                                        <Badge variant="secondary" className="text-xs font-normal">{item.categoryName}</Badge>
+                                      </div>
+                                    )}
                                     <div className="grid grid-cols-2 gap-2 text-sm">
                                       <div>
                                         <span className="text-muted-foreground">Qty: </span>
@@ -3417,18 +3422,22 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           <div className="overflow-auto max-h-[calc(100vh-200px)] -mx-4 -mt-4 -mb-4" style={{ width: "calc(100% + 2rem)" }}>
                             <table className="w-full table-fixed text-sm">
                               <colgroup>
-                                <col className="w-[40%]" />
-                                <col className={posUser ? "w-[60%]" : "w-[20%]"} />
+                                <col className="w-[35%]" />
+                                {categoriesList.length > 0 && <col className="w-[15%]" />}
+                                <col className={posUser ? "w-[50%]" : "w-[17%]"} />
                                 {!posUser && (
                                   <>
-                                    <col className="w-[20%]" />
-                                    <col className="w-[20%]" />
+                                    <col className="w-[16.5%]" />
+                                    <col className="w-[16.5%]" />
                                   </>
                                 )}
                               </colgroup>
                               <thead className="bg-muted/50 sticky top-0 z-30">
                                 <tr className="h-10">
                                   <th className="text-left px-3 font-medium">Name</th>
+                                  {categoriesList.length > 0 && (
+                                    <th className="text-left px-3 font-medium">Category</th>
+                                  )}
                                   <th className={`text-right px-3 font-medium ${posUser ? "pr-6" : ""}`}>Quantity</th>
                                   {!posUser && (
                                     <>
@@ -3453,6 +3462,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                           </Badge>
                                         </div>
                                       </td>
+                                      {categoriesList.length > 0 && <td />}
                                       <td className="px-3 py-2 text-right font-mono text-sm text-muted-foreground font-medium">
                                         {Math.floor(items.reduce((s, i) => s + parseFloat(i.quantity || "0"), 0)).toLocaleString()} <span className="text-xs">BL</span>
                                       </td>
@@ -3482,6 +3492,14 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                               </span>
                                             </button>
                                           </td>
+                                          {categoriesList.length > 0 && (
+                                            <td className="px-3 py-2.5">
+                                              {item.categoryName
+                                                ? <Badge variant="secondary" className="text-xs font-normal">{item.categoryName}</Badge>
+                                                : <span className="text-xs text-muted-foreground">—</span>
+                                              }
+                                            </td>
+                                          )}
                                           <td className={`px-3 text-right font-mono font-semibold ${isNegative ? "text-red-600" : ""}`}>
                                             {Math.floor(itemQty).toLocaleString()}<span className="ml-2 text-xs font-normal text-muted-foreground">BL</span>
                                           </td>
@@ -3502,6 +3520,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                 ))}
                                 <tr className="bg-muted/50 border-t-2 font-semibold h-12">
                                   <td className="px-3 font-bold">Grand Total</td>
+                                  {categoriesList.length > 0 && <td />}
                                   <td className="px-3 text-right font-mono font-bold">
                                     {Math.floor(inventory.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()}
                                   </td>
