@@ -127,7 +127,8 @@ export default function Containers() {
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hideContainerCosts = (myErpPages?.hiddenErpCostFields ?? []).includes("container_costs");
   const { data: currentUser } = useQuery<{ role?: string; currentRole?: string | null }>({ queryKey: ["/api/auth/me"] });
-  const isPrivilegedRole = ["Admin", "Owner", "Developer"].includes(currentUser?.currentRole || currentUser?.role || "");
+  const _allowedRoles = ["Admin", "Owner", "Developer"];
+  const isPrivilegedRole = _allowedRoles.includes(currentUser?.currentRole ?? "") || _allowedRoles.includes(currentUser?.role ?? "");
   const isDeveloper = currentUser?.role === "Developer";
   const [syncAllConfirmOpen, setSyncAllConfirmOpen] = useState(false);
 

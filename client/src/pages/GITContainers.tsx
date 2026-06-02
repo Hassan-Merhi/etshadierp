@@ -1512,8 +1512,8 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const printRef     = useRef<HTMLDivElement>(null);
   const queryClient  = useQueryClient();
 
-  const role = user?.currentRole || user?.role;
-  const isAllowed = !!role && ["Admin", "Developer", "Owner"].includes(role);
+  const allowedRoles = ["Admin", "Developer", "Owner"];
+  const isAllowed = allowedRoles.includes(user?.currentRole ?? "") || allowedRoles.includes(user?.role ?? "");
   const isDevMode = import.meta.env.DEV;
 
   const queryUrl = allCompanies
