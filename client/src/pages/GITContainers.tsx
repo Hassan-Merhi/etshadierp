@@ -6,6 +6,7 @@
  */
 
 import { useState, useMemo, useEffect, useRef } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
@@ -51,6 +52,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Ship,
   Truck,
@@ -142,8 +144,9 @@ interface GitContainersResponse {
 
 interface AuthUser {
   id: number;
-  role: string;
   username: string;
+  role?: string;
+  currentRole?: string | null;
   companyId?: number;
 }
 
@@ -1479,6 +1482,7 @@ function MultiFilterSelect({
 
 export default function GITContainers({ embedded = false }: { embedded?: boolean } = {}) {
   const { data: user, isLoading: userLoading } = useQuery<AuthUser>({ queryKey: ["/api/auth/me"] });
+  const [, navigate] = useLocation();
 
   const [allCompanies, setAllCompanies] = useState(false);
   const [companyFilter, setCompanyFilter] = useState("ALL");
@@ -1512,8 +1516,9 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const printRef     = useRef<HTMLDivElement>(null);
   const queryClient  = useQueryClient();
 
-  const allowedRoles = ["Admin", "Developer"];
-  const isAllowed = allowedRoles.includes(user?.currentRole ?? "") || allowedRoles.includes(user?.role ?? "");
+  const allowedRoles = ["Admin", "Developer", "Owner"];
+  const effectiveRole = user?.currentRole ?? user?.role ?? "";
+  const isAllowed = allowedRoles.includes(effectiveRole);
   const isDevMode = import.meta.env.DEV;
 
   const queryUrl = allCompanies
@@ -1769,23 +1774,19 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     }
   }
 
-  // ── Access denied ──
-  if (userLoading) return null;
-  if (user && !isAllowed) {
-    return (
-      <div className="flex flex-col h-full overflow-hidden">
-        {!embedded && <PageHeader title="Containers OTW" subtitle="Active container logistics and tracking" />}
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div className="text-center space-y-2">
-            <AlertTriangle className="h-8 w-8 text-muted-foreground mx-auto" />
-            <p className="text-sm font-medium">Access Restricted</p>
-            <p className="text-xs text-muted-foreground">
-              This page is available to Admin, Developer, and Owner roles only.
-            </p>
-          </div>
-        </div>
+  // ── Auth guard ──
+  if (userLoading) return (
+    <div className="flex-1 flex items-center justify-center p-8">
+      <div className="space-y-3 w-full max-w-sm">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-3/4" />
       </div>
-    );
+    </div>
+  );
+  if (!isAllowed) {
+    navigate("/");
+    return null;
   }
 
   // ── Loading ──

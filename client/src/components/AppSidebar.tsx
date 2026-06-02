@@ -161,11 +161,14 @@ export function useErpVisibleSections(user?: any): {
   const allowedPages = new Set<string>(myErpPages?.pageKeys || []);
 
   const isItemVisible = (item: NavItem): boolean => {
-    const isPOSUser   = user?.role === "POS";
-    const isAdmin     = user?.role === "Admin" || user?.role === "Developer";
-    const isDeveloper = user?.role === "Developer";
-    const isOwner     = user?.role === "Owner";
+    const effectiveRole = user?.currentRole ?? user?.role ?? "";
+    const isPOSUser   = effectiveRole === "POS";
+    const isAdmin     = effectiveRole === "Admin" || effectiveRole === "Developer";
+    const isDeveloper = effectiveRole === "Developer";
+    const isOwner     = effectiveRole === "Owner";
     const featureKey  = ROUTE_TO_FEATURE[item.url];
+
+    if (item.url === "/tracking") return ["Admin", "Developer", "Owner"].includes(effectiveRole);
 
     if (item.url === "/factory/raw-stock" && selectedCompany?.companyType !== "factory" && selectedCompany?.companyType !== "factory_v2") return false;
     if (item.url === "/net-profit-report")       return isDeveloper;
@@ -190,7 +193,7 @@ export function useErpVisibleSections(user?: any): {
     return true;
   };
 
-  const isDeveloper = user?.role === "Developer";
+  const isDeveloper = (user?.currentRole ?? user?.role) === "Developer";
 
   const sections = ERP_NAV_SECTIONS.map(s => ({
     ...s,
@@ -370,7 +373,7 @@ export function AppSidebar({ user }: { user?: any }) {
               </Badge>
             </a>
           )}
-          {!["Admin", "Owner", "Developer"].includes(user?.role) && (
+          {!["Admin", "Owner", "Developer"].includes(user?.currentRole ?? user?.role ?? "") && (
             <SidebarFlatLink href="/my-settings" icon={KeyRound} label="My Settings" testId="link-my-settings" />
           )}
           {isItemVisible({ title: "Settings", url: "/settings", icon: Settings }) && (
