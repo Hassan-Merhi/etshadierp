@@ -13,6 +13,9 @@ import { Preferences } from "@capacitor/preferences";
 import { BiometricAuth, BiometryType } from "@aparajita/capacitor-biometric-auth";
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 
+// LocalStorage key for passkey-registered flag (per username, web only)
+function passkeyStorageKey(username: string) { return `passkey_registered_${username}`; }
+
 const CRED_KEY        = "biometric_creds";
 const OPT_IN_KEY      = "biometric_opted_in"; // "yes" | "no" | (absent = not decided)
 
@@ -106,8 +109,12 @@ export default function Login() {
   const pendingUserData                             = useRef<any>(null);
   const pendingCredentials                          = useRef<{ username: string; password: string } | null>(null);
 
-  // Passkey state
+  // Passkey state (web)
   const [passKeyPending, setPassKeyPending]         = useState(false);
+  const [showPasskeyRegister, setShowPasskeyRegister] = useState(false); // post-login "save passkey?" dialog
+  const [passkeyRegPending, setPasskeyRegPending]   = useState(false);
+  const [hasSavedPasskey, setHasSavedPasskey]       = useState(false); // for typed username
+  const pendingPasskeyUser                          = useRef<string>("");
 
   const isNative = Capacitor.isNativePlatform();
 
@@ -117,6 +124,12 @@ export default function Login() {
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
   }, []);
+
+  // Check if typed username already has a passkey registered on this device
+  useEffect(() => {
+    if (isNative || !username) { setHasSavedPasskey(false); return; }
+    setHasSavedPasskey(!!localStorage.getItem(passkeyStorageKey(username.trim())));
+  }, [username, isNative]);
 
   // On mount: check biometrics availability + auto-trigger if opted in
   useEffect(() => {
@@ -148,6 +161,9 @@ export default function Login() {
 
   const [, navigate] = useLocation();
 
+  // Passkey supported on this browser/device (must be declared before loginMutation)
+  const passkeySupported = !isNative && typeof window !== "undefined" && !!(window as any).PublicKeyCredential;
+
   // ── Finalize login after biometric prompt decision ───────────────────────
   const finalizeLogin = () => {
     if (!pendingUserData.current) return;
@@ -165,24 +181,36 @@ export default function Login() {
     },
     onSuccess: async (userData, credentials) => {
       if (isNative && biometryAvailable) {
+        // ── Native: biometric opt-in flow ──
         const { value: optIn } = await Preferences.get({ key: OPT_IN_KEY });
         if (optIn === "yes") {
-          // Already opted in — save creds silently and proceed
           await saveBiometricCredentials(credentials.username, credentials.password);
           setHasSavedCreds(true);
           queryClient.setQueryData(["/api/auth/me"], userData);
           resetCsrfToken();
           navigate("/");
         } else if (optIn === "no") {
-          // User said no — just log in
           queryClient.setQueryData(["/api/auth/me"], userData);
           resetCsrfToken();
           navigate("/");
         } else {
-          // First time — stash data and show prompt
           pendingUserData.current = userData;
           pendingCredentials.current = credentials;
           setShowBioPrompt(true);
+        }
+      } else if (!isNative && passkeySupported) {
+        // ── Web: passkey registration prompt (every time until saved) ──
+        const alreadySaved = !!localStorage.getItem(passkeyStorageKey(credentials.username));
+        if (alreadySaved) {
+          // Silently proceed — passkey already set up
+          queryClient.setQueryData(["/api/auth/me"], userData);
+          resetCsrfToken();
+          navigate("/");
+        } else {
+          // Stash user data and show "save a passkey?" dialog
+          pendingUserData.current = userData;
+          pendingPasskeyUser.current = credentials.username;
+          setShowPasskeyRegister(true);
         }
       } else {
         queryClient.setQueryData(["/api/auth/me"], userData);
@@ -246,6 +274,44 @@ export default function Login() {
     }
   };
 
+  // ── Passkey registration (post-login prompt) ─────────────────────────────
+  const handleRegisterPasskey = async () => {
+    setPasskeyRegPending(true);
+    try {
+      const optionsRes = await apiRequest("POST", "/api/auth/passkey/register/options", {});
+      const options = await optionsRes.json();
+      const regResponse = await startRegistration({ optionsJSON: options });
+      const verifyRes = await apiRequest("POST", "/api/auth/passkey/register/verify", { ...regResponse, deviceName: navigator.platform || "Browser" });
+      if (!verifyRes.ok) throw new Error("Passkey registration failed");
+      // Mark as registered for this username on this device
+      localStorage.setItem(passkeyStorageKey(pendingPasskeyUser.current), "1");
+      setHasSavedPasskey(true);
+    } catch (err: any) {
+      if (err?.name === "NotAllowedError") {
+        // User cancelled the browser dialog — treat as "not now"
+      } else {
+        toast({ title: "Passkey setup failed", description: err.message || "Could not save passkey", variant: "destructive" });
+      }
+    } finally {
+      setPasskeyRegPending(false);
+      setShowPasskeyRegister(false);
+      // Proceed to app regardless
+      queryClient.setQueryData(["/api/auth/me"], pendingUserData.current);
+      resetCsrfToken();
+      pendingUserData.current = null;
+      navigate("/");
+    }
+  };
+
+  const handleSkipPasskey = () => {
+    setShowPasskeyRegister(false);
+    // No flag stored → will ask again next login
+    queryClient.setQueryData(["/api/auth/me"], pendingUserData.current);
+    resetCsrfToken();
+    pendingUserData.current = null;
+    navigate("/");
+  };
+
   // ── Passkey sign-in ──────────────────────────────────────────────────────
   const handlePasskeyLogin = async () => {
     setPassKeyPending(true);
@@ -283,8 +349,6 @@ export default function Login() {
   const BiometricIcon = (biometryType === BiometryType.faceId || biometryType === BiometryType.faceAuthentication)
     ? ScanFace
     : Fingerprint;
-
-  const passkeySupported = !isNative && typeof window !== "undefined" && !!(window as any).PublicKeyCredential;
 
   return (
     <div className="flex flex-col lg:flex-row min-h-full lg:h-full lg:overflow-hidden">
@@ -451,21 +515,6 @@ export default function Login() {
                 </button>
               )}
 
-              {/* ── Passkey sign-in (web only) ── */}
-              {passkeySupported && (
-                <button
-                  type="button"
-                  onClick={handlePasskeyLogin}
-                  disabled={passKeyPending || loginMutation.isPending}
-                  data-testid="button-passkey-login"
-                  className="w-full h-11 rounded-xl font-semibold text-sm flex items-center justify-center gap-2.5 disabled:opacity-60 transition-opacity"
-                  style={{ background: "rgba(201,168,76,0.08)", border: `1px solid rgba(201,168,76,0.24)`, color: GOLD_LIGHT }}
-                >
-                  <KeyRound className="h-5 w-5" />
-                  {passKeyPending ? "Verifying…" : "Sign in with Passkey"}
-                </button>
-              )}
-
               <form onSubmit={handleLogin} className="space-y-4" noValidate>
                 <div className="space-y-1.5">
                   <Label htmlFor="username" style={{ color: ft.labelColor }}>Username</Label>
@@ -519,6 +568,21 @@ export default function Login() {
                 >
                   {loginMutation.isPending ? "Signing in…" : "Sign In"}
                 </button>
+
+                {/* Small passkey quick-sign-in (only shown when passkey already saved for this username) */}
+                {hasSavedPasskey && passkeySupported && (
+                  <button
+                    type="button"
+                    onClick={handlePasskeyLogin}
+                    disabled={passKeyPending || loginMutation.isPending}
+                    data-testid="button-passkey-login"
+                    className="w-full flex items-center justify-center gap-2 text-xs font-medium py-1.5 rounded-lg disabled:opacity-50 transition-opacity"
+                    style={{ color: GOLD, background: "rgba(201,168,76,0.08)", border: `1px solid rgba(201,168,76,0.18)` }}
+                  >
+                    <KeyRound className="h-3.5 w-3.5" />
+                    {passKeyPending ? "Verifying…" : "Sign in with saved passkey"}
+                  </button>
+                )}
               </form>
             </div>
 
@@ -529,6 +593,70 @@ export default function Login() {
           </div>
         </div>
       </div>
+
+      {/* ══════════════════════════════════════════
+          PASSKEY REGISTER PROMPT (web only)
+      ══════════════════════════════════════════ */}
+      {showPasskeyRegister && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-4 pb-6 sm:pb-0"
+          style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)" }}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl p-6 space-y-5 relative"
+            style={{
+              background: "rgba(14,14,22,0.97)",
+              border: `1px solid rgba(201,168,76,0.28)`,
+              boxShadow: "0 24px 64px rgba(0,0,0,0.70)",
+            }}
+          >
+            <button
+              className="absolute top-4 right-4 text-muted-foreground opacity-60 hover:opacity-100 transition-opacity"
+              onClick={handleSkipPasskey}
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="flex flex-col items-center text-center gap-3 pt-1">
+              <div
+                className="flex h-14 w-14 items-center justify-center rounded-full"
+                style={{ background: "rgba(201,168,76,0.12)", border: `1px solid rgba(201,168,76,0.28)` }}
+              >
+                <KeyRound className="h-7 w-7" style={{ color: GOLD_LIGHT }} />
+              </div>
+              <div>
+                <p className="font-bold text-base" style={{ color: "#f0e6c8" }}>
+                  Save a Passkey?
+                </p>
+                <p className="text-xs mt-1" style={{ color: "rgba(201,168,76,0.50)" }}>
+                  Sign in instantly next time using Face ID, Touch ID, or your device passkey — no password needed.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleRegisterPasskey}
+                disabled={passkeyRegPending}
+                data-testid="button-save-passkey"
+                className="w-full h-11 rounded-xl font-bold text-sm text-black disabled:opacity-60"
+                style={{ background: `linear-gradient(135deg, ${GOLD_DARK} 0%, ${GOLD_LIGHT} 50%, ${GOLD_DARK} 100%)` }}
+              >
+                {passkeyRegPending ? "Setting up…" : "Save Passkey"}
+              </button>
+              <button
+                onClick={handleSkipPasskey}
+                data-testid="button-skip-passkey"
+                className="w-full h-10 rounded-xl font-semibold text-xs"
+                style={{ color: "rgba(201,168,76,0.45)", background: "transparent" }}
+              >
+                Not now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════
           BIOMETRIC OPT-IN PROMPT (native only)
