@@ -2150,6 +2150,8 @@ export class DbStorage implements IStorage {
         stockGroupCode: sql<string>`COALESCE(${schema.stockGroups.code}, '')`,
         lastSellingPrice: sql<string>`COALESCE(${schema.stockItemLocationPrices.sellingPrice}, ${schema.stockItems.sellingPrice})`.as('configured_price'),
         stockItemActive: schema.stockItems.active,
+        categoryId: schema.stockItems.categoryId,
+        categoryName: schema.stockCategories.name,
       })
       .from(schema.inventory)
       .leftJoin(
@@ -2157,6 +2159,7 @@ export class DbStorage implements IStorage {
         eq(schema.inventory.stockItemId, schema.stockItems.id)
       )
       .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
+      .leftJoin(schema.stockCategories, eq(schema.stockItems.categoryId, schema.stockCategories.id))
       .leftJoin(
         schema.stockItemLocationPrices,
         and(
@@ -2192,10 +2195,13 @@ export class DbStorage implements IStorage {
         stockGroupId: schema.stockItems.stockGroupId,
         stockGroupName: sql<string>`COALESCE(${schema.stockGroups.name}, '')`,
         stockGroupCode: sql<string>`COALESCE(${schema.stockGroups.code}, '')`,
+        categoryId: schema.stockItems.categoryId,
+        categoryName: schema.stockCategories.name,
       })
       .from(schema.inventory)
       .leftJoin(schema.stockItems, eq(schema.inventory.stockItemId, schema.stockItems.id))
       .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
+      .leftJoin(schema.stockCategories, eq(schema.stockItems.categoryId, schema.stockCategories.id))
       .innerJoin(schema.locations, eq(schema.inventory.locationId, schema.locations.id))
       .where(
         and(

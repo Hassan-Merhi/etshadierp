@@ -73,6 +73,8 @@ interface InventoryItem {
   stockGroupName: string | null;
   stockGroupCode: string | null;
   stockItemActive: boolean | null;
+  categoryId?: number | null;
+  categoryName?: string | null;
 }
 
 interface StockGroupSummary {
@@ -114,6 +116,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [allStockGroupFilter, setAllStockGroupFilter] = useState<string>("");
   const [allStockSearchTerm, setAllStockSearchTerm] = useState("");
   const [allStockLocationFilter, setAllStockLocationFilter] = useState<string>("");
+  const [allStockCategoryFilter, setAllStockCategoryFilter] = useState<string>("");
+  const [itemCategoryFilter, setItemCategoryFilter] = useState<string>("");
   const tableRef = useRef<HTMLDivElement>(null);
 
   // All Stock keyboard navigation + Stock Movement dialog
@@ -341,6 +345,12 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     staleTime: 30000,
   });
 
+  // Stock categories for filter dropdown
+  const { data: categoriesList = [] } = useQuery<{ id: number; name: string; active: boolean }[]>({
+    queryKey: ["/api/stock-categories"],
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Derive unique locations from all inventory (sorted A-Z)
   const allInventoryLocations = useMemo(() => {
     const locs = new Map<number, { id: number; name: string }>();
@@ -370,6 +380,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       stockItemCode: string;
       stockGroupId: number | null;
       stockGroupName: string;
+      categoryId: number | null;
+      categoryName: string | null;
       qtyByLocation: Record<number, number>;
       totalQty: number;
       weightedCostSum: number; // sum(qty * avgRate) for weighted average
@@ -385,6 +397,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           stockItemCode: item.stockItemCode || "",
           stockGroupId: item.stockGroupId ?? null,
           stockGroupName: item.stockGroupName || "Unassigned",
+          categoryId: item.categoryId ?? null,
+          categoryName: item.categoryName ?? null,
           qtyByLocation: {},
           totalQty: 0,
           weightedCostSum: 0,
@@ -405,7 +419,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     }));
   }, [allInventoryData]);
 
-  // Apply search + group filter, then sort by group → item name
+  // Apply search + group + category + location filter, then sort by group → item name
   const filteredCombinedRows = useMemo(() => {
     return combinedStockRows
       .filter((row) => {
@@ -414,6 +428,13 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             if (row.stockGroupId !== null) return false;
           } else {
             if (String(row.stockGroupId) !== allStockGroupFilter) return false;
+          }
+        }
+        if (allStockCategoryFilter) {
+          if (allStockCategoryFilter === "none") {
+            if (row.categoryId !== null && row.categoryId !== undefined) return false;
+          } else {
+            if (String(row.categoryId) !== allStockCategoryFilter) return false;
           }
         }
         if (allStockLocationFilter) {
@@ -434,7 +455,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         const g = a.stockGroupName.localeCompare(b.stockGroupName);
         return g !== 0 ? g : a.stockItemName.localeCompare(b.stockItemName);
       });
-  }, [combinedStockRows, allStockGroupFilter, allStockLocationFilter, allStockSearchTerm]);
+  }, [combinedStockRows, allStockGroupFilter, allStockCategoryFilter, allStockLocationFilter, allStockSearchTerm]);
 
 
   // Opening inventory map: stockItemId -> opening quantity (when fromDate is set)
@@ -521,11 +542,20 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     return a.groupName.localeCompare(b.groupName);
   });
 
-  // Filter stock groups by search term
-  const filteredStockGroups = sortedStockGroups.filter((group) =>
-    (group.groupName ?? "").toLowerCase().includes(groupSearchTerm.toLowerCase()) ||
-    (group.groupCode ?? "").toLowerCase().includes(groupSearchTerm.toLowerCase())
-  );
+  // Filter stock groups by search term and active category filter
+  const filteredStockGroups = sortedStockGroups.filter((group) => {
+    const matchesSearch =
+      (group.groupName ?? "").toLowerCase().includes(groupSearchTerm.toLowerCase()) ||
+      (group.groupCode ?? "").toLowerCase().includes(groupSearchTerm.toLowerCase());
+    if (!matchesSearch) return false;
+    if (itemCategoryFilter) {
+      const catId = itemCategoryFilter === "none" ? null : parseInt(itemCategoryFilter, 10);
+      return group.items.some((item) =>
+        catId === null ? item.categoryId == null : item.categoryId === catId
+      );
+    }
+    return true;
+  });
 
   // Filter and sort stock items alphabetically (A-Z) by name.
   // In movement mode: union of opening + closing items so that items sold out
@@ -533,6 +563,12 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   // In normal mode: derive from `inventory` (respects showZeroStock toggle).
   const filteredStockItems: InventoryItem[] = (() => {
     if (!selectedGroup) return [];
+
+    const matchesCategory = (item: InventoryItem) => {
+      if (!itemCategoryFilter) return true;
+      if (itemCategoryFilter === "none") return item.categoryId == null;
+      return item.categoryId === parseInt(itemCategoryFilter, 10);
+    };
 
     if (showMovement) {
       // Build a map of closing items for the group
@@ -552,13 +588,14 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       return result
         .sort((a, b) => (a.stockItemName ?? "").localeCompare(b.stockItemName ?? ""))
         .filter(item =>
-          (item.stockItemName ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
-          (item.stockItemCode ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase())
+          matchesCategory(item) &&
+          ((item.stockItemName ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
+          (item.stockItemCode ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase()))
         );
     }
 
     return inventory
-      .filter(item => item.stockGroupId === selectedGroup.groupId)
+      .filter(item => item.stockGroupId === selectedGroup.groupId && matchesCategory(item))
       .sort((a, b) => (a.stockItemName ?? "").localeCompare(b.stockItemName ?? ""))
       .filter(item =>
         (item.stockItemName ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
@@ -587,6 +624,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     setAllStockSearchTerm("");
     setAllStockGroupFilter("");
     setAllStockLocationFilter("");
+    setAllStockCategoryFilter("");
+    setItemCategoryFilter("");
   };
 
   // Handle back to groups
@@ -595,6 +634,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     setViewAllItems(false);
     setSelectedRowIndex(0);
     setItemSearchTerm("");
+    setItemCategoryFilter("");
   };
 
   const escapeBackHandler = selectedGroup
@@ -2007,6 +2047,24 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   ))}
                 </SelectContent>
               </Select>
+              {categoriesList.length > 0 && (
+                <Select
+                  value={allStockCategoryFilter || "__all__"}
+                  onValueChange={(v) => setAllStockCategoryFilter(v === "__all__" ? "" : v)}
+                >
+                  <SelectTrigger className="w-full sm:w-48" data-testid="select-all-stock-category">
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All Categories</SelectItem>
+                    {categoriesList.map((cat) => (
+                      <SelectItem key={cat.id} value={String(cat.id)}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {allInventoryLoading ? (
@@ -2344,7 +2402,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           </AlertDialog>
 
           <Card className="p-4 w-full overflow-hidden">
-            <div className="relative mb-4">
+            <div className="relative mb-3">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
                 placeholder="Search stock groups by name..."
@@ -2354,6 +2412,31 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 data-testid="input-search-groups"
               />
             </div>
+            {categoriesList.length > 0 && (
+              <div className="mb-4">
+                <Select
+                  value={itemCategoryFilter || "__all__"}
+                  onValueChange={(v) => setItemCategoryFilter(v === "__all__" ? "" : v)}
+                >
+                  <SelectTrigger className="w-full" data-testid="select-item-category-filter">
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All Categories</SelectItem>
+                    {categoriesList.map((cat) => (
+                      <SelectItem key={cat.id} value={String(cat.id)}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {itemCategoryFilter && (
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    Showing groups with items in selected category only
+                  </p>
+                )}
+              </div>
+            )}
 
             {!inventoryLoading && unassignedInventoryItems.length > 0 && (
               <div className="mb-4 flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-50 dark:bg-yellow-950/20 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-300">
@@ -2669,7 +2752,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           )}
 
           <Card className="p-4 w-full overflow-hidden">
-            <div className="relative mb-4">
+            <div className="relative mb-3">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
                 placeholder="Search items by name..."
@@ -2679,12 +2762,32 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 data-testid="input-search-items"
               />
             </div>
+            {categoriesList.length > 0 && (
+              <div className="mb-4">
+                <Select
+                  value={itemCategoryFilter || "__all__"}
+                  onValueChange={(v) => setItemCategoryFilter(v === "__all__" ? "" : v)}
+                >
+                  <SelectTrigger className="w-full" data-testid="select-item-category-items">
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All Categories</SelectItem>
+                    {categoriesList.map((cat) => (
+                      <SelectItem key={cat.id} value={String(cat.id)}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Mobile card view */}
             <div className="md:hidden space-y-2">
               {filteredStockItems.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  {itemSearchTerm ? "No items found matching your search" : "No items in this group"}
+                  {itemSearchTerm || itemCategoryFilter ? "No items found matching your filters" : "No items in this group"}
                 </div>
               ) : (
                 <>

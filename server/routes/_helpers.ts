@@ -24,6 +24,9 @@ import {
   suppliers,
   customers,
   factorySuppliers,
+  stockItems as stockItemsTable,
+  stockGroups as stockGroupsTable,
+  stockCategories as stockCategoriesTable,
 } from "@shared/schema";
 import { eq, and, sql, gt, ilike, isNull, inArray } from "drizzle-orm";
 
@@ -952,13 +955,46 @@ export async function calculateHistoricalLocationInventory(
     inventoryMap.set(offload.stockItemId, existing);
   }
 
+  const stockItemIdList = Array.from(inventoryMap.keys());
+  if (stockItemIdList.length === 0) return [];
+
+  const itemDetails = await db
+    .select({
+      id: stockItemsTable.id,
+      code: stockItemsTable.code,
+      name: stockItemsTable.name,
+      uom: stockItemsTable.uom,
+      stockGroupId: stockItemsTable.stockGroupId,
+      stockGroupName: sql<string>`COALESCE(${stockGroupsTable.name}, '')`,
+      stockGroupCode: sql<string>`COALESCE(${stockGroupsTable.code}, '')`,
+      categoryId: stockItemsTable.categoryId,
+      categoryName: stockCategoriesTable.name,
+      active: stockItemsTable.active,
+    })
+    .from(stockItemsTable)
+    .leftJoin(stockGroupsTable, eq(stockItemsTable.stockGroupId, stockGroupsTable.id))
+    .leftJoin(stockCategoriesTable, eq(stockItemsTable.categoryId, stockCategoriesTable.id))
+    .where(inArray(stockItemsTable.id, stockItemIdList));
+
+  const detailMap = new Map(itemDetails.map((d) => [d.id, d]));
+
   const results: any[] = [];
   for (const [stockItemId, data] of Array.from(inventoryMap.entries())) {
+    const detail = detailMap.get(stockItemId);
     results.push({
       stockItemId,
       quantity: data.quantity.toString(),
       averageRate: data.rate.toString(),
       totalValue: data.totalValue.toString(),
+      stockItemCode: detail?.code ?? "",
+      stockItemName: detail?.name ?? "",
+      stockItemUom: detail?.uom ?? "",
+      stockGroupId: detail?.stockGroupId ?? null,
+      stockGroupName: detail?.stockGroupName ?? "",
+      stockGroupCode: detail?.stockGroupCode ?? "",
+      categoryId: detail?.categoryId ?? null,
+      categoryName: detail?.categoryName ?? null,
+      stockItemActive: detail?.active ?? true,
     });
   }
   return results;
