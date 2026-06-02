@@ -411,7 +411,7 @@ async function postRentAccrualForCompany(
   companyId: number,
   shopExpenseAccountName: string,
 ): Promise<{ accrued: number; skipped: number }> {
-  // Load all active ERP SHOP contracts for the company
+  // Load all active ERP SHOP contracts owned by this company
   const shopContracts = await db
     .select({
       id: propertyContracts.id,
@@ -429,16 +429,42 @@ async function postRentAccrualForCompany(
       eq(propertyUnits.unitType, "SHOP"),
     ));
 
-  if (shopContracts.length === 0) return { accrued: 0, skipped: 0 };
+  // Also load shared contracts — units rented FROM another company (linkedCompanyId = this company).
+  // These always appear in the Shops view regardless of their unit type, so they should
+  // be accrued the same way (Dr Rent Expense / Cr Accrued Rent Payable).
+  const sharedContracts = await db
+    .select({
+      id: propertyContracts.id,
+      unitId: propertyContracts.unitId,
+      unitNumber: propertyUnits.unitNumber,
+      startDate: propertyContracts.startDate,
+      currency: propertyContracts.currency,
+    })
+    .from(propertyContracts)
+    .innerJoin(propertyUnits, eq(propertyUnits.id, propertyContracts.unitId))
+    .where(and(
+      eq(propertyContracts.linkedCompanyId, companyId),
+      eq(propertyContracts.status, "ACTIVE"),
+    ));
 
-  const contractIds = shopContracts.map(c => c.id);
+  // Deduplicate in case a contract somehow appears in both (shouldn't happen, but be safe)
+  const seen = new Set<number>();
+  const allContracts = [...shopContracts, ...sharedContracts].filter(c => {
+    if (seen.has(c.id)) return false;
+    seen.add(c.id);
+    return true;
+  });
+
+  if (allContracts.length === 0) return { accrued: 0, skipped: 0 };
+
+  const contractIds = allContracts.map(c => c.id);
 
   // Unit name (display label) keyed by unitId
-  const unitNameById = new Map(shopContracts.map(c => [c.unitId, c.unitNumber]));
+  const unitNameById = new Map(allContracts.map(c => [c.unitId, c.unitNumber]));
 
   // Billing day (day-of-month) keyed by contractId
   const billingDayByContract = new Map(
-    shopContracts.map(c => [c.id, new Date(c.startDate as any).getUTCDate()])
+    allContracts.map(c => [c.id, new Date(c.startDate as any).getUTCDate()])
   );
 
   const now = new Date();
