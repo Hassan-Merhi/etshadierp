@@ -353,80 +353,143 @@ export default function Suppliers() {
           </div>
         </div>
       ) : (
-        <div className="border rounded-xl overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead className="h-9 font-semibold text-xs">Supplier</TableHead>
-                <TableHead className="h-9 font-semibold text-xs">Containers</TableHead>
-                <TableHead className="h-9 font-semibold text-xs text-right">Balance</TableHead>
-                <TableHead className="h-9 font-semibold text-xs text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedSuppliers.map((supplier) => (
-                <TableRow
-                  key={supplier.id}
-                  className="cursor-pointer hover:bg-muted/40 group"
-                  onClick={() => handleSupplierClick(supplier)}
-                  data-testid={`row-supplier-${supplier.id}`}
-                >
-                  <TableCell className="py-3">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm" data-testid={`button-supplier-name-${supplier.id}`}>
-                        {supplier.legalName}
-                      </span>
-                      {!supplier.active && (
-                        <Badge variant="secondary" className="text-xs">Inactive</Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="py-3">
-                    {supplier.containerCount > 0 ? (
-                      <Badge variant="secondary" className="text-xs" data-testid={`text-containers-${supplier.id}`}>
-                        {supplier.containerCount}
-                      </Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground" data-testid={`text-containers-${supplier.id}`}>—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="py-3 text-right">
-                    <span
-                      className={`font-mono text-sm font-medium ${
-                        supplier.balance > 0 ? "text-red-500" : supplier.balance < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
-                      }`}
-                      data-testid={`text-balance-${supplier.id}`}
-                    >
-                      {supplier.balance === 0 ? "—" : `${formatAmount(Math.abs(supplier.balance))} ${supplier.balance > 0 ? "Cr" : "Dr"}`}
-                    </span>
-                  </TableCell>
-                  <TableCell className="py-3 text-right">
-                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => { e.stopPropagation(); navigate(`/suppliers/${supplier.id}/proformas`); }}
-                        data-testid={`button-proformas-supplier-${supplier.id}`}
-                        title="Proformas"
-                      >
-                        <FileText className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => { e.stopPropagation(); navigate(`/suppliers/${supplier.id}/edit`); }}
-                        data-testid={`button-edit-supplier-${supplier.id}`}
-                        title="Edit"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+        <>
+          {/* Desktop table */}
+          <div className="hidden md:block border rounded-xl overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="h-9 font-semibold text-xs">Supplier</TableHead>
+                  <TableHead className="h-9 font-semibold text-xs">Containers</TableHead>
+                  <TableHead className="h-9 font-semibold text-xs text-right">Balance</TableHead>
+                  <TableHead className="h-9 font-semibold text-xs text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {sortedSuppliers.map((supplier) => (
+                  <TableRow
+                    key={supplier.id}
+                    className="cursor-pointer hover:bg-muted/40 group"
+                    onClick={() => handleSupplierClick(supplier)}
+                    data-testid={`row-supplier-${supplier.id}`}
+                  >
+                    <TableCell className="py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm" data-testid={`button-supplier-name-${supplier.id}`}>
+                          {supplier.legalName}
+                        </span>
+                        {!supplier.active && (
+                          <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      {supplier.containerCount > 0 ? (
+                        <Badge variant="secondary" className="text-xs" data-testid={`text-containers-${supplier.id}`}>
+                          {supplier.containerCount}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground" data-testid={`text-containers-${supplier.id}`}>—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="py-3 text-right">
+                      <span
+                        className={`font-mono text-sm font-medium ${
+                          supplier.balance > 0 ? "text-red-500" : supplier.balance < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                        }`}
+                        data-testid={`text-balance-${supplier.id}`}
+                      >
+                        {supplier.balance === 0 ? "—" : `${formatAmount(Math.abs(supplier.balance))} ${supplier.balance > 0 ? "Cr" : "Dr"}`}
+                      </span>
+                    </TableCell>
+                    <TableCell className="py-3 text-right">
+                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => { e.stopPropagation(); navigate(`/suppliers/${supplier.id}/proformas`); }}
+                          data-testid={`button-proformas-supplier-${supplier.id}`}
+                          title="Proformas"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => { e.stopPropagation(); navigate(`/suppliers/${supplier.id}/edit`); }}
+                          data-testid={`button-edit-supplier-${supplier.id}`}
+                          title="Edit"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-2">
+            {sortedSuppliers.map((supplier) => (
+              <div
+                key={supplier.id}
+                className="border rounded-xl p-3 cursor-pointer"
+                onClick={() => handleSupplierClick(supplier)}
+                data-testid={`card-supplier-${supplier.id}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-sm leading-tight" data-testid={`button-supplier-name-mobile-${supplier.id}`}>
+                      {supplier.legalName}
+                    </div>
+                    {!supplier.active && (
+                      <Badge variant="secondary" className="text-xs mt-1">Inactive</Badge>
+                    )}
+                  </div>
+                  <span
+                    className={`font-mono text-sm font-medium shrink-0 ${
+                      supplier.balance > 0 ? "text-red-500" : supplier.balance < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                    }`}
+                    data-testid={`text-balance-mobile-${supplier.id}`}
+                  >
+                    {supplier.balance === 0 ? "—" : `${formatAmount(Math.abs(supplier.balance))} ${supplier.balance > 0 ? "Cr" : "Dr"}`}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <div>
+                    {supplier.containerCount > 0 && (
+                      <Badge variant="secondary" className="text-xs" data-testid={`text-containers-mobile-${supplier.id}`}>
+                        {supplier.containerCount} containers
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => navigate(`/suppliers/${supplier.id}/proformas`)}
+                      data-testid={`button-proformas-supplier-mobile-${supplier.id}`}
+                      title="Proformas"
+                    >
+                      <FileText className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => navigate(`/suppliers/${supplier.id}/edit`)}
+                      data-testid={`button-edit-supplier-mobile-${supplier.id}`}
+                      title="Edit"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Supplier Details Dialog */}

@@ -687,79 +687,167 @@ export default function TransactionJournal() {
           )}
         </CardHeader>
         <CardContent className="p-0">
-          <div className="table-responsive">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[110px]">Date</TableHead>
-                  <TableHead className="w-[150px]">Company</TableHead>
-                  <TableHead className="w-[160px]">Type</TableHead>
-                  <TableHead>Description</TableHead>
-                  {!hideAmounts && <TableHead className="text-right w-[130px]">Amount</TableHead>}
-                  <TableHead className="w-[120px] text-center">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array.from({ length: 10 }).map((_, i) => (
-                    <TableRow key={i}>
-                      {Array.from({ length: hideAmounts ? 5 : 6 }).map((__, j) => (
-                        <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : visibleVouchers.length === 0 ? (
+          {/* Desktop table */}
+          <div className="hidden md:block">
+            <div className="table-responsive">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={hideAmounts ? 5 : 6} className="text-center py-12 text-muted-foreground">
-                      {allVouchers.length > 0 && hiddenRowIds.size > 0
-                        ? "All rows on this page are hidden."
-                        : "No transactions found for the selected filters."}
-                    </TableCell>
+                    <TableHead className="w-[110px]">Date</TableHead>
+                    <TableHead className="w-[150px]">Company</TableHead>
+                    <TableHead className="w-[160px]">Type</TableHead>
+                    <TableHead>Description</TableHead>
+                    {!hideAmounts && <TableHead className="text-right w-[130px]">Amount</TableHead>}
+                    <TableHead className="w-[120px] text-center">Actions</TableHead>
                   </TableRow>
-                ) : (
-                  visibleVouchers.map((v) => {
-                    const isHidden = hiddenRowIds.has(v.id);
-                    return (
-                      <TableRow
-                        key={v.id}
-                        data-testid={`row-voucher-${v.id}`}
-                        className={isHidden && showHidden ? "opacity-50" : ""}
-                      >
-                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                          {fmtDate(v.voucherDate)}
-                        </TableCell>
-                        <TableCell>
-                          <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded truncate max-w-[140px] ${companyColor(v.companyId)}`}>
-                            {v.companyName}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1 flex-wrap">
-                            <VoucherTypeBadge type={v.voucherType} />
-                            {v.optional && (
-                              <Badge variant="outline" className="text-xs">Optional</Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm max-w-xs text-muted-foreground">
-                          <div className="flex items-center gap-1 truncate">
-                            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
-                            <span className="truncate">{v.description || v.narration || "—"}</span>
-                          </div>
-                        </TableCell>
-                        {!hideAmounts && (
-                          <TableCell className="text-right text-sm font-mono">
-                            <span className="text-xs text-muted-foreground mr-1">{v.currency}</span>
-                            {formatAmount(v.totalAmount)}
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    Array.from({ length: 10 }).map((_, i) => (
+                      <TableRow key={i}>
+                        {Array.from({ length: hideAmounts ? 5 : 6 }).map((__, j) => (
+                          <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                        ))}
+                      </TableRow>
+                    ))
+                  ) : visibleVouchers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={hideAmounts ? 5 : 6} className="text-center py-12 text-muted-foreground">
+                        {allVouchers.length > 0 && hiddenRowIds.size > 0
+                          ? "All rows on this page are hidden."
+                          : "No transactions found for the selected filters."}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    visibleVouchers.map((v) => {
+                      const isHidden = hiddenRowIds.has(v.id);
+                      return (
+                        <TableRow
+                          key={v.id}
+                          data-testid={`row-voucher-${v.id}`}
+                          className={isHidden && showHidden ? "opacity-50" : ""}
+                        >
+                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                            {fmtDate(v.voucherDate)}
                           </TableCell>
-                        )}
-                        <TableCell>
-                          <div className="flex items-center justify-center gap-1">
+                          <TableCell>
+                            <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded truncate max-w-[140px] ${companyColor(v.companyId)}`}>
+                              {v.companyName}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <VoucherTypeBadge type={v.voucherType} />
+                              {v.optional && (
+                                <Badge variant="outline" className="text-xs">Optional</Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm max-w-xs text-muted-foreground">
+                            <div className="flex items-center gap-1 truncate">
+                              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+                              <span className="truncate">{v.description || v.narration || "—"}</span>
+                            </div>
+                          </TableCell>
+                          {!hideAmounts && (
+                            <TableCell className="text-right text-sm font-mono">
+                              <span className="text-xs text-muted-foreground mr-1">{v.currency}</span>
+                              {formatAmount(v.totalAmount)}
+                            </TableCell>
+                          )}
+                          <TableCell>
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openDetail(v.id)}
+                                data-testid={`button-preview-voucher-${v.id}`}
+                                title="Preview"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => toggleHideRow(v.id)}
+                                data-testid={`button-hide-voucher-${v.id}`}
+                                title={isHidden ? "Unhide row" : "Hide row"}
+                              >
+                                <EyeOff className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openInCompany(v.companyId, `/daybook?voucherId=${v.id}`)}
+                                data-testid={`button-edit-voucher-${v.id}`}
+                                title="Open in Daybook"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden">
+            {isLoading ? (
+              <div className="space-y-2 p-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-20 w-full rounded-xl" />
+                ))}
+              </div>
+            ) : visibleVouchers.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground text-sm px-4">
+                {allVouchers.length > 0 && hiddenRowIds.size > 0
+                  ? "All rows on this page are hidden."
+                  : "No transactions found for the selected filters."}
+              </div>
+            ) : (
+              <div className="divide-y">
+                {visibleVouchers.map((v) => {
+                  const isHidden = hiddenRowIds.has(v.id);
+                  return (
+                    <div
+                      key={v.id}
+                      className={`px-3 py-3 ${isHidden && showHidden ? "opacity-50" : ""}`}
+                      data-testid={`card-voucher-${v.id}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                            <VoucherTypeBadge type={v.voucherType} />
+                            {v.optional && <Badge variant="outline" className="text-xs">Optional</Badge>}
+                            <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded ${companyColor(v.companyId)}`}>
+                              {v.companyName}
+                            </span>
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {v.description || v.narration || "—"}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {fmtDate(v.voucherDate)}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          {!hideAmounts && (
+                            <div className="font-mono text-sm font-medium">
+                              <span className="text-xs text-muted-foreground mr-0.5">{v.currency}</span>
+                              {formatAmount(v.totalAmount)}
+                            </div>
+                          )}
+                          <div className="flex items-center justify-end gap-0.5 mt-1">
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => openDetail(v.id)}
-                              data-testid={`button-preview-voucher-${v.id}`}
+                              data-testid={`button-preview-voucher-mobile-${v.id}`}
                               title="Preview"
                             >
                               <Eye className="h-4 w-4" />
@@ -768,7 +856,7 @@ export default function TransactionJournal() {
                               variant="ghost"
                               size="icon"
                               onClick={() => toggleHideRow(v.id)}
-                              data-testid={`button-hide-voucher-${v.id}`}
+                              data-testid={`button-hide-voucher-mobile-${v.id}`}
                               title={isHidden ? "Unhide row" : "Hide row"}
                             >
                               <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -777,19 +865,19 @@ export default function TransactionJournal() {
                               variant="ghost"
                               size="icon"
                               onClick={() => openInCompany(v.companyId, `/daybook?voucherId=${v.id}`)}
-                              data-testid={`button-edit-voucher-${v.id}`}
+                              data-testid={`button-edit-voucher-mobile-${v.id}`}
                               title="Open in Daybook"
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Pagination footer */}
