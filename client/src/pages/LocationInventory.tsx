@@ -2087,6 +2087,11 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                       <th className="text-left px-4 py-2.5 font-medium text-muted-foreground whitespace-nowrap sticky left-0 bg-muted/60 z-10">
                         Item Name
                       </th>
+                      {categoriesList.length > 0 && (
+                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground whitespace-nowrap">
+                          Category
+                        </th>
+                      )}
                       {allInventoryLocations.map((loc) => (
                         <th key={loc.id} className="text-right px-4 py-2.5 font-medium text-muted-foreground whitespace-nowrap">
                           {loc.name}
@@ -2119,7 +2124,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           rows.push(
                             <tr key={`group-${row.stockGroupName}`} className="bg-muted/30">
                               <td
-                                colSpan={allInventoryLocations.length + 4}
+                                colSpan={allInventoryLocations.length + 4 + (categoriesList.length > 0 ? 1 : 0)}
                                 className="px-4 py-1.5 sticky left-0 bg-muted/30 z-10"
                               >
                                 <div className="flex items-center justify-between gap-4">
@@ -2165,6 +2170,13 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                             )}>
                               {row.stockItemName}
                             </td>
+                            {categoriesList.length > 0 && (
+                              <td className="px-4 py-2 whitespace-nowrap" data-testid={`allstock-category-${row.stockItemId}`}>
+                                {row.categoryName
+                                  ? <Badge variant="secondary" className="text-xs font-normal">{row.categoryName}</Badge>
+                                  : <span className="text-muted-foreground/40 text-xs">—</span>}
+                              </td>
+                            )}
                             {allInventoryLocations.map((loc) => (
                               <td
                                 key={loc.id}
@@ -2205,6 +2217,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                       <td className="px-4 py-2.5 whitespace-nowrap sticky left-0 bg-muted/50 z-10">
                         Total ({filteredCombinedRows.length} items)
                       </td>
+                      {categoriesList.length > 0 && <td className="px-4 py-2.5" />}
                       {allInventoryLocations.map((loc) => {
                         const locTotal = filteredCombinedRows.reduce((s, r) => s + (r.qtyByLocation[loc.id] || 0), 0);
                         return (
