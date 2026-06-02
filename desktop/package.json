@@ -1,0 +1,28 @@
+{
+  "name": "erp-warehouse",
+  "version": "1.0.0",
+  "description": "ERP Warehouse — HMD International Group desktop application",
+  "main": "main.js",
+  "author": {
+    "name": "HMD International Group",
+    "email": "admin@hmdinternationalgroup.com"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "icons": "node scripts/generate-icons.js",
+    "build:msix": "electron-builder --win appx --x64",
+    "build:installer": "electron-builder --win nsis --x64",
+    "build:all": "electron-builder --win --x64",
+    "build:unsigned": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win appx --x64"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^31.3.0",
+    "electron-builder": "^24.13.3",
+    "sharp": "^0.33.5"
+  }
+}

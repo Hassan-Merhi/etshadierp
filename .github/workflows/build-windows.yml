@@ -1,0 +1,84 @@
+name: Build Windows Desktop App (MSIX)
+
+on:
+  push:
+    tags:
+      - 'desktop-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g. 1.2.0)'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  build-msix:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Determine version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF#refs/tags/desktop-v}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version: $VERSION"
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm ci
+
+      - name: Set version in package.json
+        working-directory: desktop
+        shell: bash
+        run: npm version ${{ steps.version.outputs.version }} --no-git-tag-version --allow-same-version
+
+      - name: Generate app icons
+        working-directory: desktop
+        run: node scripts/generate-icons.js
+
+      - name: Build MSIX (unsigned — Partner Center signs on upload)
+        working-directory: desktop
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          WIN_CSC_LINK: ''
+        run: npm run build:unsigned
+
+      - name: List build output
+        working-directory: desktop
+        shell: bash
+        run: ls -lh dist/
+
+      - name: Upload MSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: erp-warehouse-msix-${{ steps.version.outputs.version }}
+          path: |
+            desktop/dist/*.appx
+            desktop/dist/*.msix
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload installer artifact (NSIS exe — optional)
+        if: false
+        uses: actions/upload-artifact@v4
+        with:
+          name: erp-warehouse-installer-${{ steps.version.outputs.version }}
+          path: desktop/dist/*.exe
+          retention-days: 14
