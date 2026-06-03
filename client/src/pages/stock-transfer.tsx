@@ -660,9 +660,9 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[50%]">Item Name (type to search)</TableHead>
-                        <TableHead className="text-right w-32">Quantity</TableHead>
-                        <TableHead className="text-right w-32">Available</TableHead>
+                        <TableHead>Item Name (type to search)</TableHead>
+                        <TableHead className="text-right w-24">Qty</TableHead>
+                        <TableHead className="text-right w-28 hidden sm:table-cell">Available</TableHead>
                         <TableHead className="w-12"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -692,12 +692,12 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                               step="0.001"
                               value={entry.quantity}
                               onChange={(e) => handleQuantityChange(index, e.target.value)}
-                              className="w-24 text-right ml-auto"
+                              className="w-20 sm:w-24 text-right ml-auto"
                               placeholder="0"
                               data-testid={`input-quantity-${index}`}
                             />
                           </TableCell>
-                          <TableCell className="text-right font-mono text-muted-foreground">
+                          <TableCell className="text-right font-mono text-muted-foreground hidden sm:table-cell">
                             {entry.stockItemId > 0 ? formatNumber(entry.availableQty, 0) : "-"}
                           </TableCell>
                           <TableCell>
@@ -853,24 +853,24 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
               <p>No transfers yet</p>
             </div>
           ) : (
-            <div className="table-responsive">
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Voucher #</TableHead>
-                    <TableHead>Description</TableHead>
+                    <TableHead className="hidden sm:table-cell">Description</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {stockTransferVouchers.map((voucher: any) => (
                     <TableRow key={voucher.id} data-testid={`transfer-row-${voucher.id}`}>
-                      <TableCell className="font-mono">
+                      <TableCell className="font-mono text-sm whitespace-nowrap">
                         {format(parseISO(voucher.voucherDate), "MMM dd, yyyy")}
                       </TableCell>
-                      <TableCell className="font-mono">{voucher.voucherNumber}</TableCell>
-                      <TableCell className="max-w-xs truncate">{voucher.description || "-"}</TableCell>
+                      <TableCell className="font-mono text-sm">{voucher.voucherNumber}</TableCell>
+                      <TableCell className="max-w-xs truncate hidden sm:table-cell">{voucher.description || "-"}</TableCell>
                       <TableCell className="text-right">
                         <Button
                           variant="ghost"

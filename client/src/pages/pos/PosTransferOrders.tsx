@@ -714,22 +714,41 @@ function EditableTransferDetail({
           )}
         </div>
 
-        {/* Spacer: reserves room for the fixed panel so content doesn't slide under it */}
-        {panelOpen && <div className="w-64 shrink-0" />}
+        {/* Spacer: reserves room for the fixed panel on desktop so content doesn't slide under it */}
+        {panelOpen && <div className="hidden sm:block w-64 shrink-0" />}
       </div>
 
-      {/* Fixed right panel — positioned relative to the viewport, not the flex chain */}
+      {/* Fixed item-search panel — right panel on sm+, bottom sheet on mobile */}
       {panelOpen && (
-        <div className="fixed right-0 top-12 bottom-0 w-64 z-30 bg-card border-l flex flex-col shadow-md overflow-hidden">
-          <ItemSearchPanel
-            matches={panelMatches}
-            activeIdx={panelActiveIdx}
-            locationName={detail.sourceLocationName}
-            onActiveChange={setPanelActiveIdx}
-            onPick={addExtraItem}
-            onClose={() => { setPanelOpen(false); setPanelSearch(""); }}
+        <>
+          {/* Desktop: fixed right panel */}
+          <div className="hidden sm:flex fixed right-0 top-12 bottom-0 w-64 z-30 bg-card border-l flex-col shadow-md overflow-hidden">
+            <ItemSearchPanel
+              matches={panelMatches}
+              activeIdx={panelActiveIdx}
+              locationName={detail.sourceLocationName}
+              onActiveChange={setPanelActiveIdx}
+              onPick={addExtraItem}
+              onClose={() => { setPanelOpen(false); setPanelSearch(""); }}
+            />
+          </div>
+          {/* Mobile: bottom sheet */}
+          <div className="sm:hidden fixed inset-x-0 bottom-0 z-40 bg-card border-t flex flex-col shadow-lg" style={{ height: "55vh" }}>
+            <ItemSearchPanel
+              matches={panelMatches}
+              activeIdx={panelActiveIdx}
+              locationName={detail.sourceLocationName}
+              onActiveChange={setPanelActiveIdx}
+              onPick={addExtraItem}
+              onClose={() => { setPanelOpen(false); setPanelSearch(""); }}
+            />
+          </div>
+          {/* Mobile backdrop */}
+          <div
+            className="sm:hidden fixed inset-0 z-30 bg-black/30"
+            onClick={() => { setPanelOpen(false); setPanelSearch(""); }}
           />
-        </div>
+        </>
       )}
     </div>
   );
