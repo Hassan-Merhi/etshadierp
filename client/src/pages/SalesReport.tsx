@@ -32,7 +32,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, ChevronRight, RefreshCw, ChevronDown, Download, Building2, GitCompare } from "lucide-react";
+import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, ChevronRight, ChevronDown, Download, Building2, GitCompare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -163,34 +163,6 @@ export default function SalesReport() {
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
-
-  // Mutation to recalculate cost prices
-  const recalculateMutation = useMutation({
-    mutationFn: async () => {
-      const body: any = {};
-      if (periodFilter.fromDate) body.startDate = periodFilter.fromDate;
-      if (periodFilter.toDate) body.endDate = periodFilter.toDate;
-      if (selectedLocation && selectedLocation !== "all") body.locationId = parseInt(selectedLocation);
-      if (selectedStockItem && selectedStockItem !== "all") body.stockItemId = parseInt(selectedStockItem);
-      
-      return apiRequest("POST", "/api/sales-report/recalculate-costs", body);
-    },
-    onSuccess: (data: any) => {
-      toast({
-        title: "Cost Prices Updated",
-        description: `Updated ${data.updatedCount} of ${data.totalChecked} sales items`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/sales-report"] });
-    },
-    onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
 
   // Fetch locations
   const { data: locations = [] } = useQuery<any[]>({
@@ -630,16 +602,6 @@ export default function SalesReport() {
             Compare
           </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => recalculateMutation.mutate()}
-            disabled={recalculateMutation.isPending}
-            data-testid="button-recalculate-costs"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${recalculateMutation.isPending ? "animate-spin" : ""}`} />
-            {recalculateMutation.isPending ? "Recalculating..." : "Recalc Costs"}
-          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2" disabled={groupedData.length === 0} data-testid="button-export-dropdown">
