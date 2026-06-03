@@ -2938,9 +2938,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const delta = requestedQty - originalQtyForItem;
       
       return fetch(`/api/locations/${entry.sourceLocationId}/inventory`)
-        .then(res => res.json())
+        .then(res => res.ok ? res.json() : [])
         .then(inventory => {
-          const availableItem = inventory.find((item: any) => Number(item.stockItemId) === entryStockItemId);
+          const inventoryList = Array.isArray(inventory) ? inventory : [];
+          const availableItem = inventoryList.find((item: any) => Number(item.stockItemId) === entryStockItemId);
           const currentInventory = availableItem ? parseFloat(availableItem.quantity || "0") : 0;
           
           // If delta <= 0, we're requesting same or less than original - ALWAYS allow
