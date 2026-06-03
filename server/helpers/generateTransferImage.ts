@@ -1,7 +1,7 @@
 /**
  * generateTransferImage.ts
  * Renders stock-transfer summary cards as PNG buffers using @napi-rs/canvas.
- * No Chrome / Puppeteer required.
+ * Rendered at 2× scale for crisp display on high-DPI screens (WhatsApp).
  */
 
 import { createCanvas, type Canvas, type SKRSContext2D } from "@napi-rs/canvas";
@@ -68,6 +68,7 @@ function clamp(ctx: SKRSContext2D, text: string, maxW: number): string {
 // ── Transfer card (green) ────────────────────────────────────────────────────
 
 export function generateTransferImageBuffer(data: TransferImageData): Promise<Buffer> {
+  const SCALE      = 2;           // 2× for crisp HiDPI rendering
   const W          = 452;
   const MARGIN     = 16;
   const CARD_W     = W - MARGIN * 2;
@@ -90,14 +91,16 @@ export function generateTransferImageBuffer(data: TransferImageData): Promise<Bu
   const WHITE      = "#ffffff";
   const BG         = "#f0fdf4";
 
-  const canvas = createCanvas(W, TOTAL_H);
+  // Canvas is physically 2× but we draw in logical units via scale()
+  const canvas = createCanvas(W * SCALE, TOTAL_H * SCALE);
   const ctx    = canvas.getContext("2d");
+  ctx.scale(SCALE, SCALE);
 
   // Background
   ctx.fillStyle = BG;
   ctx.fillRect(0, 0, W, TOTAL_H);
 
-  // Card shadow (fake with offset fill)
+  // Card shadow
   ctx.fillStyle = "rgba(0,0,0,0.09)";
   roundRect(ctx, MARGIN + 2, MARGIN + 4, CARD_W, CARD_H, 16);
   ctx.fill();
@@ -148,15 +151,14 @@ export function generateTransferImageBuffer(data: TransferImageData): Promise<Bu
   ctx.fillStyle = SLATE_50;
   ctx.fillRect(MARGIN, y, CARD_W, ROUTE_H);
 
-  // Border bottom
   ctx.strokeStyle = SLATE_200;
-  ctx.lineWidth   = 1;
+  ctx.lineWidth   = 0.5;
   ctx.beginPath();
   ctx.moveTo(MARGIN, y + ROUTE_H);
   ctx.lineTo(MARGIN + CARD_W, y + ROUTE_H);
   ctx.stroke();
 
-  const COL_W = (CARD_W - 48) / 2;   // 48 = arrow circle space
+  const COL_W = (CARD_W - 48) / 2;
 
   // FROM
   ctx.fillStyle = SLATE_400;
@@ -206,7 +208,7 @@ export function generateTransferImageBuffer(data: TransferImageData): Promise<Bu
   ctx.fillText("UNIT", UOM_X,  y + ITEMS_HDR / 2);
 
   ctx.strokeStyle = SLATE_200;
-  ctx.lineWidth   = 2;
+  ctx.lineWidth   = 1;
   ctx.beginPath();
   ctx.moveTo(MARGIN, y + ITEMS_HDR);
   ctx.lineTo(MARGIN + CARD_W, y + ITEMS_HDR);
@@ -220,7 +222,7 @@ export function generateTransferImageBuffer(data: TransferImageData): Promise<Bu
   data.items.forEach((item, idx) => {
     if (idx > 0) {
       ctx.strokeStyle = "#f1f5f9";
-      ctx.lineWidth   = 1;
+      ctx.lineWidth   = 0.5;
       ctx.beginPath();
       ctx.moveTo(MARGIN, y);
       ctx.lineTo(MARGIN + CARD_W, y);
@@ -249,7 +251,7 @@ export function generateTransferImageBuffer(data: TransferImageData): Promise<Bu
 
   // ── Footer ───────────────────────────────────────────────────────────────
   ctx.strokeStyle = SLATE_200;
-  ctx.lineWidth   = 2;
+  ctx.lineWidth   = 1;
   ctx.beginPath();
   ctx.moveTo(MARGIN, y);
   ctx.lineTo(MARGIN + CARD_W, y);
@@ -283,6 +285,7 @@ export function generateTransferImageBuffer(data: TransferImageData): Promise<Bu
 // ── Revised Transfer card (amber) ────────────────────────────────────────────
 
 export function generateRevisedTransferImageBuffer(data: RevisedTransferImageData): Promise<Buffer> {
+  const SCALE      = 2;           // 2× for crisp HiDPI rendering
   const W          = 472;
   const MARGIN     = 16;
   const CARD_W     = W - MARGIN * 2;
@@ -309,8 +312,10 @@ export function generateRevisedTransferImageBuffer(data: RevisedTransferImageDat
   const WHITE      = "#ffffff";
   const BG         = "#fffbeb";
 
-  const canvas = createCanvas(W, TOTAL_H);
+  // Canvas is physically 2× but we draw in logical units via scale()
+  const canvas = createCanvas(W * SCALE, TOTAL_H * SCALE);
   const ctx    = canvas.getContext("2d");
+  ctx.scale(SCALE, SCALE);
 
   // Background
   ctx.fillStyle = BG;
@@ -371,7 +376,7 @@ export function generateRevisedTransferImageBuffer(data: RevisedTransferImageDat
   ctx.fillRect(MARGIN, y, CARD_W, ROUTE_H);
 
   ctx.strokeStyle = SLATE_200;
-  ctx.lineWidth   = 1;
+  ctx.lineWidth   = 0.5;
   ctx.beginPath();
   ctx.moveTo(MARGIN, y + ROUTE_H);
   ctx.lineTo(MARGIN + CARD_W, y + ROUTE_H);
@@ -410,9 +415,8 @@ export function generateRevisedTransferImageBuffer(data: RevisedTransferImageDat
 
   y += ROUTE_H;
 
-  // ── Items header (Before / Change / After / Unit) ─────────────────────
-  // Column positions (right-aligned numbers):
-  const NAME_END  = MARGIN + CARD_W - 178; // end of name column
+  // ── Items header ─────────────────────────────────────────────────────────
+  const NAME_END  = MARGIN + CARD_W - 178;
   const BEF_X     = MARGIN + CARD_W - 138;
   const CHG_X     = MARGIN + CARD_W - 88;
   const AFT_X     = MARGIN + CARD_W - 42;
@@ -430,7 +434,7 @@ export function generateRevisedTransferImageBuffer(data: RevisedTransferImageDat
   ctx.fillText("UNIT",   UOM_X2, y + ITEMS_HDR / 2);
 
   ctx.strokeStyle = SLATE_200;
-  ctx.lineWidth   = 2;
+  ctx.lineWidth   = 1;
   ctx.beginPath();
   ctx.moveTo(MARGIN, y + ITEMS_HDR);
   ctx.lineTo(MARGIN + CARD_W, y + ITEMS_HDR);
@@ -444,7 +448,7 @@ export function generateRevisedTransferImageBuffer(data: RevisedTransferImageDat
   data.items.forEach((item, idx) => {
     if (idx > 0) {
       ctx.strokeStyle = "#f1f5f9";
-      ctx.lineWidth   = 1;
+      ctx.lineWidth   = 0.5;
       ctx.beginPath();
       ctx.moveTo(MARGIN, y);
       ctx.lineTo(MARGIN + CARD_W, y);
@@ -482,7 +486,7 @@ export function generateRevisedTransferImageBuffer(data: RevisedTransferImageDat
 
   // ── Footer ───────────────────────────────────────────────────────────────
   ctx.strokeStyle = AMBER_LT;
-  ctx.lineWidth   = 2;
+  ctx.lineWidth   = 1;
   ctx.beginPath();
   ctx.moveTo(MARGIN, y);
   ctx.lineTo(MARGIN + CARD_W, y);
