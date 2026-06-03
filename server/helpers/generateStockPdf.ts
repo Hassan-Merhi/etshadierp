@@ -23,7 +23,7 @@ const CLR_MUTED    = "#94a3b8";   // slate-400  — subtitle / meta text
 const CLR_BODY     = "#1e293b";   // slate-800  — item text
 const CLR_ROW_ALT  = "#f8fafc";   // slate-50   — alternating row stripe
 const CLR_ROW_NEG  = "#fff0f0";   // red tint   — negative qty
-const CLR_SEP      = "#e2e8f0";   // slate-200  — row divider
+const CLR_SEP      = "#b0bec8";   // slate-300+ — row divider (visible)
 const CLR_NEG_TEXT = "#c2272d";   // red        — negative qty text
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -270,7 +270,7 @@ export async function generateStockPdf(
       doc.save();
       doc.rect(X_LEFT, iY, CONTENT_W, ITEM_H).fill(isBg);
       // bottom separator
-      doc.moveTo(X_LEFT, iY + ITEM_H).lineTo(X_RIGHT, iY + ITEM_H).strokeColor(CLR_SEP).lineWidth(0.5).stroke();
+      doc.moveTo(X_LEFT, iY + ITEM_H).lineTo(X_RIGHT, iY + ITEM_H).strokeColor(CLR_SEP).lineWidth(0.75).stroke();
       doc.restore();
 
       const textColor = isNeg ? CLR_NEG_TEXT : CLR_BODY;
