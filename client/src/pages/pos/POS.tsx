@@ -439,8 +439,22 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [sendingInvoiceWhatsApp, setSendingInvoiceWhatsApp] = useState(false);
 
+  // When drafts load for the first time, auto-attach to any draft already saved today
+  // so the autosave interval patches it instead of creating a duplicate.
+  useEffect(() => {
+    if (currentDraftId !== null) return;
+    if (!Array.isArray(drafts) || drafts.length === 0) return;
+    const todayUTC = new Date().toISOString().slice(0, 10);
+    const todayDraft = drafts.find((d: any) => {
+      const ds = new Date(d.updatedAt || d.createdAt).toISOString().slice(0, 10);
+      return ds === todayUTC;
+    });
+    if (todayDraft) setCurrentDraftId(todayDraft.id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drafts]);
+
   // Keep autoSaveStateRef in sync so the interval can read latest values without
-  // being in the dependency array (which would reset the 30-second timer on every keystroke).
+  // being in the dependency array (which would reset the timer on every keystroke).
   // NOTE: saveDraftIsPending is updated separately after saveDraftMutation is declared
   // (further down) to avoid a Temporal Dead Zone crash that would prevent this
   // entire assignment from running — which would keep currentDraftId stuck at null
@@ -1024,7 +1038,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   // Update the remaining ref field now that saveDraftMutation is in scope.
   autoSaveStateRef.current.saveDraftIsPending = saveDraftMutation.isPending;
 
-  // Autosave effect — silently saves every 30 seconds when cart has items and has changed.
+  // Autosave effect — silently saves every 7 seconds when cart has items and has changed.
   // Reads all mutable state from autoSaveStateRef (updated every render) so this effect
   // never needs to restart due to state changes — the 30-second timer is stable for the
   // entire component lifetime and always fires on schedule, even during active typing.
@@ -1083,7 +1097,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       } finally {
         autoSaveInProgressRef.current = false;
       }
-    }, 30000);
+    }, 7000);
 
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
