@@ -278,9 +278,7 @@ export function registerPosRoutes(app: Express) {
         ? `${customerNameForFile} Invoice ${locName} ${dateStr}`
         : `${locName} Invoice ${dateStr}`;
       const safeName = rawName.replace(/[^\w\s.()\-]/g, "_").trim();
-      const caption  = customerNameForFile
-        ? `${customerNameForFile} — ${locName} — ${dateStr}`
-        : `${locName} — ${dateStr}`;
+      const caption  = "";
 
       console.log(`[WA invoice backend] chatId=${location.whatsappGroupChatId} file=${safeName}.pdf size=${pdfBuffer.length}`);
 
