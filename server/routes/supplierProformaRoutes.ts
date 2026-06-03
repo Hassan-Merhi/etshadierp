@@ -1160,7 +1160,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       ws.mergeCells(2, 5, 2, NUM_COLS);
       ws.getRow(2).height = 24;
       const suppCell = ws.getCell(2, 1);
-      suppCell.value     = `Supplier: ${supplier?.name ?? `#${sid}`}`;
+      suppCell.value     = `Supplier: ${supplier?.legalName || supplier?.name || `#${sid}`}`;
       suppCell.font      = { bold: true, size: 11, color: { argb: C.navy } };
       suppCell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: C.subtleBg } };
       suppCell.alignment = { vertical: "middle", indent: 1 };
@@ -1258,9 +1258,9 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
           if (col === 1)   { cell.font = { size: 9, color: { argb: "FF8899AA" } }; cell.alignment = { horizontal: "center", vertical: "middle" }; }
           if (col === 2)   { cell.font = { name: "Courier New", size: 9 }; }
           if (col === 4)   cell.numFmt = "#,##0";
-          if (col === 5)   cell.numFmt = "#,##0.000";
+          if (col === 5)   cell.numFmt = "#,##0.##";
           if (col === 6)   cell.numFmt = "#,##0.00";
-          if (col === 7)   cell.numFmt = "#,##0.000";
+          if (col === 7)   cell.numFmt = "#,##0.##";
           if (col === 8)   cell.numFmt = "#,##0.00";
         });
 
@@ -1277,7 +1277,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         cell.border    = { top: medium(), bottom: medium(), left: thin(), right: thin() };
         cell.alignment = { horizontal: col <= 3 ? (col === 3 ? "left" : "center") : "right", vertical: "middle", indent: col === 3 ? 1 : 0 };
         if (col === 4) cell.numFmt = "#,##0";
-        if (col === 7) cell.numFmt = "#,##0.000";
+        if (col === 7) cell.numFmt = "#,##0.##";
         if (col === 8) cell.numFmt = "#,##0.00";
       });
 
