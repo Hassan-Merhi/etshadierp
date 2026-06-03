@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
+import { cache } from "../lib/simpleCache";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries } from "./_helpers";
 import {
@@ -1400,8 +1401,10 @@ export function registerBaleRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const settings = await storage.getCompanySettings(companyId);
-      res.json(settings || { companyId });
+      const settings = await cache(`company_settings:${companyId}`, 30_000, () =>
+        storage.getCompanySettings(companyId).then((s) => s || { companyId }),
+      );
+      res.json(settings);
     } catch (error: any) {
       console.error("Error fetching company settings:", error);
       res.status(500).json({ message: error.message });
@@ -1420,6 +1423,7 @@ export function registerBaleRoutes(app: Express) {
       const data = insertCompanySettingsSchema.parse({ ...req.body, companyId });
 
       const settings = await storage.upsertCompanySettings(data);
+      cache.del(`company_settings:${companyId}`);
       res.json(settings);
     } catch (error: any) {
       console.error("Error updating company settings:", error);

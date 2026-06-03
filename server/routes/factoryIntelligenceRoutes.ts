@@ -1,4 +1,5 @@
 import { getClientDate } from "../lib/dateUtils";
+import { cache } from "../lib/simpleCache";
 import type { Express } from "express";
 import { eq, and, desc, sql, between, gte, lte, sum, count, avg } from "drizzle-orm";
 import multer from "multer";
@@ -56,38 +57,42 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      let [settings] = await db
-        .select()
-        .from(factorySettings)
-        .where(eq(factorySettings.companyId, companyId));
+      const result = await cache(`factory_settings:${companyId}`, 30_000, async () => {
+        let [settings] = await db
+          .select()
+          .from(factorySettings)
+          .where(eq(factorySettings.companyId, companyId));
 
-      if (!settings) {
-        [settings] = await db
-          .insert(factorySettings)
-          .values({
-            companyId,
-            dashboardEnabled: true,
-            kpisEnabled: true,
-            profitabilityEnabled: true,
-            alertsEnabled: true,
-            supplierScoringEnabled: true,
-            mixOptimizerEnabled: true,
-            traceabilityEnabled: true,
-            balePhotosEnabled: true,
-            wasteTrackingEnabled: true,
-            cashflowEnabled: true,
-            rolesEnabled: true,
-            netProfitEnabled: true,
-            productionSummaryEnabled: true,
-            supplierReportEnabled: true,
-            supplierStatementEnabled: true,
-          })
-          .returning();
-      }
+        if (!settings) {
+          [settings] = await db
+            .insert(factorySettings)
+            .values({
+              companyId,
+              dashboardEnabled: true,
+              kpisEnabled: true,
+              profitabilityEnabled: true,
+              alertsEnabled: true,
+              supplierScoringEnabled: true,
+              mixOptimizerEnabled: true,
+              traceabilityEnabled: true,
+              balePhotosEnabled: true,
+              wasteTrackingEnabled: true,
+              cashflowEnabled: true,
+              rolesEnabled: true,
+              netProfitEnabled: true,
+              productionSummaryEnabled: true,
+              supplierReportEnabled: true,
+              supplierStatementEnabled: true,
+            })
+            .returning();
+        }
 
-      // Spread extraSettings so clients see all flags as top-level fields
-      const extra = (settings as any).extraSettings ?? {};
-      res.json({ ...settings, ...extra });
+        // Spread extraSettings so clients see all flags as top-level fields
+        const extra = (settings as any).extraSettings ?? {};
+        return { ...settings, ...extra };
+      });
+
+      res.json(result);
     } catch (error: any) {
       console.error("Error fetching factory settings:", error);
       res.status(500).json({ message: error.message });
@@ -160,6 +165,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         .returning();
 
       const resultExtra = (result as any).extraSettings ?? {};
+      cache.del(`factory_settings:${companyId}`);
       res.json({ ...result, ...resultExtra });
     } catch (error: any) {
       console.error("Error updating factory settings:", error);

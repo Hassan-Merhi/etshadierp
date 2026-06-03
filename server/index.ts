@@ -3795,6 +3795,21 @@ let migrationsDone = false;
       created_at    TIMESTAMP NOT NULL DEFAULT NOW()
     )`,
     `CREATE INDEX IF NOT EXISTS passkey_credentials_user_id_idx ON passkey_credentials(user_id)`,
+
+    // ── Performance indexes (Jun 2026) — three high-traffic tables missing company_id / FK indexes ──
+    // factory_bales: every page-load on the factory module runs WHERE company_id=? [AND status=?]
+    // ORDER BY created_at DESC with no index → full sequential scan on a large table.
+    `CREATE INDEX IF NOT EXISTS factory_bales_company_status_date_idx
+       ON factory_bales (company_id, status, created_at DESC)`,
+    // bale_label_prints: print-history look-up uses inArray(production_bale_id, [...])
+    // with no index → sequential scan of the full prints table for every bale page-load.
+    `CREATE INDEX IF NOT EXISTS bale_label_prints_production_bale_idx
+       ON bale_label_prints (production_bale_id)`,
+    // customers: list endpoint filters WHERE company_id=? AND deleted_at IS NULL.
+    // The existing unique index is on (company_id, code) — works for prefix scans but
+    // a dedicated partial index on company_id WHERE deleted_at IS NULL is much tighter.
+    `CREATE INDEX IF NOT EXISTS customers_company_active_idx
+       ON customers (company_id) WHERE deleted_at IS NULL`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
