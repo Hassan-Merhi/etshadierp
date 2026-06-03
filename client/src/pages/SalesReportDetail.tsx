@@ -516,16 +516,14 @@ export default function SalesReportDetail() {
                         <TableHead className="text-right">Total Sales</TableHead>
                         <TableHead className="text-right">Total Cost</TableHead>
                         <TableHead className="text-right">Cost Profit</TableHead>
-                        <TableHead className="text-right">Cost %</TableHead>
+                        <TableHead className="text-right">Cost Price</TableHead>
                         <TableHead className="text-right">Hassan's Profit</TableHead>
-                        <TableHead className="text-right">Hassan's %</TableHead>
+                        <TableHead className="text-right">Config Price</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {voucherGroups.map((vg) => {
                         const isExpanded = expandedVouchers.has(vg.voucherId);
-                        const costPct = vg.totalSales > 0 ? (vg.costProfit / vg.totalSales) * 100 : 0;
-                        const configPct = vg.totalConfiguredCost > 0 ? (vg.configuredProfit / vg.totalConfiguredCost) * 100 : 0;
                         return (
                           <>
                             <TableRow
@@ -547,22 +545,13 @@ export default function SalesReportDetail() {
                               <TableCell className={`text-right font-mono py-2 ${profitColor(vg.costProfit)}`}>
                                 {formatAmount(Math.abs(vg.costProfit))}
                               </TableCell>
-                              <TableCell className={`text-right font-mono text-sm py-2 ${profitColor(costPct)}`}>
-                                {Math.abs(costPct).toFixed(1)}%
-                              </TableCell>
+                              <TableCell className="text-right font-mono py-2 text-muted-foreground">—</TableCell>
                               <TableCell className={`text-right font-mono py-2 ${profitColor(vg.configuredProfit)}`}>
                                 {formatAmount(Math.abs(vg.configuredProfit))}
                               </TableCell>
-                              <TableCell className={`text-right font-mono text-sm py-2 ${profitColor(configPct)}`}>
-                                {Math.abs(configPct).toFixed(1)}%
-                              </TableCell>
+                              <TableCell className="text-right font-mono py-2 text-muted-foreground">—</TableCell>
                             </TableRow>
-                            {isExpanded && vg.items.map((item) => {
-                              const itemCostPct = parseFloat(item.totalSales || "0") > 0
-                                ? (parseFloat(item.costProfit || "0") / parseFloat(item.totalSales || "0")) * 100 : 0;
-                              const itemConfigPct = (item.totalConfiguredCost || 0) > 0
-                                ? (item.configuredProfit / item.totalConfiguredCost) * 100 : 0;
-                              return (
+                            {isExpanded && vg.items.map((item) => (
                                 <TableRow key={item.id} data-testid={`row-vitem-${item.id}`} className="text-xs bg-muted/10">
                                   <TableCell className="py-1 w-6"></TableCell>
                                   <TableCell className="py-1 pl-6 text-muted-foreground" colSpan={2}>{item.stockItemName}</TableCell>
@@ -573,18 +562,13 @@ export default function SalesReportDetail() {
                                   <TableCell className={`text-right font-mono py-1 ${profitColor(parseFloat(item.costProfit))}`}>
                                     {formatAmount(Math.abs(parseFloat(item.costProfit)))}
                                   </TableCell>
-                                  <TableCell className={`text-right font-mono py-1 ${profitColor(itemCostPct)}`}>
-                                    {Math.abs(itemCostPct).toFixed(1)}%
-                                  </TableCell>
+                                  <TableCell className="text-right font-mono py-1">{formatAmount(item.costPrice)}</TableCell>
                                   <TableCell className={`text-right font-mono py-1 ${profitColor(item.configuredProfit)}`}>
                                     {formatAmount(Math.abs(item.configuredProfit))}
                                   </TableCell>
-                                  <TableCell className={`text-right font-mono py-1 ${profitColor(itemConfigPct)}`}>
-                                    {Math.abs(itemConfigPct).toFixed(1)}%
-                                  </TableCell>
+                                  <TableCell className="text-right font-mono py-1">{formatAmount(item.configuredSellingPrice)}</TableCell>
                                 </TableRow>
-                              );
-                            })}
+                            ))}
                           </>
                         );
                       })}
@@ -687,17 +671,15 @@ export default function SalesReportDetail() {
                       <TableHead className="text-right">Hassan's Price</TableHead>
                       <TableHead className="text-right">Total Cost</TableHead>
                       <TableHead className="text-right">Cost Profit</TableHead>
-                      <TableHead className="text-right">Cost %</TableHead>
+                      <TableHead className="text-right">Cost Price</TableHead>
                       <TableHead className="text-right">Hassan's Profit</TableHead>
-                      <TableHead className="text-right">Hassan's %</TableHead>
+                      <TableHead className="text-right">Config Price</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {itemGroups.map((group) => {
                       const itemKey = String(group.stockItemId);
                       const isExpanded = expandedItems.has(itemKey);
-                      const costPct = group.totalSales > 0 ? (group.costProfit / group.totalSales) * 100 : 0;
-                      const configPct = group.totalConfiguredCost > 0 ? (group.configuredProfit / group.totalConfiguredCost) * 100 : 0;
                       return (
                         <>
                           {/* Item summary row */}
@@ -745,14 +727,14 @@ export default function SalesReportDetail() {
                             <TableCell className={`text-right font-mono py-2 ${profitColor(group.costProfit)}`}>
                               {formatAmount(Math.abs(group.costProfit))}
                             </TableCell>
-                            <TableCell className={`text-right font-mono text-sm py-2 ${profitColor(costPct)}`}>
-                              {Math.abs(costPct).toFixed(1)}%
+                            <TableCell className="text-right font-mono py-2 text-muted-foreground">
+                              {group.totalQty > 0 ? formatAmount(group.totalCost / group.totalQty) : "—"}
                             </TableCell>
                             <TableCell className={`text-right font-mono py-2 ${profitColor(group.configuredProfit)}`}>
                               {formatAmount(Math.abs(group.configuredProfit))}
                             </TableCell>
-                            <TableCell className={`text-right font-mono text-sm py-2 ${profitColor(configPct)}`}>
-                              {Math.abs(configPct).toFixed(1)}%
+                            <TableCell className="text-right font-mono py-2 text-muted-foreground">
+                              {group.totalQty > 0 ? formatAmount(group.totalConfiguredCost / group.totalQty) : "—"}
                             </TableCell>
                           </TableRow>
 
@@ -760,8 +742,6 @@ export default function SalesReportDetail() {
                           {isExpanded && group.locationBreakdown.map((loc) => {
                             const locRowKey = `${itemKey}-${loc.locationKey}`;
                             const isLocExpanded = expandedLocations.has(locRowKey);
-                            const locCostPct = loc.totalSales > 0 ? (loc.costProfit / loc.totalSales) * 100 : 0;
-                            const locConfigPct = loc.totalConfiguredCost > 0 ? (loc.configuredProfit / loc.totalConfiguredCost) * 100 : 0;
                             return (
                               <>
                                 {/* Location summary row for this item */}
@@ -811,14 +791,14 @@ export default function SalesReportDetail() {
                                   <TableCell className={`text-right font-mono py-1.5 ${profitColor(loc.costProfit)}`}>
                                     {formatAmount(Math.abs(loc.costProfit))}
                                   </TableCell>
-                                  <TableCell className={`text-right font-mono text-sm py-1.5 ${profitColor(locCostPct)}`}>
-                                    {Math.abs(locCostPct).toFixed(1)}%
+                                  <TableCell className="text-right font-mono py-1.5 text-muted-foreground">
+                                    {loc.totalQty > 0 ? formatAmount(loc.totalCost / loc.totalQty) : "—"}
                                   </TableCell>
                                   <TableCell className={`text-right font-mono py-1.5 ${profitColor(loc.configuredProfit)}`}>
                                     {formatAmount(Math.abs(loc.configuredProfit))}
                                   </TableCell>
-                                  <TableCell className={`text-right font-mono text-sm py-1.5 ${profitColor(locConfigPct)}`}>
-                                    {Math.abs(locConfigPct).toFixed(1)}%
+                                  <TableCell className="text-right font-mono py-1.5 text-muted-foreground">
+                                    {loc.totalQty > 0 ? formatAmount(loc.totalConfiguredCost / loc.totalQty) : "—"}
                                   </TableCell>
                                 </TableRow>
 
@@ -841,15 +821,11 @@ export default function SalesReportDetail() {
                                     <TableCell className={`text-right font-mono py-1 ${profitColor(parseFloat(item.costProfit))}`}>
                                       {formatAmount(Math.abs(parseFloat(item.costProfit)))}
                                     </TableCell>
-                                    <TableCell className={`text-right font-mono py-1 ${profitColor(item.costProfitPercentage)}`}>
-                                      {Math.abs(item.costProfitPercentage).toFixed(1)}%
-                                    </TableCell>
+                                    <TableCell className="text-right font-mono py-1">{formatAmount(item.costPrice)}</TableCell>
                                     <TableCell className={`text-right font-mono py-1 ${profitColor(item.configuredProfit)}`}>
                                       {formatAmount(Math.abs(item.configuredProfit))}
                                     </TableCell>
-                                    <TableCell className={`text-right font-mono py-1 ${profitColor(item.configuredProfitPercentage)}`}>
-                                      {Math.abs(item.configuredProfitPercentage).toFixed(1)}%
-                                    </TableCell>
+                                    <TableCell className="text-right font-mono py-1">{formatAmount(item.configuredSellingPrice)}</TableCell>
                                   </TableRow>
                                 ))}
                               </>
