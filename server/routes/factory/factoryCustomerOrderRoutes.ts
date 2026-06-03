@@ -2181,7 +2181,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           if (order.proformaIdUsed) {
             const [factoryBale] = await tx.select().from(factoryBales)
               .where(eq(factoryBales.id, b.baleId));
-            if (!factoryBale || !["RESERVED_FOR_ORDER", "SOLD"].includes(factoryBale.status)) {
+            if (!factoryBale || !["RESERVED_FOR_ORDER", "SOLD", "DISPATCHED"].includes(factoryBale.status)) {
               throw new Error(`Bale ${b.baleReference} is no longer available`);
             }
           } else {
