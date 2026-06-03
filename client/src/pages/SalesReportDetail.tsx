@@ -197,9 +197,7 @@ export default function SalesReportDetail() {
     const locKey = allCompanies
       ? `${item.companyId ?? "?"}-${item.locationId ?? "no-location"}`
       : String(item.locationId ?? "no-location");
-    const locDisplayName = allCompanies && item.companyCode
-      ? `${item.companyCode} · ${item.locationName || "No Location"}`
-      : (item.locationName || "No Location");
+    const locDisplayName = item.locationName || "No Location";
     let locSummary = g.locationBreakdown.find((l) => l.locationKey === locKey);
     if (!locSummary) {
       locSummary = {
