@@ -167,7 +167,11 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const locationPricedList = useMemo(() => {
     if (isAllMode) return masterItems as any[];
     if (!posUser) return priceList;
-    return priceList.filter((item) => item.hasCustomPrice && item.sellingPrice !== null);
+    return priceList.filter((item) =>
+      item.hasCustomPrice &&
+      item.sellingPrice !== null &&
+      parseFloat(item.quantity) > 0
+    );
   }, [priceList, masterItems, posUser, isAllMode]);
 
   const stockGroups = useMemo(() => {
