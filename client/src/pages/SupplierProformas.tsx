@@ -292,6 +292,10 @@ export default function SupplierProformas() {
                     <Upload className="mr-1 h-3 w-3" />
                     Import Excel
                   </Button>
+                  <Button variant="outline" size="sm" onClick={() => { window.location.href = `/api/suppliers/${supplierId}/proformas/${selectedProformaId}/export-excel`; }} data-testid="button-export-excel">
+                    <Download className="mr-1 h-3 w-3" />
+                    Export Excel
+                  </Button>
                   <Button size="sm" onClick={() => setAddingLine(true)} data-testid="button-add-line">
                     <Plus className="mr-1 h-3 w-3" />
                     Add Line
