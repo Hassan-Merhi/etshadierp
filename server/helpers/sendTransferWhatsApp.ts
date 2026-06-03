@@ -145,7 +145,7 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
   // Send to all target groups
   for (const chatId of chatIds) {
     if (pngBuffer) {
-      const result = await sendWhatsAppFileToChatIdPos(chatId, pngBuffer, fileName, caption, "image/png");
+      const result = await sendWhatsAppFileToChatIdPos(chatId, pngBuffer, fileName, "", "image/png");
       if (result.success) {
         console.log(`[TransferWA] Sent ${voucherNumber} image to group ${chatId}`);
       } else {
