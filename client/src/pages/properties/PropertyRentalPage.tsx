@@ -234,18 +234,20 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
   }, [units]);
 
   const totals = useMemo(() => {
-    let totalGuarantee = 0, totalOutstanding = 0, totalPaid = 0, totalMonthlyRent = 0;
+    let totalGuarantee = 0, totalOwed = 0, totalCredit = 0, totalPaid = 0, totalMonthlyRent = 0;
     units.forEach(u => {
       if (u.contract) {
         totalGuarantee += (u as any).guaranteeRemaining ?? Number(u.contract.guaranteeAmount || 0);
-        totalOutstanding += u.outstanding ?? 0;
+        const outstanding = u.outstanding ?? 0;
+        if (outstanding > 0) totalOwed += outstanding;
+        else if (outstanding < 0) totalCredit += Math.abs(outstanding);
         totalPaid += (u as any).totalPaid ?? 0;
         if (u.contract.status === "ACTIVE" || !(u.contract as any).status) {
           totalMonthlyRent += Number(u.contract.rentalAmount || 0);
         }
       }
     });
-    return { totalGuarantee, totalOutstanding, totalPaid, totalMonthlyRent };
+    return { totalGuarantee, totalOwed, totalCredit, totalPaid, totalMonthlyRent };
   }, [units]);
 
   const runMonthly = useMutation({
@@ -414,10 +416,19 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL OUTSTANDING</CardTitle></CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${totals.totalOutstanding > 0 ? "text-red-600 dark:text-red-400" : totals.totalOutstanding < 0 ? "text-green-600 dark:text-green-400" : ""}`} data-testid={`stat-${testIdPrefix}-total-outstanding`}>
-                ${fmtMoney(Math.abs(totals.totalOutstanding))}
+              <div className="text-2xl font-bold text-red-600 dark:text-red-400" data-testid={`stat-${testIdPrefix}-total-outstanding`}>
+                ${fmtMoney(totals.totalOwed)}
               </div>
-              <p className="text-[10px] text-muted-foreground mt-1">red = owed · green = credit</p>
+              <p className="text-[10px] text-muted-foreground mt-1">total owed by tenants</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL CREDIT</CardTitle></CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid={`stat-${testIdPrefix}-total-credit`}>
+                ${fmtMoney(totals.totalCredit)}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">advance payments / overpaid</p>
             </CardContent>
           </Card>
         </div>
