@@ -1873,6 +1873,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                     <p className="text-xs text-muted-foreground mt-0.5">Tap to view inventory</p>
                   </div>
                   <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {!posUser && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -1882,6 +1883,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
+                    )}
                     {!posUser && (
                       <Button
                         variant="ghost"
@@ -2259,6 +2261,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   <h1 className="text-xl md:text-2xl font-bold leading-tight">
                     {selectedLocationLocal.name}
                   </h1>
+                  {!posUser && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -2268,6 +2271,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
+                  )}
                   {!posUser && (
                     <Button
                       variant="ghost"
