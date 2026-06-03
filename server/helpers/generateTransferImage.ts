@@ -1,12 +1,12 @@
 /**
  * generateTransferImage.ts
- * Renders a stock-transfer summary card as a PNG buffer using Puppeteer.
- * Uses the shared Puppeteer semaphore to keep peak Chrome memory predictable.
+ * Renders stock-transfer summary cards as PNG buffers using @napi-rs/canvas.
+ * No Chrome / Puppeteer required.
  */
 
-import { acquirePuppeteerSlot } from "../lib/puppeteerSemaphore";
-import { execSync } from "child_process";
-import { existsSync } from "fs";
+import { createCanvas, type Canvas, type SKRSContext2D } from "@napi-rs/canvas";
+
+// ── Types ────────────────────────────────────────────────────────────────────
 
 export interface TransferImageItem {
   name: string;
@@ -21,112 +21,6 @@ export interface TransferImageData {
   destLocationName: string;
   items: TransferImageItem[];
 }
-
-function getChromiumPath(): string | null {
-  const envPath = process.env.PUPPETEER_EXECUTABLE_PATH;
-  if (envPath && existsSync(envPath)) return envPath;
-  for (const cmd of ["chromium", "chromium-browser", "google-chrome", "google-chrome-stable"]) {
-    try {
-      const p = execSync(`which ${cmd} 2>/dev/null`, { encoding: "utf8", timeout: 3000 }).trim();
-      if (p && existsSync(p)) return p;
-    } catch { /* try next */ }
-  }
-  return null;
-}
-
-function escHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
-function formatQty(n: number): string {
-  return Number.isInteger(n) ? n.toString() : n.toFixed(3).replace(/\.?0+$/, "");
-}
-
-function buildHtml(data: TransferImageData): string {
-  const totalQty = data.items.reduce((s, i) => s + i.quantity, 0);
-  const uoms = [...new Set(data.items.map((i) => i.uom))];
-  const totalUom = uoms.length === 1 ? uoms[0] : "Mixed";
-
-  const rows = data.items.map((item) =>
-    "<tr>" +
-    "<td class=\"item-name\">" + escHtml(item.name) + "</td>" +
-    "<td class=\"qty\">" + formatQty(item.quantity) + "</td>" +
-    "<td class=\"uom\">" + escHtml(item.uom) + "</td>" +
-    "</tr>"
-  ).join("");
-
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"/>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; width: 420px; padding: 0; }
-.card { background: #ffffff; border-radius: 16px; overflow: hidden; margin: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
-.header { background: #059669; padding: 16px 20px 14px; }
-.header-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.icon-circle { width: 28px; height: 28px; border-radius: 8px; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; }
-.title { color: #ffffff; font-size: 14px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
-.date { color: #a7f3d0; font-size: 11px; margin-top: 2px; font-weight: 500; }
-.route { background: #f8fafc; padding: 12px 20px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #e2e8f0; }
-.loc-block { flex: 1; }
-.loc-label { color: #94a3b8; font-size: 9px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; margin-bottom: 2px; }
-.loc-name { color: #1e293b; font-size: 14px; font-weight: 700; }
-.arrow-circle { width: 28px; height: 28px; border-radius: 50%; background: #ecfdf5; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.arrow { color: #059669; font-size: 16px; font-weight: 800; }
-.items-section { padding: 0 20px 6px; background: #ffffff; }
-.items-header { display: flex; padding: 10px 0 6px; border-bottom: 2px solid #e2e8f0; }
-.col-name { flex: 1; color: #94a3b8; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
-.col-qty { width: 60px; text-align: right; color: #94a3b8; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
-.col-uom { width: 44px; text-align: right; color: #94a3b8; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
-table { width: 100%; border-collapse: collapse; }
-table tr:not(:last-child) td { border-bottom: 1px solid #f1f5f9; }
-table td { padding: 8px 0; vertical-align: middle; }
-td.item-name { color: #334155; font-size: 12px; padding-right: 8px; font-weight: 500; }
-td.qty { width: 60px; text-align: right; color: #059669; font-size: 14px; font-weight: 800; }
-td.uom { width: 44px; text-align: right; color: #94a3b8; font-size: 10px; padding-left: 4px; font-weight: 600; }
-.footer { background: #f8fafc; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-top: 2px solid #e2e8f0; }
-.total-label { color: #94a3b8; font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; }
-.total-value { color: #059669; font-size: 20px; font-weight: 800; }
-.total-suffix { color: #94a3b8; font-size: 11px; margin-left: 4px; font-weight: 600; }
-</style></head><body>
-<div class="card">
-  <div class="header">
-    <div class="header-top">
-      <div class="icon-circle"><span style="color:white;font-size:14px;">&#8594;</span></div>
-      <div class="title">Stock Transfer</div>
-    </div>
-    <div class="date">${escHtml(data.date)} &nbsp;&bull;&nbsp; ${escHtml(data.voucherNumber)}</div>
-  </div>
-  <div class="route">
-    <div class="loc-block">
-      <div class="loc-label">From</div>
-      <div class="loc-name">${escHtml(data.sourceLocationName)}</div>
-    </div>
-    <div class="arrow-circle"><span class="arrow">&#8594;</span></div>
-    <div class="loc-block" style="text-align:right">
-      <div class="loc-label">To</div>
-      <div class="loc-name">${escHtml(data.destLocationName)}</div>
-    </div>
-  </div>
-  <div class="items-section">
-    <div class="items-header">
-      <div class="col-name">Item</div>
-      <div class="col-qty">Qty</div>
-      <div class="col-uom">Unit</div>
-    </div>
-    <table>${rows}</table>
-  </div>
-  <div class="footer">
-    <div class="total-label">Total Items</div>
-    <div style="text-align:right">
-      <span class="total-value">${formatQty(totalQty)}</span>
-      <span class="total-suffix">${escHtml(totalUom)}</span>
-    </div>
-  </div>
-</div>
-</body></html>`;
-}
-
-// ── Revised Transfer Image ────────────────────────────────────────────────────
 
 export interface RevisedTransferItem {
   name: string;
@@ -144,133 +38,480 @@ export interface RevisedTransferImageData {
   items: RevisedTransferItem[];
 }
 
-function buildRevisedHtml(data: RevisedTransferImageData): string {
-  const rows = data.items.map((item) => {
-    const deltaStr = item.delta > 0
-      ? `+${formatQty(item.delta)}`
-      : formatQty(item.delta);
-    const deltaColor = item.delta > 0 ? "#059669" : item.delta < 0 ? "#ef4444" : "#94a3b8";
-    return (
-      "<tr>" +
-      "<td class=\"item-name\">" + escHtml(item.name) + "</td>" +
-      "<td class=\"qty muted\">" + formatQty(item.before) + "</td>" +
-      "<td class=\"qty delta\" style=\"color:" + deltaColor + "\">" + deltaStr + "</td>" +
-      "<td class=\"qty after\">" + formatQty(item.after) + "</td>" +
-      "<td class=\"uom\">" + escHtml(item.uom) + "</td>" +
-      "</tr>"
-    );
-  }).join("");
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"/>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; width: 440px; padding: 0; }
-.card { background: #ffffff; border-radius: 16px; overflow: hidden; margin: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
-.header { background: #d97706; padding: 16px 20px 14px; }
-.header-top { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
-.icon-circle { width: 28px; height: 28px; border-radius: 8px; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; }
-.title { color: #ffffff; font-size: 14px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
-.subtitle { color: #fde68a; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-top: 2px; }
-.date { color: #fef3c7; font-size: 11px; margin-top: 2px; font-weight: 500; }
-.route { background: #f8fafc; padding: 12px 20px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #e2e8f0; }
-.loc-block { flex: 1; }
-.loc-label { color: #94a3b8; font-size: 9px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; margin-bottom: 2px; }
-.loc-name { color: #1e293b; font-size: 14px; font-weight: 700; }
-.arrow-circle { width: 28px; height: 28px; border-radius: 50%; background: #fffbeb; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.arrow { color: #d97706; font-size: 16px; font-weight: 800; }
-.items-section { padding: 0 20px 6px; background: #ffffff; }
-.items-header { display: flex; padding: 10px 0 6px; border-bottom: 2px solid #e2e8f0; }
-.col-name { flex: 1; color: #94a3b8; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
-.col-qty { width: 52px; text-align: right; color: #94a3b8; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
-.col-uom { width: 40px; text-align: right; color: #94a3b8; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
-table { width: 100%; border-collapse: collapse; }
-table tr:not(:last-child) td { border-bottom: 1px solid #f1f5f9; }
-table td { padding: 8px 0; vertical-align: middle; }
-td.item-name { color: #334155; font-size: 12px; padding-right: 6px; font-weight: 500; }
-td.qty { width: 52px; text-align: right; font-size: 13px; font-weight: 800; }
-td.muted { color: #94a3b8; }
-td.delta { font-size: 14px; }
-td.after { color: #2563eb; }
-td.uom { width: 40px; text-align: right; color: #94a3b8; font-size: 10px; padding-left: 3px; font-weight: 600; }
-.footer { background: #fffbeb; padding: 12px 20px; border-top: 2px solid #fde68a; display: flex; justify-content: space-between; align-items: center; }
-.badge { background: #d97706; color: #fff; font-size: 9px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; padding: 3px 10px; border-radius: 20px; }
-.items-count { color: #92400e; font-size: 13px; font-weight: 700; }
-</style></head><body>
-<div class="card">
-  <div class="header">
-    <div class="header-top">
-      <div class="icon-circle"><span style="color:white;font-size:12px;">&#9998;</span></div>
-      <div class="title">Stock Transfer</div>
-    </div>
-    <div class="subtitle">Revised</div>
-    <div class="date">${escHtml(data.date)} &nbsp;&bull;&nbsp; ${escHtml(data.voucherNumber)}</div>
-  </div>
-  <div class="route">
-    <div class="loc-block">
-      <div class="loc-label">From</div>
-      <div class="loc-name">${escHtml(data.sourceLocationName)}</div>
-    </div>
-    <div class="arrow-circle"><span class="arrow">&#8594;</span></div>
-    <div class="loc-block" style="text-align:right">
-      <div class="loc-label">To</div>
-      <div class="loc-name">${escHtml(data.destLocationName)}</div>
-    </div>
-  </div>
-  <div class="items-section">
-    <div class="items-header">
-      <div class="col-name">Item</div>
-      <div class="col-qty">Before</div>
-      <div class="col-qty">Change</div>
-      <div class="col-qty">After</div>
-      <div class="col-uom">Unit</div>
-    </div>
-    <table>${rows}</table>
-  </div>
-  <div class="footer">
-    <span class="badge">Revision</span>
-    <span class="items-count">${data.items.length} item${data.items.length !== 1 ? "s" : ""} revised</span>
-  </div>
-</div>
-</body></html>`;
+function fmtQty(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(3).replace(/\.?0+$/, "");
 }
 
-async function renderHtmlToPng(html: string, width: number, height: number): Promise<Buffer> {
-  const release = await acquirePuppeteerSlot();
-  let browser: any = null;
-  try {
-    const { default: puppeteer } = await import("puppeteer");
-    const chromePath = getChromiumPath();
-    browser = await puppeteer.launch({
-      headless: true,
-      ...(chromePath ? { executablePath: chromePath } : {}),
-      args: [
-        "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
-        "--disable-gpu", "--disable-accelerated-2d-canvas", "--no-first-run",
-        "--no-zygote", "--disable-extensions", "--disable-background-networking",
-      ],
-    });
-    const page = await browser.newPage();
-    await page.setViewport({ width, height });
-    await page.setContent(html, { waitUntil: "domcontentloaded" });
-    await new Promise((r) => setTimeout(r, 400));
-    const cardEl = await page.$(".card");
-    const screenshot = cardEl
-      ? await cardEl.screenshot({ type: "png" })
-      : await page.screenshot({ type: "png", fullPage: true });
-    return Buffer.from(screenshot as Uint8Array);
-  } finally {
-    if (browser) { try { await browser.close(); } catch { /* ignore */ } }
-    release();
-  }
+function roundRect(ctx: SKRSContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y,     x + w, y + r,     r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x,     y + h, x,     y + h - r, r);
+  ctx.lineTo(x,     y + r);
+  ctx.arcTo(x,     y,     x + r, y,         r);
+  ctx.closePath();
 }
 
-export async function generateRevisedTransferImageBuffer(data: RevisedTransferImageData): Promise<Buffer> {
-  const html = buildRevisedHtml(data);
-  return renderHtmlToPng(html, 472, 700);
+function clamp(ctx: SKRSContext2D, text: string, maxW: number): string {
+  if (ctx.measureText(text).width <= maxW) return text;
+  let t = text;
+  while (t.length > 1 && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1);
+  return t + "…";
 }
 
-export async function generateTransferImageBuffer(data: TransferImageData): Promise<Buffer> {
-  const html = buildHtml(data);
-  return renderHtmlToPng(html, 452, 700);
+// ── Transfer card (green) ────────────────────────────────────────────────────
+
+export function generateTransferImageBuffer(data: TransferImageData): Promise<Buffer> {
+  const W          = 452;
+  const MARGIN     = 16;
+  const CARD_W     = W - MARGIN * 2;
+  const HEADER_H   = 62;
+  const ROUTE_H    = 54;
+  const ITEMS_HDR  = 28;
+  const ROW_H      = 34;
+  const FOOTER_H   = 44;
+  const CARD_H     = HEADER_H + ROUTE_H + ITEMS_HDR + ROW_H * data.items.length + FOOTER_H;
+  const TOTAL_H    = CARD_H + MARGIN * 2;
+
+  const GREEN      = "#059669";
+  const GREEN_LT   = "#a7f3d0";
+  const GREEN_BG   = "#ecfdf5";
+  const SLATE_50   = "#f8fafc";
+  const SLATE_200  = "#e2e8f0";
+  const SLATE_400  = "#94a3b8";
+  const SLATE_700  = "#334155";
+  const SLATE_800  = "#1e293b";
+  const WHITE      = "#ffffff";
+  const BG         = "#f0fdf4";
+
+  const canvas = createCanvas(W, TOTAL_H);
+  const ctx    = canvas.getContext("2d");
+
+  // Background
+  ctx.fillStyle = BG;
+  ctx.fillRect(0, 0, W, TOTAL_H);
+
+  // Card shadow (fake with offset fill)
+  ctx.fillStyle = "rgba(0,0,0,0.09)";
+  roundRect(ctx, MARGIN + 2, MARGIN + 4, CARD_W, CARD_H, 16);
+  ctx.fill();
+
+  // Card white bg
+  ctx.fillStyle = WHITE;
+  roundRect(ctx, MARGIN, MARGIN, CARD_W, CARD_H, 16);
+  ctx.fill();
+
+  let y = MARGIN;
+
+  // ── Header ──────────────────────────────────────────────────────────────
+  ctx.save();
+  roundRect(ctx, MARGIN, y, CARD_W, CARD_H, 16);
+  ctx.clip();
+
+  ctx.fillStyle = GREEN;
+  ctx.fillRect(MARGIN, y, CARD_W, HEADER_H);
+
+  // Icon circle
+  ctx.fillStyle = "rgba(255,255,255,0.20)";
+  roundRect(ctx, MARGIN + 16, y + 14, 28, 28, 8);
+  ctx.fill();
+  ctx.fillStyle = WHITE;
+  ctx.font = "bold 16px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("→", MARGIN + 30, y + 28);
+
+  // Title
+  ctx.fillStyle = WHITE;
+  ctx.font = "bold 13px sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.letterSpacing = "1px";
+  ctx.fillText("STOCK TRANSFER", MARGIN + 52, y + 24);
+  ctx.letterSpacing = "0px";
+
+  // Date · voucher
+  ctx.fillStyle = GREEN_LT;
+  ctx.font = "500 11px sans-serif";
+  ctx.fillText(`${data.date}  ·  ${data.voucherNumber}`, MARGIN + 16, y + 48);
+
+  ctx.restore();
+  y += HEADER_H;
+
+  // ── Route ────────────────────────────────────────────────────────────────
+  ctx.fillStyle = SLATE_50;
+  ctx.fillRect(MARGIN, y, CARD_W, ROUTE_H);
+
+  // Border bottom
+  ctx.strokeStyle = SLATE_200;
+  ctx.lineWidth   = 1;
+  ctx.beginPath();
+  ctx.moveTo(MARGIN, y + ROUTE_H);
+  ctx.lineTo(MARGIN + CARD_W, y + ROUTE_H);
+  ctx.stroke();
+
+  const COL_W = (CARD_W - 48) / 2;   // 48 = arrow circle space
+
+  // FROM
+  ctx.fillStyle = SLATE_400;
+  ctx.font      = "700 9px sans-serif";
+  ctx.textBaseline = "top";
+  ctx.fillText("FROM", MARGIN + 20, y + 12);
+  ctx.fillStyle = SLATE_800;
+  ctx.font      = "700 14px sans-serif";
+  ctx.textBaseline = "top";
+  ctx.fillText(clamp(ctx, data.sourceLocationName, COL_W - 8), MARGIN + 20, y + 26);
+
+  // Arrow circle
+  const AX = MARGIN + CARD_W / 2;
+  ctx.fillStyle   = GREEN_BG;
+  ctx.beginPath();
+  ctx.arc(AX, y + ROUTE_H / 2, 14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle   = GREEN;
+  ctx.font        = "bold 16px sans-serif";
+  ctx.textAlign   = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("→", AX, y + ROUTE_H / 2);
+
+  // TO
+  ctx.fillStyle   = SLATE_400;
+  ctx.font        = "700 9px sans-serif";
+  ctx.textAlign   = "right";
+  ctx.textBaseline = "top";
+  ctx.fillText("TO", MARGIN + CARD_W - 20, y + 12);
+  ctx.fillStyle   = SLATE_800;
+  ctx.font        = "700 14px sans-serif";
+  ctx.fillText(clamp(ctx, data.destLocationName, COL_W - 8), MARGIN + CARD_W - 20, y + 26);
+
+  y += ROUTE_H;
+
+  // ── Items header ─────────────────────────────────────────────────────────
+  ctx.fillStyle   = SLATE_400;
+  ctx.font        = "700 9px sans-serif";
+  ctx.textAlign   = "left";
+  ctx.textBaseline = "middle";
+  const ITEM_X    = MARGIN + 20;
+  const QTY_X     = MARGIN + CARD_W - 84;
+  const UOM_X     = MARGIN + CARD_W - 20;
+  ctx.fillText("ITEM",  ITEM_X, y + ITEMS_HDR / 2);
+  ctx.textAlign = "right";
+  ctx.fillText("QTY",  QTY_X,  y + ITEMS_HDR / 2);
+  ctx.fillText("UNIT", UOM_X,  y + ITEMS_HDR / 2);
+
+  ctx.strokeStyle = SLATE_200;
+  ctx.lineWidth   = 2;
+  ctx.beginPath();
+  ctx.moveTo(MARGIN, y + ITEMS_HDR);
+  ctx.lineTo(MARGIN + CARD_W, y + ITEMS_HDR);
+  ctx.stroke();
+
+  y += ITEMS_HDR;
+
+  // ── Item rows ────────────────────────────────────────────────────────────
+  const NAME_MAX = QTY_X - ITEM_X - 12;
+
+  data.items.forEach((item, idx) => {
+    if (idx > 0) {
+      ctx.strokeStyle = "#f1f5f9";
+      ctx.lineWidth   = 1;
+      ctx.beginPath();
+      ctx.moveTo(MARGIN, y);
+      ctx.lineTo(MARGIN + CARD_W, y);
+      ctx.stroke();
+    }
+
+    const cy = y + ROW_H / 2;
+
+    ctx.fillStyle   = SLATE_700;
+    ctx.font        = "500 12px sans-serif";
+    ctx.textAlign   = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(clamp(ctx, item.name, NAME_MAX), ITEM_X, cy);
+
+    ctx.fillStyle   = GREEN;
+    ctx.font        = "800 14px sans-serif";
+    ctx.textAlign   = "right";
+    ctx.fillText(fmtQty(item.quantity), QTY_X, cy);
+
+    ctx.fillStyle   = SLATE_400;
+    ctx.font        = "600 10px sans-serif";
+    ctx.fillText(item.uom, UOM_X, cy);
+
+    y += ROW_H;
+  });
+
+  // ── Footer ───────────────────────────────────────────────────────────────
+  ctx.strokeStyle = SLATE_200;
+  ctx.lineWidth   = 2;
+  ctx.beginPath();
+  ctx.moveTo(MARGIN, y);
+  ctx.lineTo(MARGIN + CARD_W, y);
+  ctx.stroke();
+
+  ctx.fillStyle = SLATE_50;
+  ctx.fillRect(MARGIN, y, CARD_W, FOOTER_H);
+
+  const totalQty = data.items.reduce((s, i) => s + i.quantity, 0);
+  const uoms     = [...new Set(data.items.map((i) => i.uom))];
+  const uomLabel = uoms.length === 1 ? uoms[0] : "Mixed";
+
+  ctx.fillStyle   = SLATE_400;
+  ctx.font        = "700 9px sans-serif";
+  ctx.textAlign   = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText("TOTAL ITEMS", ITEM_X, y + FOOTER_H / 2);
+
+  ctx.fillStyle   = GREEN;
+  ctx.font        = "800 20px sans-serif";
+  ctx.textAlign   = "right";
+  ctx.fillText(fmtQty(totalQty), MARGIN + CARD_W - 48, y + FOOTER_H / 2);
+
+  ctx.fillStyle   = SLATE_400;
+  ctx.font        = "600 11px sans-serif";
+  ctx.fillText(uomLabel, MARGIN + CARD_W - 20, y + FOOTER_H / 2);
+
+  return Promise.resolve(canvas.toBuffer("image/png") as unknown as Buffer);
+}
+
+// ── Revised Transfer card (amber) ────────────────────────────────────────────
+
+export function generateRevisedTransferImageBuffer(data: RevisedTransferImageData): Promise<Buffer> {
+  const W          = 472;
+  const MARGIN     = 16;
+  const CARD_W     = W - MARGIN * 2;
+  const HEADER_H   = 70;
+  const ROUTE_H    = 54;
+  const ITEMS_HDR  = 28;
+  const ROW_H      = 34;
+  const FOOTER_H   = 44;
+  const CARD_H     = HEADER_H + ROUTE_H + ITEMS_HDR + ROW_H * data.items.length + FOOTER_H;
+  const TOTAL_H    = CARD_H + MARGIN * 2;
+
+  const AMBER      = "#d97706";
+  const AMBER_LT   = "#fde68a";
+  const AMBER_BG   = "#fffbeb";
+  const AMBER_TXT  = "#92400e";
+  const BLUE       = "#2563eb";
+  const RED        = "#ef4444";
+  const GREEN      = "#059669";
+  const SLATE_50   = "#f8fafc";
+  const SLATE_200  = "#e2e8f0";
+  const SLATE_400  = "#94a3b8";
+  const SLATE_700  = "#334155";
+  const SLATE_800  = "#1e293b";
+  const WHITE      = "#ffffff";
+  const BG         = "#fffbeb";
+
+  const canvas = createCanvas(W, TOTAL_H);
+  const ctx    = canvas.getContext("2d");
+
+  // Background
+  ctx.fillStyle = BG;
+  ctx.fillRect(0, 0, W, TOTAL_H);
+
+  // Shadow
+  ctx.fillStyle = "rgba(0,0,0,0.09)";
+  roundRect(ctx, MARGIN + 2, MARGIN + 4, CARD_W, CARD_H, 16);
+  ctx.fill();
+
+  // Card
+  ctx.fillStyle = WHITE;
+  roundRect(ctx, MARGIN, MARGIN, CARD_W, CARD_H, 16);
+  ctx.fill();
+
+  let y = MARGIN;
+
+  // ── Header ──────────────────────────────────────────────────────────────
+  ctx.save();
+  roundRect(ctx, MARGIN, y, CARD_W, CARD_H, 16);
+  ctx.clip();
+
+  ctx.fillStyle = AMBER;
+  ctx.fillRect(MARGIN, y, CARD_W, HEADER_H);
+
+  // Icon circle
+  ctx.fillStyle = "rgba(255,255,255,0.20)";
+  roundRect(ctx, MARGIN + 16, y + 12, 28, 28, 8);
+  ctx.fill();
+  ctx.fillStyle = WHITE;
+  ctx.font = "14px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("✎", MARGIN + 30, y + 26);
+
+  // Title
+  ctx.fillStyle = WHITE;
+  ctx.font = "bold 13px sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText("STOCK TRANSFER", MARGIN + 52, y + 22);
+
+  // Revised badge
+  ctx.fillStyle = AMBER_LT;
+  ctx.font = "700 9px sans-serif";
+  ctx.fillText("REVISED", MARGIN + 52, y + 38);
+
+  // Date
+  ctx.fillStyle = "#fef3c7";
+  ctx.font = "500 11px sans-serif";
+  ctx.fillText(`${data.date}  ·  ${data.voucherNumber}`, MARGIN + 16, y + 56);
+
+  ctx.restore();
+  y += HEADER_H;
+
+  // ── Route ────────────────────────────────────────────────────────────────
+  ctx.fillStyle = SLATE_50;
+  ctx.fillRect(MARGIN, y, CARD_W, ROUTE_H);
+
+  ctx.strokeStyle = SLATE_200;
+  ctx.lineWidth   = 1;
+  ctx.beginPath();
+  ctx.moveTo(MARGIN, y + ROUTE_H);
+  ctx.lineTo(MARGIN + CARD_W, y + ROUTE_H);
+  ctx.stroke();
+
+  const COL_W = (CARD_W - 48) / 2;
+  const AX    = MARGIN + CARD_W / 2;
+
+  ctx.fillStyle   = SLATE_400;
+  ctx.font        = "700 9px sans-serif";
+  ctx.textAlign   = "left";
+  ctx.textBaseline = "top";
+  ctx.fillText("FROM", MARGIN + 20, y + 12);
+  ctx.fillStyle   = SLATE_800;
+  ctx.font        = "700 14px sans-serif";
+  ctx.fillText(clamp(ctx, data.sourceLocationName, COL_W - 8), MARGIN + 20, y + 26);
+
+  ctx.fillStyle   = AMBER_BG;
+  ctx.beginPath();
+  ctx.arc(AX, y + ROUTE_H / 2, 14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle   = AMBER;
+  ctx.font        = "bold 16px sans-serif";
+  ctx.textAlign   = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("→", AX, y + ROUTE_H / 2);
+
+  ctx.fillStyle   = SLATE_400;
+  ctx.font        = "700 9px sans-serif";
+  ctx.textAlign   = "right";
+  ctx.textBaseline = "top";
+  ctx.fillText("TO", MARGIN + CARD_W - 20, y + 12);
+  ctx.fillStyle   = SLATE_800;
+  ctx.font        = "700 14px sans-serif";
+  ctx.fillText(clamp(ctx, data.destLocationName, COL_W - 8), MARGIN + CARD_W - 20, y + 26);
+
+  y += ROUTE_H;
+
+  // ── Items header (Before / Change / After / Unit) ─────────────────────
+  // Column positions (right-aligned numbers):
+  const NAME_END  = MARGIN + CARD_W - 178; // end of name column
+  const BEF_X     = MARGIN + CARD_W - 138;
+  const CHG_X     = MARGIN + CARD_W - 88;
+  const AFT_X     = MARGIN + CARD_W - 42;
+  const UOM_X2    = MARGIN + CARD_W - 16;
+
+  ctx.fillStyle    = SLATE_400;
+  ctx.font         = "700 9px sans-serif";
+  ctx.textAlign    = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText("ITEM",   MARGIN + 20, y + ITEMS_HDR / 2);
+  ctx.textAlign = "right";
+  ctx.fillText("BEFORE", BEF_X, y + ITEMS_HDR / 2);
+  ctx.fillText("CHANGE", CHG_X, y + ITEMS_HDR / 2);
+  ctx.fillText("AFTER",  AFT_X, y + ITEMS_HDR / 2);
+  ctx.fillText("UNIT",   UOM_X2, y + ITEMS_HDR / 2);
+
+  ctx.strokeStyle = SLATE_200;
+  ctx.lineWidth   = 2;
+  ctx.beginPath();
+  ctx.moveTo(MARGIN, y + ITEMS_HDR);
+  ctx.lineTo(MARGIN + CARD_W, y + ITEMS_HDR);
+  ctx.stroke();
+
+  y += ITEMS_HDR;
+
+  // ── Item rows ────────────────────────────────────────────────────────────
+  const NAME_MAX2 = NAME_END - (MARGIN + 20) - 8;
+
+  data.items.forEach((item, idx) => {
+    if (idx > 0) {
+      ctx.strokeStyle = "#f1f5f9";
+      ctx.lineWidth   = 1;
+      ctx.beginPath();
+      ctx.moveTo(MARGIN, y);
+      ctx.lineTo(MARGIN + CARD_W, y);
+      ctx.stroke();
+    }
+
+    const cy = y + ROW_H / 2;
+
+    ctx.fillStyle   = SLATE_700;
+    ctx.font        = "500 12px sans-serif";
+    ctx.textAlign   = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(clamp(ctx, item.name, NAME_MAX2), MARGIN + 20, cy);
+
+    ctx.fillStyle   = SLATE_400;
+    ctx.font        = "700 12px sans-serif";
+    ctx.textAlign   = "right";
+    ctx.fillText(fmtQty(item.before), BEF_X, cy);
+
+    const deltaStr   = item.delta > 0 ? `+${fmtQty(item.delta)}` : fmtQty(item.delta);
+    ctx.fillStyle    = item.delta > 0 ? GREEN : item.delta < 0 ? RED : SLATE_400;
+    ctx.font         = "800 13px sans-serif";
+    ctx.fillText(deltaStr, CHG_X, cy);
+
+    ctx.fillStyle   = BLUE;
+    ctx.font        = "800 13px sans-serif";
+    ctx.fillText(fmtQty(item.after), AFT_X, cy);
+
+    ctx.fillStyle   = SLATE_400;
+    ctx.font        = "600 10px sans-serif";
+    ctx.fillText(item.uom, UOM_X2, cy);
+
+    y += ROW_H;
+  });
+
+  // ── Footer ───────────────────────────────────────────────────────────────
+  ctx.strokeStyle = AMBER_LT;
+  ctx.lineWidth   = 2;
+  ctx.beginPath();
+  ctx.moveTo(MARGIN, y);
+  ctx.lineTo(MARGIN + CARD_W, y);
+  ctx.stroke();
+
+  ctx.fillStyle = AMBER_BG;
+  ctx.fillRect(MARGIN, y, CARD_W, FOOTER_H);
+
+  // "REVISION" pill
+  const PILL_X = MARGIN + 20;
+  const PILL_Y = y + (FOOTER_H - 20) / 2;
+  ctx.fillStyle = AMBER;
+  roundRect(ctx, PILL_X, PILL_Y, 66, 20, 10);
+  ctx.fill();
+  ctx.fillStyle    = WHITE;
+  ctx.font         = "800 9px sans-serif";
+  ctx.textAlign    = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("REVISION", PILL_X + 33, PILL_Y + 10);
+
+  ctx.fillStyle    = AMBER_TXT;
+  ctx.font         = "700 13px sans-serif";
+  ctx.textAlign    = "right";
+  ctx.textBaseline = "middle";
+  ctx.fillText(
+    `${data.items.length} item${data.items.length !== 1 ? "s" : ""} revised`,
+    MARGIN + CARD_W - 20,
+    y + FOOTER_H / 2,
+  );
+
+  return Promise.resolve(canvas.toBuffer("image/png") as unknown as Buffer);
 }
