@@ -380,8 +380,12 @@ export async function httpScrapeTracking(containerNumber: string): Promise<HttpS
       result = { success: false, shipment: null, error: "CMA page: DataDome protected, use ParcelsApp API" };
       break;
     default:
-      // For YANGMING, OOCL, and unknowns — try ParcelsApp page HTML.
-      result = await tryPageHtml(containerNumber);
+      // ParcelsApp removed server-side Nuxt data embedding from their page
+      // HTML — tryPageHtml() now always returns "No embedded tracking data in
+      // page" (99 errors/month observed).  Fast-fail here so the provider
+      // chain reaches the ParcelsApp v3 API immediately instead of wasting
+      // a 12-second HTTP round-trip on a request that never succeeds.
+      result = { success: false, shipment: null, error: "unknown carrier: forwarding to ParcelsApp API" };
   }
 
   if (!result.success) {
