@@ -2175,19 +2175,11 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         if (bales.length === 0) throw new Error("Order has no bales");
 
         for (const b of bales) {
-          // V5 guard: proformaIdUsed IS NOT NULL
-          // V5 bales are already SOLD (set when order moved to PENDING_VERIFICATION).
-          // Accept SOLD or RESERVED_FOR_ORDER for V5; require RESERVED_FOR_ORDER only for legacy.
-          if (order.proformaIdUsed) {
-            const [factoryBale] = await tx.select().from(factoryBales)
-              .where(eq(factoryBales.id, b.baleId));
-            if (!factoryBale || !["RESERVED_FOR_ORDER", "SOLD", "DISPATCHED"].includes(factoryBale.status)) {
-              throw new Error(`Bale ${b.baleReference} is no longer available`);
-            }
-          } else {
-            const [factoryBale] = await tx.select().from(factoryBales)
-              .where(and(eq(factoryBales.id, b.baleId), eq(factoryBales.status, "RESERVED_FOR_ORDER"), eq(factoryBales.erpLocationId, b.locationId)));
-            if (!factoryBale) throw new Error(`Bale ${b.baleReference} is no longer available`);
+          // Just verify the bale still exists — status is not checked here.
+          const [factoryBale] = await tx.select().from(factoryBales)
+            .where(eq(factoryBales.id, b.baleId));
+          if (!factoryBale || factoryBale.status === "DELETED") {
+            throw new Error(`Bale ${b.baleReference} is no longer available`);
           }
         }
 
