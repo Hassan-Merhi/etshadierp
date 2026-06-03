@@ -1416,7 +1416,7 @@ export function registerGitRoutes(app: Express) {
         mimeType      = "application/pdf";
       }
 
-      const caption = `Containers OTW — ${today}`;
+      const caption = "";
       const result  = await sendWhatsAppFileToChatId(settings.groupChatId, buffer, finalFileName, caption, mimeType);
       if (!result.success) {
         return res.status(500).json({ message: result.error || "Failed to send" });

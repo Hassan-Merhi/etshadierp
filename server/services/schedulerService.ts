@@ -961,7 +961,7 @@ async function checkAndRunContainersWhatsApp(): Promise<void> {
     const { buffer, rowCount } = await generateContainersPdf();
 
     const today    = new Date().toISOString().substring(0, 10);
-    const caption  = `Containers OTW — ${today} (${rowCount} container${rowCount !== 1 ? "s" : ""})`;
+    const caption  = "";
     const fileName = `Containers_${today}.pdf`;
 
     const result = await sendWhatsAppFileToChatId(
