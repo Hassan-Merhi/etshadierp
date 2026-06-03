@@ -52,11 +52,12 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       const stockItemIds = items.map((r: any) => r.id);
       const idsParam = stockItemIds.map((_: any, i: number) => `$${i + 1}`).join(",");
 
-      // 2. Average selling price per item in date range
+      // 2. Average selling price + total sales qty per item in date range
       const avgSellResult = await pool.query(`
         SELECT si.stock_item_id,
           SUM(si.total_sales::numeric) / NULLIF(SUM(si.quantity::numeric), 0) AS avg_selling_price,
-          AVG(si.configured_price::numeric) FILTER (WHERE si.configured_price IS NOT NULL AND si.configured_price::numeric > 0) AS avg_config_price
+          AVG(si.configured_price::numeric) FILTER (WHERE si.configured_price IS NOT NULL AND si.configured_price::numeric > 0) AS avg_config_price,
+          SUM(si.quantity::numeric) AS total_qty
         FROM sales_items si
         JOIN vouchers v ON v.id = si.voucher_id
         WHERE v.company_id = $1
@@ -67,11 +68,12 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
           AND si.stock_item_id = ANY($4::int[])
         GROUP BY si.stock_item_id
       `, [companyId, fromDate, toDate, stockItemIds]);
-      const avgSellMap = new Map<number, { avgSellingPrice: number | null; avgConfigPrice: number }>();
+      const avgSellMap = new Map<number, { avgSellingPrice: number | null; avgConfigPrice: number; salesQty: number }>();
       for (const row of avgSellResult.rows) {
         avgSellMap.set(Number(row.stock_item_id), {
           avgSellingPrice: row.avg_selling_price != null ? Number(row.avg_selling_price) : null,
           avgConfigPrice: row.avg_config_price != null ? Number(row.avg_config_price) : 0,
+          salesQty: row.total_qty != null ? Number(row.total_qty) : 0,
         });
       }
 
@@ -152,6 +154,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         const salesData = avgSellMap.get(id);
         const avgSellingPrice = salesData?.avgSellingPrice ?? null;
         const configPrice = salesData?.avgConfigPrice ?? 0;
+        const salesQty = salesData?.salesQty ?? 0;
 
         const dubaiData = proformaRateMap.get(id) ?? poRateMap.get(id);
         const dubaiCost = dubaiData?.rate ?? 0;
@@ -185,6 +188,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
           stockGroupId: item.stock_group_id,
           stockGroupName: item.stock_group_name,
           currentStock,
+          salesQty,
           avgSellingPrice,
           dubaiCost,
           dubaiCostSource,

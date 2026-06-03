@@ -52,6 +52,7 @@ interface AnalysisRow {
   stockGroupId: number | null;
   stockGroupName: string | null;
   currentStock: number;
+  salesQty: number;
   avgSellingPrice: number | null;
   dubaiCost: number;
   dubaiCostSource: string;
@@ -625,6 +626,7 @@ export default function SupplierProfitCheck() {
                 <TableRow className="bg-muted/50">
                   <TableHead className="min-w-[90px]">Code</TableHead>
                   <TableHead className="min-w-[200px]">Name</TableHead>
+                  <TableHead className="text-right min-w-[90px]">Sales Qty</TableHead>
                   <TableHead className="text-right min-w-[110px]">Avg Sell</TableHead>
                   <TableHead className="text-right min-w-[110px]">Dubai Cost</TableHead>
                   <TableHead className="text-right min-w-[100px]">Config Price</TableHead>
@@ -646,7 +648,7 @@ export default function SupplierProfitCheck() {
               <TableBody>
                 {filteredRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
                       <Package className="w-8 h-8 mx-auto mb-2 opacity-40" />
                       No items match your filters
                     </TableCell>
@@ -664,6 +666,11 @@ export default function SupplierProfitCheck() {
                       <TableRow key={row.stockItemId} className={rowBg} data-testid={`row-item-${row.stockItemId}`}>
                         <TableCell className="font-mono text-xs">{row.code}</TableCell>
                         <TableCell className="font-medium text-sm">{row.name}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          {row.salesQty > 0
+                            ? row.salesQty.toLocaleString("en-US")
+                            : <span className="text-muted-foreground text-xs">—</span>}
+                        </TableCell>
                         <TableCell className="text-right text-sm font-medium">
                           {row.avgSellingPrice != null ? `$${fmt(row.avgSellingPrice)}` : <span className="text-muted-foreground text-xs">—</span>}
                         </TableCell>
