@@ -670,7 +670,7 @@ export default function BarcodeLookup() {
                           </p>
                           <p className="text-sm font-medium">
                             {referenceResult.baleInfo.finalizedAt
-                              ? formatDate(referenceResult.baleInfo.finalizedAt)
+                              ? formatDateOnly(referenceResult.baleInfo.finalizedAt)
                               : formatDateOnly(referenceResult.baleInfo.stockEntryDate!)}
                           </p>
                         </div>
@@ -693,15 +693,25 @@ export default function BarcodeLookup() {
                           <p className="text-sm font-medium">{formatDate(referenceResult.baleInfo.updatedAt)}</p>
                         </div>
                       )}
-                      {referenceResult.baleInfo.deletedAt && (
-                        <div>
-                          <p className="text-xs text-muted-foreground flex items-center gap-1 text-destructive">
-                            <Trash2 className="h-3 w-3" />
-                            Deleted
-                          </p>
-                          <p className="text-sm font-medium text-destructive">{formatDate(referenceResult.baleInfo.deletedAt)}</p>
-                        </div>
-                      )}
+                      {(referenceResult.baleInfo.deletedAt || referenceResult.baleInfo.status === "DELETED") && (() => {
+                        const deleteEntry = referenceResult.auditHistory?.find((e: any) => e.action === "delete");
+                        return (
+                          <div>
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 text-destructive">
+                              <Trash2 className="h-3 w-3" />
+                              Deleted
+                            </p>
+                            <p className="text-sm font-medium text-destructive">
+                              {referenceResult.baleInfo.deletedAt
+                                ? formatDate(referenceResult.baleInfo.deletedAt)
+                                : formatDate(deleteEntry?.createdAt) ?? "—"}
+                            </p>
+                            {deleteEntry?.username && (
+                              <p className="text-xs text-muted-foreground mt-0.5">by {deleteEntry.username}</p>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </CardContent>

@@ -1294,10 +1294,23 @@ export function registerBaleRoutes(app: Express) {
         }
       }
 
+      const deletedAt = new Date();
       await db
         .update(factoryBales)
-        .set({ status: "DELETED", updatedAt: new Date() })
+        .set({ status: "DELETED", deletedAt, updatedAt: deletedAt })
         .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)));
+
+      // Write audit entry so "Deleted by" info is available on the barcode lookup
+      await logAudit({
+        userId: req.session.userId!,
+        username: (req.session as any).username || "unknown",
+        companyId,
+        action: "delete",
+        tableName: "factory_bales",
+        recordId: bale.id,
+        recordIdentifier: referenceNumber,
+        changes: { status: { old: bale.status, new: "DELETED" } },
+      });
 
       res.json({ message: "Bale deleted from linked records" });
     } catch (error: any) {
