@@ -1145,11 +1145,13 @@ export function registerContainerRoutes(app: Express) {
             }
 
             // Freight is now embedded inside the purchase voucher — delete any stale FREIGHT- voucher.
+            // Search in the PO's own company, NOT the session company, so the parent company's
+            // freight vouchers are never accidentally deleted when processing subsidiary POs.
             {
               const [staleFV] = await db
                 .select({ id: vouchers.id })
                 .from(vouchers)
-                .where(and(eq(vouchers.companyId, companyId), eq(vouchers.voucherNumber, freightVoucherNum)))
+                .where(and(eq(vouchers.companyId, po.companyId), eq(vouchers.voucherNumber, freightVoucherNum)))
                 .limit(1);
               if (staleFV) {
                 await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, staleFV.id));
