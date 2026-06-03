@@ -812,18 +812,26 @@ export function registerContainerRoutes(app: Express) {
         return res.json({ message: "No parent company — nothing to sync", found: false, updated: false });
       }
 
-      const { intercoTotal } = calcPoAmounts({
+      const { grossTotal: poGrossTotal } = calcPoAmounts({
         itemsTotal: po.itemsTotal, freight: po.freight, surcharge: po.surcharge,
         fumigation: po.fumigation, documentCharges: po.documentCharges,
         discount: po.discount, otherCharges: po.otherCharges,
         freightPaidBy: (po as any).freightPaidBy,
       });
+      const poFreightPaidBy: string = (po as any).freightPaidBy || 'supplier';
+      const poFreightAmt = parseFloat(po.freight || '0');
+      const poFreightParentAcctId: number | null = (po as any).freightParentAccountId
+        ? Number((po as any).freightParentAccountId) : null;
+      const poHasParentFreight = poFreightPaidBy === 'parent' && poFreightAmt > 0 && !!poFreightParentAcctId;
 
       const poContainerRow = po.containerId
         ? (await db.select({ containerNumber: containers.containerNumber }).from(containers).where(eq(containers.id, po.containerId)).limit(1))[0]
         : undefined;
 
-      const result = await syncIntercoParentVoucher(db, po.poNumber, intercoTotal, poContainerRow?.containerNumber);
+      const result = await syncIntercoParentVoucher(
+        db, po.poNumber, poGrossTotal, poContainerRow?.containerNumber,
+        poHasParentFreight ? { freightAmount: poFreightAmt, freightParentAccountId: poFreightParentAcctId! } : undefined,
+      );
       res.json({
         message: result.found
           ? `Parent JV synced — voucher #${result.voucherId} updated to ${result.amount}`
@@ -3073,16 +3081,25 @@ export function registerContainerRoutes(app: Express) {
             }
           }
 
-          // ── Inter-company sync: use freightPaidBy-aware supplier total for the parent voucher.
+          // ── Inter-company sync: pass grossTotal + freight opts so the parent INTERCO-PARENT
+          // voucher is split correctly (DR subsidiary = grossTotal, CR supplier = intercoTotal,
+          // CR freightAccount = freightAmount). Without freight opts the split is never written.
           {
-            const _b1IntercoTotal = b1IntercoTotal;
+            const _b1FreightParentAccountId: number | null =
+              req.body.freightParentAccountId !== undefined
+                ? (req.body.freightParentAccountId === null ? null : Number(req.body.freightParentAccountId))
+                : ((existingPO as any).freightParentAccountId ?? null);
+            const _b1HasParentFreight = b1FreightPaidBy === 'parent' && freight > 0 && !!_b1FreightParentAccountId;
             const _b1NewPoNum = req.body.poNumber && req.body.poNumber !== existingPO.poNumber
               ? req.body.poNumber as string : null;
             const _b1PoNums = _b1NewPoNum ? [existingPO.poNumber, _b1NewPoNum] : existingPO.poNumber;
             const _b1ContainerRow = existingPO.containerId
               ? (await tx.select({ containerNumber: containers.containerNumber }).from(containers).where(eq(containers.id, existingPO.containerId)).limit(1))[0]
               : undefined;
-            const _b1Sync = await syncIntercoParentVoucher(tx, _b1PoNums, _b1IntercoTotal, _b1ContainerRow?.containerNumber);
+            const _b1Sync = await syncIntercoParentVoucher(
+              tx, _b1PoNums, poGrandTotal, _b1ContainerRow?.containerNumber,
+              _b1HasParentFreight ? { freightAmount: freight, freightParentAccountId: _b1FreightParentAccountId! } : undefined,
+            );
             if (!_b1Sync.found) {
               console.warn(`[PO-PATCH items] No INTERCO-PARENT voucher for PO(s): ${Array.isArray(_b1PoNums) ? _b1PoNums.join(", ") : _b1PoNums}`);
             }
@@ -3679,6 +3696,8 @@ export function registerContainerRoutes(app: Express) {
       
       // ── Inter-company sync — runs unconditionally after every charges-only update.
       // (Branch 1/items path runs its own sync inside the transaction above.)
+      // Pass grossTotal (not supplierTotal) so the DR subsidiary entry is correct,
+      // and include freight opts so the parent CR is split between supplier + freight account.
       {
         const _b2ParentId = await storage.getParentCompanyId();
         if (_b2ParentId && existingPO.companyId !== _b2ParentId) {
@@ -3688,7 +3707,12 @@ export function registerContainerRoutes(app: Express) {
           const _b2ContainerRow = existingPO.containerId
             ? (await db.select({ containerNumber: containers.containerNumber }).from(containers).where(eq(containers.id, existingPO.containerId)).limit(1))[0]
             : undefined;
-          const _b2Sync = await syncIntercoParentVoucher(db, _b2PoNums, supplierTotal, _b2ContainerRow?.containerNumber);
+          const _b2Sync = await syncIntercoParentVoucher(
+            db, _b2PoNums, newGrandTotal, _b2ContainerRow?.containerNumber,
+            newHasParentFreight && newFreightParentAccountId
+              ? { freightAmount: newFreight, freightParentAccountId: newFreightParentAccountId }
+              : undefined,
+          );
           if (!_b2Sync.found) {
             console.warn(`[PO-PATCH charges] No INTERCO-PARENT voucher for PO(s): ${Array.isArray(_b2PoNums) ? _b2PoNums.join(", ") : _b2PoNums}`);
           }
