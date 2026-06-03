@@ -5,6 +5,7 @@ import {
   CalendarDays, ChevronDown, ChevronUp, CheckCircle2, AlertCircle, Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -36,8 +37,21 @@ interface DayBale {
   product_name: string | null;
   weight_kg: string | null;
   status: string;
+  is_in_loading_order: boolean;
+  is_deleted: boolean;
   date_bale_produced: string | null;
   worker_name: string | null;
+}
+
+function StatusBadge({ status, isInLoadingOrder, isDeleted }: { status: string; isInLoadingOrder: boolean; isDeleted: boolean }) {
+  if (isDeleted) return <Badge className="bg-red-600 text-white border-0">Deleted</Badge>;
+  const s = (status || "").toUpperCase();
+  if (isInLoadingOrder || s === "LOADING" || s === "LOADED")
+    return <Badge className="bg-amber-500 text-white border-0">Pending Loading</Badge>;
+  if (s === "IN_STOCK") return <Badge className="bg-green-600 text-white border-0">In Stock</Badge>;
+  if (s === "SOLD") return <Badge className="bg-red-600 text-white border-0">Sold</Badge>;
+  if (s === "RESERVED_FOR_ORDER") return <Badge className="bg-blue-600 text-white border-0">Reserved</Badge>;
+  return <Badge variant="outline">{status || "—"}</Badge>;
 }
 
 interface DailyScanRow {
@@ -402,6 +416,7 @@ export default function DailyScan() {
                       <TableHead className="text-right">Weight (kg)</TableHead>
                       <TableHead>Date Produced</TableHead>
                       <TableHead>Worker</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -427,6 +442,9 @@ export default function DailyScan() {
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {b.worker_name ?? <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={b.status} isInLoadingOrder={b.is_in_loading_order} isDeleted={b.is_deleted} />
                         </TableCell>
                       </TableRow>
                     ))}
@@ -466,6 +484,7 @@ export default function DailyScan() {
                         <TableHead className="text-right">Weight (kg)</TableHead>
                         <TableHead>Date Produced</TableHead>
                         <TableHead>Worker</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead className="text-right">Scanned At</TableHead>
                         <TableHead className="w-10" />
                       </TableRow>
@@ -493,6 +512,9 @@ export default function DailyScan() {
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
                               {b.worker_name ?? "—"}
+                            </TableCell>
+                            <TableCell>
+                              <StatusBadge status={b.status} isInLoadingOrder={b.is_in_loading_order} isDeleted={b.is_deleted} />
                             </TableCell>
                             <TableCell className="text-right text-sm text-muted-foreground">
                               {new Date(scanRow.scanned_at).toLocaleTimeString("en-GB")}
