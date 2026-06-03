@@ -957,6 +957,20 @@ export function registerBaleRoutes(app: Express) {
           directLoadedOnOrder = directOrder || null;
         }
 
+        // Fetch audit history for this bale
+        const directAuditHistory = await db
+          .select({
+            id: auditLog.id,
+            action: auditLog.action,
+            username: auditLog.username,
+            changes: auditLog.changes,
+            createdAt: auditLog.createdAt,
+          })
+          .from(auditLog)
+          .where(and(eq(auditLog.tableName, "factory_bales"), eq(auditLog.recordId, directBale.id)))
+          .orderBy(desc(auditLog.createdAt))
+          .limit(30);
+
         return res.json({
           labelPrint: null,
           product: product || null,
@@ -975,12 +989,16 @@ export function registerBaleRoutes(app: Express) {
             pressedAt: directBale.pressedAt,
             finalizedAt: directBale.finalizedAt,
             workerName: directWorkerName,
+            createdAt: directBale.createdAt,
+            updatedAt: directBale.updatedAt,
+            deletedAt: directBale.deletedAt,
           },
           locationInfo,
           pressingBatch: null,
           mixBatch: null,
           containers_used: [],
           loadedOnOrder: directLoadedOnOrder,
+          auditHistory: directAuditHistory,
         });
       }
 
@@ -1039,6 +1057,9 @@ export function registerBaleRoutes(app: Express) {
           pressedAt: factoryBale.pressedAt,
           finalizedAt: factoryBale.finalizedAt,
           workerName,
+          createdAt: factoryBale.createdAt,
+          updatedAt: factoryBale.updatedAt,
+          deletedAt: factoryBale.deletedAt,
         };
 
         // Get location
@@ -1169,6 +1190,23 @@ export function registerBaleRoutes(app: Express) {
         baleInfo.isInLoadingOrder = true;
       }
 
+      // Fetch audit history for this bale
+      let auditHistory: any[] = [];
+      if (baleInfo?.id) {
+        auditHistory = await db
+          .select({
+            id: auditLog.id,
+            action: auditLog.action,
+            username: auditLog.username,
+            changes: auditLog.changes,
+            createdAt: auditLog.createdAt,
+          })
+          .from(auditLog)
+          .where(and(eq(auditLog.tableName, "factory_bales"), eq(auditLog.recordId, baleInfo.id)))
+          .orderBy(desc(auditLog.createdAt))
+          .limit(30);
+      }
+
       res.json({
         labelPrint: { ...labelPrint, printedByName, scannedByName },
         product: product || null,
@@ -1178,6 +1216,7 @@ export function registerBaleRoutes(app: Express) {
         mixBatch,
         containers_used,
         loadedOnOrder,
+        auditHistory,
       });
     } catch (error: any) {
       console.error("Error looking up reference:", error);

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Search, Package, Clock, User, Scale, Hash, Layers, Container, Truck, FlaskConical, Box, CheckCircle2, AlertCircle, XCircle, ArchiveX, Ship, FileText, User2, Trash2, Pencil, ArchiveRestore, Undo2, AlertTriangle } from "lucide-react";
+import { Search, Package, Clock, User, Scale, Hash, Layers, Container, Truck, FlaskConical, Box, CheckCircle2, AlertCircle, XCircle, ArchiveX, Ship, FileText, User2, Trash2, Pencil, ArchiveRestore, Undo2, AlertTriangle, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,6 +95,9 @@ export default function BarcodeLookup() {
       pressedAt: string | null;
       finalizedAt: string | null;
       workerName: string | null;
+      createdAt: string | null;
+      updatedAt: string | null;
+      deletedAt: string | null;
     } | null;
     locationInfo: { id: number; name: string; city: string | null; state: string | null } | null;
     pressingBatch: {
@@ -142,6 +145,13 @@ export default function BarcodeLookup() {
       priceUsed: string;
       baleWeight: string;
     } | null;
+    auditHistory: Array<{
+      id: number;
+      action: string;
+      username: string;
+      changes: Record<string, { old: any; new: any }> | null;
+      createdAt: string;
+    }>;
   } | null>(null);
 
   const referenceLookup = useMutation({
@@ -648,8 +658,101 @@ export default function BarcodeLookup() {
                       </div>
                     )}
                   </div>
+
+                  {/* Row 3: Audit dates */}
+                  {referenceResult.baleInfo && (
+                    <div className="border-t pt-3 flex items-start gap-6 flex-wrap">
+                      {(referenceResult.baleInfo.finalizedAt || referenceResult.baleInfo.stockEntryDate) && (
+                        <div>
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <History className="h-3 w-3" />
+                            Date Produced
+                          </p>
+                          <p className="text-sm font-medium">
+                            {referenceResult.baleInfo.finalizedAt
+                              ? formatDate(referenceResult.baleInfo.finalizedAt)
+                              : formatDateOnly(referenceResult.baleInfo.stockEntryDate!)}
+                          </p>
+                        </div>
+                      )}
+                      {referenceResult.baleInfo.createdAt && (
+                        <div>
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            Record Created
+                          </p>
+                          <p className="text-sm font-medium">{formatDate(referenceResult.baleInfo.createdAt)}</p>
+                        </div>
+                      )}
+                      {referenceResult.baleInfo.updatedAt && referenceResult.baleInfo.updatedAt !== referenceResult.baleInfo.createdAt && (
+                        <div>
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Pencil className="h-3 w-3" />
+                            Last Modified
+                          </p>
+                          <p className="text-sm font-medium">{formatDate(referenceResult.baleInfo.updatedAt)}</p>
+                        </div>
+                      )}
+                      {referenceResult.baleInfo.deletedAt && (
+                        <div>
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 text-destructive">
+                            <Trash2 className="h-3 w-3" />
+                            Deleted
+                          </p>
+                          <p className="text-sm font-medium text-destructive">{formatDate(referenceResult.baleInfo.deletedAt)}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
+
+              {/* Audit History */}
+              {referenceResult.auditHistory && referenceResult.auditHistory.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 flex-wrap">
+                      <History className="h-5 w-5" />
+                      Change Log
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {referenceResult.auditHistory.map((entry) => {
+                        const changedFields = entry.changes ? Object.keys(entry.changes) : [];
+                        const actionLabel =
+                          entry.action === "create" ? "Created" :
+                          entry.action === "delete" ? "Deleted" :
+                          entry.action === "restore" ? "Restored" : "Updated";
+                        return (
+                          <div key={entry.id} className="flex items-start gap-3 py-2 border-b last:border-b-0">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge
+                                  variant={entry.action === "delete" ? "destructive" : entry.action === "create" ? "default" : "secondary"}
+                                  className="text-xs"
+                                >
+                                  {actionLabel}
+                                </Badge>
+                                <span className="text-sm font-medium flex items-center gap-1">
+                                  <User className="h-3 w-3 text-muted-foreground" />
+                                  {entry.username}
+                                </span>
+                                <span className="text-xs text-muted-foreground">{formatDate(entry.createdAt)}</span>
+                              </div>
+                              {changedFields.length > 0 && (
+                                <p className="text-xs text-muted-foreground mt-1 truncate">
+                                  Changed: {changedFields.join(", ")}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Loaded onto outbound container / customer order */}
               {referenceResult.loadedOnOrder && (() => {
