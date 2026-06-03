@@ -478,12 +478,16 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     return fc.trackingLastCheckedAt && new Date(fc.trackingLastCheckedAt).toDateString() === today;
   }).length;
 
-  // Total cost (USD equivalent)
-  const totalCostUsd = filtered.reduce((s, c) => {
-    const cost = containerCost(c);
-    const fx = num((c as any).fxRateToUsd) || 1;
-    return s + cost.amount * fx;
-  }, 0);
+  // Cost totals grouped by currency
+  const costByCurrency = filtered.reduce<Record<string, { symbol: string; amount: number }>>((acc, c) => {
+    const { symbol, amount } = containerCost(c);
+    const ccy = c.currencyCode || "USD";
+    if (amount > 0) {
+      if (!acc[ccy]) acc[ccy] = { symbol, amount: 0 };
+      acc[ccy].amount += amount;
+    }
+    return acc;
+  }, {});
 
   const docsReceived = filtered.filter((c) => docs[String(c.id)]).length;
   const timelineContainer = otwContainers.find((c) => c.id === timelineId) ?? null;
@@ -605,12 +609,15 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
           icon={<CheckCircle className="h-4 w-4 text-green-600" />}
           accent="bg-green-100 dark:bg-green-900/30"
         />
-        <SummaryCard
-          label="Total Cost (USD)"
-          value={`$${Math.round(totalCostUsd).toLocaleString()}`}
-          icon={<DollarSign className="h-4 w-4 text-emerald-600" />}
-          accent="bg-emerald-100 dark:bg-emerald-900/30"
-        />
+        {Object.entries(costByCurrency).map(([ccy, { symbol, amount }]) => (
+          <SummaryCard
+            key={ccy}
+            label={`Total (${ccy})`}
+            value={`${symbol} ${Math.round(amount).toLocaleString()}`}
+            icon={<DollarSign className="h-4 w-4 text-emerald-600" />}
+            accent="bg-emerald-100 dark:bg-emerald-900/30"
+          />
+        ))}
       </div>
 
       {/* ── Search + Filters Toggle + Track All ── */}
