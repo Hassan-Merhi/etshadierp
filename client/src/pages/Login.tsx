@@ -290,13 +290,13 @@ export default function Login() {
       };
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-full lg:h-full lg:overflow-hidden">
+    <div className="flex flex-col xl:flex-row min-h-full xl:h-full xl:overflow-hidden">
 
       {/* ══════════════════════════════════════════
           LEFT — Always-dark branding panel (desktop)
       ══════════════════════════════════════════ */}
       <div
-        className="hidden lg:flex lg:w-[46%] shrink-0 flex-col justify-between px-12 py-10 relative overflow-hidden"
+        className="hidden xl:flex xl:w-[46%] shrink-0 flex-col justify-between px-12 py-10 relative overflow-hidden"
         style={{ background: "linear-gradient(155deg, #050505 0%, #0C0900 25%, #0D0D0D 60%, #080810 100%)" }}
       >
         {/* Ambient glows — richer layered */}
@@ -427,7 +427,7 @@ export default function Login() {
         />
 
         {/* ── MOBILE BRANDING ── */}
-        <div className="lg:hidden flex flex-col items-center pt-14 pb-6 px-6">
+        <div className="xl:hidden flex flex-col items-center pt-14 pb-6 px-6">
           <div
             className="w-20 h-20 rounded-full overflow-hidden mb-4"
             style={{
@@ -447,12 +447,12 @@ export default function Login() {
         </div>
 
         {/* ── FORM inside premium card ── */}
-        <div className="relative z-10 flex flex-1 items-center justify-center px-4 sm:px-6 py-8 lg:py-10">
+        <div className="relative z-10 flex flex-1 items-center justify-center px-4 sm:px-6 py-8 xl:py-10">
           <div className="w-full max-w-[400px] rounded-2xl p-7 sm:p-9 space-y-5" style={cardStyle}>
 
             {/* Heading */}
             <div className="space-y-1">
-              <p className="hidden lg:block text-[0.58rem] font-bold tracking-[0.3em] uppercase"
+              <p className="hidden xl:block text-[0.58rem] font-bold tracking-[0.3em] uppercase"
                 style={{ color: isDark ? "rgba(212,175,55,0.5)" : "rgba(139,100,20,0.55)" }}>
                 HMD International Group
               </p>
