@@ -472,11 +472,11 @@ function EditableTransferDetail({
                       onChange={e => setDeltaVal(item.id, e.target.value)}
                       onBlur={() => normalizeDelta(item.id)}
                       onKeyDown={e => {
-                        if (e.key === "Enter" || (e.key === "Tab" && !e.shiftKey)) {
+                        if (e.key === "Enter" || (e.key === "Tab" && !e.shiftKey) || e.key === "ArrowDown") {
                           e.preventDefault();
                           normalizeDelta(item.id);
                           focusRelative(`base-${item.id}`, 1);
-                        } else if (e.key === "Tab" && e.shiftKey) {
+                        } else if ((e.key === "Tab" && e.shiftKey) || e.key === "ArrowUp") {
                           e.preventDefault();
                           normalizeDelta(item.id);
                           focusRelative(`base-${item.id}`, -1);
@@ -536,10 +536,10 @@ function EditableTransferDetail({
                       value={item.qtyDraft}
                       onChange={e => updateExtraQty(idx, e.target.value)}
                       onKeyDown={e => {
-                        if (e.key === "Enter" || (e.key === "Tab" && !e.shiftKey)) {
+                        if (e.key === "Enter" || (e.key === "Tab" && !e.shiftKey) || e.key === "ArrowDown") {
                           e.preventDefault();
                           focusRelative(`extra-${item.stockItemId}`, 1);
-                        } else if (e.key === "Tab" && e.shiftKey) {
+                        } else if ((e.key === "Tab" && e.shiftKey) || e.key === "ArrowUp") {
                           e.preventDefault();
                           focusRelative(`extra-${item.stockItemId}`, -1);
                         }
