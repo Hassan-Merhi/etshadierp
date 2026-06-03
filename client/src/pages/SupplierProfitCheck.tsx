@@ -54,11 +54,10 @@ interface AnalysisRow {
   currentStock: number;
   salesQty: number;
   avgSellingPrice: number | null;
-  dubaiCost: number;
-  dubaiCostSource: string;
+  nCost: number;
+  nCostSource: string;
   configPrice: number;
   offloadingCost: number;
-  offloadingSource: string;
   totalCost: number;
   estimatedProfit: number | null;
   profitPercent: number | null;
@@ -190,19 +189,19 @@ export default function SupplierProfitCheck() {
     return rows.map((row) => {
       const sell = row.avgSellingPrice;
 
-      // Profit (Config) = Sell − Dubai − Config Price
+      // Profit (Config) = Sell − N Cost − Config Price
       let profitByConfig: number | null = null;
       let profitByConfigPct: number | null = null;
       if (sell != null) {
-        profitByConfig = sell - row.dubaiCost - row.configPrice;
+        profitByConfig = sell - row.nCost - row.configPrice;
         profitByConfigPct = sell > 0 ? (profitByConfig / sell) * 100 : null;
       }
 
-      // Profit (Offload) = Sell − Dubai − Offload Cost
+      // Profit (Offload) = Sell − N Cost − Avg Inventory Cost
       let profitByOffload: number | null = null;
       let profitByOffloadPct: number | null = null;
       if (sell != null) {
-        profitByOffload = sell - row.dubaiCost - row.offloadingCost;
+        profitByOffload = sell - row.nCost - row.offloadingCost;
         profitByOffloadPct = sell > 0 ? (profitByOffload / sell) * 100 : null;
       }
 
@@ -227,7 +226,7 @@ export default function SupplierProfitCheck() {
       }
       if (statusFilter !== "all") {
         if (statusFilter === "missing_offload") {
-          if (r.offloadingSource !== "missing") return false;
+          if (r.offloadingCost > 0) return false;
         } else {
           // filter by config status (primary profit)
           if (r.statusByConfig !== statusFilter) return false;
@@ -243,7 +242,7 @@ export default function SupplierProfitCheck() {
     const withQty = computedRows.filter((r) => Number(qtyMap[r.stockItemId]) > 0);
     const totalQty = withQty.reduce((s, r) => s + (Number(qtyMap[r.stockItemId]) || 0), 0);
     const totalSupCost = withQty.reduce(
-      (s, r) => s + (Number(qtyMap[r.stockItemId]) || 0) * r.dubaiCost,
+      (s, r) => s + (Number(qtyMap[r.stockItemId]) || 0) * r.nCost,
       0
     );
     const totalEstSales = withQty.reduce((s, r) => {
@@ -261,7 +260,7 @@ export default function SupplierProfitCheck() {
     const losingConfigCount = computedRows.filter((r) => r.statusByConfig === "losing").length;
     const losingOffloadCount = computedRows.filter((r) => r.statusByOffload === "losing").length;
     const noDataCount = computedRows.filter((r) => r.statusByConfig === "no_sales_data").length;
-    const missingOffloadCount = computedRows.filter((r) => r.offloadingSource === "missing").length;
+    const missingOffloadCount = computedRows.filter((r) => r.offloadingCost === 0).length;
 
     return {
       totalItems: computedRows.length,
@@ -328,7 +327,7 @@ export default function SupplierProfitCheck() {
         name: r.name,
         itemName: r.name,
         qty: Number(qtyMap[r.stockItemId]) || 0,
-        supplierPrice: r.dubaiCost,
+        supplierPrice: r.nCost,
         weight: 0,
       }));
       const res = await apiRequest("POST", "/api/supplier-profit-check/save-proforma", {
@@ -628,9 +627,9 @@ export default function SupplierProfitCheck() {
                   <TableHead className="min-w-[200px]">Name</TableHead>
                   <TableHead className="text-right min-w-[90px]">Sales Qty</TableHead>
                   <TableHead className="text-right min-w-[110px]">Avg Sell</TableHead>
-                  <TableHead className="text-right min-w-[110px]">Dubai Cost</TableHead>
+                  <TableHead className="text-right min-w-[110px]">N Cost</TableHead>
                   <TableHead className="text-right min-w-[100px]">Config Price</TableHead>
-                  <TableHead className="text-right min-w-[100px]">Offload Cost</TableHead>
+                  <TableHead className="text-right min-w-[100px]">Avg Cost</TableHead>
                   {/* Profit (Config) = Sell − Dubai − Config */}
                   <TableHead className="text-right min-w-[130px] bg-blue-50/50 dark:bg-blue-900/10">
                     <div className="text-blue-700 dark:text-blue-400">Profit (Config)</div>
@@ -674,16 +673,13 @@ export default function SupplierProfitCheck() {
                         <TableCell className="text-right text-sm font-medium">
                           {row.avgSellingPrice != null ? `$${fmt(row.avgSellingPrice)}` : <span className="text-muted-foreground text-xs">—</span>}
                         </TableCell>
-                        {/* Dubai Cost — read only */}
+                        {/* N Cost — from PO */}
                         <TableCell className="text-right text-sm">
-                          <span className="font-mono">${fmt(row.dubaiCost)}</span>
+                          <span className={`font-mono ${row.nCostSource === "missing" ? "text-orange-500" : ""}`}>${fmt(row.nCost)}</span>
                         </TableCell>
                         <TableCell className="text-right text-sm text-muted-foreground">${fmt(row.configPrice)}</TableCell>
                         <TableCell className="text-right text-sm">
-                          <div className="flex items-center justify-end gap-1">
-                            <span className={row.offloadingSource === "missing" ? "text-orange-500" : ""}>${fmt(row.offloadingCost)}</span>
-                            {row.offloadingSource === "missing" && <AlertTriangle className="w-3 h-3 text-orange-500 shrink-0" />}
-                          </div>
+                          <span className="font-mono">${fmt(row.offloadingCost)}</span>
                         </TableCell>
                         {/* Profit (Config) */}
                         <TableCell className="bg-blue-50/30 dark:bg-blue-900/10">

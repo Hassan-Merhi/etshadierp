@@ -77,30 +77,11 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         });
       }
 
-      // 3. Dubai Cost: prefer most recent proforma line for this supplier, then PO line
-      const proformaRateResult = await pool.query(`
-        SELECT DISTINCT ON (si.id)
-          si.id AS stock_item_id,
-          spl.price_per_bale::numeric AS rate,
-          'proforma' AS source
-        FROM stock_items si
-        JOIN supplier_proforma_lines spl ON lower(spl.barcode) = lower(si.code)
-        JOIN supplier_proformas sp ON sp.id = spl.proforma_id
-        WHERE sp.supplier_id = $1
-          AND sp.company_id = $2
-          AND si.id = ANY($3::int[])
-        ORDER BY si.id, sp.created_at DESC
-      `, [supplierId, companyId, stockItemIds]);
-      const proformaRateMap = new Map<number, { rate: number; source: string }>();
-      for (const row of proformaRateResult.rows) {
-        proformaRateMap.set(Number(row.stock_item_id), { rate: Number(row.rate), source: row.source });
-      }
-
-      const poRateResult = await pool.query(`
+      // 3. N Cost: most recent PO line rate for this supplier
+      const nCostResult = await pool.query(`
         SELECT DISTINCT ON (pli.stock_item_id)
           pli.stock_item_id,
-          pli.rate::numeric AS rate,
-          'po' AS source
+          pli.rate::numeric AS rate
         FROM po_line_items pli
         JOIN purchase_orders po ON po.id = pli.po_id
         WHERE po.company_id = $1
@@ -108,44 +89,27 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
           AND pli.stock_item_id = ANY($3::int[])
         ORDER BY pli.stock_item_id, po.created_at DESC
       `, [companyId, supplierId, stockItemIds]);
-      const poRateMap = new Map<number, { rate: number; source: string }>();
-      for (const row of poRateResult.rows) {
-        poRateMap.set(Number(row.stock_item_id), { rate: Number(row.rate), source: row.source });
+      const nCostMap = new Map<number, number>();
+      for (const row of nCostResult.rows) {
+        nCostMap.set(Number(row.stock_item_id), Number(row.rate));
       }
 
-      // 4. Offloading Cost: most recent container offload for item from this supplier's containers
-      const offloadResult = await pool.query(`
-        SELECT DISTINCT ON (coi.stock_item_id)
-          coi.stock_item_id,
-          co.additional_cost_per_bale::numeric AS offloading_cost,
-          'last_container' AS source
-        FROM container_offload_items coi
-        JOIN container_offloads co ON co.id = coi.offload_id
-        JOIN containers c ON c.id = co.container_id
-        WHERE c.supplier_id = $1
-          AND c.company_id = $2
-          AND coi.stock_item_id = ANY($3::int[])
-        ORDER BY coi.stock_item_id, co.offloaded_at DESC
-      `, [supplierId, companyId, stockItemIds]);
-      const offloadMap = new Map<number, { offloadingCost: number; source: string }>();
-      for (const row of offloadResult.rows) {
-        offloadMap.set(Number(row.stock_item_id), {
-          offloadingCost: Number(row.offloading_cost),
-          source: row.source,
-        });
-      }
-
-      // 5. Current stock sum across all company locations
+      // 4. Current stock + weighted average inventory cost
       const stockResult = await pool.query(`
-        SELECT i.stock_item_id, SUM(i.quantity::numeric) AS current_stock
+        SELECT i.stock_item_id,
+          SUM(i.quantity::numeric) AS current_stock,
+          SUM(i.quantity::numeric * i.average_rate::numeric) / NULLIF(SUM(i.quantity::numeric), 0) AS avg_cost
         FROM inventory i
         WHERE i.company_id = $1
           AND i.stock_item_id = ANY($2::int[])
         GROUP BY i.stock_item_id
       `, [companyId, stockItemIds]);
-      const stockMap = new Map<number, number>();
+      const stockMap = new Map<number, { currentStock: number; avgCost: number }>();
       for (const row of stockResult.rows) {
-        stockMap.set(Number(row.stock_item_id), Number(row.current_stock));
+        stockMap.set(Number(row.stock_item_id), {
+          currentStock: Number(row.current_stock),
+          avgCost: row.avg_cost != null ? Number(row.avg_cost) : 0,
+        });
       }
 
       // Build response
@@ -156,16 +120,14 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         const configPrice = salesData?.avgConfigPrice ?? 0;
         const salesQty = salesData?.salesQty ?? 0;
 
-        const dubaiData = proformaRateMap.get(id) ?? poRateMap.get(id);
-        const dubaiCost = dubaiData?.rate ?? 0;
-        const dubaiCostSource = dubaiData?.source ?? "missing";
+        const nCost = nCostMap.get(id) ?? 0;
+        const nCostSource = nCostMap.has(id) ? "po" : "missing";
 
-        const offloadData = offloadMap.get(id);
-        const offloadingCost = offloadData?.offloadingCost ?? 0;
-        const offloadingSource = offloadData?.source ?? "missing";
+        const inventoryData = stockMap.get(id);
+        const currentStock = inventoryData?.currentStock ?? 0;
+        const offloadingCost = inventoryData?.avgCost ?? 0;
 
-        const currentStock = stockMap.get(id) ?? 0;
-        const totalCost = dubaiCost + configPrice + offloadingCost;
+        const totalCost = nCost + configPrice + offloadingCost;
 
         let estimatedProfit: number | null = null;
         let profitPercent: number | null = null;
@@ -190,11 +152,10 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
           currentStock,
           salesQty,
           avgSellingPrice,
-          dubaiCost,
-          dubaiCostSource,
+          nCost,
+          nCostSource,
           configPrice,
           offloadingCost,
-          offloadingSource,
           totalCost,
           estimatedProfit,
           profitPercent,
@@ -462,11 +423,11 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
 
       const headers = [
         "Item Code", "Item Name", "Current Stock",
-        "Avg Sell Price", "Dubai Cost", "Config Price", "Offload Cost",
-        "Offload Source",
+        "Avg Sell Price", "N Cost", "Config Price", "Avg Inv Cost",
+        "Cost Source",
         "Profit (Config)", "Config %",
         "Profit (Offload)", "Offload %",
-        "Status", "Qty to Order", "Total Supplier Cost", "Est. Total Sales",
+        "Status", "Qty to Order", "Total N Cost", "Est. Total Sales",
         "Est. Profit (Config)", "Est. Profit (Offload)",
       ];
       const hRow = ws.addRow(headers);
@@ -485,20 +446,20 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i];
         const sell = r.avgSellingPrice != null ? Number(r.avgSellingPrice) : null;
-        const dubai = Number(r.dubaiCost) || 0;
+        const nCost = Number(r.nCost) || 0;
         const config = Number(r.configPrice) || 0;
         const offload = Number(r.offloadingCost) || 0;
 
-        // Profit (Config) = Sell − Dubai − Config
-        const profitByConfig = sell != null ? sell - dubai - config : null;
+        // Profit (Config) = Sell − N Cost − Config Price
+        const profitByConfig = sell != null ? sell - nCost - config : null;
         const profitByConfigPct = (sell != null && sell > 0 && profitByConfig != null) ? (profitByConfig / sell) * 100 : null;
 
-        // Profit (Offload) = Sell − Dubai − Offload
-        const profitByOffload = sell != null ? sell - dubai - offload : null;
+        // Profit (Offload) = Sell − N Cost − Avg Inventory Cost
+        const profitByOffload = sell != null ? sell - nCost - offload : null;
         const profitByOffloadPct = (sell != null && sell > 0 && profitByOffload != null) ? (profitByOffload / sell) * 100 : null;
 
         const qty = Number(r.qty) || 0;
-        const totalSupCost = qty * dubai;
+        const totalSupCost = qty * nCost;
         const estTotalSales = sell != null ? qty * sell : 0;
         const estProfitConfig = profitByConfig != null ? qty * profitByConfig : 0;
         const estProfitOffload = profitByOffload != null ? qty * profitByOffload : 0;
@@ -511,7 +472,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
           dubai,
           config,
           offload,
-          r.offloadingSource || "missing",
+          r.nCostSource || "missing",
           profitByConfig ?? "",
           profitByConfigPct ?? "",
           profitByOffload ?? "",
@@ -554,18 +515,18 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       // Summary totals
       const hasQty = rows.filter((r: any) => Number(r.qty) > 0);
       const totalQtyOrdered = hasQty.reduce((s: number, r: any) => s + (Number(r.qty) || 0), 0);
-      const totalSupCost = hasQty.reduce((s: number, r: any) => s + (Number(r.qty) || 0) * (Number(r.dubaiCost) || 0), 0);
+      const totalSupCost = hasQty.reduce((s: number, r: any) => s + (Number(r.qty) || 0) * (Number(r.nCost) || 0), 0);
       const totalEstSales = hasQty.reduce((s: number, r: any) => {
         return r.avgSellingPrice != null ? s + (Number(r.qty) || 0) * Number(r.avgSellingPrice) : s;
       }, 0);
       const totalEstCfgProfit = hasQty.reduce((s: number, r: any) => {
         const sell = r.avgSellingPrice != null ? Number(r.avgSellingPrice) : null;
-        const p = sell != null ? sell - (Number(r.dubaiCost) || 0) - (Number(r.configPrice) || 0) : null;
+        const p = sell != null ? sell - (Number(r.nCost) || 0) - (Number(r.configPrice) || 0) : null;
         return p != null ? s + (Number(r.qty) || 0) * p : s;
       }, 0);
       const totalEstOffProfit = hasQty.reduce((s: number, r: any) => {
         const sell = r.avgSellingPrice != null ? Number(r.avgSellingPrice) : null;
-        const p = sell != null ? sell - (Number(r.dubaiCost) || 0) - (Number(r.offloadingCost) || 0) : null;
+        const p = sell != null ? sell - (Number(r.nCost) || 0) - (Number(r.offloadingCost) || 0) : null;
         return p != null ? s + (Number(r.qty) || 0) * p : s;
       }, 0);
 
