@@ -1462,9 +1462,11 @@ export function registerFiscalTransferRoutes(app: Express) {
           }
         }
 
-        // Load destination location for inventory
-        const [destLocation] = await tx.select({ companyId: locations.companyId }).from(locations).where(eq(locations.id, transfer.destinationLocationId));
-        const companyId = destLocation?.companyId ?? null;
+        // Use the transfer's own company (from its voucher) for inventory adjustments.
+        // Stock is always per-company — never use the destination location's company
+        // as that can cross company boundaries.
+        const [transferVoucherRow] = await tx.select({ companyId: vouchers.companyId }).from(vouchers).where(eq(vouchers.id, transfer.voucherId));
+        const companyId = transferVoucherRow?.companyId ?? req.session.currentCompanyId ?? null;
 
         // Load existing transfer items
         const existingItems = await tx.select().from(stockTransferItems).where(eq(stockTransferItems.transferId, transfer.id));
