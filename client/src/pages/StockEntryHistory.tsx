@@ -934,8 +934,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                               <th className="px-3 py-1.5 text-right">Bales</th>
                               <th className="px-3 py-1.5 text-right">Total kg</th>
                               <th className="px-3 py-1.5 text-right">Avg kg</th>
-                              <th className="px-3 py-1.5">First</th>
-                              <th className="px-3 py-1.5">Last</th>
                               <th className="px-3 py-1.5">Reassign</th>
                             </tr>
                           </thead>
@@ -962,8 +960,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                                   <td className="px-3 py-1.5 text-right font-medium">{g.baleCount}</td>
                                   <td className="px-3 py-1.5 text-right">{parseFloat(g.totalWeight || "0").toFixed(2)}</td>
                                   <td className="px-3 py-1.5 text-right">{parseFloat(g.avgWeight || "0").toFixed(2)}</td>
-                                  <td className="px-3 py-1.5 text-muted-foreground">{fmtTime(g.firstFinalizedAt)}</td>
-                                  <td className="px-3 py-1.5 text-muted-foreground">{fmtTime(g.lastFinalizedAt)}</td>
                                   <td className="px-3 py-1.5" onClick={e => e.stopPropagation()}>
                                     <Select
                                       value={g.workerId ? String(g.workerId) : ""}
