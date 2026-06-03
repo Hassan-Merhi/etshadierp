@@ -581,8 +581,15 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       res.json(updated);
     } catch (error: any) {
-      console.error("Error updating factory container:", error);
-      res.status(400).json({ message: error.message });
+      const pgErr = error?.cause ?? error;
+      const pgMsg = pgErr?.message ?? error?.message ?? "Unknown error";
+      const pgCode = pgErr?.code;
+      const pgConstraint = pgErr?.constraint;
+      console.error("[factory-container PATCH] DB error:", { pgCode, pgConstraint, pgMsg, full: error?.message });
+      const userMsg = pgCode
+        ? `${pgMsg}${pgConstraint ? ` (constraint: ${pgConstraint})` : ""}`
+        : pgMsg.split("\n\n").pop() || pgMsg;
+      res.status(400).json({ message: userMsg });
     }
   });
 
