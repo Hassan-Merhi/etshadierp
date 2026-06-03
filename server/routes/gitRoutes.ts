@@ -1340,7 +1340,7 @@ export function registerGitRoutes(app: Express) {
       const buffer = Buffer.from(base64Data, "base64");
       const today = new Date().toISOString().substring(0, 10);
       const finalFileName = String(fileName || `AgentDuty_${agentName}_${today}.png`);
-      const caption = `Agent Duty — ${agentName} — ${today}`;
+      const caption = "";
       const result = await sendWhatsAppFileToChatId(groupChatId, buffer, finalFileName, caption, "image/png");
       if (!result.success) return res.status(500).json({ message: result.error || "Failed to send" });
       res.json({ ok: true, message: `Sent to WhatsApp group for ${agentName}.` });
