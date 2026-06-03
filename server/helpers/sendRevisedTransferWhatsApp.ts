@@ -113,20 +113,24 @@ export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOpt
   const fileName = `Revised_Transfer_${safeVoucher}.png`;
 
   for (const chatId of chatIds) {
+    let imageSent = false;
     if (pngBuffer) {
       const result = await sendWhatsAppFileToChatIdPos(chatId, pngBuffer, fileName, "", "image/png");
       if (result.success) {
+        imageSent = true;
         console.log(`[RevisedTransferWA] Sent ${voucherNumber} revised image to group ${chatId}`);
       } else {
         console.warn(`[RevisedTransferWA] Image send failed for ${voucherNumber} → ${chatId}: ${result.error}`);
       }
     }
-    // Always send the text message (in addition to the image, or as the only message if image failed)
-    const textResult = await sendWhatsAppTextToChatIdPos(chatId, caption);
-    if (textResult.success) {
-      console.log(`[RevisedTransferWA] Text message sent for ${voucherNumber} → ${chatId}`);
-    } else {
-      console.warn(`[RevisedTransferWA] Text send failed for ${voucherNumber} → ${chatId}: ${textResult.error}`);
+    // Only send text if the image was not sent (no image generated, or image send failed)
+    if (!imageSent) {
+      const textResult = await sendWhatsAppTextToChatIdPos(chatId, caption);
+      if (textResult.success) {
+        console.log(`[RevisedTransferWA] Text fallback sent for ${voucherNumber} → ${chatId}`);
+      } else {
+        console.warn(`[RevisedTransferWA] Text fallback failed for ${voucherNumber} → ${chatId}: ${textResult.error}`);
+      }
     }
   }
 }
