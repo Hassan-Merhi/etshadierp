@@ -26,7 +26,7 @@ import { CursorNavProvider } from "@/contexts/CursorNavContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search, Tag, Building2, ClipboardList, KeyRound } from "lucide-react";
+import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search, Tag, Building2, ClipboardList } from "lucide-react";
 import { FactorySidebar, FACTORY_NAV_SECTIONS, FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
 import { PropertiesSidebar } from "@/components/PropertiesSidebar";
 import { OfflineBanner } from "@/components/OfflineBanner";
@@ -747,7 +747,7 @@ function AuthenticatedApp() {
     const isOnSettings = currentLocation === "/pos-settings";
     const isOnPriceList = currentLocation === "/pos-price-list";
     const isOnTransferOrders = currentLocation === "/pos-transfer-orders";
-    const isOnMySettings = currentLocation === "/my-settings";
+
 
     const posNavItems = [
       { label: "Point of Sale", icon: ShoppingCart, active: isOnPOS, testId: "button-pos-tab", onClick: () => setLocation("/") },
@@ -758,9 +758,8 @@ function AuthenticatedApp() {
       { label: "Orders", icon: ClipboardList, active: isOnTransferOrders, testId: "button-transfer-orders-tab", onClick: () => setLocation("/pos-transfer-orders") },
       ...(user.canAccessCustomers ? [{ label: "Customers", icon: Users, active: isOnCustomers, testId: "button-customers-tab", onClick: () => setLocation("/pos-customers") }] : []),
       ...(posImportEnabled ? [{ label: "Import", icon: Upload, active: isOnImport, testId: "button-pos-import-tab", onClick: () => setLocation("/pos-import") }] : []),
-      { label: "Chat", icon: MessageSquare, active: isOnChat, testId: "button-chat-tab", onClick: () => setLocation("/pos-chat"), badge: chatUnread?.count || 0 },
+      ...(user.role === "Developer" ? [{ label: "Chat", icon: MessageSquare, active: isOnChat, testId: "button-chat-tab", onClick: () => setLocation("/pos-chat"), badge: chatUnread?.count || 0 }] : []),
       { label: "Settings", icon: Cog, active: isOnSettings, testId: "button-settings-tab", onClick: () => setLocation("/pos-settings") },
-      { label: "My Settings", icon: KeyRound, active: isOnMySettings, testId: "button-my-settings-tab", onClick: () => setLocation("/my-settings") },
     ];
 
     const posStyle = { "--sidebar-width": "11rem", "--sidebar-width-icon": "3rem" };
