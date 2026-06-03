@@ -6,7 +6,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -39,7 +39,6 @@ import {
   FileText,
   CheckCircle,
   Package,
-  DollarSign,
   Loader2,
   BarChart2,
   RefreshCw,
@@ -67,12 +66,34 @@ interface AnalysisRow {
   proformaBarcode: string | null;
 }
 
+interface ComputedRow extends AnalysisRow {
+  profitByConfig: number | null;
+  profitByConfigPct: number | null;
+  profitByOffload: number | null;
+  profitByOffloadPct: number | null;
+  statusByConfig: string;
+  statusByOffload: string;
+}
+
 function fmt(n: number | null | undefined, decimals = 2): string {
   if (n == null) return "-";
   return n.toLocaleString("en-US", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
+}
+
+function ProfitCell({ value, pct }: { value: number | null; pct: number | null }) {
+  if (value == null) return <span className="text-muted-foreground text-xs">—</span>;
+  const positive = value >= 0;
+  return (
+    <div className={`text-right font-semibold ${positive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+      <div>{value < 0 ? "-" : ""}${fmt(Math.abs(value))}</div>
+      {pct != null && (
+        <div className="text-xs font-normal opacity-75">{fmt(Math.abs(pct), 1)}%</div>
+      )}
+    </div>
+  );
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -101,6 +122,13 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function calcStatus(profit: number | null): string {
+  if (profit == null) return "no_sales_data";
+  if (profit > 0) return "gaining";
+  if (profit < 0) return "losing";
+  return "break_even";
+}
+
 export default function SupplierProfitCheck() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
@@ -122,16 +150,13 @@ export default function SupplierProfitCheck() {
   const [isLoading, setIsLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  // Edit state
+  // Qty edit state
   const [qtyMap, setQtyMap] = useState<Record<number, string>>({});
-  const [priceMap, setPriceMap] = useState<Record<number, string>>({});
 
   // Filter state
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [groupFilter, setGroupFilter] = useState<string>("all");
   const [qtyEnteredOnly, setQtyEnteredOnly] = useState(false);
-  const [minProfitPct, setMinProfitPct] = useState<string>("");
 
   // Proforma save state
   const [savedProforma, setSavedProforma] = useState<{ id: number; reference: string } | null>(null);
@@ -159,63 +184,60 @@ export default function SupplierProfitCheck() {
     },
   });
 
-  // Rows with live profit recalculation using user-edited prices
-  const computedRows = useMemo(() => {
+  // Computed rows: two profit columns
+  const computedRows = useMemo((): ComputedRow[] => {
     return rows.map((row) => {
-      const editedPrice = priceMap[row.stockItemId];
-      const dubaiCost = editedPrice !== undefined ? Number(editedPrice) || 0 : row.dubaiCost;
-      const totalCost = dubaiCost + row.configPrice + row.offloadingCost;
-      let estimatedProfit: number | null = null;
-      let profitPercent: number | null = null;
-      let status = row.status;
-      if (row.avgSellingPrice != null) {
-        estimatedProfit = row.avgSellingPrice - totalCost;
-        profitPercent = row.avgSellingPrice > 0 ? (estimatedProfit / row.avgSellingPrice) * 100 : null;
-        if (estimatedProfit > 0) status = "gaining";
-        else if (estimatedProfit < 0) status = "losing";
-        else status = "break_even";
-      }
-      return { ...row, dubaiCost, totalCost, estimatedProfit, profitPercent, status };
-    });
-  }, [rows, priceMap]);
+      const sell = row.avgSellingPrice;
 
-  // Groups for filter
-  const groups = useMemo(() => {
-    const seen = new Set<string>();
-    const out: { id: string; name: string }[] = [];
-    for (const r of rows) {
-      const key = r.stockGroupId ? String(r.stockGroupId) : "null";
-      if (!seen.has(key)) {
-        seen.add(key);
-        out.push({ id: key, name: r.stockGroupName || "No Group" });
+      // Profit (Config) = Sell − Dubai − Config Price
+      let profitByConfig: number | null = null;
+      let profitByConfigPct: number | null = null;
+      if (sell != null) {
+        profitByConfig = sell - row.dubaiCost - row.configPrice;
+        profitByConfigPct = sell > 0 ? (profitByConfig / sell) * 100 : null;
       }
-    }
-    return out.sort((a, b) => a.name.localeCompare(b.name));
+
+      // Profit (Offload) = Sell − Dubai − Offload Cost
+      let profitByOffload: number | null = null;
+      let profitByOffloadPct: number | null = null;
+      if (sell != null) {
+        profitByOffload = sell - row.dubaiCost - row.offloadingCost;
+        profitByOffloadPct = sell > 0 ? (profitByOffload / sell) * 100 : null;
+      }
+
+      return {
+        ...row,
+        profitByConfig,
+        profitByConfigPct,
+        profitByOffload,
+        profitByOffloadPct,
+        statusByConfig: calcStatus(profitByConfig),
+        statusByOffload: calcStatus(profitByOffload),
+      };
+    });
   }, [rows]);
 
   // Filtered rows
   const filteredRows = useMemo(() => {
-    const minPct = minProfitPct ? Number(minProfitPct) : null;
     return computedRows.filter((r) => {
       if (search) {
         const q = search.toLowerCase();
         if (!r.code.toLowerCase().includes(q) && !r.name.toLowerCase().includes(q)) return false;
       }
       if (statusFilter !== "all") {
-        if (statusFilter === "missing_offload" && r.offloadingSource !== "missing") return false;
-        if (statusFilter !== "missing_offload" && r.status !== statusFilter) return false;
-      }
-      if (groupFilter !== "all") {
-        const key = r.stockGroupId ? String(r.stockGroupId) : "null";
-        if (key !== groupFilter) return false;
+        if (statusFilter === "missing_offload") {
+          if (r.offloadingSource !== "missing") return false;
+        } else {
+          // filter by config status (primary profit)
+          if (r.statusByConfig !== statusFilter) return false;
+        }
       }
       if (qtyEnteredOnly && !(Number(qtyMap[r.stockItemId]) > 0)) return false;
-      if (minPct != null && (r.profitPercent == null || r.profitPercent < minPct)) return false;
       return true;
     });
-  }, [computedRows, search, statusFilter, groupFilter, qtyEnteredOnly, qtyMap, minProfitPct]);
+  }, [computedRows, search, statusFilter, qtyEnteredOnly, qtyMap]);
 
-  // Summary stats
+  // Summary stats (based on items with qty entered)
   const summary = useMemo(() => {
     const withQty = computedRows.filter((r) => Number(qtyMap[r.stockItemId]) > 0);
     const totalQty = withQty.reduce((s, r) => s + (Number(qtyMap[r.stockItemId]) || 0), 0);
@@ -226,51 +248,42 @@ export default function SupplierProfitCheck() {
     const totalEstSales = withQty.reduce((s, r) => {
       return r.avgSellingPrice != null ? s + (Number(qtyMap[r.stockItemId]) || 0) * r.avgSellingPrice : s;
     }, 0);
-    const totalEstProfit = withQty.reduce((s, r) => {
-      return r.estimatedProfit != null ? s + (Number(qtyMap[r.stockItemId]) || 0) * r.estimatedProfit : s;
+    const totalConfigProfit = withQty.reduce((s, r) => {
+      return r.profitByConfig != null ? s + (Number(qtyMap[r.stockItemId]) || 0) * r.profitByConfig : s;
     }, 0);
-    const avgProfitPct =
-      totalEstSales > 0 ? (totalEstProfit / totalEstSales) * 100 : null;
-    const losingCount = computedRows.filter((r) => r.status === "losing").length;
-    const noDataCount = computedRows.filter((r) => r.status === "no_sales_data").length;
-    const missingOffloadCount = computedRows.filter((r) => r.offloadingSource === "missing").length;
-    const selectedCount = withQty.length;
+    const totalOffloadProfit = withQty.reduce((s, r) => {
+      return r.profitByOffload != null ? s + (Number(qtyMap[r.stockItemId]) || 0) * r.profitByOffload : s;
+    }, 0);
+    const configProfitPct = totalEstSales > 0 ? (totalConfigProfit / totalEstSales) * 100 : null;
+    const offloadProfitPct = totalEstSales > 0 ? (totalOffloadProfit / totalEstSales) * 100 : null;
 
-    // Items where dubai cost would change
-    const dubaiUpdateCount = withQty.filter((r) => {
-      const editedPrice = priceMap[r.stockItemId];
-      if (editedPrice === undefined) return false;
-      return Math.abs(Number(editedPrice) - r.dubaiCost) > 0.001;
-    }).length;
+    const losingConfigCount = computedRows.filter((r) => r.statusByConfig === "losing").length;
+    const losingOffloadCount = computedRows.filter((r) => r.statusByOffload === "losing").length;
+    const noDataCount = computedRows.filter((r) => r.statusByConfig === "no_sales_data").length;
+    const missingOffloadCount = computedRows.filter((r) => r.offloadingSource === "missing").length;
 
     return {
       totalItems: computedRows.length,
-      selectedCount,
+      selectedCount: withQty.length,
       totalQty,
       totalSupCost,
       totalEstSales,
-      totalEstProfit,
-      avgProfitPct,
-      losingCount,
+      totalConfigProfit,
+      totalOffloadProfit,
+      configProfitPct,
+      offloadProfitPct,
+      losingConfigCount,
+      losingOffloadCount,
       noDataCount,
       missingOffloadCount,
-      dubaiUpdateCount,
     };
-  }, [computedRows, qtyMap, priceMap]);
+  }, [computedRows, qtyMap]);
 
   const handleLoad = useCallback(async () => {
-    if (!supplierId) {
-      toast({ title: "Select a supplier", variant: "destructive" });
-      return;
-    }
-    if (!fromDate || !toDate) {
-      toast({ title: "Select a date range", variant: "destructive" });
-      return;
-    }
-    if (sourceType === "proforma" && !proformaId) {
-      toast({ title: "Select a proforma", variant: "destructive" });
-      return;
-    }
+    if (!supplierId) { toast({ title: "Select a supplier", variant: "destructive" }); return; }
+    if (!fromDate || !toDate) { toast({ title: "Select a date range", variant: "destructive" }); return; }
+    if (sourceType === "proforma" && !proformaId) { toast({ title: "Select a proforma", variant: "destructive" }); return; }
+
     setIsLoading(true);
     setLoaded(false);
     setSavedProforma(null);
@@ -284,19 +297,13 @@ export default function SupplierProfitCheck() {
       });
       const analysisRows: AnalysisRow[] = await data.json();
       setRows(analysisRows);
-      // Pre-fill qty from proforma if source is proforma
       const initialQty: Record<number, string> = {};
-      const initialPrice: Record<number, string> = {};
       for (const r of analysisRows) {
         if (r.proformaQty != null && r.proformaQty > 0) {
           initialQty[r.stockItemId] = String(r.proformaQty);
         }
-        if (r.dubaiCost > 0) {
-          initialPrice[r.stockItemId] = String(r.dubaiCost);
-        }
       }
       setQtyMap(initialQty);
-      setPriceMap(initialPrice);
       setLoaded(true);
       toast({ title: `Loaded ${analysisRows.length} items` });
     } catch (err: any) {
@@ -311,14 +318,6 @@ export default function SupplierProfitCheck() {
     [computedRows, qtyMap]
   );
 
-  const handleCreateProforma = useCallback(() => {
-    if (itemsWithQty.length === 0) {
-      toast({ title: "Enter qty for at least one item", variant: "destructive" });
-      return;
-    }
-    setShowConfirmModal(true);
-  }, [itemsWithQty.length, toast]);
-
   const handleSaveProforma = useCallback(async () => {
     setIsSaving(true);
     try {
@@ -328,11 +327,9 @@ export default function SupplierProfitCheck() {
         name: r.name,
         itemName: r.name,
         qty: Number(qtyMap[r.stockItemId]) || 0,
-        supplierPrice: Number(priceMap[r.stockItemId] ?? r.dubaiCost) || 0,
+        supplierPrice: r.dubaiCost,
         weight: 0,
       }));
-
-      const selectedSupplier = suppliers.find((s) => String(s.id) === supplierId);
       const res = await apiRequest("POST", "/api/supplier-profit-check/save-proforma", {
         supplierId: Number(supplierId),
         reference: proformaRef || undefined,
@@ -342,31 +339,23 @@ export default function SupplierProfitCheck() {
       const data = await res.json();
       setSavedProforma({ id: data.id, reference: data.reference });
       setShowConfirmModal(false);
-      toast({
-        title: "Proforma saved",
-        description: `Reference: ${data.reference}`,
-      });
+      toast({ title: "Proforma saved", description: `Reference: ${data.reference}` });
     } catch (err: any) {
       toast({ title: "Save failed", description: err.message, variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
-  }, [itemsWithQty, qtyMap, priceMap, supplierId, proformaRef, proformaNotes, suppliers, toast]);
+  }, [itemsWithQty, qtyMap, supplierId, proformaRef, proformaNotes, toast]);
 
   const handleExportSupplier = useCallback(async () => {
     if (!savedProforma) return;
     try {
-      const res = await fetch(
-        `/api/supplier-profit-check/proforma/${savedProforma.id}/export-supplier`,
-        { credentials: "include" }
-      );
+      const res = await fetch(`/api/supplier-profit-check/proforma/${savedProforma.id}/export-supplier`, { credentials: "include" });
       if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
-      a.download = `proforma-${savedProforma.reference}.xlsx`;
-      a.click();
+      a.href = url; a.download = `proforma-${savedProforma.reference}.xlsx`; a.click();
       URL.revokeObjectURL(url);
     } catch (err: any) {
       toast({ title: "Export failed", description: err.message, variant: "destructive" });
@@ -375,11 +364,10 @@ export default function SupplierProfitCheck() {
 
   const handleExportInternal = useCallback(async () => {
     try {
-      const selectedSupplier = suppliers.find((s) => String(s.id) === supplierId);
+      const selectedSupplier = suppliers.find((s: any) => String(s.id) === supplierId);
       const exportRows = itemsWithQty.map((r) => ({
         ...r,
         qty: Number(qtyMap[r.stockItemId]) || 0,
-        dubaiCost: Number(priceMap[r.stockItemId] ?? r.dubaiCost),
       }));
       const res = await fetch("/api/supplier-profit-check/export-internal", {
         method: "POST",
@@ -397,23 +385,17 @@ export default function SupplierProfitCheck() {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
-      a.download = `profit-analysis-${savedProforma?.reference || "export"}.xlsx`;
-      a.click();
+      a.href = url; a.download = `profit-analysis-${savedProforma?.reference || "export"}.xlsx`; a.click();
       URL.revokeObjectURL(url);
     } catch (err: any) {
       toast({ title: "Export failed", description: err.message, variant: "destructive" });
     }
-  }, [itemsWithQty, qtyMap, priceMap, supplierId, suppliers, fromDate, toDate, savedProforma, toast]);
-
-  const selectedSupplierName = useMemo(() => {
-    const s = suppliers.find((x) => String(x.id) === supplierId);
-    return s?.legalName || s?.legal_name || "";
-  }, [suppliers, supplierId]);
+  }, [itemsWithQty, qtyMap, supplierId, suppliers, fromDate, toDate, savedProforma, toast]);
 
   return (
     <div className="h-full overflow-y-auto bg-background">
       <div className="max-w-full p-4 space-y-4">
+
         {/* Page Title */}
         <div className="flex items-center gap-3">
           <BarChart2 className="w-6 h-6 text-amber-600" />
@@ -430,9 +412,7 @@ export default function SupplierProfitCheck() {
           <CardContent className="pt-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Supplier
-                </label>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Supplier</label>
                 <Select value={supplierId} onValueChange={setSupplierId}>
                   <SelectTrigger data-testid="select-supplier">
                     <SelectValue placeholder="Select supplier" />
@@ -448,40 +428,18 @@ export default function SupplierProfitCheck() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Sales Date Range
-                </label>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sales Date Range</label>
                 <div className="flex gap-1 items-center">
-                  <Input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    data-testid="input-from-date"
-                  />
-                  <span className="text-muted-foreground text-sm">–</span>
-                  <Input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    data-testid="input-to-date"
-                  />
+                  <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} data-testid="input-from-date" />
+                  <span className="text-muted-foreground text-sm shrink-0">–</span>
+                  <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} data-testid="input-to-date" />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Item Source
-                </label>
-                <Select
-                  value={sourceType}
-                  onValueChange={(v) => {
-                    setSourceType(v as "all" | "proforma");
-                    setProformaId("");
-                  }}
-                >
-                  <SelectTrigger data-testid="select-source-type">
-                    <SelectValue />
-                  </SelectTrigger>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Item Source</label>
+                <Select value={sourceType} onValueChange={(v) => { setSourceType(v as "all" | "proforma"); setProformaId(""); }}>
+                  <SelectTrigger data-testid="select-source-type"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Supplier Items</SelectItem>
                     <SelectItem value="proforma">Existing Proforma</SelectItem>
@@ -491,37 +449,21 @@ export default function SupplierProfitCheck() {
 
               {sourceType === "proforma" ? (
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Select Proforma
-                  </label>
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Select Proforma</label>
                   <Select value={proformaId} onValueChange={setProformaId}>
-                    <SelectTrigger data-testid="select-proforma">
-                      <SelectValue placeholder="Select proforma" />
-                    </SelectTrigger>
+                    <SelectTrigger data-testid="select-proforma"><SelectValue placeholder="Select proforma" /></SelectTrigger>
                     <SelectContent>
                       {proformas.map((p: any) => (
-                        <SelectItem key={p.id} value={String(p.id)}>
-                          {p.reference}
-                        </SelectItem>
+                        <SelectItem key={p.id} value={String(p.id)}>{p.reference}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-              ) : (
-                <div />
-              )}
+              ) : <div />}
 
               <div className="lg:col-span-4 flex justify-end">
-                <Button
-                  onClick={handleLoad}
-                  disabled={isLoading || !supplierId}
-                  data-testid="button-load-items"
-                >
-                  {isLoading ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                  )}
+                <Button onClick={handleLoad} disabled={isLoading || !supplierId} data-testid="button-load-items">
+                  {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
                   {isLoading ? "Loading..." : "Load Items"}
                 </Button>
               </div>
@@ -531,12 +473,12 @@ export default function SupplierProfitCheck() {
 
         {/* Summary Cards */}
         {loaded && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <Card>
               <CardContent className="pt-3 pb-3">
-                <div className="text-xs text-muted-foreground">Selected Items</div>
+                <div className="text-xs text-muted-foreground">Items</div>
                 <div className="text-2xl font-bold">{summary.selectedCount}</div>
-                <div className="text-xs text-muted-foreground">of {summary.totalItems} total</div>
+                <div className="text-xs text-muted-foreground">of {summary.totalItems}</div>
               </CardContent>
             </Card>
             <Card>
@@ -547,79 +489,61 @@ export default function SupplierProfitCheck() {
             </Card>
             <Card>
               <CardContent className="pt-3 pb-3">
-                <div className="text-xs text-muted-foreground">Total Supplier Cost</div>
-                <div className="text-2xl font-bold">${fmt(summary.totalSupCost)}</div>
+                <div className="text-xs text-muted-foreground">Supplier Cost</div>
+                <div className="text-lg font-bold">${fmt(summary.totalSupCost)}</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-3 pb-3">
-                <div className="text-xs text-muted-foreground">Est. Profit</div>
-                <div
-                  className={`text-2xl font-bold ${
-                    summary.totalEstProfit >= 0 ? "text-green-600" : "text-red-600"
-                  }`}
-                >
-                  ${fmt(summary.totalEstProfit)}
+                <div className="text-xs text-muted-foreground">Profit (Config)</div>
+                <div className={`text-lg font-bold ${summary.totalConfigProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                  {summary.totalConfigProfit < 0 ? "-" : ""}${fmt(Math.abs(summary.totalConfigProfit))}
                 </div>
-                {summary.avgProfitPct != null && (
-                  <div className="text-xs text-muted-foreground">{fmt(summary.avgProfitPct)}% avg</div>
+                {summary.configProfitPct != null && (
+                  <div className="text-xs text-muted-foreground">{fmt(Math.abs(summary.configProfitPct), 1)}%</div>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-3 pb-3">
+                <div className="text-xs text-muted-foreground">Profit (Offload)</div>
+                <div className={`text-lg font-bold ${summary.totalOffloadProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                  {summary.totalOffloadProfit < 0 ? "-" : ""}${fmt(Math.abs(summary.totalOffloadProfit))}
+                </div>
+                {summary.offloadProfitPct != null && (
+                  <div className="text-xs text-muted-foreground">{fmt(Math.abs(summary.offloadProfitPct), 1)}%</div>
                 )}
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-3 pb-3">
                 <div className="text-xs text-muted-foreground">Issues</div>
-                <div className="space-y-0.5">
-                  <div className="text-sm">
-                    <span className="text-red-600 font-semibold">{summary.losingCount}</span>
-                    <span className="text-muted-foreground"> losing</span>
-                  </div>
-                  <div className="text-sm">
-                    <span className="text-amber-600 font-semibold">{summary.noDataCount}</span>
-                    <span className="text-muted-foreground"> no sales data</span>
-                  </div>
-                  <div className="text-sm">
-                    <span className="text-orange-600 font-semibold">{summary.missingOffloadCount}</span>
-                    <span className="text-muted-foreground"> missing offload</span>
-                  </div>
+                <div className="space-y-0.5 text-sm">
+                  <div><span className="font-semibold text-red-600">{summary.losingConfigCount}</span> <span className="text-muted-foreground">losing (cfg)</span></div>
+                  <div><span className="font-semibold text-red-600">{summary.losingOffloadCount}</span> <span className="text-muted-foreground">losing (off)</span></div>
+                  <div><span className="font-semibold text-amber-600">{summary.noDataCount}</span> <span className="text-muted-foreground">no data</span></div>
                 </div>
               </CardContent>
             </Card>
           </div>
         )}
 
-        {/* After save: proforma reference + export buttons */}
+        {/* Saved proforma banner */}
         {savedProforma && (
           <Card className="border-green-500 bg-green-50 dark:bg-green-900/10">
             <CardContent className="pt-3 pb-3">
               <div className="flex flex-wrap items-center gap-3 justify-between">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-green-600" />
-                  <div>
-                    <span className="font-semibold text-green-800 dark:text-green-300">
-                      Proforma saved:
-                    </span>{" "}
-                    <span className="font-mono text-green-700 dark:text-green-400">
-                      {savedProforma.reference}
-                    </span>
-                  </div>
+                  <span className="font-semibold text-green-800 dark:text-green-300">Proforma saved:</span>
+                  <span className="font-mono text-green-700 dark:text-green-400">{savedProforma.reference}</span>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  <Button
-                    variant="outline"
-                    onClick={handleExportSupplier}
-                    data-testid="button-export-supplier"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Supplier Excel
+                  <Button variant="outline" onClick={handleExportSupplier} data-testid="button-export-supplier">
+                    <Download className="w-4 h-4 mr-2" /> Supplier Excel
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleExportInternal}
-                    data-testid="button-export-internal"
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    Analysis Excel
+                  <Button variant="outline" onClick={handleExportInternal} data-testid="button-export-internal">
+                    <FileText className="w-4 h-4 mr-2" /> Analysis Excel
                   </Button>
                 </div>
               </div>
@@ -643,30 +567,16 @@ export default function SupplierProfitCheck() {
               </div>
 
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40" data-testid="select-status-filter">
+                <SelectTrigger className="w-44" data-testid="select-status-filter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="gaining">Gaining</SelectItem>
-                  <SelectItem value="losing">Losing</SelectItem>
-                  <SelectItem value="break_even">Break Even</SelectItem>
+                  <SelectItem value="gaining">Gaining (Config)</SelectItem>
+                  <SelectItem value="losing">Losing (Config)</SelectItem>
+                  <SelectItem value="break_even">Break Even (Config)</SelectItem>
                   <SelectItem value="no_sales_data">No Sales Data</SelectItem>
-                  <SelectItem value="missing_offload">Missing Offload</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={groupFilter} onValueChange={setGroupFilter}>
-                <SelectTrigger className="w-36" data-testid="select-group-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Groups</SelectItem>
-                  {groups.map((g) => (
-                    <SelectItem key={g.id} value={g.id}>
-                      {g.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="missing_offload">Missing Offload Cost</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -677,24 +587,15 @@ export default function SupplierProfitCheck() {
               >
                 Qty Entered Only
               </Button>
-
-              <div className="flex items-center gap-1">
-                <span className="text-sm text-muted-foreground whitespace-nowrap">Min Profit%</span>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={minProfitPct}
-                  onChange={(e) => setMinProfitPct(e.target.value)}
-                  className="w-20"
-                  data-testid="input-min-profit"
-                />
-              </div>
             </div>
 
             <div className="flex gap-2">
               {!savedProforma && (
                 <Button
-                  onClick={handleCreateProforma}
+                  onClick={() => {
+                    if (itemsWithQty.length === 0) { toast({ title: "Enter qty for at least one item", variant: "destructive" }); return; }
+                    setShowConfirmModal(true);
+                  }}
                   disabled={itemsWithQty.length === 0}
                   data-testid="button-create-proforma"
                 >
@@ -705,12 +606,10 @@ export default function SupplierProfitCheck() {
               {savedProforma && (
                 <>
                   <Button variant="outline" onClick={handleExportSupplier} data-testid="button-export-supplier-bar">
-                    <Download className="w-4 h-4 mr-2" />
-                    Supplier Excel
+                    <Download className="w-4 h-4 mr-2" /> Supplier Excel
                   </Button>
                   <Button variant="outline" onClick={handleExportInternal} data-testid="button-export-internal-bar">
-                    <FileText className="w-4 h-4 mr-2" />
-                    Analysis Excel
+                    <FileText className="w-4 h-4 mr-2" /> Analysis Excel
                   </Button>
                 </>
               )}
@@ -724,126 +623,73 @@ export default function SupplierProfitCheck() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead className="min-w-[100px]">Code</TableHead>
+                  <TableHead className="min-w-[90px]">Code</TableHead>
                   <TableHead className="min-w-[200px]">Name</TableHead>
-                  <TableHead className="min-w-[120px]">Group</TableHead>
-                  <TableHead className="text-right min-w-[90px]">Stock</TableHead>
+                  <TableHead className="text-right min-w-[80px]">Stock</TableHead>
                   <TableHead className="text-right min-w-[110px]">Avg Sell</TableHead>
                   <TableHead className="text-right min-w-[110px]">Dubai Cost</TableHead>
-                  <TableHead className="text-right min-w-[100px]">Config</TableHead>
-                  <TableHead className="text-right min-w-[110px]">Offload</TableHead>
-                  <TableHead className="text-right min-w-[100px]">Total Cost</TableHead>
-                  <TableHead className="text-right min-w-[110px]">Profit</TableHead>
-                  <TableHead className="text-right min-w-[80px]">Prof%</TableHead>
-                  <TableHead className="min-w-[100px]">Status</TableHead>
+                  <TableHead className="text-right min-w-[100px]">Config Price</TableHead>
+                  <TableHead className="text-right min-w-[100px]">Offload Cost</TableHead>
+                  {/* Profit (Config) = Sell − Dubai − Config */}
+                  <TableHead className="text-right min-w-[130px] bg-blue-50/50 dark:bg-blue-900/10">
+                    <div className="text-blue-700 dark:text-blue-400">Profit (Config)</div>
+                    <div className="text-[10px] font-normal text-muted-foreground">Sell − Dubai − Config</div>
+                  </TableHead>
+                  {/* Profit (Offload) = Sell − Dubai − Offload */}
+                  <TableHead className="text-right min-w-[130px] bg-violet-50/50 dark:bg-violet-900/10">
+                    <div className="text-violet-700 dark:text-violet-400">Profit (Offload)</div>
+                    <div className="text-[10px] font-normal text-muted-foreground">Sell − Dubai − Offload</div>
+                  </TableHead>
+                  <TableHead className="min-w-[90px]">Status</TableHead>
                   <TableHead className="text-right min-w-[100px]">Qty to Order</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
                       <Package className="w-8 h-8 mx-auto mb-2 opacity-40" />
                       No items match your filters
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredRows.map((row) => {
-                    const isLosing = row.status === "losing";
-                    const isNoData = row.status === "no_sales_data";
-                    const isMissingOffload = row.offloadingSource === "missing";
+                    const rowBg =
+                      row.statusByConfig === "losing"
+                        ? "bg-red-50/50 dark:bg-red-900/10"
+                        : row.statusByConfig === "no_sales_data"
+                        ? "bg-amber-50/50 dark:bg-amber-900/10"
+                        : "";
 
                     return (
-                      <TableRow
-                        key={row.stockItemId}
-                        className={
-                          isLosing
-                            ? "bg-red-50/60 dark:bg-red-900/10"
-                            : isNoData
-                            ? "bg-amber-50/60 dark:bg-amber-900/10"
-                            : ""
-                        }
-                        data-testid={`row-item-${row.stockItemId}`}
-                      >
+                      <TableRow key={row.stockItemId} className={rowBg} data-testid={`row-item-${row.stockItemId}`}>
                         <TableCell className="font-mono text-xs">{row.code}</TableCell>
                         <TableCell className="font-medium text-sm">{row.name}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {row.stockGroupName || "—"}
-                        </TableCell>
-                        <TableCell className="text-right text-sm">{fmt(row.currentStock, 0)}</TableCell>
+                        <TableCell className="text-right text-sm text-muted-foreground">{fmt(row.currentStock, 0)}</TableCell>
                         <TableCell className="text-right text-sm font-medium">
-                          {row.avgSellingPrice != null ? (
-                            `$${fmt(row.avgSellingPrice)}`
-                          ) : (
-                            <span className="text-muted-foreground text-xs">—</span>
-                          )}
+                          {row.avgSellingPrice != null ? `$${fmt(row.avgSellingPrice)}` : <span className="text-muted-foreground text-xs">—</span>}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={priceMap[row.stockItemId] ?? String(row.dubaiCost)}
-                            onChange={(e) =>
-                              setPriceMap((prev) => ({
-                                ...prev,
-                                [row.stockItemId]: e.target.value,
-                              }))
-                            }
-                            className="w-24 h-7 text-right text-sm ml-auto"
-                            data-testid={`input-price-${row.stockItemId}`}
-                          />
+                        {/* Dubai Cost — read only */}
+                        <TableCell className="text-right text-sm">
+                          <span className="font-mono">${fmt(row.dubaiCost)}</span>
                         </TableCell>
-                        <TableCell className="text-right text-sm text-muted-foreground">
-                          ${fmt(row.configPrice)}
-                        </TableCell>
+                        <TableCell className="text-right text-sm text-muted-foreground">${fmt(row.configPrice)}</TableCell>
                         <TableCell className="text-right text-sm">
                           <div className="flex items-center justify-end gap-1">
-                            <span>${fmt(row.offloadingCost)}</span>
-                            {isMissingOffload && (
-                              <AlertTriangle className="w-3 h-3 text-orange-500 shrink-0" />
-                            )}
+                            <span className={row.offloadingSource === "missing" ? "text-orange-500" : ""}>${fmt(row.offloadingCost)}</span>
+                            {row.offloadingSource === "missing" && <AlertTriangle className="w-3 h-3 text-orange-500 shrink-0" />}
                           </div>
                         </TableCell>
-                        <TableCell className="text-right text-sm font-medium">
-                          ${fmt(row.totalCost)}
+                        {/* Profit (Config) */}
+                        <TableCell className="bg-blue-50/30 dark:bg-blue-900/10">
+                          <ProfitCell value={row.profitByConfig} pct={row.profitByConfigPct} />
                         </TableCell>
-                        <TableCell className="text-right text-sm font-semibold">
-                          {row.estimatedProfit != null ? (
-                            <span
-                              className={
-                                row.estimatedProfit > 0
-                                  ? "text-green-600"
-                                  : row.estimatedProfit < 0
-                                  ? "text-red-600"
-                                  : ""
-                              }
-                            >
-                              ${fmt(row.estimatedProfit)}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right text-sm">
-                          {row.profitPercent != null ? (
-                            <span
-                              className={
-                                row.profitPercent > 0
-                                  ? "text-green-600"
-                                  : row.profitPercent < 0
-                                  ? "text-red-600"
-                                  : ""
-                              }
-                            >
-                              {fmt(row.profitPercent, 1)}%
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">—</span>
-                          )}
+                        {/* Profit (Offload) */}
+                        <TableCell className="bg-violet-50/30 dark:bg-violet-900/10">
+                          <ProfitCell value={row.profitByOffload} pct={row.profitByOffloadPct} />
                         </TableCell>
                         <TableCell>
-                          <StatusBadge status={row.status} />
+                          <StatusBadge status={row.statusByConfig} />
                         </TableCell>
                         <TableCell>
                           <Input
@@ -852,12 +698,7 @@ export default function SupplierProfitCheck() {
                             step="1"
                             placeholder="0"
                             value={qtyMap[row.stockItemId] ?? ""}
-                            onChange={(e) =>
-                              setQtyMap((prev) => ({
-                                ...prev,
-                                [row.stockItemId]: e.target.value,
-                              }))
-                            }
+                            onChange={(e) => setQtyMap((prev) => ({ ...prev, [row.stockItemId]: e.target.value }))}
                             className="w-24 h-7 text-right ml-auto"
                             data-testid={`input-qty-${row.stockItemId}`}
                           />
@@ -871,7 +712,7 @@ export default function SupplierProfitCheck() {
           </div>
         )}
 
-        {/* Empty state before load */}
+        {/* Empty states */}
         {!loaded && !isLoading && (
           <Card>
             <CardContent className="py-16 text-center">
@@ -882,7 +723,6 @@ export default function SupplierProfitCheck() {
             </CardContent>
           </Card>
         )}
-
         {isLoading && (
           <Card>
             <CardContent className="py-16 text-center">
@@ -893,98 +733,57 @@ export default function SupplierProfitCheck() {
         )}
       </div>
 
-      {/* Confirmation Modal */}
+      {/* Confirm Proforma Modal */}
       <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Save className="w-5 h-5" />
-              Confirm Proforma Creation
+              <Save className="w-5 h-5" /> Confirm Proforma Creation
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Stats */}
             <div className="grid grid-cols-2 gap-2">
               {[
                 { label: "Items Selected", value: summary.selectedCount },
                 { label: "Total Quantity", value: summary.totalQty.toLocaleString() },
                 { label: "Total Supplier Value", value: `$${fmt(summary.totalSupCost)}` },
-                { label: "Est. Total Profit", value: `$${fmt(summary.totalEstProfit)}`, colored: true },
-                { label: "Losing Items", value: summary.losingCount, warn: summary.losingCount > 0 },
-                { label: "No Sales Data", value: summary.noDataCount, warn: summary.noDataCount > 0 },
-                { label: "Dubai Cost Updates", value: summary.dubaiUpdateCount, info: true },
+                { label: "Profit (Config)", value: `${summary.totalConfigProfit < 0 ? "-" : ""}$${fmt(Math.abs(summary.totalConfigProfit))}`, negative: summary.totalConfigProfit < 0 },
+                { label: "Profit (Offload)", value: `${summary.totalOffloadProfit < 0 ? "-" : ""}$${fmt(Math.abs(summary.totalOffloadProfit))}`, negative: summary.totalOffloadProfit < 0 },
+                { label: "Losing Items (Config)", value: summary.losingConfigCount, warn: summary.losingConfigCount > 0 },
               ].map((item) => (
                 <div key={item.label} className="rounded-md border p-2 bg-muted/30">
                   <div className="text-xs text-muted-foreground">{item.label}</div>
-                  <div
-                    className={`text-sm font-semibold ${
-                      item.warn
-                        ? "text-red-600"
-                        : item.info
-                        ? "text-amber-600"
-                        : item.colored
-                        ? summary.totalEstProfit >= 0
-                          ? "text-green-600"
-                          : "text-red-600"
-                        : ""
-                    }`}
-                  >
+                  <div className={`text-sm font-semibold ${"warn" in item && item.warn ? "text-red-600" : "negative" in item && item.negative ? "text-red-600" : ""}`}>
                     {item.value}
                   </div>
                 </div>
               ))}
             </div>
 
-            {summary.losingCount > 0 && (
+            {summary.losingConfigCount > 0 && (
               <div className="flex gap-2 items-start rounded-md border border-red-200 bg-red-50 dark:bg-red-900/10 p-2 text-sm text-red-700 dark:text-red-400">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{summary.losingCount} item(s) are currently losing. Review before confirming.</span>
+                <span>{summary.losingConfigCount} item(s) are losing on Config Profit. Review before confirming.</span>
               </div>
             )}
 
-            {summary.dubaiUpdateCount > 0 && (
-              <div className="flex gap-2 items-start rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-900/10 p-2 text-sm text-amber-700 dark:text-amber-400">
-                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>
-                  {summary.dubaiUpdateCount} item(s) have a modified supplier price that will be saved as the new Dubai Cost in this proforma.
-                </span>
-              </div>
-            )}
-
-            {/* Proforma details */}
             <div className="space-y-2">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Proforma Reference</label>
-                <Input
-                  placeholder="Auto-generated if blank"
-                  value={proformaRef}
-                  onChange={(e) => setProformaRef(e.target.value)}
-                  data-testid="input-proforma-ref"
-                />
+                <Input placeholder="Auto-generated if blank" value={proformaRef} onChange={(e) => setProformaRef(e.target.value)} data-testid="input-proforma-ref" />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Notes (optional)</label>
-                <Input
-                  placeholder="Any notes..."
-                  value={proformaNotes}
-                  onChange={(e) => setProformaNotes(e.target.value)}
-                  data-testid="input-proforma-notes"
-                />
+                <Input placeholder="Any notes..." value={proformaNotes} onChange={(e) => setProformaNotes(e.target.value)} data-testid="input-proforma-notes" />
               </div>
             </div>
           </div>
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowConfirmModal(false)} disabled={isSaving}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setShowConfirmModal(false)} disabled={isSaving}>Cancel</Button>
             <Button onClick={handleSaveProforma} disabled={isSaving} data-testid="button-confirm-save">
-              {isSaving ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4 mr-2" />
-              )}
+              {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
               {isSaving ? "Saving..." : "Save Proforma"}
             </Button>
           </DialogFooter>

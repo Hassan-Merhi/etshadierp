@@ -421,25 +421,26 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       ws.columns = [
         { key: "code", width: 14 },
         { key: "name", width: 32 },
-        { key: "group", width: 16 },
         { key: "stock", width: 12 },
         { key: "avg_sell", width: 14 },
         { key: "dubai_cost", width: 14 },
         { key: "config_cost", width: 14 },
         { key: "offload_cost", width: 14 },
         { key: "offload_src", width: 14 },
-        { key: "total_cost", width: 14 },
-        { key: "profit", width: 14 },
-        { key: "profit_pct", width: 12 },
+        { key: "profit_config", width: 15 },
+        { key: "profit_config_pct", width: 12 },
+        { key: "profit_offload", width: 15 },
+        { key: "profit_offload_pct", width: 12 },
         { key: "status", width: 12 },
         { key: "qty", width: 10 },
         { key: "total_supplier_cost", width: 18 },
         { key: "est_total_sales", width: 18 },
-        { key: "est_total_profit", width: 18 },
+        { key: "est_profit_config", width: 18 },
+        { key: "est_profit_offload", width: 18 },
       ];
 
       // Title
-      ws.mergeCells("A1:Q1");
+      ws.mergeCells("A1:R1");
       const t = ws.getCell("A1");
       t.value = `INTERNAL PROFIT ANALYSIS — ${supplierName || ""}`;
       t.font = { bold: true, size: 14, color: { argb: WHITE } };
@@ -447,7 +448,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       t.alignment = { horizontal: "center", vertical: "middle" };
       ws.getRow(1).height = 28;
 
-      ws.mergeCells("A2:Q2");
+      ws.mergeCells("A2:R2");
       const sub = ws.getCell("A2");
       sub.value = `Date Range: ${fromDate} → ${toDate}   |   Proforma Ref: ${proformaRef || "N/A"}`;
       sub.font = { bold: false, size: 10, color: { argb: NAVY } };
@@ -456,10 +457,13 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       ws.getRow(2).height = 18;
 
       const headers = [
-        "Item Code", "Item Name", "Stock Group", "Current Stock",
-        "Avg Sell Price", "Dubai Cost", "Config Cost", "Offload Cost",
-        "Offload Source", "Total Cost", "Est. Profit", "Profit %",
-        "Status", "Qty to Order", "Total Supplier Cost", "Est. Total Sales", "Est. Total Profit",
+        "Item Code", "Item Name", "Current Stock",
+        "Avg Sell Price", "Dubai Cost", "Config Price", "Offload Cost",
+        "Offload Source",
+        "Profit (Config)", "Config %",
+        "Profit (Offload)", "Offload %",
+        "Status", "Qty to Order", "Total Supplier Cost", "Est. Total Sales",
+        "Est. Profit (Config)", "Est. Profit (Offload)",
       ];
       const hRow = ws.addRow(headers);
       hRow.eachCell(c => {
@@ -476,57 +480,71 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
 
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i];
+        const sell = r.avgSellingPrice != null ? Number(r.avgSellingPrice) : null;
+        const dubai = Number(r.dubaiCost) || 0;
+        const config = Number(r.configPrice) || 0;
+        const offload = Number(r.offloadingCost) || 0;
+
+        // Profit (Config) = Sell − Dubai − Config
+        const profitByConfig = sell != null ? sell - dubai - config : null;
+        const profitByConfigPct = (sell != null && sell > 0 && profitByConfig != null) ? (profitByConfig / sell) * 100 : null;
+
+        // Profit (Offload) = Sell − Dubai − Offload
+        const profitByOffload = sell != null ? sell - dubai - offload : null;
+        const profitByOffloadPct = (sell != null && sell > 0 && profitByOffload != null) ? (profitByOffload / sell) * 100 : null;
+
         const qty = Number(r.qty) || 0;
-        const totalSupCost = qty * Number(r.dubaiCost || 0);
-        const estTotalSales = qty * Number(r.avgSellingPrice || 0);
-        const estTotalProfit = qty * Number(r.estimatedProfit || 0);
+        const totalSupCost = qty * dubai;
+        const estTotalSales = sell != null ? qty * sell : 0;
+        const estProfitConfig = profitByConfig != null ? qty * profitByConfig : 0;
+        const estProfitOffload = profitByOffload != null ? qty * profitByOffload : 0;
+
+        const statusByConfig = profitByConfig == null ? "no_sales_data" : profitByConfig > 0 ? "gaining" : profitByConfig < 0 ? "losing" : "break_even";
 
         const dataRow = ws.addRow([
-          r.code, r.name, r.stockGroupName || "", Number(r.currentStock) || 0,
-          r.avgSellingPrice != null ? Number(r.avgSellingPrice) : "",
-          Number(r.dubaiCost) || 0,
-          Number(r.configPrice) || 0,
-          Number(r.offloadingCost) || 0,
+          r.code, r.name, Number(r.currentStock) || 0,
+          sell ?? "",
+          dubai,
+          config,
+          offload,
           r.offloadingSource || "missing",
-          Number(r.totalCost) || 0,
-          r.estimatedProfit != null ? Number(r.estimatedProfit) : "",
-          r.profitPercent != null ? Number(r.profitPercent) : "",
-          r.status || "",
+          profitByConfig ?? "",
+          profitByConfigPct ?? "",
+          profitByOffload ?? "",
+          profitByOffloadPct ?? "",
+          statusByConfig,
           qty,
           totalSupCost,
           estTotalSales,
-          estTotalProfit,
+          estProfitConfig,
+          estProfitOffload,
         ]);
 
-        // Color code by status
+        // Row background by config status
         let rowColor: string | null = null;
-        if (r.status === "losing") rowColor = LIGHT_RED;
-        else if (r.status === "gaining") rowColor = LIGHT_GREEN;
-        else if (r.status === "no_sales_data") rowColor = LIGHT_YELLOW;
-
+        if (statusByConfig === "losing") rowColor = LIGHT_RED;
+        else if (statusByConfig === "gaining") rowColor = LIGHT_GREEN;
+        else if (statusByConfig === "no_sales_data") rowColor = LIGHT_YELLOW;
         if (rowColor) {
           dataRow.eachCell(c => {
             c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowColor! } };
           });
         }
 
-        // Status cell color
+        // Status cell font color (col 13)
         const statusCell = dataRow.getCell(13);
-        if (r.status === "gaining") {
-          statusCell.font = { bold: true, color: { argb: GREEN } };
-        } else if (r.status === "losing") {
-          statusCell.font = { bold: true, color: { argb: RED } };
-        } else if (r.status === "no_sales_data") {
-          statusCell.font = { bold: true, color: { argb: YELLOW } };
-        }
+        if (statusByConfig === "gaining") statusCell.font = { bold: true, color: { argb: GREEN } };
+        else if (statusByConfig === "losing") statusCell.font = { bold: true, color: { argb: RED } };
+        else if (statusByConfig === "no_sales_data") statusCell.font = { bold: true, color: { argb: YELLOW } };
 
-        // Number formats
-        [5,6,7,8,10,11,15,16,17].forEach(col => {
+        // Number formats: cols 3=stock, 4=sell, 5=dubai, 6=config, 7=offload, 9=profitCfg, 11=profitOff, 15=supCost, 16=estSales, 17=estCfg, 18=estOff
+        [4, 5, 6, 7, 9, 11, 15, 16, 17, 18].forEach(col => {
           dataRow.getCell(col).numFmt = numFmt2;
         });
-        dataRow.getCell(4).numFmt = numFmt2;
-        dataRow.getCell(12).numFmt = numFmtPct;
-        dataRow.getCell(14).numFmt = numFmt0;
+        dataRow.getCell(3).numFmt = numFmt2;
+        dataRow.getCell(10).numFmt = numFmtPct; // Config %
+        dataRow.getCell(12).numFmt = numFmtPct; // Offload %
+        dataRow.getCell(14).numFmt = numFmt0;   // Qty
       }
 
       // Summary totals
@@ -536,25 +554,34 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       const totalEstSales = hasQty.reduce((s: number, r: any) => {
         return r.avgSellingPrice != null ? s + (Number(r.qty) || 0) * Number(r.avgSellingPrice) : s;
       }, 0);
-      const totalEstProfit = hasQty.reduce((s: number, r: any) => {
-        return r.estimatedProfit != null ? s + (Number(r.qty) || 0) * Number(r.estimatedProfit) : s;
+      const totalEstCfgProfit = hasQty.reduce((s: number, r: any) => {
+        const sell = r.avgSellingPrice != null ? Number(r.avgSellingPrice) : null;
+        const p = sell != null ? sell - (Number(r.dubaiCost) || 0) - (Number(r.configPrice) || 0) : null;
+        return p != null ? s + (Number(r.qty) || 0) * p : s;
+      }, 0);
+      const totalEstOffProfit = hasQty.reduce((s: number, r: any) => {
+        const sell = r.avgSellingPrice != null ? Number(r.avgSellingPrice) : null;
+        const p = sell != null ? sell - (Number(r.dubaiCost) || 0) - (Number(r.offloadingCost) || 0) : null;
+        return p != null ? s + (Number(r.qty) || 0) * p : s;
       }, 0);
 
       ws.addRow([]);
       const sumRow = ws.addRow([
-        "TOTALS", "", "", "", "", "", "", "", "", "",
-        "", "", `${hasQty.length} items`, totalQtyOrdered,
-        totalSupCost, totalEstSales, totalEstProfit,
+        "TOTALS", "", "", "", "", "", "", "",
+        "", "", "", "",
+        `${hasQty.length} items`, totalQtyOrdered,
+        totalSupCost, totalEstSales, totalEstCfgProfit, totalEstOffProfit,
       ]);
       sumRow.eachCell(c => {
         c.font = { bold: true, color: { argb: WHITE } };
         c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
         c.border = { top: { style: "double", color: { argb: GOLD } } };
       });
-      sumRow.getCell(14).numFmt = numFmt0;
-      sumRow.getCell(15).numFmt = numFmt2;
-      sumRow.getCell(16).numFmt = numFmt2;
-      sumRow.getCell(17).numFmt = numFmt2;
+      sumRow.getCell(14).numFmt = numFmt0;   // qty
+      sumRow.getCell(15).numFmt = numFmt2;   // supplier cost
+      sumRow.getCell(16).numFmt = numFmt2;   // est sales
+      sumRow.getCell(17).numFmt = numFmt2;   // est profit config
+      sumRow.getCell(18).numFmt = numFmt2;   // est profit offload
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="profit-analysis-${proformaRef || "export"}.xlsx"`);
