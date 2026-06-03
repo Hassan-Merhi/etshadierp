@@ -91,6 +91,7 @@ async function syncIntercoParentVoucher(
   freightOpts?: {
     freightAmount: number;
     freightParentAccountId: number;
+    subsidiaryCompanyId?: number;  // needed for fallback freight journal when no INTERCO-PARENT exists
   },
 ): Promise<SyncIntercoResult> {
   const amountStr = grossTotal.toFixed(2);
@@ -163,6 +164,87 @@ async function syncIntercoParentVoucher(
     }
 
     if (!parentVoucher) {
+      // ── Fallback: no INTERCO-PARENT voucher exists for this PO.
+      // When freight opts + subsidiary company ID are provided, create (or update) a
+      // standalone PARENT-FREIGHT- journal in the parent company so the freight
+      // is still credited to the configured account.
+      if (freightOpts && freightOpts.freightAmount > 0 && freightOpts.subsidiaryCompanyId) {
+        try {
+          const primaryPoNum = nums[0];
+          const fallbackVoucherNum = `PARENT-FREIGHT-${primaryPoNum}`;
+          const freightAmtStr = freightOpts.freightAmount.toFixed(2);
+
+          // Look up the interco config to get the subsidiary receivable account (DR side).
+          const [icCfg] = await dbOrTx
+            .select({ destIntercoAccountId: intercompanyPosConfigs.destIntercoAccountId })
+            .from(intercompanyPosConfigs)
+            .where(eq(intercompanyPosConfigs.sourceCompanyId, freightOpts.subsidiaryCompanyId))
+            .limit(1);
+          const drAccountId = icCfg?.destIntercoAccountId ?? null;
+
+          // Check if fallback voucher already exists (idempotent).
+          const [existingFallback] = await dbOrTx
+            .select({ id: vouchers.id })
+            .from(vouchers)
+            .where(and(eq(vouchers.companyId, parentCompanyId), eq(vouchers.voucherNumber, fallbackVoucherNum)))
+            .limit(1);
+
+          if (existingFallback) {
+            // Update existing fallback voucher entries.
+            await dbOrTx.update(vouchers)
+              .set({ totalAmount: freightAmtStr })
+              .where(eq(vouchers.id, existingFallback.id));
+            const fbEntries = await dbOrTx.select().from(voucherEntries)
+              .where(eq(voucherEntries.voucherId, existingFallback.id));
+            for (const fe of fbEntries) {
+              if (parseFloat(fe.debitAmount || "0") > 0) {
+                await dbOrTx.update(voucherEntries)
+                  .set({ debitAmount: freightAmtStr })
+                  .where(eq(voucherEntries.id, fe.id));
+              } else if (parseFloat(fe.creditAmount || "0") > 0) {
+                await dbOrTx.update(voucherEntries)
+                  .set({ creditAmount: freightAmtStr, ledgerAccountId: freightOpts.freightParentAccountId })
+                  .where(eq(voucherEntries.id, fe.id));
+              }
+            }
+            console.log(`[syncIntercoParentVoucher] Updated fallback PARENT-FREIGHT journal #${existingFallback.id} for PO(s) ${nums.join(", ")}`);
+            return { found: true, updated: true, voucherId: existingFallback.id, amount: freightAmtStr };
+          } else {
+            // Create new fallback voucher.
+            const today = new Date().toISOString().split('T')[0];
+            const [newFV] = await dbOrTx.insert(vouchers).values({
+              companyId: parentCompanyId,
+              voucherNumber: fallbackVoucherNum,
+              voucherType: 'Journal',
+              voucherDate: today,
+              description: `Parent freight - ${nums.join(", ")}${containerNumber ? ` (${containerNumber})` : ""}`,
+              totalAmount: freightAmtStr,
+              sourceModule: 'ERP',
+            }).returning();
+            const entriesToInsert: any[] = [
+              {
+                voucherId: newFV.id, companyId: parentCompanyId,
+                ledgerAccountId: freightOpts.freightParentAccountId,
+                debitAmount: "0", creditAmount: freightAmtStr,
+                narration: `Freight - ${nums.join(", ")}`,
+              },
+            ];
+            if (drAccountId) {
+              entriesToInsert.push({
+                voucherId: newFV.id, companyId: parentCompanyId,
+                ledgerAccountId: drAccountId,
+                debitAmount: freightAmtStr, creditAmount: "0",
+                narration: `Freight receivable - ${nums.join(", ")}`,
+              });
+            }
+            await dbOrTx.insert(voucherEntries).values(entriesToInsert);
+            console.log(`[syncIntercoParentVoucher] Created fallback PARENT-FREIGHT journal #${newFV.id} for PO(s) ${nums.join(", ")}`);
+            return { found: true, updated: true, voucherId: newFV.id, amount: freightAmtStr };
+          }
+        } catch (fbErr) {
+          console.error("[syncIntercoParentVoucher] Failed to create fallback freight journal:", fbErr);
+        }
+      }
       console.warn(`[syncIntercoParentVoucher] No INTERCO-PARENT voucher found for PO(s): ${nums.join(", ")}`);
       return { found: false, updated: false, amount: amountStr };
     }
@@ -721,7 +803,7 @@ export function registerContainerRoutes(app: Express) {
         if (parentCompanyId && po.companyId !== parentCompanyId) {
           const svResult = await syncIntercoParentVoucher(
             db, po.poNumber, poTotal, container.containerNumber,
-            hasParentFreight ? { freightAmount: poFreight, freightParentAccountId: poFreightParentAccountId! } : undefined,
+            hasParentFreight ? { freightAmount: poFreight, freightParentAccountId: poFreightParentAccountId!, subsidiaryCompanyId: po.companyId } : undefined,
           );
           if (svResult.updated) {
             updatedParentVouchers++;
@@ -830,7 +912,7 @@ export function registerContainerRoutes(app: Express) {
 
       const result = await syncIntercoParentVoucher(
         db, po.poNumber, poGrossTotal, poContainerRow?.containerNumber,
-        poHasParentFreight ? { freightAmount: poFreightAmt, freightParentAccountId: poFreightParentAcctId! } : undefined,
+        poHasParentFreight ? { freightAmount: poFreightAmt, freightParentAccountId: poFreightParentAcctId!, subsidiaryCompanyId: po.companyId } : undefined,
       );
       res.json({
         message: result.found
@@ -1138,7 +1220,7 @@ export function registerContainerRoutes(app: Express) {
             if (parentCompanyId && po.companyId !== parentCompanyId) {
               const svResult = await syncIntercoParentVoucher(
                 db, po.poNumber, grossTotal, cNum,
-                hasParentFreight ? { freightAmount: poFreight, freightParentAccountId: poFreightParentAccountId! } : undefined,
+                hasParentFreight ? { freightAmount: poFreight, freightParentAccountId: poFreightParentAccountId!, subsidiaryCompanyId: po.companyId } : undefined,
               );
               if (svResult.updated) {
                 updatedParentVouchers++;
@@ -3098,7 +3180,7 @@ export function registerContainerRoutes(app: Express) {
               : undefined;
             const _b1Sync = await syncIntercoParentVoucher(
               tx, _b1PoNums, poGrandTotal, _b1ContainerRow?.containerNumber,
-              _b1HasParentFreight ? { freightAmount: freight, freightParentAccountId: _b1FreightParentAccountId! } : undefined,
+              _b1HasParentFreight ? { freightAmount: freight, freightParentAccountId: _b1FreightParentAccountId!, subsidiaryCompanyId: existingPO.companyId } : undefined,
             );
             if (!_b1Sync.found) {
               console.warn(`[PO-PATCH items] No INTERCO-PARENT voucher for PO(s): ${Array.isArray(_b1PoNums) ? _b1PoNums.join(", ") : _b1PoNums}`);
@@ -3710,7 +3792,7 @@ export function registerContainerRoutes(app: Express) {
           const _b2Sync = await syncIntercoParentVoucher(
             db, _b2PoNums, newGrandTotal, _b2ContainerRow?.containerNumber,
             newHasParentFreight && newFreightParentAccountId
-              ? { freightAmount: newFreight, freightParentAccountId: newFreightParentAccountId }
+              ? { freightAmount: newFreight, freightParentAccountId: newFreightParentAccountId, subsidiaryCompanyId: existingPO.companyId }
               : undefined,
           );
           if (!_b2Sync.found) {
