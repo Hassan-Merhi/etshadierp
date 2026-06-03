@@ -4,7 +4,7 @@ import { format, parseISO } from "date-fns";
 import { PageHeader } from "@/components/PageHeader";
 import {
   ArrowLeft, Loader2, Save, CheckCircle2, Search, X, ArrowRight,
-  Clock, Package2, Lock, Eye, Pencil, Filter, CalendarIcon, Plus, Trash2,
+  Clock, Package2, Lock, Eye, Pencil, CalendarIcon, Plus, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -1215,127 +1215,173 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
         )}
       </div>
 
-      {/* Filters */}
-      <div className="border rounded-md p-4 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Filter className="h-4 w-4" />Filters
-          </div>
-          {hasFilters && (
-            <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs h-7 gap-1">
-              <X className="h-3 w-3" />Clear Filters
-            </Button>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-3 items-end">
-          <div className="space-y-1 min-w-[140px]">
-            <label className="text-xs font-medium text-muted-foreground">Date</label>
-            <div className="relative">
-              <CalendarIcon className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-              <input type="date" value={dateFilter} onChange={e => setDateFilter(e.target.value)}
-                className="h-8 pl-8 pr-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring w-full"
-                data-testid="input-date-filter" />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Status</label>
-            <Select value={statusFilter} onValueChange={v => setStatusFilter(v as any)}>
-              <SelectTrigger className="h-8 text-sm w-[120px]" data-testid="select-status-filter">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="applied">Applied</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1 flex-1 min-w-[180px]">
-            <label className="text-xs font-medium text-muted-foreground">Search</label>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-              <Input placeholder="Voucher # or item..." value={search} onChange={e => setSearch(e.target.value)}
-                className="pl-8 h-8 text-sm" data-testid="input-list-search" />
-            </div>
+      {/* Filter bar */}
+      <div className="flex flex-wrap items-end gap-3 rounded-md bg-muted/30 px-4 py-3">
+        <div className="space-y-1 min-w-[140px]">
+          <label className="text-xs font-medium text-muted-foreground">Date</label>
+          <div className="relative">
+            <CalendarIcon className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={e => setDateFilter(e.target.value)}
+              className="h-8 pl-8 pr-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring w-full"
+              data-testid="input-date-filter"
+            />
           </div>
         </div>
-      </div>
-
-      {/* Transactions table */}
-      <div className="border rounded-md overflow-hidden">
-        <div className="px-4 py-3 border-b bg-muted/20 flex items-center gap-2">
-          <span className="font-semibold text-sm">Transactions</span>
-          <span className="text-xs text-muted-foreground">({transfers.length} entries)</span>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Status</label>
+          <Select value={statusFilter} onValueChange={v => setStatusFilter(v as any)}>
+            <SelectTrigger className="h-8 text-sm w-[120px]" data-testid="select-status-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="applied">Applied</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-
-        {isLoading ? (
-          <div className="divide-y">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="flex gap-4 px-4 py-3 items-center">
-                <Skeleton className="h-4 w-24" /><Skeleton className="h-4 w-48 flex-1" /><Skeleton className="h-4 w-16" />
-              </div>
-            ))}
+        <div className="space-y-1 flex-1 min-w-[180px]">
+          <label className="text-xs font-medium text-muted-foreground">Search</label>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              placeholder="Voucher # or item..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-8 h-8 text-sm"
+              data-testid="input-list-search"
+            />
           </div>
-        ) : transfers.length === 0 ? (
-          <div className="text-center py-16 text-muted-foreground" data-testid="text-empty">
-            <Package2 className="h-10 w-10 mx-auto mb-2 opacity-25" />
-            <p className="text-sm">No transfer orders found</p>
-            {hasFilters && <p className="text-xs mt-1">Try clearing your filters</p>}
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="text-xs w-[110px]">Date</TableHead>
-                <TableHead className="text-xs w-[90px]">Status</TableHead>
-                <TableHead className="text-xs">Description</TableHead>
-                <TableHead className="text-right text-xs w-[80px]">Items</TableHead>
-                <TableHead className="text-right text-xs w-[100px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {transfers.map(t => (
-                <TableRow key={t.voucherId} data-testid={`row-transfer-${t.voucherId}`}>
-                  <TableCell className="text-xs text-muted-foreground py-3 align-top">
-                    {formatDate(t.voucherDate)}
-                  </TableCell>
-                  <TableCell className="py-3 align-top">
-                    {t.inventoryApplied ? (
-                      <Badge variant="secondary" className="gap-1 text-xs" data-testid={`badge-applied-${t.voucherId}`}>
-                        <Lock className="h-2.5 w-2.5" />Applied
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-xs" data-testid={`badge-pending-${t.voucherId}`}>Pending</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="py-3 align-top">
-                    <div className="text-sm text-muted-foreground flex items-center gap-1">
-                      <span>{t.sourceLocationName}</span>
-                      <ArrowRight className="h-3 w-3 shrink-0" />
-                      <span>{t.destinationLocationName}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right text-sm font-mono py-3 align-top">{t.itemCount}</TableCell>
-                  <TableCell className="text-right py-3 align-top">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button size="icon" variant="ghost" onClick={() => openView(t.voucherId)}
-                        data-testid={`button-view-${t.voucherId}`} title="View">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {!t.inventoryApplied && (
-                        <Button size="icon" variant="ghost" onClick={() => setEditVoucherId(t.voucherId)}
-                          data-testid={`button-edit-${t.voucherId}`} title="Adjust">
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        </div>
+        {hasFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1.5" data-testid="button-clear-filters">
+            <X className="h-3.5 w-3.5" />Clear
+          </Button>
         )}
       </div>
+
+      {/* Order count label */}
+      <div className="flex items-center justify-between px-1">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          {isLoading ? "Loading…" : `${transfers.length} ${transfers.length === 1 ? "order" : "orders"}`}
+        </span>
+      </div>
+
+      {/* Transfer order cards */}
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="rounded-md border bg-card p-4 flex items-center gap-4">
+              <Skeleton className="h-2.5 w-2.5 rounded-full shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3.5 w-36" />
+                <Skeleton className="h-3 w-52" />
+              </div>
+              <div className="space-y-1 text-right shrink-0">
+                <Skeleton className="h-5 w-8 ml-auto" />
+                <Skeleton className="h-3 w-8 ml-auto" />
+              </div>
+              <Skeleton className="h-8 w-16 shrink-0" />
+            </div>
+          ))}
+        </div>
+      ) : transfers.length === 0 ? (
+        <div
+          className="rounded-md border bg-card text-center py-16 text-muted-foreground"
+          data-testid="text-empty"
+        >
+          <Package2 className="h-10 w-10 mx-auto mb-3 opacity-20" />
+          <p className="text-sm font-medium">No transfer orders found</p>
+          {hasFilters && (
+            <p className="text-xs mt-1 opacity-70">Try clearing your filters</p>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {transfers.map(t => (
+            <div
+              key={t.voucherId}
+              className="rounded-md border bg-card px-4 py-3.5 flex items-center gap-4 hover-elevate"
+              data-testid={`row-transfer-${t.voucherId}`}
+            >
+              {/* Status dot */}
+              <div
+                className={cn(
+                  "h-2.5 w-2.5 rounded-full shrink-0",
+                  t.inventoryApplied
+                    ? "bg-green-500 dark:bg-green-400"
+                    : "bg-amber-400 dark:bg-amber-400"
+                )}
+              />
+
+              {/* Main content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold font-mono" data-testid={`text-voucher-${t.voucherId}`}>
+                    {t.voucherNumber}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{formatDate(t.voucherDate)}</span>
+                  {t.inventoryApplied ? (
+                    <Badge
+                      variant="secondary"
+                      className="gap-1 text-xs text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30"
+                      data-testid={`badge-applied-${t.voucherId}`}
+                    >
+                      <CheckCircle2 className="h-3 w-3" />Applied
+                    </Badge>
+                  ) : (
+                    <Badge
+                      variant="secondary"
+                      className="gap-1 text-xs text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30"
+                      data-testid={`badge-pending-${t.voucherId}`}
+                    >
+                      <Clock className="h-3 w-3" />Pending
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 mt-1 text-sm text-muted-foreground">
+                  <span className="truncate">{t.sourceLocationName}</span>
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-50" />
+                  <span className="truncate font-medium text-foreground">{t.destinationLocationName}</span>
+                </div>
+              </div>
+
+              {/* Item count */}
+              <div className="shrink-0 text-right">
+                <div className="text-xl font-bold font-mono tabular-nums leading-none">{t.itemCount}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">items</div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => openView(t.voucherId)}
+                  data-testid={`button-view-${t.voucherId}`}
+                  title="View"
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+                {!t.inventoryApplied && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setEditVoucherId(t.voucherId)}
+                    data-testid={`button-edit-${t.voucherId}`}
+                    title="Adjust"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <ViewTransferDialog
         voucherId={viewVoucherId}
