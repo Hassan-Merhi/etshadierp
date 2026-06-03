@@ -1,25 +1,30 @@
 /**
- * Stock PDF — mirrors the POS stock print template.
+ * Stock PDF — branded Godown Summary report.
  *
- * Uses pdfkit's standard auto-flow mode (margin: 40) with pageAdded event
- * to reliably handle multi-page output without blank-page artifacts.
- *
- * Layout : A4, 2 columns (POS) — Particulars | Qty
- *          A4, 4 columns (cost) — Particulars | Qty | Avg Rate | Total Value
- * Negatives: red text + red background row
+ * Layout : A4, 2 columns (POS) — Particulars | Qty  [UOM]
+ *          A4, 4 columns (cost) — Particulars | Qty  [UOM] | Avg Rate | Total Value
  *
  * IMPORTANT: In PDFKit ≥0.17, doc.page.maxY is a FUNCTION, not a number.
- * ensureSpace() always calls it as a function to avoid the bug where the
- * nullish-coalescing fallback never fires (because a function is truthy),
- * making every comparison evaluate to false and silently skipping page breaks.
+ * ensureSpace() always calls it as a function.
  */
 
 import { pool } from "../db";
 
-// ── Geometry (margin: 40 gives 515pt usable width, x: 40–555) ────────────────
+// ── Geometry ──────────────────────────────────────────────────────────────────
 const X_LEFT    = 40;
 const X_RIGHT   = 555;
 const CONTENT_W = X_RIGHT - X_LEFT;   // 515 pt
+
+// ── Brand colours ─────────────────────────────────────────────────────────────
+const CLR_BRAND    = "#0f172a";   // dark navy  — header bar + group rows
+const CLR_ACCENT   = "#059669";   // emerald    — grand total bar
+const CLR_WHITE    = "#ffffff";
+const CLR_MUTED    = "#94a3b8";   // slate-400  — subtitle / meta text
+const CLR_BODY     = "#1e293b";   // slate-800  — item text
+const CLR_ROW_ALT  = "#f8fafc";   // slate-50   — alternating row stripe
+const CLR_ROW_NEG  = "#fff0f0";   // red tint   — negative qty
+const CLR_SEP      = "#e2e8f0";   // slate-200  — row divider
+const CLR_NEG_TEXT = "#c2272d";   // red        — negative qty text
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtQty(n: number): string {
@@ -57,7 +62,7 @@ export async function generateStockPdf(
   includeCost:   boolean = false,
 ): Promise<StockPdfResult> {
 
-  // ── Fetch inventory ─────────────────────────────────────────────────────────
+  // ── Fetch inventory ──────────────────────────────────────────────────────────
   const params: number[] = [companyId];
   let locationFilter = "";
   if (locationId) {
@@ -110,18 +115,28 @@ export async function generateStockPdf(
   const now        = new Date();
   const dateStr    = fmtDate(now);
   const printedStr = `${dateStr} ${now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
-  const mainTitle  = locationName ?? "Godown Summary";
 
-  // ── Column geometry (adapts to includeCost) ───────────────────────────────
-  const COL_QTY_W  = 70;
+  // Title lines
+  const mainTitle = locationName ?? companyName;
+  const subTitle  = locationName ? "Godown Summary" : "Godown Summary";
+
+  // ── Column geometry ──────────────────────────────────────────────────────────
+  // Qty column split: number + UOM label
+  const COL_UOM_W  = 28;                           // UOM label (right-most)
+  const COL_NUM_W  = 58;                           // quantity number
+  const X_UOM      = X_RIGHT;                      // right edge of UOM
+  const X_NUM      = X_UOM - COL_UOM_W - 4;        // right edge of qty number
+
   const COL_RATE_W = includeCost ? 80 : 0;
   const COL_VAL_W  = includeCost ? 95 : 0;
-  // Column X anchors (right edge of each column)
-  const X_VAL   = X_RIGHT;
-  const X_RATE  = X_VAL  - COL_VAL_W;
-  const X_QTY   = X_RATE - COL_RATE_W;
+  const X_VAL      = includeCost ? X_NUM - COL_NUM_W - 8 : 0;
+  const X_RATE     = includeCost ? X_VAL - COL_VAL_W     : 0;
 
-  // ── Build PDF (margin: 40 — reliable auto-flow mode) ─────────────────────
+  // ── PDFKit setup ─────────────────────────────────────────────────────────────
+  const HEADER_BAR_H = 58;   // height of the coloured top bar (covers top margin)
+  const META_H       = 20;   // printed / page line below bar
+  const COL_HDR_H    = 22;   // table column header row
+
   const PDFDocument = (await import("pdfkit")).default;
   const doc = new PDFDocument({ size: "A4", margin: 40, autoFirstPage: true });
 
@@ -132,64 +147,10 @@ export async function generateStockPdf(
     doc.on("error", reject);
   });
 
-  let pageNum = 1;
+  let pageNum   = 1;
+  let rowIndex  = 0;          // used for alternating rows
 
-  // ── Page header + table header (drawn on every page) ─────────────────────
-  function drawPageHeader(): void {
-    doc.font("Helvetica-Bold").fontSize(16).fillColor("#000000");
-    doc.text(mainTitle, X_LEFT, doc.y, { width: CONTENT_W, align: "center", underline: true, lineBreak: false });
-    doc.y += 22;
-
-    if (locationName) {
-      doc.font("Helvetica-Bold").fontSize(12).fillColor("#000000");
-      doc.text("Godown Summary", X_LEFT, doc.y, { width: CONTENT_W, align: "center", lineBreak: false });
-      doc.y += 17;
-    }
-
-    doc.font("Helvetica").fontSize(9).fillColor("#333333");
-    doc.text(dateStr, X_LEFT, doc.y, { width: CONTENT_W, align: "center", lineBreak: false });
-    doc.y += 13;
-
-    doc.save();
-    doc.moveTo(X_LEFT, doc.y).lineTo(X_RIGHT, doc.y).strokeColor("#cccccc").lineWidth(0.5).stroke();
-    doc.restore();
-    doc.y += 4;
-
-    const metaY = doc.y;
-    doc.font("Helvetica").fontSize(8).fillColor("#666666");
-    doc.text(`Printed: ${printedStr}`, X_LEFT, metaY, { lineBreak: false });
-    doc.text(`Page ${pageNum}`,        X_LEFT, metaY, { width: CONTENT_W, align: "right", lineBreak: false });
-    doc.y = metaY + 13;
-
-    // Table header row — 4 columns
-    const thY = doc.y;
-    const thH = 24;
-    doc.save();
-    doc.rect(X_LEFT, thY, CONTENT_W, thH).fill("#f8f8f8");
-    doc.moveTo(X_LEFT,  thY)       .lineTo(X_RIGHT, thY)       .strokeColor("#111111").lineWidth(2.5).stroke();
-    doc.moveTo(X_LEFT,  thY + thH) .lineTo(X_RIGHT, thY + thH) .strokeColor("#111111").lineWidth(2.5).stroke();
-    doc.restore();
-
-    doc.font("Helvetica-Bold").fontSize(8.5).fillColor("#000000");
-
-    // Particulars — left aligned
-    doc.text("Particulars",  X_LEFT + 4,          thY + 8, { lineBreak: false });
-
-    // Qty — right-aligned over COL_QTY_W
-    doc.text("Qty",          X_QTY - COL_QTY_W,   thY + 8, { width: COL_QTY_W, align: "right", lineBreak: false });
-
-    if (includeCost) {
-      // Avg Rate — right-aligned over COL_RATE_W
-      doc.text("Avg Rate",     X_RATE - COL_RATE_W,  thY + 8, { width: COL_RATE_W, align: "right", lineBreak: false });
-      // Total Value — right-aligned over COL_VAL_W
-      doc.text("Total Value",  X_VAL - COL_VAL_W,    thY + 8, { width: COL_VAL_W,  align: "right", lineBreak: false });
-    }
-
-    doc.y = thY + thH + 2;
-    doc.fillColor("#000000");
-  }
-
-  // ── Page-bottom helper — PDFKit ≥0.17 exposes maxY as a function ──────────
+  // ── Page-bottom helper ───────────────────────────────────────────────────────
   function pageBottom(): number {
     const page = doc.page as any;
     if (typeof page.maxY === "function") return page.maxY() as number;
@@ -198,86 +159,174 @@ export async function generateStockPdf(
   }
 
   function ensureSpace(need: number): void {
-    if (doc.y + need > pageBottom()) {
-      doc.addPage();
+    if (doc.y + need > pageBottom()) doc.addPage();
+  }
+
+  // ── Page header ──────────────────────────────────────────────────────────────
+  function drawPageHeader(): void {
+    const PW = doc.page.width;   // 595.28
+
+    // ── Coloured top bar ──────────────────────────────────────────────────────
+    doc.save();
+    doc.rect(0, 0, PW, HEADER_BAR_H).fill(CLR_BRAND);
+    doc.restore();
+
+    // Company / location name — white bold centred
+    doc.font("Helvetica-Bold").fontSize(16).fillColor(CLR_WHITE);
+    doc.text(mainTitle, X_LEFT, 10, { width: CONTENT_W, align: "center", lineBreak: false });
+
+    // Subtitle — muted, smaller
+    doc.font("Helvetica").fontSize(9).fillColor(CLR_MUTED);
+    doc.text(subTitle, X_LEFT, 30, { width: CONTENT_W - 80, align: "center", lineBreak: false });
+
+    // Date — right side of the bar, same row as subtitle
+    doc.font("Helvetica").fontSize(9).fillColor(CLR_MUTED);
+    doc.text(dateStr, X_LEFT, 30, { width: CONTENT_W, align: "right", lineBreak: false });
+
+    // ── Meta row (printed / page) ─────────────────────────────────────────────
+    const metaY = HEADER_BAR_H + 4;
+    doc.font("Helvetica").fontSize(7.5).fillColor("#888888");
+    doc.text(`Printed: ${printedStr}`, X_LEFT, metaY, { lineBreak: false });
+    doc.text(`Page ${pageNum}`,        X_LEFT, metaY, { width: CONTENT_W, align: "right", lineBreak: false });
+
+    // ── Column header row ─────────────────────────────────────────────────────
+    const thY = metaY + META_H;
+    doc.save();
+    doc.rect(X_LEFT, thY, CONTENT_W, COL_HDR_H).fill("#f1f5f9");
+    // top + bottom border
+    doc.moveTo(X_LEFT, thY)              .lineTo(X_RIGHT, thY)              .strokeColor("#cbd5e1").lineWidth(1).stroke();
+    doc.moveTo(X_LEFT, thY + COL_HDR_H) .lineTo(X_RIGHT, thY + COL_HDR_H) .strokeColor("#cbd5e1").lineWidth(1).stroke();
+    doc.restore();
+
+    doc.font("Helvetica-Bold").fontSize(8).fillColor("#64748b");
+
+    // Particulars
+    doc.text("PARTICULARS", X_LEFT + 4, thY + 7, { lineBreak: false });
+
+    // Qty (number + uom together as one header label)
+    const qtyHdrX = X_NUM - COL_NUM_W;
+    const qtyHdrW = COL_NUM_W + 4 + COL_UOM_W;
+    doc.text("QTY", qtyHdrX, thY + 7, { width: qtyHdrW, align: "right", lineBreak: false });
+
+    if (includeCost) {
+      doc.text("AVG RATE",    X_RATE - COL_RATE_W, thY + 7, { width: COL_RATE_W, align: "right", lineBreak: false });
+      doc.text("TOTAL VALUE", X_VAL  - COL_VAL_W,  thY + 7, { width: COL_VAL_W,  align: "right", lineBreak: false });
     }
+
+    doc.y = thY + COL_HDR_H + 2;
+    doc.fillColor(CLR_BODY);
   }
 
   drawPageHeader();
 
   doc.on("pageAdded", () => {
     pageNum++;
+    rowIndex = 0;
     drawPageHeader();
   });
 
-  // ── Group + item rows ─────────────────────────────────────────────────────
+  // ── Group + item rows ─────────────────────────────────────────────────────────
+  const GROUP_H = 18;
+  const ITEM_H  = 19;
+
   for (const { groupName, items } of grouped) {
     const groupQty   = items.reduce((s, r) => s + r.qty, 0);
     const groupValue = items.reduce((s, r) => s + r.totalValue, 0);
     const firstUom   = items[0]?.uom || "BL";
     const isGroupNeg = groupQty < 0;
 
-    ensureSpace(17 + 20);
+    ensureSpace(GROUP_H + ITEM_H);
 
-    // Group header row
+    // ── Group header — dark brand row ─────────────────────────────────────────
     const gY = doc.y;
-    const gH = 17;
     doc.save();
-    doc.rect(X_LEFT, gY, CONTENT_W, gH).fill("#e8e8e8");
-    doc.moveTo(X_LEFT, gY)      .lineTo(X_RIGHT, gY)      .strokeColor("#aaaaaa").lineWidth(0.75).stroke();
-    doc.moveTo(X_LEFT, gY + gH) .lineTo(X_RIGHT, gY + gH) .strokeColor("#aaaaaa").lineWidth(0.75).stroke();
+    doc.rect(X_LEFT, gY, CONTENT_W, GROUP_H).fill(isGroupNeg ? CLR_NEG_TEXT : CLR_BRAND);
     doc.restore();
 
-    doc.font("Helvetica-Bold").fontSize(9.5).fillColor(isGroupNeg ? "#c2272d" : "#000000");
-    doc.text(groupName,                          X_LEFT + 4,          gY + 4, { lineBreak: false });
-    doc.text(`${fmtQty(groupQty)} ${firstUom}`, X_QTY - COL_QTY_W,   gY + 4, { width: COL_QTY_W, align: "right", lineBreak: false });
-    if (includeCost) {
-      doc.text(fmtAmt(groupValue),               X_VAL - COL_VAL_W,   gY + 4, { width: COL_VAL_W, align: "right", lineBreak: false });
-    }
-    doc.y = gY + gH;
+    doc.font("Helvetica-Bold").fontSize(9).fillColor(CLR_WHITE);
+    doc.text(groupName, X_LEFT + 8, gY + 5, { lineBreak: false });
 
-    // Item rows
+    // group qty number
+    doc.text(fmtQty(groupQty), X_NUM - COL_NUM_W, gY + 5, { width: COL_NUM_W, align: "right", lineBreak: false });
+    // group uom — muted
+    doc.font("Helvetica").fontSize(8).fillColor(CLR_MUTED);
+    doc.text(firstUom, X_NUM + 4, gY + 6, { width: COL_UOM_W, lineBreak: false });
+
+    if (includeCost) {
+      doc.font("Helvetica-Bold").fontSize(9).fillColor(CLR_WHITE);
+      doc.text(fmtAmt(groupValue), X_VAL - COL_VAL_W, gY + 5, { width: COL_VAL_W, align: "right", lineBreak: false });
+    }
+
+    doc.y = gY + GROUP_H;
+
+    // ── Item rows ─────────────────────────────────────────────────────────────
     for (const item of items) {
-      ensureSpace(20);
+      ensureSpace(ITEM_H);
 
       const iY    = doc.y;
-      const iH    = 20;
       const isNeg = item.qty < 0;
+      const isBg  = isNeg ? CLR_ROW_NEG : (rowIndex % 2 === 1 ? CLR_ROW_ALT : CLR_WHITE);
 
       doc.save();
-      if (isNeg) doc.rect(X_LEFT, iY, CONTENT_W, iH).fill("#fff0f0");
-      doc.moveTo(X_LEFT, iY + iH).lineTo(X_RIGHT, iY + iH).strokeColor("#cccccc").lineWidth(0.75).stroke();
+      doc.rect(X_LEFT, iY, CONTENT_W, ITEM_H).fill(isBg);
+      // bottom separator
+      doc.moveTo(X_LEFT, iY + ITEM_H).lineTo(X_RIGHT, iY + ITEM_H).strokeColor(CLR_SEP).lineWidth(0.5).stroke();
       doc.restore();
 
-      doc.font(isNeg ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(isNeg ? "#c2272d" : "#222222");
+      const textColor = isNeg ? CLR_NEG_TEXT : CLR_BODY;
 
-      doc.text(item.itemName,                         X_LEFT + 16,         iY + 6, { lineBreak: false });
-      doc.text(`${fmtQty(item.qty)} ${item.uom}`,    X_QTY - COL_QTY_W,   iY + 6, { width: COL_QTY_W, align: "right", lineBreak: false });
+      // Item name
+      doc.font(isNeg ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(textColor);
+      doc.text(item.itemName, X_LEFT + 18, iY + 5, { lineBreak: false });
+
+      // Qty number — bold, slightly larger
+      doc.font("Helvetica-Bold").fontSize(9.5).fillColor(isNeg ? CLR_NEG_TEXT : CLR_BRAND);
+      doc.text(fmtQty(item.qty), X_NUM - COL_NUM_W, iY + 5, { width: COL_NUM_W, align: "right", lineBreak: false });
+
+      // UOM — small gray label
+      doc.font("Helvetica").fontSize(7.5).fillColor(CLR_MUTED);
+      doc.text(item.uom, X_NUM + 4, iY + 7, { width: COL_UOM_W, lineBreak: false });
+
       if (includeCost) {
-        doc.text(fmtAmt(item.rate),                   X_RATE - COL_RATE_W, iY + 6, { width: COL_RATE_W, align: "right", lineBreak: false });
-        doc.text(fmtAmt(item.totalValue),             X_VAL - COL_VAL_W,   iY + 6, { width: COL_VAL_W, align: "right", lineBreak: false });
+        doc.font("Helvetica").fontSize(9).fillColor(textColor);
+        doc.text(fmtAmt(item.rate),       X_RATE - COL_RATE_W, iY + 5, { width: COL_RATE_W, align: "right", lineBreak: false });
+        doc.text(fmtAmt(item.totalValue), X_VAL  - COL_VAL_W,  iY + 5, { width: COL_VAL_W,  align: "right", lineBreak: false });
       }
-      doc.y = iY + iH;
+
+      doc.y = iY + ITEM_H;
+      rowIndex++;
     }
   }
 
-  // ── Grand Total row ───────────────────────────────────────────────────────
-  ensureSpace(22);
-  doc.y += 2;
+  // ── Grand Total row ───────────────────────────────────────────────────────────
+  ensureSpace(24);
+  doc.y += 3;
   const tY = doc.y;
-  const tH = 18;
+  const tH = 22;
+
   doc.save();
-  doc.rect(X_LEFT, tY, CONTENT_W, tH).fill("#e8e8e8");
-  doc.moveTo(X_LEFT, tY)      .lineTo(X_RIGHT, tY)      .strokeColor("#111111").lineWidth(2.5).stroke();
-  doc.moveTo(X_LEFT, tY + tH) .lineTo(X_RIGHT, tY + tH) .strokeColor("#111111").lineWidth(2.5).stroke();
+  doc.rect(X_LEFT, tY, CONTENT_W, tH).fill(CLR_ACCENT);
   doc.restore();
 
-  doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000");
-  doc.text("Grand Total",                              X_LEFT + 4,          tY + 4, { lineBreak: false });
-  doc.text(`${fmtQty(grandTotalQty)} ${uomFirst}`,    X_QTY - COL_QTY_W,   tY + 4, { width: COL_QTY_W, align: "right", lineBreak: false });
+  doc.font("Helvetica-Bold").fontSize(10).fillColor(CLR_WHITE);
+  doc.text("GRAND TOTAL", X_LEFT + 8, tY + 6, { lineBreak: false });
+
+  // Total qty number
+  doc.text(fmtQty(grandTotalQty), X_NUM - COL_NUM_W, tY + 6, { width: COL_NUM_W, align: "right", lineBreak: false });
+
+  // Total UOM — slightly muted white
+  doc.font("Helvetica").fontSize(8).fillColor("rgba(255,255,255,0.75)");
+  doc.text(uomFirst, X_NUM + 4, tY + 8, { width: COL_UOM_W, lineBreak: false });
+
   if (includeCost) {
-    doc.text(fmtAmt(grandTotalValue),                  X_VAL - COL_VAL_W,   tY + 4, { width: COL_VAL_W, align: "right", lineBreak: false });
+    doc.font("Helvetica-Bold").fontSize(10).fillColor(CLR_WHITE);
+    doc.text(fmtAmt(grandTotalValue), X_VAL - COL_VAL_W, tY + 6, { width: COL_VAL_W, align: "right", lineBreak: false });
   }
+
+  // ── Footer on last page ───────────────────────────────────────────────────────
+  const footerY = pageBottom() - 14;
+  doc.font("Helvetica").fontSize(7).fillColor("#b0b8c4");
+  doc.text("HMD International Group · Confidential", X_LEFT, footerY, { width: CONTENT_W, align: "center", lineBreak: false });
 
   doc.end();
   const buffer = await pdfReady;
