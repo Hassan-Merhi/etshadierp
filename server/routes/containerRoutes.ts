@@ -934,10 +934,11 @@ export function registerContainerRoutes(app: Express) {
           if (toDeleteIds.length > 0) await tx.delete(voucherEntries).where(inArray(voucherEntries.id, toDeleteIds));
           if (purchasesEntryId !== null) await tx.update(voucherEntries).set({ debitAmount: poGrossTotal.toFixed(2), creditAmount: "0" }).where(eq(voucherEntries.id, purchasesEntryId));
           if (mainCrEntryId !== null) await tx.update(voucherEntries).set({ creditAmount: poSupplierTotal.toFixed(2), debitAmount: "0" }).where(eq(voucherEntries.id, mainCrEntryId));
+          const _syncBtnFreightNarration = `Freight - ${po.poNumber}${poContainerRow?.containerNumber ? ` (${poContainerRow.containerNumber})` : ''}`;
           if (freightCrEntryId !== null) {
-            await tx.update(voucherEntries).set({ creditAmount: poFreightAmt.toFixed(2), debitAmount: "0", ledgerAccountId: poFreightParentAcctId! }).where(eq(voucherEntries.id, freightCrEntryId));
+            await tx.update(voucherEntries).set({ creditAmount: poFreightAmt.toFixed(2), debitAmount: "0", ledgerAccountId: poFreightParentAcctId!, narration: _syncBtnFreightNarration }).where(eq(voucherEntries.id, freightCrEntryId));
           } else {
-            await tx.insert(voucherEntries).values({ voucherId: po.voucherId!, companyId: po.companyId, ledgerAccountId: poFreightParentAcctId!, debitAmount: "0", creditAmount: poFreightAmt.toFixed(2), narration: `Freight - PO ${po.poNumber}` });
+            await tx.insert(voucherEntries).values({ voucherId: po.voucherId!, companyId: po.companyId, ledgerAccountId: poFreightParentAcctId!, debitAmount: "0", creditAmount: poFreightAmt.toFixed(2), narration: _syncBtnFreightNarration });
           }
           await tx.update(vouchers).set({ totalAmount: poGrossTotal.toFixed(2) }).where(eq(vouchers.id, po.voucherId!));
         });
@@ -1150,10 +1151,11 @@ export function registerContainerRoutes(app: Express) {
                       if (toDeleteIds.length > 0) await db.delete(voucherEntries).where(inArray(voucherEntries.id, toDeleteIds));
                       if (purchasesEntryId !== null) await db.update(voucherEntries).set({ debitAmount: grossTotal.toFixed(2), creditAmount: "0" }).where(eq(voucherEntries.id, purchasesEntryId));
                       if (mainCrEntryId !== null) await db.update(voucherEntries).set({ creditAmount: intercoTotal.toFixed(2), debitAmount: "0" }).where(eq(voucherEntries.id, mainCrEntryId));
+                      const _syncAllFreightNarration = `Freight - ${po.poNumber}${cNum && cNum !== String(po.id) ? ` (${cNum})` : ''}`;
                       if (freightCrEntryId !== null) {
-                        await db.update(voucherEntries).set({ creditAmount: poFreight.toFixed(2), debitAmount: "0", ledgerAccountId: poFreightParentAccountId! }).where(eq(voucherEntries.id, freightCrEntryId));
+                        await db.update(voucherEntries).set({ creditAmount: poFreight.toFixed(2), debitAmount: "0", ledgerAccountId: poFreightParentAccountId!, narration: _syncAllFreightNarration }).where(eq(voucherEntries.id, freightCrEntryId));
                       } else {
-                        await db.insert(voucherEntries).values({ voucherId: po.voucherId, companyId: po.companyId, ledgerAccountId: poFreightParentAccountId!, debitAmount: "0", creditAmount: poFreight.toFixed(2), narration: `Freight - PO ${po.poNumber}` });
+                        await db.insert(voucherEntries).values({ voucherId: po.voucherId, companyId: po.companyId, ledgerAccountId: poFreightParentAccountId!, debitAmount: "0", creditAmount: poFreight.toFixed(2), narration: _syncAllFreightNarration });
                       }
                       updatedFreightVouchers++;
                     } else {
@@ -3512,6 +3514,10 @@ export function registerContainerRoutes(app: Express) {
       // Used inside the transaction to pick the right voucher structure.
       const _pfParentId = await storage.getParentCompanyId();
       const _isSameCompanyOrNoInterco = !_pfParentId || existingPO.companyId === _pfParentId;
+      const _poContainerNum = existingPO.containerId
+        ? (await db.select({ containerNumber: containers.containerNumber }).from(containers).where(eq(containers.id, existingPO.containerId)).limit(1))[0]?.containerNumber ?? null
+        : null;
+      const _freightNarration = `Freight - ${existingPO.poNumber}${_poContainerNum ? ` (${_poContainerNum})` : ''}`;
 
       // Update voucher entries when local voucher total, freight payer, or own-account changes,
       // OR when the actual DB voucher total doesn't match the expected total.
@@ -3587,14 +3593,14 @@ export function registerContainerRoutes(app: Express) {
                 // Update or insert freight CR entry pointing at freightParentAccountId
                 if (freightCrEntryId !== null) {
                   await tx.update(voucherEntries)
-                    .set({ creditAmount: newFreight.toFixed(2), debitAmount: "0", ledgerAccountId: newFreightParentAccountId })
+                    .set({ creditAmount: newFreight.toFixed(2), debitAmount: "0", ledgerAccountId: newFreightParentAccountId, narration: _freightNarration })
                     .where(eq(voucherEntries.id, freightCrEntryId));
                 } else {
                   await tx.insert(voucherEntries).values({
                     voucherId: existingPO.voucherId, companyId: existingPO.companyId,
                     ledgerAccountId: newFreightParentAccountId,
                     debitAmount: "0", creditAmount: newFreight.toFixed(2),
-                    narration: `Freight - PO ${existingPO.poNumber}`,
+                    narration: _freightNarration,
                   });
                 }
 
