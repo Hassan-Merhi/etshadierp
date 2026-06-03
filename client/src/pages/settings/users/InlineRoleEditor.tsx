@@ -177,8 +177,13 @@ export function InlineRoleEditor({
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (isPOS && !posViewOnly && selectedLocationIds.length > 0) {
-        const missing = selectedLocationIds.filter((id) => !locationCashAccounts[id]);
+      if (isPOS && selectedLocationIds.length > 0) {
+        // When posViewOnly, only the primary (first) location needs a cash account.
+        // Without posViewOnly, all selected locations need one.
+        const locationsNeedingCash = posViewOnly
+          ? selectedLocationIds.slice(0, 1)
+          : selectedLocationIds;
+        const missing = locationsNeedingCash.filter((id) => !locationCashAccounts[id]);
         if (missing.length > 0) {
           const locNames = missing.map((id) => {
             const loc = (locations as any[]).find((l: any) => l.id === id);
@@ -197,7 +202,7 @@ export function InlineRoleEditor({
         posStation: isPOS ? posStation : undefined,
         daybookEditDays,
         cashAccountId: undefined,
-        canSellNegativeStock: posViewOnly ? false : canSellNegativeStock,
+        canSellNegativeStock: canSellNegativeStock,
         posViewOnly: isPOS ? posViewOnly : false,
         canDeleteRecords: role === "Manager" ? canDeleteRecords : false,
       };
@@ -341,7 +346,7 @@ export function InlineRoleEditor({
                         <span className="truncate">{loc.name}</span>
                         <span className="text-muted-foreground shrink-0">({loc.code})</span>
                       </label>
-                      {checked && !posViewOnly && (
+                      {checked && (!posViewOnly || selectedLocationIds[0] === loc.id) && (
                         <div className="pl-6 pr-1 pb-1">
                           <Select
                             value={locationCashAccounts[loc.id]?.toString() || ""}
@@ -404,35 +409,30 @@ export function InlineRoleEditor({
             </div>
           </div>
 
-          {/* View Only Mode */}
+          {/* Multi-Location Stock View */}
           <div className="flex items-center gap-3 rounded-md border border-border/60 bg-background px-3 py-2">
             <Switch
               checked={posViewOnly}
-              onCheckedChange={(v) => {
-                setPosViewOnly(v);
-                if (v) setCanSellNegativeStock(false);
-              }}
+              onCheckedChange={(v) => setPosViewOnly(v)}
               data-testid="switch-pos-view-only"
             />
             <div className="space-y-0.5">
-              <Label className="text-xs cursor-pointer">Stock View Only (no sales)</Label>
+              <Label className="text-xs cursor-pointer">Multi-Location Stock View</Label>
               <p className="text-xs text-muted-foreground">
-                User can see inventory across all assigned locations but cannot sell or open shifts. No cash account needed.
+                User can sell from their primary location and view stock at all other assigned locations. Cash account required for primary location only.
               </p>
             </div>
           </div>
 
-          {/* Allow 0-stock sales — hidden when view-only */}
-          {!posViewOnly && (
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={canSellNegativeStock}
-                onCheckedChange={setCanSellNegativeStock}
-                data-testid="switch-can-sell-negative-stock"
-              />
-              <Label className="text-xs cursor-pointer">Allow 0-stock sales</Label>
-            </div>
-          )}
+          {/* Allow 0-stock sales */}
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={canSellNegativeStock}
+              onCheckedChange={setCanSellNegativeStock}
+              data-testid="switch-can-sell-negative-stock"
+            />
+            <Label className="text-xs cursor-pointer">Allow 0-stock sales</Label>
+          </div>
         </div>
       )}
 
