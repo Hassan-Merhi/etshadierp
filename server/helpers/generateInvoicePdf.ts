@@ -17,7 +17,7 @@ const CLR_WHITE   = "#ffffff";
 const CLR_MUTED   = "#94a3b8";   // slate-400  — subtitle / meta text
 const CLR_BODY    = "#1e293b";   // slate-800  — item text
 const CLR_ROW_ALT = "#f8fafc";   // slate-50   — alternating stripe
-const CLR_SEP     = "#e2e8f0";   // slate-200  — row divider
+const CLR_SEP     = "#b0bec8";   // slate-300+ — row divider (visible)
 const CLR_GREEN   = "#059669";
 const CLR_RED     = "#c2272d";
 
@@ -348,9 +348,9 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     doc.rect(MARGIN_X, y, USABLE_W, dynH).fill(rowBg);
     // bottom separator
     doc.moveTo(MARGIN_X, y + dynH).lineTo(MARGIN_X + USABLE_W, y + dynH)
-      .strokeColor(CLR_SEP).lineWidth(0.4).stroke();
+      .strokeColor(CLR_SEP).lineWidth(0.75).stroke();
     // inner dividers
-    doc.strokeColor(CLR_SEP).lineWidth(0.4);
+    doc.strokeColor(CLR_SEP).lineWidth(0.75);
     for (const x of innerDividers) {
       doc.moveTo(x, y).lineTo(x, y + dynH).stroke();
     }
@@ -402,8 +402,11 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   cellText(doc, fmtQty(totalQty), X_QTY,  COL_QTY_W,  y, totH, "center");
   cellText(doc, fmtUSD(totalAmt), X_AMT,  COL_AMT_W,  y, totH, "center");
   if (!d.hideProfitCols) {
-    doc.fillColor(totalPL >= 0 ? "#d1fae5" : "#fee2e2");
-    cellText(doc, fmtUSD(totalPL), X_TPL, COL_TPL_W, y, totH, "center");
+    // White for profit, bright red for loss — clearly readable on green background.
+    // Always show sign (+/−) so direction is unambiguous.
+    const plSign = totalPL > 0 ? "+" : totalPL < 0 ? "−" : "";
+    doc.fillColor(totalPL >= 0 ? CLR_WHITE : "#ffaaaa");
+    cellText(doc, plSign + fmtUSD(Math.abs(totalPL)), X_TPL, COL_TPL_W, y, totH, "center");
   }
   y += totH + 8;
 
