@@ -504,19 +504,24 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   const trackNowMutation = useMutation({
     mutationFn: async (containerId: number) => {
       const res = await factoryApiRequest("POST", `/api/factory/container-tracking/${containerId}/track-now`, {});
-      return res as any;
+      if (!res.ok) throw new Error("Failed to dispatch tracking");
+      return containerId;
     },
     onMutate: (id) => setTrackingNowId(id),
-    onSuccess: (data) => {
-      setTrackingNowId(null);
-      tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
-      toast({
-        title: data.success ? "Tracking updated" : "Tracking failed",
-        description: data.success
-          ? `${data.containerNumber}: ${data.lastStatus ?? "Status fetched"}`
-          : `${data.containerNumber}: ${data.error ?? "Unknown error"}`,
-        variant: data.success ? "default" : "destructive",
-      });
+    onSuccess: (_containerId) => {
+      toast({ title: "Tracking started", description: "Fetching live data in the background…" });
+      // Poll for updated container data while tracking runs in background
+      let elapsed = 0;
+      const POLL_MS = 4000;
+      const MAX_MS = 28000;
+      const interval = setInterval(() => {
+        elapsed += POLL_MS;
+        tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+        if (elapsed >= MAX_MS) {
+          clearInterval(interval);
+          setTrackingNowId(null);
+        }
+      }, POLL_MS);
     },
     onError: (err: any) => {
       setTrackingNowId(null);
@@ -538,22 +543,29 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     }
     setBulkTracking(true);
     setBulkProgress({ done: 0, total: eligible.length });
-    let succeeded = 0; let failed = 0;
+    // Dispatch all tracking requests — each responds immediately (fire-and-forget on server)
     for (let i = 0; i < eligible.length; i++) {
       const c = eligible[i];
       try {
-        const res = await factoryApiRequest("POST", `/api/factory/container-tracking/${c.id}/track-now`, {});
-        const data = res.ok ? await res.json() : null;
-        if (data?.success) succeeded++; else failed++;
-      } catch { failed++; }
+        await factoryApiRequest("POST", `/api/factory/container-tracking/${c.id}/track-now`, {});
+      } catch { /* ignore dispatch errors */ }
       setBulkProgress({ done: i + 1, total: eligible.length });
     }
-    tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
     setBulkTracking(false);
     setBulkProgress(null);
     toast({
-      title: `Track All complete — ${succeeded} updated${failed > 0 ? `, ${failed} failed` : ""}`,
+      title: `Tracking ${eligible.length} containers…`,
+      description: "Results will appear automatically over the next minute.",
     });
+    // Poll for results as background tracking completes
+    let elapsed = 0;
+    const POLL_MS = 5000;
+    const MAX_MS = 60000;
+    const interval = setInterval(() => {
+      elapsed += POLL_MS;
+      tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+      if (elapsed >= MAX_MS) clearInterval(interval);
+    }, POLL_MS);
   }
 
   if (isLoading) {
@@ -745,7 +757,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
               <TableHead className="w-8">#</TableHead>
               <TableHead>Container #</TableHead>
               <TableHead>Supplier</TableHead>
-              <TableHead>Status</TableHead>
               <TableHead>ETA</TableHead>
               <TableHead className="text-right">Cost</TableHead>
               <TableHead className="text-right">Freight</TableHead>
@@ -801,7 +812,8 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                           <XCircle className="h-3 w-3 shrink-0" />
                           {(() => {
                             const err: string = fc.trackingError ?? "";
-                            return err.toLowerCase().includes("timeout") ? "Carrier timeout" : err.slice(0, 35);
+                            const low = err.toLowerCase();
+                            return (low.includes("timeout") || low.includes("timed out")) ? "Carrier timeout" : err.slice(0, 35);
                           })()}
                         </span>
                       )}
@@ -816,11 +828,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                   {/* Supplier */}
                   <TableCell>
                     {fc.supplierName ?? <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-
-                  {/* Status */}
-                  <TableCell>
-                    <ContainerStatusBadge status={c.status ?? "PENDING"} />
                   </TableCell>
 
                   {/* ETA */}

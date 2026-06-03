@@ -98,8 +98,12 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
 
       if (!container) return res.status(404).json({ message: "Container not found" });
 
-      const result = await trackOneFactoryContainerById(containerId);
-      res.json(result);
+      // Fire tracking in background so we never block the HTTP response
+      trackOneFactoryContainerById(containerId).catch((err: any) => {
+        console.error(`[FactoryTracking] Background track error for container ${containerId}:`, err?.message);
+      });
+
+      res.json({ success: true, queued: true, containerId });
     } catch (err: any) {
       const status = err.message?.includes("not found") ? 404 :
                      err.message?.includes("disabled") ? 400 :
