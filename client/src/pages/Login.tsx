@@ -144,18 +144,16 @@ export default function Login() {
         const alreadySaved = !!localStorage.getItem(passkeyStorageKey(credentials.username));
         const snoozed = isPasskeySnoozed(credentials.username);
         if (alreadySaved || snoozed) {
-          queryClient.setQueryData(["/api/auth/me"], userData);
           resetCsrfToken();
-          navigate("/");
+          window.location.href = "/";
         } else {
           pendingUserData.current = userData;
           pendingPasskeyUser.current = credentials.username;
           setShowPasskeyRegister(true);
         }
       } else {
-        queryClient.setQueryData(["/api/auth/me"], userData);
         resetCsrfToken();
-        navigate("/");
+        window.location.href = "/";
       }
     },
     onError: (error: any) => {
@@ -231,20 +229,18 @@ export default function Login() {
     } finally {
       setPasskeyRegPending(false);
       setShowPasskeyRegister(false);
-      queryClient.setQueryData(["/api/auth/me"], pendingUserData.current);
       resetCsrfToken();
       pendingUserData.current = null;
-      navigate("/");
+      window.location.href = "/";
     }
   };
 
   const handleSkipPasskey = () => {
     localStorage.setItem(passkeySnoozeKey(pendingPasskeyUser.current), String(Date.now()));
     setShowPasskeyRegister(false);
-    queryClient.setQueryData(["/api/auth/me"], pendingUserData.current);
     resetCsrfToken();
     pendingUserData.current = null;
-    navigate("/");
+    window.location.href = "/";
   };
 
   const handlePasskeyLogin = async () => {
@@ -258,10 +254,8 @@ export default function Login() {
         const err = await verifyRes.json();
         throw new Error(err.message || "Passkey verification failed");
       }
-      const userData = await verifyRes.json();
-      queryClient.setQueryData(["/api/auth/me"], userData);
       resetCsrfToken();
-      navigate("/");
+      window.location.href = "/";
     } catch (err: any) {
       if (err?.name === "NotAllowedError") return;
       toast({ title: "Passkey failed", description: err.message || "Could not sign in with passkey", variant: "destructive" });
