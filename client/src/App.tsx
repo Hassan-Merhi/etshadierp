@@ -91,6 +91,7 @@ const POSPriceList = lazy(() => import("@/pages/pos/POSPriceList"));
 const PosTransferOrders = lazy(() => import("@/pages/pos/PosTransferOrders"));
 const EditSupplier = lazy(() => import("@/pages/EditSupplier"));
 const SupplierProformas = lazy(() => import("@/pages/SupplierProformas"));
+const SupplierProfitCheck = lazy(() => import("@/pages/SupplierProfitCheck"));
 const ContainerVerification = lazy(() => import("@/pages/ContainerVerification"));
 const StockOTW = lazy(() => import("@/pages/StockOTW"));
 const Customers = lazy(() => import("@/pages/Customers"));
@@ -401,6 +402,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
         : <Route path="/customers"><Redirect to="/tracking" /></Route>}
       {canAccess("suppliers") && <Route path="/suppliers/:supplierId/proformas" component={SupplierProformas} />}
       {canAccess("suppliers") && <Route path="/suppliers/:id/edit" component={EditSupplier} />}
+      {canAccess("suppliers") && <Route path="/supplier-profit-check" component={SupplierProfitCheck} />}
 
       {/* Vouchers */}
       {canAccess("vouchers")

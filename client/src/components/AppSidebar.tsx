@@ -17,6 +17,7 @@ import {
   PieChart,
   Ship,
   TrendingUp,
+  Calculator,
   MessageCircle,
   TableProperties,
   ExternalLink,
@@ -77,9 +78,10 @@ export const ERP_NAV_SECTIONS: NavSection[] = [
     label: "Inventory",
     color: NAV_COLOR.inventory,
     items: [
-      { title: "Inventory",         url: "/inventory",         icon: Layers   },
-      { title: "Stock",             url: "/stock",             icon: Package  },
-      { title: "Optional Vouchers", url: "/optional-vouchers", icon: FileText },
+      { title: "Inventory",         url: "/inventory",              icon: Layers      },
+      { title: "Stock",             url: "/stock",                  icon: Package     },
+      { title: "Optional Vouchers", url: "/optional-vouchers",      icon: FileText    },
+      { title: "Profit Check",      url: "/supplier-profit-check",  icon: Calculator  },
     ],
   },
   {
