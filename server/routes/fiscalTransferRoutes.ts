@@ -1266,8 +1266,43 @@ export function registerFiscalTransferRoutes(app: Express) {
           .limit(1);
 
         if (existingOptional) {
-          // Replace only this user's items on their existing revision
-          await db.delete(stockTransferRevisionItems).where(eq(stockTransferRevisionItems.revisionId, existingOptional.id));
+          // Merge: upsert each incoming item into the existing revision.
+          // Items already in the revision but NOT in this payload are kept as-is
+          // (they were prior adjustments the user hasn't touched this session).
+          const existingRevItems = await db
+            .select()
+            .from(stockTransferRevisionItems)
+            .where(eq(stockTransferRevisionItems.revisionId, existingOptional.id));
+
+          const existingByKey = new Map(
+            existingRevItems.map(i => [`${i.stockItemId}:${i.sourceLocationId ?? ""}`, i])
+          );
+
+          for (const item of items as any[]) {
+            const key = `${item.stockItemId}:${item.sourceLocationId ?? ""}`;
+            const existing = existingByKey.get(key);
+            if (existing) {
+              await db.update(stockTransferRevisionItems)
+                .set({
+                  delta: String(item.delta),
+                  newQuantity: String(item.newQuantity),
+                  stockItemName: item.stockItemName,
+                })
+                .where(eq(stockTransferRevisionItems.id, existing.id));
+            } else {
+              await db.insert(stockTransferRevisionItems).values({
+                revisionId: existingOptional.id,
+                stockItemId: item.stockItemId,
+                stockItemName: item.stockItemName,
+                sourceLocationId: item.sourceLocationId ?? null,
+                sourceLocationName: item.sourceLocationName ?? null,
+                originalQuantity: String(item.originalQuantity),
+                delta: String(item.delta),
+                newQuantity: String(item.newQuantity),
+              });
+            }
+          }
+
           await db
             .update(stockTransferRevisions)
             .set({ note: note?.trim() || existingOptional.note, revisionDate: new Date() })

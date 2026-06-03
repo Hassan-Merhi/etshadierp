@@ -75,6 +75,7 @@ interface Revision {
   revisionNumber: number;
   note?: string;
   optional: boolean;
+  createdBy?: number | null;
   createdAt: string;
   items: RevisionItem[];
 }
@@ -168,6 +169,7 @@ function ItemSearchPanel({
         ) : (
           matches.map((item, i) => {
             const qty = parseFloat(item.quantity) || 0;
+            const inStock = qty > 0;
             return (
               <button
                 key={item.stockItemId}
@@ -182,12 +184,15 @@ function ItemSearchPanel({
                 data-testid={`button-panel-item-${item.stockItemId}`}
               >
                 <span className="truncate font-medium">{item.name}</span>
-                <span className={cn(
-                  "text-xs font-mono shrink-0 tabular-nums",
-                  qty > 0 ? "text-foreground" : "text-muted-foreground"
-                )}>
-                  {qty > 0 ? fmtQty(qty) : "0"}
-                </span>
+                {inStock ? (
+                  <span className="text-xs font-mono shrink-0 tabular-nums font-semibold">
+                    {fmtQty(qty)}
+                  </span>
+                ) : (
+                  <span className="text-xs shrink-0 px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+                    Out
+                  </span>
+                )}
               </button>
             );
           })
@@ -207,8 +212,37 @@ function EditableTransferDetail({
   onBack: () => void;
 }) {
   const { toast } = useToast();
-  const [deltas, setDeltas] = useState<Record<number, string>>({});
-  const [extraItems, setExtraItems] = useState<ExtraItem[]>([]);
+
+  // Pre-populate from any existing pending revision (so user sees their prior adjustments)
+  const [deltas, setDeltas] = useState<Record<number, string>>(() => {
+    const pending = detail.revisions.find(r => r.optional);
+    if (!pending) return {};
+    const stockItemToId = new Map(detail.items.map(i => [i.stockItemId, i.id]));
+    const init: Record<number, string> = {};
+    for (const ri of pending.items) {
+      const transferItemId = stockItemToId.get(ri.stockItemId);
+      if (transferItemId !== undefined && parseFloat(ri.originalQuantity) > 0) {
+        const d = parseFloat(ri.delta);
+        if (d !== 0) init[transferItemId] = String(d);
+      }
+    }
+    return init;
+  });
+
+  const [extraItems, setExtraItems] = useState<ExtraItem[]>(() => {
+    const pending = detail.revisions.find(r => r.optional);
+    if (!pending) return [];
+    const baseIds = new Set(detail.items.map(i => i.stockItemId));
+    return pending.items
+      .filter(ri => !baseIds.has(ri.stockItemId) || parseFloat(ri.originalQuantity) === 0)
+      .filter(ri => parseFloat(ri.newQuantity) > 0)
+      .map(ri => ({
+        stockItemId: ri.stockItemId,
+        stockItemName: ri.stockItemName,
+        qtyDraft: fmtQty(ri.newQuantity),
+      }));
+  });
+
   const [note, setNote] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelSearch, setPanelSearch] = useState("");
@@ -238,7 +272,7 @@ function EditableTransferDetail({
     onSuccess: () => {
       toast({ title: "Revision saved", description: "Adjustments submitted for admin review." });
       queryClient.invalidateQueries({ queryKey: ["/api/pos-transfer-detail", voucherId] });
-      setDeltas({}); setExtraItems([]); setNote("");
+      setNote("");
     },
     onError: (err: any) => { toast({ title: "Error", description: err.message, variant: "destructive" }); },
   });
@@ -295,6 +329,26 @@ function EditableTransferDetail({
   const updateExtraQty = (idx: number, val: string) =>
     setExtraItems(p => p.map((it, i) => i === idx ? { ...it, qtyDraft: val } : it));
   const removeExtra = (idx: number) => setExtraItems(p => p.filter((_, i) => i !== idx));
+
+  // Ordered list of all delta input keys for keyboard navigation
+  const getAllInputKeys = useCallback(() => [
+    ...myItems.map(i => `base-${i.id}`),
+    ...extraItems.map(e => `extra-${e.stockItemId}`),
+  ], [myItems, extraItems]);
+
+  const focusRelative = useCallback((currentKey: string, direction: 1 | -1) => {
+    const keys = getAllInputKeys();
+    const idx = keys.indexOf(currentKey);
+    if (idx === -1) return;
+    const next = idx + direction;
+    if (next >= 0 && next < keys.length) {
+      const el = deltaRefs.current[keys[next]];
+      el?.focus();
+      el?.select();
+    } else if (direction === 1) {
+      searchBarRef.current?.focus();
+    }
+  }, [getAllInputKeys]);
 
   const handleSave = () => {
     // Only send items whose delta is non-zero (supports both + and - adjustments)
@@ -412,14 +466,20 @@ function EditableTransferDetail({
                     <input
                       ref={el => { deltaRefs.current[`base-${item.id}`] = el; }}
                       type="text"
-                      inputMode="text"
+                      inputMode="decimal"
                       placeholder="0"
                       value={deltas[item.id] ?? ""}
                       onChange={e => setDeltaVal(item.id, e.target.value)}
                       onBlur={() => normalizeDelta(item.id)}
                       onKeyDown={e => {
-                        if (e.key === "Tab" && !e.shiftKey) {
-                          // move to next adjustment input
+                        if (e.key === "Enter" || (e.key === "Tab" && !e.shiftKey)) {
+                          e.preventDefault();
+                          normalizeDelta(item.id);
+                          focusRelative(`base-${item.id}`, 1);
+                        } else if (e.key === "Tab" && e.shiftKey) {
+                          e.preventDefault();
+                          normalizeDelta(item.id);
+                          focusRelative(`base-${item.id}`, -1);
                         }
                       }}
                       className="w-full text-center text-sm border rounded-md bg-background px-1 py-1 font-mono outline-none focus:ring-1 focus:ring-ring"
@@ -471,10 +531,19 @@ function EditableTransferDetail({
                     <input
                       ref={el => { deltaRefs.current[`extra-${item.stockItemId}`] = el; }}
                       type="text"
-                      inputMode="numeric"
+                      inputMode="decimal"
                       placeholder="0"
                       value={item.qtyDraft}
                       onChange={e => updateExtraQty(idx, e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter" || (e.key === "Tab" && !e.shiftKey)) {
+                          e.preventDefault();
+                          focusRelative(`extra-${item.stockItemId}`, 1);
+                        } else if (e.key === "Tab" && e.shiftKey) {
+                          e.preventDefault();
+                          focusRelative(`extra-${item.stockItemId}`, -1);
+                        }
+                      }}
                       className="w-full text-center text-sm border rounded-md bg-background px-1 py-1 font-mono outline-none focus:ring-1 focus:ring-ring"
                       data-testid={`input-extra-qty-${item.stockItemId}`}
                     />
