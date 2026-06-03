@@ -491,7 +491,7 @@ export default function FactoryStatusBuilder() {
     sourceSheetId: "", sourceRowId: "", sourceColId: "",
   });
 
-  const [pendingDelete, setPendingDelete] = useState<{ type: "row" | "col"; idx: number; label: string } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ type: "row" | "col" | "page"; idx: number; label: string } | null>(null);
 
   const fmtLabel = useCallback((label: string): string => {
     if (/^\d{4}-\d{2}-\d{2}$/.test(label)) return formatDisplayDate(label);
@@ -693,11 +693,7 @@ export default function FactoryStatusBuilder() {
   const deleteTab = (idx: number) => {
     const s = localSheets[idx];
     if (!s) return;
-    if (s.id) deleteMutation.mutate(s.id);
-    else {
-      setLocalSheets((prev) => prev.filter((_, i) => i !== idx));
-      setActiveIdx((prev) => Math.max(0, prev - 1));
-    }
+    setPendingDelete({ type: "page", idx, label: s.name });
   };
 
   // ── Column operations ──────────────────────────────────────────────────────
@@ -1171,14 +1167,16 @@ export default function FactoryStatusBuilder() {
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            Delete {pendingDelete?.type === "row" ? "Row" : "Column"}?
+            Delete {pendingDelete?.type === "row" ? "Row" : pendingDelete?.type === "col" ? "Column" : "Page"}?
           </AlertDialogTitle>
           <AlertDialogDescription>
             Are you sure you want to delete{" "}
             <span className="font-medium">"{pendingDelete?.label}"</span>?
             {pendingDelete?.type === "row"
               ? " All data in this row will be lost."
-              : " All data in this column will be lost."}
+              : pendingDelete?.type === "col"
+              ? " All data in this column will be lost."
+              : " This page and all its data will be permanently deleted."}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -1188,7 +1186,17 @@ export default function FactoryStatusBuilder() {
             onClick={() => {
               if (!pendingDelete) return;
               if (pendingDelete.type === "row") removeRow(pendingDelete.idx);
-              else removeColumn(pendingDelete.idx);
+              else if (pendingDelete.type === "col") removeColumn(pendingDelete.idx);
+              else {
+                const s = localSheets[pendingDelete.idx];
+                if (s) {
+                  if (s.id) deleteMutation.mutate(s.id);
+                  else {
+                    setLocalSheets((prev) => prev.filter((_, i) => i !== pendingDelete.idx));
+                    setActiveIdx((prev) => Math.max(0, prev - 1));
+                  }
+                }
+              }
               setPendingDelete(null);
             }}
           >
