@@ -32,10 +32,10 @@ if (isLocalReplitDB) {
   console.log('✓ SSL enabled for external database connection');
 }
 
-// Configurable via PG_POOL_MAX env var (default 5).
-// Keep low to leave headroom for zombie connections from crashed deploys.
-// Two instances during zero-downtime deploy: 5*2 + session(1*2) = 12, well within 103.
-const poolMax = Number(process.env.PG_POOL_MAX || 5);
+// Configurable via PG_POOL_MAX env var (default 10).
+// Zero-downtime deploy runs two instances: 10*2 + session(1*2) = 22 connections,
+// well within the Render 97-connection limit. Raise PG_POOL_MAX if the DB plan allows more.
+const poolMax = Number(process.env.PG_POOL_MAX || 10);
 console.log(`[DB Pool] max=${poolMax} (PG_POOL_MAX=${process.env.PG_POOL_MAX ?? 'unset'})`);
 
 export const pool = new Pool({

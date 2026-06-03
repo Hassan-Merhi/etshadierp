@@ -1409,7 +1409,12 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { status, mixBatchId, pressingBatchId, locationId, productId } = req.query;
+      const { status, mixBatchId, pressingBatchId, locationId, productId, limit: limitQ, offset: offsetQ } = req.query;
+
+      // Hard cap: never return more than 2000 rows in one call to prevent OOM.
+      // Callers that need everything should page with ?limit=N&offset=M.
+      const rowLimit = Math.min(Number(limitQ) || 2000, 2000);
+      const rowOffset = Math.max(Number(offsetQ) || 0, 0);
 
       const conditions: any[] = [
         eq(factoryBales.companyId, companyId),
@@ -1427,7 +1432,9 @@ export function registerFactoryBalesRoutes(app: Express) {
         .select()
         .from(factoryBales)
         .where(and(...conditions))
-        .orderBy(desc(factoryBales.createdAt));
+        .orderBy(desc(factoryBales.createdAt))
+        .limit(rowLimit)
+        .offset(rowOffset);
 
       const productIds: number[] = Array.from(new Set(bales.map((b: any) => b.productId).filter(Boolean)));
       const batchIds: number[] = Array.from(new Set(bales.map((b: any) => b.mixBatchId).filter(Boolean)));
@@ -1444,7 +1451,9 @@ export function registerFactoryBalesRoutes(app: Express) {
 
       const baleIds = bales.map((b: any) => b.id).filter(Boolean);
       const lastPrintMap = new Map<number, string>();
-      if (baleIds.length > 0) {
+      // Guard: skip the print-history look-up if there are too many IDs — a huge
+      // IN-clause with thousands of values is expensive and rarely needed for all bales.
+      if (baleIds.length > 0 && baleIds.length <= 500) {
         const printRows = await db
           .select({
             productionBaleId: baleLabelPrints.productionBaleId,
