@@ -1080,22 +1080,23 @@ export function registerContainerRoutes(app: Express) {
                   .where(eq(voucherEntries.voucherId, po.voucherId));
 
                 // ── Determine if a repair is needed ──────────────────────────
-                // For parent-freight, the freight account (freightParentAccountId) lives
-                // ONLY in the parent INTERCO journal — NOT in the child's purchase voucher.
-                // The child's voucher has: DR Purchases (goods) + DR Purchases (freight) + CR parentCredit.
-                // We never look for a CR to freightParentAccountId in the child's voucher.
+                const isSameCompanyPo = !parentCompanyId || po.companyId === parentCompanyId;
                 let freightEntryMissing = false;
                 if (hasParentFreight) {
-                  // Detect old single-DR structure or wrong DR sum → needs rebuild
+                  if (isSameCompanyPo) {
+                    // Same-company: freight DR entry must exist at freightParentAccountId
+                    const freightDrEntry = entries.find(
+                      (e: any) => Number(e.ledgerAccountId) === poFreightParentAccountId &&
+                                  parseFloat(e.debitAmount || "0") > 0 && parseFloat(e.creditAmount || "0") === 0
+                    );
+                    freightEntryMissing = !freightDrEntry ||
+                      Math.abs(parseFloat((freightDrEntry as any).debitAmount || "0") - poFreight) > 0.001;
+                  } else {
+                  // Interco: detect old single-DR structure or wrong DR sum → needs rebuild
                   const drEntries = entries.filter((e: any) =>
                     parseFloat(e.debitAmount || "0") > 0 && parseFloat(e.creditAmount || "0") === 0
                   );
                   const drSum = drEntries.reduce((s: number, e: any) => s + parseFloat(e.debitAmount || "0"), 0);
-                  // Also detect stray freight-account CR inside child voucher.
-                  // freightParentAccountId belongs ONLY in the parent INTERCO journal.
-                  // If it appears as a CR here it means the parent credit entry was
-                  // left at intercoTotal and the freight leaked into the wrong account,
-                  // causing an intercompany receivable/payable mismatch.
                   const strayFreightCr = poFreightParentAccountId
                     ? entries.some(
                         (e: any) => Number((e as any).ledgerAccountId) === poFreightParentAccountId &&
@@ -1103,6 +1104,7 @@ export function registerContainerRoutes(app: Express) {
                       )
                     : false;
                   freightEntryMissing = drEntries.length !== 2 || Math.abs(drSum - grossTotal) > 0.001 || strayFreightCr;
+                  }
                 } else if (hasOwnFreight) {
                   // Own-freight: freight CR to freightAccountId must exist in child's voucher
                   const freightCrEntry = entries.find(
@@ -1120,12 +1122,43 @@ export function registerContainerRoutes(app: Express) {
                     .where(eq(vouchers.id, po.voucherId));
 
                   if (hasParentFreight) {
-                    // Parent-freight: delete-and-rebuild approach.
-                    // Child's voucher MUST be:
+                    if (isSameCompanyPo) {
+                      // Same-company: embed freight DR into the PO voucher.
+                      //   DR Purchases (intercoTotal — goods only)
+                      //   DR freightParentAccountId (freight)
+                      //   CR (supplier/payable entry) (grossTotal)
+                      let purchasesEntryId: number | null = null;
+                      let freightDrEntryId: number | null = null;
+                      let mainCrEntryId: number | null = null;
+                      const toDeleteIds: number[] = [];
+                      for (const entry of entries) {
+                        const acctId = (entry as any).ledgerAccountId as number | null;
+                        const isDebit  = parseFloat(entry.debitAmount  || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
+                        const isCredit = parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount  || "0") === 0;
+                        if (isDebit && acctId === poFreightParentAccountId && freightDrEntryId === null) {
+                          freightDrEntryId = entry.id;
+                        } else if (isDebit && purchasesEntryId === null) {
+                          purchasesEntryId = entry.id;
+                        } else if (isCredit && mainCrEntryId === null) {
+                          mainCrEntryId = entry.id;
+                        } else {
+                          toDeleteIds.push(entry.id);
+                        }
+                      }
+                      if (toDeleteIds.length > 0) await db.delete(voucherEntries).where(inArray(voucherEntries.id, toDeleteIds));
+                      if (purchasesEntryId !== null) await db.update(voucherEntries).set({ debitAmount: intercoTotal.toFixed(2), creditAmount: "0" }).where(eq(voucherEntries.id, purchasesEntryId));
+                      if (freightDrEntryId !== null) {
+                        await db.update(voucherEntries).set({ debitAmount: poFreight.toFixed(2), creditAmount: "0", ledgerAccountId: poFreightParentAccountId! }).where(eq(voucherEntries.id, freightDrEntryId));
+                      } else {
+                        await db.insert(voucherEntries).values({ voucherId: po.voucherId, companyId: po.companyId, ledgerAccountId: poFreightParentAccountId!, debitAmount: poFreight.toFixed(2), creditAmount: "0", narration: `Freight - PO ${po.poNumber}` });
+                      }
+                      if (mainCrEntryId !== null) await db.update(voucherEntries).set({ creditAmount: grossTotal.toFixed(2), debitAmount: "0" }).where(eq(voucherEntries.id, mainCrEntryId));
+                      updatedFreightVouchers++;
+                    } else {
+                    // Interco: delete-and-rebuild approach.
                     //   DR Purchases (intercoTotal — goods)
-                    //   DR Purchases (freight)
+                    //   DR Purchases (freight — same account)
                     //   CR parentCreditAccount (grossTotal)
-                    // freightParentAccountId is NEVER in the child's voucher.
                     const childSettings = await storage.getCompanySettings(po.companyId);
                     const parentCreditAcctId = childSettings?.parentCreditAccountId ?? null;
 
@@ -1181,6 +1214,7 @@ export function registerContainerRoutes(app: Express) {
                         },
                       ]);
                     }
+                    } // end interco branch
                   } else if (hasOwnFreight) {
                     // Own-freight: DR Purchases (goods) + DR FreightOwnAccount (freight)
                     //              CR Supplier (goods) + CR FreightOwnAccount (freight)
