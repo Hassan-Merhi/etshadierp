@@ -387,48 +387,48 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
         </div>
 
         {/* Summary tiles */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL UNITS</CardTitle></CardHeader>
-            <CardContent><div className="text-2xl font-bold" data-testid={`stat-${testIdPrefix}-total-units`}>{units.length}</div></CardContent>
+            <CardHeader className="px-3 pt-3 pb-1"><CardTitle className="text-[10px] text-muted-foreground font-normal tracking-wide">TOTAL UNITS</CardTitle></CardHeader>
+            <CardContent className="px-3 pb-3"><div className="text-lg font-bold" data-testid={`stat-${testIdPrefix}-total-units`}>{units.length}</div></CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">RENT / MONTH</CardTitle></CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400" data-testid={`stat-${testIdPrefix}-monthly-rent`}>
+            <CardHeader className="px-3 pt-3 pb-1"><CardTitle className="text-[10px] text-muted-foreground font-normal tracking-wide">RENT / MONTH</CardTitle></CardHeader>
+            <CardContent className="px-3 pb-3">
+              <div className="text-lg font-bold text-blue-600 dark:text-blue-400" data-testid={`stat-${testIdPrefix}-monthly-rent`}>
                 ${fmtMoney(totals.totalMonthlyRent)}
               </div>
-              <p className="text-[10px] text-muted-foreground mt-1">expected from active leases</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">expected from active leases</p>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL GUARANTEE</CardTitle></CardHeader>
-            <CardContent><div className="text-2xl font-bold" data-testid={`stat-${testIdPrefix}-total-guarantee`}>${fmtMoney(totals.totalGuarantee)}</div></CardContent>
+            <CardHeader className="px-3 pt-3 pb-1"><CardTitle className="text-[10px] text-muted-foreground font-normal tracking-wide">TOTAL GUARANTEE</CardTitle></CardHeader>
+            <CardContent className="px-3 pb-3"><div className="text-lg font-bold" data-testid={`stat-${testIdPrefix}-total-guarantee`}>${fmtMoney(totals.totalGuarantee)}</div></CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL PAID</CardTitle></CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${totals.totalPaid > 0 ? "text-green-600 dark:text-green-400" : ""}`} data-testid={`stat-${testIdPrefix}-total-paid`}>
+            <CardHeader className="px-3 pt-3 pb-1"><CardTitle className="text-[10px] text-muted-foreground font-normal tracking-wide">TOTAL PAID</CardTitle></CardHeader>
+            <CardContent className="px-3 pb-3">
+              <div className={`text-lg font-bold ${totals.totalPaid > 0 ? "text-green-600 dark:text-green-400" : ""}`} data-testid={`stat-${testIdPrefix}-total-paid`}>
                 ${fmtMoney(totals.totalPaid)}
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-0 flex h-full">
-              <div className="flex-1 p-4 pb-3">
-                <p className="text-xs text-muted-foreground font-normal">TOTAL OUTSTANDING</p>
-                <div className="text-2xl font-bold text-red-600 dark:text-red-400 mt-2" data-testid={`stat-${testIdPrefix}-total-outstanding`}>
+              <div className="flex-1 px-3 pt-3 pb-3">
+                <p className="text-[10px] text-muted-foreground font-normal tracking-wide">OUTSTANDING</p>
+                <div className="text-lg font-bold text-red-600 dark:text-red-400 mt-1" data-testid={`stat-${testIdPrefix}-total-outstanding`}>
                   ${fmtMoney(totals.totalOwed)}
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-1">total owed by tenants</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">owed by tenants</p>
               </div>
-              <div className="w-px bg-border self-stretch my-3" />
-              <div className="flex-1 p-4 pb-3">
-                <p className="text-xs text-muted-foreground font-normal">TOTAL CREDIT</p>
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400 mt-2" data-testid={`stat-${testIdPrefix}-total-credit`}>
+              <div className="w-px bg-border self-stretch my-2" />
+              <div className="flex-1 px-3 pt-3 pb-3">
+                <p className="text-[10px] text-muted-foreground font-normal tracking-wide">CREDIT</p>
+                <div className="text-lg font-bold text-green-600 dark:text-green-400 mt-1" data-testid={`stat-${testIdPrefix}-total-credit`}>
                   ${fmtMoney(totals.totalCredit)}
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-1">advance payments / overpaid</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">advance / overpaid</p>
               </div>
             </CardContent>
           </Card>
