@@ -73,6 +73,7 @@ export function InlineRoleEditor({
   const [posStation, setPosStation] = useState<number | undefined>();
   const [daybookEditDays, setDaybookEditDays] = useState(0);
   const [canSellNegativeStock, setCanSellNegativeStock] = useState(false);
+  const [posViewOnly, setPosViewOnly] = useState(false);
   const [canDeleteRecords, setCanDeleteRecords] = useState(false);
   const [confirmPasswordOpen, setConfirmPasswordOpen] = useState(false);
 
@@ -105,6 +106,7 @@ export function InlineRoleEditor({
       setPosStation(editingRole.posStation ?? undefined);
       setDaybookEditDays(editingRole.daybookEditDays ?? 0);
       setCanSellNegativeStock(editingRole.canSellNegativeStock ?? false);
+      setPosViewOnly(editingRole.posViewOnly ?? false);
       setCanDeleteRecords(editingRole.canDeleteRecords ?? false);
 
       if (editingRole.role === "POS") {
@@ -144,6 +146,7 @@ export function InlineRoleEditor({
       setPosStation(undefined);
       setDaybookEditDays(0);
       setCanSellNegativeStock(false);
+      setPosViewOnly(false);
       setCanDeleteRecords(false);
     }
   }, [editingRole?.id]);
@@ -174,7 +177,7 @@ export function InlineRoleEditor({
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (isPOS && selectedLocationIds.length > 0) {
+      if (isPOS && !posViewOnly && selectedLocationIds.length > 0) {
         const missing = selectedLocationIds.filter((id) => !locationCashAccounts[id]);
         if (missing.length > 0) {
           const locNames = missing.map((id) => {
@@ -194,7 +197,8 @@ export function InlineRoleEditor({
         posStation: isPOS ? posStation : undefined,
         daybookEditDays,
         cashAccountId: undefined,
-        canSellNegativeStock,
+        canSellNegativeStock: posViewOnly ? false : canSellNegativeStock,
+        posViewOnly: isPOS ? posViewOnly : false,
         canDeleteRecords: role === "Manager" ? canDeleteRecords : false,
       };
 
@@ -337,7 +341,7 @@ export function InlineRoleEditor({
                         <span className="truncate">{loc.name}</span>
                         <span className="text-muted-foreground shrink-0">({loc.code})</span>
                       </label>
-                      {checked && (
+                      {checked && !posViewOnly && (
                         <div className="pl-6 pr-1 pb-1">
                           <Select
                             value={locationCashAccounts[loc.id]?.toString() || ""}
@@ -400,15 +404,35 @@ export function InlineRoleEditor({
             </div>
           </div>
 
-          {/* Allow 0-stock sales */}
-          <div className="flex items-center gap-2">
+          {/* View Only Mode */}
+          <div className="flex items-center gap-3 rounded-md border border-border/60 bg-background px-3 py-2">
             <Switch
-              checked={canSellNegativeStock}
-              onCheckedChange={setCanSellNegativeStock}
-              data-testid="switch-can-sell-negative-stock"
+              checked={posViewOnly}
+              onCheckedChange={(v) => {
+                setPosViewOnly(v);
+                if (v) setCanSellNegativeStock(false);
+              }}
+              data-testid="switch-pos-view-only"
             />
-            <Label className="text-xs cursor-pointer">Allow 0-stock sales</Label>
+            <div className="space-y-0.5">
+              <Label className="text-xs cursor-pointer">Stock View Only (no sales)</Label>
+              <p className="text-xs text-muted-foreground">
+                User can see inventory across all assigned locations but cannot sell or open shifts. No cash account needed.
+              </p>
+            </div>
           </div>
+
+          {/* Allow 0-stock sales — hidden when view-only */}
+          {!posViewOnly && (
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={canSellNegativeStock}
+                onCheckedChange={setCanSellNegativeStock}
+                data-testid="switch-can-sell-negative-stock"
+              />
+              <Label className="text-xs cursor-pointer">Allow 0-stock sales</Label>
+            </div>
+          )}
         </div>
       )}
 
@@ -500,7 +524,7 @@ export function InlineRoleEditor({
           type="button"
           size="sm"
           onClick={handleSave}
-          disabled={saveMutation.isPending || (isPOS && selectedLocationIds.length === 0)}
+          disabled={saveMutation.isPending || (isPOS && selectedLocationIds.length === 0 && !posViewOnly)}
           data-testid="button-save-role"
         >
           <Check className="h-3.5 w-3.5 mr-1" />

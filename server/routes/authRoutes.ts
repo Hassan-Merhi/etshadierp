@@ -168,6 +168,7 @@ export function registerAuthRoutes(app: Express) {
         req.session.currentPOSStation = firstCompany.posStation;
         req.session.cashAccountId = firstCompany.cashAccountId;
         req.session.canSellNegativeStock = firstCompany.canSellNegativeStock;
+        (req.session as any).posViewOnly = firstCompany.posViewOnly ?? false;
         req.session.daybookEditDays = firstCompany.daybookEditDays;
         req.session.canAccessCustomers = firstCompany.canAccessCustomers;
         req.session.canDeleteRecords = firstCompany.canDeleteRecords;
@@ -1869,6 +1870,7 @@ export function registerAuthRoutes(app: Express) {
       req.session.currentPOSStation = userRole.posStation;
       req.session.cashAccountId = userRole.cashAccountId;
       req.session.canSellNegativeStock = userRole.canSellNegativeStock;
+      (req.session as any).posViewOnly = (userRole as any).posViewOnly ?? false;
       req.session.daybookEditDays = userRole.daybookEditDays;
       req.session.canAccessCustomers = userRole.canAccessCustomers;
       req.session.canDeleteRecords = userRole.canDeleteRecords;

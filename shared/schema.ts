@@ -67,6 +67,7 @@ export const userCompanyRoles = pgTable("user_company_roles", {
   cashAccountId: integer("cash_account_id").references(() => ledgerAccounts.id, { onDelete: "restrict" }),
   posStation: integer("pos_station"),
   canSellNegativeStock: boolean("can_sell_negative_stock").notNull().default(false),
+  posViewOnly: boolean("pos_view_only").notNull().default(false),
   daybookEditDays: integer("daybook_edit_days").notNull().default(0),
   canAccessCustomers: boolean("can_access_customers").notNull().default(false),
   canDeleteRecords: boolean("can_delete_records").notNull().default(false),

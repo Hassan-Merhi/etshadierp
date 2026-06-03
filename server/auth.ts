@@ -70,6 +70,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     canSellNegativeStock: ["Admin", "Owner", "Manager", "Developer"].includes(role)
       ? true
       : (req.session.canSellNegativeStock ?? false),
+    posViewOnly: (req.session as any).posViewOnly ?? false,
     daybookEditDays: req.session.daybookEditDays ?? 0,
     canAccessCustomers: req.session.canAccessCustomers ?? false,
     canDeleteRecords: req.session.canDeleteRecords ?? false,
