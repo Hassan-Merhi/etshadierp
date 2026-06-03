@@ -361,7 +361,7 @@ export default function PropertyRentalPage({ unitType, pageTitle, pageIcon, test
                 Payments Log
               </Button>
             )}
-            {apiBase === "/api/erp/rental" && unitType === "SHOP" && (
+            {(apiBase === "/api/erp/rental" || apiBase === "/api/factory/rental") && unitType === "SHOP" && (
               <>
                 <Button variant="outline" size="sm" onClick={() => postAccrual.mutate()} disabled={postAccrual.isPending || resetAccrual.isPending} data-testid={`button-${testIdPrefix}-post-accrual`}>
                   <BookOpen className={`h-4 w-4 mr-1 ${postAccrual.isPending ? "animate-pulse" : ""}`} />

@@ -410,8 +410,9 @@ async function postRentAccrualForContract(
 async function postRentAccrualForCompany(
   companyId: number,
   shopExpenseAccountName: string,
+  moduleParam: string = "ERP",
 ): Promise<{ accrued: number; skipped: number }> {
-  // Load all active ERP SHOP contracts owned by this company
+  // Load all active SHOP contracts owned by this company for the given module
   const shopContracts = await db
     .select({
       id: propertyContracts.id,
@@ -424,7 +425,7 @@ async function postRentAccrualForCompany(
     .innerJoin(propertyUnits, eq(propertyUnits.id, propertyContracts.unitId))
     .where(and(
       eq(propertyContracts.companyId, companyId),
-      eq(propertyContracts.module, "ERP"),
+      eq(propertyContracts.module, moduleParam as any),
       eq(propertyContracts.status, "ACTIVE"),
       eq(propertyUnits.unitType, "SHOP"),
     ));
@@ -594,7 +595,7 @@ async function postRentAccrualForCompany(
         description:  voucherDesc,
         totalAmount:  String(totalAmount),
         currency:     "USD",
-        sourceModule: "ERP",
+        sourceModule: moduleParam as any,
       }).returning();
 
       // One debit entry per row so the journal is traceable by unit + month
@@ -653,11 +654,11 @@ export function registerRentalRoutes(
 
       await ensureMonthlyForCompany(companyId, module);
 
-      // For ERP SHOP view: silently post any pending rent accruals on page load.
+      // For ERP/FACTORY SHOP view: silently post any pending rent accruals on page load.
       // All due rows are combined into ONE journal voucher per run.
       // Fire-and-forget (errors are logged but do not block the response).
-      if (module === "ERP" && unitType === "SHOP") {
-        postRentAccrualForCompany(companyId, shopExpenseAccountName).catch(e =>
+      if ((module === "ERP" || module === "FACTORY") && unitType === "SHOP") {
+        postRentAccrualForCompany(companyId, shopExpenseAccountName, module).catch(e =>
           console.warn(`${tag} page-load accrual failed:`, e.message?.split("\n")[0]));
       }
 
@@ -2424,13 +2425,10 @@ export function registerRentalRoutes(
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      // Only applicable for ERP module
-      if (module !== "ERP") return res.status(400).json({ message: "Accrual is only available for ERP module" });
-
       await ensureMonthlyForCompany(companyId, module);
 
       // Post all due, unaccrued rows as ONE combined journal voucher
-      const { accrued, skipped } = await postRentAccrualForCompany(companyId, shopExpenseAccountName);
+      const { accrued, skipped } = await postRentAccrualForCompany(companyId, shopExpenseAccountName, module);
 
       res.json({ accrued, skipped });
     } catch (e: any) {
@@ -2454,18 +2452,17 @@ export function registerRentalRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      if (module !== "ERP") return res.status(400).json({ message: "Re-accrual is only available for ERP module" });
 
       await ensureMonthlyForCompany(companyId, module);
 
-      // 1. Find all active SHOP contract IDs for this company
+      // 1. Find all active SHOP contract IDs for this company (module-aware)
       const shopContracts = await db
         .select({ id: propertyContracts.id })
         .from(propertyContracts)
         .innerJoin(propertyUnits, eq(propertyUnits.id, propertyContracts.unitId))
         .where(and(
           eq(propertyContracts.companyId, companyId),
-          eq(propertyContracts.module, "ERP"),
+          eq(propertyContracts.module, module as any),
           eq(propertyContracts.status, "ACTIVE"),
           eq(propertyUnits.unitType, "SHOP"),
         ));
@@ -2581,7 +2578,7 @@ export function registerRentalRoutes(
                 description:  `Phantom accrual correction — Dr AP / Cr Rent Expense (${phantomRows.length} rows)`,
                 totalAmount:  String(phantomFixTotal),
                 currency:     "USD",
-                sourceModule: "ERP",
+                sourceModule: module as any,
               }).returning();
 
               const corrEntries: {
@@ -2698,7 +2695,7 @@ export function registerRentalRoutes(
       }
 
       // 3. Re-run the combined accrual
-      const { accrued, skipped } = await postRentAccrualForCompany(companyId, shopExpenseAccountName);
+      const { accrued, skipped } = await postRentAccrualForCompany(companyId, shopExpenseAccountName, module);
       console.log(`[re-accrue] result reset=${reset} accrued=${accrued} skipped=${skipped}`);
 
       res.json({ reset, accrued, skipped });
