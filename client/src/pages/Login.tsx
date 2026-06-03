@@ -13,6 +13,12 @@ import { BiometricAuth, BiometryType } from "@aparajita/capacitor-biometric-auth
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 
 function passkeyStorageKey(username: string) { return `passkey_registered_${username}`; }
+function passkeySnoozeKey(username: string) { return `passkey_snoozed_${username}`; }
+function isPasskeySnoozed(username: string) {
+  const ts = localStorage.getItem(passkeySnoozeKey(username));
+  if (!ts) return false;
+  return Date.now() - parseInt(ts, 10) < 30 * 24 * 60 * 60 * 1000; // 30 days
+}
 
 const CRED_KEY    = "biometric_creds";
 const OPT_IN_KEY  = "biometric_opted_in";
@@ -127,7 +133,8 @@ export default function Login() {
         }
       } else if (!isNative && passkeySupported) {
         const alreadySaved = !!localStorage.getItem(passkeyStorageKey(credentials.username));
-        if (alreadySaved) {
+        const snoozed = isPasskeySnoozed(credentials.username);
+        if (alreadySaved || snoozed) {
           queryClient.setQueryData(["/api/auth/me"], userData);
           resetCsrfToken();
           navigate("/");
@@ -223,6 +230,7 @@ export default function Login() {
   };
 
   const handleSkipPasskey = () => {
+    localStorage.setItem(passkeySnoozeKey(pendingPasskeyUser.current), String(Date.now()));
     setShowPasskeyRegister(false);
     queryClient.setQueryData(["/api/auth/me"], pendingUserData.current);
     resetCsrfToken();
