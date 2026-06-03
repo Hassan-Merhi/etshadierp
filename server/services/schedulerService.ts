@@ -346,7 +346,7 @@ async function runDailyWhatsAppSend(
 
   const chatId      = rRow.rows[0].chat_id as string;
   const zipFileName = `DailyExport_${dateLabel}.zip`;
-  const zipCaption  = `Daily Company Export — ${dateLabel}\nAll companies included.`;
+  const zipCaption  = "";
   console.log(`[WhatsApp] Sending daily export ZIP (${zipSizeMb.toFixed(1)} MB) to ${chatId}…`);
 
   try {
@@ -478,7 +478,7 @@ export async function checkAndRunStockReport(): Promise<void> {
     }
 
     const pdfName = `Stock_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.pdf`;
-    const pdfCap  = `Stock Inventory with Cost — ${company.name}\nAs of ${today}`;
+    const pdfCap  = "";
     console.log(
       `[StockReport] Uploading stock PDF — chatId=${chatId} file=${pdfName} ` +
       `size=${pdfBuf.length} pageCount=${pdfPageCount} rowCount=${pdfRowCount}`,
@@ -497,7 +497,7 @@ export async function checkAndRunStockReport(): Promise<void> {
     // 2. Net Position Excel (Jan 1 → today)
     const xlsBuf  = await generateNetPositionExcel(row.company_id, company.name, yearStart, today);
     const xlsName = `NetPosition_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.xlsx`;
-    const xlsCap  = `Net Position — ${company.name}\nPeriod: ${yearStart} → ${today}`;
+    const xlsCap  = "";
     const xlsRes  = await sendWhatsAppFileToChatId(
       chatId, xlsBuf, xlsName, xlsCap,
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -564,7 +564,7 @@ export async function checkAndRunNetPositionExport(): Promise<void> {
             chatId,
             zipBuf,
             `NetPosition_AllCompanies_${today}.zip`,
-            `Net Position Report — All Companies\nPeriod: ${npStart} → ${npEnd}`,
+            "",
             "application/zip",
           );
           console.log(`[NetPositionExport] WhatsApp: ${waRes.success ? "sent" : waRes.error}`);
@@ -628,7 +628,7 @@ async function runMonthlyWhatsAppNetPosition() {
         const buffer   = await generateNetPositionExcel(company.id, company.name, startDate, endDate);
         const safe     = company.name.replace(/[^a-z0-9]/gi, "_");
         const fileName = `NetPosition_${safe}_${endDate}.xlsx`;
-        const caption  = `Monthly Net Position Report — ${company.name}\nPeriod: ${startDate} → ${endDate}`;
+        const caption  = "";
         const result   = await sendWhatsAppFile(buffer, fileName, caption);
         console.log(`[WhatsApp] ${company.name}: sent=${result.sent} failed=${result.failed}`);
       } catch (compErr: any) {

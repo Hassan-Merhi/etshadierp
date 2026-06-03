@@ -567,7 +567,7 @@ export function registerWhatsAppRoutes(app: Express) {
       }
 
       const pdfName  = `Stock_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.pdf`;
-      const pdfCap   = `Stock Inventory with Cost — ${company.name}\nAs of ${today}`;
+      const pdfCap   = "";
       console.log(`[WhatsApp] Uploading stock PDF — chatId=${chatId} file=${pdfName} size=${pdfBuf.length}`);
       const pdfRes   = await sendWhatsAppFileToChatId(chatId, pdfBuf, pdfName, pdfCap, "application/pdf");
       if (!pdfRes.success) {
@@ -582,7 +582,7 @@ export function registerWhatsAppRoutes(app: Express) {
       console.log(`[WhatsApp] Generating net-position Excel for ${company.name} (${yearStart}→${today})…`);
       const xlsBuf  = await generateNetPositionExcel(companyId, company.name, yearStart, today);
       const xlsName = `NetPosition_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.xlsx`;
-      const xlsCap  = `Net Position Report — ${company.name}\nPeriod: ${yearStart} → ${today}`;
+      const xlsCap  = "";
       const xlsRes  = await sendWhatsAppFileToChatId(
         chatId, xlsBuf, xlsName, xlsCap,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
