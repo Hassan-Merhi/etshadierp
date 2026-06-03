@@ -1,14 +1,14 @@
 import { useState, useMemo, useEffect } from "react";
 import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 import { useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useQuery } from "@tanstack/react-query";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { useDateJump } from "@/hooks/use-date-jump";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
 import {
@@ -151,9 +151,8 @@ export default function SalesReport() {
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, []);
 
-  const [selectedLocation, setSelectedLocation] = useState<string>("all");
-  const [selectedStockItem, setSelectedStockItem] = useState<string>("all");
-  const [selectedStockGroup, setSelectedStockGroup] = useState<string>("all");
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [selectedStockGroups, setSelectedStockGroups] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [grouping, setGrouping] = useState<GroupingType>("daily");
   const [profitFilter, setProfitFilter] = useState<ProfitFilter>("all");
@@ -179,21 +178,18 @@ export default function SalesReport() {
     queryKey: ["/api/stock-groups"],
   });
 
-  // Filter stock items to those in the selected group
-  const filteredStockItems = stockItems.filter((item: any) =>
-    !selectedStockGroup || selectedStockGroup === "all" || item.stockGroupId === parseInt(selectedStockGroup)
+  // Resolve selected group names (for multi-company query)
+  const selectedStockGroupNames = useMemo(() =>
+    stockGroups
+      .filter((g: any) => selectedStockGroups.includes(String(g.id)))
+      .map((g: any) => g.name as string),
+    [stockGroups, selectedStockGroups]
   );
 
-  // Resolve selected group name (for multi-company query)
-  const selectedStockGroupName = stockGroups.find((g: any) => g.id === parseInt(selectedStockGroup))?.name || "";
-
-  // Build query params for single-company mode
+  // Build query params for single-company mode (location/group filtered client-side)
   const queryParams = new URLSearchParams();
   if (periodFilter.fromDate) queryParams.append("startDate", periodFilter.fromDate);
   if (periodFilter.toDate) queryParams.append("endDate", periodFilter.toDate);
-  if (selectedLocation && selectedLocation !== "all") queryParams.append("locationId", selectedLocation);
-  if (selectedStockItem && selectedStockItem !== "all") queryParams.append("stockItemId", selectedStockItem);
-  if (selectedStockGroup && selectedStockGroup !== "all") queryParams.append("stockGroupId", selectedStockGroup);
 
   const queryString = queryParams.toString();
   const singleCompanyQueryKey = queryString ? `/api/sales-report?${queryString}` : "/api/sales-report";
@@ -204,8 +200,8 @@ export default function SalesReport() {
   if (periodFilter.toDate) multiCompanyParams.append("endDate", periodFilter.toDate);
   // Note: locationId and stockItemId are company-specific so not passed in multi-company mode
   if (selectedCompanies.length > 0) multiCompanyParams.append("companyFilter", selectedCompanies.join(","));
-  if (selectedStockGroup && selectedStockGroup !== "all" && selectedStockGroupName) {
-    multiCompanyParams.append("stockGroupName", selectedStockGroupName);
+  if (selectedStockGroupNames.length > 0) {
+    multiCompanyParams.append("stockGroupName", selectedStockGroupNames[0]);
   }
 
   const multiCompanyQueryString = multiCompanyParams.toString();
@@ -229,6 +225,26 @@ export default function SalesReport() {
   const salesData = isMultiCompanyMode ? allCompaniesSalesData : singleCompanySalesData;
   const isLoading = isMultiCompanyMode ? isLoadingMulti : isLoadingSingle;
 
+  // Build set of stockItemIds that belong to selected groups (for client-side group filtering)
+  const selectedGroupItemIds = useMemo(() => {
+    if (selectedStockGroups.length === 0) return null;
+    return new Set(
+      stockItems
+        .filter((item: any) => selectedStockGroups.includes(String(item.stockGroupId)))
+        .map((item: any) => item.id as number)
+    );
+  }, [selectedStockGroups, stockItems]);
+
+  // Apply location and group filters client-side
+  const localFilteredData = useMemo(() =>
+    salesData.filter(item => {
+      if (selectedLocations.length > 0 && !selectedLocations.includes(String(item.locationId))) return false;
+      if (selectedGroupItemIds && !selectedGroupItemIds.has(item.stockItemId)) return false;
+      return true;
+    }),
+    [salesData, selectedLocations, selectedGroupItemIds]
+  );
+
   // Extract unique companies from multi-company data
   const companyFilterOptions = useMemo(() => {
     if (!isMultiCompanyMode || !allCompaniesSalesData.length) return [];
@@ -242,7 +258,7 @@ export default function SalesReport() {
   }, [isMultiCompanyMode, allCompaniesSalesData]);
 
   // Group sales by date/month/year — credit sales get their own separate group
-  const groupedData: DailySummary[] = salesData.reduce((acc: DailySummary[], item) => {
+  const groupedData: DailySummary[] = localFilteredData.reduce((acc: DailySummary[], item) => {
     const itemDate = parseISO(item.voucherDate);
     let dateKey: string;
     let displayDate: string;
@@ -335,9 +351,8 @@ export default function SalesReport() {
 
   const handleClearFilters = () => {
     setPeriodFilter(getDefaultPeriodValue("today"));
-    setSelectedLocation("all");
-    setSelectedStockItem("all");
-    setSelectedStockGroup("all");
+    setSelectedLocations([]);
+    setSelectedStockGroups([]);
     setSearchTerm("");
     setProfitFilter("all");
     setSelectedCompanies([]);
@@ -347,13 +362,6 @@ export default function SalesReport() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.altKey && (e.key === "s" || e.key === "ß")) {
-        if (!selectedStockItem || selectedStockItem === "all") return;
-        e.preventDefault();
-        navigate(`/stock-query/${selectedStockItem}`);
-        return;
-      }
-
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         if (hasAnyOpenDialog()) return;
         const tag = (document.activeElement?.tagName || "").toLowerCase();
@@ -372,7 +380,7 @@ export default function SalesReport() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [selectedStockItem, navigate, filteredGroupedData]);
+  }, [filteredGroupedData]);
 
   useEffect(() => {
     if (!selectedRowDate) return;
@@ -401,9 +409,8 @@ export default function SalesReport() {
       params.set("startDate", `${dk}-01-01`);
       params.set("endDate", `${dk}-12-31`);
     }
-    if (selectedLocation && selectedLocation !== "all") params.set("locationId", selectedLocation);
-    if (selectedStockItem && selectedStockItem !== "all") params.set("stockItemId", selectedStockItem);
-    if (selectedStockGroup && selectedStockGroup !== "all") params.set("stockGroupId", selectedStockGroup);
+    if (selectedLocations.length === 1) params.set("locationId", selectedLocations[0]);
+    if (selectedStockGroups.length === 1) params.set("stockGroupId", selectedStockGroups[0]);
     if (searchTerm) params.set("searchTerm", searchTerm);
     params.set("isCreditSale", summary.isCreditSale ? "true" : "false");
     if (isMultiCompanyMode) {
@@ -505,106 +512,23 @@ export default function SalesReport() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-2">
+      {/* Header */}
+      <div className="flex items-start justify-between flex-wrap gap-2">
         <div>
           <PageHeader title="Sales Report" />
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Analyze profit and loss from POS transactions
-            {isMultiCompanyMode && " (All Companies)"}
+            {isMultiCompanyMode && " · All Companies"}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
-          {/* Period Filter */}
-          <PeriodFilter
-            value={periodFilter}
-            onChange={setPeriodFilter}
-            data-testid="period-filter-sales-report"
-          />
-
-          {/* Multi-company mode toggle */}
-          <Button
-            variant={isMultiCompanyMode ? "default" : "outline"}
-            size="sm"
-            onClick={() => {
-              const next = !isMultiCompanyMode;
-              setIsMultiCompanyMode(next);
-              setSelectedCompanies([]);
-              // Location and stock item IDs are company-specific — clear them when entering multi-company mode
-              if (next) {
-                setSelectedLocation("all");
-                setSelectedStockItem("all");
-                // If still on "this_month" default, switch to last 30 days so cross-company data is visible
-                if (periodFilter.preset === "this_month") {
-                  setPeriodFilter(getDefaultPeriodValue("today"));
-                }
-              }
-            }}
-            className="gap-2"
-            data-testid="button-toggle-multi-company"
-          >
-            <Building2 className="w-4 h-4" />
-            {isMultiCompanyMode ? "All Companies" : "Current Company"}
-          </Button>
-
-          {/* Company filter (only in multi-company mode) */}
-          {isMultiCompanyMode && companyFilterOptions.length > 0 && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2" data-testid="button-company-filter">
-                  <Building2 className="w-4 h-4" />
-                  {selectedCompanies.length === 0 
-                    ? "All Companies" 
-                    : `${selectedCompanies.length} selected`}
-                  <ChevronDown className="w-3 h-3" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-56 p-2" align="end">
-                <div className="space-y-1">
-                  <div 
-                    className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
-                    onClick={() => setSelectedCompanies([])}
-                    data-testid="option-all-companies"
-                  >
-                    <Checkbox 
-                      checked={selectedCompanies.length === 0} 
-                      className="h-4 w-4"
-                    />
-                    <span className="text-sm font-medium">All Companies</span>
-                  </div>
-                  <div className="border-t my-1" />
-                  {companyFilterOptions.map(([code, name]) => (
-                    <div 
-                      key={code}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
-                      onClick={() => {
-                        setSelectedCompanies(prev => 
-                          prev.includes(code) 
-                            ? prev.filter(c => c !== code)
-                            : [...prev, code]
-                        );
-                      }}
-                      data-testid={`option-company-${code}`}
-                    >
-                      <Checkbox 
-                        checked={selectedCompanies.includes(code)} 
-                        className="h-4 w-4"
-                      />
-                      <span className="text-sm">{name}</span>
-                    </div>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
-
           <Button variant="outline" size="sm" onClick={() => navigate("/sales-report/comparison")} data-testid="button-compare-companies">
             <GitCompare className="w-4 h-4 mr-2" />
             Compare
           </Button>
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2" disabled={groupedData.length === 0} data-testid="button-export-dropdown">
+              <Button variant="outline" size="sm" className="gap-2" disabled={groupedData.length === 0} data-testid="button-export-dropdown">
                 <Download className="w-4 h-4" />
                 Export
                 <ChevronDown className="w-4 h-4" />
@@ -625,45 +549,45 @@ export default function SalesReport() {
       </div>
 
       {/* Summary Pills */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-2">
         {isLoading ? (
           <>
-            <Skeleton className="h-10 w-40 rounded-lg" />
-            <Skeleton className="h-10 w-40 rounded-lg" />
-            <Skeleton className="h-10 w-44 rounded-lg" />
-            <Skeleton className="h-10 w-44 rounded-lg" />
-            <Skeleton className="h-10 w-48 rounded-lg" />
+            <Skeleton className="h-9 w-36 rounded-lg" />
+            <Skeleton className="h-9 w-36 rounded-lg" />
+            <Skeleton className="h-9 w-40 rounded-lg" />
+            <Skeleton className="h-9 w-40 rounded-lg" />
+            <Skeleton className="h-9 w-44 rounded-lg" />
           </>
         ) : (
           <>
-            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Total Sales</span>
-              <span className="font-semibold font-mono" data-testid="text-total-sales">{formatAmount(totals.totalSales)}</span>
+            <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
+              <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-muted-foreground text-xs">Total Sales</span>
+              <span className="font-semibold font-mono text-sm" data-testid="text-total-sales">{formatAmount(totals.totalSales)}</span>
             </div>
-            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
-              <span className="text-muted-foreground">Cost Price</span>
-              <span className="font-semibold font-mono" data-testid="text-total-cost">{formatAmount(totals.totalCost)}</span>
+            <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
+              <span className="text-muted-foreground text-xs">Cost Price</span>
+              <span className="font-semibold font-mono text-sm" data-testid="text-total-cost">{formatAmount(totals.totalCost)}</span>
             </div>
-            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+            <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
               {totals.costProfit >= 0
-                ? <TrendingUp className="h-4 w-4 text-emerald-500" />
-                : <TrendingDown className="h-4 w-4 text-red-500" />}
-              <span className="text-muted-foreground">Cost Profit</span>
-              <span className={`font-semibold font-mono ${totals.costProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-cost-profit">
+                ? <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                : <TrendingDown className="h-3.5 w-3.5 text-red-500" />}
+              <span className="text-muted-foreground text-xs">Cost Profit</span>
+              <span className={`font-semibold font-mono text-sm ${totals.costProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-cost-profit">
                 {totals.costProfit < 0 ? "-" : ""}{formatAmount(Math.abs(totals.costProfit))}
               </span>
             </div>
-            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
-              <span className="text-muted-foreground">Configured Price</span>
-              <span className="font-semibold font-mono" data-testid="text-configured-cost">{formatAmount(totals.totalConfiguredCost)}</span>
+            <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
+              <span className="text-muted-foreground text-xs">Config Price</span>
+              <span className="font-semibold font-mono text-sm" data-testid="text-configured-cost">{formatAmount(totals.totalConfiguredCost)}</span>
             </div>
-            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+            <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
               {totals.configuredProfit >= 0
-                ? <TrendingUp className="h-4 w-4 text-emerald-500" />
-                : <TrendingDown className="h-4 w-4 text-red-500" />}
-              <span className="text-muted-foreground">Configured Profit</span>
-              <span className={`font-semibold font-mono ${totals.configuredProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-configured-profit">
+                ? <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                : <TrendingDown className="h-3.5 w-3.5 text-red-500" />}
+              <span className="text-muted-foreground text-xs">Config Profit</span>
+              <span className={`font-semibold font-mono text-sm ${totals.configuredProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-configured-profit">
                 {totals.configuredProfit < 0 ? "-" : ""}{formatAmount(Math.abs(totals.configuredProfit))}
               </span>
             </div>
@@ -671,10 +595,69 @@ export default function SalesReport() {
         )}
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
+      {/* Unified filter bar */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Date period */}
+        <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter-sales-report" />
+
+        {/* Company toggle */}
+        <Button
+          variant={isMultiCompanyMode ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            const next = !isMultiCompanyMode;
+            setIsMultiCompanyMode(next);
+            setSelectedCompanies([]);
+            if (next) {
+              setSelectedLocations([]);
+              if (periodFilter.preset === "this_month") {
+                setPeriodFilter(getDefaultPeriodValue("today"));
+              }
+            }
+          }}
+          className="gap-1.5"
+          data-testid="button-toggle-multi-company"
+        >
+          <Building2 className="w-4 h-4" />
+          {isMultiCompanyMode ? "All Companies" : "Current Company"}
+        </Button>
+
+        {/* Company filter (multi-company only) */}
+        {isMultiCompanyMode && companyFilterOptions.length > 0 && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-company-filter">
+                <Building2 className="w-4 h-4" />
+                {selectedCompanies.length === 0 ? "All Companies" : `${selectedCompanies.length} co.`}
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-52 p-2" align="start">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer" onClick={() => setSelectedCompanies([])} data-testid="option-all-companies">
+                  <Checkbox checked={selectedCompanies.length === 0} className="h-4 w-4" />
+                  <span className="text-sm font-medium">All Companies</span>
+                </div>
+                <div className="border-t my-1" />
+                {companyFilterOptions.map(([code, name]) => (
+                  <div key={code} className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
+                    onClick={() => setSelectedCompanies(prev => prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code])}
+                    data-testid={`option-company-${code}`}
+                  >
+                    <Checkbox checked={selectedCompanies.includes(code)} className="h-4 w-4" />
+                    <span className="text-sm">{name}</span>
+                  </div>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
+
+        <div className="h-5 w-px bg-border" />
+
+        {/* Grouping */}
         <Select value={grouping} onValueChange={(value) => setGrouping(value as GroupingType)}>
-          <SelectTrigger className="w-32" data-testid="select-grouping">
+          <SelectTrigger className="w-28 h-9" data-testid="select-grouping">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -683,8 +666,10 @@ export default function SalesReport() {
             <SelectItem value="yearly">Yearly</SelectItem>
           </SelectContent>
         </Select>
+
+        {/* Profit filter */}
         <Select value={profitFilter} onValueChange={(value) => setProfitFilter(value as ProfitFilter)}>
-          <SelectTrigger className="w-40" data-testid="select-profit-filter">
+          <SelectTrigger className="w-36 h-9" data-testid="select-profit-filter">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -693,49 +678,82 @@ export default function SalesReport() {
             <SelectItem value="negative">Negative Only</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={selectedLocation} onValueChange={setSelectedLocation} disabled={isMultiCompanyMode}>
-          <SelectTrigger className="w-40" data-testid="select-location">
-            <SelectValue placeholder={isMultiCompanyMode ? "N/A (multi-co)" : "All Locations"} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Locations</SelectItem>
-            {locations.map((loc: any) => (
-              <SelectItem key={loc.id} value={loc.id.toString()}>{loc.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={selectedStockGroup} onValueChange={(val) => { setSelectedStockGroup(val); setSelectedStockItem("all"); }}>
-          <SelectTrigger className="w-36" data-testid="select-stock-group">
-            <SelectValue placeholder="All Groups" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Groups</SelectItem>
-            {stockGroups.map((g: any) => (
-              <SelectItem key={g.id} value={g.id.toString()}>{g.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={selectedStockItem} onValueChange={setSelectedStockItem} disabled={isMultiCompanyMode}>
-          <SelectTrigger className="w-44" data-testid="select-stock-item">
-            <SelectValue placeholder={isMultiCompanyMode ? "N/A (multi-co)" : "All Items"} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Items</SelectItem>
-            {filteredStockItems.map((item: any) => (
-              <SelectItem key={item.id} value={item.id.toString()}>{item.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+
+        {/* Locations multi-select */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-location-filter" disabled={isMultiCompanyMode}>
+              {selectedLocations.length === 0
+                ? "All Locations"
+                : `${selectedLocations.length} Location${selectedLocations.length !== 1 ? "s" : ""}`}
+              <ChevronDown className="w-3 h-3" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-52 p-2" align="start">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer" onClick={() => setSelectedLocations([])}>
+                <Checkbox checked={selectedLocations.length === 0} className="h-4 w-4" />
+                <span className="text-sm font-medium">All Locations</span>
+              </div>
+              <div className="border-t my-1" />
+              {locations.map((loc: any) => (
+                <div key={loc.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
+                  onClick={() => setSelectedLocations(prev => prev.includes(String(loc.id)) ? prev.filter(l => l !== String(loc.id)) : [...prev, String(loc.id)])}
+                  data-testid={`option-location-${loc.id}`}
+                >
+                  <Checkbox checked={selectedLocations.includes(String(loc.id))} className="h-4 w-4" />
+                  <span className="text-sm">{loc.name}</span>
+                </div>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* Groups multi-select */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-group-filter">
+              {selectedStockGroups.length === 0
+                ? "All Groups"
+                : `${selectedStockGroups.length} Group${selectedStockGroups.length !== 1 ? "s" : ""}`}
+              <ChevronDown className="w-3 h-3" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-52 p-2" align="start">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer" onClick={() => setSelectedStockGroups([])}>
+                <Checkbox checked={selectedStockGroups.length === 0} className="h-4 w-4" />
+                <span className="text-sm font-medium">All Groups</span>
+              </div>
+              <div className="border-t my-1" />
+              {stockGroups.map((g: any) => (
+                <div key={g.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
+                  onClick={() => setSelectedStockGroups(prev => prev.includes(String(g.id)) ? prev.filter(x => x !== String(g.id)) : [...prev, String(g.id)])}
+                  data-testid={`option-group-${g.id}`}
+                >
+                  <Checkbox checked={selectedStockGroups.includes(String(g.id))} className="h-4 w-4" />
+                  <span className="text-sm">{g.name}</span>
+                </div>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* Search */}
         <Input
           placeholder="Search..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-44"
+          className="w-40 h-9"
           data-testid="input-search"
         />
-        <Button variant="ghost" onClick={handleClearFilters} data-testid="button-clear-filters">
-          Clear
-        </Button>
+
+        {/* Clear — only when filters are active */}
+        {(searchTerm || selectedLocations.length > 0 || selectedStockGroups.length > 0 || profitFilter !== "all") && (
+          <Button variant="ghost" size="sm" onClick={handleClearFilters} data-testid="button-clear-filters">
+            Clear
+          </Button>
+        )}
       </div>
 
       {/* Data Table */}
@@ -824,7 +842,7 @@ export default function SalesReport() {
                   {/* Totals Row */}
                   <TableRow className="bg-muted/40 hover:bg-muted/40 font-semibold">
                     <TableCell className="py-3 text-xs uppercase tracking-wide text-muted-foreground">Total</TableCell>
-                    <TableCell className="py-3 text-right font-mono text-sm hidden sm:table-cell">{formatNumber(salesData.length, 0)}</TableCell>
+                    <TableCell className="py-3 text-right font-mono text-sm hidden sm:table-cell">{formatNumber(localFilteredData.length, 0)}</TableCell>
                     <TableCell className="py-3 text-right font-mono text-sm">{formatNumber(totals.totalQty, 0)}</TableCell>
                     <TableCell className="py-3 text-right font-mono text-sm">{formatAmount(totals.totalSales)}</TableCell>
                     <TableCell className="py-3 text-right font-mono text-sm hidden sm:table-cell">{formatAmount(totals.totalCost)}</TableCell>
