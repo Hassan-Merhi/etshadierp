@@ -152,12 +152,12 @@ function ItemSearchPanel({
   return (
     <div className="flex flex-col h-full">
       {/* Panel header */}
-      <div className="flex items-start justify-between gap-2 px-3 py-3 border-b">
-        <div>
-          <div className="font-semibold text-sm">Search Items</div>
-          <div className="text-xs text-muted-foreground">{locationName}</div>
+      <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b bg-muted/30">
+        <div className="min-w-0">
+          <div className="font-semibold text-sm leading-tight">Add Items</div>
+          <div className="text-xs text-muted-foreground truncate">{locationName}</div>
         </div>
-        <Button size="icon" variant="ghost" onClick={onClose} className="shrink-0 -mr-1 -mt-0.5" data-testid="button-close-search-panel">
+        <Button size="icon" variant="ghost" onClick={onClose} className="shrink-0" data-testid="button-close-search-panel">
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -165,7 +165,7 @@ function ItemSearchPanel({
       {/* Items list */}
       <div ref={listRef} className="flex-1 overflow-y-auto">
         {matches.length === 0 ? (
-          <div className="text-center py-8 text-xs text-muted-foreground">No items found</div>
+          <div className="text-center py-10 text-xs text-muted-foreground">No items found</div>
         ) : (
           matches.map((item, i) => {
             const qty = parseFloat(item.quantity) || 0;
@@ -178,18 +178,18 @@ function ItemSearchPanel({
                 onClick={() => onPick(item)}
                 onMouseEnter={() => onActiveChange(i)}
                 className={cn(
-                  "w-full text-left px-3 py-2 text-sm border-b last:border-b-0 flex items-center justify-between gap-2 transition-none",
+                  "w-full text-left px-3 py-2.5 text-sm border-b last:border-b-0 flex items-center justify-between gap-3 transition-none",
                   i === activeIdx ? "bg-accent text-accent-foreground" : "hover-elevate"
                 )}
                 data-testid={`button-panel-item-${item.stockItemId}`}
               >
-                <span className="truncate font-medium">{item.name}</span>
+                <span className="truncate text-sm">{item.name}</span>
                 {inStock ? (
-                  <span className="text-xs font-mono shrink-0 tabular-nums font-semibold">
+                  <span className="text-xs font-mono shrink-0 tabular-nums font-bold text-green-600 dark:text-green-400">
                     {fmtQty(qty)}
                   </span>
                 ) : (
-                  <span className="text-xs shrink-0 px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+                  <span className="text-xs shrink-0 px-1.5 py-0.5 rounded-sm bg-muted text-muted-foreground font-medium">
                     Out
                   </span>
                 )}
@@ -399,19 +399,25 @@ function EditableTransferDetail({
   return (
     <div className="flex flex-col h-full">
       {/* ── Header ── */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b">
+      <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
         <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back-to-list">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="flex items-center gap-2 text-sm flex-1 min-w-0">
-          <span className="font-semibold font-mono" data-testid="text-voucher-number">{detail.voucherNumber}</span>
-          <span className="text-muted-foreground">&middot;</span>
-          <span className="text-muted-foreground">{formatDate(detail.voucherDate)}</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-sm">
-          <span className="font-medium">{detail.sourceLocationName}</span>
-          <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="font-semibold">{detail.destinationLocationName}</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-bold font-mono text-sm" data-testid="text-voucher-number">{detail.voucherNumber}</span>
+            <span className="text-xs text-muted-foreground">{formatDate(detail.voucherDate)}</span>
+            {detail.inventoryApplied && (
+              <Badge variant="secondary" className="text-xs gap-1 text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30">
+                <Lock className="h-3 w-3" />Applied
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="text-sm text-muted-foreground">{detail.sourceLocationName}</span>
+            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
+            <span className="text-sm font-semibold">{detail.destinationLocationName}</span>
+          </div>
         </div>
       </div>
 
@@ -423,7 +429,7 @@ function EditableTransferDetail({
           {/* Table */}
           <div className="border rounded-md overflow-hidden">
             {/* Column header */}
-            <div className="grid grid-cols-[1.5rem_1fr_5rem_5rem] sm:grid-cols-[2rem_1fr_5.5rem_6.5rem_5.5rem_2rem] bg-muted/40 border-b px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide gap-2">
+            <div className="grid grid-cols-[2rem_1fr_5rem_5rem] sm:grid-cols-[2rem_1fr_5.5rem_6.5rem_6rem_2rem] bg-muted/60 border-b px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider gap-2">
               <span>#</span>
               <span>Item</span>
               <span className="hidden sm:block text-right">Original</span>
@@ -442,25 +448,24 @@ function EditableTransferDetail({
                 <div
                   key={item.id}
                   className={cn(
-                    "grid grid-cols-[1.5rem_1fr_5rem_5rem] sm:grid-cols-[2rem_1fr_5.5rem_6.5rem_5.5rem_2rem] items-center px-3 py-1.5 gap-2 border-b last:border-b-0 group",
-                    changed && "bg-primary/5"
+                    "grid grid-cols-[2rem_1fr_5rem_5rem] sm:grid-cols-[2rem_1fr_5.5rem_6.5rem_6rem_2rem] items-center px-3 py-2.5 gap-2 border-b last:border-b-0",
+                    changed ? "bg-primary/5 border-l-2 border-l-primary" : "border-l-2 border-l-transparent"
                   )}
                   data-testid={`row-item-${item.id}`}
                 >
-                  <span className="text-xs text-muted-foreground tabular-nums">{idx + 1}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums font-mono">{idx + 1}</span>
 
-                  {/* Item name — click to open search panel */}
                   <button
                     type="button"
                     onClick={() => openPanel()}
-                    className="text-sm font-medium text-left truncate hover:text-primary transition-colors cursor-pointer"
+                    className="text-sm font-medium text-left truncate hover:text-primary transition-colors"
                     title={item.stockItemName}
                     data-testid={`button-item-name-${item.id}`}
                   >
                     {item.stockItemName}
                   </button>
 
-                  <span className="hidden sm:block text-sm font-mono text-right tabular-nums">{fmtQty(original)}</span>
+                  <span className="hidden sm:block text-sm font-mono text-right tabular-nums text-muted-foreground">{fmtQty(original)}</span>
 
                   <div className="flex justify-center">
                     <input
@@ -482,16 +487,21 @@ function EditableTransferDetail({
                           focusRelative(`base-${item.id}`, -1);
                         }
                       }}
-                      className="w-full text-center text-sm border rounded-md bg-background px-1 py-1 font-mono outline-none focus:ring-1 focus:ring-ring"
+                      className={cn(
+                        "w-full text-center text-sm border rounded-md bg-background px-1 py-1.5 font-mono outline-none focus:ring-2 focus:ring-primary/40 transition-shadow",
+                        changed && "border-primary/40 bg-primary/5"
+                      )}
                       data-testid={`input-delta-${item.id}`}
                     />
                   </div>
 
                   <span className={cn(
-                    "text-sm font-mono font-semibold text-right tabular-nums",
+                    "font-mono font-bold text-right tabular-nums",
                     changed
-                      ? deltaNum > 0 ? "text-green-600 dark:text-green-400" : "text-destructive"
-                      : ""
+                      ? deltaNum > 0
+                        ? "text-base text-green-600 dark:text-green-400"
+                        : "text-base text-destructive"
+                      : "text-sm"
                   )}>
                     {fmtQty(newQty)}
                   </span>
@@ -507,14 +517,13 @@ function EditableTransferDetail({
               return (
                 <div
                   key={`extra-${item.stockItemId}`}
-                  className="grid grid-cols-[1.5rem_1fr_5rem_5rem] sm:grid-cols-[2rem_1fr_5.5rem_6.5rem_5.5rem_2rem] items-center px-3 py-1.5 gap-2 border-b last:border-b-0 bg-primary/5"
+                  className="grid grid-cols-[2rem_1fr_5rem_5rem] sm:grid-cols-[2rem_1fr_5.5rem_6.5rem_6rem_2rem] items-center px-3 py-2.5 gap-2 border-b last:border-b-0 bg-primary/5 border-l-2 border-l-primary"
                   data-testid={`row-extra-${item.stockItemId}`}
                 >
-                  <span className="text-xs text-muted-foreground tabular-nums">{myItems.length + idx + 1}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums font-mono">{myItems.length + idx + 1}</span>
 
                   <div className="flex items-center gap-1 min-w-0">
                     <span className="text-sm font-medium truncate flex-1" title={item.stockItemName}>{item.stockItemName}</span>
-                    {/* Delete button: visible inline on mobile, hidden on sm+ (uses its own grid cell there) */}
                     <button
                       type="button"
                       onClick={() => removeExtra(idx)}
@@ -525,7 +534,7 @@ function EditableTransferDetail({
                     </button>
                   </div>
 
-                  <span className="hidden sm:block text-sm font-mono text-right text-muted-foreground">0</span>
+                  <span className="hidden sm:block text-sm font-mono text-right text-muted-foreground">—</span>
 
                   <div className="flex justify-center">
                     <input
@@ -544,19 +553,18 @@ function EditableTransferDetail({
                           focusRelative(`extra-${item.stockItemId}`, -1);
                         }
                       }}
-                      className="w-full text-center text-sm border rounded-md bg-background px-1 py-1 font-mono outline-none focus:ring-1 focus:ring-ring"
+                      className="w-full text-center text-sm border border-primary/40 rounded-md bg-primary/5 px-1 py-1.5 font-mono outline-none focus:ring-2 focus:ring-primary/40 transition-shadow"
                       data-testid={`input-extra-qty-${item.stockItemId}`}
                     />
                   </div>
 
                   <span className={cn(
-                    "text-sm font-mono font-semibold text-right tabular-nums",
-                    qty > 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                    "font-mono font-bold text-right tabular-nums",
+                    qty > 0 ? "text-base text-green-600 dark:text-green-400" : "text-sm text-muted-foreground"
                   )}>
                     {qty > 0 ? fmtQty(qty) : "—"}
                   </span>
 
-                  {/* Delete button: only in its own grid cell on sm+ */}
                   <button
                     type="button"
                     onClick={() => removeExtra(idx)}
@@ -569,13 +577,13 @@ function EditableTransferDetail({
               );
             })}
 
-            {/* Search-to-add bar — a real typeable input */}
-            <div className="flex items-center gap-2 px-3 py-2 border-t bg-muted/10">
-              <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            {/* Search-to-add bar */}
+            <div className="flex items-center gap-2 px-3 py-2.5 border-t bg-muted/20">
+              <Plus className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <input
                 ref={searchBarRef}
                 type="text"
-                placeholder="Search items to add..."
+                placeholder="Add item by searching…"
                 value={panelSearch}
                 onChange={e => {
                   setPanelSearch(e.target.value);
@@ -617,8 +625,11 @@ function EditableTransferDetail({
             </div>
 
             {/* Footer */}
-            <div className="border-t px-3 py-1.5 bg-muted/20 flex justify-end text-xs text-muted-foreground">
-              Total Items: <strong className="text-foreground ml-1">{totalItems}</strong>
+            <div className="border-t px-3 py-2 bg-muted/30 flex items-center justify-between text-xs text-muted-foreground">
+              <span>{totalItems} {totalItems === 1 ? "item" : "items"} total</span>
+              {hasChanges && (
+                <span className="text-primary font-medium">Unsaved changes</span>
+              )}
             </div>
           </div>
 
