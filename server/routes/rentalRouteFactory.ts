@@ -2636,19 +2636,23 @@ export function registerRentalRoutes(
         ));
       console.log(`[re-accrue] dangling stamp sweep cleared rows`);
 
-      // 2b. Full reset for the current month: find ALL accrual vouchers whose
-      //     ledger rows fall in the current billing month and delete them all.
-      //     This is safe because postRentAccrualForCompany (step 3) will
-      //     immediately recreate ONE combined voucher using the full expectedAmount
-      //     for every unit — paid, partially-paid, and unpaid alike.  The net
-      //     effect on Accrued Rent Payable is unchanged:
-      //       Cr AP (new accrual, full rent) − Dr AP (existing payment) = outstanding balance.
+      // 2b. Full reset for ALL fully-unpaid months (paidAmount = 0):
+      //     Find every ledger row that still has an accrual stamp but has NOT yet
+      //     received any payment.  Since paidAmount = 0 there are no Dr AP entries
+      //     from payments that could become "orphaned" when we delete the accrual
+      //     credit — it is always safe to wipe and re-accrue these rows.
+      //     Rows with paidAmount > 0 are left alone; the phantom-fix in step 1b
+      //     already corrects any pre-payment / post-accrual mismatches for those.
+      //
+      //     This replaces the old "current month only" reset and fixes the case
+      //     where multiple past months are outstanding but only the current month's
+      //     accrual was being rebuilt.
       const now = new Date();
       const curYear  = now.getUTCFullYear();
       const curMonth = now.getUTCMonth() + 1;
 
-      // Diagnostic: log all current-month rows (with and without accrualVoucherId)
-      const allCurMonthRows = await db
+      // All accrued rows with no payment whatsoever (safe to delete + re-accrue)
+      const allUnpaidAccruedRows = await db
         .select({
           id:               propertyMonthlyLedger.id,
           accrualVoucherId: propertyMonthlyLedger.accrualVoucherId,
@@ -2660,21 +2664,20 @@ export function registerRentalRoutes(
         .from(propertyMonthlyLedger)
         .where(and(
           inArray(propertyMonthlyLedger.contractId, contractIds),
-          sql`${propertyMonthlyLedger.year} = ${curYear} AND ${propertyMonthlyLedger.month} = ${curMonth}`,
+          isNotNull(propertyMonthlyLedger.accrualVoucherId),
+          sql`${propertyMonthlyLedger.paidAmount}::numeric = 0`,
         ));
-      console.log(`[re-accrue] company=${companyId} ${curYear}-${curMonth} totalRows=${allCurMonthRows.length}`, JSON.stringify(allCurMonthRows));
-
-      const curMonthAccruedRows = allCurMonthRows.filter(r => r.accrualVoucherId !== null && r.accrualVoucherId !== undefined);
+      console.log(`[re-accrue] company=${companyId} ${curYear}-${curMonth} unpaidAccruedRows=${allUnpaidAccruedRows.length}`, JSON.stringify(allUnpaidAccruedRows));
 
       const voucherIdsToDelete = [
         ...new Set(
-          curMonthAccruedRows
+          allUnpaidAccruedRows
             .map(r => r.accrualVoucherId)
             .filter((id): id is number => id !== null && id !== undefined),
         ),
       ];
 
-      console.log(`[re-accrue] accrued rows=${curMonthAccruedRows.length} vouchersToDelete=${JSON.stringify(voucherIdsToDelete)}`);
+      console.log(`[re-accrue] vouchersToDelete=${JSON.stringify(voucherIdsToDelete)}`);
 
       let reset = 0;
       if (voucherIdsToDelete.length > 0) {
@@ -2686,10 +2689,10 @@ export function registerRentalRoutes(
               inArray(vouchers.id, voucherIdsToDelete),
               eq(vouchers.companyId, companyId),
             ));
-          // De-stamp only the current-month rows — historical months are untouched
+          // Clear stamps on all the rows we just wiped
           await tx.update(propertyMonthlyLedger)
             .set({ accrualVoucherId: null })
-            .where(inArray(propertyMonthlyLedger.id, curMonthAccruedRows.map(r => r.id)));
+            .where(inArray(propertyMonthlyLedger.id, allUnpaidAccruedRows.map(r => r.id)));
         });
         reset = voucherIdsToDelete.length;
       }
