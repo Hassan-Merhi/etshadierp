@@ -1495,11 +1495,11 @@ export function registerStockRoutes(app: Express) {
         .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)));
       const itemByCode = new Map(allItems.map((i: any) => [i.code.toLowerCase().trim(), i.id]));
 
-      const allGroups = await db
-        .select({ id: stockGroups.id, name: stockGroups.name })
-        .from(stockGroups)
-        .where(eq(stockGroups.companyId, companyId));
-      const groupByName = new Map(allGroups.map((g: any) => [g.name.toLowerCase().trim(), g.id]));
+      const allCats = await db
+        .select({ id: stockCategories.id, name: stockCategories.name })
+        .from(stockCategories)
+        .where(eq(stockCategories.companyId, companyId));
+      const catByName = new Map(allCats.map((c: any) => [c.name.toLowerCase().trim(), c.id]));
 
       let updated = 0;
       let notFound = 0;
@@ -1515,10 +1515,10 @@ export function registerStockRoutes(app: Express) {
         const itemId = itemByCode.get(code.toLowerCase());
         if (!itemId) { notFound++; notFoundCodes.push(code); continue; }
 
-        const groupId = groupByName.get(catName.toLowerCase());
-        if (!groupId) { categoryNotFound++; if (!categoryNotFoundNames.includes(catName)) categoryNotFoundNames.push(catName); continue; }
+        const catId = catByName.get(catName.toLowerCase());
+        if (!catId) { categoryNotFound++; if (!categoryNotFoundNames.includes(catName)) categoryNotFoundNames.push(catName); continue; }
 
-        await db.update(stockItems).set({ stockGroupId: groupId }).where(eq(stockItems.id, itemId));
+        await db.update(stockItems).set({ categoryId: catId }).where(eq(stockItems.id, itemId));
         updated++;
       }
 
