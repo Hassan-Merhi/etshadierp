@@ -253,7 +253,8 @@ export default function FactoryContainerCreate() {
                 type="number"
                 value={ratePerKg}
                 onChange={e => setRatePerKg(e.target.value)}
-                placeholder="0.00"
+                placeholder="0.0000000"
+                step="0.0000001"
                 data-testid="input-container-rate"
               />
             </div>

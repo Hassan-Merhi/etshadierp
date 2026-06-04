@@ -2191,7 +2191,7 @@ export default function FactoryContainers() {
                     inputMode="decimal"
                     value={formData.ratePerKg}
                     onChange={(e) => setFormData({ ...formData, ratePerKg: e.target.value })}
-                    placeholder="0.00"
+                    placeholder="0.0000000"
                     data-testid="input-container-rate"
                   />
                 </div>

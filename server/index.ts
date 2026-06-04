@@ -3810,6 +3810,9 @@ let migrationsDone = false;
     // a dedicated partial index on company_id WHERE deleted_at IS NULL is much tighter.
     `CREATE INDEX IF NOT EXISTS customers_company_active_idx
        ON customers (company_id) WHERE deleted_at IS NULL`,
+    // Increase factory_containers rate_per_kg / rate_per_kg_usd precision to 7 decimal places
+    `ALTER TABLE factory_containers ALTER COLUMN rate_per_kg TYPE DECIMAL(20,7)`,
+    `ALTER TABLE factory_containers ALTER COLUMN rate_per_kg_usd TYPE DECIMAL(20,7)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
