@@ -220,10 +220,17 @@ const RE_NEWS_QUERY = /\b(latest news|current events|what.{0,25}happening (in|to
 // ── Code agent intent regexes ─────────────────────────────────────────────────
 // Matches a reference to a project file (path or bare filename with extension)
 const RE_PROJECT_FILE = /\b((?:server|client|shared|scripts)\/[\w./+-]+\.(?:ts|tsx|js|jsx|css|json|md)|[\w-]+\.(?:ts|tsx|js|jsx|json|css|md))\b/i;
-// Read-only intent verbs combined with a project file ref
+// Read-only intent verbs combined with a project file ref OR explicit search/grep request
 const RE_CODE_READ = /\b(?:show me|read|open|explain|what does|how does|how is|describe|view)\b.*\b[\w-]+\.(?:ts|tsx|js|jsx|json|css)|\b(?:find where|search for|where is|grep for|look for|where does)\b/i;
 // Write/edit intent verbs combined with a project file ref OR explicit edit phrasing
 const RE_CODE_EDIT = /\b(?:add|create|edit|fix|update|modify|refactor|implement|write)\b.{0,120}\b[\w-]+\.(?:ts|tsx|js|jsx|json|css)|\b(?:create (?:a )?(?:new )?file|add (?:a )?(?:function|route|endpoint|component|field|column|type|interface|class|method|hook|handler)|fix (?:the )?bug|implement (?:the )?)\b.{0,80}\b(?:server|client|shared)\//i;
+// Pathless code-edit intent: covers "add a discount field to the voucher form" style requests
+// that reference UI/code constructs but no explicit file path.
+// "create" is included (create a new component/page/hook) but "voucher/payment/entry" are
+// deliberately excluded from the target-noun list to avoid misclassifying ERP requests.
+const RE_CODE_EDIT_PATHLESS = /\b(?:add|create|edit|fix|update|modify|refactor|implement|rename|remove|delete)\b.{0,140}\b(?:field|button|component|form|page|tab|modal|dialog|dropdown|select|input|textarea|checkbox|radio|label|column|table|card|sidebar|header|footer|nav|menu|link|icon|badge|tooltip|alert|toast|state|hook|function|method|route|endpoint|schema|migration|type|interface|class|handler|prop|event|style|stylesheet|variable|constant|import|export|render|widget|layout|section|panel|filter|feature|validation|permission)\b/i;
+// Financial-transaction markers — presence means the request is almost certainly ERP, not code
+const RE_FINANCIAL_TX = /(?:\$\s?\d|\d[\d,]*\s*(?:USD|PKR|AED|EUR|GBP|SAR|OMR|KWD|usd|pkr|aed|eur))\b|\b(?:paid|pay\b|received|collect\b|deposit\b|withdraw|remit|invoice\s+\S+\s+\d|receipt\s+\S+\s+\d)\b/i;
 const RE_GENERAL_KNOWLEDGE = /^(hi|hello|hey|yo|sup|hiya|howdy)\b|\b(explain|what (is|are|was|were|does|did)|who (is|are|was|were)|how does|how do|how (can|should) (i|we)|why (is|are|does|do|was|were)|tell me about|write (a |an )?(story|poem|essay|email|letter|blog|article|report)|help me (understand|with|write|create)|translate|summarize|what does .{0,30} mean|give me (a |an )?(example|list|summary|idea)|best (way|practice|approach) to|pros and cons|difference between)\b/i;
 
 // Detect best provider for a given message — returns override or null (use admin setting)
@@ -1367,7 +1374,22 @@ function classifyChatIntent(
   userMessage: string,
   _pageContext?: { currentRoute?: string; entityType?: string; entityId?: number; entityName?: string }
 ): ChatIntent {
-  // Action intents — checked in priority order
+  const hasFileRef = RE_PROJECT_FILE.test(userMessage);
+  const isFinancialTx = RE_FINANCIAL_TX.test(userMessage);
+
+  // ── Code agent intents — evaluated FIRST when there is a file reference.
+  //    File references are unambiguous: "edit chatService.ts" can only be code.
+  if (hasFileRef && RE_CODE_EDIT.test(userMessage)) return "code_edit";
+  if (hasFileRef && RE_CODE_READ.test(userMessage)) return "code_read";
+  // Read-only with explicit search/grep verbs, no file extension required
+  if (RE_CODE_READ.test(userMessage) && /\b(?:find where|search for|where is|grep for|look for|where does|list files|ls\b)\b/i.test(userMessage)) return "code_read";
+
+  // ── Code edit without file path — "add a discount field to the voucher form".
+  //    Only fires when the message lacks financial-transaction markers so that
+  //    "pay $500 to supplier" doesn't accidentally match code_edit.
+  if (!isFinancialTx && RE_CODE_EDIT_PATHLESS.test(userMessage)) return "code_edit";
+
+  // ── ERP action intents — checked after code intents ──────────────────────
   if (RE_STOCK_ADJ.test(userMessage)) return "create_stock_adjustment";
   if (RE_STOCK_ITEM_CREATE.test(userMessage)) return "create_stock_item";
   // Transfer before voucher — "transfer stock" should not match voucher keywords
@@ -1376,11 +1398,6 @@ function classifyChatIntent(
   if (RE_ACCOUNT_QUERY.test(userMessage)) return "account_query";
   if (RE_PRICE_UPDATE.test(userMessage)) return "price_update";
   if (RE_VOUCHER.test(userMessage)) return "create_voucher";
-
-  // ── Code agent intents (checked before general_knowledge) ──────────────────
-  const hasFileRef = RE_PROJECT_FILE.test(userMessage);
-  if (hasFileRef && RE_CODE_EDIT.test(userMessage)) return "code_edit";
-  if (RE_CODE_READ.test(userMessage) && (hasFileRef || /\b(?:find where|search for|where is|grep for|look for|where does|list files|ls\b)\b/i.test(userMessage))) return "code_read";
 
   // Query intents that need broad context
   if (/\b(excel|import|export|template|download.*excel)\b/i.test(userMessage)) return "excel_import";
