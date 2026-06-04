@@ -731,25 +731,17 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       if (id === null) return res.status(400).json({ message: "Invalid id" });
 
-      // Soft-delete: hide from listings; child rows preserved for restore.
-      // Permanent deletion happens from Settings → Deleted Items (admin route).
-      const [updated] = await db.update(factoryContainers)
-        .set({ deletedAt: new Date(), updatedAt: new Date() })
-        .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId), isNull(factoryContainers.deletedAt)))
-        .returning({ id: factoryContainers.id });
-
-      if (!updated) return res.status(404).json({ message: "Container not found" });
-      res.json({ id: updated.id, message: "Container moved to Deleted Items" });
-      return;
-
-      // eslint-disable-next-line no-unreachable
-      let deleted: any;
+      let updatedId: number | null = null;
       await db.transaction(async (tx: any) => {
-        const [container] = await tx.select().from(factoryContainers)
-          .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId)));
-        if (!container) return;
+        // Soft-delete the container
+        const [updated] = await tx.update(factoryContainers)
+          .set({ deletedAt: new Date(), updatedAt: new Date() })
+          .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId), isNull(factoryContainers.deletedAt)))
+          .returning({ id: factoryContainers.id });
+        if (!updated) return;
+        updatedId = updated.id;
 
-        // 1. Collect child raw stock and commission IDs for daybook cleanup
+        // 1. Collect child IDs for daybook cleanup
         const rsRows = await tx.select({ id: factoryRawStock.id }).from(factoryRawStock)
           .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, id)));
         const rsIds = rsRows.map((r: any) => r.id);
@@ -758,7 +750,7 @@ export function registerFactoryContainersRoutes(app: Express) {
           .where(and(eq(factoryContainerCommissions.companyId, companyId), eq(factoryContainerCommissions.containerId, id)));
         const commIds = commRows.map((r: any) => r.id);
 
-        // 2. Delete daybook entries
+        // 2. Delete daybook entries linked to this container
         if (rsIds.length > 0) {
           await tx.delete(factoryDaybookEntries).where(and(
             eq(factoryDaybookEntries.companyId, companyId),
@@ -795,49 +787,10 @@ export function registerFactoryContainersRoutes(app: Express) {
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
           await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
         }
-
-        // 4. Delete FX allocations
-        await tx.delete(factoryFxAllocations).where(and(
-          eq(factoryFxAllocations.companyId, companyId),
-          eq(factoryFxAllocations.containerId, id)
-        ));
-
-        // 5. Delete mix batch sources
-        await tx.delete(factoryMixBatchSources).where(eq(factoryMixBatchSources.containerId, id));
-
-        // 6. Delete offload additional charges
-        await tx.delete(factoryOffloadAdditionalCharges).where(and(
-          eq(factoryOffloadAdditionalCharges.companyId, companyId),
-          eq(factoryOffloadAdditionalCharges.containerId, id)
-        ));
-
-        // 7. Delete pre-registered other charges
-        await tx.delete(factoryContainerOtherCharges).where(and(
-          eq(factoryContainerOtherCharges.companyId, companyId),
-          eq(factoryContainerOtherCharges.containerId, id)
-        ));
-
-        // 8. Delete commission records
-        await tx.delete(factoryContainerCommissions).where(and(
-          eq(factoryContainerCommissions.companyId, companyId),
-          eq(factoryContainerCommissions.containerId, id)
-        ));
-
-        // 9. Delete raw stock records
-        await tx.delete(factoryRawStock).where(and(
-          eq(factoryRawStock.companyId, companyId),
-          eq(factoryRawStock.containerId, id)
-        ));
-
-        // 10. Delete the container itself
-        const [d] = await tx.delete(factoryContainers)
-          .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId)))
-          .returning();
-        deleted = d;
       });
 
-      if (!deleted) return res.status(404).json({ message: "Container not found" });
-      res.json(deleted);
+      if (!updatedId) return res.status(404).json({ message: "Container not found" });
+      res.json({ id: updatedId, message: "Container deleted" });
     } catch (error: any) {
       console.error("Error deleting factory container:", error);
       res.status(500).json({ message: error.message });

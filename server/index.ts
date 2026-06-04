@@ -3813,6 +3813,30 @@ let migrationsDone = false;
     // Increase factory_containers rate_per_kg / rate_per_kg_usd precision to 7 decimal places
     `ALTER TABLE factory_containers ALTER COLUMN rate_per_kg TYPE DECIMAL(20,7)`,
     `ALTER TABLE factory_containers ALTER COLUMN rate_per_kg_usd TYPE DECIMAL(20,7)`,
+    // Clean up orphaned factory daybook entries for already soft-deleted containers
+    `DELETE FROM factory_daybook_entries
+       WHERE tx_type IN ('FREIGHT','OTHER_CHARGE','DUTY','CONTAINER_IMPORT','PURCHASE')
+         AND reference_id IN (SELECT id FROM factory_containers WHERE deleted_at IS NOT NULL)`,
+    // Clean up orphaned factory vouchers for already soft-deleted containers
+    `DELETE FROM voucher_entries
+       WHERE voucher_id IN (
+         SELECT v.id FROM vouchers v
+         JOIN factory_containers fc ON v.voucher_number LIKE 'FACTORY-IMPORT-' || fc.id || '-%'
+                                    OR v.voucher_number LIKE 'FACTORY-COMM-'   || fc.id || '-%'
+                                    OR v.voucher_number LIKE 'FACTORY-FREIGHT-'|| fc.id || '-%'
+                                    OR v.voucher_number LIKE 'FACTORY-OC-'     || fc.id || '-%'
+         WHERE v.source_module = 'FACTORY' AND fc.deleted_at IS NOT NULL
+       )`,
+    `DELETE FROM vouchers
+       WHERE source_module = 'FACTORY'
+         AND id IN (
+           SELECT v.id FROM vouchers v
+           JOIN factory_containers fc ON v.voucher_number LIKE 'FACTORY-IMPORT-' || fc.id || '-%'
+                                      OR v.voucher_number LIKE 'FACTORY-COMM-'   || fc.id || '-%'
+                                      OR v.voucher_number LIKE 'FACTORY-FREIGHT-'|| fc.id || '-%'
+                                      OR v.voucher_number LIKE 'FACTORY-OC-'     || fc.id || '-%'
+           WHERE fc.deleted_at IS NOT NULL
+         )`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
