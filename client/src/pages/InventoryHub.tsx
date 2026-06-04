@@ -1,16 +1,14 @@
 import { useSearch, useLocation } from "wouter";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { MapPin, Ship, Layers, Package } from "lucide-react";
+import { MapPin, Ship, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import LocationInventory from "@/pages/LocationInventory";
 import StockOTW from "@/pages/StockOTW";
 import Containers from "@/pages/ContainersPage";
-import CombinedInventory from "@/pages/CombinedInventory";
 
 const TABS = [
   { value: "by-location", label: "By Location", icon: MapPin },
   { value: "on-the-way",  label: "On The Way",  icon: Ship },
-  { value: "combined",    label: "Combined",     icon: Layers },
   { value: "containers",  label: "Containers",   icon: Package },
 ];
 
@@ -54,10 +52,6 @@ export default function InventoryHub() {
 
         <TabsContent value="on-the-way">
           <StockOTW />
-        </TabsContent>
-
-        <TabsContent value="combined">
-          <CombinedInventory />
         </TabsContent>
 
         <TabsContent value="containers">

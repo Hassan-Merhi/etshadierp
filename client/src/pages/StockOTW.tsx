@@ -8,11 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Package, Search, Ship, AlertCircle, ChevronRight, ChevronDown, X } from "lucide-react";
+import { Package, Search, Ship, AlertCircle, ChevronRight, ChevronDown, X, Layers } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import type { Container, Supplier } from "@shared/schema";
 import { PageHeader } from "@/components/PageHeader";
+import CombinedInventory from "@/pages/CombinedInventory";
 
 interface ContainerDetailData {
   container: Container;
@@ -51,7 +52,7 @@ interface GroupedStockItem {
   }[];
 }
 
-function StockOTWContent() {
+function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boolean; onToggleCombined: () => void }) {
   const { formatAmount } = useCurrencyContext();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
@@ -259,9 +260,46 @@ function StockOTWContent() {
     );
   }
 
+  if (showCombined) {
+    return (
+      <div className="p-3 sm:p-0 space-y-4 sm:space-y-6">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex-1 min-w-0">
+            <PageHeader title="Combined Inventory" subtitle="OTW stock combined with in-hand stock" />
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onToggleCombined}
+            data-testid="button-toggle-combined"
+            className="shrink-0 gap-2"
+          >
+            <Ship className="h-4 w-4" />
+            Stock OTW
+          </Button>
+        </div>
+        <CombinedInventory />
+      </div>
+    );
+  }
+
   return (
     <div className="p-3 sm:p-0 space-y-4 sm:space-y-6">
-      <PageHeader title="Stock On The Way" subtitle="All stock items from containers currently in transit" />
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <PageHeader title="Stock On The Way" subtitle="All stock items from containers currently in transit" />
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onToggleCombined}
+          data-testid="button-toggle-combined"
+          className="shrink-0 gap-2"
+        >
+          <Layers className="h-4 w-4" />
+          Combined
+        </Button>
+      </div>
 
       {hasErrors && (
         <Alert variant="destructive">
@@ -574,5 +612,11 @@ function StockOTWContent() {
 }
 
 export default function StockOTW() {
-  return <StockOTWContent />;
+  const [showCombined, setShowCombined] = useState(false);
+  return (
+    <StockOTWContent
+      showCombined={showCombined}
+      onToggleCombined={() => setShowCombined((v) => !v)}
+    />
+  );
 }
