@@ -268,30 +268,58 @@ export default function Suppliers() {
     "Debit Note": "bg-amber-500/10 text-amber-600 dark:text-amber-400",
   };
 
+  const getInitials = (name: string) =>
+    name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
+
+  const avatarColors = [
+    "bg-blue-500/20 text-blue-600 dark:text-blue-400",
+    "bg-violet-500/20 text-violet-600 dark:text-violet-400",
+    "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400",
+    "bg-amber-500/20 text-amber-600 dark:text-amber-400",
+    "bg-rose-500/20 text-rose-600 dark:text-rose-400",
+    "bg-cyan-500/20 text-cyan-600 dark:text-cyan-400",
+    "bg-orange-500/20 text-orange-600 dark:text-orange-400",
+    "bg-indigo-500/20 text-indigo-600 dark:text-indigo-400",
+  ];
+
+  const getAvatarColor = (id: number) => avatarColors[id % avatarColors.length];
+
   return (
     <div className="p-6 space-y-5">
       <PageHeader title="Suppliers" subtitle="Manage supplier accounts and track container shipments" showBackButton={false} />
 
-      {/* Stats pills */}
-      <div className="flex flex-wrap gap-3">
+      {/* Stat cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {isLoading ? (
-          [1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-40 rounded-lg" />)
+          [1, 2, 3].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)
         ) : (
           <>
-            <div className="flex items-center gap-2.5 rounded-lg border bg-muted/40 px-4 py-2">
-              <Users className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span className="text-xs text-muted-foreground">Active Suppliers</span>
-              <span className="font-semibold text-sm" data-testid="text-active-suppliers">{activeSuppliers.length}</span>
+            <div className="rounded-xl border bg-card p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
+                <Users className="w-5 h-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Active Suppliers</p>
+                <p className="text-2xl font-bold leading-tight" data-testid="text-active-suppliers">{activeSuppliers.length}</p>
+              </div>
             </div>
-            <div className="flex items-center gap-2.5 rounded-lg border bg-muted/40 px-4 py-2">
-              <Container className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span className="text-xs text-muted-foreground">Total Containers</span>
-              <span className="font-semibold text-sm" data-testid="text-total-containers">{totalContainers}</span>
+            <div className="rounded-xl border bg-card p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
+                <Container className="w-5 h-5 text-violet-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Containers</p>
+                <p className="text-2xl font-bold leading-tight" data-testid="text-total-containers">{totalContainers}</p>
+              </div>
             </div>
-            <div className="flex items-center gap-2.5 rounded-lg border bg-muted/40 px-4 py-2">
-              <DollarSign className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span className="text-xs text-muted-foreground">Total Outstanding</span>
-              <span className="font-semibold text-sm font-mono" data-testid="text-total-balance">{formatAmount(totalBalance)}</span>
+            <div className="rounded-xl border bg-card p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                <DollarSign className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Outstanding</p>
+                <p className="text-xl font-bold leading-tight font-mono" data-testid="text-total-balance">{formatAmount(totalBalance)}</p>
+              </div>
             </div>
           </>
         )}
@@ -310,7 +338,7 @@ export default function Suppliers() {
           />
         </div>
         <Button
-          variant="outline"
+          variant={hideZeroBalance ? "secondary" : "outline"}
           size="default"
           onClick={() => setHideZeroBalance(!hideZeroBalance)}
           data-testid="button-toggle-zero-balance"
@@ -320,15 +348,17 @@ export default function Suppliers() {
         </Button>
       </div>
 
-      {/* Supplier table */}
+      {/* Supplier list */}
       {isLoading ? (
-        <div className="border rounded-xl overflow-hidden">
-          <div className="bg-muted/40 px-4 py-2.5 border-b flex gap-6">
-            {[180, 80, 100, 80].map((w, i) => <Skeleton key={i} className="h-3.5 rounded" style={{ width: w }} />)}
-          </div>
+        <div className="space-y-2">
           {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="px-4 py-3.5 border-b last:border-b-0 flex gap-6 items-center">
-              {[180, 80, 100, 80].map((w, j) => <Skeleton key={j} className="h-3 rounded" style={{ width: w }} />)}
+            <div key={i} className="rounded-xl border bg-card p-4 flex items-center gap-4">
+              <Skeleton className="w-10 h-10 rounded-lg shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3.5 w-40 rounded" />
+                <Skeleton className="h-3 w-24 rounded" />
+              </div>
+              <Skeleton className="h-6 w-28 rounded-md" />
             </div>
           ))}
         </div>
@@ -353,148 +383,98 @@ export default function Suppliers() {
           </div>
         </div>
       ) : (
-        <>
-          {/* Desktop table */}
-          <div className="hidden md:block border rounded-xl overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="h-9 font-semibold text-xs">Supplier</TableHead>
-                  <TableHead className="h-9 font-semibold text-xs">Containers</TableHead>
-                  <TableHead className="h-9 font-semibold text-xs text-right">Balance</TableHead>
-                  <TableHead className="h-9 font-semibold text-xs text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedSuppliers.map((supplier) => (
-                  <TableRow
-                    key={supplier.id}
-                    className="cursor-pointer hover:bg-muted/40 group"
-                    onClick={() => handleSupplierClick(supplier)}
-                    data-testid={`row-supplier-${supplier.id}`}
-                  >
-                    <TableCell className="py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm" data-testid={`button-supplier-name-${supplier.id}`}>
-                          {supplier.legalName}
-                        </span>
-                        {!supplier.active && (
-                          <Badge variant="secondary" className="text-xs">Inactive</Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      {supplier.containerCount > 0 ? (
-                        <Badge variant="secondary" className="text-xs" data-testid={`text-containers-${supplier.id}`}>
-                          {supplier.containerCount}
-                        </Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground" data-testid={`text-containers-${supplier.id}`}>—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="py-3 text-right">
-                      <span
-                        className={`font-mono text-sm font-medium ${
-                          supplier.balance > 0 ? "text-red-500" : supplier.balance < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
-                        }`}
-                        data-testid={`text-balance-${supplier.id}`}
-                      >
-                        {supplier.balance === 0 ? "—" : `${formatAmount(Math.abs(supplier.balance))} ${supplier.balance > 0 ? "Cr" : "Dr"}`}
-                      </span>
-                    </TableCell>
-                    <TableCell className="py-3 text-right">
-                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => { e.stopPropagation(); navigate(`/suppliers/${supplier.id}/proformas`); }}
-                          data-testid={`button-proformas-supplier-${supplier.id}`}
-                          title="Proformas"
-                        >
-                          <FileText className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => { e.stopPropagation(); navigate(`/suppliers/${supplier.id}/edit`); }}
-                          data-testid={`button-edit-supplier-${supplier.id}`}
-                          title="Edit"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+        <div className="space-y-2">
+          {sortedSuppliers.map((supplier) => (
+            <div
+              key={supplier.id}
+              className="rounded-xl border bg-card p-4 cursor-pointer hover-elevate flex items-center gap-4 group"
+              onClick={() => handleSupplierClick(supplier)}
+              data-testid={`row-supplier-${supplier.id}`}
+            >
+              {/* Avatar */}
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-sm font-bold ${getAvatarColor(supplier.id)}`}>
+                {getInitials(supplier.legalName)}
+              </div>
 
-          {/* Mobile cards */}
-          <div className="md:hidden space-y-2">
-            {sortedSuppliers.map((supplier) => (
-              <div
-                key={supplier.id}
-                className="border rounded-xl p-3 cursor-pointer"
-                onClick={() => handleSupplierClick(supplier)}
-                data-testid={`card-supplier-${supplier.id}`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-sm leading-tight" data-testid={`button-supplier-name-mobile-${supplier.id}`}>
-                      {supplier.legalName}
-                    </div>
-                    {supplier.phone && (
-                      <div className="text-xs text-muted-foreground mt-0.5" data-testid={`text-phone-mobile-${supplier.id}`}>
-                        {supplier.phone}
-                      </div>
-                    )}
-                    {!supplier.active && (
-                      <Badge variant="secondary" className="text-xs mt-1">Inactive</Badge>
-                    )}
-                  </div>
+              {/* Name + meta */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-sm" data-testid={`button-supplier-name-${supplier.id}`}>
+                    {supplier.legalName}
+                  </span>
+                  {!supplier.active && (
+                    <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                  )}
+                </div>
+                {supplier.containerCount > 0 ? (
+                  <p className="text-xs text-muted-foreground mt-0.5" data-testid={`text-containers-${supplier.id}`}>
+                    {supplier.containerCount} container{supplier.containerCount !== 1 ? "s" : ""}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-0.5">No containers</p>
+                )}
+              </div>
+
+              {/* Balance */}
+              <div className="shrink-0 text-right hidden sm:block">
+                {supplier.balance === 0 ? (
+                  <span className="text-xs text-muted-foreground" data-testid={`text-balance-${supplier.id}`}>—</span>
+                ) : (
                   <span
-                    className={`font-mono text-sm font-medium shrink-0 ${
-                      supplier.balance > 0 ? "text-red-500" : supplier.balance < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                    className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-mono font-semibold ${
+                      supplier.balance > 0
+                        ? "bg-red-500/10 text-red-600 dark:text-red-400"
+                        : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                    }`}
+                    data-testid={`text-balance-${supplier.id}`}
+                  >
+                    {formatAmount(Math.abs(supplier.balance))}
+                    <span className="ml-1 opacity-70 text-[10px]">{supplier.balance > 0 ? "Cr" : "Dr"}</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Mobile balance */}
+              <div className="shrink-0 sm:hidden">
+                {supplier.balance !== 0 && (
+                  <span
+                    className={`text-xs font-mono font-semibold ${
+                      supplier.balance > 0 ? "text-red-500" : "text-emerald-600 dark:text-emerald-400"
                     }`}
                     data-testid={`text-balance-mobile-${supplier.id}`}
                   >
-                    {supplier.balance === 0 ? "—" : `${formatAmount(Math.abs(supplier.balance))} ${supplier.balance > 0 ? "Cr" : "Dr"}`}
+                    {formatAmount(Math.abs(supplier.balance))}
                   </span>
-                </div>
-                <div className="flex items-center justify-between mt-2">
-                  <div>
-                    {supplier.containerCount > 0 && (
-                      <Badge variant="secondary" className="text-xs" data-testid={`text-containers-mobile-${supplier.id}`}>
-                        {supplier.containerCount} containers
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => navigate(`/suppliers/${supplier.id}/proformas`)}
-                      data-testid={`button-proformas-supplier-mobile-${supplier.id}`}
-                      title="Proformas"
-                    >
-                      <FileText className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => navigate(`/suppliers/${supplier.id}/edit`)}
-                      data-testid={`button-edit-supplier-mobile-${supplier.id}`}
-                      title="Edit"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+                )}
               </div>
-            ))}
-          </div>
-        </>
+
+              {/* Actions */}
+              <div
+                className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate(`/suppliers/${supplier.id}/proformas`)}
+                  data-testid={`button-proformas-supplier-${supplier.id}`}
+                  title="Proformas"
+                >
+                  <FileText className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate(`/suppliers/${supplier.id}/edit`)}
+                  data-testid={`button-edit-supplier-${supplier.id}`}
+                  title="Edit"
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Supplier Details Dialog */}
