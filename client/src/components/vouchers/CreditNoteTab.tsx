@@ -152,12 +152,12 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
   });
 
   const { data: locationInventory = [] } = useQuery<InventoryItem[]>({
-    queryKey: selectedLocationId ? [`/api/locations/${selectedLocationId}/inventory`] : [],
+    queryKey: selectedLocationId ? ["/api/locations", selectedLocationId, "inventory"] : [],
     enabled: selectedLocationId > 0,
   });
 
   const { data: editData, isLoading: editLoading } = useQuery<CreditNoteData>({
-    queryKey: editVoucherId ? [`/api/credit-notes/${editVoucherId}`] : [],
+    queryKey: editVoucherId ? ["/api/credit-notes", editVoucherId] : [],
     enabled: !!editVoucherId,
   });
 
@@ -289,7 +289,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
       });
       resetForm();
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/locations/${selectedLocationId}/inventory`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/locations", selectedLocationId, "inventory"] });
     },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;
@@ -326,8 +326,8 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
       resetForm();
       window.history.pushState({}, "", "/vouchers?tab=credit-note");
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/locations/${selectedLocationId}/inventory`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/credit-notes/${editingVoucherId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/locations", selectedLocationId, "inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/credit-notes", editingVoucherId] });
     },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;

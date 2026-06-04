@@ -185,7 +185,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   });
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
-    queryKey: ["/api/suppliers", selectedCompany?.id],
+    queryKey: ["/api/suppliers"],
     enabled: !!selectedCompany,
   });
 
@@ -838,7 +838,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
         refetchType: "all",
       });
       queryClient.invalidateQueries({
-        queryKey: ["/api/suppliers", selectedCompany?.id],
+        queryKey: ["/api/suppliers"],
       });
       queryClient.invalidateQueries({
         queryKey: ["/api/bank-accounts", selectedCompany?.id],
@@ -896,7 +896,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
         queryKey: ["/api/salary-advances"],
       });
       queryClient.invalidateQueries({
-        queryKey: ["/api/suppliers", selectedCompany?.id],
+        queryKey: ["/api/suppliers"],
       });
       queryClient.invalidateQueries({
         queryKey: ["/api/bank-accounts", selectedCompany?.id],

@@ -370,10 +370,17 @@ export function registerEmployeeRoutes(app: Express) {
     requireAuth,
     async (req, res) => {
       try {
-        await storage.addEmployeeToGroup(
-          parseInt(req.params.groupId),
-          parseInt(req.params.employeeId),
-        );
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const groupId = parseInt(req.params.groupId);
+        if (isNaN(groupId)) return res.status(400).json({ message: "Invalid group ID" });
+        const employeeId = parseInt(req.params.employeeId);
+        if (isNaN(employeeId)) return res.status(400).json({ message: "Invalid employee ID" });
+        const group = await storage.getEmployeeGroupById(groupId);
+        if (!group || group.companyId !== companyId) {
+          return res.status(403).json({ message: "Group not found or access denied" });
+        }
+        await storage.addEmployeeToGroup(groupId, employeeId);
         res.status(201).send();
       } catch (error: any) {
         res.status(400).json({ message: error.message });
@@ -386,10 +393,15 @@ export function registerEmployeeRoutes(app: Express) {
     requireAuth,
     async (req, res) => {
       try {
-        await storage.removeEmployeeFromGroup(
-          parseInt(req.params.groupId),
-          parseInt(req.params.employeeId),
-        );
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const groupId = parseInt(req.params.groupId);
+        if (isNaN(groupId)) return res.status(400).json({ message: "Invalid group ID" });
+        const group = await storage.getEmployeeGroupById(groupId);
+        if (!group || group.companyId !== companyId) {
+          return res.status(403).json({ message: "Group not found or access denied" });
+        }
+        await storage.removeEmployeeFromGroup(groupId, parseInt(req.params.employeeId));
         res.status(204).send();
       } catch (error: any) {
         res.status(400).json({ message: error.message });

@@ -73,7 +73,7 @@ export function StockItemEditDialog({
 
   // Fetch stock item details
   const { data: stockItem, isLoading } = useQuery<StockItem>({
-    queryKey: [`/api/stock-items/${stockItemId}`],
+    queryKey: ["/api/stock-items", stockItemId],
     enabled: open && !!stockItemId,
   });
 
@@ -103,7 +103,7 @@ export function StockItemEditDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/stock-items/${stockItemId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items", stockItemId] });
       queryClient.invalidateQueries({ queryKey: ["/api/pos/stock-items"] });
       toast({
         title: "Stock Item Updated",

@@ -460,7 +460,6 @@ interface CategoryRow {
 
 function UpdateCategoriesTab() {
   const { toast } = useToast();
-  const { selectedCompany } = useCompany();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<CategoryRow[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);

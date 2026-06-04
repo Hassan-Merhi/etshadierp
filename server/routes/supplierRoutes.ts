@@ -322,7 +322,7 @@ export function registerSupplierRoutes(app: Express) {
   );
 
   // PATCH /api/suppliers/:id/stock-group — link/unlink a stock group from a supplier
-  app.patch("/api/suppliers/:id/stock-group", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/suppliers/:id/stock-group", requireAuth, requireNonPOS, async (req: any, res: any) => {
     try {
       const supplierId = parseInt(req.params.id);
       const { stockGroupId } = req.body; // null to unlink

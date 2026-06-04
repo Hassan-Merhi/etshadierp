@@ -420,9 +420,9 @@ export default function Analytics() {
   });
   // Suppliers are only used in the Container Report filter — defer until that section opens.
   const { data: suppliers = [] } = useQuery<Supplier[]>({ 
-    queryKey: ["/api/suppliers", selectedCompany?.id],
-    queryFn: async ({ queryKey }) => {
-      const response = await fetch(queryKey[0] as string, { credentials: "include" });
+    queryKey: ["/api/suppliers"],
+    queryFn: async () => {
+      const response = await fetch("/api/suppliers", { credentials: "include" });
       if (!response.ok) throw new Error("Failed to fetch suppliers");
       return response.json();
     },
