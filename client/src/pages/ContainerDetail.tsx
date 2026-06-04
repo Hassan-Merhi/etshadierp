@@ -952,26 +952,34 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
   }, 0);
 
   return (
-    <div className="space-y-4 p-3 sm:p-0">
-      <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-        <Link href={backUrl}>
-          <Button variant="ghost" size="icon" data-testid="button-back">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-        </Link>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-lg sm:text-2xl font-semibold truncate" data-testid="text-container-number">
-            Container {container.containerNumber}
-          </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground">
-            Imported on {formatDisplayDate(container.importDate)}
-          </p>
+    <div className="space-y-5 p-3 sm:p-0">
+      {/* ── Page header ── */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0">
+          <Link href={backUrl}>
+            <Button variant="ghost" size="icon" data-testid="button-back">
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+          </Link>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-bold truncate" data-testid="text-container-number">
+                Container {container.containerNumber}
+              </h1>
+              <Badge
+                variant={container.status === "OTW" ? "default" : container.status === "OFFLOADED" ? "secondary" : "outline"}
+                className="shrink-0"
+                data-testid="badge-status"
+              >
+                {container.status}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Imported on {formatDisplayDate(container.importDate)}
+            </p>
+          </div>
         </div>
-        <Badge variant={container.status === "OTW" ? "default" : "secondary"} data-testid="badge-status">
-          {container.status}
-        </Badge>
-      </div>
-      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
         {/* Actions dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -1085,6 +1093,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
           <span className="hidden sm:inline">Delete Container</span>
           <span className="sm:hidden">Delete</span>
         </Button>
+        </div>
       </div>
 
       {containerSale && (
@@ -1142,192 +1151,143 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Supplier</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-semibold" data-testid="text-supplier">
-              {supplier ? supplier.legalName : "Unknown"}
-            </div>
-            {supplier && (
-              <p className="text-xs text-muted-foreground">{supplier.code}</p>
-            )}
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="rounded-lg border bg-card p-4 space-y-1">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Supplier</p>
+          <p className="text-base font-semibold leading-tight" data-testid="text-supplier">
+            {supplier ? supplier.legalName : "—"}
+          </p>
+          {supplier && <p className="text-xs text-muted-foreground">{supplier.code}</p>}
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Items Total</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-items-total">
-              {formatAmount(itemsTotal)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {pos.reduce((sum: number, po: any) => sum + po.items.length, 0)} items in {pos.length} PO(s)
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-lg border bg-card p-4 space-y-1">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Items Total</p>
+          <p className="text-2xl font-bold tabular-nums" data-testid="text-items-total">{formatAmount(itemsTotal)}</p>
+          <p className="text-xs text-muted-foreground">
+            {pos.reduce((sum: number, po: any) => sum + po.items.length, 0)} items in {pos.length} PO(s)
+          </p>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Grand Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-grand-total">
-              {formatAmount(grandTotal)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Including {formatAmount(Math.abs(chargesTotal))} in charges
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-lg border bg-card p-4 space-y-1">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Grand Total</p>
+          <p className="text-2xl font-bold tabular-nums" data-testid="text-grand-total">{formatAmount(grandTotal)}</p>
+          {chargesTotal > 0 && (
+            <p className="text-xs text-muted-foreground">Including {formatAmount(Math.abs(chargesTotal))} in charges</p>
+          )}
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Purchase Orders & Items</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {pos.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">No purchase orders found</p>
-          ) : (
-            <div className="space-y-6">
-              {pos.map((po: any) => (
-                <div key={po.id} className="space-y-2">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <h3 className="text-base sm:text-lg font-semibold" data-testid={`text-po-${po.poNumber}`}>
-                      PO: {po.poNumber}
-                    </h3>
-                    <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-                      <div className="text-sm">
-                        <span className="text-muted-foreground">Currency: </span>
-                        <span className="font-medium">{po.currency}</span>
-                        <span className="text-muted-foreground ml-2 sm:ml-4">Total: </span>
-                        <span className="font-semibold">{formatAmount(po.itemsTotal)}</span>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setLocation(`/purchase-orders/${po.id}/edit`)}
-                        data-testid={`button-edit-po-${po.id}`}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeletePO(po.id, po.poNumber)}
-                        disabled={deletePOMutation.isPending}
-                        data-testid={`button-delete-po-${po.id}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+      <div className="space-y-1">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide px-0.5">Purchase Orders</h2>
+      </div>
+      {pos.length === 0 ? (
+        <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">No purchase orders found</div>
+      ) : (
+        <div className="space-y-4">
+          {pos.map((po: any) => (
+            <div key={po.id} className="rounded-lg border bg-card overflow-hidden">
+              {/* PO header bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3 bg-muted/40 border-b">
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-sm" data-testid={`text-po-${po.poNumber}`}>{po.poNumber}</span>
+                  <span className="text-xs text-muted-foreground">{po.currency}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold tabular-nums">{formatAmount(po.itemsTotal)}</span>
+                  <Button variant="ghost" size="icon" onClick={() => setLocation(`/purchase-orders/${po.id}/edit`)} data-testid={`button-edit-po-${po.id}`}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => handleDeletePO(po.id, po.poNumber)} disabled={deletePOMutation.isPending} data-testid={`button-delete-po-${po.id}`}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Items table — desktop */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Item Name</TableHead>
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Qty</TableHead>
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Rate</TableHead>
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {po.items.map((item: any) => (
+                      <TableRow key={item.id} data-testid={`row-item-${item.id}`} className="text-sm">
+                        <TableCell className="font-medium py-2">{item.itemName}</TableCell>
+                        <TableCell className="text-right tabular-nums py-2 text-muted-foreground">{item.quantity}</TableCell>
+                        <TableCell className="text-right tabular-nums py-2 text-muted-foreground">{formatAmount(item.rate)}</TableCell>
+                        <TableCell className="text-right tabular-nums py-2 font-semibold">{formatAmount(item.lineTotal)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Items — mobile */}
+              <div className="md:hidden divide-y">
+                {po.items.map((item: any) => (
+                  <div key={item.id} className="px-4 py-3 text-sm" data-testid={`row-item-${item.id}`}>
+                    <p className="font-medium mb-1.5">{item.itemName}</p>
+                    <div className="grid grid-cols-3 gap-2 text-muted-foreground text-xs">
+                      <div><span className="block">Qty</span><span className="font-mono font-medium text-foreground">{item.quantity}</span></div>
+                      <div><span className="block">Rate</span><span className="font-mono font-medium text-foreground">{formatAmount(item.rate)}</span></div>
+                      <div><span className="block">Total</span><span className="font-mono font-semibold text-foreground">{formatAmount(item.lineTotal)}</span></div>
                     </div>
                   </div>
+                ))}
+              </div>
 
-                  <div className="rounded-md border hidden md:block">
-                    <Table>
-                      <TableHeader className="sticky top-0 z-30 bg-background">
-                        <TableRow>
-                          <TableHead>Item Name</TableHead>
-                          <TableHead className="text-right">Quantity</TableHead>
-                          <TableHead className="text-right">Rate</TableHead>
-                          <TableHead className="text-right">Line Total</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {po.items.map((item: any) => (
-                          <TableRow key={item.id} data-testid={`row-item-${item.id}`}>
-                            <TableCell className="font-medium">{item.itemName}</TableCell>
-                            <TableCell className="text-right">{item.quantity}</TableCell>
-                            <TableCell className="text-right">{formatAmount(item.rate)}</TableCell>
-                            <TableCell className="text-right font-semibold">
-                              {formatAmount(item.lineTotal)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  <div className="md:hidden space-y-2">
-                    {po.items.map((item: any) => (
-                      <div key={item.id} className="p-3 rounded-md border text-sm" data-testid={`row-item-${item.id}`}>
-                        <div className="font-medium mb-1">{item.itemName}</div>
-                        <div className="grid grid-cols-3 gap-2 text-muted-foreground">
-                          <div>
-                            <div className="text-xs">Qty</div>
-                            <div className="font-mono">{item.quantity}</div>
-                          </div>
-                          <div>
-                            <div className="text-xs">Rate</div>
-                            <div className="font-mono">{formatAmount(item.rate)}</div>
-                          </div>
-                          <div>
-                            <div className="text-xs">Total</div>
-                            <div className="font-mono font-semibold">{formatAmount(item.lineTotal)}</div>
-                          </div>
-                        </div>
+              {/* Per-PO charges */}
+              {(() => {
+                const poCharges = [
+                  { label: "Freight", value: parseFloat(po.freight || "0") },
+                  { label: "Surcharge", value: parseFloat(po.surcharge || "0") },
+                  { label: "Fumigation", value: parseFloat(po.fumigation || "0") },
+                  { label: "Document Charges", value: parseFloat(po.documentCharges || "0") },
+                  { label: "Other Charges", value: parseFloat(po.otherCharges || "0") },
+                  { label: "Discount", value: -parseFloat(po.discount || "0") },
+                ].filter(c => Math.abs(c.value) > 0.001);
+                if (poCharges.length === 0) return null;
+                return (
+                  <div className="border-t bg-muted/20 px-4 py-3 space-y-1.5" data-testid={`po-charges-${po.id}`}>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Charges</p>
+                    {poCharges.map(c => (
+                      <div key={c.label} className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">{c.label}</span>
+                        <span className={`tabular-nums font-medium ${c.value < 0 ? "text-destructive" : ""}`}>{formatAmount(c.value)}</span>
                       </div>
                     ))}
                   </div>
+                );
+              })()}
+            </div>
+          ))}
+        </div>
+      )}
 
-                  {/* Per-PO charges: show any non-zero charge inline */}
-                  {(() => {
-                    const poCharges = [
-                      { label: "Freight", value: parseFloat(po.freight || "0") },
-                      { label: "Surcharge", value: parseFloat(po.surcharge || "0") },
-                      { label: "Fumigation", value: parseFloat(po.fumigation || "0") },
-                      { label: "Document Charges", value: parseFloat(po.documentCharges || "0") },
-                      { label: "Other Charges", value: parseFloat(po.otherCharges || "0") },
-                      { label: "Discount", value: -parseFloat(po.discount || "0") },
-                    ].filter(c => Math.abs(c.value) > 0.001);
-                    if (poCharges.length === 0) return null;
-                    return (
-                      <div className="mt-2 rounded-md border bg-muted/30 px-4 py-2 space-y-1" data-testid={`po-charges-${po.id}`}>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Charges</p>
-                        {poCharges.map(c => (
-                          <div key={c.label} className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">{c.label}</span>
-                            <span className={`font-mono font-medium ${c.value < 0 ? "text-red-500" : ""}`}>{formatAmount(c.value)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                </div>
-              ))}
+      <div className="rounded-lg border bg-card p-4 space-y-2">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Summary</p>
+        <div className="space-y-1.5 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Items Total</span>
+            <span className="tabular-nums font-medium">{formatAmount(itemsTotal)}</span>
+          </div>
+          {chargesTotal !== 0 && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Charges Total</span>
+              <span className="tabular-nums font-medium">{formatAmount(chargesTotal)}</span>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Summary</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Items Total:</span>
-              <span className="font-semibold">{formatAmount(itemsTotal)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Charges Total:</span>
-              <span className="font-semibold">{formatAmount(chargesTotal)}</span>
-            </div>
-            <div className="flex justify-between pt-2 border-t">
-              <span className="text-lg font-bold">Grand Total:</span>
-              <span className="text-lg font-bold">{formatAmount(grandTotal)}</span>
-            </div>
+          <div className="flex justify-between pt-2 border-t font-bold">
+            <span>Grand Total</span>
+            <span className="tabular-nums text-base">{formatAmount(grandTotal)}</span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <OffloadDialog
         open={showOffloadDialog}
