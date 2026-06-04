@@ -200,7 +200,22 @@ type ChatIntent =
   | "sales_query"
   | "excel_import"
   | "business_summary"
+  | "general_knowledge"
   | "general";
+
+// ── Smart provider routing regexes ────────────────────────────────────────────
+const RE_CODE_GEN = /\b(write (a |an |some )?(code|function|class|script|app|program|website|webpage|component|html page)|build (me )?(a |an )?(app|website|script|tool)|create (a |an )?(app|website|html|component|tool)|generate (a |an )?(html|css|script|app)|make (me )?(a |an )?(app|website|tool)|(html|css|javascript|typescript|python|react|nodejs?)\s+(code|snippet|example|template|app)|code (to|that|which)|how (to|do I) (code|program|write code|build))\b/i;
+const RE_NEWS_QUERY = /\b(latest news|current events|what.{0,25}happening (in|today|now|right now)|news (today|about|on)|recent (developments|events|news)|trending (now|today)|breaking news|what.{0,20}new (in|with|about)|today.{0,15}(news|events|headlines))\b/i;
+const RE_GENERAL_KNOWLEDGE = /^(hi|hello|hey|yo|sup|hiya|howdy)\b|\b(explain|what (is|are|was|were|does|did)|who (is|are|was|were)|how does|how do|how (can|should) (i|we)|why (is|are|does|do|was|were)|tell me about|write (a |an )?(story|poem|essay|email|letter|blog|article|report)|help me (understand|with|write|create)|translate|summarize|what does .{0,30} mean|give me (a |an )?(example|list|summary|idea)|best (way|practice|approach) to|pros and cons|difference between)\b/i;
+
+// Detect best provider for a given message — returns override or null (use admin setting)
+function detectSmartProvider(message: string, available: string[]): "gemini" | "chatgpt" | "grok" | null {
+  const has = (p: string) => available.includes(p);
+  if (RE_CODE_GEN.test(message) && has("chatgpt")) return "chatgpt";
+  if (RE_NEWS_QUERY.test(message) && has("grok")) return "grok";
+  if (/\b(analyz|statistic|math|calculat|formula|equation|data science|machine learning|science|chemistry|biology|physics|research)\b/i.test(message) && has("gemini")) return "gemini";
+  return null;
+}
 
 // ── Module-level intent regexes (shared between classifyChatIntent + chat) ────
 const RE_VOUCHER = /\b(create|make|record|add|post|enter|book)\b.{0,80}\b(payment|receipt|journal|voucher|entry|invoice|transaction)\b|\b(pay|paid|receive[d]?|collect[ed]?|transfer[red]?|deposit[ed]?)\b.{0,60}\$?\d|\b(journal|receipt|payment)\b.{0,40}\$?\d/i;
@@ -1280,7 +1295,10 @@ You can help with scenarios like:
 - Use bullet points for lists
 - Keep responses concise but informative
 
-Remember: You're talking to business owners who need actionable insights, not raw data dumps.`;
+Remember: You're talking to business owners who need actionable insights, not raw data dumps.
+
+## YOU ARE ALSO A GENERAL-PURPOSE AI
+Beyond this ERP data, you are capable of answering ANY question the user asks — general knowledge, coding, writing, math, science, news, creative tasks, or anything else. Never say "I can only help with ERP topics." If the user asks a non-ERP question, answer it fully and helpfully, then optionally note that you also have their business data available if needed.`;
 }
 
 function generateQuickSuggestions(context: ERPContext): string[] {
@@ -1349,6 +1367,15 @@ function classifyChatIntent(
   if (/\b(supplier|vendor|purchase order|po\b|container.{0,20}(arriv|transit|offload))\b/i.test(userMessage)) return "supplier_query";
   if (/\b(customer|client|receivable|owed by|owes|outstanding)\b/i.test(userMessage)) return "customer_query";
 
+  // General knowledge — only fire when message has NO ERP-specific context words
+  const hasERPTerms = /\b(our|my company|erp|stock item|supplier|purchase order|warehouse|voucher|ledger|invoice|inventory|selling price|location|container|shipment|bale|factory|payroll|worker|proforma)\b/i.test(userMessage);
+  if (!hasERPTerms) {
+    if (/^(hi|hello|hey|yo|sup|hiya|howdy|good (morning|evening|afternoon|night))\b/i.test(userMessage.trim())) return "general_knowledge";
+    if (RE_CODE_GEN.test(userMessage)) return "general_knowledge";
+    if (RE_NEWS_QUERY.test(userMessage)) return "general_knowledge";
+    if (RE_GENERAL_KNOWLEDGE.test(userMessage)) return "general_knowledge";
+  }
+
   return "general";
 }
 
@@ -1362,7 +1389,30 @@ const ACTION_INTENTS = new Set<ChatIntent>([
   "search_voucher",
   "account_query",
   "excel_import",
+  "general_knowledge",
 ]);
+
+function buildGeneralSystemPrompt(): string {
+  const today = new Date().toISOString().slice(0, 10);
+  return `You are a powerful AI assistant — combining the best of ChatGPT, Gemini, and Grok. Today is ${today}.
+
+You can help with ANYTHING the user asks:
+- **Code & Apps**: Write HTML/CSS/JavaScript apps, React components, Python scripts, algorithms, etc.
+- **General Knowledge**: Answer questions on any topic — science, history, geography, culture, etc.
+- **Writing**: Essays, emails, stories, summaries, translations, blog posts
+- **Math & Analysis**: Calculations, equations, statistics, data interpretation
+- **News & Current Events**: Recent developments and trends (note: knowledge cutoff may apply)
+- **Creative Work**: Ideas, brainstorming, creative writing, design advice
+- **ERP/Business Help**: If asked about inventory, sales, or business data, you can answer based on general knowledge or note that you'd need access to their ERP data for specifics
+
+When writing code:
+- Always use proper markdown code blocks with the language specified (e.g. \`\`\`html, \`\`\`javascript, \`\`\`python)
+- For complete mini-apps or web pages, write fully self-contained HTML files with embedded CSS and JavaScript in a single code block
+- Make code clean, readable, and functional
+- Add helpful inline comments
+
+Respond in the same language the user is writing in. Be direct, thorough, and genuinely helpful.`;
+}
 
 function buildActionSystemPrompt(intent: ChatIntent, pageContext?: { currentRoute?: string }): string {
   const today = new Date().toISOString().slice(0, 10);
@@ -1636,7 +1686,19 @@ export async function chat(
     let systemPrompt: string;
     let suggestions: string[];
 
-    if (isActionIntent) {
+    if (intent === "general_knowledge") {
+      // General knowledge: skip ERP context entirely, use open-ended ChatGPT-style prompt
+      systemPrompt = buildGeneralSystemPrompt();
+      suggestions = [
+        "Write me a simple HTML calculator app",
+        "Explain how machine learning works",
+        "What's the latest in AI?",
+        "Write a Python script to sort a list",
+        "Help me write a professional email",
+        "What are the pros and cons of React vs Vue?",
+      ];
+      console.log("[ChatService] general_knowledge intent — skipping ERP context");
+    } else if (isActionIntent) {
       // Action intents: skip the expensive full-context load, use a light prompt
       systemPrompt = buildActionSystemPrompt(intent, pageContext);
       suggestions = [];
@@ -1668,10 +1730,12 @@ export async function chat(
       }
     }
 
-    // Get selected provider and call with fallback
-    const selectedProvider = await getSelectedAIProvider();
-    console.log(`[ChatService] Selected provider: ${selectedProvider}, Available: ${available.join(", ")}`);
-    
+    // Get selected provider; smart-route if the question type has a best-fit AI
+    const adminProvider = await getSelectedAIProvider();
+    const smartOverride = detectSmartProvider(userMessage, available);
+    const selectedProvider = smartOverride ?? adminProvider;
+    console.log(`[ChatService] Provider: ${selectedProvider} (smart=${smartOverride ?? "none"}, admin=${adminProvider}), Available: ${available.join(", ")}`);
+
     const aiStart = Date.now();
     const { response, usedProvider } = await callAIWithFallback(
       selectedProvider,

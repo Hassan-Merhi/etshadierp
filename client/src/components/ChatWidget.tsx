@@ -36,6 +36,10 @@ import {
   ArrowLeftRight,
   TrendingUp,
   Circle,
+  Copy,
+  Eye,
+  EyeOff,
+  Cpu,
 } from "lucide-react";
 import {
   Select,
@@ -227,6 +231,7 @@ interface DataQueryResult {
 interface ChatResponse {
   response: string;
   suggestions: string[];
+  provider?: string;
   voucherDraft?: VoucherDraft | null;
   stockAdjustmentDraft?: StockAdjustmentDraft | null;
   stockTransferDraft?: StockTransferDraft | null;
@@ -1770,6 +1775,80 @@ function DataQueryResultCard({ result, onDismiss }: { result: DataQueryResult; o
   );
 }
 
+// ── Provider display helpers ─────────────────────────────────────────
+const PROVIDER_LABELS: Record<string, string> = {
+  chatgpt: "ChatGPT",
+  gemini: "Gemini",
+  grok: "Grok",
+};
+
+// ── Inline Code Block with copy + live preview ───────────────────────
+function CodeBlock({ code, lang }: { code: string; lang: string }) {
+  const [copied, setCopied] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const normalizedLang = lang.toLowerCase().trim();
+  const isPreviewable = ["html", "htm", "javascript", "js"].includes(normalizedLang);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const getPreviewSrcdoc = () => {
+    if (normalizedLang === "javascript" || normalizedLang === "js") {
+      return `<!DOCTYPE html><html><body><script>\n${code}\n<\/script></body></html>`;
+    }
+    return code;
+  };
+
+  return (
+    <div className="my-2 rounded-md border border-border overflow-hidden text-left">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-muted/60 border-b border-border gap-2">
+        <span className="text-xs font-mono text-muted-foreground">{normalizedLang || "code"}</span>
+        <div className="flex items-center gap-1">
+          {isPreviewable && (
+            <button
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-0.5 rounded hover:bg-muted"
+              onClick={() => setShowPreview(v => !v)}
+              type="button"
+            >
+              {showPreview ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+              {showPreview ? "Hide" : "Preview"}
+            </button>
+          )}
+          <button
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-0.5 rounded hover:bg-muted"
+            onClick={handleCopy}
+            type="button"
+          >
+            {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+            {copied ? "Copied!" : "Copy"}
+          </button>
+        </div>
+      </div>
+      <pre className="overflow-x-auto p-3 text-xs font-mono bg-zinc-950 dark:bg-zinc-900 text-zinc-100 leading-relaxed m-0">
+        <code>{code}</code>
+      </pre>
+      {showPreview && isPreviewable && (
+        <div className="border-t border-border">
+          <div className="px-3 py-1.5 bg-muted/40 text-xs text-muted-foreground flex items-center gap-1.5">
+            <Eye className="h-3 w-3" />
+            Live Preview
+          </div>
+          <iframe
+            srcDoc={getPreviewSrcdoc()}
+            className="w-full bg-white"
+            style={{ height: "280px", border: "none" }}
+            sandbox="allow-scripts allow-same-origin"
+            title="Code preview"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main ChatWidget ──────────────────────────────────────────────────
 export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -1800,6 +1879,7 @@ export function ChatWidget() {
   const [dataQueryResult, setDataQueryResult] = useState<DataQueryResult | null>(null);
   const [pendingStockTransfer, setPendingStockTransfer] = useState<StockTransferDraft | null>(null);
   const [stockTransferSubmitting, setStockTransferSubmitting] = useState(false);
+  const [lastUsedProvider, setLastUsedProvider] = useState<string | null>(null);
   const [location] = useLocation();
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -1828,6 +1908,7 @@ export function ChatWidget() {
     onSuccess: (data) => {
       refetchHistory();
       setMessage("");
+      if (data.provider) setLastUsedProvider(data.provider);
       if (data.suggestions && data.suggestions.length > 0) {
         setSuggestions(data.suggestions);
       }
@@ -2282,9 +2363,9 @@ export function ChatWidget() {
                     <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                       <Bot className="h-8 w-8 text-primary" />
                     </div>
-                    <h3 className="font-semibold text-lg mb-1">Hello! I'm your ERP Assistant</h3>
+                    <h3 className="font-semibold text-lg mb-1">Hello! I'm your AI Assistant</h3>
                     <p className="text-sm text-muted-foreground mb-4 max-w-[280px]">
-                      I can help you with inventory, sales, finances, and business insights.
+                      Ask me anything — ERP data, code, general questions, or have me build you a mini app.
                     </p>
 
                     <div className="w-full space-y-2">
@@ -2369,15 +2450,18 @@ export function ChatWidget() {
                                   ),
                                   code: ({ children, className }) => {
                                     const isInline = !className;
-                                    return isInline ? (
-                                      <code className="bg-background/50 px-1 py-0.5 rounded text-xs font-mono">
-                                        {children}
-                                      </code>
-                                    ) : (
-                                      <code className="block bg-background/50 p-2 rounded text-xs font-mono overflow-x-auto">
-                                        {children}
-                                      </code>
-                                    );
+                                    if (isInline) {
+                                      return (
+                                        <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">
+                                          {children}
+                                        </code>
+                                      );
+                                    }
+                                    const lang = (className ?? "").replace("language-", "");
+                                    const codeStr = Array.isArray(children)
+                                      ? children.join("")
+                                      : String(children ?? "");
+                                    return <CodeBlock code={codeStr.replace(/\n$/, "")} lang={lang} />;
                                   },
                                   strong: ({ children }) => (
                                     <strong className="font-semibold">{children}</strong>
@@ -2393,7 +2477,7 @@ export function ChatWidget() {
                         </div>
 
                         {msg.role === "assistant" && (
-                          <div className="flex items-center gap-1 mt-1 ml-1">
+                          <div className="flex items-center gap-1 mt-1 ml-1 flex-wrap">
                             <Button
                               variant="ghost"
                               size="icon"
@@ -2420,6 +2504,15 @@ export function ChatWidget() {
                             >
                               <ThumbsDown className="h-3 w-3" />
                             </Button>
+                            {lastUsedProvider && history[history.length - 1]?.id === msg.id && (
+                              <span
+                                className="flex items-center gap-1 text-[10px] text-muted-foreground/70 ml-1"
+                                data-testid={`provider-badge-${msg.id}`}
+                              >
+                                <Cpu className="h-2.5 w-2.5" />
+                                {PROVIDER_LABELS[lastUsedProvider] ?? lastUsedProvider}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
