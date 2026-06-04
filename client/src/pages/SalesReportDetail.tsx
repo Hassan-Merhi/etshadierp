@@ -509,19 +509,19 @@ export default function SalesReportDetail() {
                       <TableRow>
                         <TableHead className="w-6"></TableHead>
                         <TableHead>Location</TableHead>
-                        <TableHead className="text-right">Items</TableHead>
                         <TableHead className="text-right">Qty</TableHead>
+                        <TableHead className="text-right">Price / Bale</TableHead>
                         <TableHead className="text-right">Total Sales</TableHead>
-                        <TableHead className="text-right">Total Cost</TableHead>
-                        <TableHead className="text-right">Cost Profit</TableHead>
-                        <TableHead className="text-right">Cost Price</TableHead>
+                        <TableHead className="text-right">Hassan's Price</TableHead>
                         <TableHead className="text-right">Hassan's Profit</TableHead>
-                        <TableHead className="text-right">Config Price</TableHead>
+                        <TableHead className="text-right">Cost Price</TableHead>
+                        <TableHead className="text-right">Cost Profit</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {voucherGroups.map((vg) => {
                         const isExpanded = expandedVouchers.has(vg.voucherId);
+                        const groupPricePerBale = vg.totalQty > 0 ? vg.totalSales / vg.totalQty : 0;
                         return (
                           <>
                             <TableRow
@@ -536,37 +536,40 @@ export default function SalesReportDetail() {
                                   : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                               </TableCell>
                               <TableCell className="py-2 text-sm text-muted-foreground">{vg.locationName}</TableCell>
-                              <TableCell className="text-right font-mono py-2 text-muted-foreground">{vg.items.length}</TableCell>
                               <TableCell className="text-right font-mono py-2">{formatNumber(vg.totalQty)}</TableCell>
+                              <TableCell className="text-right font-mono py-2 text-muted-foreground">{formatAmount(groupPricePerBale)}</TableCell>
                               <TableCell className="text-right font-mono py-2">{formatAmount(vg.totalSales)}</TableCell>
-                              <TableCell className="text-right font-mono py-2">{formatAmount(vg.totalCost)}</TableCell>
-                              <TableCell className={`text-right font-mono py-2 ${profitColor(vg.costProfit)}`}>
-                                {formatAmount(Math.abs(vg.costProfit))}
-                              </TableCell>
                               <TableCell className="text-right font-mono py-2 text-muted-foreground">—</TableCell>
                               <TableCell className={`text-right font-mono py-2 ${profitColor(vg.configuredProfit)}`}>
                                 {formatAmount(Math.abs(vg.configuredProfit))}
                               </TableCell>
                               <TableCell className="text-right font-mono py-2 text-muted-foreground">—</TableCell>
+                              <TableCell className={`text-right font-mono py-2 ${profitColor(vg.costProfit)}`}>
+                                {formatAmount(Math.abs(vg.costProfit))}
+                              </TableCell>
                             </TableRow>
-                            {isExpanded && vg.items.map((item) => (
+                            {isExpanded && vg.items.map((item) => {
+                              const qty = parseFloat(item.quantity) || 0;
+                              const itemSales = parseFloat(String(item.totalSales)) || 0;
+                              const pricePerBale = qty > 0 ? itemSales / qty : 0;
+                              return (
                                 <TableRow key={item.id} data-testid={`row-vitem-${item.id}`} className="text-xs bg-muted/10">
                                   <TableCell className="py-1 w-6"></TableCell>
-                                  <TableCell className="py-1 pl-6 text-muted-foreground" colSpan={2}>{item.stockItemName}</TableCell>
-                                  <TableCell></TableCell>
+                                  <TableCell className="py-1 pl-6 text-muted-foreground">{item.stockItemName}</TableCell>
                                   <TableCell className="text-right font-mono py-1">{formatNumericValue(item.quantity)}</TableCell>
+                                  <TableCell className="text-right font-mono py-1">{formatAmount(pricePerBale)}</TableCell>
                                   <TableCell className="text-right font-mono py-1">{formatAmount(item.totalSales)}</TableCell>
-                                  <TableCell className="text-right font-mono py-1">{formatAmount(item.totalCost)}</TableCell>
-                                  <TableCell className={`text-right font-mono py-1 ${profitColor(parseFloat(item.costProfit))}`}>
-                                    {formatAmount(Math.abs(parseFloat(item.costProfit)))}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono py-1">{formatAmount(item.costPrice)}</TableCell>
+                                  <TableCell className="text-right font-mono py-1">{formatAmount(item.configuredSellingPrice)}</TableCell>
                                   <TableCell className={`text-right font-mono py-1 ${profitColor(item.configuredProfit)}`}>
                                     {formatAmount(Math.abs(item.configuredProfit))}
                                   </TableCell>
-                                  <TableCell className="text-right font-mono py-1">{formatAmount(item.configuredSellingPrice)}</TableCell>
+                                  <TableCell className="text-right font-mono py-1">{formatAmount(item.costPrice)}</TableCell>
+                                  <TableCell className={`text-right font-mono py-1 ${profitColor(parseFloat(item.costProfit))}`}>
+                                    {formatAmount(Math.abs(parseFloat(item.costProfit)))}
+                                  </TableCell>
                                 </TableRow>
-                            ))}
+                              );
+                            })}
                           </>
                         );
                       })}
@@ -574,22 +577,21 @@ export default function SalesReportDetail() {
                     <TableFooter className="sticky bottom-0 bg-background border-t">
                       <TableRow className="font-semibold">
                         <TableCell></TableCell>
-                        <TableCell colSpan={2}>
+                        <TableCell>
                           Total ({voucherGroups.length} sale{voucherGroups.length !== 1 ? "s" : ""}
                           {plFilter !== "all" ? `, ${plFilter === "gain" ? "gaining" : "losing"} only` : ""})
                         </TableCell>
-                        <TableCell></TableCell>
                         <TableCell className="text-right font-mono">{formatNumber(voucherGroups.reduce((s, v) => s + v.totalQty, 0))}</TableCell>
+                        <TableCell></TableCell>
                         <TableCell className="text-right font-mono">{formatAmount(voucherGroups.reduce((s, v) => s + v.totalSales, 0))}</TableCell>
-                        <TableCell className="text-right font-mono">{formatAmount(voucherGroups.reduce((s, v) => s + v.totalCost, 0))}</TableCell>
-                        <TableCell className={`text-right font-mono ${profitColor(voucherGroups.reduce((s, v) => s + v.costProfit, 0))}`}>
-                          {formatAmount(Math.abs(voucherGroups.reduce((s, v) => s + v.costProfit, 0)))}
-                        </TableCell>
                         <TableCell></TableCell>
                         <TableCell className={`text-right font-mono ${profitColor(voucherGroups.reduce((s, v) => s + v.configuredProfit, 0))}`}>
                           {formatAmount(Math.abs(voucherGroups.reduce((s, v) => s + v.configuredProfit, 0)))}
                         </TableCell>
                         <TableCell></TableCell>
+                        <TableCell className={`text-right font-mono ${profitColor(voucherGroups.reduce((s, v) => s + v.costProfit, 0))}`}>
+                          {formatAmount(Math.abs(voucherGroups.reduce((s, v) => s + v.costProfit, 0)))}
+                        </TableCell>
                       </TableRow>
                     </TableFooter>
                   </Table>
@@ -599,6 +601,7 @@ export default function SalesReportDetail() {
                 <div className="md:hidden space-y-3 p-3">
                   {voucherGroups.map((vg) => {
                     const isExpanded = expandedVouchers.has(vg.voucherId);
+                    const groupPpb = vg.totalQty > 0 ? vg.totalSales / vg.totalQty : 0;
                     return (
                       <div key={vg.voucherId}>
                         <Card
@@ -618,31 +621,40 @@ export default function SalesReportDetail() {
                             </div>
                             <div className="grid grid-cols-2 gap-1 text-xs">
                               <div><span className="text-muted-foreground">Qty: </span><span className="font-mono">{formatNumber(vg.totalQty)}</span></div>
-                              <div><span className="text-muted-foreground">Sales: </span><span className="font-mono">{formatAmount(vg.totalSales)}</span></div>
+                              <div><span className="text-muted-foreground">Price/Bale: </span><span className="font-mono">{formatAmount(groupPpb)}</span></div>
+                              <div><span className="text-muted-foreground">Total Sales: </span><span className="font-mono">{formatAmount(vg.totalSales)}</span></div>
                             </div>
                             <div className="flex items-center justify-between gap-2 pt-1 border-t text-xs">
-                              <span className={`font-mono font-semibold ${profitColor(vg.costProfit)}`}>
-                                Cost P/L: {formatAmount(Math.abs(vg.costProfit))}
-                              </span>
                               <span className={`font-mono font-semibold ${profitColor(vg.configuredProfit)}`}>
                                 Hassan's P/L: {formatAmount(Math.abs(vg.configuredProfit))}
+                              </span>
+                              <span className={`font-mono font-semibold ${profitColor(vg.costProfit)}`}>
+                                Cost P/L: {formatAmount(Math.abs(vg.costProfit))}
                               </span>
                             </div>
                           </CardContent>
                         </Card>
                         {isExpanded && (
                           <div className="border border-t-0 rounded-b-md p-2 space-y-1 bg-muted/10">
-                            {vg.items.map((item) => (
-                              <div key={item.id} className="text-xs p-1 border-b last:border-b-0">
-                                <div className="font-medium">{item.stockItemName}</div>
-                                <div className="grid grid-cols-2 gap-1 mt-1">
-                                  <div><span className="text-muted-foreground">Qty: </span><span className="font-mono">{formatNumericValue(item.quantity)}</span></div>
-                                  <div><span className="text-muted-foreground">Sales: </span><span className="font-mono">{formatAmount(item.totalSales)}</span></div>
-                                  <div className={`font-mono ${profitColor(parseFloat(item.costProfit))}`}>Cost P/L: {formatAmount(Math.abs(parseFloat(item.costProfit)))}</div>
-                                  <div className={`font-mono ${profitColor(item.configuredProfit)}`}>Hassan's: {formatAmount(Math.abs(item.configuredProfit))}</div>
+                            {vg.items.map((item) => {
+                              const qty = parseFloat(item.quantity) || 0;
+                              const sales = parseFloat(String(item.totalSales)) || 0;
+                              const ppb = qty > 0 ? sales / qty : 0;
+                              return (
+                                <div key={item.id} className="text-xs p-1 border-b last:border-b-0">
+                                  <div className="font-medium">{item.stockItemName}</div>
+                                  <div className="grid grid-cols-2 gap-1 mt-1">
+                                    <div><span className="text-muted-foreground">Qty: </span><span className="font-mono">{formatNumericValue(item.quantity)}</span></div>
+                                    <div><span className="text-muted-foreground">Price/Bale: </span><span className="font-mono">{formatAmount(ppb)}</span></div>
+                                    <div><span className="text-muted-foreground">Sales: </span><span className="font-mono">{formatAmount(item.totalSales)}</span></div>
+                                    <div><span className="text-muted-foreground">H. Price: </span><span className="font-mono">{formatAmount(item.configuredSellingPrice)}</span></div>
+                                    <div className={`font-mono ${profitColor(item.configuredProfit)}`}>Hassan's: {formatAmount(Math.abs(item.configuredProfit))}</div>
+                                    <div><span className="text-muted-foreground">Cost Price: </span><span className="font-mono">{formatAmount(item.costPrice)}</span></div>
+                                    <div className={`font-mono ${profitColor(parseFloat(item.costProfit))}`}>Cost P/L: {formatAmount(Math.abs(parseFloat(item.costProfit)))}</div>
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </div>
