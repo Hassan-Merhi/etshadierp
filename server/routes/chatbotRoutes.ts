@@ -250,7 +250,7 @@ export function registerChatbotRoutes(app: Express) {
 
       const history = await getAllChatHistory(companyId, 200);
       
-      // Enrich with username
+      // Enrich with username and role
       const userIds = Array.from(new Set(history.map(h => h.userId)));
       const usersList = userIds.length > 0 
         ? await db.select({ id: users.id, username: users.username })
@@ -259,8 +259,28 @@ export function registerChatbotRoutes(app: Express) {
         : [];
       
       const userMap = new Map(usersList.map(u => [u.id, u.username]));
-      
-      const enrichedHistory = history.map(h => ({
+
+      // Fetch roles for all message authors in this company
+      let developerUserIds = new Set<string>();
+      if (userIds.length > 0) {
+        const roleRows = await db
+          .select({ userId: userCompanyRoles.userId, role: userCompanyRoles.role })
+          .from(userCompanyRoles)
+          .where(and(
+            eq(userCompanyRoles.companyId, companyId),
+            eq(userCompanyRoles.role, "Developer"),
+            inArray(userCompanyRoles.userId, userIds.map(Number)),
+          ));
+        developerUserIds = new Set(roleRows.map(r => String(r.userId)));
+      }
+
+      // Admin/Owner cannot see Developer users' chats; Developer can see everything
+      const isDeveloper = userRole === "Developer";
+      const filteredHistory = isDeveloper
+        ? history
+        : history.filter(h => !developerUserIds.has(String(h.userId)));
+
+      const enrichedHistory = filteredHistory.map(h => ({
         ...h,
         username: userMap.get(h.userId) || "Unknown",
       }));
@@ -315,12 +335,46 @@ export function registerChatbotRoutes(app: Express) {
 
       const { sessionId } = req.params;
 
-      const isAdmin = userRole === "Admin" || userRole === "Owner";
-      const whereClause = isAdmin
-        ? and(eq(chatMessages.sessionId, sessionId), eq(chatMessages.companyId, companyId))
-        : and(eq(chatMessages.sessionId, sessionId), eq(chatMessages.userId, String(userId)));
+      const isDeveloper = userRole === "Developer";
+      const isAdminOrOwner = userRole === "Admin" || userRole === "Owner";
 
-      await db.delete(chatMessages).where(whereClause);
+      // Determine session owner
+      const sessionOwnerRow = await db
+        .select({ userId: chatMessages.userId })
+        .from(chatMessages)
+        .where(and(eq(chatMessages.sessionId, sessionId), eq(chatMessages.companyId, companyId)))
+        .limit(1);
+
+      if (sessionOwnerRow.length === 0) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+
+      const ownerUserId = sessionOwnerRow[0].userId;
+
+      // Admin/Owner cannot delete Developer users' sessions
+      if (isAdminOrOwner && !isDeveloper) {
+        const ownerRoleRow = await db
+          .select({ role: userCompanyRoles.role })
+          .from(userCompanyRoles)
+          .where(and(
+            eq(userCompanyRoles.companyId, companyId),
+            eq(userCompanyRoles.userId, Number(ownerUserId)),
+            eq(userCompanyRoles.role, "Developer"),
+          ))
+          .limit(1);
+        if (ownerRoleRow.length > 0) {
+          return res.status(403).json({ message: "Cannot delete a Developer's conversation" });
+        }
+      }
+
+      // Regular users can only delete their own sessions
+      if (!isDeveloper && !isAdminOrOwner && ownerUserId !== String(userId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      await db.delete(chatMessages).where(
+        and(eq(chatMessages.sessionId, sessionId), eq(chatMessages.companyId, companyId))
+      );
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
