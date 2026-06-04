@@ -664,9 +664,8 @@ export default function SupplierProfitCheck() {
 
         {/* Data Table */}
         {loaded && (
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader className="sticky top-0 z-20 bg-background">
+          <Table wrapperClassName="max-h-[calc(100vh-320px)]">
+              <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow className="bg-muted/50">
                   <TableHead className="min-w-[90px]">Code</TableHead>
                   <TableHead className="min-w-[200px]">Name</TableHead>
@@ -753,8 +752,7 @@ export default function SupplierProfitCheck() {
                   })
                 )}
               </TableBody>
-            </Table>
-          </div>
+          </Table>
         )}
 
         {/* Empty states */}
