@@ -3813,6 +3813,28 @@ let migrationsDone = false;
     // Increase factory_containers rate_per_kg / rate_per_kg_usd precision to 7 decimal places
     `ALTER TABLE factory_containers ALTER COLUMN rate_per_kg TYPE DECIMAL(20,7)`,
     `ALTER TABLE factory_containers ALTER COLUMN rate_per_kg_usd TYPE DECIMAL(20,7)`,
+    // Clean up orphaned OFFLOAD_RAW_STOCK daybook entries for already soft-deleted raw stock receipts
+    `DELETE FROM factory_daybook_entries
+       WHERE tx_type = 'OFFLOAD_RAW_STOCK'
+         AND reference_id IN (SELECT id FROM factory_raw_stock WHERE deleted_at IS NOT NULL)`,
+    // Clean up orphaned OFFLOAD_RAW_STOCK daybook entries for already soft-deleted adjustments
+    `DELETE FROM factory_daybook_entries
+       WHERE tx_type = 'OFFLOAD_RAW_STOCK'
+         AND reference_id IN (SELECT id FROM factory_raw_material_adjustments WHERE deleted_at IS NOT NULL)`,
+    // Clean up vouchers for already soft-deleted adjustments (FACTORY-MANUAL-{id}-* pattern)
+    `DELETE FROM voucher_entries
+       WHERE voucher_id IN (
+         SELECT v.id FROM vouchers v
+         JOIN factory_raw_material_adjustments a ON v.voucher_number LIKE 'FACTORY-MANUAL-' || a.id || '-%'
+         WHERE v.source_module = 'FACTORY' AND a.deleted_at IS NOT NULL
+       )`,
+    `DELETE FROM vouchers
+       WHERE source_module = 'FACTORY'
+         AND id IN (
+           SELECT v.id FROM vouchers v
+           JOIN factory_raw_material_adjustments a ON v.voucher_number LIKE 'FACTORY-MANUAL-' || a.id || '-%'
+           WHERE a.deleted_at IS NOT NULL
+         )`,
     // Clean up orphaned factory daybook entries for already soft-deleted containers
     `DELETE FROM factory_daybook_entries
        WHERE tx_type IN ('FREIGHT','OTHER_CHARGE','DUTY','CONTAINER_IMPORT','PURCHASE')

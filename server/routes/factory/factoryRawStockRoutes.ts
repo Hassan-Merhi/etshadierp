@@ -930,10 +930,31 @@ export function registerFactoryRawStockRoutes(app: Express) {
             ));
         });
       } else {
-        // For ADD / REMOVE: soft-delete (vouchers and daybook stay intact)
-        await db.update(factoryRawMaterialAdjustments)
-          .set({ deletedAt: new Date() })
-          .where(and(eq(factoryRawMaterialAdjustments.id, id), eq(factoryRawMaterialAdjustments.companyId, companyId)));
+        // For ADD / REMOVE: soft-delete + clean up linked daybook entries and vouchers
+        await db.transaction(async (tx: any) => {
+          await tx.update(factoryRawMaterialAdjustments)
+            .set({ deletedAt: new Date() })
+            .where(and(eq(factoryRawMaterialAdjustments.id, id), eq(factoryRawMaterialAdjustments.companyId, companyId)));
+
+          // Delete linked OFFLOAD_RAW_STOCK daybook entry (referenceId = adjustment id)
+          await tx.delete(factoryDaybookEntries).where(and(
+            eq(factoryDaybookEntries.companyId, companyId),
+            eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
+            eq(factoryDaybookEntries.referenceId, id)
+          ));
+
+          // Delete linked voucher (pattern: FACTORY-MANUAL-{id}-*)
+          const linkedVouchers = await tx.select({ id: vouchers.id }).from(vouchers).where(and(
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.sourceModule, "FACTORY"),
+            ilike(vouchers.voucherNumber, `FACTORY-MANUAL-${id}-%`)
+          ));
+          if (linkedVouchers.length > 0) {
+            const vIds = linkedVouchers.map((v: any) => v.id);
+            await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
+            await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
+          }
+        });
       }
 
       res.json({ success: true });
@@ -1040,10 +1061,19 @@ export function registerFactoryRawStockRoutes(app: Express) {
         });
       }
 
-      // Soft-delete (recoverable from Settings → Deleted Items)
-      await db.update(factoryRawStock)
-        .set({ deletedAt: new Date() })
-        .where(and(eq(factoryRawStock.id, rawStockId), eq(factoryRawStock.companyId, companyId)));
+      await db.transaction(async (tx: any) => {
+        // Soft-delete the raw stock record
+        await tx.update(factoryRawStock)
+          .set({ deletedAt: new Date() })
+          .where(and(eq(factoryRawStock.id, rawStockId), eq(factoryRawStock.companyId, companyId)));
+
+        // Delete linked OFFLOAD_RAW_STOCK daybook entry
+        await tx.delete(factoryDaybookEntries).where(and(
+          eq(factoryDaybookEntries.companyId, companyId),
+          eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
+          eq(factoryDaybookEntries.referenceId, rawStockId)
+        ));
+      });
 
       res.json({ success: true });
     } catch (error: any) {
