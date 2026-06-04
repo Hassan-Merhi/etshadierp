@@ -78,10 +78,10 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
   const supplierNameMap: Record<number, string> = {};
   for (const s of allSuppliers) supplierNameMap[(s as any).id] = (s as any).name;
 
-  // Containers — exclude OTW unless caller opts in
+  // Containers — exclude OTW unless caller opts in; always exclude soft-deleted
   const containersWhereClause = includeOtw
-    ? and(eq(factoryContainers.companyId, companyId), inArray(factoryContainers.supplierId, allSupplierIds))
-    : and(eq(factoryContainers.companyId, companyId), inArray(factoryContainers.supplierId, allSupplierIds), sql`${factoryContainers.status} NOT IN ('PENDING', 'IN_TRANSIT')`);
+    ? and(eq(factoryContainers.companyId, companyId), inArray(factoryContainers.supplierId, allSupplierIds), isNull(factoryContainers.deletedAt))
+    : and(eq(factoryContainers.companyId, companyId), inArray(factoryContainers.supplierId, allSupplierIds), isNull(factoryContainers.deletedAt), sql`${factoryContainers.status} NOT IN ('PENDING', 'IN_TRANSIT')`);
   const allContainers = allSupplierIds.length > 0
     ? await db.select().from(factoryContainers)
         .where(containersWhereClause)
@@ -408,7 +408,8 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
         .where(and(
           eq(factoryContainers.companyId, companyId),
           sql`${factoryContainers.otherChargesSupplierId} = ANY(${sqlArray(allSupplierIds)})`,
-          sql`${factoryContainers.otherCharges}::numeric > 0`
+          sql`${factoryContainers.otherCharges}::numeric > 0`,
+          isNull(factoryContainers.deletedAt)
         ))
     : [];
 
@@ -2139,8 +2140,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
 
       const includeOtw = req.query.includeOtw === "true";
       const containersWhere = includeOtw
-        ? and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.supplierId, supplierId))
-        : and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.supplierId, supplierId), sql`${factoryContainers.status} NOT IN ('PENDING', 'IN_TRANSIT')`);
+        ? and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.supplierId, supplierId), isNull(factoryContainers.deletedAt))
+        : and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.supplierId, supplierId), isNull(factoryContainers.deletedAt), sql`${factoryContainers.status} NOT IN ('PENDING', 'IN_TRANSIT')`);
       const containers = await db
         .select()
         .from(factoryContainers)
@@ -2166,7 +2167,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
         .where(and(
           eq(factoryContainers.companyId, companyId),
           eq((factoryContainers as any).commissionSupplierId, supplierId),
-          sql`${factoryContainers.supplierId} != ${supplierId}`
+          sql`${factoryContainers.supplierId} != ${supplierId}`,
+          isNull(factoryContainers.deletedAt)
         ))
         .orderBy(desc(factoryContainers.createdAt));
       const brokerContainers = (brokerContainerRows as any[]).filter((c: any) => parseFloat(c.commissionAmount || "0") > 0);
