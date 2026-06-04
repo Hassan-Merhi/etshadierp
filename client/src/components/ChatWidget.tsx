@@ -1894,6 +1894,13 @@ function computeLineDiff(original: string, modified: string): DiffLine[] {
   return result;
 }
 
+interface PushResult {
+  success: boolean;
+  commitHash?: string;
+  branch?: string;
+  error?: string;
+}
+
 interface FileDiffCardProps {
   draft: FilePatchDraft;
   onApply: () => void;
@@ -1902,9 +1909,10 @@ interface FileDiffCardProps {
   appliedFile: string | null;
   onGitPush: (commitMsg: string) => void;
   isPushing: boolean;
+  pushResult: PushResult | null;
 }
 
-function FileDiffCard({ draft, onApply, onCancel, isApplying, appliedFile, onGitPush, isPushing }: FileDiffCardProps) {
+function FileDiffCard({ draft, onApply, onCancel, isApplying, appliedFile, onGitPush, isPushing, pushResult }: FileDiffCardProps) {
   const [commitMsg, setCommitMsg] = useState(draft.description);
   const [showFullDiff, setShowFullDiff] = useState(false);
   const isApplied = appliedFile === draft.filePath;
@@ -2019,7 +2027,34 @@ function FileDiffCard({ draft, onApply, onCancel, isApplying, appliedFile, onGit
         <div className="px-3 py-3 text-xs text-muted-foreground">No changes detected.</div>
       )}
 
-      {isApplied ? (
+      {pushResult ? (
+        <div className="border-t border-border bg-muted/20 px-3 py-3 space-y-1.5">
+          {pushResult.success ? (
+            <div className="flex items-start gap-2 text-sm text-green-600 dark:text-green-400">
+              <Check className="h-4 w-4 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-medium">Pushed to GitHub</span>
+                {(pushResult.commitHash || pushResult.branch) && (
+                  <span className="text-xs text-muted-foreground ml-2 font-mono">
+                    {pushResult.branch}{pushResult.commitHash ? ` @ ${pushResult.commitHash}` : ""}
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-start gap-2 text-sm text-destructive">
+              <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-medium">Push failed: </span>
+                <span className="text-xs">{pushResult.error}</span>
+              </div>
+            </div>
+          )}
+          <Button size="sm" variant="ghost" onClick={onCancel} className="mt-1">
+            Dismiss
+          </Button>
+        </div>
+      ) : isApplied ? (
         <div className="border-t border-border bg-muted/20 px-3 py-2 space-y-2">
           <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
             <Check className="h-3.5 w-3.5" />
@@ -2091,6 +2126,7 @@ export function ChatWidget() {
   const [patchApplying, setPatchApplying] = useState(false);
   const [appliedPatchFile, setAppliedPatchFile] = useState<string | null>(null);
   const [gitPushing, setGitPushing] = useState(false);
+  const [gitPushResult, setGitPushResult] = useState<PushResult | null>(null);
   const [location] = useLocation();
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -2345,6 +2381,7 @@ export function ChatWidget() {
   const handleGitPush = async (commitMsg: string) => {
     if (!appliedPatchFile) return;
     setGitPushing(true);
+    setGitPushResult(null);
     try {
       const res = await apiRequest("POST", "/api/chatbot/git-push", {
         files: [appliedPatchFile],
@@ -2352,15 +2389,12 @@ export function ChatWidget() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        sendMutation.mutate(`Git push failed: ${data.error ?? data.message ?? "Unknown error"}`);
+        setGitPushResult({ success: false, error: data.error ?? data.message ?? "Unknown error" });
         return;
       }
-      setPendingFilePatch(null);
-      setAppliedPatchFile(null);
-      const hashNote = data.commitHash ? ` (${String(data.commitHash).slice(0, 7)})` : "";
-      sendMutation.mutate(`Pushed to GitHub${hashNote}: "${commitMsg}"`);
+      setGitPushResult({ success: true, commitHash: data.commitHash, branch: data.branch });
     } catch (err: any) {
-      sendMutation.mutate(`Git push failed: ${err.message}`);
+      setGitPushResult({ success: false, error: err.message });
     } finally {
       setGitPushing(false);
     }
@@ -2470,6 +2504,7 @@ export function ChatWidget() {
     setDataQueryResult(null);
     setPendingFilePatch(null);
     setAppliedPatchFile(null);
+    setGitPushResult(null);
     setShowAlerts(true);
     queryClient.removeQueries({ queryKey: [`/api/chatbot/history/${sessionId}`] });
   };
@@ -2904,11 +2939,12 @@ export function ChatWidget() {
                     <FileDiffCard
                       draft={pendingFilePatch}
                       onApply={handleApplyPatch}
-                      onCancel={() => { setPendingFilePatch(null); setAppliedPatchFile(null); }}
+                      onCancel={() => { setPendingFilePatch(null); setAppliedPatchFile(null); setGitPushResult(null); }}
                       isApplying={patchApplying}
                       appliedFile={appliedPatchFile}
                       onGitPush={handleGitPush}
                       isPushing={gitPushing}
+                      pushResult={gitPushResult}
                     />
                   )}
                 </div>

@@ -1049,9 +1049,31 @@ export function registerChatbotRoutes(app: Express) {
         }
       }
 
+      // Load GitHub settings from DB at request time (not from potentially stale process.env)
+      const [urlRow, tokenRow] = await Promise.all([
+        db.select({ value: systemSettings.value }).from(systemSettings)
+          .where(eq(systemSettings.key, "github_repo_url")).limit(1),
+        db.select({ value: systemSettings.value }).from(systemSettings)
+          .where(eq(systemSettings.key, "github_token")).limit(1),
+      ]);
+
+      const baseUrl = urlRow[0]?.value ?? process.env.GITHUB_REPO_URL ?? "";
+      const token = tokenRow[0]?.value ?? process.env.GITHUB_TOKEN ?? "";
+
+      if (!baseUrl) {
+        return res.status(422).json({
+          success: false,
+          error: "GitHub repository URL is not configured. Please set it in Chatbot Settings → GitHub Integration.",
+        });
+      }
+
+      const { buildAuthenticatedUrl } = await import("../lib/githubPush");
+      const authenticatedUrl = buildAuthenticatedUrl(baseUrl, token);
+
       const result = await commitAndPush({
         files,
         message: String(commitMessage).trim(),
+        repoUrl: authenticatedUrl,
         authorName: req.session.userId ? String(req.session.userId) : "ERP Agent",
         authorEmail: "agent@erp.local",
       });
@@ -1084,15 +1106,20 @@ export function registerChatbotRoutes(app: Express) {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const repoUrlRow = await db.select({ value: systemSettings.value })
-        .from(systemSettings).where(eq(systemSettings.key, "github_repo_url")).limit(1);
+      const [urlRow, tokenRow] = await Promise.all([
+        db.select({ value: systemSettings.value }).from(systemSettings)
+          .where(eq(systemSettings.key, "github_repo_url")).limit(1),
+        db.select({ value: systemSettings.value }).from(systemSettings)
+          .where(eq(systemSettings.key, "github_token")).limit(1),
+      ]);
 
-      const repoUrl = repoUrlRow[0]?.value ?? "";
-      // Mask the token portion in the URL for display
-      const maskedUrl = repoUrl.replace(/https?:\/\/[^@]+@/, "https://***@");
-      const hasToken = repoUrl.includes("@");
+      const baseUrl = urlRow[0]?.value ?? "";
+      const hasToken = !!(tokenRow[0]?.value);
 
-      res.json({ repoUrl: maskedUrl, hasToken, configured: !!repoUrl });
+      // Strip any embedded token from URL before returning (never expose token)
+      const safeUrl = baseUrl.replace(/https?:\/\/[^@]+@/, "https://");
+
+      res.json({ repoUrl: safeUrl, hasToken, configured: !!baseUrl });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1105,27 +1132,33 @@ export function registerChatbotRoutes(app: Express) {
         return res.status(403).json({ message: "Only Admin/Developer users can configure GitHub settings" });
       }
 
-      const { repoUrl } = req.body;
-      if (!repoUrl || typeof repoUrl !== "string" || !repoUrl.trim()) {
-        return res.status(400).json({ message: "repoUrl is required" });
+      const { repoUrl, token } = req.body;
+      if (!repoUrl && !token) {
+        return res.status(400).json({ message: "repoUrl or token is required" });
       }
 
-      const cleanUrl = repoUrl.trim();
+      // Helper to upsert a systemSettings key
+      const upsertSetting = async (key: string, value: string) => {
+        const existing = await db.select({ id: systemSettings.id }).from(systemSettings)
+          .where(eq(systemSettings.key, key)).limit(1);
+        if (existing.length > 0) {
+          await db.update(systemSettings)
+            .set({ value, updatedAt: new Date() } as any)
+            .where(eq(systemSettings.key, key));
+        } else {
+          await db.insert(systemSettings).values({ key, value } as any);
+        }
+      };
 
-      // Upsert GITHUB_REPO_URL setting
-      const existing = await db.select().from(systemSettings)
-        .where(eq(systemSettings.key, "github_repo_url")).limit(1);
-
-      if (existing.length > 0) {
-        await db.update(systemSettings)
-          .set({ value: cleanUrl, updatedAt: new Date() })
-          .where(eq(systemSettings.key, "github_repo_url"));
-      } else {
-        await db.insert(systemSettings).values({ key: "github_repo_url", value: cleanUrl } as any);
+      if (repoUrl && typeof repoUrl === "string" && repoUrl.trim()) {
+        // Strip any accidentally embedded token from URL — token is stored separately
+        const cleanUrl = repoUrl.trim().replace(/https?:\/\/[^@]+@/, "https://");
+        await upsertSetting("github_repo_url", cleanUrl);
       }
 
-      // Also set in process.env for the current session
-      process.env.GITHUB_REPO_URL = cleanUrl;
+      if (token && typeof token === "string" && token.trim()) {
+        await upsertSetting("github_token", token.trim());
+      }
 
       res.json({ success: true });
     } catch (error: any) {

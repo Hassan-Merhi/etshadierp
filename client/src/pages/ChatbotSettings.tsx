@@ -49,6 +49,7 @@ export default function ChatbotSettings() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("users");
   const [githubRepoUrl, setGithubRepoUrl] = useState("");
+  const [githubToken, setGithubToken] = useState("");
   const [showToken, setShowToken] = useState(false);
 
   const { data: githubSettings, isLoading: githubLoading } = useQuery<GitHubSettings>({
@@ -56,14 +57,15 @@ export default function ChatbotSettings() {
   });
 
   const githubMutation = useMutation({
-    mutationFn: async (repoUrl: string) => {
-      const response = await apiRequest("PATCH", "/api/chatbot/github-settings", { repoUrl });
+    mutationFn: async ({ repoUrl, token }: { repoUrl?: string; token?: string }) => {
+      const response = await apiRequest("PATCH", "/api/chatbot/github-settings", { repoUrl: repoUrl || undefined, token: token || undefined });
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/chatbot/github-settings"] });
       setGithubRepoUrl("");
-      toast({ title: "GitHub settings saved", description: "Repository URL has been updated." });
+      setGithubToken("");
+      toast({ title: "GitHub settings saved", description: "Repository settings have been updated." });
     },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;
@@ -229,11 +231,10 @@ export default function ChatbotSettings() {
               GitHub Integration
             </CardTitle>
             <CardDescription>
-              Configure a GitHub repository so the AI agent can push approved code changes. Use an authenticated URL like{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">https://TOKEN@github.com/user/repo.git</code>
+              Store your repository URL and a GitHub token separately — the token is never returned to the browser and is composed server-side when pushing.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
             {githubLoading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -242,27 +243,42 @@ export default function ChatbotSettings() {
             ) : (
               <>
                 {githubSettings?.configured && (
-                  <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-2 text-sm flex-wrap">
                     <Check className="h-4 w-4 text-green-500 shrink-0" />
                     <span className="font-mono text-muted-foreground truncate max-w-sm">
                       {githubSettings.repoUrl}
                     </span>
-                    {githubSettings.hasToken && (
-                      <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30 shrink-0">
-                        Token set
-                      </Badge>
-                    )}
+                    <Badge variant="outline" className={githubSettings.hasToken ? "bg-green-500/10 text-green-600 border-green-500/30" : "bg-orange-500/10 text-orange-600 border-orange-500/30"}>
+                      {githubSettings.hasToken ? "Token configured" : "No token"}
+                    </Badge>
                   </div>
                 )}
-                <div className="flex gap-2 items-center flex-wrap">
-                  <div className="relative flex-1 min-w-[240px]">
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground">Repository URL</label>
+                  <input
+                    type="text"
+                    className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                    placeholder={githubSettings?.configured ? "Enter new URL to replace…" : "https://github.com/user/repo.git"}
+                    value={githubRepoUrl}
+                    onChange={e => setGithubRepoUrl(e.target.value)}
+                    data-testid="input-github-repo-url"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Personal Access Token
+                    {githubSettings?.hasToken && <span className="ml-2 text-green-600">(currently set — enter new to replace)</span>}
+                  </label>
+                  <div className="relative">
                     <input
                       type={showToken ? "text" : "password"}
                       className="w-full h-9 rounded-md border border-border bg-background px-3 pr-9 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
-                      placeholder={githubSettings?.configured ? "Enter new URL to replace…" : "https://TOKEN@github.com/user/repo.git"}
-                      value={githubRepoUrl}
-                      onChange={e => setGithubRepoUrl(e.target.value)}
-                      data-testid="input-github-repo-url"
+                      placeholder={githubSettings?.hasToken ? "Enter new token to replace…" : "ghp_xxxxxxxxxxxx"}
+                      value={githubToken}
+                      onChange={e => setGithubToken(e.target.value)}
+                      data-testid="input-github-token"
                     />
                     <button
                       type="button"
@@ -273,16 +289,17 @@ export default function ChatbotSettings() {
                       {showToken ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                     </button>
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => githubMutation.mutate(githubRepoUrl)}
-                    disabled={githubMutation.isPending || !githubRepoUrl.trim()}
-                    data-testid="button-save-github"
-                  >
-                    {githubMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Check className="h-3.5 w-3.5 mr-1" />}
-                    Save
-                  </Button>
                 </div>
+
+                <Button
+                  size="sm"
+                  onClick={() => githubMutation.mutate({ repoUrl: githubRepoUrl || undefined, token: githubToken || undefined })}
+                  disabled={githubMutation.isPending || (!githubRepoUrl.trim() && !githubToken.trim())}
+                  data-testid="button-save-github"
+                >
+                  {githubMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Check className="h-3.5 w-3.5 mr-1" />}
+                  Save Settings
+                </Button>
               </>
             )}
           </CardContent>

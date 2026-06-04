@@ -1,6 +1,7 @@
 /**
  * GitHub Push Helper — commits and pushes changed files using the local git CLI.
- * Reads GITHUB_REPO_URL from env (set by the admin in ChatbotSettings).
+ * The authenticated remote URL is composed server-side from separate repoUrl + token
+ * loaded from DB at request time; neither field is returned to the client.
  */
 
 import { execFile } from "child_process";
@@ -9,22 +10,20 @@ import path from "path";
 import { WORKSPACE_ROOT, resolveWorkspacePath } from "./codeAgentTools";
 
 const execFileAsync = promisify(execFile);
-
 const GIT_TIMEOUT = 30_000;
 
-async function git(args: string[], opts: { cwd?: string } = {}): Promise<string> {
+async function git(args: string[], opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): Promise<string> {
   const cwd = opts.cwd ?? WORKSPACE_ROOT;
   const { stdout, stderr } = await execFileAsync("git", args, {
     cwd,
     timeout: GIT_TIMEOUT,
     env: {
       ...process.env,
+      ...(opts.env ?? {}),
       GIT_TERMINAL_PROMPT: "0",
     },
   });
-  if (stderr && !stderr.includes("warning:") && !stderr.toLowerCase().includes("hint:")) {
-    // Only surface actual errors, not routine git messages
-  }
+  void stderr;
   return stdout.trim();
 }
 
@@ -36,12 +35,32 @@ export interface CommitResult {
 }
 
 /**
+ * Compose an authenticated HTTPS remote URL.
+ * baseUrl: the plain https URL without credentials (e.g. https://github.com/user/repo.git)
+ * token: personal access token or app token
+ * If baseUrl already contains credentials, they are preserved as-is.
+ */
+export function buildAuthenticatedUrl(baseUrl: string, token?: string): string {
+  if (!token || !token.trim()) return baseUrl;
+  try {
+    const u = new URL(baseUrl);
+    if (u.username || u.password) return baseUrl; // already has creds
+    u.username = token.trim();
+    u.password = "";
+    return u.toString();
+  } catch {
+    return baseUrl;
+  }
+}
+
+/**
  * Stage, commit, and push the given files to the remote.
- * Requires GITHUB_REPO_URL (e.g. https://<token>@github.com/user/repo.git) in env.
+ * @param params.repoUrl  Full authenticated remote URL (composed server-side). Falls back to GITHUB_REPO_URL env.
  */
 export async function commitAndPush(params: {
   files: string[];
   message: string;
+  repoUrl?: string;
   authorName?: string;
   authorEmail?: string;
 }): Promise<CommitResult> {
@@ -51,7 +70,6 @@ export async function commitAndPush(params: {
     return { success: false, error: "No files to commit" };
   }
 
-  // Validate all paths are inside workspace
   for (const f of files) {
     try {
       resolveWorkspacePath(f);
@@ -60,18 +78,15 @@ export async function commitAndPush(params: {
     }
   }
 
-  // Check for remote configuration
-  const repoUrl = process.env.GITHUB_REPO_URL;
+  const repoUrl = params.repoUrl ?? process.env.GITHUB_REPO_URL;
   if (!repoUrl) {
     return {
       success: false,
-      error:
-        "GITHUB_REPO_URL is not configured. Please add it in Chatbot Settings → GitHub Integration.",
+      error: "GitHub repository is not configured. Please set it in Chatbot Settings → GitHub Integration.",
     };
   }
 
   try {
-    // Set remote if not already set (or update it)
     try {
       const remotes = await git(["remote"]);
       if (remotes.includes("origin")) {
@@ -83,72 +98,45 @@ export async function commitAndPush(params: {
       // Continue even if setting remote fails
     }
 
-    // Get current branch
     let branch = "main";
     try {
       branch = await git(["rev-parse", "--abbrev-ref", "HEAD"]);
     } catch {
-      // Use default
+      // use default
     }
 
-    // Stage the files
     const relPaths = files.map((f) =>
       path.isAbsolute(f) ? path.relative(WORKSPACE_ROOT, f) : f
     );
     await git(["add", "--", ...relPaths]);
 
-    // Check if there is anything staged
     const status = await git(["status", "--porcelain"]).catch(() => "");
     if (!status.trim()) {
-      return {
-        success: false,
-        error: "Nothing to commit — the file content may already be up to date.",
-      };
+      return { success: false, error: "Nothing to commit — the file content may already be up to date." };
     }
 
-    // Commit
     await git([
-      "-c",
-      `user.name=${authorName}`,
-      "-c",
-      `user.email=${authorEmail}`,
-      "commit",
-      "-m",
-      message,
+      "-c", `user.name=${authorName}`,
+      "-c", `user.email=${authorEmail}`,
+      "commit", "-m", message,
     ]);
 
-    // Get the new commit hash
     const commitHash = await git(["rev-parse", "--short", "HEAD"]).catch(() => "");
 
-    // Push
     await git(["push", "origin", branch]);
 
     return { success: true, commitHash, branch };
   } catch (e: any) {
     const msg: string = e.message ?? String(e);
-
-    // Provide friendlier error messages
     if (msg.includes("Authentication failed") || msg.includes("remote: Invalid username")) {
-      return {
-        success: false,
-        error:
-          "Authentication failed. Please check your GITHUB_REPO_URL includes a valid token (e.g. https://<token>@github.com/user/repo.git).",
-      };
+      return { success: false, error: "Authentication failed. Check your GitHub token in Chatbot Settings." };
     }
     if (msg.includes("rejected") || msg.includes("non-fast-forward")) {
-      return {
-        success: false,
-        error:
-          "Push rejected — the remote has changes that conflict with yours. Pull and merge first.",
-      };
+      return { success: false, error: "Push rejected — the remote has conflicting changes. Pull and merge first." };
     }
     if (msg.includes("Repository not found")) {
-      return {
-        success: false,
-        error: "Repository not found. Check that GITHUB_REPO_URL is correct.",
-      };
+      return { success: false, error: "Repository not found. Check your GitHub URL in Chatbot Settings." };
     }
-
     return { success: false, error: msg };
   }
 }
