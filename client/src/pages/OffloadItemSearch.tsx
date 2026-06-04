@@ -48,13 +48,12 @@ export default function OffloadItemSearch() {
   const totalQty = results.reduce((sum, r) => sum + parseFloat(r.quantity || "0"), 0);
   const totalValue = results.reduce((sum, r) => sum + parseFloat(r.lineTotal || "0"), 0);
   const uniqueContainers = new Set(results.map((r) => r.containerNumber)).size;
-  const currency = results[0]?.currency ?? "USD";
 
   const fmtQty = (v: string | number) =>
-    Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    Number(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
   const fmtMoney = (v: string | number) =>
-    Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    "$\u200b" + Number(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
@@ -103,11 +102,11 @@ export default function OffloadItemSearch() {
           <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
             <Package className="h-4 w-4 text-muted-foreground" />
             <span className="text-muted-foreground">Total Qty</span>
-            <span className="font-semibold" data-testid="stat-qty">{fmtQty(totalQty)} KG</span>
+            <span className="font-semibold" data-testid="stat-qty">{fmtQty(totalQty)} BL</span>
           </div>
           <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
             <span className="text-muted-foreground">Total Value</span>
-            <span className="font-semibold" data-testid="stat-value">{currency} {fmtMoney(totalValue)}</span>
+            <span className="font-semibold" data-testid="stat-value">{fmtMoney(totalValue)}</span>
           </div>
         </div>
       )}
@@ -148,10 +147,8 @@ export default function OffloadItemSearch() {
                   <th className="text-left px-4 font-medium">Item Name</th>
                   <th className="text-left px-4 font-medium">Container</th>
                   <th className="text-left px-4 font-medium">Offload Date</th>
-                  <th className="text-left px-4 font-medium">PO #</th>
-                  <th className="text-left px-4 font-medium">Supplier</th>
-                  <th className="text-right px-4 font-medium">Qty (KG)</th>
-                  <th className="text-right px-4 font-medium">Price / KG</th>
+                  <th className="text-right px-4 font-medium">Qty</th>
+                  <th className="text-right px-4 font-medium">Price / BL</th>
                   <th className="text-right px-4 font-medium">Total</th>
                 </tr>
               </thead>
@@ -165,24 +162,22 @@ export default function OffloadItemSearch() {
                     <td className="px-4 py-3 text-muted-foreground">
                       {row.offloadDate ? format(new Date(row.offloadDate), "dd MMM yyyy") : "—"}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{row.poNumber}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{row.supplierName ?? "—"}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{fmtQty(row.quantity)}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
-                      {row.currency} {fmtMoney(row.rate)}
+                      {fmtMoney(row.rate)}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums font-medium">
-                      {row.currency} {fmtMoney(row.lineTotal)}
+                      {fmtMoney(row.lineTotal)}
                     </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="border-t bg-muted/40">
-                  <td colSpan={5} className="px-4 py-2 text-sm font-medium">Total</td>
+                  <td colSpan={3} className="px-4 py-2 text-sm font-medium">Total</td>
                   <td className="px-4 py-2 text-right tabular-nums font-semibold">{fmtQty(totalQty)}</td>
                   <td />
-                  <td className="px-4 py-2 text-right tabular-nums font-semibold">{currency} {fmtMoney(totalValue)}</td>
+                  <td className="px-4 py-2 text-right tabular-nums font-semibold">{fmtMoney(totalValue)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -197,20 +192,18 @@ export default function OffloadItemSearch() {
                   <Badge variant="outline" className="font-mono text-xs shrink-0">{row.containerNumber}</Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  <div><span className="text-foreground font-medium">PO:</span> {row.poNumber}</div>
                   <div><span className="text-foreground font-medium">Date:</span> {row.offloadDate ? format(new Date(row.offloadDate), "dd MMM yyyy") : "—"}</div>
-                  <div><span className="text-foreground font-medium">Supplier:</span> {row.supplierName ?? "—"}</div>
-                  <div><span className="text-foreground font-medium">Qty:</span> {fmtQty(row.quantity)} KG</div>
+                  <div><span className="text-foreground font-medium">Qty:</span> {fmtQty(row.quantity)} BL</div>
                 </div>
                 <div className="flex justify-between items-center pt-1 border-t text-sm">
-                  <span className="text-muted-foreground">{row.currency} {fmtMoney(row.rate)} / KG</span>
-                  <span className="font-semibold">{row.currency} {fmtMoney(row.lineTotal)}</span>
+                  <span className="text-muted-foreground">{fmtMoney(row.rate)} / BL</span>
+                  <span className="font-semibold">{fmtMoney(row.lineTotal)}</span>
                 </div>
               </div>
             ))}
             <div className="border rounded-xl px-4 py-3 bg-muted/40 flex justify-between text-sm font-semibold">
               <span>Total ({uniqueContainers} container{uniqueContainers !== 1 ? "s" : ""})</span>
-              <span>{currency} {fmtMoney(totalValue)}</span>
+              <span>{fmtMoney(totalValue)}</span>
             </div>
           </div>
         </>
