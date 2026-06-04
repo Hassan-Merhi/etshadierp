@@ -77,7 +77,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         });
       }
 
-      // 3. N Cost: most recent PO line rate for this supplier
+      // 3. N Cost (most recent PO line for this supplier — kept for proforma save only, not shown in UI)
       const nCostResult = await pool.query(`
         SELECT DISTINCT ON (pli.stock_item_id)
           pli.stock_item_id,
@@ -94,11 +94,25 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         nCostMap.set(Number(row.stock_item_id), Number(row.rate));
       }
 
-      // 4. Current stock + weighted average inventory cost
+      // 3b. Hassan's Price — selling_price set on the stock item (avg across locations if ever differs)
+      const hassansPriceResult = await pool.query(`
+        SELECT si.id AS stock_item_id,
+          si.selling_price::numeric AS hassans_price
+        FROM stock_items si
+        WHERE si.company_id = $1
+          AND si.id = ANY($2::int[])
+      `, [companyId, stockItemIds]);
+      const hassansPriceMap = new Map<number, number>();
+      for (const row of hassansPriceResult.rows) {
+        hassansPriceMap.set(Number(row.stock_item_id), Number(row.hassans_price) || 0);
+      }
+
+      // 4. Current stock + weighted average inventory cost (primary avg cost source)
       const stockResult = await pool.query(`
         SELECT i.stock_item_id,
           SUM(i.quantity::numeric) AS current_stock,
-          SUM(i.quantity::numeric * i.average_rate::numeric) / NULLIF(SUM(i.quantity::numeric), 0) AS avg_cost
+          SUM(i.quantity::numeric * i.average_rate::numeric) / NULLIF(SUM(i.quantity::numeric), 0) AS avg_cost,
+          MAX(i.average_rate::numeric) AS max_avg_rate
         FROM inventory i
         WHERE i.company_id = $1
           AND i.stock_item_id = ANY($2::int[])
@@ -108,8 +122,26 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       for (const row of stockResult.rows) {
         stockMap.set(Number(row.stock_item_id), {
           currentStock: Number(row.current_stock),
-          avgCost: row.avg_cost != null ? Number(row.avg_cost) : 0,
+          // use weighted avg_cost; if qty is 0 but rows exist, fall back to max avg_rate so we keep last known cost
+          avgCost: row.avg_cost != null ? Number(row.avg_cost)
+                 : (row.max_avg_rate != null ? Number(row.max_avg_rate) : 0),
         });
+      }
+
+      // 4b. Fallback avg cost: most recent PO line rate from ANY PO in this company (when no inventory record)
+      const avgCostFallbackResult = await pool.query(`
+        SELECT DISTINCT ON (pli.stock_item_id)
+          pli.stock_item_id,
+          pli.rate::numeric AS rate
+        FROM po_line_items pli
+        JOIN purchase_orders po ON po.id = pli.po_id
+        WHERE po.company_id = $1
+          AND pli.stock_item_id = ANY($2::int[])
+        ORDER BY pli.stock_item_id, po.created_at DESC
+      `, [companyId, stockItemIds]);
+      const avgCostFallbackMap = new Map<number, number>();
+      for (const row of avgCostFallbackResult.rows) {
+        avgCostFallbackMap.set(Number(row.stock_item_id), Number(row.rate));
       }
 
       // Build response
@@ -117,29 +149,41 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         const id = Number(item.id);
         const salesData = avgSellMap.get(id);
         const avgSellingPrice = salesData?.avgSellingPrice ?? null;
-        const configPrice = salesData?.avgConfigPrice ?? 0;
         const salesQty = salesData?.salesQty ?? 0;
 
+        // N Cost kept for proforma save (not shown in UI)
         const nCost = nCostMap.get(id) ?? 0;
         const nCostSource = nCostMap.has(id) ? "po" : "missing";
 
+        // Hassan's Price = selling price set on the stock item
+        const configPrice = hassansPriceMap.get(id) ?? 0;
+
+        // Avg Cost = weighted avg inventory rate; fallback to latest PO line rate if no inventory
         const inventoryData = stockMap.get(id);
         const currentStock = inventoryData?.currentStock ?? 0;
-        const offloadingCost = inventoryData?.avgCost ?? 0;
+        const invAvgCost = inventoryData?.avgCost ?? 0;
+        const offloadingCost = invAvgCost > 0
+          ? invAvgCost
+          : (avgCostFallbackMap.get(id) ?? 0);
+        const avgCostSource = invAvgCost > 0 ? "inventory" : (avgCostFallbackMap.has(id) ? "po_fallback" : "missing");
 
-        const totalCost = nCost + configPrice + offloadingCost;
+        // Hassan's Profit = Hassan's Price − Avg Cost
+        const hassansProfit = configPrice - offloadingCost;
+        // Cost Profit = Avg Sell − Avg Cost
+        const costProfit = avgSellingPrice != null ? avgSellingPrice - offloadingCost : null;
 
-        let estimatedProfit: number | null = null;
+        const totalCost = configPrice + offloadingCost;
+
+        let estimatedProfit: number | null = costProfit;
         let profitPercent: number | null = null;
         let status: string;
 
         if (avgSellingPrice == null) {
           status = "no_sales_data";
         } else {
-          estimatedProfit = avgSellingPrice - totalCost;
-          profitPercent = avgSellingPrice > 0 ? (estimatedProfit / avgSellingPrice) * 100 : null;
-          if (estimatedProfit > 0) status = "gaining";
-          else if (estimatedProfit < 0) status = "losing";
+          profitPercent = avgSellingPrice > 0 && costProfit != null ? (costProfit / avgSellingPrice) * 100 : null;
+          if (hassansProfit > 0) status = "gaining";
+          else if (hassansProfit < 0) status = "losing";
           else status = "break_even";
         }
 
@@ -153,7 +197,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
           salesQty,
           avgSellingPrice,
           nCost,
-          nCostSource,
+          nCostSource: avgCostSource,
           configPrice,
           offloadingCost,
           totalCost,
@@ -388,20 +432,19 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         { key: "name", width: 32 },
         { key: "stock", width: 12 },
         { key: "avg_sell", width: 14 },
-        { key: "dubai_cost", width: 14 },
-        { key: "config_cost", width: 14 },
-        { key: "offload_cost", width: 14 },
-        { key: "offload_src", width: 14 },
-        { key: "profit_config", width: 15 },
-        { key: "profit_config_pct", width: 12 },
-        { key: "profit_offload", width: 15 },
-        { key: "profit_offload_pct", width: 12 },
+        { key: "hassans_price", width: 16 },
+        { key: "avg_cost", width: 14 },
+        { key: "cost_source", width: 14 },
+        { key: "hassans_profit", width: 16 },
+        { key: "hassans_profit_pct", width: 13 },
+        { key: "cost_profit", width: 16 },
+        { key: "cost_profit_pct", width: 13 },
         { key: "status", width: 12 },
         { key: "qty", width: 10 },
-        { key: "total_supplier_cost", width: 18 },
+        { key: "total_avg_cost", width: 18 },
         { key: "est_total_sales", width: 18 },
-        { key: "est_profit_config", width: 18 },
-        { key: "est_profit_offload", width: 18 },
+        { key: "est_hassans_profit", width: 20 },
+        { key: "est_cost_profit", width: 18 },
       ];
 
       // Title
@@ -423,12 +466,12 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
 
       const headers = [
         "Item Code", "Item Name", "Current Stock",
-        "Avg Sell Price", "N Cost", "Config Price", "Avg Inv Cost",
+        "Avg Sell Price", "Hassan's Price", "Avg Cost",
         "Cost Source",
-        "Profit (Config)", "Config %",
-        "Profit (Offload)", "Offload %",
-        "Status", "Qty to Order", "Total N Cost", "Est. Total Sales",
-        "Est. Profit (Config)", "Est. Profit (Offload)",
+        "Hassan's Profit", "Hassan's Profit %",
+        "Cost Profit", "Cost Profit %",
+        "Status", "Qty to Order", "Total Avg Cost", "Est. Total Sales",
+        "Est. Hassan's Profit", "Est. Cost Profit",
       ];
       const hRow = ws.addRow(headers);
       hRow.eachCell(c => {
@@ -446,107 +489,104 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i];
         const sell = r.avgSellingPrice != null ? Number(r.avgSellingPrice) : null;
-        const nCost = Number(r.nCost) || 0;
-        const config = Number(r.configPrice) || 0;
-        const offload = Number(r.offloadingCost) || 0;
+        const hassansPrice = Number(r.configPrice) || 0;
+        const avgCost = Number(r.offloadingCost) || 0;
 
-        // Profit (Config) = Sell − N Cost − Config Price
-        const profitByConfig = sell != null ? sell - nCost - config : null;
-        const profitByConfigPct = (sell != null && sell > 0 && profitByConfig != null) ? (profitByConfig / sell) * 100 : null;
+        // Hassan's Profit = Hassan's Price − Avg Cost
+        const hassansProfit = hassansPrice - avgCost;
+        const hassansProfitPct = hassansPrice > 0 ? (hassansProfit / hassansPrice) * 100 : null;
 
-        // Profit (Offload) = Sell − N Cost − Avg Inventory Cost
-        const profitByOffload = sell != null ? sell - nCost - offload : null;
-        const profitByOffloadPct = (sell != null && sell > 0 && profitByOffload != null) ? (profitByOffload / sell) * 100 : null;
+        // Cost Profit = Avg Sell − Avg Cost
+        const costProfit = sell != null ? sell - avgCost : null;
+        const costProfitPct = (sell != null && sell > 0 && costProfit != null) ? (costProfit / sell) * 100 : null;
 
         const qty = Number(r.qty) || 0;
-        const totalSupCost = qty * nCost;
+        const totalAvgCost = qty * avgCost;
         const estTotalSales = sell != null ? qty * sell : 0;
-        const estProfitConfig = profitByConfig != null ? qty * profitByConfig : 0;
-        const estProfitOffload = profitByOffload != null ? qty * profitByOffload : 0;
+        const estHassansProfit = qty * hassansProfit;
+        const estCostProfit = costProfit != null ? qty * costProfit : 0;
 
-        const statusByConfig = profitByConfig == null ? "no_sales_data" : profitByConfig > 0 ? "gaining" : profitByConfig < 0 ? "losing" : "break_even";
+        const statusByHassans = hassansProfit > 0 ? "gaining" : hassansProfit < 0 ? "losing" : (sell == null ? "no_sales_data" : "break_even");
 
         const dataRow = ws.addRow([
           r.code, r.name, Number(r.currentStock) || 0,
           sell ?? "",
-          dubai,
-          config,
-          offload,
+          hassansPrice,
+          avgCost,
           r.nCostSource || "missing",
-          profitByConfig ?? "",
-          profitByConfigPct ?? "",
-          profitByOffload ?? "",
-          profitByOffloadPct ?? "",
-          statusByConfig,
+          hassansProfit,
+          hassansProfitPct ?? "",
+          costProfit ?? "",
+          costProfitPct ?? "",
+          statusByHassans,
           qty,
-          totalSupCost,
+          totalAvgCost,
           estTotalSales,
-          estProfitConfig,
-          estProfitOffload,
+          estHassansProfit,
+          estCostProfit,
         ]);
 
-        // Row background by config status
+        // Row background by hassan's profit status
         let rowColor: string | null = null;
-        if (statusByConfig === "losing") rowColor = LIGHT_RED;
-        else if (statusByConfig === "gaining") rowColor = LIGHT_GREEN;
-        else if (statusByConfig === "no_sales_data") rowColor = LIGHT_YELLOW;
+        if (statusByHassans === "losing") rowColor = LIGHT_RED;
+        else if (statusByHassans === "gaining") rowColor = LIGHT_GREEN;
+        else if (statusByHassans === "no_sales_data") rowColor = LIGHT_YELLOW;
         if (rowColor) {
           dataRow.eachCell(c => {
             c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowColor! } };
           });
         }
 
-        // Status cell font color (col 13)
-        const statusCell = dataRow.getCell(13);
-        if (statusByConfig === "gaining") statusCell.font = { bold: true, color: { argb: GREEN } };
-        else if (statusByConfig === "losing") statusCell.font = { bold: true, color: { argb: RED } };
-        else if (statusByConfig === "no_sales_data") statusCell.font = { bold: true, color: { argb: YELLOW } };
+        // Status cell font color (col 12)
+        const statusCell = dataRow.getCell(12);
+        if (statusByHassans === "gaining") statusCell.font = { bold: true, color: { argb: GREEN } };
+        else if (statusByHassans === "losing") statusCell.font = { bold: true, color: { argb: RED } };
+        else if (statusByHassans === "no_sales_data") statusCell.font = { bold: true, color: { argb: YELLOW } };
 
-        // Number formats: cols 3=stock, 4=sell, 5=dubai, 6=config, 7=offload, 9=profitCfg, 11=profitOff, 15=supCost, 16=estSales, 17=estCfg, 18=estOff
-        [4, 5, 6, 7, 9, 11, 15, 16, 17, 18].forEach(col => {
+        // Number formats: 3=stock, 4=sell, 5=hassansPrice, 6=avgCost, 8=hassansProfit, 10=costProfit, 14=totalAvgCost, 15=estSales, 16=estHassans, 17=estCost
+        [4, 5, 6, 8, 10, 14, 15, 16, 17].forEach(col => {
           dataRow.getCell(col).numFmt = numFmt2;
         });
         dataRow.getCell(3).numFmt = numFmt2;
-        dataRow.getCell(10).numFmt = numFmtPct; // Config %
-        dataRow.getCell(12).numFmt = numFmtPct; // Offload %
-        dataRow.getCell(14).numFmt = numFmt0;   // Qty
+        dataRow.getCell(9).numFmt = numFmtPct;  // Hassan's Profit %
+        dataRow.getCell(11).numFmt = numFmtPct; // Cost Profit %
+        dataRow.getCell(13).numFmt = numFmt0;   // Qty
       }
 
       // Summary totals
       const hasQty = rows.filter((r: any) => Number(r.qty) > 0);
       const totalQtyOrdered = hasQty.reduce((s: number, r: any) => s + (Number(r.qty) || 0), 0);
-      const totalSupCost = hasQty.reduce((s: number, r: any) => s + (Number(r.qty) || 0) * (Number(r.nCost) || 0), 0);
+      const totalAvgCostSum = hasQty.reduce((s: number, r: any) => s + (Number(r.qty) || 0) * (Number(r.offloadingCost) || 0), 0);
       const totalEstSales = hasQty.reduce((s: number, r: any) => {
         return r.avgSellingPrice != null ? s + (Number(r.qty) || 0) * Number(r.avgSellingPrice) : s;
       }, 0);
-      const totalEstCfgProfit = hasQty.reduce((s: number, r: any) => {
-        const sell = r.avgSellingPrice != null ? Number(r.avgSellingPrice) : null;
-        const p = sell != null ? sell - (Number(r.nCost) || 0) - (Number(r.configPrice) || 0) : null;
-        return p != null ? s + (Number(r.qty) || 0) * p : s;
+      const totalEstHassansProfit = hasQty.reduce((s: number, r: any) => {
+        const hp = (Number(r.configPrice) || 0) - (Number(r.offloadingCost) || 0);
+        return s + (Number(r.qty) || 0) * hp;
       }, 0);
-      const totalEstOffProfit = hasQty.reduce((s: number, r: any) => {
+      const totalEstCostProfit = hasQty.reduce((s: number, r: any) => {
         const sell = r.avgSellingPrice != null ? Number(r.avgSellingPrice) : null;
-        const p = sell != null ? sell - (Number(r.nCost) || 0) - (Number(r.offloadingCost) || 0) : null;
+        const p = sell != null ? sell - (Number(r.offloadingCost) || 0) : null;
         return p != null ? s + (Number(r.qty) || 0) * p : s;
       }, 0);
 
       ws.addRow([]);
       const sumRow = ws.addRow([
         "TOTALS", "", "", "", "", "", "", "",
-        "", "", "", "",
+        "", "", "",
         `${hasQty.length} items`, totalQtyOrdered,
-        totalSupCost, totalEstSales, totalEstCfgProfit, totalEstOffProfit,
+        totalAvgCostSum, totalEstSales, totalEstHassansProfit, totalEstCostProfit,
       ]);
       sumRow.eachCell(c => {
         c.font = { bold: true, color: { argb: WHITE } };
         c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
         c.border = { top: { style: "double", color: { argb: GOLD } } };
       });
-      sumRow.getCell(14).numFmt = numFmt0;   // qty
-      sumRow.getCell(15).numFmt = numFmt2;   // supplier cost
-      sumRow.getCell(16).numFmt = numFmt2;   // est sales
-      sumRow.getCell(17).numFmt = numFmt2;   // est profit config
-      sumRow.getCell(18).numFmt = numFmt2;   // est profit offload
+      sumRow.getCell(13).numFmt = numFmt0;   // qty
+      sumRow.getCell(14).numFmt = numFmt2;   // total avg cost
+      sumRow.getCell(15).numFmt = numFmt2;   // est sales
+      sumRow.getCell(16).numFmt = numFmt2;   // est hassan's profit
+      sumRow.getCell(17).numFmt = numFmt2;   // est cost profit
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="profit-analysis-${proformaRef || "export"}.xlsx"`);

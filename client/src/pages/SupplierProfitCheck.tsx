@@ -67,10 +67,10 @@ interface AnalysisRow {
 }
 
 interface ComputedRow extends AnalysisRow {
-  profitByConfig: number | null;
-  profitByConfigPct: number | null;
-  profitByOffload: number | null;
-  profitByOffloadPct: number | null;
+  hassansProfit: number;
+  hassansProfitPct: number | null;
+  costProfit: number | null;
+  costProfitPct: number | null;
   statusByConfig: string;
   statusByOffload: string;
 }
@@ -189,30 +189,26 @@ export default function SupplierProfitCheck() {
     return rows.map((row) => {
       const sell = row.avgSellingPrice;
 
-      // Profit (Config) = Sell − N Cost − Config Price
-      let profitByConfig: number | null = null;
-      let profitByConfigPct: number | null = null;
-      if (sell != null) {
-        profitByConfig = sell - row.nCost - row.configPrice;
-        profitByConfigPct = sell > 0 ? (profitByConfig / sell) * 100 : null;
-      }
+      // Hassan's Profit = Hassan's Price − Avg Cost
+      const hassansProfit = row.configPrice - row.offloadingCost;
+      const hassansProfitPct = row.configPrice > 0 ? (hassansProfit / row.configPrice) * 100 : null;
 
-      // Profit (Offload) = Sell − N Cost − Avg Inventory Cost
-      let profitByOffload: number | null = null;
-      let profitByOffloadPct: number | null = null;
+      // Cost Profit = Avg Sell − Avg Cost
+      let costProfit: number | null = null;
+      let costProfitPct: number | null = null;
       if (sell != null) {
-        profitByOffload = sell - row.nCost - row.offloadingCost;
-        profitByOffloadPct = sell > 0 ? (profitByOffload / sell) * 100 : null;
+        costProfit = sell - row.offloadingCost;
+        costProfitPct = sell > 0 ? (costProfit / sell) * 100 : null;
       }
 
       return {
         ...row,
-        profitByConfig,
-        profitByConfigPct,
-        profitByOffload,
-        profitByOffloadPct,
-        statusByConfig: calcStatus(profitByConfig),
-        statusByOffload: calcStatus(profitByOffload),
+        hassansProfit,
+        hassansProfitPct,
+        costProfit,
+        costProfitPct,
+        statusByConfig: calcStatus(hassansProfit),
+        statusByOffload: calcStatus(costProfit),
       };
     });
   }, [rows]);
@@ -241,21 +237,21 @@ export default function SupplierProfitCheck() {
   const summary = useMemo(() => {
     const withQty = computedRows.filter((r) => Number(qtyMap[r.stockItemId]) > 0);
     const totalQty = withQty.reduce((s, r) => s + (Number(qtyMap[r.stockItemId]) || 0), 0);
-    const totalSupCost = withQty.reduce(
-      (s, r) => s + (Number(qtyMap[r.stockItemId]) || 0) * r.nCost,
+    const totalAvgCost = withQty.reduce(
+      (s, r) => s + (Number(qtyMap[r.stockItemId]) || 0) * r.offloadingCost,
       0
     );
     const totalEstSales = withQty.reduce((s, r) => {
       return r.avgSellingPrice != null ? s + (Number(qtyMap[r.stockItemId]) || 0) * r.avgSellingPrice : s;
     }, 0);
-    const totalConfigProfit = withQty.reduce((s, r) => {
-      return r.profitByConfig != null ? s + (Number(qtyMap[r.stockItemId]) || 0) * r.profitByConfig : s;
+    const totalHassansProfit = withQty.reduce((s, r) => {
+      return s + (Number(qtyMap[r.stockItemId]) || 0) * r.hassansProfit;
     }, 0);
-    const totalOffloadProfit = withQty.reduce((s, r) => {
-      return r.profitByOffload != null ? s + (Number(qtyMap[r.stockItemId]) || 0) * r.profitByOffload : s;
+    const totalCostProfit = withQty.reduce((s, r) => {
+      return r.costProfit != null ? s + (Number(qtyMap[r.stockItemId]) || 0) * r.costProfit : s;
     }, 0);
-    const configProfitPct = totalEstSales > 0 ? (totalConfigProfit / totalEstSales) * 100 : null;
-    const offloadProfitPct = totalEstSales > 0 ? (totalOffloadProfit / totalEstSales) * 100 : null;
+    const hassansProfitPct = totalAvgCost > 0 ? (totalHassansProfit / totalAvgCost) * 100 : null;
+    const costProfitPct = totalEstSales > 0 ? (totalCostProfit / totalEstSales) * 100 : null;
 
     const losingConfigCount = computedRows.filter((r) => r.statusByConfig === "losing").length;
     const losingOffloadCount = computedRows.filter((r) => r.statusByOffload === "losing").length;
@@ -266,12 +262,12 @@ export default function SupplierProfitCheck() {
       totalItems: computedRows.length,
       selectedCount: withQty.length,
       totalQty,
-      totalSupCost,
+      totalAvgCost,
       totalEstSales,
-      totalConfigProfit,
-      totalOffloadProfit,
-      configProfitPct,
-      offloadProfitPct,
+      totalHassansProfit,
+      totalCostProfit,
+      hassansProfitPct,
+      costProfitPct,
       losingConfigCount,
       losingOffloadCount,
       noDataCount,
@@ -489,29 +485,29 @@ export default function SupplierProfitCheck() {
             </Card>
             <Card>
               <CardContent className="pt-3 pb-3">
-                <div className="text-xs text-muted-foreground">Supplier Cost</div>
-                <div className="text-lg font-bold">${fmt(summary.totalSupCost)}</div>
+                <div className="text-xs text-muted-foreground">Total Avg Cost</div>
+                <div className="text-lg font-bold">${fmt(summary.totalAvgCost)}</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-3 pb-3">
-                <div className="text-xs text-muted-foreground">Profit (Config)</div>
-                <div className={`text-lg font-bold ${summary.totalConfigProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                  {summary.totalConfigProfit < 0 ? "-" : ""}${fmt(Math.abs(summary.totalConfigProfit))}
+                <div className="text-xs text-muted-foreground">Hassan's Profit</div>
+                <div className={`text-lg font-bold ${summary.totalHassansProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                  {summary.totalHassansProfit < 0 ? "-" : ""}${fmt(Math.abs(summary.totalHassansProfit))}
                 </div>
-                {summary.configProfitPct != null && (
-                  <div className="text-xs text-muted-foreground">{fmt(Math.abs(summary.configProfitPct), 1)}%</div>
+                {summary.hassansProfitPct != null && (
+                  <div className="text-xs text-muted-foreground">{fmt(Math.abs(summary.hassansProfitPct), 1)}%</div>
                 )}
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-3 pb-3">
-                <div className="text-xs text-muted-foreground">Profit (Offload)</div>
-                <div className={`text-lg font-bold ${summary.totalOffloadProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                  {summary.totalOffloadProfit < 0 ? "-" : ""}${fmt(Math.abs(summary.totalOffloadProfit))}
+                <div className="text-xs text-muted-foreground">Cost Profit</div>
+                <div className={`text-lg font-bold ${summary.totalCostProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                  {summary.totalCostProfit < 0 ? "-" : ""}${fmt(Math.abs(summary.totalCostProfit))}
                 </div>
-                {summary.offloadProfitPct != null && (
-                  <div className="text-xs text-muted-foreground">{fmt(Math.abs(summary.offloadProfitPct), 1)}%</div>
+                {summary.costProfitPct != null && (
+                  <div className="text-xs text-muted-foreground">{fmt(Math.abs(summary.costProfitPct), 1)}%</div>
                 )}
               </CardContent>
             </Card>
@@ -519,8 +515,8 @@ export default function SupplierProfitCheck() {
               <CardContent className="pt-3 pb-3">
                 <div className="text-xs text-muted-foreground">Issues</div>
                 <div className="space-y-0.5 text-sm">
-                  <div><span className="font-semibold text-red-600">{summary.losingConfigCount}</span> <span className="text-muted-foreground">losing (cfg)</span></div>
-                  <div><span className="font-semibold text-red-600">{summary.losingOffloadCount}</span> <span className="text-muted-foreground">losing (off)</span></div>
+                  <div><span className="font-semibold text-red-600">{summary.losingConfigCount}</span> <span className="text-muted-foreground">losing (Hassan)</span></div>
+                  <div><span className="font-semibold text-red-600">{summary.losingOffloadCount}</span> <span className="text-muted-foreground">losing (cost)</span></div>
                   <div><span className="font-semibold text-amber-600">{summary.noDataCount}</span> <span className="text-muted-foreground">no data</span></div>
                 </div>
               </CardContent>
@@ -627,18 +623,17 @@ export default function SupplierProfitCheck() {
                   <TableHead className="min-w-[200px]">Name</TableHead>
                   <TableHead className="text-right min-w-[90px]">Sales Qty</TableHead>
                   <TableHead className="text-right min-w-[110px]">Avg Sell</TableHead>
-                  <TableHead className="text-right min-w-[110px]">N Cost</TableHead>
-                  <TableHead className="text-right min-w-[100px]">Config Price</TableHead>
+                  <TableHead className="text-right min-w-[110px]">Hassan's Price</TableHead>
                   <TableHead className="text-right min-w-[100px]">Avg Cost</TableHead>
-                  {/* Profit (Config) = Sell − Dubai − Config */}
+                  {/* Hassan's Profit = Hassan's Price − Avg Cost */}
                   <TableHead className="text-right min-w-[130px] bg-blue-50/50 dark:bg-blue-900/10">
-                    <div className="text-blue-700 dark:text-blue-400">Profit (Config)</div>
-                    <div className="text-[10px] font-normal text-muted-foreground">Sell − Dubai − Config</div>
+                    <div className="text-blue-700 dark:text-blue-400">Hassan's Profit</div>
+                    <div className="text-[10px] font-normal text-muted-foreground">Hassan's Price − Avg Cost</div>
                   </TableHead>
-                  {/* Profit (Offload) = Sell − Dubai − Offload */}
+                  {/* Cost Profit = Avg Sell − Avg Cost */}
                   <TableHead className="text-right min-w-[130px] bg-violet-50/50 dark:bg-violet-900/10">
-                    <div className="text-violet-700 dark:text-violet-400">Profit (Offload)</div>
-                    <div className="text-[10px] font-normal text-muted-foreground">Sell − Dubai − Offload</div>
+                    <div className="text-violet-700 dark:text-violet-400">Cost Profit</div>
+                    <div className="text-[10px] font-normal text-muted-foreground">Avg Sell − Avg Cost</div>
                   </TableHead>
                   <TableHead className="min-w-[90px]">Status</TableHead>
                   <TableHead className="text-right min-w-[100px]">Qty to Order</TableHead>
@@ -673,21 +668,21 @@ export default function SupplierProfitCheck() {
                         <TableCell className="text-right text-sm font-medium">
                           {row.avgSellingPrice != null ? `$${fmt(row.avgSellingPrice)}` : <span className="text-muted-foreground text-xs">—</span>}
                         </TableCell>
-                        {/* N Cost — from PO */}
+                        {/* Hassan's Price — from stock_items.selling_price */}
                         <TableCell className="text-right text-sm">
-                          <span className={`font-mono ${row.nCostSource === "missing" ? "text-orange-500" : ""}`}>${fmt(row.nCost)}</span>
+                          <span className={`font-mono ${row.configPrice === 0 ? "text-orange-500" : ""}`}>${fmt(row.configPrice)}</span>
                         </TableCell>
-                        <TableCell className="text-right text-sm text-muted-foreground">${fmt(row.configPrice)}</TableCell>
+                        {/* Avg Cost — inventory avg or PO fallback */}
                         <TableCell className="text-right text-sm">
-                          <span className="font-mono">${fmt(row.offloadingCost)}</span>
+                          <span className={`font-mono ${row.nCostSource === "missing" ? "text-orange-500" : row.nCostSource === "po_fallback" ? "text-amber-600" : ""}`}>${fmt(row.offloadingCost)}</span>
                         </TableCell>
-                        {/* Profit (Config) */}
+                        {/* Hassan's Profit */}
                         <TableCell className="bg-blue-50/30 dark:bg-blue-900/10">
-                          <ProfitCell value={row.profitByConfig} pct={row.profitByConfigPct} />
+                          <ProfitCell value={row.hassansProfit} pct={row.hassansProfitPct} />
                         </TableCell>
-                        {/* Profit (Offload) */}
+                        {/* Cost Profit */}
                         <TableCell className="bg-violet-50/30 dark:bg-violet-900/10">
-                          <ProfitCell value={row.profitByOffload} pct={row.profitByOffloadPct} />
+                          <ProfitCell value={row.costProfit} pct={row.costProfitPct} />
                         </TableCell>
                         <TableCell>
                           <StatusBadge status={row.statusByConfig} />
@@ -748,10 +743,10 @@ export default function SupplierProfitCheck() {
               {[
                 { label: "Items Selected", value: summary.selectedCount },
                 { label: "Total Quantity", value: summary.totalQty.toLocaleString() },
-                { label: "Total Supplier Value", value: `$${fmt(summary.totalSupCost)}` },
-                { label: "Profit (Config)", value: `${summary.totalConfigProfit < 0 ? "-" : ""}$${fmt(Math.abs(summary.totalConfigProfit))}`, negative: summary.totalConfigProfit < 0 },
-                { label: "Profit (Offload)", value: `${summary.totalOffloadProfit < 0 ? "-" : ""}$${fmt(Math.abs(summary.totalOffloadProfit))}`, negative: summary.totalOffloadProfit < 0 },
-                { label: "Losing Items (Config)", value: summary.losingConfigCount, warn: summary.losingConfigCount > 0 },
+                { label: "Total Avg Cost", value: `$${fmt(summary.totalAvgCost)}` },
+                { label: "Hassan's Profit", value: `${summary.totalHassansProfit < 0 ? "-" : ""}$${fmt(Math.abs(summary.totalHassansProfit))}`, negative: summary.totalHassansProfit < 0 },
+                { label: "Cost Profit", value: `${summary.totalCostProfit < 0 ? "-" : ""}$${fmt(Math.abs(summary.totalCostProfit))}`, negative: summary.totalCostProfit < 0 },
+                { label: "Losing Items (Hassan)", value: summary.losingConfigCount, warn: summary.losingConfigCount > 0 },
               ].map((item) => (
                 <div key={item.label} className="rounded-md border p-2 bg-muted/30">
                   <div className="text-xs text-muted-foreground">{item.label}</div>
