@@ -51,6 +51,8 @@ import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositio
 import path from "path";
 import fs from "fs";
 import { requireAIActionPermission, logAIAction } from "../lib/aiActionPermission";
+import { resolveWorkspacePath, readProjectFileRaw } from "../lib/codeAgentTools";
+import { commitAndPush } from "../lib/githubPush";
 
 export function registerChatbotRoutes(app: Express) {
   app.get("/api/chatbot/status", requireAuth, async (req, res) => {
@@ -175,6 +177,7 @@ export function registerChatbotRoutes(app: Express) {
       res.json({
         response: result.response,
         suggestions: result.suggestions,
+        provider: result.provider ?? null,
         voucherDraft: result.voucherDraft ?? null,
         stockAdjustmentDraft: result.stockAdjustmentDraft ?? null,
         stockTransferDraft: result.stockTransferDraft ?? null,
@@ -184,6 +187,7 @@ export function registerChatbotRoutes(app: Express) {
         accountQueryResult: result.accountQueryResult ?? null,
         verifyContainerDraft: result.verifyContainerDraft ?? null,
         dataQueryResult: result.dataQueryResult ?? null,
+        filePatchDraft: result.filePatchDraft ?? null,
       });
     } catch (error: any) {
       console.error("[Chatbot] ERROR:", error.message);
@@ -961,4 +965,171 @@ export function registerChatbotRoutes(app: Express) {
   // ============================================================
 
   // Get list of legacy EMP-* salary accounts
+
+  // ── Code Agent: apply file patch ───────────────────────────────────────────
+  app.post("/api/chatbot/apply-patch", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const userRole = req.session.currentRole;
+      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
+        return res.status(403).json({ message: "Only Admin/Developer users can apply code changes" });
+      }
+
+      const { filePath, originalContent, newContent } = req.body;
+      if (!filePath || newContent === undefined || newContent === null) {
+        return res.status(400).json({ message: "filePath and newContent are required" });
+      }
+
+      // Validate path is inside workspace
+      let absPath: string;
+      try {
+        absPath = resolveWorkspacePath(filePath);
+      } catch (e: any) {
+        return res.status(400).json({ message: e.message });
+      }
+
+      // Stale guard: check current content matches originalContent
+      // (skip guard if originalContent is empty — means file is being created)
+      if (originalContent && originalContent.trim() !== "") {
+        const currentContent = await readProjectFileRaw(filePath).catch(() => "");
+        if (currentContent !== originalContent) {
+          return res.status(409).json({
+            message: "The file has changed since the diff was generated. Please re-ask the AI to regenerate the patch.",
+            stale: true,
+          });
+        }
+      }
+
+      // Ensure parent directory exists
+      const dir = path.dirname(absPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
+      // Write the new content
+      fs.writeFileSync(absPath, newContent, "utf8");
+
+      await logAIAction({
+        req,
+        actionType: "write",
+        actionName: "apply_patch",
+        inputJson: { filePath, lineCount: newContent.split("\n").length },
+        outputJson: { success: true },
+        status: "success",
+      });
+
+      res.json({ success: true, filePath });
+    } catch (error: any) {
+      console.error("[Chatbot] apply-patch error:", error.message);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Code Agent: commit and push to GitHub ─────────────────────────────────
+  app.post("/api/chatbot/git-push", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const userRole = req.session.currentRole;
+      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
+        return res.status(403).json({ message: "Only Admin/Developer users can push to GitHub" });
+      }
+
+      const { files, message: commitMessage } = req.body;
+      if (!Array.isArray(files) || files.length === 0) {
+        return res.status(400).json({ message: "files array is required" });
+      }
+      if (!commitMessage || !String(commitMessage).trim()) {
+        return res.status(400).json({ message: "Commit message is required" });
+      }
+
+      // Validate all paths
+      for (const f of files) {
+        try {
+          resolveWorkspacePath(f);
+        } catch (e: any) {
+          return res.status(400).json({ message: e.message });
+        }
+      }
+
+      const result = await commitAndPush({
+        files,
+        message: String(commitMessage).trim(),
+        authorName: req.session.userId ? String(req.session.userId) : "ERP Agent",
+        authorEmail: "agent@erp.local",
+      });
+
+      if (!result.success) {
+        return res.status(422).json({ success: false, error: result.error });
+      }
+
+      await logAIAction({
+        req,
+        actionType: "write",
+        actionName: "git_push",
+        inputJson: { files, message: commitMessage },
+        outputJson: { commitHash: result.commitHash, branch: result.branch },
+        status: "success",
+      });
+
+      res.json({ success: true, commitHash: result.commitHash, branch: result.branch });
+    } catch (error: any) {
+      console.error("[Chatbot] git-push error:", error.message);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── GitHub settings ────────────────────────────────────────────────────────
+  app.get("/api/chatbot/github-settings", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const userRole = req.session.currentRole;
+      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const repoUrlRow = await db.select({ value: systemSettings.value })
+        .from(systemSettings).where(eq(systemSettings.key, "github_repo_url")).limit(1);
+
+      const repoUrl = repoUrlRow[0]?.value ?? "";
+      // Mask the token portion in the URL for display
+      const maskedUrl = repoUrl.replace(/https?:\/\/[^@]+@/, "https://***@");
+      const hasToken = repoUrl.includes("@");
+
+      res.json({ repoUrl: maskedUrl, hasToken, configured: !!repoUrl });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/chatbot/github-settings", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const userRole = req.session.currentRole;
+      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
+        return res.status(403).json({ message: "Only Admin/Developer users can configure GitHub settings" });
+      }
+
+      const { repoUrl } = req.body;
+      if (!repoUrl || typeof repoUrl !== "string" || !repoUrl.trim()) {
+        return res.status(400).json({ message: "repoUrl is required" });
+      }
+
+      const cleanUrl = repoUrl.trim();
+
+      // Upsert GITHUB_REPO_URL setting
+      const existing = await db.select().from(systemSettings)
+        .where(eq(systemSettings.key, "github_repo_url")).limit(1);
+
+      if (existing.length > 0) {
+        await db.update(systemSettings)
+          .set({ value: cleanUrl, updatedAt: new Date() })
+          .where(eq(systemSettings.key, "github_repo_url"));
+      } else {
+        await db.insert(systemSettings).values({ key: "github_repo_url", value: cleanUrl } as any);
+      }
+
+      // Also set in process.env for the current session
+      process.env.GITHUB_REPO_URL = cleanUrl;
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 }

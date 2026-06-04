@@ -40,6 +40,11 @@ import {
   Eye,
   EyeOff,
   Cpu,
+  FileCode,
+  GitBranch,
+  GitCommit,
+  Plus,
+  Minus,
 } from "lucide-react";
 import {
   Select,
@@ -228,6 +233,13 @@ interface DataQueryResult {
   noData?: boolean;
 }
 
+interface FilePatchDraft {
+  filePath: string;
+  description: string;
+  originalContent: string;
+  newContent: string;
+}
+
 interface ChatResponse {
   response: string;
   suggestions: string[];
@@ -241,6 +253,7 @@ interface ChatResponse {
   accountQueryResult?: AccountQueryResult | null;
   verifyContainerDraft?: VerifyContainerDraft | null;
   dataQueryResult?: DataQueryResult | null;
+  filePatchDraft?: FilePatchDraft | null;
 }
 
 interface VoucherDraft {
@@ -1849,6 +1862,200 @@ function CodeBlock({ code, lang }: { code: string; lang: string }) {
   );
 }
 
+// ── File diff helpers ─────────────────────────────────────────────────────
+type DiffLine = { type: "same" | "add" | "remove"; line: string };
+
+function computeLineDiff(original: string, modified: string): DiffLine[] {
+  const oldLines = original.split("\n");
+  const newLines = modified.split("\n");
+  const MAX = 400;
+  if (oldLines.length > MAX || newLines.length > MAX) {
+    return newLines.map(line => ({ type: "add" as const, line }));
+  }
+  const m = oldLines.length, n = newLines.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (oldLines[i - 1] === newLines[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
+      else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+  const result: DiffLine[] = [];
+  let i = m, j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
+      result.unshift({ type: "same", line: oldLines[i - 1] }); i--; j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      result.unshift({ type: "add", line: newLines[j - 1] }); j--;
+    } else {
+      result.unshift({ type: "remove", line: oldLines[i - 1] }); i--;
+    }
+  }
+  return result;
+}
+
+interface FileDiffCardProps {
+  draft: FilePatchDraft;
+  onApply: () => void;
+  onCancel: () => void;
+  isApplying: boolean;
+  appliedFile: string | null;
+  onGitPush: (commitMsg: string) => void;
+  isPushing: boolean;
+}
+
+function FileDiffCard({ draft, onApply, onCancel, isApplying, appliedFile, onGitPush, isPushing }: FileDiffCardProps) {
+  const [commitMsg, setCommitMsg] = useState(draft.description);
+  const [showFullDiff, setShowFullDiff] = useState(false);
+  const isApplied = appliedFile === draft.filePath;
+
+  const diffLines = computeLineDiff(draft.originalContent, draft.newContent);
+  const CONTEXT = 3;
+  const visibleSet = new Set<number>();
+  diffLines.forEach((dl, idx) => {
+    if (dl.type !== "same") {
+      for (let k = Math.max(0, idx - CONTEXT); k <= Math.min(diffLines.length - 1, idx + CONTEXT); k++) {
+        visibleSet.add(k);
+      }
+    }
+  });
+
+  const added = diffLines.filter(l => l.type === "add").length;
+  const removed = diffLines.filter(l => l.type === "remove").length;
+  const hasChanges = added > 0 || removed > 0;
+
+  type Segment = { isSkip: true; count: number } | { isSkip: false; item: DiffLine & { idx: number } };
+  const segments: Segment[] = [];
+  let prevIdx = -1;
+  diffLines.forEach((dl, idx) => {
+    if (!visibleSet.has(idx)) return;
+    if (prevIdx !== -1 && idx > prevIdx + 1) {
+      segments.push({ isSkip: true, count: idx - prevIdx - 1 });
+    }
+    segments.push({ isSkip: false, item: { ...dl, idx } });
+    prevIdx = idx;
+  });
+  if (diffLines.length > 0 && prevIdx < diffLines.length - 1 && visibleSet.size > 0) {
+    const trailingSkip = diffLines.length - 1 - prevIdx;
+    if (trailingSkip > 0) segments.push({ isSkip: true, count: trailingSkip });
+  }
+
+  return (
+    <div className="rounded-md border border-border bg-background mt-3 overflow-hidden text-left">
+      <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b border-border gap-2 flex-wrap">
+        <div className="flex items-center gap-2 min-w-0">
+          <FileCode className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-xs font-mono text-foreground truncate max-w-[220px]">{draft.filePath}</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs shrink-0">
+          {added > 0 && <span className="text-green-600 dark:text-green-400 flex items-center gap-0.5"><Plus className="h-3 w-3" />{added}</span>}
+          {removed > 0 && <span className="text-red-500 dark:text-red-400 flex items-center gap-0.5"><Minus className="h-3 w-3" />{removed}</span>}
+        </div>
+      </div>
+
+      <div className="px-3 py-2 bg-muted/20 border-b border-border">
+        <p className="text-xs text-muted-foreground leading-relaxed">{draft.description}</p>
+      </div>
+
+      {hasChanges ? (
+        <div className="overflow-hidden">
+          <pre className={cn(
+            "overflow-x-auto text-xs font-mono leading-5 overflow-y-auto transition-all",
+            showFullDiff ? "max-h-[480px]" : "max-h-64",
+          )}>
+            {segments.length === 0 ? (
+              diffLines.map((dl, idx) => (
+                <div
+                  key={idx}
+                  className={cn(
+                    "px-3 py-px whitespace-pre",
+                    dl.type === "add" && "bg-green-950/40 dark:bg-green-900/30 text-green-300",
+                    dl.type === "remove" && "bg-red-950/40 dark:bg-red-900/30 text-red-300",
+                    dl.type === "same" && "text-muted-foreground",
+                  )}
+                >
+                  <span className="select-none opacity-50 mr-2 w-3 inline-block">
+                    {dl.type === "add" ? "+" : dl.type === "remove" ? "-" : " "}
+                  </span>
+                  {dl.line}
+                </div>
+              ))
+            ) : (
+              segments.map((seg, si) =>
+                seg.isSkip ? (
+                  <div key={`skip-${si}`} className="px-3 py-0.5 text-muted-foreground/50 bg-muted/20 text-xs select-none">
+                    ... {seg.count} unchanged {seg.count === 1 ? "line" : "lines"} ...
+                  </div>
+                ) : (
+                  <div
+                    key={seg.item.idx}
+                    className={cn(
+                      "px-3 py-px whitespace-pre",
+                      seg.item.type === "add" && "bg-green-950/40 dark:bg-green-900/30 text-green-300",
+                      seg.item.type === "remove" && "bg-red-950/40 dark:bg-red-900/30 text-red-300",
+                      seg.item.type === "same" && "text-muted-foreground",
+                    )}
+                  >
+                    <span className="select-none opacity-50 mr-2 w-3 inline-block">
+                      {seg.item.type === "add" ? "+" : seg.item.type === "remove" ? "-" : " "}
+                    </span>
+                    {seg.item.line}
+                  </div>
+                ),
+              )
+            )}
+          </pre>
+          {diffLines.length > 20 && (
+            <button
+              type="button"
+              className="w-full text-xs text-muted-foreground py-1 bg-muted/20 border-t border-border hover:bg-muted/40 transition-colors"
+              onClick={() => setShowFullDiff(v => !v)}
+            >
+              {showFullDiff ? "Collapse diff" : `Show full diff (${diffLines.length} lines)`}
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="px-3 py-3 text-xs text-muted-foreground">No changes detected.</div>
+      )}
+
+      {isApplied ? (
+        <div className="border-t border-border bg-muted/20 px-3 py-2 space-y-2">
+          <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
+            <Check className="h-3.5 w-3.5" />
+            <span>Applied to <span className="font-mono">{draft.filePath}</span></span>
+          </div>
+          <div className="flex gap-2 items-center flex-wrap">
+            <input
+              className="flex-1 min-w-0 h-8 rounded-md border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              value={commitMsg}
+              onChange={e => setCommitMsg(e.target.value)}
+              placeholder="Commit message…"
+            />
+            <Button size="sm" onClick={() => onGitPush(commitMsg)} disabled={isPushing || !commitMsg.trim()}>
+              {isPushing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <GitCommit className="h-3 w-3 mr-1" />}
+              Push to GitHub
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onCancel} disabled={isPushing}>
+              Dismiss
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 px-3 py-2 border-t border-border bg-muted/20 flex-wrap">
+          <Button size="sm" onClick={onApply} disabled={isApplying || !hasChanges}>
+            {isApplying ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
+            Apply Change
+          </Button>
+          <Button size="sm" variant="outline" onClick={onCancel} disabled={isApplying}>
+            Cancel
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main ChatWidget ──────────────────────────────────────────────────
 export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -1880,6 +2087,10 @@ export function ChatWidget() {
   const [pendingStockTransfer, setPendingStockTransfer] = useState<StockTransferDraft | null>(null);
   const [stockTransferSubmitting, setStockTransferSubmitting] = useState(false);
   const [lastUsedProvider, setLastUsedProvider] = useState<string | null>(null);
+  const [pendingFilePatch, setPendingFilePatch] = useState<FilePatchDraft | null>(null);
+  const [patchApplying, setPatchApplying] = useState(false);
+  const [appliedPatchFile, setAppliedPatchFile] = useState<string | null>(null);
+  const [gitPushing, setGitPushing] = useState(false);
   const [location] = useLocation();
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -1956,6 +2167,12 @@ export function ChatWidget() {
         setDataQueryResult(data.dataQueryResult);
       } else {
         setDataQueryResult(null);
+      }
+      if (data.filePatchDraft) {
+        setPendingFilePatch(data.filePatchDraft);
+        setAppliedPatchFile(null);
+      } else {
+        setPendingFilePatch(null);
       }
     },
   });
@@ -2101,6 +2318,54 @@ export function ChatWidget() {
     }
   };
 
+  const handleApplyPatch = async () => {
+    if (!pendingFilePatch) return;
+    setPatchApplying(true);
+    try {
+      const res = await apiRequest("POST", "/api/chatbot/apply-patch", {
+        filePath: pendingFilePatch.filePath,
+        originalContent: pendingFilePatch.originalContent,
+        newContent: pendingFilePatch.newContent,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Apply failed" }));
+        sendMutation.mutate(`Failed to apply patch: ${err.message}`);
+        setPendingFilePatch(null);
+        return;
+      }
+      setAppliedPatchFile(pendingFilePatch.filePath);
+    } catch (err: any) {
+      sendMutation.mutate(`Failed to apply patch: ${err.message}`);
+      setPendingFilePatch(null);
+    } finally {
+      setPatchApplying(false);
+    }
+  };
+
+  const handleGitPush = async (commitMsg: string) => {
+    if (!appliedPatchFile) return;
+    setGitPushing(true);
+    try {
+      const res = await apiRequest("POST", "/api/chatbot/git-push", {
+        files: [appliedPatchFile],
+        message: commitMsg,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        sendMutation.mutate(`Git push failed: ${data.error ?? data.message ?? "Unknown error"}`);
+        return;
+      }
+      setPendingFilePatch(null);
+      setAppliedPatchFile(null);
+      const hashNote = data.commitHash ? ` (${String(data.commitHash).slice(0, 7)})` : "";
+      sendMutation.mutate(`Pushed to GitHub${hashNote}: "${commitMsg}"`);
+    } catch (err: any) {
+      sendMutation.mutate(`Git push failed: ${err.message}`);
+    } finally {
+      setGitPushing(false);
+    }
+  };
+
   useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector(
@@ -2203,6 +2468,8 @@ export function ChatWidget() {
     setPoDraftError(null);
     setVerifyContainerDraft(null);
     setDataQueryResult(null);
+    setPendingFilePatch(null);
+    setAppliedPatchFile(null);
     setShowAlerts(true);
     queryClient.removeQueries({ queryKey: [`/api/chatbot/history/${sessionId}`] });
   };
@@ -2629,6 +2896,19 @@ export function ChatWidget() {
                     <DataQueryResultCard
                       result={dataQueryResult}
                       onDismiss={() => setDataQueryResult(null)}
+                    />
+                  )}
+
+                  {/* ── Phase 2: File Patch Diff Card ── */}
+                  {pendingFilePatch && !sendMutation.isPending && (
+                    <FileDiffCard
+                      draft={pendingFilePatch}
+                      onApply={handleApplyPatch}
+                      onCancel={() => { setPendingFilePatch(null); setAppliedPatchFile(null); }}
+                      isApplying={patchApplying}
+                      appliedFile={appliedPatchFile}
+                      onGitPush={handleGitPush}
+                      isPushing={gitPushing}
                     />
                   )}
                 </div>

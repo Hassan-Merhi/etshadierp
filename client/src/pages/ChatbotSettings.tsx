@@ -18,7 +18,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Bot, Users, MessageCircle, ArrowLeft, Loader2, Check, X, Settings } from "lucide-react";
+import { Bot, Users, MessageCircle, ArrowLeft, Loader2, Check, X, Settings, GitBranch, Eye, EyeOff } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 
@@ -39,9 +39,37 @@ interface ChatMessage {
   username?: string;
 }
 
+interface GitHubSettings {
+  repoUrl: string;
+  hasToken: boolean;
+  configured: boolean;
+}
+
 export default function ChatbotSettings() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("users");
+  const [githubRepoUrl, setGithubRepoUrl] = useState("");
+  const [showToken, setShowToken] = useState(false);
+
+  const { data: githubSettings, isLoading: githubLoading } = useQuery<GitHubSettings>({
+    queryKey: ["/api/chatbot/github-settings"],
+  });
+
+  const githubMutation = useMutation({
+    mutationFn: async (repoUrl: string) => {
+      const response = await apiRequest("PATCH", "/api/chatbot/github-settings", { repoUrl });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chatbot/github-settings"] });
+      setGithubRepoUrl("");
+      toast({ title: "GitHub settings saved", description: "Repository URL has been updated." });
+    },
+    onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error", description: error.message || "Failed to save GitHub settings", variant: "destructive" });
+    },
+  });
 
   const { data: users = [], isLoading: usersLoading } = useQuery<UserChatbotStatus[]>({
     queryKey: ["/api/users/chatbot-status"],
@@ -189,6 +217,74 @@ export default function ChatbotSettings() {
                 </Badge>
               )}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {chatStatus?.isAdminOrOwner && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <GitBranch className="h-5 w-5" />
+              GitHub Integration
+            </CardTitle>
+            <CardDescription>
+              Configure a GitHub repository so the AI agent can push approved code changes. Use an authenticated URL like{" "}
+              <code className="text-xs bg-muted px-1 py-0.5 rounded">https://TOKEN@github.com/user/repo.git</code>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {githubLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading...
+              </div>
+            ) : (
+              <>
+                {githubSettings?.configured && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Check className="h-4 w-4 text-green-500 shrink-0" />
+                    <span className="font-mono text-muted-foreground truncate max-w-sm">
+                      {githubSettings.repoUrl}
+                    </span>
+                    {githubSettings.hasToken && (
+                      <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30 shrink-0">
+                        Token set
+                      </Badge>
+                    )}
+                  </div>
+                )}
+                <div className="flex gap-2 items-center flex-wrap">
+                  <div className="relative flex-1 min-w-[240px]">
+                    <input
+                      type={showToken ? "text" : "password"}
+                      className="w-full h-9 rounded-md border border-border bg-background px-3 pr-9 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                      placeholder={githubSettings?.configured ? "Enter new URL to replace…" : "https://TOKEN@github.com/user/repo.git"}
+                      value={githubRepoUrl}
+                      onChange={e => setGithubRepoUrl(e.target.value)}
+                      data-testid="input-github-repo-url"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => setShowToken(v => !v)}
+                      tabIndex={-1}
+                    >
+                      {showToken ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => githubMutation.mutate(githubRepoUrl)}
+                    disabled={githubMutation.isPending || !githubRepoUrl.trim()}
+                    data-testid="button-save-github"
+                  >
+                    {githubMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Check className="h-3.5 w-3.5 mr-1" />}
+                    Save
+                  </Button>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}

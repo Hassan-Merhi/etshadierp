@@ -2,6 +2,14 @@ import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import { db } from "./db";
 import * as schema from "@shared/schema";
+import {
+  readProjectFile,
+  grepProjectFiles,
+  listProjectDir,
+  extractFilePathsFromMessage,
+  extractSearchPattern,
+  readProjectFileRaw,
+} from "./lib/codeAgentTools";
 import { eq, and, desc, sql, lt, gt, gte, isNull, asc, ilike, or, inArray } from "drizzle-orm";
 import {
   searchStockItems,
@@ -201,11 +209,21 @@ type ChatIntent =
   | "excel_import"
   | "business_summary"
   | "general_knowledge"
+  | "code_read"
+  | "code_edit"
   | "general";
 
 // ── Smart provider routing regexes ────────────────────────────────────────────
 const RE_CODE_GEN = /\b(write (a |an |some )?(code|function|class|script|app|program|website|webpage|component|html page)|build (me )?(a |an )?(app|website|script|tool)|create (a |an )?(app|website|html|component|tool)|generate (a |an )?(html|css|script|app)|make (me )?(a |an )?(app|website|tool)|(html|css|javascript|typescript|python|react|nodejs?)\s+(code|snippet|example|template|app)|code (to|that|which)|how (to|do I) (code|program|write code|build))\b/i;
 const RE_NEWS_QUERY = /\b(latest news|current events|what.{0,25}happening (in|today|now|right now)|news (today|about|on)|recent (developments|events|news)|trending (now|today)|breaking news|what.{0,20}new (in|with|about)|today.{0,15}(news|events|headlines))\b/i;
+
+// ── Code agent intent regexes ─────────────────────────────────────────────────
+// Matches a reference to a project file (path or bare filename with extension)
+const RE_PROJECT_FILE = /\b((?:server|client|shared|scripts)\/[\w./+-]+\.(?:ts|tsx|js|jsx|css|json|md)|[\w-]+\.(?:ts|tsx|js|jsx|json|css|md))\b/i;
+// Read-only intent verbs combined with a project file ref
+const RE_CODE_READ = /\b(?:show me|read|open|explain|what does|how does|how is|describe|view)\b.*\b[\w-]+\.(?:ts|tsx|js|jsx|json|css)|\b(?:find where|search for|where is|grep for|look for|where does)\b/i;
+// Write/edit intent verbs combined with a project file ref OR explicit edit phrasing
+const RE_CODE_EDIT = /\b(?:add|create|edit|fix|update|modify|refactor|implement|write)\b.{0,120}\b[\w-]+\.(?:ts|tsx|js|jsx|json|css)|\b(?:create (?:a )?(?:new )?file|add (?:a )?(?:function|route|endpoint|component|field|column|type|interface|class|method|hook|handler)|fix (?:the )?bug|implement (?:the )?)\b.{0,80}\b(?:server|client|shared)\//i;
 const RE_GENERAL_KNOWLEDGE = /^(hi|hello|hey|yo|sup|hiya|howdy)\b|\b(explain|what (is|are|was|were|does|did)|who (is|are|was|were)|how does|how do|how (can|should) (i|we)|why (is|are|does|do|was|were)|tell me about|write (a |an )?(story|poem|essay|email|letter|blog|article|report)|help me (understand|with|write|create)|translate|summarize|what does .{0,30} mean|give me (a |an )?(example|list|summary|idea)|best (way|practice|approach) to|pros and cons|difference between)\b/i;
 
 // Detect best provider for a given message — returns override or null (use admin setting)
@@ -1359,6 +1377,11 @@ function classifyChatIntent(
   if (RE_PRICE_UPDATE.test(userMessage)) return "price_update";
   if (RE_VOUCHER.test(userMessage)) return "create_voucher";
 
+  // ── Code agent intents (checked before general_knowledge) ──────────────────
+  const hasFileRef = RE_PROJECT_FILE.test(userMessage);
+  if (hasFileRef && RE_CODE_EDIT.test(userMessage)) return "code_edit";
+  if (RE_CODE_READ.test(userMessage) && (hasFileRef || /\b(?:find where|search for|where is|grep for|look for|where does|list files|ls\b)\b/i.test(userMessage))) return "code_read";
+
   // Query intents that need broad context
   if (/\b(excel|import|export|template|download.*excel)\b/i.test(userMessage)) return "excel_import";
   if (/\b(summary|overview|dashboard|today.{0,20}business|how.{0,15}doing|performance|monthly|this month|last month)\b/i.test(userMessage)) return "business_summary";
@@ -1390,6 +1413,8 @@ const ACTION_INTENTS = new Set<ChatIntent>([
   "account_query",
   "excel_import",
   "general_knowledge",
+  "code_read",
+  "code_edit",
 ]);
 
 function buildGeneralSystemPrompt(): string {
@@ -1663,7 +1688,7 @@ export async function chat(
   conversationHistory: { role: string; content: string }[] = [],
   userPreferences?: UserPreferences,
   pageContext?: { currentRoute?: string; entityType?: string; entityId?: number; entityName?: string }
-): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any; stockTransferDraft?: any; voucherSearchResults?: any[]; stockItemDraft?: any; priceUpdateDraft?: any; accountQueryResult?: any; verifyContainerDraft?: any; dataQueryResult?: any }> {
+): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any; stockTransferDraft?: any; voucherSearchResults?: any[]; stockItemDraft?: any; priceUpdateDraft?: any; accountQueryResult?: any; verifyContainerDraft?: any; dataQueryResult?: any; filePatchDraft?: any }> {
   const available = getAvailableProviders();
   
   if (available.length === 0) {
@@ -1698,6 +1723,98 @@ export async function chat(
         "What are the pros and cons of React vs Vue?",
       ];
       console.log("[ChatService] general_knowledge intent — skipping ERP context");
+
+    } else if (intent === "code_read") {
+      // ── Code Read: read project files or grep, inject into system prompt ──────
+      const filePaths = extractFilePathsFromMessage(userMessage);
+      let codeContext = "";
+
+      if (filePaths.length > 0) {
+        for (const fp of filePaths.slice(0, 3)) {
+          try {
+            const { content, totalLines, truncated } = await readProjectFile(fp);
+            codeContext += `\n\n**File: ${fp}** (${totalLines} lines${truncated ? `, first 300 shown` : ""})\n\`\`\`typescript\n${content}\n\`\`\``;
+          } catch (err: any) {
+            // File not found → try a grep search as fallback
+            const grepResult = await grepProjectFiles(fp.replace(/.*\//, "").replace(/\.\w+$/, ""), ".").catch(() => "(not found)");
+            codeContext += `\n\n**File ${fp} not found. Grep results:**\n\`\`\`\n${grepResult}\n\`\`\``;
+          }
+        }
+      } else {
+        // No file paths — try grep for keywords
+        const pattern = extractSearchPattern(userMessage);
+        if (pattern) {
+          try {
+            const grepResult = await grepProjectFiles(pattern, ".");
+            codeContext = `\n\n**Search results for \`${pattern}\`:**\n\`\`\`\n${grepResult}\n\`\`\``;
+          } catch (err: any) {
+            codeContext = `\n\n**Search error:** ${(err as Error).message}`;
+          }
+        } else if (/\b(?:list files|ls\b|what files|directory)\b/i.test(userMessage)) {
+          const dirMatch = userMessage.match(/\b(server|client|shared|scripts)\/[\w./+-]*/);
+          const dir = dirMatch ? dirMatch[0] : ".";
+          try {
+            const entries = await listProjectDir(dir);
+            codeContext = `\n\n**Directory listing for \`${dir}\`:**\n${entries.join("\n")}`;
+          } catch (err: any) {
+            codeContext = `\n\n**Listing error:** ${(err as Error).message}`;
+          }
+        }
+      }
+
+      systemPrompt = `You are a coding assistant with access to this TypeScript ERP/POS project (React + Express + PostgreSQL). Answer the user's question clearly and concisely about the code.${codeContext}\n\nIf you reference specific parts of the code, use code blocks with the language specified.`;
+      suggestions = ["Explain how this works", "Find related files", "Show me all usages"];
+      console.log("[ChatService] code_read intent — loaded file/grep context");
+
+    } else if (intent === "code_edit") {
+      // ── Code Edit: load file and build structured output prompt ───────────────
+      const filePaths = extractFilePathsFromMessage(userMessage);
+      const targetFilePath = filePaths[0] ?? "";
+      let fileContent = "";
+
+      if (targetFilePath) {
+        try {
+          const { content, totalLines, truncated } = await readProjectFile(targetFilePath);
+          fileContent = content;
+          console.log(`[ChatService] code_edit — read ${targetFilePath} (${totalLines} lines${truncated ? ", truncated" : ""})`);
+        } catch {
+          // File may not exist yet (new file creation) — leave fileContent empty
+        }
+      }
+
+      const currentContentBlock = fileContent
+        ? `\n\nCurrent content of \`${targetFilePath}\` (${fileContent.split("\n").length} lines):\n\`\`\`typescript\n${fileContent}\n\`\`\``
+        : targetFilePath
+          ? `\n\nFile \`${targetFilePath}\` does not exist yet — you will be creating it.`
+          : `\n\nNo specific file path was mentioned. Infer the best file to create or edit from the request and set it in filePath.`;
+
+      // We store the original file content for the stale guard (full file, not just 300 lines)
+      const fullOriginalContent = targetFilePath
+        ? await readProjectFileRaw(targetFilePath).catch(() => "")
+        : "";
+
+      systemPrompt = `You are a senior TypeScript engineer on this ERP/POS project (React 18 + Express + Drizzle ORM + shadcn/ui). You MUST respond with ONLY a valid JSON object — no markdown, no explanation, ONLY raw JSON.
+
+User request: "${userMessage}"${currentContentBlock}
+
+Respond with ONLY this JSON:
+{
+  "filePath": "${targetFilePath || "path/to/file.ts"}",
+  "description": "one-sentence description of the change",
+  "originalContent": ${JSON.stringify(fullOriginalContent)},
+  "newContent": "the complete new file content"
+}
+
+Rules:
+- "newContent" must be the COMPLETE file — every line, not just changed parts
+- Preserve all existing imports, exports, and functionality unless explicitly asked to remove something
+- Match the existing coding style, indentation (2 spaces), and TypeScript patterns exactly
+- If creating a new file, "originalContent" must be ""
+- Never truncate newContent — output the entire file even if it is long`;
+
+      suggestions = ["Apply this change", "Show me the diff", "Explain what changed"];
+      console.log(`[ChatService] code_edit intent — target: ${targetFilePath || "(inferred)"}`);
+
     } else if (isActionIntent) {
       // Action intents: skip the expensive full-context load, use a light prompt
       systemPrompt = buildActionSystemPrompt(intent, pageContext);
@@ -1744,6 +1861,31 @@ export async function chat(
       userMessage
     );
     console.log(`[ChatService] AI call (${usedProvider}) took ${Date.now() - aiStart}ms`);
+
+    // ── Code Edit: parse filePatchDraft from AI JSON response ─────────────
+    let filePatchDraft: any = undefined;
+    let finalResponse = response;
+
+    if (intent === "code_edit") {
+      try {
+        const raw = response.trim().replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
+        if (raw.startsWith("{")) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.filePath && "newContent" in parsed) {
+            filePatchDraft = {
+              filePath: parsed.filePath,
+              description: parsed.description || "Apply code changes",
+              originalContent: parsed.originalContent ?? "",
+              newContent: parsed.newContent ?? "",
+            };
+            // Replace the raw JSON response with a friendly message
+            finalResponse = `I've prepared the changes for **\`${parsed.filePath}\`**.\n\n${parsed.description || "Review the diff below and click Apply when you're ready."}\n\nClick **Apply** to write the changes to disk, or **Cancel** to discard.`;
+          }
+        }
+      } catch {
+        // If parsing fails, return the raw response as-is (AI may have explained instead of outputting JSON)
+      }
+    }
 
     // ── Phase 5b: detect voucher creation intent ──────────────────────────
     // Ask the AI to extract a voucher draft if the message contains creation intent.
@@ -5375,7 +5517,7 @@ If the intent does not match any type, output: null`;
 
     console.log(`[ChatService] Total chat time: ${Date.now() - chatStart}ms`);
     return {
-      response,
+      response: finalResponse,
       suggestions,
       provider: usedProvider,
       voucherDraft,
@@ -5387,6 +5529,7 @@ If the intent does not match any type, output: null`;
       accountQueryResult,
       verifyContainerDraft,
       dataQueryResult,
+      filePatchDraft,
     };
   } catch (error: any) {
     console.error("[ChatService] ERROR:", error.message);
