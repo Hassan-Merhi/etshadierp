@@ -1478,6 +1478,56 @@ export function registerStockRoutes(app: Express) {
     }
   });
 
+  // ── Bulk category (stock group) update for existing stock items ───────────────
+  app.post("/api/stock-items/update-categories", requireAuth, requireNonPOS, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { rows } = req.body as { rows: { itemCode: string; categoryName: string }[] };
+      if (!Array.isArray(rows) || rows.length === 0)
+        return res.status(400).json({ message: "rows must be a non-empty array" });
+
+      // Build lookups
+      const allItems = await db
+        .select({ id: stockItems.id, code: stockItems.code })
+        .from(stockItems)
+        .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)));
+      const itemByCode = new Map(allItems.map((i: any) => [i.code.toLowerCase().trim(), i.id]));
+
+      const allGroups = await db
+        .select({ id: stockGroups.id, name: stockGroups.name })
+        .from(stockGroups)
+        .where(eq(stockGroups.companyId, companyId));
+      const groupByName = new Map(allGroups.map((g: any) => [g.name.toLowerCase().trim(), g.id]));
+
+      let updated = 0;
+      let notFound = 0;
+      let categoryNotFound = 0;
+      const notFoundCodes: string[] = [];
+      const categoryNotFoundNames: string[] = [];
+
+      for (const row of rows) {
+        const code = String(row.itemCode || "").trim();
+        const catName = String(row.categoryName || "").trim();
+        if (!code || !catName) continue;
+
+        const itemId = itemByCode.get(code.toLowerCase());
+        if (!itemId) { notFound++; notFoundCodes.push(code); continue; }
+
+        const groupId = groupByName.get(catName.toLowerCase());
+        if (!groupId) { categoryNotFound++; if (!categoryNotFoundNames.includes(catName)) categoryNotFoundNames.push(catName); continue; }
+
+        await db.update(stockItems).set({ stockGroupId: groupId }).where(eq(stockItems.id, itemId));
+        updated++;
+      }
+
+      res.json({ updated, notFound, categoryNotFound, notFoundCodes, categoryNotFoundNames });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ── Grade/Category Template Import ────────────────────────────────────────────
 
   app.post("/api/stock-items/import-grade-category-template", requireAuth, requireNonPOS, upload.single("file"), async (req: any, res) => {
