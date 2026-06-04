@@ -678,12 +678,11 @@ export default function SalesReportDetail() {
                       <TableHead className="text-right">Qty</TableHead>
                       <TableHead className="text-right">Price / Bale</TableHead>
                       <TableHead className="text-right">Total Sales</TableHead>
-                      <TableHead className="text-right">Hassan's Price</TableHead>
+                      <TableHead className="text-right">Cost Price</TableHead>
                       <TableHead className="text-right">Total Cost</TableHead>
                       <TableHead className="text-right">Cost Profit</TableHead>
-                      <TableHead className="text-right">Cost Price</TableHead>
+                      <TableHead className="text-right">Hassan's Price</TableHead>
                       <TableHead className="text-right">Hassan's Profit</TableHead>
-                      <TableHead className="text-right">Config Price</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -730,21 +729,18 @@ export default function SalesReportDetail() {
                               {group.totalQty > 0 ? formatAmount(group.totalSales / group.totalQty) : "—"}
                             </TableCell>
                             <TableCell className="text-right font-mono py-2">{formatAmount(group.totalSales)}</TableCell>
-                            <TableCell className="text-right font-mono py-2">
-                              {group.totalQty > 0 ? formatAmount(group.totalConfiguredCost / group.totalQty) : "—"}
+                            <TableCell className="text-right font-mono py-2 text-muted-foreground">
+                              {group.totalQty > 0 ? formatAmount(group.totalCost / group.totalQty) : "—"}
                             </TableCell>
                             <TableCell className="text-right font-mono py-2">{formatAmount(group.totalCost)}</TableCell>
                             <TableCell className={`text-right font-mono py-2 ${profitColor(group.costProfit)}`}>
                               {formatAmount(Math.abs(group.costProfit))}
                             </TableCell>
                             <TableCell className="text-right font-mono py-2 text-muted-foreground">
-                              {group.totalQty > 0 ? formatAmount(group.totalCost / group.totalQty) : "—"}
+                              {group.totalQty > 0 ? formatAmount(group.totalConfiguredCost / group.totalQty) : "—"}
                             </TableCell>
                             <TableCell className={`text-right font-mono py-2 ${profitColor(group.configuredProfit)}`}>
                               {formatAmount(Math.abs(group.configuredProfit))}
-                            </TableCell>
-                            <TableCell className="text-right font-mono py-2 text-muted-foreground">
-                              {group.totalQty > 0 ? formatAmount(group.totalConfiguredCost / group.totalQty) : "—"}
                             </TableCell>
                           </TableRow>
 
@@ -794,21 +790,18 @@ export default function SalesReportDetail() {
                                     {loc.totalQty > 0 ? formatAmount(loc.totalSales / loc.totalQty) : "—"}
                                   </TableCell>
                                   <TableCell className="text-right font-mono py-1.5">{formatAmount(loc.totalSales)}</TableCell>
-                                  <TableCell className="text-right font-mono py-1.5">
-                                    {loc.totalQty > 0 ? formatAmount(loc.totalConfiguredCost / loc.totalQty) : "—"}
+                                  <TableCell className="text-right font-mono py-1.5 text-muted-foreground">
+                                    {loc.totalQty > 0 ? formatAmount(loc.totalCost / loc.totalQty) : "—"}
                                   </TableCell>
                                   <TableCell className="text-right font-mono py-1.5">{formatAmount(loc.totalCost)}</TableCell>
                                   <TableCell className={`text-right font-mono py-1.5 ${profitColor(loc.costProfit)}`}>
                                     {formatAmount(Math.abs(loc.costProfit))}
                                   </TableCell>
                                   <TableCell className="text-right font-mono py-1.5 text-muted-foreground">
-                                    {loc.totalQty > 0 ? formatAmount(loc.totalCost / loc.totalQty) : "—"}
+                                    {loc.totalQty > 0 ? formatAmount(loc.totalConfiguredCost / loc.totalQty) : "—"}
                                   </TableCell>
                                   <TableCell className={`text-right font-mono py-1.5 ${profitColor(loc.configuredProfit)}`}>
                                     {formatAmount(Math.abs(loc.configuredProfit))}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono py-1.5 text-muted-foreground">
-                                    {loc.totalQty > 0 ? formatAmount(loc.totalConfiguredCost / loc.totalQty) : "—"}
                                   </TableCell>
                                 </TableRow>
 
@@ -826,16 +819,15 @@ export default function SalesReportDetail() {
                                     <TableCell className="text-right font-mono py-1">{formatNumericValue(item.quantity)}</TableCell>
                                     <TableCell className="text-right font-mono py-1">{formatAmount(item.actualSellingPrice)}</TableCell>
                                     <TableCell className="text-right font-mono py-1">{formatAmount(item.totalSales)}</TableCell>
-                                    <TableCell className="text-right font-mono py-1">{formatAmount(item.configuredSellingPrice)}</TableCell>
+                                    <TableCell className="text-right font-mono py-1">{formatAmount(item.costPrice)}</TableCell>
                                     <TableCell className="text-right font-mono py-1">{formatAmount(item.totalCost)}</TableCell>
                                     <TableCell className={`text-right font-mono py-1 ${profitColor(parseFloat(item.costProfit))}`}>
                                       {formatAmount(Math.abs(parseFloat(item.costProfit)))}
                                     </TableCell>
-                                    <TableCell className="text-right font-mono py-1">{formatAmount(item.costPrice)}</TableCell>
+                                    <TableCell className="text-right font-mono py-1">{formatAmount(item.configuredSellingPrice)}</TableCell>
                                     <TableCell className={`text-right font-mono py-1 ${profitColor(item.configuredProfit)}`}>
                                       {formatAmount(Math.abs(item.configuredProfit))}
                                     </TableCell>
-                                    <TableCell className="text-right font-mono py-1">{formatAmount(item.configuredSellingPrice)}</TableCell>
                                   </TableRow>
                                 ))}
                               </>
@@ -864,7 +856,6 @@ export default function SalesReportDetail() {
                       <TableCell className={`text-right font-mono ${profitColor(configuredProfit)}`}>
                         {formatAmount(Math.abs(configuredProfit))}
                       </TableCell>
-                      <TableCell></TableCell>
                     </TableRow>
                   </TableFooter>
                 </Table>
