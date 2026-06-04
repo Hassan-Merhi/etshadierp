@@ -363,6 +363,7 @@ export const suppliers = pgTable("suppliers", {
   active: boolean("active").notNull().default(true),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  stockGroupId: integer("stock_group_id").references(() => stockGroups.id, { onDelete: "set null" }),
 });
 
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({

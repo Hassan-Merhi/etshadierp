@@ -33,18 +33,41 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
           ORDER BY si.code
         `, [proformaId, companyId]);
       } else {
-        itemsResult = await pool.query(`
-          SELECT si.id, si.code, si.name, si.stock_group_id,
-            sg.name as stock_group_name,
-            NULL::integer as proforma_qty,
-            NULL::numeric as proforma_price,
-            si.code as proforma_barcode
-          FROM stock_items si
-          LEFT JOIN stock_groups sg ON sg.id = si.stock_group_id
-          WHERE si.company_id = $1
-            AND si.deleted_at IS NULL
-          ORDER BY si.code
-        `, [companyId]);
+        // Look up the supplier's linked stock group (if any)
+        const supplierRow = await pool.query(
+          `SELECT stock_group_id FROM suppliers WHERE id = $1`,
+          [supplierId]
+        );
+        const linkedStockGroupId = supplierRow.rows[0]?.stock_group_id ?? null;
+
+        if (linkedStockGroupId) {
+          itemsResult = await pool.query(`
+            SELECT si.id, si.code, si.name, si.stock_group_id,
+              sg.name as stock_group_name,
+              NULL::integer as proforma_qty,
+              NULL::numeric as proforma_price,
+              si.code as proforma_barcode
+            FROM stock_items si
+            LEFT JOIN stock_groups sg ON sg.id = si.stock_group_id
+            WHERE si.company_id = $1
+              AND si.deleted_at IS NULL
+              AND si.stock_group_id = $2
+            ORDER BY si.code
+          `, [companyId, linkedStockGroupId]);
+        } else {
+          itemsResult = await pool.query(`
+            SELECT si.id, si.code, si.name, si.stock_group_id,
+              sg.name as stock_group_name,
+              NULL::integer as proforma_qty,
+              NULL::numeric as proforma_price,
+              si.code as proforma_barcode
+            FROM stock_items si
+            LEFT JOIN stock_groups sg ON sg.id = si.stock_group_id
+            WHERE si.company_id = $1
+              AND si.deleted_at IS NULL
+            ORDER BY si.code
+          `, [companyId]);
+        }
       }
       const items = itemsResult.rows;
       if (items.length === 0) return res.json([]);

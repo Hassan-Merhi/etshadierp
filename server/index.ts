@@ -2627,6 +2627,7 @@ let migrationsDone = false;
       `ALTER TABLE ledger_accounts ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
       `ALTER TABLE employees ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
       `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS stock_group_id integer REFERENCES stock_groups(id) ON DELETE SET NULL`,
       `ALTER TABLE stock_groups ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
       `ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
       `ALTER TABLE bank_accounts ADD COLUMN IF NOT EXISTS deleted_at timestamp`,

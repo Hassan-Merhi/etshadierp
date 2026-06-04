@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
@@ -133,6 +133,7 @@ export default function SupplierProfitCheck() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const companyId = selectedCompany?.id;
+  const queryClient = useQueryClient();
 
   // Setup state
   const [supplierId, setSupplierId] = useState<string>("");
@@ -169,6 +170,32 @@ export default function SupplierProfitCheck() {
       const res = await fetch(`/api/suppliers?companyId=${companyId}`, { credentials: "include" });
       return res.ok ? res.json() : [];
     },
+  });
+
+  const { data: stockGroups = [] } = useQuery<any[]>({
+    queryKey: ["/api/stock-groups", companyId],
+    enabled: !!companyId,
+    queryFn: async () => {
+      const res = await fetch(`/api/stock-groups?companyId=${companyId}`, { credentials: "include" });
+      return res.ok ? res.json() : [];
+    },
+  });
+
+  // The currently-selected supplier's linked stock group
+  const selectedSupplier = suppliers.find((s: any) => String(s.id) === supplierId);
+  const linkedStockGroupId: number | null = selectedSupplier?.stockGroupId ?? selectedSupplier?.stock_group_id ?? null;
+
+  const linkStockGroupMutation = useMutation({
+    mutationFn: async (stockGroupId: number | null) => {
+      const res = await apiRequest("PATCH", `/api/suppliers/${supplierId}/stock-group`, { stockGroupId });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/supplier-profit-check/analyze"] });
+      toast({ title: "Supplier stock group updated" });
+    },
+    onError: (err: any) => toast({ title: "Failed to update", description: err.message, variant: "destructive" }),
   });
 
   const { data: proformas = [] } = useQuery<any[]>({
@@ -432,6 +459,34 @@ export default function SupplierProfitCheck() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Linked Stock Group — only shown when sourceType is "all" and a supplier is selected */}
+              {sourceType === "all" && supplierId && (
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Linked Stock Group
+                    {linkedStockGroupId && (
+                      <span className="ml-1 text-emerald-600 dark:text-emerald-400">(active filter)</span>
+                    )}
+                  </label>
+                  <Select
+                    value={linkedStockGroupId ? String(linkedStockGroupId) : "__all__"}
+                    onValueChange={(v) => linkStockGroupMutation.mutate(v === "__all__" ? null : Number(v))}
+                    disabled={linkStockGroupMutation.isPending}
+                    data-testid="select-linked-stock-group"
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All items (no filter)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All items (no filter)</SelectItem>
+                      {stockGroups.map((g: any) => (
+                        <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {sourceType === "proforma" ? (
                 <div className="space-y-1">

@@ -321,5 +321,20 @@ export function registerSupplierRoutes(app: Express) {
     },
   );
 
+  // PATCH /api/suppliers/:id/stock-group — link/unlink a stock group from a supplier
+  app.patch("/api/suppliers/:id/stock-group", requireAuth, async (req: any, res: any) => {
+    try {
+      const supplierId = parseInt(req.params.id);
+      const { stockGroupId } = req.body; // null to unlink
+      await db
+        .update(suppliers)
+        .set({ stockGroupId: stockGroupId ?? null })
+        .where(eq(suppliers.id, supplierId));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Customers
 }
