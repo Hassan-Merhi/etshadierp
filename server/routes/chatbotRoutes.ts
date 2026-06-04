@@ -271,6 +271,62 @@ export function registerChatbotRoutes(app: Express) {
     }
   });
 
+  // ── My chat sessions (any logged-in user, own history only) ──────────────
+  app.get("/api/chatbot/my-sessions", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      const companyId = req.session.currentCompanyId;
+      if (!userId || !companyId) return res.status(400).json({ message: "Not authenticated" });
+
+      const rows = await db
+        .select({
+          sessionId: chatMessages.sessionId,
+          messageCount: sql<number>`count(*)::int`,
+          lastMessageTime: sql<string>`max(${chatMessages.createdAt})`,
+          preview: sql<string>`min(case when ${chatMessages.role} = 'user' then ${chatMessages.content} end)`,
+        })
+        .from(chatMessages)
+        .where(and(
+          eq(chatMessages.userId, String(userId)),
+          eq(chatMessages.companyId, companyId),
+        ))
+        .groupBy(chatMessages.sessionId)
+        .orderBy(desc(sql`max(${chatMessages.createdAt})`))
+        .limit(100);
+
+      res.json(rows.map(r => ({
+        sessionId: r.sessionId,
+        messageCount: Number(r.messageCount),
+        preview: r.preview ? String(r.preview).slice(0, 100) : "Chat session",
+        lastMessageTime: r.lastMessageTime,
+      })));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Delete a chat session ─────────────────────────────────────────────────
+  app.delete("/api/chatbot/session/:sessionId", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      const companyId = req.session.currentCompanyId;
+      const userRole = req.session.currentRole;
+      if (!userId || !companyId) return res.status(400).json({ message: "Not authenticated" });
+
+      const { sessionId } = req.params;
+
+      const isAdmin = userRole === "Admin" || userRole === "Owner";
+      const whereClause = isAdmin
+        ? and(eq(chatMessages.sessionId, sessionId), eq(chatMessages.companyId, companyId))
+        : and(eq(chatMessages.sessionId, sessionId), eq(chatMessages.userId, String(userId)));
+
+      await db.delete(chatMessages).where(whereClause);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ── PROACTIVE ALERTS DIGEST (5a) ──
   app.get("/api/chatbot/alerts", requireAuth, async (req, res) => {
     try {

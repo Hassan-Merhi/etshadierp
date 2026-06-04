@@ -2101,9 +2101,13 @@ export function ChatWidget() {
   const [message, setMessage] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [feedbackGiven, setFeedbackGiven] = useState<Record<number, "positive" | "negative">>({});
-  const [sessionId, setSessionId] = useState(
-    () => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-  );
+  const [sessionId, setSessionId] = useState(() => {
+    const stored = localStorage.getItem("erp_chat_session");
+    if (stored) return stored;
+    const newId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem("erp_chat_session", newId);
+    return newId;
+  });
   const [showAlerts, setShowAlerts] = useState(true);
   const [pendingVoucher, setPendingVoucher] = useState<VoucherDraft | null>(null);
   const [voucherSubmitting, setVoucherSubmitting] = useState(false);
@@ -2507,7 +2511,10 @@ export function ChatWidget() {
 
   const handleNewChat = () => {
     const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem("erp_chat_session", newSessionId);
     setSessionId(newSessionId);
+    setSessionReadFiles([]);
+    setShowSessionFiles(false);
     setSuggestions([]);
     setFeedbackGiven({});
     setPendingVoucher(null);

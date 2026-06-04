@@ -18,7 +18,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Bot, Users, MessageCircle, ArrowLeft, Loader2, Check, X, Settings, GitBranch, Eye, EyeOff, History, FileCode, RotateCcw, GitCommit } from "lucide-react";
+import { Bot, Users, MessageCircle, ArrowLeft, Loader2, Check, X, Settings, GitBranch, Eye, EyeOff, History, FileCode, RotateCcw, GitCommit, Trash2, PlusCircle } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 
@@ -56,12 +56,21 @@ interface PatchHistoryEntry {
   revertedAt: string | null;
 }
 
+interface MySession {
+  sessionId: string;
+  messageCount: number;
+  preview: string;
+  lastMessageTime: string;
+}
+
 export default function ChatbotSettings() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("users");
   const [githubRepoUrl, setGithubRepoUrl] = useState("");
   const [githubToken, setGithubToken] = useState("");
   const [showToken, setShowToken] = useState(false);
+  const [viewAllChats, setViewAllChats] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<string | null>(null);
 
   const { data: githubSettings, isLoading: githubLoading } = useQuery<GitHubSettings>({
     queryKey: ["/api/chatbot/github-settings"],
@@ -88,8 +97,14 @@ export default function ChatbotSettings() {
     queryKey: ["/api/users/chatbot-status"],
   });
 
-  const { data: chatHistory = [], isLoading: historyLoading } = useQuery<ChatMessage[]>({
+  const { data: chatHistory = [], isLoading: allHistoryLoading } = useQuery<ChatMessage[]>({
     queryKey: ["/api/chatbot/all-history"],
+    enabled: activeTab === "history" && !!chatStatus?.isAdminOrOwner && viewAllChats,
+  });
+
+  const { data: mySessions = [], isLoading: mySessionsLoading, refetch: refetchMySessions } = useQuery<MySession[]>({
+    queryKey: ["/api/chatbot/my-sessions"],
+    enabled: activeTab === "history",
   });
 
   const { data: chatStatus } = useQuery<{ enabled: boolean; hasApiKey: boolean; providerName: string; selectedProvider: string; isAdminOrOwner: boolean }>({
@@ -178,12 +193,31 @@ export default function ChatbotSettings() {
     return acc;
   }, {} as Record<string, { sessionId: string; username: string; userId: number; messages: ChatMessage[]; lastMessageTime: string }>);
 
-  const sessions = Object.values(groupedHistory).sort(
+  const allSessions = Object.values(groupedHistory).sort(
     (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
   );
 
-  const [selectedSession, setSelectedSession] = useState<string | null>(null);
-  const selectedMessages = selectedSession ? groupedHistory[selectedSession]?.messages || [] : [];
+  const { data: selectedSessionMessages = [], isLoading: sessionMessagesLoading } = useQuery<{ id: number; role: string; message: string; createdAt: string }[]>({
+    queryKey: [`/api/chatbot/history/${selectedSession}`],
+    enabled: !!selectedSession,
+  });
+
+  const deleteSessionMutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      const response = await apiRequest("DELETE", `/api/chatbot/session/${sessionId}`, {});
+      return response.json();
+    },
+    onSuccess: (_, sessionId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chatbot/my-sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/chatbot/all-history"] });
+      if (selectedSession === sessionId) setSelectedSession(null);
+      toast({ title: "Deleted", description: "The conversation has been deleted." });
+    },
+    onError: (error: any) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error", description: error.message || "Failed to delete conversation", variant: "destructive" });
+    },
+  });
 
   return (
     <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-6">
@@ -411,68 +445,148 @@ export default function ChatbotSettings() {
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4">
+          {/* Admin toggle between My Chats / All Chats */}
+          {chatStatus?.isAdminOrOwner && (
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant={!viewAllChats ? "default" : "outline"}
+                onClick={() => { setViewAllChats(false); setSelectedSession(null); }}
+                data-testid="button-my-chats"
+              >
+                My Chats
+              </Button>
+              <Button
+                size="sm"
+                variant={viewAllChats ? "default" : "outline"}
+                onClick={() => { setViewAllChats(true); setSelectedSession(null); }}
+                data-testid="button-all-chats"
+              >
+                <Users className="h-3.5 w-3.5 mr-1.5" />
+                All Users
+              </Button>
+            </div>
+          )}
+
           <div className="grid md:grid-cols-3 gap-4">
+            {/* Session list */}
             <Card className="md:col-span-1">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Conversations</CardTitle>
+                <CardTitle className="text-base flex items-center justify-between gap-2">
+                  <span>{viewAllChats ? "All Conversations" : "My Conversations"}</span>
+                  {!viewAllChats && (
+                    <Badge variant="secondary" className="text-xs">
+                      {mySessions.length}
+                    </Badge>
+                  )}
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                {historyLoading ? (
+                {(viewAllChats ? allHistoryLoading : mySessionsLoading) ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
-                ) : sessions.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8 px-4">No chat history yet.</p>
+                ) : (viewAllChats ? allSessions : mySessions).length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+                    <MessageCircle className="h-8 w-8 mb-2 opacity-40" />
+                    <p className="text-sm">No conversations yet.</p>
+                    <p className="text-xs mt-1 opacity-70">Start a chat to see history here.</p>
+                  </div>
                 ) : (
-                  <ScrollArea className="h-[400px]">
-                    <div className="space-y-1 p-2">
-                      {sessions.map((session) => (
-                        <button
-                          key={session.sessionId}
-                          onClick={() => setSelectedSession(session.sessionId)}
-                          className={`w-full text-left p-3 rounded-md transition-colors ${
-                            selectedSession === session.sessionId
-                              ? "bg-primary/10"
-                              : "hover-elevate"
-                          }`}
-                          data-testid={`button-session-${session.sessionId}`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium truncate">{session.username}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {session.messages.length}
-                            </Badge>
+                  <ScrollArea className="h-[440px]">
+                    <div className="space-y-0.5 p-2">
+                      {(viewAllChats ? allSessions : mySessions).map((session) => {
+                        const sid = session.sessionId ?? "";
+                        const preview = viewAllChats
+                          ? (session as typeof allSessions[0]).username
+                          : (session as MySession).preview;
+                        const msgCount = viewAllChats
+                          ? (session as typeof allSessions[0]).messages.length
+                          : (session as MySession).messageCount;
+                        const lastTime = session.lastMessageTime;
+                        return (
+                          <div
+                            key={sid}
+                            className={`group flex items-start gap-1 w-full rounded-md transition-colors ${
+                              selectedSession === sid ? "bg-primary/10" : "hover-elevate"
+                            }`}
+                          >
+                            <button
+                              onClick={() => setSelectedSession(sid)}
+                              className="flex-1 min-w-0 text-left p-3"
+                              data-testid={`button-session-${sid}`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium truncate flex-1">{preview}</p>
+                                <Badge variant="outline" className="text-xs shrink-0">
+                                  {msgCount}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {format(new Date(lastTime), "MMM d, h:mm a")}
+                              </p>
+                            </button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 mt-1.5 mr-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 text-destructive"
+                              onClick={() => deleteSessionMutation.mutate(sid)}
+                              disabled={deleteSessionMutation.isPending}
+                              title="Delete conversation"
+                              data-testid={`button-delete-session-${sid}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {format(new Date(session.lastMessageTime), "MMM d, h:mm a")}
-                          </p>
-                        </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   </ScrollArea>
                 )}
               </CardContent>
             </Card>
 
+            {/* Message view */}
             <Card className="md:col-span-2">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Messages</CardTitle>
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-base">Messages</CardTitle>
+                  {selectedSession && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-destructive border-destructive/40 hover:bg-destructive/10"
+                      onClick={() => deleteSessionMutation.mutate(selectedSession)}
+                      disabled={deleteSessionMutation.isPending}
+                      data-testid="button-delete-selected-session"
+                    >
+                      {deleteSessionMutation.isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                      )}
+                      Delete
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 {!selectedSession ? (
                   <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                    <MessageCircle className="h-12 w-12 mb-4" />
-                    <p>Select a conversation to view messages</p>
+                    <MessageCircle className="h-10 w-10 mb-3 opacity-40" />
+                    <p className="text-sm">Select a conversation to read it</p>
+                  </div>
+                ) : sessionMessagesLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
                 ) : (
-                  <ScrollArea className="h-[400px] p-4">
+                  <ScrollArea className="h-[440px] p-4">
                     <div className="space-y-3">
-                      {selectedMessages.map((msg) => (
+                      {selectedSessionMessages.map((msg) => (
                         <div
                           key={msg.id}
-                          className={`flex gap-2 ${
-                            msg.role === "user" ? "justify-end" : "justify-start"
-                          }`}
+                          className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                           data-testid={`message-${msg.id}`}
                         >
                           {msg.role === "assistant" && (
@@ -482,21 +596,17 @@ export default function ChatbotSettings() {
                           )}
                           <div
                             className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                              msg.role === "user"
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted"
+                              msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
                             }`}
                           >
                             <p className="whitespace-pre-wrap break-words">{msg.message}</p>
-                            <p className="text-xs opacity-70 mt-1">
+                            <p className="text-xs opacity-60 mt-1">
                               {format(new Date(msg.createdAt), "h:mm a")}
                             </p>
                           </div>
                           {msg.role === "user" && (
                             <div className="flex-shrink-0 h-7 w-7 rounded-full bg-muted flex items-center justify-center">
-                              <span className="text-xs font-medium">
-                                {msg.username?.charAt(0).toUpperCase() || "U"}
-                              </span>
+                              <span className="text-xs font-medium">Me</span>
                             </div>
                           )}
                         </div>
