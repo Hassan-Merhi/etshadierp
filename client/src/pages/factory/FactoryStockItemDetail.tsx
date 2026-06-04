@@ -76,7 +76,12 @@ export default function FactoryStockItemDetail() {
   useEscapeBack(handleBack);
 
   const { data, isLoading, error } = useQuery<BaleProductDetail>({
-    queryKey: [`/api/factory/bale-product-detail/${productId}`],
+    queryKey: ["/api/factory/bale-product-detail", productId],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/bale-product-detail/${productId}`, { credentials: "include" });
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to fetch product detail");
+      return res.json();
+    },
     enabled: !!productId,
   });
 

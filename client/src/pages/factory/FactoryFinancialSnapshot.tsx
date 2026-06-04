@@ -211,7 +211,7 @@ export default function FactoryFinancialSnapshot() {
     onSuccess: (_data, { type }) => {
       if (type === "agent") queryClient.invalidateQueries({ queryKey: ["/api/agent-accounts"] });
       else if (type === "freight") queryClient.invalidateQueries({ queryKey: ["/api/freight-accounts"] });
-      else queryClient.invalidateQueries({ queryKey: [`/api/snapshot-pinned-accounts/${type}`] });
+      else queryClient.invalidateQueries({ queryKey: [`/api/snapshot-pinned-accounts/${type as string}`] });
     },
     onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
@@ -225,7 +225,7 @@ export default function FactoryFinancialSnapshot() {
     onSuccess: (_data, { type }) => {
       if (type === "agent") queryClient.invalidateQueries({ queryKey: ["/api/agent-accounts"] });
       else if (type === "freight") queryClient.invalidateQueries({ queryKey: ["/api/freight-accounts"] });
-      else queryClient.invalidateQueries({ queryKey: [`/api/snapshot-pinned-accounts/${type}`] });
+      else queryClient.invalidateQueries({ queryKey: [`/api/snapshot-pinned-accounts/${type as string}`] });
     },
     onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });

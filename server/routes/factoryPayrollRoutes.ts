@@ -334,7 +334,9 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         return res.status(400).json({ message: "companyId is required" });
       }
 
-      const conditions: any[] = [eq(factoryPayrolls.companyId, parseInt(companyId as string))];
+      const companyIdNum = parseInt(companyId as string, 10);
+      if (isNaN(companyIdNum)) return res.status(400).json({ message: "Invalid companyId" });
+      const conditions: any[] = [eq(factoryPayrolls.companyId, companyIdNum)];
       if (startDate) conditions.push(gte(factoryPayrolls.periodStart, startDate as string));
       if (endDate) conditions.push(lte(factoryPayrolls.periodEnd, endDate as string));
       if (status) conditions.push(eq(factoryPayrolls.status, status as string));

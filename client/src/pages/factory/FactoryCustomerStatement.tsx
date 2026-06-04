@@ -104,7 +104,12 @@ export default function FactoryCustomerStatement() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: statement, isLoading } = useQuery<StatementData>({
-    queryKey: [`/api/factory/customers/${customerId}/statement`],
+    queryKey: ["/api/factory/customers", customerId, "statement"],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/customers/${customerId}/statement`, { credentials: "include" });
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to fetch statement");
+      return res.json();
+    },
     enabled: !!customerId,
   });
 
@@ -140,7 +145,7 @@ export default function FactoryCustomerStatement() {
       await apiRequest("PATCH", `/api/factory/customers/${customerId}/statement-note`, { statementNote: note });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customers/${customerId}/statement`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers", customerId, "statement"] });
       toast({ title: "Note saved" });
     },
     onError: () => {
@@ -183,7 +188,7 @@ export default function FactoryCustomerStatement() {
     setSavingRowNote(entryId);
     try {
       await apiRequest("PATCH", `/api/factory/customers/${customerId}/balance/${entryId}/note`, { rowNote: note });
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customers/${customerId}/statement`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers", customerId, "statement"] });
     } catch {
       toast({ title: "Failed to save row note", variant: "destructive" });
     } finally {

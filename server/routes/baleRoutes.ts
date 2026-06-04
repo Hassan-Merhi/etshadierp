@@ -81,7 +81,8 @@ export function registerBaleRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid bale ID" });
       const bale = await storage.getBaleById(id);
       
       if (!bale) {
@@ -150,7 +151,8 @@ export function registerBaleRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid bale ID" });
       const existing = await storage.getBaleById(id);
       
       if (!existing) {
@@ -179,7 +181,8 @@ export function registerBaleRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid bale ID" });
       const existing = await storage.getBaleById(id);
       
       if (!existing) {
@@ -366,7 +369,8 @@ export function registerBaleRoutes(app: Express) {
 
   app.patch("/api/pending-barcodes/:id", requireAuth, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid barcode ID" });
       const barcode = await storage.updatePendingBarcode(id, req.body);
       res.json(barcode);
     } catch (error: any) {
@@ -391,7 +395,9 @@ export function registerBaleRoutes(app: Express) {
 
   app.delete("/api/pending-barcodes/:id", requireAuth, async (req, res) => {
     try {
-      await storage.deletePendingBarcode(parseInt(req.params.id));
+      const _bid = parseInt(req.params.id, 10);
+      if (isNaN(_bid)) return res.status(400).json({ message: "Invalid barcode ID" });
+      await storage.deletePendingBarcode(_bid);
       res.status(204).send();
     } catch (error: any) {
       console.error("Error deleting pending barcode:", error);
@@ -426,7 +432,8 @@ export function registerBaleRoutes(app: Express) {
 
   app.patch("/api/bale-product-categories/:id", requireAuth, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid category ID" });
       const existing = await storage.getBaleProductCategoryById(id);
       if (!existing) return res.status(404).json({ message: "Category not found" });
       const updated = await storage.updateBaleProductCategory(id, req.body);
@@ -438,7 +445,8 @@ export function registerBaleRoutes(app: Express) {
 
   app.delete("/api/bale-product-categories/:id", requireAuth, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid category ID" });
       const existing = await storage.getBaleProductCategoryById(id);
       if (!existing) return res.status(404).json({ message: "Category not found" });
       await storage.deleteBaleProductCategory(id);
@@ -2110,7 +2118,8 @@ export function registerBaleRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const batchId = parseInt(req.params.id);
+      const batchId = parseInt(req.params.id, 10);
+      if (isNaN(batchId)) return res.status(400).json({ message: "Invalid batch ID" });
 
       const [batchRow] = await db
         .select({
@@ -2420,7 +2429,8 @@ export function registerBaleRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid bale ID" });
       await storage.deleteProductionBale(id, companyId);
       res.json({ success: true });
     } catch (error: any) {
@@ -2436,7 +2446,8 @@ export function registerBaleRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid bale ID" });
       const { status } = req.body;
       const validStatuses = ["PENDING", "LABEL_PRINTED", "PRESSED", "IN_STOCK", "RESERVED", "SOLD"];
       if (!validStatuses.includes(status)) {
@@ -2865,7 +2876,8 @@ export function registerBaleRoutes(app: Express) {
   app.patch("/api/bale-transfers/:id", requireAuth, async (req, res) => {
     try {
       const { items, status, notes } = req.body;
-      const transferId = parseInt(req.params.id);
+      const transferId = parseInt(req.params.id, 10);
+      if (isNaN(transferId)) return res.status(400).json({ message: "Invalid transfer ID" });
       
       await storage.updateBaleTransfer(transferId, {
         status,
@@ -2905,7 +2917,9 @@ export function registerBaleRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       
-      const bales = await storage.getProductionBalesByLocation(companyId, parseInt(req.params.locationId));
+      const _locId = parseInt(req.params.locationId, 10);
+      if (isNaN(_locId)) return res.status(400).json({ message: "Invalid location ID" });
+      const bales = await storage.getProductionBalesByLocation(companyId, _locId);
       res.json(bales.map(b => ({
         id: b.id,
         baleCode: b.baleCode,

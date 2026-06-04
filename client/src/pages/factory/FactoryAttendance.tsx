@@ -154,7 +154,12 @@ export default function FactoryAttendance() {
   const [notesMap, setNotesMap] = useState<Record<number, string>>({});
 
   const { data, isLoading } = useQuery<{ workers: WorkerRow[]; attendance: AttendanceRecord[] }>({
-    queryKey: [`/api/factory/attendance?date=${selectedDate}`],
+    queryKey: ["/api/factory/attendance", selectedDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/attendance?date=${selectedDate}`, { credentials: "include" });
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to fetch attendance");
+      return res.json();
+    },
   });
 
   useEffect(() => {
@@ -176,7 +181,7 @@ export default function FactoryAttendance() {
     mutationFn: (records: any[]) =>
       apiRequest("POST", "/api/factory/attendance/bulk", { records }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/attendance?date=${selectedDate}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/attendance", selectedDate] });
       toast({ title: "Attendance saved", description: `Saved for ${selectedDate}` });
     },
     onError: (err: any) => {
