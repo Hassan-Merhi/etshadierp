@@ -153,7 +153,6 @@ export default function SupplierProfitCheck() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [statusBasis, setStatusBasis] = useState<"hassan" | "cost">("hassan");
-  const [qtyEnteredOnly, setQtyEnteredOnly] = useState(false);
 
   // Proforma save state
   const [savedProforma, setSavedProforma] = useState<{ id: number; reference: string } | null>(null);
@@ -282,10 +281,9 @@ export default function SupplierProfitCheck() {
           if (activeStatus !== statusFilter) return false;
         }
       }
-      if (qtyEnteredOnly && !(Number(qtyMap[r.stockItemId]) > 0)) return false;
       return true;
     });
-  }, [computedRows, search, statusFilter, statusBasis, qtyEnteredOnly, qtyMap]);
+  }, [computedRows, search, statusFilter, statusBasis, qtyMap]);
 
   // Summary stats (based on items with qty entered)
   const summary = useMemo(() => {
@@ -625,13 +623,6 @@ export default function SupplierProfitCheck() {
                 </SelectContent>
               </Select>
 
-              <Button
-                variant={qtyEnteredOnly ? "default" : "outline"}
-                onClick={() => setQtyEnteredOnly((v) => !v)}
-                data-testid="button-qty-filter"
-              >
-                Qty Entered Only
-              </Button>
             </div>
 
             <div className="flex gap-2">
