@@ -514,22 +514,6 @@ export default function SupplierProfitCheck() {
               </div>
             </div>
 
-            {/* Hassan's Profit */}
-            <div className="rounded-md border bg-card px-3 py-2.5 flex items-start gap-2.5">
-              <div className={`mt-0.5 p-1.5 rounded-md shrink-0 ${summary.totalHassansProfit >= 0 ? "bg-blue-50 dark:bg-blue-900/20" : "bg-red-50 dark:bg-red-900/20"}`}>
-                <TrendingUp className={`w-3.5 h-3.5 ${summary.totalHassansProfit >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-500"}`} />
-              </div>
-              <div className="min-w-0">
-                <div className="text-[11px] font-medium text-muted-foreground">Hassan's Profit</div>
-                <div className={`text-base font-bold leading-tight ${summary.totalHassansProfit >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-600"}`}>
-                  {summary.totalHassansProfit < 0 ? "-" : ""}${fmt(Math.abs(summary.totalHassansProfit))}
-                </div>
-                {summary.hassansProfitPct != null && (
-                  <div className="text-[11px] text-muted-foreground">{fmt(Math.abs(summary.hassansProfitPct), 1)}%</div>
-                )}
-              </div>
-            </div>
-
             {/* Cost Profit */}
             <div className="rounded-md border bg-card px-3 py-2.5 flex items-start gap-2.5">
               <div className={`mt-0.5 p-1.5 rounded-md shrink-0 ${summary.totalCostProfit >= 0 ? "bg-emerald-50 dark:bg-emerald-900/20" : "bg-red-50 dark:bg-red-900/20"}`}>
@@ -668,11 +652,7 @@ export default function SupplierProfitCheck() {
                 <TableHead className="text-right min-w-[100px] text-xs font-semibold">Avg Sell</TableHead>
                 <TableHead className="text-right min-w-[90px] text-xs font-semibold">Avg Cost</TableHead>
                 <TableHead className="text-right min-w-[130px] text-xs font-semibold">
-                  <div className="text-blue-600 dark:text-blue-400">Hassan's Profit</div>
-                  <div className="font-normal text-muted-foreground" style={{ fontSize: "10px" }}>Avg Sell − Cost</div>
-                </TableHead>
-                <TableHead className="text-right min-w-[130px] text-xs font-semibold">
-                  <div className="text-emerald-600 dark:text-emerald-400">Cost Profit</div>
+                  <div className="text-emerald-600 dark:text-emerald-400">Profit</div>
                   <div className="font-normal text-muted-foreground" style={{ fontSize: "10px" }}>Avg Sell − Cost</div>
                 </TableHead>
                 <TableHead className="min-w-[90px] text-xs font-semibold">Status</TableHead>
@@ -682,7 +662,7 @@ export default function SupplierProfitCheck() {
             <TableBody>
               {filteredRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                     <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
                     <p className="text-sm">No items match your filters</p>
                   </TableCell>
@@ -713,9 +693,6 @@ export default function SupplierProfitCheck() {
                         <span className={`font-mono ${row.nCostSource === "missing" ? "text-orange-500" : row.nCostSource === "po_fallback" ? "text-amber-600" : ""}`}>${fmt(row.offloadingCost)}</span>
                       </TableCell>
                       <TableCell>
-                        <ProfitCell value={row.hassansProfit} pct={row.hassansProfitPct} />
-                      </TableCell>
-                      <TableCell>
                         <ProfitCell value={row.costProfit} pct={row.costProfitPct} />
                       </TableCell>
                       <TableCell>
@@ -729,6 +706,14 @@ export default function SupplierProfitCheck() {
                           placeholder="0"
                           value={qtyMap[row.stockItemId] ?? ""}
                           onChange={(e) => setQtyMap((prev) => ({ ...prev, [row.stockItemId]: e.target.value }))}
+                          onKeyDown={(e) => {
+                            if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                              e.preventDefault();
+                              const curr = Number(qtyMap[row.stockItemId] ?? 0);
+                              const next = e.key === "ArrowUp" ? curr + 1 : Math.max(0, curr - 1);
+                              setQtyMap((prev) => ({ ...prev, [row.stockItemId]: String(next) }));
+                            }
+                          }}
                           className="w-24 h-7 text-right ml-auto"
                           data-testid={`input-qty-${row.stockItemId}`}
                         />
