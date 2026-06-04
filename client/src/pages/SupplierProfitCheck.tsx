@@ -141,10 +141,8 @@ export default function SupplierProfitCheck() {
   // Setup state
   const [supplierId, setSupplierId] = useState<string>("");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => {
-    const d = new Date();
-    const from = new Date(d);
-    from.setMonth(d.getMonth() - 3);
-    return { fromDate: from.toISOString().slice(0, 10), toDate: d.toISOString().slice(0, 10), preset: "custom" };
+    const today = new Date().toISOString().slice(0, 10);
+    return { fromDate: today, toDate: today, preset: "today" };
   });
   const [sourceType, setSourceType] = useState<"all" | "proforma">("all");
   const [proformaId, setProformaId] = useState<string>("");
@@ -463,32 +461,7 @@ export default function SupplierProfitCheck() {
                 </Select>
               </div>
 
-              {sourceType === "all" && supplierId ? (
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                    Linked Stock Group
-                    {linkedStockGroupId && (
-                      <span className="text-emerald-600 dark:text-emerald-400 font-medium">(active filter)</span>
-                    )}
-                  </label>
-                  <Select
-                    value={linkedStockGroupId ? String(linkedStockGroupId) : "__all__"}
-                    onValueChange={(v) => linkStockGroupMutation.mutate(v === "__all__" ? null : Number(v))}
-                    disabled={linkStockGroupMutation.isPending}
-                    data-testid="select-linked-stock-group"
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="All items (no filter)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__all__">All items</SelectItem>
-                      {stockGroups.map((g: any) => (
-                        <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : sourceType === "proforma" ? (
+              {sourceType === "proforma" ? (
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Select Proforma</label>
                   <Select value={proformaId} onValueChange={setProformaId}>
