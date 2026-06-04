@@ -1307,56 +1307,6 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         </CardContent>
       </Card>
 
-      {charges.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Extra Charges</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-md border hidden md:block">
-              <Table>
-                <TableHeader className="sticky top-0 z-30 bg-background">
-                  <TableRow>
-                    <TableHead>Charge Type</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {charges.map((charge: any) => (
-                    <TableRow key={charge.id} data-testid={`row-charge-${(charge.chargeType || "").toLowerCase().replace(/\s/g, "-")}`}>
-                      <TableCell className="font-medium">{charge.chargeType}</TableCell>
-                      <TableCell className={`text-right font-semibold ${parseFloat(charge.amount) < 0 ? "text-red-500" : ""}`}>
-                        {formatAmount(charge.amount)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  <TableRow>
-                    <TableCell className="font-bold">Total Charges</TableCell>
-                    <TableCell className="text-right font-bold">
-                      {formatAmount(chargesTotal)}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-            <div className="md:hidden space-y-2">
-              {charges.map((charge: any) => (
-                <div key={charge.id} className="flex justify-between items-center p-2 rounded-md border text-sm" data-testid={`row-charge-${(charge.chargeType || "").toLowerCase().replace(/\s/g, "-")}`}>
-                  <span className="font-medium">{charge.chargeType}</span>
-                  <span className={`font-mono font-semibold ${parseFloat(charge.amount) < 0 ? "text-red-500" : ""}`}>
-                    {formatAmount(charge.amount)}
-                  </span>
-                </div>
-              ))}
-              <div className="flex justify-between items-center p-2 rounded-md border bg-muted/50 text-sm font-bold">
-                <span>Total Charges</span>
-                <span className="font-mono">{formatAmount(chargesTotal)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle>Summary</CardTitle>
