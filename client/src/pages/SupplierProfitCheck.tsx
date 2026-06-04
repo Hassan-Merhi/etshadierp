@@ -883,7 +883,12 @@ export default function SupplierProfitCheck() {
                       {colVisibility.dubaiPrice && (
                         <TableCell className="text-right text-sm">
                           {row.poPrice != null ? (
-                            <span className="font-mono">${fmt(row.poPrice)}</span>
+                            <div>
+                              <span className="font-mono">${fmt(row.poPrice)}</span>
+                              {row.poPriceSource === "any_po_fallback" && (
+                                <div className="text-[10px] text-amber-500 leading-tight">any supplier</div>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-orange-500 text-xs">No PO price</span>
                           )}
