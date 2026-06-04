@@ -408,89 +408,94 @@ export default function SupplierProfitCheck() {
     <div className="h-full overflow-y-auto bg-background">
       <div className="max-w-full p-4 space-y-3">
 
-        {/* ── Page Header ── */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 border border-amber-500/20">
-              <BarChart2 className="w-5 h-5 text-amber-500" />
+        {/* ── Header + Setup (unified card) ── */}
+        <div className="rounded-xl border bg-card overflow-hidden">
+          {/* Top strip: title + action */}
+          <div className="flex items-center justify-between gap-4 px-5 py-3 border-b bg-muted/30">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500/25 to-amber-600/10 border border-amber-500/20 shrink-0">
+                <BarChart2 className="w-4 h-4 text-amber-500" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-base font-bold tracking-tight leading-tight">Supplier Profit Check</h1>
+                <p className="text-[11px] text-muted-foreground">Analyze item profitability before ordering</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">Supplier Profit Check</h1>
-              <p className="text-xs text-muted-foreground">Analyze item profitability before ordering</p>
-            </div>
+            {loaded && !savedProforma && (
+              <Button
+                onClick={() => {
+                  if (itemsWithQty.length === 0) { toast({ title: "Enter qty for at least one item", variant: "destructive" }); return; }
+                  setShowConfirmModal(true);
+                }}
+                disabled={itemsWithQty.length === 0}
+                className="bg-amber-500 text-white shrink-0"
+                data-testid="button-create-proforma"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Create Proforma ({itemsWithQty.length})
+              </Button>
+            )}
+            {loaded && savedProforma && (
+              <div className="flex gap-2 shrink-0">
+                <Button variant="outline" size="sm" onClick={handleExportSupplier} data-testid="button-export-supplier-bar">
+                  <Download className="w-4 h-4 mr-1.5" /> Supplier Excel
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleExportInternal} data-testid="button-export-internal-bar">
+                  <FileText className="w-4 h-4 mr-1.5" /> Analysis Excel
+                </Button>
+              </div>
+            )}
           </div>
-          {/* Sticky Create Proforma */}
-          {loaded && !savedProforma && (
-            <Button
-              onClick={() => {
-                if (itemsWithQty.length === 0) { toast({ title: "Enter qty for at least one item", variant: "destructive" }); return; }
-                setShowConfirmModal(true);
-              }}
-              disabled={itemsWithQty.length === 0}
-              className="bg-amber-500 hover:bg-amber-600 text-white shadow-md shrink-0"
-              data-testid="button-create-proforma"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Create Proforma ({itemsWithQty.length})
-            </Button>
-          )}
-          {loaded && savedProforma && (
-            <div className="flex gap-2 shrink-0">
-              <Button variant="outline" size="sm" onClick={handleExportSupplier} data-testid="button-export-supplier-bar">
-                <Download className="w-4 h-4 mr-1.5" /> Supplier Excel
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExportInternal} data-testid="button-export-internal-bar">
-                <FileText className="w-4 h-4 mr-1.5" /> Analysis Excel
-              </Button>
-            </div>
-          )}
-        </div>
 
-        {/* ── Setup Panel ── */}
-        <div className="rounded-xl border bg-card p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Supplier</label>
-              <Select value={supplierId} onValueChange={setSupplierId}>
-                <SelectTrigger data-testid="select-supplier">
-                  <SelectValue placeholder="Select supplier…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {suppliers.map((s: any) => (
-                    <SelectItem key={s.id} value={String(s.id)}>
-                      {s.legalName || s.legal_name || s.code}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Sales Date Range</label>
-              <PeriodFilter value={periodFilter} onChange={setPeriodFilter} hideCustomInputs data-testid="period-filter-sales" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Item Source</label>
-              <Select value={sourceType} onValueChange={(v) => { setSourceType(v as "all" | "proforma"); setProformaId(""); }}>
-                <SelectTrigger data-testid="select-source-type"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Supplier Items</SelectItem>
-                  <SelectItem value="proforma">Existing Proforma</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {sourceType === "proforma" ? (
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Select Proforma</label>
-                <Select value={proformaId} onValueChange={setProformaId}>
-                  <SelectTrigger data-testid="select-proforma"><SelectValue placeholder="Select proforma…" /></SelectTrigger>
+          {/* Controls row */}
+          <div className="px-5 py-4">
+            <div className="flex flex-wrap gap-4 items-end">
+              <div className="space-y-1.5 min-w-[180px] flex-1">
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Supplier</label>
+                <Select value={supplierId} onValueChange={setSupplierId}>
+                  <SelectTrigger data-testid="select-supplier">
+                    <SelectValue placeholder="Select supplier…" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {proformas.map((p: any) => (
-                      <SelectItem key={p.id} value={String(p.id)}>{p.reference}</SelectItem>
+                    {suppliers.map((s: any) => (
+                      <SelectItem key={s.id} value={String(s.id)}>
+                        {s.legalName || s.legal_name || s.code}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            ) : <div />}
+
+              <div className="space-y-1.5 shrink-0">
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Sales Date Range</label>
+                <PeriodFilter value={periodFilter} onChange={setPeriodFilter} hideCustomInputs data-testid="period-filter-sales" />
+              </div>
+
+              <div className="space-y-1.5 min-w-[160px] shrink-0">
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Item Source</label>
+                <Select value={sourceType} onValueChange={(v) => { setSourceType(v as "all" | "proforma"); setProformaId(""); }}>
+                  <SelectTrigger data-testid="select-source-type"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Supplier Items</SelectItem>
+                    <SelectItem value="proforma">Existing Proforma</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {sourceType === "proforma" && (
+                <div className="space-y-1.5 min-w-[160px] shrink-0">
+                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Select Proforma</label>
+                  <Select value={proformaId} onValueChange={setProformaId}>
+                    <SelectTrigger data-testid="select-proforma"><SelectValue placeholder="Select proforma…" /></SelectTrigger>
+                    <SelectContent>
+                      {proformas.map((p: any) => (
+                        <SelectItem key={p.id} value={String(p.id)}>{p.reference}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
