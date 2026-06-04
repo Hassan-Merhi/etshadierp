@@ -2841,6 +2841,11 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                             <span className="font-mono font-bold text-sm flex-shrink-0">{formatAmount(parseFloat(item.totalValue))}</span>
                           )}
                         </div>
+                        {item.categoryName && (
+                          <div className="mb-2">
+                            <Badge variant="secondary" className="text-xs font-normal">{item.categoryName}</Badge>
+                          </div>
+                        )}
                         <div className="flex items-center gap-3 flex-wrap">
                           {showMovement ? (
                             <>
@@ -2883,25 +2888,27 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 <colgroup>
                   {showMovement ? (
                     <>
-                      <col className="w-[34%]" />
-                      <col className="w-[15%]" />
-                      <col className="w-[15%]" />
+                      <col className="w-[24%]" />
+                      <col className="w-[16%]" />
+                      <col className="w-[14%]" />
+                      <col className="w-[14%]" />
                       <col className="w-[12%]" />
                       {!posUser && (
                         <>
-                          <col className="w-[12%]" />
-                          <col className="w-[12%]" />
+                          <col className="w-[10%]" />
+                          <col className="w-[10%]" />
                         </>
                       )}
                     </>
                   ) : (
                     <>
-                      <col className={posUser ? "w-[82%]" : "w-[46%]"} />
+                      <col className={posUser ? "w-[60%]" : "w-[30%]"} />
+                      <col className="w-[22%]" />
                       <col className="w-[18%]" />
                       {!posUser && (
                         <>
-                          <col className="w-[18%]" />
-                          <col className="w-[18%]" />
+                          <col className="w-[15%]" />
+                          <col className="w-[15%]" />
                         </>
                       )}
                     </>
@@ -2912,12 +2919,16 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                     <th className="text-left px-3 font-medium">Name</th>
                     {showMovement ? (
                       <>
+                        <th className="text-left px-3 font-medium">Category</th>
                         <th className="text-right px-3 font-medium">Opening (BL)</th>
                         <th className="text-right px-3 font-medium">Closing (BL)</th>
                         <th className="text-right px-3 font-medium">Movement</th>
                       </>
                     ) : (
-                      <th className={`text-right px-3 font-medium ${posUser ? "pr-6" : ""}`}>Quantity</th>
+                      <>
+                        <th className="text-left px-3 font-medium">Category</th>
+                        <th className={`text-right px-3 font-medium ${posUser ? "pr-6" : ""}`}>Quantity</th>
+                      </>
                     )}
                     {!posUser && (
                       <>
@@ -2930,7 +2941,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 <tbody>
                   {filteredStockItems.length === 0 ? (
                     <tr>
-                      <td colSpan={posUser ? (showMovement ? 4 : 2) : (showMovement ? 6 : 4)} className="text-center py-8 text-muted-foreground">
+                      <td colSpan={posUser ? (showMovement ? 5 : 3) : (showMovement ? 7 : 5)} className="text-center py-8 text-muted-foreground">
                         {itemSearchTerm ? "No items found matching your search" : "No items in this group"}
                       </td>
                     </tr>
@@ -2966,6 +2977,11 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                 {item.stockItemActive === false && <Badge variant="outline" className="text-xs shrink-0">Inactive</Badge>}
                               </span>
                             </button>
+                          </td>
+                          <td className="px-3">
+                            {item.categoryName
+                              ? <Badge variant="secondary" className="text-xs font-normal">{item.categoryName}</Badge>
+                              : <span className="text-muted-foreground text-xs">—</span>}
                           </td>
                           {showMovement ? (
                             <>
@@ -3006,6 +3022,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   <tfoot className="bg-muted/50 border-t-2 font-semibold">
                     <tr className="h-12">
                       <td className="px-3 font-bold">Total</td>
+                      <td className="px-3"></td>
                       {showMovement ? (
                         <>
                           <td className="px-3 text-right font-mono font-bold text-muted-foreground">
