@@ -14,7 +14,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { PageHeader } from "@/components/PageHeader";
 
 const ALL_LOCATIONS_ID = -1;
 
@@ -653,41 +652,44 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
           )}
         </div>
 
-        <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0 flex-wrap">
-          <Tag className="w-4 h-4 text-muted-foreground" />
-          <PageHeader title="Price List" showBackButton={false} />
-          {isAllMode ? (
-            <Badge variant="secondary" className="gap-1">
-              <Layers className="w-3 h-3" />
-              All Locations
-            </Badge>
-          ) : selectedLocation ? (
-            <Badge variant="secondary" className="gap-1">
-              <MapPin className="w-3 h-3" />
-              {selectedLocation.name}
-            </Badge>
-          ) : null}
+        {/* ── Title bar ── */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <Tag className="w-4 h-4 text-muted-foreground shrink-0" />
+            <h1 className="text-base font-semibold truncate">Price List</h1>
+            {isAllMode ? (
+              <Badge variant="secondary" className="gap-1 shrink-0">
+                <Layers className="w-3 h-3" />
+                All Locations
+              </Badge>
+            ) : selectedLocation ? (
+              <Badge variant="secondary" className="gap-1 shrink-0">
+                <MapPin className="w-3 h-3" />
+                {selectedLocation.name}
+              </Badge>
+            ) : null}
+          </div>
           {selectedLocationId && (
-            <div className="ml-auto flex items-center gap-1.5">
+            <div className="ml-auto flex items-center gap-1.5 shrink-0">
               {isAllMode && canEdit && (
                 <>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     data-testid="button-download-price-template"
                     onClick={downloadTemplate}
                     disabled={masters.length === 0}
-                    className="gap-1.5"
+                    className="gap-1.5 text-muted-foreground"
                   >
                     <FileSpreadsheet className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Template</span>
                   </Button>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     data-testid="button-upload-price-list"
                     onClick={() => { setImportError(null); importFileRef.current?.click(); }}
-                    className="gap-1.5"
+                    className="gap-1.5 text-muted-foreground"
                   >
                     <Upload className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Upload</span>
@@ -703,12 +705,12 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 </>
               )}
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 data-testid="button-export-price-list"
                 onClick={exportToExcel}
                 disabled={exporting || filteredItems.length === 0}
-                className="gap-1.5"
+                className="gap-1.5 text-muted-foreground"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">{exporting ? "Exporting…" : "Export"}</span>
@@ -717,39 +719,44 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
           )}
         </div>
 
+        {/* ── Locations visibility strip ── */}
         {isAllMode && selectedLocationId && (
-          <div className="flex flex-wrap items-center gap-1.5 px-4 py-2 border-b shrink-0 bg-muted/30">
-            <span className="text-xs text-muted-foreground shrink-0 mr-1">Locations:</span>
-            {masters.map((m) => {
-              const isHidden = hiddenLocations.has(m.id);
-              return (
-                <button
-                  key={m.id}
-                  data-testid={`chip-location-${m.id}`}
-                  onClick={() => {
-                    setHiddenLocations((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(m.id)) next.delete(m.id);
-                      else next.add(m.id);
-                      return next;
-                    });
-                  }}
-                  className={cn(
-                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-all",
-                    isHidden
-                      ? "bg-muted text-muted-foreground border-border line-through opacity-50"
-                      : "bg-background text-foreground border-border hover-elevate"
-                  )}
-                >
-                  {m.name}
-                </button>
-              );
-            })}
-            <div className="flex gap-1 ml-auto">
+          <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b shrink-0">
+            <span className="text-xs font-medium text-muted-foreground shrink-0">Locations</span>
+            <div className="w-px h-3.5 bg-border shrink-0" />
+            <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
+              {masters.map((m) => {
+                const isHidden = hiddenLocations.has(m.id);
+                return (
+                  <button
+                    key={m.id}
+                    data-testid={`chip-location-${m.id}`}
+                    onClick={() => {
+                      setHiddenLocations((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(m.id)) next.delete(m.id);
+                        else next.add(m.id);
+                        return next;
+                      });
+                    }}
+                    className={cn(
+                      "inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border transition-all",
+                      isHidden
+                        ? "bg-muted/40 text-muted-foreground border-transparent opacity-50"
+                        : "bg-muted text-foreground border-transparent hover-elevate"
+                    )}
+                  >
+                    {isHidden ? <EyeOff className="w-3 h-3 mr-1 opacity-60" /> : null}
+                    {m.name}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex gap-1 shrink-0">
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 text-xs px-2"
+                className="h-7 text-xs px-2 text-muted-foreground"
                 onClick={() => setHiddenLocations(new Set())}
                 data-testid="button-show-all-locations"
               >
@@ -758,7 +765,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 text-xs px-2"
+                className="h-7 text-xs px-2 text-muted-foreground"
                 onClick={() => setHiddenLocations(new Set(masters.map((m) => m.id)))}
                 data-testid="button-hide-all-locations"
               >
@@ -768,13 +775,14 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
           </div>
         )}
 
+        {/* ── Search + filter row ── */}
         {selectedLocationId && (
-          <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b shrink-0">
+          <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b shrink-0">
             <div className="relative flex-1 min-w-[180px]">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <Input
                 data-testid="input-price-search"
-                className="pl-8"
+                className="pl-9 h-9"
                 placeholder="Search by name or code…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -782,7 +790,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
             </div>
             {stockGroups.length > 0 && !showUnpriced && (
               <Select value={groupFilter} onValueChange={setGroupFilter}>
-                <SelectTrigger data-testid="select-group-filter" className="w-44">
+                <SelectTrigger data-testid="select-group-filter" className="w-40 h-9">
                   <SelectValue placeholder="All groups" />
                 </SelectTrigger>
                 <SelectContent>
@@ -794,69 +802,78 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
               </Select>
             )}
             {canEdit && (
-              <Button
-                variant={showUnpriced ? "default" : "outline"}
-                size="sm"
+              <button
                 data-testid="button-show-unpriced"
                 onClick={() => {
                   setShowUnpriced((v) => !v);
                   setHiddenUnpricedGroups(new Set());
                   setGroupFilter("all");
                 }}
-                className="gap-1.5 shrink-0"
+                className={cn(
+                  "inline-flex items-center gap-2 h-9 px-3 rounded-md text-sm font-medium border transition-colors shrink-0",
+                  showUnpriced
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-muted/60 text-foreground border-transparent hover-elevate"
+                )}
               >
                 <EyeOff className="w-3.5 h-3.5" />
                 Unpriced
                 {unpricedCount > 0 && (
-                  <Badge variant={showUnpriced ? "secondary" : "destructive"} className="ml-0.5 px-1.5 py-0 text-xs">
+                  <span className={cn(
+                    "inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded text-[11px] font-semibold",
+                    showUnpriced ? "bg-primary-foreground/20 text-primary-foreground" : "bg-foreground/10 text-foreground"
+                  )}>
                     {unpricedCount}
-                  </Badge>
+                  </span>
                 )}
-              </Button>
+              </button>
             )}
           </div>
         )}
 
         {/* ── Unpriced group chips ── */}
         {selectedLocationId && showUnpriced && unpricedByGroup.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 px-4 py-2 border-b shrink-0 bg-muted/30">
-            <span className="text-xs text-muted-foreground shrink-0 mr-1">Groups:</span>
-            {unpricedByGroup.map(({ name, count }) => {
-              const isHidden = hiddenUnpricedGroups.has(name);
-              return (
-                <button
-                  key={name}
-                  data-testid={`chip-unpriced-group-${name}`}
-                  onClick={() => {
-                    setHiddenUnpricedGroups((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(name)) next.delete(name);
-                      else next.add(name);
-                      return next;
-                    });
-                  }}
-                  className={cn(
-                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-all",
-                    isHidden
-                      ? "bg-muted text-muted-foreground border-border line-through opacity-50"
-                      : "bg-background text-foreground border-border hover-elevate"
-                  )}
-                >
-                  {name}
-                  <span className={cn(
-                    "text-[10px] font-semibold px-1 py-0 rounded-full",
-                    isHidden ? "bg-muted-foreground/20 text-muted-foreground" : "bg-amber-500/20 text-amber-700 dark:text-amber-400"
-                  )}>
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-            <div className="flex gap-1 ml-auto">
+          <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b shrink-0">
+            <span className="text-xs font-medium text-muted-foreground shrink-0">Groups</span>
+            <div className="w-px h-3.5 bg-border shrink-0" />
+            <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
+              {unpricedByGroup.map(({ name, count }) => {
+                const isHidden = hiddenUnpricedGroups.has(name);
+                return (
+                  <button
+                    key={name}
+                    data-testid={`chip-unpriced-group-${name}`}
+                    onClick={() => {
+                      setHiddenUnpricedGroups((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(name)) next.delete(name);
+                        else next.add(name);
+                        return next;
+                      });
+                    }}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all",
+                      isHidden
+                        ? "bg-muted/40 text-muted-foreground border-transparent opacity-50"
+                        : "bg-muted text-foreground border-transparent hover-elevate"
+                    )}
+                  >
+                    <span>{name}</span>
+                    <span className={cn(
+                      "inline-flex items-center justify-center min-w-[1.1rem] h-4 px-1 rounded text-[10px] font-bold",
+                      isHidden ? "bg-muted-foreground/15 text-muted-foreground" : "bg-amber-500/20 text-amber-700 dark:text-amber-400"
+                    )}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex gap-1 shrink-0">
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 text-xs px-2"
+                className="h-7 text-xs px-2 text-muted-foreground"
                 onClick={() => setHiddenUnpricedGroups(new Set())}
                 data-testid="button-show-all-unpriced-groups"
               >
@@ -865,7 +882,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 text-xs px-2"
+                className="h-7 text-xs px-2 text-muted-foreground"
                 onClick={() => setHiddenUnpricedGroups(new Set(unpricedByGroup.map((g) => g.name)))}
                 data-testid="button-hide-all-unpriced-groups"
               >
