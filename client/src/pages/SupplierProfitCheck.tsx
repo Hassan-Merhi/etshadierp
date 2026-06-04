@@ -156,6 +156,7 @@ export default function SupplierProfitCheck() {
   // Filter state
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusBasis, setStatusBasis] = useState<"hassan" | "cost">("hassan");
   const [qtyEnteredOnly, setQtyEnteredOnly] = useState(false);
 
   // Proforma save state
@@ -224,14 +225,14 @@ export default function SupplierProfitCheck() {
         if (statusFilter === "missing_offload") {
           if (r.offloadingCost > 0) return false;
         } else {
-          // filter by config status (primary profit)
-          if (r.statusByConfig !== statusFilter) return false;
+          const activeStatus = statusBasis === "cost" ? r.statusByOffload : r.statusByConfig;
+          if (activeStatus !== statusFilter) return false;
         }
       }
       if (qtyEnteredOnly && !(Number(qtyMap[r.stockItemId]) > 0)) return false;
       return true;
     });
-  }, [computedRows, search, statusFilter, qtyEnteredOnly, qtyMap]);
+  }, [computedRows, search, statusFilter, statusBasis, qtyEnteredOnly, qtyMap]);
 
   // Summary stats (based on items with qty entered)
   const summary = useMemo(() => {
@@ -562,15 +563,25 @@ export default function SupplierProfitCheck() {
                 />
               </div>
 
+              <Select value={statusBasis} onValueChange={(v) => setStatusBasis(v as "hassan" | "cost")}>
+                <SelectTrigger className="w-44" data-testid="select-status-basis">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="hassan">Status: Hassan's Profit</SelectItem>
+                  <SelectItem value="cost">Status: Cost Profit</SelectItem>
+                </SelectContent>
+              </Select>
+
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-44" data-testid="select-status-filter">
+                <SelectTrigger className="w-40" data-testid="select-status-filter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="gaining">Gaining (Config)</SelectItem>
-                  <SelectItem value="losing">Losing (Config)</SelectItem>
-                  <SelectItem value="break_even">Break Even (Config)</SelectItem>
+                  <SelectItem value="gaining">Gaining</SelectItem>
+                  <SelectItem value="losing">Losing</SelectItem>
+                  <SelectItem value="break_even">Break Even</SelectItem>
                   <SelectItem value="no_sales_data">No Sales Data</SelectItem>
                   <SelectItem value="missing_offload">Missing Offload Cost</SelectItem>
                 </SelectContent>
@@ -685,7 +696,7 @@ export default function SupplierProfitCheck() {
                           <ProfitCell value={row.costProfit} pct={row.costProfitPct} />
                         </TableCell>
                         <TableCell>
-                          <StatusBadge status={row.statusByConfig} />
+                          <StatusBadge status={statusBasis === "cost" ? row.statusByOffload : row.statusByConfig} />
                         </TableCell>
                         <TableCell>
                           <Input
