@@ -207,10 +207,13 @@ export default function Containers() {
     } as const;
   };
 
-  const { data: allContainers = [], isLoading } = useQuery<Container[]>({
+  const { data: rawContainers = [], isLoading } = useQuery<Container[]>({
     queryKey: ["/api/containers/active", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
   });
+  const allContainers = rawContainers.slice().sort((a, b) =>
+    new Date(b.importDate).getTime() - new Date(a.importDate).getTime()
+  );
 
   const { data: soldContainers = [], isLoading: isSoldLoading } = useQuery<
     SoldContainer[]
