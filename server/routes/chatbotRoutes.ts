@@ -53,6 +53,22 @@ import fs from "fs";
 import { requireAIActionPermission, logAIAction } from "../lib/aiActionPermission";
 import { resolveWorkspacePath, readProjectFileRaw } from "../lib/codeAgentTools";
 import { commitAndPush } from "../lib/githubPush";
+import CryptoJS from "crypto-js";
+
+// ── GitHub token encryption helpers ────────────────────────────────────────
+// Key is derived from SESSION_SECRET so it survives restarts without a new env var.
+const _tokenKey = () => process.env.SESSION_SECRET ?? "erp-github-token-fallback-key";
+function encryptToken(plain: string): string {
+  return CryptoJS.AES.encrypt(plain, _tokenKey()).toString();
+}
+function decryptToken(cipher: string): string {
+  try {
+    const bytes = CryptoJS.AES.decrypt(cipher, _tokenKey());
+    return bytes.toString(CryptoJS.enc.Utf8) || "";
+  } catch {
+    return "";
+  }
+}
 
 export function registerChatbotRoutes(app: Express) {
   app.get("/api/chatbot/status", requireAuth, async (req, res) => {
@@ -1069,7 +1085,9 @@ export function registerChatbotRoutes(app: Express) {
       ]);
 
       const baseUrl = urlRow[0]?.value ?? process.env.GITHUB_REPO_URL ?? "";
-      const token = tokenRow[0]?.value ?? process.env.GITHUB_TOKEN ?? "";
+      const rawToken = tokenRow[0]?.value ?? process.env.GITHUB_TOKEN ?? "";
+      // Decrypt if it looks like a CryptoJS AES cipher (base64 with U2FsdGVkX1 prefix)
+      const token = rawToken.startsWith("U2FsdGVkX1") ? decryptToken(rawToken) : rawToken;
 
       if (!baseUrl) {
         return res.status(422).json({
@@ -1168,7 +1186,7 @@ export function registerChatbotRoutes(app: Express) {
       }
 
       if (token && typeof token === "string" && token.trim()) {
-        await upsertSetting("github_token", token.trim());
+        await upsertSetting("github_token", encryptToken(token.trim()));
       }
 
       res.json({ success: true });

@@ -127,16 +127,22 @@ export async function commitAndPush(params: {
 
     return { success: true, commitHash, branch };
   } catch (e: any) {
-    const msg: string = e.message ?? String(e);
-    if (msg.includes("Authentication failed") || msg.includes("remote: Invalid username")) {
+    const raw: string = e.message ?? String(e);
+    // Sanitize: strip any credential-bearing URLs before surfacing to callers/logs
+    const msg = raw.replace(/https?:\/\/[^@\s]+@[^\s]*/gi, "<redacted-url>");
+    if (msg.includes("Authentication failed") || msg.includes("Invalid username") || msg.includes("could not read Username")) {
       return { success: false, error: "Authentication failed. Check your GitHub token in Chatbot Settings." };
     }
     if (msg.includes("rejected") || msg.includes("non-fast-forward")) {
       return { success: false, error: "Push rejected — the remote has conflicting changes. Pull and merge first." };
     }
-    if (msg.includes("Repository not found")) {
+    if (msg.includes("Repository not found") || msg.includes("not found")) {
       return { success: false, error: "Repository not found. Check your GitHub URL in Chatbot Settings." };
     }
+    if (msg.includes("Permission denied") || msg.includes("403")) {
+      return { success: false, error: "Permission denied. Ensure your token has the required repository write scope." };
+    }
+    // Safe fallback: return sanitized message (credentials already stripped above)
     return { success: false, error: msg };
   }
 }
