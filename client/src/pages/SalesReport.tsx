@@ -579,14 +579,14 @@ export default function SalesReport() {
               </span>
             </div>
             <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
-              <span className="text-muted-foreground text-xs">Config Price</span>
+              <span className="text-muted-foreground text-xs">Hassan's Price</span>
               <span className="font-semibold font-mono text-sm" data-testid="text-configured-cost">{formatAmount(totals.totalConfiguredCost)}</span>
             </div>
             <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
               {totals.configuredProfit >= 0
                 ? <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
                 : <TrendingDown className="h-3.5 w-3.5 text-red-500" />}
-              <span className="text-muted-foreground text-xs">Config Profit</span>
+              <span className="text-muted-foreground text-xs">Hassan's Profit</span>
               <span className={`font-semibold font-mono text-sm ${totals.configuredProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-configured-profit">
                 {totals.configuredProfit < 0 ? "-" : ""}{formatAmount(Math.abs(totals.configuredProfit))}
               </span>
@@ -774,8 +774,8 @@ export default function SalesReport() {
                 <TableHead className="text-xs h-9 font-semibold text-right">Total Sales</TableHead>
                 <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">Cost Price</TableHead>
                 <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">Cost Profit</TableHead>
-                <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">Config. Price</TableHead>
-                <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">Config. Profit</TableHead>
+                <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">Hassan's Price</TableHead>
+                <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">Hassan's Profit</TableHead>
                 <TableHead className="text-xs h-9 w-8"></TableHead>
               </TableRow>
             </TableHeader>
