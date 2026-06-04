@@ -11,7 +11,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
 
       const { supplierId, fromDate, toDate, sourceType, proformaId } = req.body;
       if (!supplierId) return res.status(400).json({ message: "supplierId required" });
-      if (!fromDate || !toDate) return res.status(400).json({ message: "Date range required" });
+      const allTime = !fromDate || !toDate;
 
       // 1. Get stock items (all for company OR from proforma lines)
       let itemsResult;
@@ -76,21 +76,35 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       const idsParam = stockItemIds.map((_: any, i: number) => `$${i + 1}`).join(",");
 
       // 2. Average selling price + total sales qty per item in date range
-      const avgSellResult = await pool.query(`
-        SELECT si.stock_item_id,
-          SUM(si.total_sales::numeric) / NULLIF(SUM(si.quantity::numeric), 0) AS avg_selling_price,
-          AVG(si.configured_price::numeric) FILTER (WHERE si.configured_price IS NOT NULL AND si.configured_price::numeric > 0) AS avg_config_price,
-          SUM(si.quantity::numeric) AS total_qty
-        FROM sales_items si
-        JOIN vouchers v ON v.id = si.voucher_id
-        WHERE v.company_id = $1
-          AND v.voucher_type = 'Sales'
-          AND v.voucher_date >= $2
-          AND v.voucher_date <= $3
-          AND v.deleted_at IS NULL
-          AND si.stock_item_id = ANY($4::int[])
-        GROUP BY si.stock_item_id
-      `, [companyId, fromDate, toDate, stockItemIds]);
+      const avgSellResult = allTime
+        ? await pool.query(`
+            SELECT si.stock_item_id,
+              SUM(si.total_sales::numeric) / NULLIF(SUM(si.quantity::numeric), 0) AS avg_selling_price,
+              AVG(si.configured_price::numeric) FILTER (WHERE si.configured_price IS NOT NULL AND si.configured_price::numeric > 0) AS avg_config_price,
+              SUM(si.quantity::numeric) AS total_qty
+            FROM sales_items si
+            JOIN vouchers v ON v.id = si.voucher_id
+            WHERE v.company_id = $1
+              AND v.voucher_type = 'Sales'
+              AND v.deleted_at IS NULL
+              AND si.stock_item_id = ANY($2::int[])
+            GROUP BY si.stock_item_id
+          `, [companyId, stockItemIds])
+        : await pool.query(`
+            SELECT si.stock_item_id,
+              SUM(si.total_sales::numeric) / NULLIF(SUM(si.quantity::numeric), 0) AS avg_selling_price,
+              AVG(si.configured_price::numeric) FILTER (WHERE si.configured_price IS NOT NULL AND si.configured_price::numeric > 0) AS avg_config_price,
+              SUM(si.quantity::numeric) AS total_qty
+            FROM sales_items si
+            JOIN vouchers v ON v.id = si.voucher_id
+            WHERE v.company_id = $1
+              AND v.voucher_type = 'Sales'
+              AND v.voucher_date >= $2
+              AND v.voucher_date <= $3
+              AND v.deleted_at IS NULL
+              AND si.stock_item_id = ANY($4::int[])
+            GROUP BY si.stock_item_id
+          `, [companyId, fromDate, toDate, stockItemIds]);
       const avgSellMap = new Map<number, { avgSellingPrice: number | null; avgConfigPrice: number; salesQty: number }>();
       for (const row of avgSellResult.rows) {
         avgSellMap.set(Number(row.stock_item_id), {
