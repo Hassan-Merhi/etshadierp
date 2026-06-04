@@ -1,5 +1,6 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -41,7 +42,6 @@ import {
   Package,
   Loader2,
   BarChart2,
-  RefreshCw,
   Save,
 } from "lucide-react";
 
@@ -136,19 +136,14 @@ export default function SupplierProfitCheck() {
 
   // Setup state
   const [supplierId, setSupplierId] = useState<string>("");
-  const [fromDate, setFromDate] = useState<string>(() => {
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => {
     const d = new Date();
-    d.setMonth(d.getMonth() - 3);
-    return d.toISOString().slice(0, 10);
+    const from = new Date(d);
+    from.setMonth(d.getMonth() - 3);
+    return { fromDate: from.toISOString().slice(0, 10), toDate: d.toISOString().slice(0, 10), preset: "custom" };
   });
-  const [toDate, setToDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [sourceType, setSourceType] = useState<"all" | "proforma">("all");
   const [proformaId, setProformaId] = useState<string>("");
-
-  // Data state
-  const [rows, setRows] = useState<AnalysisRow[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loaded, setLoaded] = useState(false);
 
   // Qty edit state
   const [qtyMap, setQtyMap] = useState<Record<number, string>>({});
@@ -184,6 +179,37 @@ export default function SupplierProfitCheck() {
       return res.ok ? res.json() : [];
     },
   });
+
+  // Auto-load analysis whenever supplier / dates / source change
+  const queryEnabled = !!supplierId && (sourceType !== "proforma" || !!proformaId);
+  const { data: rows = [], isLoading } = useQuery<AnalysisRow[]>({
+    queryKey: ["/api/supplier-profit-check/analyze", supplierId, periodFilter.fromDate, periodFilter.toDate, sourceType, proformaId],
+    enabled: queryEnabled,
+    queryFn: async () => {
+      const res = await apiRequest("POST", "/api/supplier-profit-check/analyze", {
+        supplierId: Number(supplierId),
+        fromDate: periodFilter.fromDate,
+        toDate: periodFilter.toDate,
+        sourceType,
+        proformaId: proformaId ? Number(proformaId) : undefined,
+      });
+      return res.json();
+    },
+  });
+
+  // Reset qty map whenever loaded data changes
+  useEffect(() => {
+    const initialQty: Record<number, string> = {};
+    for (const r of rows) {
+      if (r.proformaQty != null && r.proformaQty > 0) {
+        initialQty[r.stockItemId] = String(r.proformaQty);
+      }
+    }
+    setQtyMap(initialQty);
+    setSavedProforma(null);
+  }, [rows]);
+
+  const loaded = queryEnabled && !isLoading && rows.length >= 0;
 
   // Computed rows: two profit columns
   const computedRows = useMemo((): ComputedRow[] => {
@@ -276,39 +302,6 @@ export default function SupplierProfitCheck() {
     };
   }, [computedRows, qtyMap]);
 
-  const handleLoad = useCallback(async () => {
-    if (!supplierId) { toast({ title: "Select a supplier", variant: "destructive" }); return; }
-    if (!fromDate || !toDate) { toast({ title: "Select a date range", variant: "destructive" }); return; }
-    if (sourceType === "proforma" && !proformaId) { toast({ title: "Select a proforma", variant: "destructive" }); return; }
-
-    setIsLoading(true);
-    setLoaded(false);
-    setSavedProforma(null);
-    try {
-      const data = await apiRequest("POST", "/api/supplier-profit-check/analyze", {
-        supplierId: Number(supplierId),
-        fromDate,
-        toDate,
-        sourceType,
-        proformaId: proformaId ? Number(proformaId) : undefined,
-      });
-      const analysisRows: AnalysisRow[] = await data.json();
-      setRows(analysisRows);
-      const initialQty: Record<number, string> = {};
-      for (const r of analysisRows) {
-        if (r.proformaQty != null && r.proformaQty > 0) {
-          initialQty[r.stockItemId] = String(r.proformaQty);
-        }
-      }
-      setQtyMap(initialQty);
-      setLoaded(true);
-      toast({ title: `Loaded ${analysisRows.length} items` });
-    } catch (err: any) {
-      toast({ title: "Failed to load", description: err.message, variant: "destructive" });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [supplierId, fromDate, toDate, sourceType, proformaId, toast]);
 
   const itemsWithQty = useMemo(
     () => computedRows.filter((r) => Number(qtyMap[r.stockItemId]) > 0),
@@ -373,8 +366,8 @@ export default function SupplierProfitCheck() {
         body: JSON.stringify({
           rows: exportRows,
           supplierName: selectedSupplier?.legalName || selectedSupplier?.legal_name || "",
-          fromDate,
-          toDate,
+          fromDate: periodFilter.fromDate,
+          toDate: periodFilter.toDate,
           proformaRef: savedProforma?.reference || "",
         }),
       });
@@ -387,7 +380,7 @@ export default function SupplierProfitCheck() {
     } catch (err: any) {
       toast({ title: "Export failed", description: err.message, variant: "destructive" });
     }
-  }, [itemsWithQty, qtyMap, supplierId, suppliers, fromDate, toDate, savedProforma, toast]);
+  }, [itemsWithQty, qtyMap, supplierId, suppliers, periodFilter, savedProforma, toast]);
 
   return (
     <div className="h-full overflow-y-auto bg-background">
@@ -426,11 +419,7 @@ export default function SupplierProfitCheck() {
 
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sales Date Range</label>
-                <div className="flex gap-1 items-center">
-                  <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} data-testid="input-from-date" />
-                  <span className="text-muted-foreground text-sm shrink-0">–</span>
-                  <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} data-testid="input-to-date" />
-                </div>
+                <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter-sales" />
               </div>
 
               <div className="space-y-1">
@@ -458,12 +447,6 @@ export default function SupplierProfitCheck() {
                 </div>
               ) : <div />}
 
-              <div className="lg:col-span-4 flex justify-end">
-                <Button onClick={handleLoad} disabled={isLoading || !supplierId} data-testid="button-load-items">
-                  {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                  {isLoading ? "Loading..." : "Load Items"}
-                </Button>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -720,12 +703,12 @@ export default function SupplierProfitCheck() {
         )}
 
         {/* Empty states */}
-        {!loaded && !isLoading && (
+        {!supplierId && (
           <Card>
             <CardContent className="py-16 text-center">
               <BarChart2 className="w-12 h-12 mx-auto mb-3 opacity-30" />
               <p className="text-muted-foreground">
-                Select a supplier and date range, then click <strong>Load Items</strong> to start the analysis.
+                Select a supplier to start the analysis.
               </p>
             </CardContent>
           </Card>
