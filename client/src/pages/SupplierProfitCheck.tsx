@@ -141,8 +141,7 @@ export default function SupplierProfitCheck() {
   // Setup state
   const [supplierId, setSupplierId] = useState<string>("");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return { fromDate: today, toDate: today, preset: "today" };
+    return { fromDate: "", toDate: "", preset: "all_time" };
   });
   const [sourceType, setSourceType] = useState<"all" | "proforma">("all");
   const [proformaId, setProformaId] = useState<string>("");
