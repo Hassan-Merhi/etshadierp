@@ -242,9 +242,9 @@ export default function SupplierProfitCheck() {
     return rows.map((row) => {
       const sell = row.avgSellingPrice;
 
-      // Hassan's Profit = Hassan's Price − Avg Cost
-      const hassansProfit = row.configPrice - row.offloadingCost;
-      const hassansProfitPct = row.configPrice > 0 ? (hassansProfit / row.configPrice) * 100 : null;
+      // Hassan's Profit = Avg Sell − Avg Cost
+      const hassansProfit = sell != null ? sell - row.offloadingCost : null;
+      const hassansProfitPct = hassansProfit != null && sell != null && sell > 0 ? (hassansProfit / sell) * 100 : null;
 
       // Cost Profit = Avg Sell − Avg Cost
       let costProfit: number | null = null;
@@ -260,7 +260,7 @@ export default function SupplierProfitCheck() {
         hassansProfitPct,
         costProfit,
         costProfitPct,
-        statusByConfig: calcStatus(hassansProfit),
+        statusByConfig: calcStatus(hassansProfit ?? null),
         statusByOffload: calcStatus(costProfit),
       };
     });
@@ -666,11 +666,10 @@ export default function SupplierProfitCheck() {
                 <TableHead className="min-w-[200px] text-xs font-semibold">Name</TableHead>
                 <TableHead className="text-right min-w-[80px] text-xs font-semibold">Sales Qty</TableHead>
                 <TableHead className="text-right min-w-[100px] text-xs font-semibold">Avg Sell</TableHead>
-                <TableHead className="text-right min-w-[110px] text-xs font-semibold">Hassan's Price</TableHead>
                 <TableHead className="text-right min-w-[90px] text-xs font-semibold">Avg Cost</TableHead>
                 <TableHead className="text-right min-w-[130px] text-xs font-semibold">
                   <div className="text-blue-600 dark:text-blue-400">Hassan's Profit</div>
-                  <div className="font-normal text-muted-foreground" style={{ fontSize: "10px" }}>Price − Cost</div>
+                  <div className="font-normal text-muted-foreground" style={{ fontSize: "10px" }}>Avg Sell − Cost</div>
                 </TableHead>
                 <TableHead className="text-right min-w-[130px] text-xs font-semibold">
                   <div className="text-emerald-600 dark:text-emerald-400">Cost Profit</div>
@@ -709,9 +708,6 @@ export default function SupplierProfitCheck() {
                       </TableCell>
                       <TableCell className="text-right text-sm font-medium">
                         {row.avgSellingPrice != null ? `$${fmt(row.avgSellingPrice)}` : <span className="text-muted-foreground text-xs">—</span>}
-                      </TableCell>
-                      <TableCell className="text-right text-sm">
-                        <span className={`font-mono ${row.configPrice === 0 ? "text-orange-500" : ""}`}>${fmt(row.configPrice)}</span>
                       </TableCell>
                       <TableCell className="text-right text-sm">
                         <span className={`font-mono ${row.nCostSource === "missing" ? "text-orange-500" : row.nCostSource === "po_fallback" ? "text-amber-600" : ""}`}>${fmt(row.offloadingCost)}</span>
