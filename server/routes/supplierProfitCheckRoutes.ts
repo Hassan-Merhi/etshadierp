@@ -238,6 +238,12 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
           currentStock,
           salesQty,
           avgSellingPrice,
+          // Dubai / PO Price — clean rate from selected supplier PO only, no fallback
+          poPrice: nCostMap.has(id) ? nCostMap.get(id)! : null,
+          poPriceSource: nCostMap.has(id) ? "selected_supplier_po" : "missing",
+          // Inventory avg cost (separate from Dubai price)
+          inventoryAvgCost: offloadingCost,
+          // Keep for proforma save compat
           nCost,
           nCostSource: avgCostSource,
           configPrice,
