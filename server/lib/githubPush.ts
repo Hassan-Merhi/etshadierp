@@ -87,17 +87,6 @@ export async function commitAndPush(params: {
   }
 
   try {
-    try {
-      const remotes = await git(["remote"]);
-      if (remotes.includes("origin")) {
-        await git(["remote", "set-url", "origin", repoUrl]);
-      } else {
-        await git(["remote", "add", "origin", repoUrl]);
-      }
-    } catch {
-      // Continue even if setting remote fails
-    }
-
     let branch = "main";
     try {
       branch = await git(["rev-parse", "--abbrev-ref", "HEAD"]);
@@ -123,7 +112,8 @@ export async function commitAndPush(params: {
 
     const commitHash = await git(["rev-parse", "--short", "HEAD"]).catch(() => "");
 
-    await git(["push", "origin", branch]);
+    // Push directly to the authenticated URL — never write credentials to .git/config
+    await git(["push", repoUrl, `HEAD:refs/heads/${branch}`]);
 
     return { success: true, commitHash, branch };
   } catch (e: any) {

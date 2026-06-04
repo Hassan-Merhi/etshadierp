@@ -1795,7 +1795,7 @@ export async function chat(
       const filePaths = extractFilePathsFromMessage(userMessage);
       const rawPath = filePaths[0] ?? "";
       // Resolve bare filenames ("chatService.ts") to full workspace-relative paths
-      const targetFilePath = rawPath ? (resolveFilePath(rawPath) ?? rawPath) : "";
+      let targetFilePath = rawPath ? (resolveFilePath(rawPath) ?? rawPath) : "";
       let fileContent = "";
 
       if (targetFilePath) {
@@ -1806,15 +1806,46 @@ export async function chat(
         } catch {
           // File may not exist yet (new file creation) — leave fileContent empty
         }
+      } else {
+        // ── Pathless edit: infer candidate files by grepping message keywords ─
+        // Extract nouns longer than 3 chars that could be class/component names
+        const keywords = [...new Set(
+          (userMessage.match(/\b[A-Z][a-zA-Z]{3,}\b|\b[a-z]{4,}(?:Form|Page|Component|Hook|Route|Schema|Type|Service|Helper|Utils?)\b/g) ?? [])
+            .concat(userMessage.match(/\b(?:voucher|invoice|payment|receipt|stock|pos|purchase|sale|customer|supplier|company|user|auth|chat)\b/gi) ?? [])
+        )].slice(0, 4);
+
+        let grepResults = "";
+        for (const kw of keywords) {
+          const result = await grepProjectFiles(kw, "client/src").catch(() => "");
+          if (result && result !== "(no matches found)") {
+            grepResults += result + "\n";
+            break; // one good hit is enough for file discovery
+          }
+        }
+        // Parse unique file paths from grep output
+        const candidatePaths = [...new Set(
+          (grepResults.match(/^([\w/.-]+\.(?:tsx?|jsx?)):/gm) ?? []).map(l => l.replace(/:$/, ""))
+        )].slice(0, 2);
+
+        if (candidatePaths.length > 0) {
+          targetFilePath = candidatePaths[0];
+          try {
+            const { content, totalLines, truncated } = await readProjectFile(targetFilePath);
+            fileContent = content;
+            console.log(`[ChatService] code_edit (pathless) — inferred ${targetFilePath} (${totalLines} lines${truncated ? ", truncated" : ""})`);
+          } catch {
+            // Leave fileContent empty
+          }
+        }
       }
 
       const currentContentBlock = fileContent
         ? `\n\nCurrent content of \`${targetFilePath}\` (${fileContent.split("\n").length} lines):\n\`\`\`typescript\n${fileContent}\n\`\`\``
         : targetFilePath
           ? `\n\nFile \`${targetFilePath}\` does not exist yet — you will be creating it.`
-          : `\n\nNo specific file path was mentioned. Infer the best file to create or edit from the request and set it in filePath.`;
+          : `\n\nNo specific file was found. Infer the best file to create or edit and set filePath accordingly.`;
 
-      // We store the original file content for the stale guard (full file, not just 300 lines)
+      // Store original file content for the stale guard (full file, not just 300 lines)
       const fullOriginalContent = targetFilePath
         ? await readProjectFileRaw(targetFilePath).catch(() => "")
         : "";
