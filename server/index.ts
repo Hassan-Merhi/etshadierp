@@ -3814,6 +3814,20 @@ let migrationsDone = false;
     // Increase factory_containers rate_per_kg / rate_per_kg_usd precision to 7 decimal places
     `ALTER TABLE factory_containers ALTER COLUMN rate_per_kg TYPE DECIMAL(20,7)`,
     `ALTER TABLE factory_containers ALTER COLUMN rate_per_kg_usd TYPE DECIMAL(20,7)`,
+    // ── Code Patch History table (AI coding agent) ──────────────────────────
+    `CREATE TABLE IF NOT EXISTS code_patch_history (
+      id                SERIAL PRIMARY KEY,
+      company_id        INTEGER NOT NULL,
+      file_path         TEXT NOT NULL,
+      description       TEXT,
+      original_content  TEXT,
+      new_content       TEXT,
+      applied_by_user_id TEXT,
+      applied_at        TIMESTAMP NOT NULL DEFAULT NOW(),
+      commit_hash       TEXT,
+      reverted_at       TIMESTAMP
+    )`,
+    `CREATE INDEX IF NOT EXISTS code_patch_history_company_idx ON code_patch_history (company_id)`,
     // Clean up orphaned OFFLOAD_RAW_STOCK daybook entries for already soft-deleted raw stock receipts
     `DELETE FROM factory_daybook_entries
        WHERE tx_type = 'OFFLOAD_RAW_STOCK'

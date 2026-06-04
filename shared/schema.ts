@@ -5963,6 +5963,26 @@ export type LabelDesignColor = typeof labelDesignColors.$inferSelect;
 export const insertLabelDesignColorSchema = createInsertSchema(labelDesignColors).omit({ id: true, createdAt: true });
 export type InsertLabelDesignColor = z.infer<typeof insertLabelDesignColorSchema>;
 
+// ── Code Patch History (AI coding agent) ─────────────────────────────────────
+export const codePatchHistory = pgTable("code_patch_history", {
+  id:               serial("id").primaryKey(),
+  companyId:        integer("company_id").notNull(),
+  filePath:         text("file_path").notNull(),
+  description:      text("description"),
+  originalContent:  text("original_content"),
+  newContent:       text("new_content"),
+  appliedByUserId:  text("applied_by_user_id"),
+  appliedAt:        timestamp("applied_at").notNull().defaultNow(),
+  commitHash:       text("commit_hash"),
+  revertedAt:       timestamp("reverted_at"),
+}, (t) => ({
+  companyIdx: index("code_patch_history_company_idx").on(t.companyId),
+}));
+
+export type CodePatchHistory = typeof codePatchHistory.$inferSelect;
+export const insertCodePatchHistorySchema = createInsertSchema(codePatchHistory).omit({ id: true, appliedAt: true });
+export type InsertCodePatchHistory = z.infer<typeof insertCodePatchHistorySchema>;
+
 export const importBatches = pgTable("import_batches", {
   id:                  serial("id").primaryKey(),
   companyId:           integer("company_id").notNull(),

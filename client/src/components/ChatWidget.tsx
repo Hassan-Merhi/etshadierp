@@ -45,6 +45,9 @@ import {
   GitCommit,
   Plus,
   Minus,
+  History,
+  ChevronRight,
+  RotateCcw,
 } from "lucide-react";
 import {
   Select,
@@ -253,7 +256,8 @@ interface ChatResponse {
   accountQueryResult?: AccountQueryResult | null;
   verifyContainerDraft?: VerifyContainerDraft | null;
   dataQueryResult?: DataQueryResult | null;
-  filePatchDraft?: FilePatchDraft | null;
+  filePatchDrafts?: FilePatchDraft[] | null;
+  readFiles?: string[] | null;
 }
 
 interface VoucherDraft {
@@ -1903,19 +1907,18 @@ interface PushResult {
 
 interface FileDiffCardProps {
   draft: FilePatchDraft;
-  onApply: () => void;
-  onCancel: () => void;
+  onApply: (patch: FilePatchDraft) => void;
+  onCancel: (filePath: string) => void;
   isApplying: boolean;
-  appliedFile: string | null;
-  onGitPush: (commitMsg: string) => void;
+  isApplied: boolean;
+  onGitPush: (filePath: string, commitMsg: string) => void;
   isPushing: boolean;
   pushResult: PushResult | null;
 }
 
-function FileDiffCard({ draft, onApply, onCancel, isApplying, appliedFile, onGitPush, isPushing, pushResult }: FileDiffCardProps) {
+function FileDiffCard({ draft, onApply, onCancel, isApplying, isApplied, onGitPush, isPushing, pushResult }: FileDiffCardProps) {
   const [commitMsg, setCommitMsg] = useState(draft.description);
   const [showFullDiff, setShowFullDiff] = useState(false);
-  const isApplied = appliedFile === draft.filePath;
 
   const diffLines = computeLineDiff(draft.originalContent, draft.newContent);
   const CONTEXT = 3;
@@ -2050,7 +2053,7 @@ function FileDiffCard({ draft, onApply, onCancel, isApplying, appliedFile, onGit
               </div>
             </div>
           )}
-          <Button size="sm" variant="ghost" onClick={onCancel} className="mt-1">
+          <Button size="sm" variant="ghost" onClick={() => onCancel(draft.filePath)} className="mt-1">
             Dismiss
           </Button>
         </div>
@@ -2067,22 +2070,22 @@ function FileDiffCard({ draft, onApply, onCancel, isApplying, appliedFile, onGit
               onChange={e => setCommitMsg(e.target.value)}
               placeholder="Commit message…"
             />
-            <Button size="sm" onClick={() => onGitPush(commitMsg)} disabled={isPushing || !commitMsg.trim()}>
+            <Button size="sm" onClick={() => onGitPush(draft.filePath, commitMsg)} disabled={isPushing || !commitMsg.trim()}>
               {isPushing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <GitCommit className="h-3 w-3 mr-1" />}
               Push to GitHub
             </Button>
-            <Button size="sm" variant="ghost" onClick={onCancel} disabled={isPushing}>
+            <Button size="sm" variant="ghost" onClick={() => onCancel(draft.filePath)} disabled={isPushing}>
               Dismiss
             </Button>
           </div>
         </div>
       ) : (
         <div className="flex items-center gap-2 px-3 py-2 border-t border-border bg-muted/20 flex-wrap">
-          <Button size="sm" onClick={onApply} disabled={isApplying || !hasChanges}>
+          <Button size="sm" onClick={() => onApply(draft)} disabled={isApplying || !hasChanges}>
             {isApplying ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
             Apply Change
           </Button>
-          <Button size="sm" variant="outline" onClick={onCancel} disabled={isApplying}>
+          <Button size="sm" variant="outline" onClick={() => onCancel(draft.filePath)} disabled={isApplying}>
             Cancel
           </Button>
         </div>
@@ -2122,11 +2125,13 @@ export function ChatWidget() {
   const [pendingStockTransfer, setPendingStockTransfer] = useState<StockTransferDraft | null>(null);
   const [stockTransferSubmitting, setStockTransferSubmitting] = useState(false);
   const [lastUsedProvider, setLastUsedProvider] = useState<string | null>(null);
-  const [pendingFilePatch, setPendingFilePatch] = useState<FilePatchDraft | null>(null);
-  const [patchApplying, setPatchApplying] = useState(false);
-  const [appliedPatchFile, setAppliedPatchFile] = useState<string | null>(null);
+  const [pendingFilePatches, setPendingFilePatches] = useState<FilePatchDraft[]>([]);
+  const [patchApplying, setPatchApplying] = useState<string | null>(null); // filePath being applied
+  const [appliedPatchFiles, setAppliedPatchFiles] = useState<Set<string>>(new Set());
   const [gitPushing, setGitPushing] = useState(false);
-  const [gitPushResult, setGitPushResult] = useState<PushResult | null>(null);
+  const [perFilePushResult, setPerFilePushResult] = useState<Record<string, PushResult>>({});
+  const [sessionReadFiles, setSessionReadFiles] = useState<string[]>([]);
+  const [showSessionFiles, setShowSessionFiles] = useState(false);
   const [location] = useLocation();
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -2149,6 +2154,7 @@ export function ChatWidget() {
         message: msg,
         sessionId,
         pageContext: { currentRoute: location },
+        sessionReadFiles: sessionReadFiles.length > 0 ? sessionReadFiles : undefined,
       }, false, 120000);
       return response.json() as Promise<ChatResponse>;
     },
@@ -2204,11 +2210,21 @@ export function ChatWidget() {
       } else {
         setDataQueryResult(null);
       }
-      if (data.filePatchDraft) {
-        setPendingFilePatch(data.filePatchDraft);
-        setAppliedPatchFile(null);
+      if (data.filePatchDrafts && data.filePatchDrafts.length > 0) {
+        setPendingFilePatches(data.filePatchDrafts);
+        setAppliedPatchFiles(new Set());
+        setPerFilePushResult({});
       } else {
-        setPendingFilePatch(null);
+        setPendingFilePatches([]);
+      }
+      if (data.readFiles && data.readFiles.length > 0) {
+        setSessionReadFiles(prev => {
+          const next = [...prev];
+          for (const f of data.readFiles!) {
+            if (!next.includes(f)) next.push(f);
+          }
+          return next;
+        });
       }
     },
   });
@@ -2354,47 +2370,51 @@ export function ChatWidget() {
     }
   };
 
-  const handleApplyPatch = async () => {
-    if (!pendingFilePatch) return;
-    setPatchApplying(true);
+  const handleApplyPatch = async (patch: FilePatchDraft) => {
+    setPatchApplying(patch.filePath);
     try {
       const res = await apiRequest("POST", "/api/chatbot/apply-patch", {
-        filePath: pendingFilePatch.filePath,
-        originalContent: pendingFilePatch.originalContent,
-        newContent: pendingFilePatch.newContent,
+        filePath: patch.filePath,
+        originalContent: patch.originalContent,
+        newContent: patch.newContent,
+        description: patch.description,
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: "Apply failed" }));
-        sendMutation.mutate(`Failed to apply patch: ${err.message}`);
-        setPendingFilePatch(null);
+        sendMutation.mutate(`Failed to apply patch to ${patch.filePath}: ${err.message}`);
         return;
       }
-      setAppliedPatchFile(pendingFilePatch.filePath);
+      setAppliedPatchFiles(prev => new Set([...prev, patch.filePath]));
     } catch (err: any) {
       sendMutation.mutate(`Failed to apply patch: ${err.message}`);
-      setPendingFilePatch(null);
     } finally {
-      setPatchApplying(false);
+      setPatchApplying(null);
     }
   };
 
-  const handleGitPush = async (commitMsg: string) => {
-    if (!appliedPatchFile) return;
+  const handleApplyAllPatches = async () => {
+    for (const patch of pendingFilePatches) {
+      if (appliedPatchFiles.has(patch.filePath)) continue;
+      await handleApplyPatch(patch);
+    }
+  };
+
+  const handleGitPush = async (filePath: string, commitMsg: string) => {
     setGitPushing(true);
-    setGitPushResult(null);
+    setPerFilePushResult(prev => ({ ...prev, [filePath]: { success: false } }));
     try {
       const res = await apiRequest("POST", "/api/chatbot/git-push", {
-        files: [appliedPatchFile],
+        files: [filePath],
         message: commitMsg,
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setGitPushResult({ success: false, error: data.error ?? data.message ?? "Unknown error" });
+        setPerFilePushResult(prev => ({ ...prev, [filePath]: { success: false, error: data.error ?? data.message ?? "Unknown error" } }));
         return;
       }
-      setGitPushResult({ success: true, commitHash: data.commitHash, branch: data.branch });
+      setPerFilePushResult(prev => ({ ...prev, [filePath]: { success: true, commitHash: data.commitHash, branch: data.branch } }));
     } catch (err: any) {
-      setGitPushResult({ success: false, error: err.message });
+      setPerFilePushResult(prev => ({ ...prev, [filePath]: { success: false, error: err.message } }));
     } finally {
       setGitPushing(false);
     }
@@ -2502,9 +2522,9 @@ export function ChatWidget() {
     setPoDraftError(null);
     setVerifyContainerDraft(null);
     setDataQueryResult(null);
-    setPendingFilePatch(null);
-    setAppliedPatchFile(null);
-    setGitPushResult(null);
+    setPendingFilePatches([]);
+    setAppliedPatchFiles(new Set());
+    setPerFilePushResult({});
     setShowAlerts(true);
     queryClient.removeQueries({ queryKey: [`/api/chatbot/history/${sessionId}`] });
   };
@@ -2934,18 +2954,47 @@ export function ChatWidget() {
                     />
                   )}
 
-                  {/* ── Phase 2: File Patch Diff Card ── */}
-                  {pendingFilePatch && !sendMutation.isPending && (
-                    <FileDiffCard
-                      draft={pendingFilePatch}
-                      onApply={handleApplyPatch}
-                      onCancel={() => { setPendingFilePatch(null); setAppliedPatchFile(null); setGitPushResult(null); }}
-                      isApplying={patchApplying}
-                      appliedFile={appliedPatchFile}
-                      onGitPush={handleGitPush}
-                      isPushing={gitPushing}
-                      pushResult={gitPushResult}
-                    />
+                  {/* ── Phase 2: File Patch Diff Cards (multi-file support) ── */}
+                  {pendingFilePatches.length > 0 && !sendMutation.isPending && (
+                    <div className="mt-3 space-y-3">
+                      {pendingFilePatches.length > 1 && (
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="text-xs text-muted-foreground font-medium">
+                            {pendingFilePatches.length} files to change
+                          </span>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => { setPendingFilePatches([]); setAppliedPatchFiles(new Set()); setPerFilePushResult({}); }}
+                            >
+                              Cancel All
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={handleApplyAllPatches}
+                              disabled={patchApplying !== null || pendingFilePatches.every(p => appliedPatchFiles.has(p.filePath))}
+                            >
+                              {patchApplying !== null ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
+                              Apply All
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      {pendingFilePatches.map(draft => (
+                        <FileDiffCard
+                          key={draft.filePath}
+                          draft={draft}
+                          onApply={handleApplyPatch}
+                          onCancel={fp => setPendingFilePatches(prev => prev.filter(p => p.filePath !== fp))}
+                          isApplying={patchApplying === draft.filePath}
+                          isApplied={appliedPatchFiles.has(draft.filePath)}
+                          onGitPush={handleGitPush}
+                          isPushing={gitPushing}
+                          pushResult={perFilePushResult[draft.filePath] ?? null}
+                        />
+                      ))}
+                    </div>
                   )}
                 </div>
 
@@ -2970,6 +3019,39 @@ export function ChatWidget() {
                   </div>
                 )}
               </ScrollArea>
+
+              {/* ── Session File Cache chips ── */}
+              {sessionReadFiles.length > 0 && (
+                <div className="px-4 pb-1 border-b border-border/40">
+                  <button
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-1"
+                    onClick={() => setShowSessionFiles(v => !v)}
+                  >
+                    <History className="h-3 w-3" />
+                    <span>{sessionReadFiles.length} file{sessionReadFiles.length !== 1 ? "s" : ""} in context</span>
+                    {showSessionFiles ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                  </button>
+                  {showSessionFiles && (
+                    <div className="flex flex-wrap gap-1 pb-1">
+                      {sessionReadFiles.map(fp => (
+                        <span
+                          key={fp}
+                          className="inline-flex items-center gap-1 text-[10px] font-mono bg-muted rounded px-1.5 py-0.5 text-muted-foreground"
+                        >
+                          <FileCode className="h-2.5 w-2.5 shrink-0" />
+                          {fp.replace(/^.*\//, "")}
+                        </span>
+                      ))}
+                      <button
+                        className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors px-1"
+                        onClick={() => { setSessionReadFiles([]); setShowSessionFiles(false); }}
+                      >
+                        clear
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="p-4 border-t bg-background">
                 <div className="flex items-center gap-1 bg-muted/50 dark:bg-zinc-800/50 rounded-2xl border border-border/60 px-1 pr-1.5 focus-within:border-blue-300 dark:focus-within:border-blue-700 focus-within:ring-2 focus-within:ring-blue-100 dark:focus-within:ring-blue-900/40 transition-all">

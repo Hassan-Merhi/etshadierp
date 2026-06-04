@@ -39,6 +39,7 @@ import {
   
   systemSettings,
   aiActionLog,
+  codePatchHistory,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
@@ -162,7 +163,7 @@ export function registerChatbotRoutes(app: Express) {
       const denied = await requireAIActionPermission(req, "read");
       if (denied) return res.status(denied.code).json({ message: denied.message });
 
-      const { message, sessionId, pageContext } = req.body;
+      const { message, sessionId, pageContext, sessionReadFiles } = req.body;
       if (!message || !sessionId) {
         return res.status(400).json({ message: "Message and sessionId are required" });
       }
@@ -174,7 +175,7 @@ export function registerChatbotRoutes(app: Express) {
       const history = await getConversationHistoryForAI(sessionId, 10);
 
       // Get AI response (excluding current message from history context)
-      const result = await chat(message, companyId, history.slice(0, -1), undefined, pageContext);
+      const result = await chat(message, companyId, history.slice(0, -1), undefined, pageContext, sessionReadFiles ?? []);
 
       // Save assistant response
       await saveMessage(companyId, userId, "assistant", result.response, sessionId);
@@ -203,7 +204,8 @@ export function registerChatbotRoutes(app: Express) {
         accountQueryResult: result.accountQueryResult ?? null,
         verifyContainerDraft: result.verifyContainerDraft ?? null,
         dataQueryResult: result.dataQueryResult ?? null,
-        filePatchDraft: result.filePatchDraft ?? null,
+        filePatchDrafts: result.filePatchDrafts ?? null,
+        readFiles: result.readFiles ?? null,
       });
     } catch (error: any) {
       console.error("[Chatbot] ERROR:", error.message);
@@ -1035,6 +1037,19 @@ export function registerChatbotRoutes(app: Express) {
       // Write the new content
       fs.writeFileSync(absPath, newContent, "utf8");
 
+      // Log to code_patch_history
+      const { description: patchDescription } = req.body;
+      try {
+        await db.insert(codePatchHistory).values({
+          companyId,
+          filePath,
+          description: patchDescription || null,
+          originalContent: originalContent || "",
+          newContent,
+          appliedByUserId: String(userId),
+        });
+      } catch (_) { /* Non-fatal: don't fail the request if history logging fails */ }
+
       await logAIAction({
         req,
         actionType: "write",
@@ -1050,6 +1065,115 @@ export function registerChatbotRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
+
+  // ── Code Agent: patch history (list) ─────────────────────────────────────
+  app.get("/api/chatbot/patch-history", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      const userRole = req.session.currentRole;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const rows = await db
+        .select({
+          id: codePatchHistory.id,
+          companyId: codePatchHistory.companyId,
+          filePath: codePatchHistory.filePath,
+          description: codePatchHistory.description,
+          appliedByUserId: codePatchHistory.appliedByUserId,
+          appliedAt: codePatchHistory.appliedAt,
+          commitHash: codePatchHistory.commitHash,
+          revertedAt: codePatchHistory.revertedAt,
+        })
+        .from(codePatchHistory)
+        .where(eq(codePatchHistory.companyId, companyId))
+        .orderBy(desc(codePatchHistory.appliedAt))
+        .limit(100);
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Code Agent: revert a patch ────────────────────────────────────────────
+  app.post("/api/chatbot/revert-patch/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      const userRole = req.session.currentRole;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
+        return res.status(403).json({ message: "Only Admin/Developer users can revert patches" });
+      }
+
+      const patchId = parseInt(req.params.id, 10);
+      if (isNaN(patchId)) return res.status(400).json({ message: "Invalid patch id" });
+
+      const [row] = await db
+        .select()
+        .from(codePatchHistory)
+        .where(and(eq(codePatchHistory.id, patchId), eq(codePatchHistory.companyId, companyId)));
+      if (!row) return res.status(404).json({ message: "Patch not found" });
+      if (row.revertedAt) return res.status(409).json({ message: "Patch has already been reverted" });
+
+      // Write original content back to disk
+      let absPath: string;
+      try {
+        absPath = resolveWorkspacePath(row.filePath);
+      } catch (e: any) {
+        return res.status(400).json({ message: e.message });
+      }
+
+      const dir = path.dirname(absPath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(absPath, row.originalContent ?? "", "utf8");
+
+      // Mark as reverted
+      await db
+        .update(codePatchHistory)
+        .set({ revertedAt: new Date() } as any)
+        .where(eq(codePatchHistory.id, patchId));
+
+      await logAIAction({
+        req,
+        actionType: "write",
+        actionName: "revert_patch",
+        inputJson: { patchId, filePath: row.filePath },
+        outputJson: { success: true },
+        status: "success",
+      });
+
+      res.json({ success: true, filePath: row.filePath });
+    } catch (error: any) {
+      console.error("[Chatbot] revert-patch error:", error.message);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Code Agent: update commit hash after successful git-push ──────────────
+  // Called internally by the git-push handler to link the history record.
+  async function updatePatchCommitHash(companyId: number, filePath: string, commitHash: string) {
+    try {
+      // Update the most recent un-pushed patch for this file
+      const [latest] = await db
+        .select({ id: codePatchHistory.id })
+        .from(codePatchHistory)
+        .where(and(
+          eq(codePatchHistory.companyId, companyId),
+          eq(codePatchHistory.filePath, filePath),
+          isNull(codePatchHistory.commitHash),
+          isNull(codePatchHistory.revertedAt),
+        ))
+        .orderBy(desc(codePatchHistory.appliedAt))
+        .limit(1);
+      if (latest) {
+        await db
+          .update(codePatchHistory)
+          .set({ commitHash } as any)
+          .where(eq(codePatchHistory.id, latest.id));
+      }
+    } catch (_) { /* Non-fatal */ }
+  }
 
   // ── Code Agent: commit and push to GitHub ─────────────────────────────────
   app.post("/api/chatbot/git-push", requireAuth, requireNonPOS, async (req, res) => {
@@ -1109,6 +1233,13 @@ export function registerChatbotRoutes(app: Express) {
 
       if (!result.success) {
         return res.status(422).json({ success: false, error: result.error });
+      }
+
+      // Link commit hash to patch history records for each pushed file
+      if (result.commitHash && companyId) {
+        for (const fp of files) {
+          await updatePatchCommitHash(companyId, fp, result.commitHash).catch(() => {});
+        }
       }
 
       await logAIAction({

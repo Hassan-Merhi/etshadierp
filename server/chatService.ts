@@ -1708,8 +1708,9 @@ export async function chat(
   companyId: number,
   conversationHistory: { role: string; content: string }[] = [],
   userPreferences?: UserPreferences,
-  pageContext?: { currentRoute?: string; entityType?: string; entityId?: number; entityName?: string }
-): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any; stockTransferDraft?: any; voucherSearchResults?: any[]; stockItemDraft?: any; priceUpdateDraft?: any; accountQueryResult?: any; verifyContainerDraft?: any; dataQueryResult?: any; filePatchDraft?: any }> {
+  pageContext?: { currentRoute?: string; entityType?: string; entityId?: number; entityName?: string },
+  sessionReadFiles?: string[]
+): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any; stockTransferDraft?: any; voucherSearchResults?: any[]; stockItemDraft?: any; priceUpdateDraft?: any; accountQueryResult?: any; verifyContainerDraft?: any; dataQueryResult?: any; filePatchDrafts?: any[]; readFiles?: string[] }> {
   const available = getAvailableProviders();
   
   if (available.length === 0) {
@@ -1731,6 +1732,11 @@ export async function chat(
     let context: ERPContext | null = null;
     let systemPrompt: string;
     let suggestions: string[];
+
+    // Variables populated inside code_read / code_edit branches; used later in
+    // the parsing block and return value.
+    const codeReadFiles: string[] = [];              // files read this request (all code intents)
+    const codeEditOriginalMap: Record<string, string> = {}; // file → full original content
 
     if (intent === "general_knowledge") {
       // General knowledge: skip ERP context entirely, use open-ended ChatGPT-style prompt
@@ -1757,6 +1763,7 @@ export async function chat(
           try {
             const { content, totalLines, truncated } = await readProjectFile(fp);
             codeContext += `\n\n**File: ${fp}** (${totalLines} lines${truncated ? `, first 300 shown` : ""})\n\`\`\`typescript\n${content}\n\`\`\``;
+            if (!codeReadFiles.includes(fp)) codeReadFiles.push(fp);
           } catch (err: any) {
             // Still not found — fall back to grep by base name
             const basename = fp.replace(/.*\//, "").replace(/\.\w+$/, "");
@@ -1791,24 +1798,34 @@ export async function chat(
       console.log("[ChatService] code_read intent — loaded file/grep context");
 
     } else if (intent === "code_edit") {
-      // ── Code Edit: load file and build structured output prompt ───────────────
-      const filePaths = extractFilePathsFromMessage(userMessage);
-      const rawPath = filePaths[0] ?? "";
-      // Resolve bare filenames ("chatService.ts") to full workspace-relative paths
-      let targetFilePath = rawPath ? (resolveFilePath(rawPath) ?? rawPath) : "";
-      let fileContent = "";
+      // ── Code Edit: load files and build structured output prompt ──────────────
+      // Support up to 3 explicitly-named files; fall back to keyword grep for pathless edits.
+      const rawPaths = extractFilePathsFromMessage(userMessage);
+      const resolvedPaths = rawPaths.slice(0, 3)
+        .map(p => resolveFilePath(p) ?? p)
+        .filter(Boolean);
 
-      if (targetFilePath) {
+      const contentBlocks: string[] = [];
+
+      // Read each explicitly-named file
+      for (const fp of resolvedPaths) {
+        const alreadyInSession = sessionReadFiles?.includes(fp);
         try {
-          const { content, totalLines, truncated } = await readProjectFile(targetFilePath);
-          fileContent = content;
-          console.log(`[ChatService] code_edit — read ${targetFilePath} (${totalLines} lines${truncated ? ", truncated" : ""})`);
+          const { content, totalLines, truncated } = await readProjectFile(fp);
+          const raw = await readProjectFileRaw(fp).catch(() => "");
+          codeEditOriginalMap[fp] = raw;
+          if (!codeReadFiles.includes(fp)) codeReadFiles.push(fp);
+          const note = alreadyInSession ? " *(also seen earlier this session)*" : "";
+          contentBlocks.push(`Current content of \`${fp}\`${note} (${totalLines} lines${truncated ? ", first 300 shown" : ""}):\n\`\`\`typescript\n${content}\n\`\`\``);
+          console.log(`[ChatService] code_edit — read ${fp} (${totalLines} lines${truncated ? ", truncated" : ""})`);
         } catch {
-          // File may not exist yet (new file creation) — leave fileContent empty
+          contentBlocks.push(`File \`${fp}\` does not exist yet — you will be creating it.`);
+          if (!codeReadFiles.includes(fp)) codeReadFiles.push(fp);
         }
-      } else {
-        // ── Pathless edit: infer candidate files by grepping message keywords ─
-        // Extract nouns longer than 3 chars that could be class/component names
+      }
+
+      // Pathless edit: infer candidate file by grepping message keywords
+      if (resolvedPaths.length === 0) {
         const keywords = [...new Set(
           (userMessage.match(/\b[A-Z][a-zA-Z]{3,}\b|\b[a-z]{4,}(?:Form|Page|Component|Hook|Route|Schema|Type|Service|Helper|Utils?)\b/g) ?? [])
             .concat(userMessage.match(/\b(?:voucher|invoice|payment|receipt|stock|pos|purchase|sale|customer|supplier|company|user|auth|chat)\b/gi) ?? [])
@@ -1819,58 +1836,57 @@ export async function chat(
           const result = await grepProjectFiles(kw, "client/src").catch(() => "");
           if (result && result !== "(no matches found)") {
             grepResults += result + "\n";
-            break; // one good hit is enough for file discovery
+            break;
           }
         }
-        // Parse unique file paths from grep output
         const candidatePaths = [...new Set(
           (grepResults.match(/^([\w/.-]+\.(?:tsx?|jsx?)):/gm) ?? []).map(l => l.replace(/:$/, ""))
-        )].slice(0, 2);
+        )].slice(0, 1);
 
-        if (candidatePaths.length > 0) {
-          targetFilePath = candidatePaths[0];
+        for (const fp of candidatePaths) {
+          const alreadyInSession = sessionReadFiles?.includes(fp);
           try {
-            const { content, totalLines, truncated } = await readProjectFile(targetFilePath);
-            fileContent = content;
-            console.log(`[ChatService] code_edit (pathless) — inferred ${targetFilePath} (${totalLines} lines${truncated ? ", truncated" : ""})`);
-          } catch {
-            // Leave fileContent empty
-          }
+            const { content, totalLines, truncated } = await readProjectFile(fp);
+            const raw = await readProjectFileRaw(fp).catch(() => "");
+            codeEditOriginalMap[fp] = raw;
+            if (!codeReadFiles.includes(fp)) codeReadFiles.push(fp);
+            const note = alreadyInSession ? " *(also seen earlier this session)*" : "";
+            contentBlocks.push(`Current content of \`${fp}\`${note} (${totalLines} lines${truncated ? ", first 300 shown" : ""}):\n\`\`\`typescript\n${content}\n\`\`\``);
+            console.log(`[ChatService] code_edit (pathless) — inferred ${fp} (${totalLines} lines${truncated ? ", truncated" : ""})`);
+          } catch { /* File might not exist */ }
+        }
+
+        if (candidatePaths.length === 0) {
+          contentBlocks.push(`No specific file was found. Infer the best file to create or edit and set filePath accordingly.`);
         }
       }
 
-      const currentContentBlock = fileContent
-        ? `\n\nCurrent content of \`${targetFilePath}\` (${fileContent.split("\n").length} lines):\n\`\`\`typescript\n${fileContent}\n\`\`\``
-        : targetFilePath
-          ? `\n\nFile \`${targetFilePath}\` does not exist yet — you will be creating it.`
-          : `\n\nNo specific file was found. Infer the best file to create or edit and set filePath accordingly.`;
-
-      // Store original file content for the stale guard (full file, not just 300 lines)
-      const fullOriginalContent = targetFilePath
-        ? await readProjectFileRaw(targetFilePath).catch(() => "")
-        : "";
+      const primaryFilePath = resolvedPaths[0] ?? codeReadFiles[0] ?? "path/to/file.ts";
+      const contentSection = contentBlocks.length > 0 ? "\n\n" + contentBlocks.join("\n\n") : "";
 
       systemPrompt = `You are a senior TypeScript engineer on this ERP/POS project (React 18 + Express + Drizzle ORM + shadcn/ui). You MUST respond with ONLY a valid JSON object — no markdown, no explanation, ONLY raw JSON.
 
-User request: "${userMessage}"${currentContentBlock}
+User request: "${userMessage}"${contentSection}
 
-Respond with ONLY this JSON:
-{
-  "filePath": "${targetFilePath || "path/to/file.ts"}",
-  "description": "one-sentence description of the change",
-  "originalContent": ${JSON.stringify(fullOriginalContent)},
-  "newContent": "the complete new file content"
-}
+Respond with ONLY JSON in ONE of these two formats:
+
+Single file change:
+{"filePath":"...","description":"one-sentence summary","originalContent":"(the exact current file content shown above, or empty string for new files)","newContent":"the complete new file content"}
+
+Multiple file changes (only when edits span more than one file):
+{"description":"one-sentence summary of all changes","patches":[{"filePath":"...","description":"...","originalContent":"...","newContent":"..."},...]}
 
 Rules:
-- "newContent" must be the COMPLETE file — every line, not just changed parts
+- "newContent" must be the COMPLETE file — every line, not just the changed parts
 - Preserve all existing imports, exports, and functionality unless explicitly asked to remove something
 - Match the existing coding style, indentation (2 spaces), and TypeScript patterns exactly
 - If creating a new file, "originalContent" must be ""
-- Never truncate newContent — output the entire file even if it is long`;
+- Never truncate newContent — output the entire file even if it is long
+- "originalContent" in each patch MUST exactly match what was shown above (required for stale-guard validation)
+- Use the multi-file format ONLY when the change genuinely requires editing more than one file`;
 
       suggestions = ["Apply this change", "Show me the diff", "Explain what changed"];
-      console.log(`[ChatService] code_edit intent — target: ${targetFilePath || "(inferred)"}`);
+      console.log(`[ChatService] code_edit intent — targets: ${codeReadFiles.join(", ") || "(inferred)"}`);
 
     } else if (isActionIntent) {
       // Action intents: skip the expensive full-context load, use a light prompt
@@ -1919,8 +1935,8 @@ Rules:
     );
     console.log(`[ChatService] AI call (${usedProvider}) took ${Date.now() - aiStart}ms`);
 
-    // ── Code Edit: parse filePatchDraft from AI JSON response ─────────────
-    let filePatchDraft: any = undefined;
+    // ── Code Edit: parse filePatchDrafts (single or multi-file) from AI JSON ──
+    let filePatchDrafts: any[] | undefined = undefined;
     let finalResponse = response;
 
     if (intent === "code_edit") {
@@ -1928,19 +1944,33 @@ Rules:
         const raw = response.trim().replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
         if (raw.startsWith("{")) {
           const parsed = JSON.parse(raw);
-          if (parsed && parsed.filePath && "newContent" in parsed) {
-            filePatchDraft = {
+          if (parsed && Array.isArray(parsed.patches) && parsed.patches.length > 0) {
+            // Multi-file patches
+            filePatchDrafts = parsed.patches
+              .filter((p: any) => p.filePath && "newContent" in p)
+              .map((p: any) => ({
+                filePath: p.filePath,
+                description: p.description || parsed.description || "Apply code changes",
+                originalContent: p.originalContent ?? codeEditOriginalMap[p.filePath] ?? "",
+                newContent: p.newContent ?? "",
+              }));
+            if (filePatchDrafts.length > 0) {
+              const fileList = filePatchDrafts.map((p: any) => `- \`${p.filePath}\``).join("\n");
+              finalResponse = `I've prepared changes for **${filePatchDrafts.length} file${filePatchDrafts.length > 1 ? "s" : ""}**.\n\n${parsed.description || "Review the diffs below."}\n\n${fileList}\n\nClick **Apply** on each diff, or **Apply All** to write all changes at once.`;
+            }
+          } else if (parsed && parsed.filePath && "newContent" in parsed) {
+            // Single file patch
+            filePatchDrafts = [{
               filePath: parsed.filePath,
               description: parsed.description || "Apply code changes",
-              originalContent: parsed.originalContent ?? "",
+              originalContent: parsed.originalContent ?? codeEditOriginalMap[parsed.filePath] ?? "",
               newContent: parsed.newContent ?? "",
-            };
-            // Replace the raw JSON response with a friendly message
+            }];
             finalResponse = `I've prepared the changes for **\`${parsed.filePath}\`**.\n\n${parsed.description || "Review the diff below and click Apply when you're ready."}\n\nClick **Apply** to write the changes to disk, or **Cancel** to discard.`;
           }
         }
       } catch {
-        // If parsing fails, return the raw response as-is (AI may have explained instead of outputting JSON)
+        // AI responded with explanation text — leave finalResponse as-is
       }
     }
 
@@ -5586,7 +5616,8 @@ If the intent does not match any type, output: null`;
       accountQueryResult,
       verifyContainerDraft,
       dataQueryResult,
-      filePatchDraft,
+      filePatchDrafts: filePatchDrafts && filePatchDrafts.length > 0 ? filePatchDrafts : undefined,
+      readFiles: codeReadFiles.length > 0 ? codeReadFiles : undefined,
     };
   } catch (error: any) {
     console.error("[ChatService] ERROR:", error.message);
