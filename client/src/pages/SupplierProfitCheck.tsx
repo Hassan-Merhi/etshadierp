@@ -43,6 +43,9 @@ import {
   Loader2,
   BarChart2,
   Save,
+  DollarSign,
+  Hash,
+  ShoppingCart,
 } from "lucide-react";
 
 interface AnalysisRow {
@@ -152,7 +155,7 @@ export default function SupplierProfitCheck() {
   // Filter state
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [statusBasis, setStatusBasis] = useState<"hassan" | "cost">("hassan");
+  const [statusBasis, setStatusBasis] = useState<"hassan" | "cost">("cost");
 
   // Proforma save state
   const [savedProforma, setSavedProforma] = useState<{ id: number; reference: string } | null>(null);
@@ -409,28 +412,30 @@ export default function SupplierProfitCheck() {
 
   return (
     <div className="h-full overflow-y-auto bg-background">
-      <div className="max-w-full p-4 space-y-4">
+      <div className="max-w-full p-4 space-y-3">
 
-        {/* Page Title */}
-        <div className="flex items-center gap-3">
-          <BarChart2 className="w-6 h-6 text-amber-600" />
-          <div>
-            <h1 className="text-xl font-semibold">Supplier Profit Check</h1>
-            <p className="text-sm text-muted-foreground">
-              Analyze item profitability before ordering from a supplier
-            </p>
+        {/* Page Header */}
+        <div className="flex items-center justify-between gap-3 pb-1">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-md bg-amber-500/10">
+              <BarChart2 className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold leading-tight">Supplier Profit Check</h1>
+              <p className="text-xs text-muted-foreground">Analyze item profitability before ordering</p>
+            </div>
           </div>
         </div>
 
         {/* Setup Panel */}
         <Card>
-          <CardContent className="pt-4">
+          <CardContent className="p-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Supplier</label>
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Supplier</label>
                 <Select value={supplierId} onValueChange={setSupplierId}>
                   <SelectTrigger data-testid="select-supplier">
-                    <SelectValue placeholder="Select supplier" />
+                    <SelectValue placeholder="Select supplier…" />
                   </SelectTrigger>
                   <SelectContent>
                     {suppliers.map((s: any) => (
@@ -443,12 +448,12 @@ export default function SupplierProfitCheck() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sales Date Range</label>
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Sales Date Range</label>
                 <PeriodFilter value={periodFilter} onChange={setPeriodFilter} hideCustomInputs data-testid="period-filter-sales" />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Item Source</label>
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Item Source</label>
                 <Select value={sourceType} onValueChange={(v) => { setSourceType(v as "all" | "proforma"); setProformaId(""); }}>
                   <SelectTrigger data-testid="select-source-type"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -458,13 +463,12 @@ export default function SupplierProfitCheck() {
                 </Select>
               </div>
 
-              {/* Linked Stock Group — only shown when sourceType is "all" and a supplier is selected */}
-              {sourceType === "all" && supplierId && (
+              {sourceType === "all" && supplierId ? (
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                     Linked Stock Group
                     {linkedStockGroupId && (
-                      <span className="ml-1 text-emerald-600 dark:text-emerald-400">(active filter)</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-medium">(active filter)</span>
                     )}
                   </label>
                   <Select
@@ -477,20 +481,18 @@ export default function SupplierProfitCheck() {
                       <SelectValue placeholder="All items (no filter)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__all__">All items (no filter)</SelectItem>
+                      <SelectItem value="__all__">All items</SelectItem>
                       {stockGroups.map((g: any) => (
                         <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-              )}
-
-              {sourceType === "proforma" ? (
+              ) : sourceType === "proforma" ? (
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Select Proforma</label>
+                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Select Proforma</label>
                   <Select value={proformaId} onValueChange={setProformaId}>
-                    <SelectTrigger data-testid="select-proforma"><SelectValue placeholder="Select proforma" /></SelectTrigger>
+                    <SelectTrigger data-testid="select-proforma"><SelectValue placeholder="Select proforma…" /></SelectTrigger>
                     <SelectContent>
                       {proformas.map((p: any) => (
                         <SelectItem key={p.id} value={String(p.id)}>{p.reference}</SelectItem>
@@ -499,89 +501,120 @@ export default function SupplierProfitCheck() {
                   </Select>
                 </div>
               ) : <div />}
-
             </div>
           </CardContent>
         </Card>
 
-        {/* Summary Cards */}
+        {/* Summary Stats Row */}
         {loaded && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <Card>
-              <CardContent className="pt-3 pb-3">
-                <div className="text-xs text-muted-foreground">Items</div>
-                <div className="text-2xl font-bold">{summary.selectedCount}</div>
-                <div className="text-xs text-muted-foreground">of {summary.totalItems}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-3 pb-3">
-                <div className="text-xs text-muted-foreground">Total Qty</div>
-                <div className="text-2xl font-bold">{summary.totalQty.toLocaleString()}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-3 pb-3">
-                <div className="text-xs text-muted-foreground">Total Avg Cost</div>
-                <div className="text-lg font-bold">${fmt(summary.totalAvgCost)}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-3 pb-3">
-                <div className="text-xs text-muted-foreground">Hassan's Profit</div>
-                <div className={`text-lg font-bold ${summary.totalHassansProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            {/* Items */}
+            <div className="rounded-md border bg-card px-3 py-2.5 flex items-start gap-2.5">
+              <div className="mt-0.5 p-1.5 rounded-md bg-muted shrink-0">
+                <Hash className="w-3.5 h-3.5 text-muted-foreground" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[11px] font-medium text-muted-foreground">Items</div>
+                <div className="text-xl font-bold leading-tight">{summary.selectedCount}</div>
+                <div className="text-[11px] text-muted-foreground">of {summary.totalItems}</div>
+              </div>
+            </div>
+
+            {/* Total Qty */}
+            <div className="rounded-md border bg-card px-3 py-2.5 flex items-start gap-2.5">
+              <div className="mt-0.5 p-1.5 rounded-md bg-muted shrink-0">
+                <ShoppingCart className="w-3.5 h-3.5 text-muted-foreground" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[11px] font-medium text-muted-foreground">Total Qty</div>
+                <div className="text-xl font-bold leading-tight">{summary.totalQty.toLocaleString()}</div>
+              </div>
+            </div>
+
+            {/* Avg Cost */}
+            <div className="rounded-md border bg-card px-3 py-2.5 flex items-start gap-2.5">
+              <div className="mt-0.5 p-1.5 rounded-md bg-muted shrink-0">
+                <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[11px] font-medium text-muted-foreground">Total Avg Cost</div>
+                <div className="text-base font-bold leading-tight">${fmt(summary.totalAvgCost)}</div>
+              </div>
+            </div>
+
+            {/* Hassan's Profit */}
+            <div className="rounded-md border bg-card px-3 py-2.5 flex items-start gap-2.5">
+              <div className={`mt-0.5 p-1.5 rounded-md shrink-0 ${summary.totalHassansProfit >= 0 ? "bg-blue-50 dark:bg-blue-900/20" : "bg-red-50 dark:bg-red-900/20"}`}>
+                <TrendingUp className={`w-3.5 h-3.5 ${summary.totalHassansProfit >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-500"}`} />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[11px] font-medium text-muted-foreground">Hassan's Profit</div>
+                <div className={`text-base font-bold leading-tight ${summary.totalHassansProfit >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-600"}`}>
                   {summary.totalHassansProfit < 0 ? "-" : ""}${fmt(Math.abs(summary.totalHassansProfit))}
                 </div>
                 {summary.hassansProfitPct != null && (
-                  <div className="text-xs text-muted-foreground">{fmt(Math.abs(summary.hassansProfitPct), 1)}%</div>
+                  <div className="text-[11px] text-muted-foreground">{fmt(Math.abs(summary.hassansProfitPct), 1)}%</div>
                 )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-3 pb-3">
-                <div className="text-xs text-muted-foreground">Cost Profit</div>
-                <div className={`text-lg font-bold ${summary.totalCostProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+              </div>
+            </div>
+
+            {/* Cost Profit */}
+            <div className="rounded-md border bg-card px-3 py-2.5 flex items-start gap-2.5">
+              <div className={`mt-0.5 p-1.5 rounded-md shrink-0 ${summary.totalCostProfit >= 0 ? "bg-emerald-50 dark:bg-emerald-900/20" : "bg-red-50 dark:bg-red-900/20"}`}>
+                <TrendingUp className={`w-3.5 h-3.5 ${summary.totalCostProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}`} />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[11px] font-medium text-muted-foreground">Cost Profit</div>
+                <div className={`text-base font-bold leading-tight ${summary.totalCostProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600"}`}>
                   {summary.totalCostProfit < 0 ? "-" : ""}${fmt(Math.abs(summary.totalCostProfit))}
                 </div>
                 {summary.costProfitPct != null && (
-                  <div className="text-xs text-muted-foreground">{fmt(Math.abs(summary.costProfitPct), 1)}%</div>
+                  <div className="text-[11px] text-muted-foreground">{fmt(Math.abs(summary.costProfitPct), 1)}%</div>
                 )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-3 pb-3">
-                <div className="text-xs text-muted-foreground">Issues</div>
-                <div className="space-y-0.5 text-sm">
-                  <div><span className="font-semibold text-red-600">{summary.losingConfigCount}</span> <span className="text-muted-foreground">losing (Hassan)</span></div>
-                  <div><span className="font-semibold text-red-600">{summary.losingOffloadCount}</span> <span className="text-muted-foreground">losing (cost)</span></div>
-                  <div><span className="font-semibold text-amber-600">{summary.noDataCount}</span> <span className="text-muted-foreground">no data</span></div>
+              </div>
+            </div>
+
+            {/* Issues */}
+            <div className="rounded-md border bg-card px-3 py-2.5 flex items-start gap-2.5">
+              <div className="mt-0.5 p-1.5 rounded-md bg-amber-50 dark:bg-amber-900/20 shrink-0">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="min-w-0 space-y-0.5">
+                <div className="text-[11px] font-medium text-muted-foreground">Issues</div>
+                <div className="text-[11px]">
+                  <span className="font-semibold text-red-600">{summary.losingConfigCount}</span>
+                  <span className="text-muted-foreground ml-1">Hassan losing</span>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="text-[11px]">
+                  <span className="font-semibold text-red-600">{summary.losingOffloadCount}</span>
+                  <span className="text-muted-foreground ml-1">cost losing</span>
+                </div>
+                <div className="text-[11px]">
+                  <span className="font-semibold text-amber-600">{summary.noDataCount}</span>
+                  <span className="text-muted-foreground ml-1">no data</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Saved proforma banner */}
+        {/* Saved Proforma Banner */}
         {savedProforma && (
-          <Card className="border-green-500 bg-green-50 dark:bg-green-900/10">
-            <CardContent className="pt-3 pb-3">
-              <div className="flex flex-wrap items-center gap-3 justify-between">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <span className="font-semibold text-green-800 dark:text-green-300">Proforma saved:</span>
-                  <span className="font-mono text-green-700 dark:text-green-400">{savedProforma.reference}</span>
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  <Button variant="outline" onClick={handleExportSupplier} data-testid="button-export-supplier">
-                    <Download className="w-4 h-4 mr-2" /> Supplier Excel
-                  </Button>
-                  <Button variant="outline" onClick={handleExportInternal} data-testid="button-export-internal">
-                    <FileText className="w-4 h-4 mr-2" /> Analysis Excel
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex flex-wrap items-center gap-3 justify-between rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/10 px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">Proforma saved:</span>
+              <span className="font-mono text-sm text-emerald-700 dark:text-emerald-400">{savedProforma.reference}</span>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Button size="sm" variant="outline" onClick={handleExportSupplier} data-testid="button-export-supplier">
+                <Download className="w-3.5 h-3.5 mr-1.5" /> Supplier Excel
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleExportInternal} data-testid="button-export-internal">
+                <FileText className="w-3.5 h-3.5 mr-1.5" /> Analysis Excel
+              </Button>
+            </div>
+          </div>
         )}
 
         {/* Filter Bar + Actions */}
@@ -589,12 +622,12 @@ export default function SupplierProfitCheck() {
           <div className="flex flex-wrap gap-2 items-center justify-between">
             <div className="flex flex-wrap gap-2 items-center">
               <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                 <Input
                   placeholder="Search code / name"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-8 w-48"
+                  className="pl-8 w-44"
                   data-testid="input-search"
                 />
               </div>
@@ -604,13 +637,13 @@ export default function SupplierProfitCheck() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="hassan">Status: Hassan's Profit</SelectItem>
+                  <SelectItem value="hassan">Status: Hassan's</SelectItem>
                   <SelectItem value="cost">Status: Cost Profit</SelectItem>
                 </SelectContent>
               </Select>
 
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40" data-testid="select-status-filter">
+                <SelectTrigger className="w-36" data-testid="select-status-filter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -619,10 +652,9 @@ export default function SupplierProfitCheck() {
                   <SelectItem value="losing">Losing</SelectItem>
                   <SelectItem value="break_even">Break Even</SelectItem>
                   <SelectItem value="no_sales_data">No Sales Data</SelectItem>
-                  <SelectItem value="missing_offload">Missing Offload Cost</SelectItem>
+                  <SelectItem value="missing_offload">Missing Cost</SelectItem>
                 </SelectContent>
               </Select>
-
             </div>
 
             <div className="flex gap-2">
@@ -656,114 +688,108 @@ export default function SupplierProfitCheck() {
         {/* Data Table */}
         {loaded && (
           <Table wrapperClassName="max-h-[calc(100vh-320px)]">
-              <TableHeader className="sticky top-0 z-30 bg-background">
-                <TableRow className="bg-muted/50">
-                  <TableHead className="min-w-[90px]">Code</TableHead>
-                  <TableHead className="min-w-[200px]">Name</TableHead>
-                  <TableHead className="text-right min-w-[90px]">Sales Qty</TableHead>
-                  <TableHead className="text-right min-w-[110px]">Avg Sell</TableHead>
-                  <TableHead className="text-right min-w-[110px]">Hassan's Price</TableHead>
-                  <TableHead className="text-right min-w-[100px]">Avg Cost</TableHead>
-                  {/* Hassan's Profit = Hassan's Price − Avg Cost */}
-                  <TableHead className="text-right min-w-[130px] bg-blue-50/50 dark:bg-blue-900/10">
-                    <div className="text-blue-700 dark:text-blue-400">Hassan's Profit</div>
-                    <div className="text-[10px] font-normal text-muted-foreground">Hassan's Price − Avg Cost</div>
-                  </TableHead>
-                  {/* Cost Profit = Avg Sell − Avg Cost */}
-                  <TableHead className="text-right min-w-[130px] bg-violet-50/50 dark:bg-violet-900/10">
-                    <div className="text-violet-700 dark:text-violet-400">Cost Profit</div>
-                    <div className="text-[10px] font-normal text-muted-foreground">Avg Sell − Avg Cost</div>
-                  </TableHead>
-                  <TableHead className="min-w-[90px]">Status</TableHead>
-                  <TableHead className="text-right min-w-[100px]">Qty to Order</TableHead>
+            <TableHeader className="sticky top-0 z-30 bg-background">
+              <TableRow className="border-b-2">
+                <TableHead className="min-w-[90px] text-xs font-semibold">Code</TableHead>
+                <TableHead className="min-w-[200px] text-xs font-semibold">Name</TableHead>
+                <TableHead className="text-right min-w-[80px] text-xs font-semibold">Sales Qty</TableHead>
+                <TableHead className="text-right min-w-[100px] text-xs font-semibold">Avg Sell</TableHead>
+                <TableHead className="text-right min-w-[110px] text-xs font-semibold">Hassan's Price</TableHead>
+                <TableHead className="text-right min-w-[90px] text-xs font-semibold">Avg Cost</TableHead>
+                <TableHead className="text-right min-w-[130px] text-xs font-semibold">
+                  <div className="text-blue-600 dark:text-blue-400">Hassan's Profit</div>
+                  <div className="font-normal text-muted-foreground" style={{ fontSize: "10px" }}>Price − Cost</div>
+                </TableHead>
+                <TableHead className="text-right min-w-[130px] text-xs font-semibold">
+                  <div className="text-emerald-600 dark:text-emerald-400">Cost Profit</div>
+                  <div className="font-normal text-muted-foreground" style={{ fontSize: "10px" }}>Avg Sell − Cost</div>
+                </TableHead>
+                <TableHead className="min-w-[90px] text-xs font-semibold">Status</TableHead>
+                <TableHead className="text-right min-w-[100px] text-xs font-semibold">Qty to Order</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredRows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
+                    <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">No items match your filters</p>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
-                      <Package className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                      No items match your filters
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredRows.map((row) => {
-                    const rowBg =
-                      row.statusByConfig === "losing"
-                        ? "bg-red-50/50 dark:bg-red-900/10"
-                        : row.statusByConfig === "no_sales_data"
-                        ? "bg-amber-50/50 dark:bg-amber-900/10"
-                        : "";
+              ) : (
+                filteredRows.map((row) => {
+                  const activeStatus = statusBasis === "cost" ? row.statusByOffload : row.statusByConfig;
+                  const rowBg =
+                    activeStatus === "losing"
+                      ? "bg-red-50/40 dark:bg-red-900/10"
+                      : activeStatus === "no_sales_data"
+                      ? "bg-amber-50/40 dark:bg-amber-900/10"
+                      : "";
 
-                    return (
-                      <TableRow key={row.stockItemId} className={rowBg} data-testid={`row-item-${row.stockItemId}`}>
-                        <TableCell className="font-mono text-xs">{row.code}</TableCell>
-                        <TableCell className="font-medium text-sm">{row.name}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          {row.salesQty > 0
-                            ? row.salesQty.toLocaleString("en-US")
-                            : <span className="text-muted-foreground text-xs">—</span>}
-                        </TableCell>
-                        <TableCell className="text-right text-sm font-medium">
-                          {row.avgSellingPrice != null ? `$${fmt(row.avgSellingPrice)}` : <span className="text-muted-foreground text-xs">—</span>}
-                        </TableCell>
-                        {/* Hassan's Price — from stock_items.selling_price */}
-                        <TableCell className="text-right text-sm">
-                          <span className={`font-mono ${row.configPrice === 0 ? "text-orange-500" : ""}`}>${fmt(row.configPrice)}</span>
-                        </TableCell>
-                        {/* Avg Cost — inventory avg or PO fallback */}
-                        <TableCell className="text-right text-sm">
-                          <span className={`font-mono ${row.nCostSource === "missing" ? "text-orange-500" : row.nCostSource === "po_fallback" ? "text-amber-600" : ""}`}>${fmt(row.offloadingCost)}</span>
-                        </TableCell>
-                        {/* Hassan's Profit */}
-                        <TableCell className="bg-blue-50/30 dark:bg-blue-900/10">
-                          <ProfitCell value={row.hassansProfit} pct={row.hassansProfitPct} />
-                        </TableCell>
-                        {/* Cost Profit */}
-                        <TableCell className="bg-violet-50/30 dark:bg-violet-900/10">
-                          <ProfitCell value={row.costProfit} pct={row.costProfitPct} />
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={statusBasis === "cost" ? row.statusByOffload : row.statusByConfig} />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="1"
-                            placeholder="0"
-                            value={qtyMap[row.stockItemId] ?? ""}
-                            onChange={(e) => setQtyMap((prev) => ({ ...prev, [row.stockItemId]: e.target.value }))}
-                            className="w-24 h-7 text-right ml-auto"
-                            data-testid={`input-qty-${row.stockItemId}`}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
+                  return (
+                    <TableRow key={row.stockItemId} className={`${rowBg} hover:bg-muted/30`} data-testid={`row-item-${row.stockItemId}`}>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{row.code}</TableCell>
+                      <TableCell className="font-medium text-sm">{row.name}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {row.salesQty > 0
+                          ? row.salesQty.toLocaleString("en-US")
+                          : <span className="text-muted-foreground text-xs">—</span>}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-medium">
+                        {row.avgSellingPrice != null ? `$${fmt(row.avgSellingPrice)}` : <span className="text-muted-foreground text-xs">—</span>}
+                      </TableCell>
+                      <TableCell className="text-right text-sm">
+                        <span className={`font-mono ${row.configPrice === 0 ? "text-orange-500" : ""}`}>${fmt(row.configPrice)}</span>
+                      </TableCell>
+                      <TableCell className="text-right text-sm">
+                        <span className={`font-mono ${row.nCostSource === "missing" ? "text-orange-500" : row.nCostSource === "po_fallback" ? "text-amber-600" : ""}`}>${fmt(row.offloadingCost)}</span>
+                      </TableCell>
+                      <TableCell>
+                        <ProfitCell value={row.hassansProfit} pct={row.hassansProfitPct} />
+                      </TableCell>
+                      <TableCell>
+                        <ProfitCell value={row.costProfit} pct={row.costProfitPct} />
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={statusBasis === "cost" ? row.statusByOffload : row.statusByConfig} />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="1"
+                          placeholder="0"
+                          value={qtyMap[row.stockItemId] ?? ""}
+                          onChange={(e) => setQtyMap((prev) => ({ ...prev, [row.stockItemId]: e.target.value }))}
+                          className="w-24 h-7 text-right ml-auto"
+                          data-testid={`input-qty-${row.stockItemId}`}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
           </Table>
         )}
 
         {/* Empty states */}
         {!supplierId && (
-          <Card>
-            <CardContent className="py-16 text-center">
-              <BarChart2 className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p className="text-muted-foreground">
-                Select a supplier to start the analysis.
-              </p>
-            </CardContent>
-          </Card>
+          <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+            <div className="p-4 rounded-full bg-muted">
+              <BarChart2 className="w-8 h-8 text-muted-foreground opacity-60" />
+            </div>
+            <div>
+              <p className="font-medium text-sm">Select a supplier to begin</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Choose a supplier from the panel above to load its items</p>
+            </div>
+          </div>
         )}
         {isLoading && (
-          <Card>
-            <CardContent className="py-16 text-center">
-              <Loader2 className="w-10 h-10 mx-auto mb-3 animate-spin opacity-40" />
-              <p className="text-muted-foreground">Loading items and calculating profitability...</p>
-            </CardContent>
-          </Card>
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Calculating profitability…</p>
+          </div>
         )}
       </div>
 
