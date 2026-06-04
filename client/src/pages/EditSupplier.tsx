@@ -17,12 +17,14 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { insertSupplierSchema } from "@shared/schema";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export default function EditSupplier() {
   const params = useParams();
@@ -30,12 +32,22 @@ export default function EditSupplier() {
   const handleBack = useBackToParent();
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
+  const { selectedCompany } = useCompany();
   const supplierId = params.id ? parseInt(params.id) : null;
   useEscapeToParent("/suppliers");
 
   const { data: supplier, isLoading } = useQuery({
     queryKey: [`/api/suppliers/${supplierId}`],
     enabled: !!supplierId,
+  });
+
+  const { data: stockGroups = [] } = useQuery<any[]>({
+    queryKey: ["/api/stock-groups", selectedCompany?.id],
+    enabled: !!selectedCompany?.id,
+    queryFn: async () => {
+      const res = await fetch("/api/stock-groups", { credentials: "include" });
+      return res.ok ? res.json() : [];
+    },
   });
 
   const form = useForm({
@@ -50,6 +62,7 @@ export default function EditSupplier() {
       paymentTerms: "",
       openingBalance: "0.00",
       active: true,
+      stockGroupId: null as number | null,
     },
   });
 
@@ -65,6 +78,7 @@ export default function EditSupplier() {
         paymentTerms: String((supplier as any).paymentTerms || ""),
         openingBalance: String((supplier as any).openingBalance || "0.00"),
         active: Boolean((supplier as any).active),
+        stockGroupId: (supplier as any).stockGroupId ?? (supplier as any).stock_group_id ?? null,
       });
     }
   }, [supplier]);
@@ -298,6 +312,33 @@ export default function EditSupplier() {
                           data-testid="input-openingBalance"
                         />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="stockGroupId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Linked Stock Group</FormLabel>
+                      <Select
+                        value={field.value ? String(field.value) : "__none__"}
+                        onValueChange={(v) => field.onChange(v === "__none__" ? null : Number(v))}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-stock-group">
+                            <SelectValue placeholder="No stock group linked" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="__none__">No stock group linked</SelectItem>
+                          {stockGroups.map((g: any) => (
+                            <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
