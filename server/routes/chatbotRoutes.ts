@@ -987,10 +987,21 @@ export function registerChatbotRoutes(app: Express) {
         return res.status(400).json({ message: e.message });
       }
 
-      // Stale guard: check current content matches originalContent
-      // (skip guard if originalContent is empty — means file is being created)
-      if (originalContent && originalContent.trim() !== "") {
+      // Stale guard: enforce whenever the file exists on disk.
+      // - If originalContent is non-empty: compare exactly (protects against concurrent edits).
+      // - If originalContent is empty but file already exists: reject — the AI must have read
+      //   the file first; an empty originalContent for an existing file means the patch was
+      //   generated without seeing the current content and cannot be applied safely.
+      // - If file does NOT exist yet: allow creation unconditionally.
+      const fileAlreadyExists = fs.existsSync(absPath) && fs.statSync(absPath).isFile();
+      if (fileAlreadyExists) {
         const currentContent = await readProjectFileRaw(filePath).catch(() => "");
+        if (!originalContent || originalContent.trim() === "") {
+          return res.status(409).json({
+            message: "Cannot overwrite an existing file without a stale-check reference. Please re-ask the AI to regenerate the patch.",
+            stale: true,
+          });
+        }
         if (currentContent !== originalContent) {
           return res.status(409).json({
             message: "The file has changed since the diff was generated. Please re-ask the AI to regenerate the patch.",

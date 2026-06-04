@@ -62,6 +62,55 @@ export async function readProjectFileRaw(relPath: string): Promise<string> {
   return fs.readFileSync(abs, "utf8");
 }
 
+// ── Bare-filename search ────────────────────────────────────────────────────
+
+const SOURCE_DIRS = ["server", "client/src", "shared", "scripts"];
+
+/**
+ * Search known source directories for a file with the given basename.
+ * Returns the first match as a workspace-relative path, or null if not found.
+ */
+function findInSourceDirs(dirAbs: string, filename: string): string | null {
+  if (!fs.existsSync(dirAbs)) return null;
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dirAbs, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  for (const e of entries) {
+    if (e.name === "node_modules" || e.name === ".git" || e.name === "dist") continue;
+    const fullPath = path.join(dirAbs, e.name);
+    if (e.isFile() && e.name === filename) return fullPath;
+    if (e.isDirectory()) {
+      const found = findInSourceDirs(fullPath, filename);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolve a user-supplied filename (bare name or relative path) to a workspace-relative
+ * path by searching known source directories. Returns null if nothing is found.
+ */
+export function resolveFilePath(nameOrPath: string): string | null {
+  // Strip leading slashes
+  const cleaned = nameOrPath.replace(/^\/+/, "");
+  // Direct hit first (exact relative path)
+  const directAbs = path.resolve(WORKSPACE_ROOT, cleaned);
+  if (fs.existsSync(directAbs) && fs.statSync(directAbs).isFile()) {
+    return cleaned;
+  }
+  // Bare filename — search source dirs
+  const basename = path.basename(cleaned);
+  for (const srcDir of SOURCE_DIRS) {
+    const found = findInSourceDirs(path.resolve(WORKSPACE_ROOT, srcDir), basename);
+    if (found) return path.relative(WORKSPACE_ROOT, found);
+  }
+  return null;
+}
+
 export async function listProjectDir(relPath: string = "."): Promise<string[]> {
   const abs = resolveWorkspacePath(relPath);
   if (!fs.existsSync(abs)) {

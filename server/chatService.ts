@@ -9,6 +9,7 @@ import {
   extractFilePathsFromMessage,
   extractSearchPattern,
   readProjectFileRaw,
+  resolveFilePath,
 } from "./lib/codeAgentTools";
 import { eq, and, desc, sql, lt, gt, gte, isNull, asc, ilike, or, inArray } from "drizzle-orm";
 import {
@@ -1381,8 +1382,11 @@ function classifyChatIntent(
   //    File references are unambiguous: "edit chatService.ts" can only be code.
   if (hasFileRef && RE_CODE_EDIT.test(userMessage)) return "code_edit";
   if (hasFileRef && RE_CODE_READ.test(userMessage)) return "code_read";
-  // Read-only with explicit search/grep verbs, no file extension required
-  if (RE_CODE_READ.test(userMessage) && /\b(?:find where|search for|where is|grep for|look for|where does|list files|ls\b)\b/i.test(userMessage)) return "code_read";
+  // Read-only with explicit developer verbs (grep/list-files) — only when the message
+  // also has code-specific context so "search for supplier" doesn't route here.
+  const hasCodeContext = hasFileRef ||
+    /\b(?:server|client|shared|scripts)\/|\b[\w-]+\.(?:ts|tsx|js|jsx)\b|\b(?:function|component|hook|middleware|handler|schema|interface|endpoint)\b/i.test(userMessage);
+  if (hasCodeContext && /\b(?:find where|grep for|list files|ls\b|where does)\b/i.test(userMessage)) return "code_read";
 
   // ── Code edit without file path — "add a discount field to the voucher form".
   //    Only fires when the message lacks financial-transaction markers so that
@@ -1747,14 +1751,17 @@ export async function chat(
       let codeContext = "";
 
       if (filePaths.length > 0) {
-        for (const fp of filePaths.slice(0, 3)) {
+        for (const raw of filePaths.slice(0, 3)) {
+          // Resolve bare filenames (e.g. "chatService.ts") to full workspace-relative paths
+          const fp = resolveFilePath(raw) ?? raw;
           try {
             const { content, totalLines, truncated } = await readProjectFile(fp);
             codeContext += `\n\n**File: ${fp}** (${totalLines} lines${truncated ? `, first 300 shown` : ""})\n\`\`\`typescript\n${content}\n\`\`\``;
           } catch (err: any) {
-            // File not found → try a grep search as fallback
-            const grepResult = await grepProjectFiles(fp.replace(/.*\//, "").replace(/\.\w+$/, ""), ".").catch(() => "(not found)");
-            codeContext += `\n\n**File ${fp} not found. Grep results:**\n\`\`\`\n${grepResult}\n\`\`\``;
+            // Still not found — fall back to grep by base name
+            const basename = fp.replace(/.*\//, "").replace(/\.\w+$/, "");
+            const grepResult = await grepProjectFiles(basename, ".").catch(() => "(not found)");
+            codeContext += `\n\n**File ${fp} not found. Grep results for \`${basename}\`:**\n\`\`\`\n${grepResult}\n\`\`\``;
           }
         }
       } else {
@@ -1786,7 +1793,9 @@ export async function chat(
     } else if (intent === "code_edit") {
       // ── Code Edit: load file and build structured output prompt ───────────────
       const filePaths = extractFilePathsFromMessage(userMessage);
-      const targetFilePath = filePaths[0] ?? "";
+      const rawPath = filePaths[0] ?? "";
+      // Resolve bare filenames ("chatService.ts") to full workspace-relative paths
+      const targetFilePath = rawPath ? (resolveFilePath(rawPath) ?? rawPath) : "";
       let fileContent = "";
 
       if (targetFilePath) {
