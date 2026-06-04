@@ -82,7 +82,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import type { Employee } from "@shared/schema";
 import { insertEmployeeSchema } from "@shared/schema";
-import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown, ExternalLink, User, HardHat, Banknote, ArrowDownCircle, ArrowUpCircle, Gift, Receipt, PlayCircle, X, Loader2, RefreshCw, Percent, Package, Save, ChevronRight, Printer } from "lucide-react";
+import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown, ExternalLink, User, HardHat, Banknote, ArrowDownCircle, ArrowUpCircle, Gift, Receipt, PlayCircle, X, Loader2, RefreshCw, Percent, Package, Save, ChevronRight, Printer, MinusCircle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -155,6 +155,10 @@ export default function Payroll() {
   const [selectedWorkerProfileId, setSelectedWorkerProfileId] = useState<number | null>(null);
   const [workerProfileSearch, setWorkerProfileSearch] = useState("");
   const [workerProfileGroupFilter, setWorkerProfileGroupFilter] = useState<number | null>(null);
+  const [workerDeductionTarget, setWorkerDeductionTarget] = useState<Employee | null>(null);
+  const [workerDeductionAmount, setWorkerDeductionAmount] = useState("");
+  const [workerDeductionReason, setWorkerDeductionReason] = useState("");
+  const [workerDeductionDate, setWorkerDeductionDate] = useState(new Date().toLocaleDateString("en-CA"));
   const { selectedCompany, companies } = useCompany();
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -1093,6 +1097,31 @@ export default function Payroll() {
       toast({ title: "Deleted", description: "Salary advance deleted" });
       queryClient.invalidateQueries({ queryKey: ["/api/salary-advances", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats/net-profit"] });
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const workerDeductionMutation = useMutation({
+    mutationFn: async () => {
+      if (!workerDeductionTarget) throw new Error("No worker selected");
+      const amt = parseFloat(workerDeductionAmount);
+      if (isNaN(amt) || amt <= 0) throw new Error("Amount must be a positive number");
+      return await modeApiRequest("POST", `/api/factory/workers/${workerDeductionTarget.id}/deductions`, {
+        amount: workerDeductionAmount,
+        reason: workerDeductionReason || null,
+        deductionDate: workerDeductionDate,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Deduction added", description: "Pending deduction saved. It will be applied at next payroll." });
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/workers/${workerDeductionTarget?.id}/deductions`] });
+      setWorkerDeductionTarget(null);
+      setWorkerDeductionAmount("");
+      setWorkerDeductionReason("");
+      setWorkerDeductionDate(new Date().toLocaleDateString("en-CA"));
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
@@ -2671,11 +2700,8 @@ export default function Payroll() {
                             </AvatarFallback>
                           </Avatar>
                           <p className="font-semibold text-sm leading-tight uppercase" data-testid={`text-worker-name-${worker.id}`}>
-                            {worker.firstName} {worker.lastName}
+                            {[worker.firstName, worker.lastName].filter(Boolean).join(" ")}
                           </p>
-                          {worker.code && (
-                            <p className="text-xs text-muted-foreground mt-0.5 font-mono" data-testid={`text-worker-code-${worker.id}`}>{worker.code}</p>
-                          )}
                           {workerGroupMap[worker.id] ? (
                             <Badge variant="secondary" className="mt-2 text-xs">
                               {workerGroupMap[worker.id]}
@@ -2704,7 +2730,16 @@ export default function Payroll() {
                           <p className="font-mono text-sm font-medium mt-2" data-testid={`text-worker-salary-${worker.id}`}>
                             {formatAmount(parseFloat(worker.monthlySalary || "0"))}
                           </p>
-                          <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                          <div className="mt-2 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={(e) => { e.stopPropagation(); setWorkerDeductionTarget(worker as any); }}
+                              data-testid={`button-deduction-worker-${worker.id}`}
+                              title="Add deduction"
+                            >
+                              <MinusCircle className="h-3.5 w-3.5 text-amber-500" />
+                            </Button>
                             <Button
                               size="icon"
                               variant="ghost"
@@ -2958,6 +2993,68 @@ export default function Payroll() {
         setEditBalePctRates={setEditBalePctRates}
         pctLocations={pctLocations}
       />
+
+      {/* Worker Deduction Dialog */}
+      <Dialog open={!!workerDeductionTarget} onOpenChange={(open) => { if (!open) { setWorkerDeductionTarget(null); setWorkerDeductionAmount(""); setWorkerDeductionReason(""); } }}>
+        <DialogContent data-testid="dialog-worker-deduction">
+          <DialogHeader>
+            <DialogTitle>Add Deduction</DialogTitle>
+            <DialogDescription>
+              {workerDeductionTarget
+                ? `Deduction for ${[workerDeductionTarget.firstName, (workerDeductionTarget as any).lastName].filter(Boolean).join(" ")}. Pending deductions are applied automatically at the next payroll run.`
+                : "Add a pending deduction for this worker."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div className="space-y-1.5">
+              <Label htmlFor="ded-amount">Amount</Label>
+              <Input
+                id="ded-amount"
+                type="number"
+                min="0.01"
+                step="0.01"
+                placeholder="0.00"
+                value={workerDeductionAmount}
+                onChange={(e) => setWorkerDeductionAmount(e.target.value)}
+                data-testid="input-worker-deduction-amount"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ded-reason">Reason (optional)</Label>
+              <Input
+                id="ded-reason"
+                placeholder="e.g. Uniform, Damage, etc."
+                value={workerDeductionReason}
+                onChange={(e) => setWorkerDeductionReason(e.target.value)}
+                data-testid="input-worker-deduction-reason"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ded-date">Date</Label>
+              <Input
+                id="ded-date"
+                type="date"
+                value={workerDeductionDate}
+                onChange={(e) => setWorkerDeductionDate(e.target.value)}
+                data-testid="input-worker-deduction-date"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => { setWorkerDeductionTarget(null); setWorkerDeductionAmount(""); setWorkerDeductionReason(""); }} data-testid="button-cancel-worker-deduction">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => workerDeductionMutation.mutate()}
+              disabled={workerDeductionMutation.isPending || !workerDeductionAmount}
+              data-testid="button-submit-worker-deduction"
+            >
+              {workerDeductionMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Save Deduction
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

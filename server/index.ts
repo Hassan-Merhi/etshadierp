@@ -3874,6 +3874,20 @@ let migrationsDone = false;
                                       OR v.voucher_number LIKE 'FACTORY-OC-'     || fc.id || '-%'
            WHERE fc.deleted_at IS NOT NULL
          )`,
+    // Factory worker deductions — pending deductions applied at payroll time
+    `CREATE TABLE IF NOT EXISTS factory_worker_deductions (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      worker_id integer NOT NULL REFERENCES factory_workers(id),
+      amount decimal(20, 2) NOT NULL,
+      reason text,
+      deduction_date date NOT NULL,
+      applied boolean NOT NULL DEFAULT false,
+      payroll_id integer,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS factory_worker_deductions_company_idx ON factory_worker_deductions (company_id)`,
+    `CREATE INDEX IF NOT EXISTS factory_worker_deductions_worker_idx ON factory_worker_deductions (worker_id)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

@@ -4055,6 +4055,34 @@ export const insertFactoryAdvanceRepaymentSchema = createInsertSchema(factoryAdv
 export type InsertFactoryAdvanceRepayment = z.infer<typeof insertFactoryAdvanceRepaymentSchema>;
 export type FactoryAdvanceRepayment = typeof factoryAdvanceRepayments.$inferSelect;
 
+// ─── Factory Worker Deductions ─── pending deductions applied at payroll time
+export const factoryWorkerDeductions = pgTable("factory_worker_deductions", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  workerId: integer("worker_id").notNull().references(() => factoryWorkers.id),
+  amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
+  reason: text("reason"),
+  deductionDate: date("deduction_date").notNull(),
+  applied: boolean("applied").notNull().default(false),
+  payrollId: integer("payroll_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  companyIdx: index("factory_worker_deductions_company_idx").on(t.companyId),
+  workerIdx: index("factory_worker_deductions_worker_idx").on(t.workerId),
+}));
+
+export const insertFactoryWorkerDeductionSchema = createInsertSchema(factoryWorkerDeductions).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  amount: z.string().min(1, "Amount is required").refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0, "Amount must be positive"),
+  reason: z.string().optional().nullable(),
+  deductionDate: z.string().min(1, "Date is required"),
+});
+
+export type InsertFactoryWorkerDeduction = z.infer<typeof insertFactoryWorkerDeductionSchema>;
+export type FactoryWorkerDeduction = typeof factoryWorkerDeductions.$inferSelect;
+
 export const factoryWorkerDocuments = pgTable("factory_worker_documents", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),

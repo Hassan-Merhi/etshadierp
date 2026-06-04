@@ -18,6 +18,7 @@ import {
   factoryWorkerDocuments,
   factoryWorkerAdvances,
   factoryAdvanceRepayments,
+  factoryWorkerDeductions,
   factoryAttendance,
   ledgerAccounts,
   bankAccounts,
@@ -391,6 +392,19 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
         advanceByWorker[adv.workerId] = (advanceByWorker[adv.workerId] || 0) + parseFloat(adv.remainingBalance || "0");
       }
 
+      // Fetch pending (unapplied) deductions per worker
+      const allPendingDeductions = await db.select().from(factoryWorkerDeductions)
+        .where(and(eq(factoryWorkerDeductions.companyId, companyId), eq(factoryWorkerDeductions.applied, false)));
+      const deductionByWorker: Record<number, number[]> = {};
+      for (const ded of allPendingDeductions) {
+        if (!deductionByWorker[ded.workerId]) deductionByWorker[ded.workerId] = [];
+        deductionByWorker[ded.workerId].push(ded.id);
+      }
+      const deductionAmtByWorker: Record<number, number> = {};
+      for (const ded of allPendingDeductions) {
+        deductionAmtByWorker[ded.workerId] = (deductionAmtByWorker[ded.workerId] || 0) + parseFloat(ded.amount || "0");
+      }
+
       // Pre-resolve ledger accounts OUTSIDE the transaction to prevent concurrent insert conflicts
       const [expenseAcc, payableAccGen, advancesAccGen] = await Promise.all([
         findOrCreateLedger(companyId, "Factory Worker Payroll", "Expense"),
@@ -447,17 +461,26 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
           const advanceDeduction = overrideAmt >= 0
             ? Math.min(overrideAmt, base + bonus + transport, workerAdvanceBalance)
             : Math.min(workerAdvanceBalance, base + bonus + transport);
-          const net = base + bonus + transport - advanceDeduction;
-          await tx.insert(factoryPayrolls).values({
+          // Include pending worker deductions
+          const workerPendingDeductions = deductionAmtByWorker[worker.id] || 0;
+          const net = base + bonus + transport - advanceDeduction - workerPendingDeductions;
+          const [newPayroll] = await tx.insert(factoryPayrolls).values({
             companyId, workerId: worker.id, periodStart, periodEnd,
             baseSalary: base.toFixed(2), bonuses: bonus.toFixed(2),
             transport: transport.toFixed(2),
-            baleEarnings: "0", kgEarnings: "0", overtimePay: "0", deductions: "0",
+            baleEarnings: "0", kgEarnings: "0", overtimePay: "0",
+            deductions: workerPendingDeductions.toFixed(2),
             advances: advanceDeduction.toFixed(2),
             netSalary: net.toFixed(2), balesCount: 0, kgProcessed: "0", overtimeHours: "0",
             status: "DRAFT", notes: notes || null,
             cashAccountId: cashAccountId ? parseInt(cashAccountId) : null,
-          } as any);
+          } as any).returning({ id: factoryPayrolls.id });
+          // Mark pending deductions as applied
+          if (deductionByWorker[worker.id]?.length) {
+            await tx.update(factoryWorkerDeductions)
+              .set({ applied: true, payrollId: newPayroll.id } as any)
+              .where(inArray(factoryWorkerDeductions.id, deductionByWorker[worker.id]));
+          }
           // Settle advances immediately at generate time so remaining balance updates right away
           await settleAdvancesForPayroll(tx, companyId, worker.id, advanceDeduction);
           totalNet += net;
@@ -1203,6 +1226,65 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       res.json(result);
     } catch (error: any) {
       console.error("Error creating advance:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─── Worker Deductions CRUD ───────────────────────────────────────────────
+
+  // GET /api/factory/workers/:id/deductions
+  app.get("/api/factory/workers/:id/deductions", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const workerId = parseId(req.params.id);
+      const deductions = await db.select().from(factoryWorkerDeductions)
+        .where(and(eq(factoryWorkerDeductions.companyId, companyId), eq(factoryWorkerDeductions.workerId, workerId)))
+        .orderBy(desc(factoryWorkerDeductions.createdAt));
+      res.json(deductions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/factory/workers/:id/deductions
+  app.post("/api/factory/workers/:id/deductions", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const workerId = parseId(req.params.id);
+      const { amount, reason, deductionDate } = req.body;
+      if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+        return res.status(400).json({ message: "Amount must be a positive number" });
+      }
+      if (!deductionDate) return res.status(400).json({ message: "Deduction date is required" });
+      const [deduction] = await db.insert(factoryWorkerDeductions).values({
+        companyId,
+        workerId,
+        amount: parseFloat(amount).toFixed(2),
+        reason: reason || null,
+        deductionDate,
+        applied: false,
+      } as any).returning();
+      res.json(deduction);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // DELETE /api/factory/workers/:workerId/deductions/:id
+  app.delete("/api/factory/workers/:workerId/deductions/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const deductionId = parseId(req.params.id);
+      const [existing] = await db.select().from(factoryWorkerDeductions)
+        .where(and(eq(factoryWorkerDeductions.id, deductionId), eq(factoryWorkerDeductions.companyId, companyId)));
+      if (!existing) return res.status(404).json({ message: "Deduction not found" });
+      if (existing.applied) return res.status(400).json({ message: "Cannot delete an already-applied deduction" });
+      await db.delete(factoryWorkerDeductions).where(eq(factoryWorkerDeductions.id, deductionId));
+      res.json({ message: "Deduction deleted" });
+    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
