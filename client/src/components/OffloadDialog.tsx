@@ -35,14 +35,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
-import { Plus, X, Check, ChevronsUpDown, ChevronDown } from "lucide-react";
+import { Plus, X, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatNumber";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import type { Location } from "@shared/schema";
 import { useCompany } from "@/contexts/CompanyContext";
 
@@ -198,15 +193,9 @@ export function OffloadDialog({
   // ── ERP-only state ────────────────────────────────────────────────────────
   const [duties, setDuties] = useState("0");
   const [dutiesAccountId, setDutiesAccountId] = useState("");
-  const [officeCharges, setOfficeCharges] = useState("0");
-  const [officeChargesAccountId, setOfficeChargesAccountId] = useState("");
-  const [officeChargesCashAccountId, setOfficeChargesCashAccountId] = useState("");
-  const [transferCharges, setTransferCharges] = useState("0");
   const [transportFees, setTransportFees] = useState("0");
   const [transportAccountId, setTransportAccountId] = useState("");
   const [additionalCharges, setAdditionalCharges] = useState<AdditionalCharge[]>([]);
-  const [costCorrections, setCostCorrections] = useState<Record<number, string>>({});
-  const [correctionSectionOpen, setCorrectionSectionOpen] = useState(false);
 
   // ── SP-mode state ─────────────────────────────────────────────────────────
   const [spDutiesAmount, setSpDutiesAmount] = useState("");
@@ -224,15 +213,9 @@ export function OffloadDialog({
     // ERP fields
     setDuties("0");
     setDutiesAccountId("");
-    setOfficeCharges("0");
-    setOfficeChargesAccountId("");
-    setOfficeChargesCashAccountId("");
-    setTransferCharges("0");
     setTransportFees("0");
     setTransportAccountId("");
     setAdditionalCharges([]);
-    setCostCorrections({});
-    setCorrectionSectionOpen(false);
     // SP fields
     setSpDutiesAmount("");
     setSpDutiesMethod("prepaid_expenses");
@@ -241,12 +224,6 @@ export function OffloadDialog({
     setSpTransportMethod("prepaid_expenses");
     setSpTransportAgentId("");
   }, [open, containerId]);
-
-  // Reset cost corrections when location changes (keep other fields intact)
-  useEffect(() => {
-    setCostCorrections({});
-    setCorrectionSectionOpen(false);
-  }, [locationId]);
 
   // ── Queries ───────────────────────────────────────────────────────────────
   const { data: locations = [] } = useQuery<Location[]>({
@@ -277,32 +254,7 @@ export function OffloadDialog({
   const spPrepaidExpAcct = (spStatusData?.spAccounts || []).find((a: any) => a.subType === "sp_prepaid_expenses");
   const spHadiIcAcct = (spStatusData?.spAccounts || []).find((a: any) => a.subType === "sp_hadi_intercompany");
 
-  // ── ERP charge calculations ───────────────────────────────────────────────
-  const containerStockItemIds = (() => {
-    if (!containerData?.pos) return [];
-    const ids = new Set<number>();
-    for (const po of containerData.pos) {
-      if (po.items) {
-        for (const item of po.items) {
-          if (item.stockItemId && item.stockItemId > 0) ids.add(item.stockItemId);
-        }
-      }
-    }
-    return Array.from(ids);
-  })();
-
-  const { data: inventoryRates = [] } = useQuery<any[]>({
-    queryKey: ["/api/locations", locationId, "inventory-rates", containerStockItemIds.join(",")],
-    queryFn: async () => {
-      if (!locationId || containerStockItemIds.length === 0) return [];
-      const res = await factoryApiRequest("GET", `/api/locations/${locationId}/inventory-rates?stockItemIds=${containerStockItemIds.join(",")}`);
-      return res.json();
-    },
-    enabled: open && !!locationId && containerStockItemIds.length > 0 && !isSpCompany,
-  });
-
-  const hasExistingInventory = inventoryRates.some((r: any) => parseFloat(r.quantity) > 0);
-
+  // ── Charge calculations ───────────────────────────────────────────────────
   let poChargesTotal = 0;
   if (containerData?.charges && Array.isArray(containerData.charges)) {
     containerData.charges.forEach((charge: any) => {
@@ -313,8 +265,6 @@ export function OffloadDialog({
 
   const erpManualCharges =
     parseFloat(duties || "0") +
-    parseFloat(officeCharges || "0") +
-    parseFloat(transferCharges || "0") +
     parseFloat(transportFees || "0") +
     additionalCharges.reduce((sum, charge) => sum + parseFloat(charge.amount || "0"), 0);
 
@@ -346,7 +296,6 @@ export function OffloadDialog({
       if (!locationId) throw new Error("Please select a location");
 
       if (isSpCompany) {
-        // ── SP mode ──
         const dutiesAmt = parseFloat(spDutiesAmount || "0");
         const transportAmt = parseFloat(spTransportAmount || "0");
 
@@ -391,15 +340,8 @@ export function OffloadDialog({
         });
         return await response.json();
       } else {
-        // ── ERP mode ──
         if (parseFloat(duties) > 0 && !dutiesAccountId) {
           throw new Error("Please select an account for duties");
-        }
-        if (parseFloat(officeCharges) > 0 && !officeChargesAccountId) {
-          throw new Error("Please select an office charges account");
-        }
-        if (parseFloat(officeCharges) > 0 && !officeChargesCashAccountId) {
-          throw new Error("Please select a cash account for office charges");
         }
         if (parseFloat(transportFees) > 0 && !transportAccountId) {
           throw new Error("Please select an account for transport fees");
@@ -416,10 +358,10 @@ export function OffloadDialog({
           offloadDate,
           duties,
           dutiesAccountId: dutiesAccountId ? parseInt(dutiesAccountId) : null,
-          officeCharges,
-          officeChargesAccountId: officeChargesAccountId ? parseInt(officeChargesAccountId) : null,
-          officeChargesCashAccountId: officeChargesCashAccountId ? parseInt(officeChargesCashAccountId) : null,
-          transferCharges,
+          officeCharges: "0",
+          officeChargesAccountId: null,
+          officeChargesCashAccountId: null,
+          transferCharges: "0",
           transportFees,
           transportAccountId: transportAccountId ? parseInt(transportAccountId) : null,
           additionalCharges: additionalCharges
@@ -429,12 +371,7 @@ export function OffloadDialog({
               amount: parseFloat(c.amount),
               ledgerAccountId: parseInt(c.ledgerAccountId),
             })),
-          inventoryCostCorrections: Object.entries(costCorrections)
-            .filter(([, rate]) => parseFloat(rate) > 0)
-            .map(([stockItemId, rate]) => ({
-              stockItemId: parseInt(stockItemId),
-              correctRate: parseFloat(rate),
-            })),
+          inventoryCostCorrections: [],
           agentChargeLines: [],
         });
         return await response.json();
@@ -472,20 +409,21 @@ export function OffloadDialog({
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Offload Container {containerNumber}</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="text-lg">Offload Container {containerNumber}</DialogTitle>
+          <DialogDescription className="text-sm leading-relaxed">
             {isSpCompany
               ? "Set the offload date, enter any landed charges, and choose a destination location."
-              : "Enter the offload charges, select accounts, and choose a destination location. The additional cost per bale will be calculated and added to each item's rate."}
+              : "Enter charges, select accounts, and choose a destination. The total cost per bale will be recalculated automatically."}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+
           {/* Offload Date */}
-          <div className="space-y-2">
-            <Label htmlFor="offload-date">Offload Date</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="offload-date" className="text-sm font-medium">Offload Date</Label>
             <Input
               id="offload-date"
               type="date"
@@ -495,283 +433,240 @@ export function OffloadDialog({
             />
           </div>
 
-          {isSpCompany ? (
-            /* ── SP-mode form ── */
-            <>
-              {/* Duties */}
-              <div className="space-y-2">
-                <Label>Duties</Label>
-                <div className="grid grid-cols-12 gap-2 items-start">
-                  <div className="col-span-3">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="Amount"
-                      value={spDutiesAmount}
-                      onChange={(e) => setSpDutiesAmount(e.target.value)}
-                      data-testid="input-sp-duties"
-                    />
-                  </div>
-                  <div className="col-span-4">
-                    <Select
-                      value={spDutiesMethod}
-                      onValueChange={(v) => {
-                        setSpDutiesMethod(v as "prepaid_expenses" | "parent_agent");
-                        setSpDutiesAgentId("");
-                      }}
-                    >
-                      <SelectTrigger data-testid="select-sp-duties-method">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="prepaid_expenses">Prepaid Expenses</SelectItem>
-                        <SelectItem value="parent_agent">Agent via HADI L&apos;SHI</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {spDutiesMethod === "prepaid_expenses" ? (
-                    <div className="col-span-5 flex items-center h-9 px-3 rounded-md border bg-muted/40 text-sm text-muted-foreground">
-                      {spPrepaidExpAcct?.name ?? "Prepaid Expenses"}
+          {/* Charges section */}
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Landed Charges</p>
+
+            {isSpCompany ? (
+              <>
+                {/* SP — Duties */}
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Duties</Label>
+                  <div className="grid grid-cols-12 gap-2 items-start">
+                    <div className="col-span-3">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Amount"
+                        value={spDutiesAmount}
+                        onChange={(e) => setSpDutiesAmount(e.target.value)}
+                        data-testid="input-sp-duties"
+                      />
                     </div>
-                  ) : (
-                    <div className="col-span-5">
-                      <Select value={spDutiesAgentId} onValueChange={setSpDutiesAgentId}>
-                        <SelectTrigger data-testid="select-sp-duties-agent">
-                          <SelectValue placeholder="Select agent" />
+                    <div className="col-span-4">
+                      <Select
+                        value={spDutiesMethod}
+                        onValueChange={(v) => {
+                          setSpDutiesMethod(v as "prepaid_expenses" | "parent_agent");
+                          setSpDutiesAgentId("");
+                        }}
+                      >
+                        <SelectTrigger data-testid="select-sp-duties-method">
+                          <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {(parentAgents as any[]).map((a: any) => (
-                            <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
-                              {a.account_name}
-                            </SelectItem>
-                          ))}
+                          <SelectItem value="prepaid_expenses">Prepaid Expenses</SelectItem>
+                          <SelectItem value="parent_agent">Agent via HADI L&apos;SHI</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Transport */}
-              <div className="space-y-2">
-                <Label>Transport</Label>
-                <div className="grid grid-cols-12 gap-2 items-start">
-                  <div className="col-span-3">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="Amount"
-                      value={spTransportAmount}
-                      onChange={(e) => setSpTransportAmount(e.target.value)}
-                      data-testid="input-sp-transport"
-                    />
-                  </div>
-                  <div className="col-span-4">
-                    <Select
-                      value={spTransportMethod}
-                      onValueChange={(v) => {
-                        setSpTransportMethod(v as "prepaid_expenses" | "parent_agent");
-                        setSpTransportAgentId("");
-                      }}
-                    >
-                      <SelectTrigger data-testid="select-sp-transport-method">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="prepaid_expenses">Prepaid Expenses</SelectItem>
-                        <SelectItem value="parent_agent">Agent via HADI L&apos;SHI</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {spTransportMethod === "prepaid_expenses" ? (
-                    <div className="col-span-5 flex items-center h-9 px-3 rounded-md border bg-muted/40 text-sm text-muted-foreground">
-                      {spPrepaidExpAcct?.name ?? "Prepaid Expenses"}
-                    </div>
-                  ) : (
-                    <div className="col-span-5">
-                      <Select value={spTransportAgentId} onValueChange={setSpTransportAgentId}>
-                        <SelectTrigger data-testid="select-sp-transport-agent">
-                          <SelectValue placeholder="Select agent" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(parentAgents as any[]).map((a: any) => (
-                            <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
-                              {a.account_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </>
-          ) : (
-            /* ── ERP-mode form ── */
-            <>
-              {/* Duties */}
-              <div className="space-y-2">
-                <Label>Duties</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="Amount"
-                    value={duties}
-                    onChange={(e) => setDuties(e.target.value)}
-                    data-testid="input-duties"
-                  />
-                  <AccountCombobox
-                    value={dutiesAccountId}
-                    onValueChange={setDutiesAccountId}
-                    accounts={ledgerAccounts}
-                    placeholder="Select account"
-                    disabled={parseFloat(duties) === 0}
-                    testId="select-duties-account"
-                  />
-                </div>
-              </div>
-
-              {/* Office Charges */}
-              <div className="space-y-2">
-                <Label>Office Charges</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="Amount"
-                    value={officeCharges}
-                    onChange={(e) => setOfficeCharges(e.target.value)}
-                    data-testid="input-office-charges"
-                  />
-                  <AccountCombobox
-                    value={officeChargesAccountId}
-                    onValueChange={setOfficeChargesAccountId}
-                    accounts={ledgerAccounts}
-                    placeholder="Office account"
-                    disabled={parseFloat(officeCharges) === 0}
-                    testId="select-office-charges-account"
-                  />
-                  <AccountCombobox
-                    value={officeChargesCashAccountId}
-                    onValueChange={setOfficeChargesCashAccountId}
-                    accounts={ledgerAccounts}
-                    placeholder="Cash account"
-                    disabled={parseFloat(officeCharges) === 0}
-                    testId="select-office-charges-cash-account"
-                  />
-                </div>
-              </div>
-
-              {/* Transfer Charges */}
-              <div className="space-y-2">
-                <Label htmlFor="transfer-charges">Transfer Charges</Label>
-                <Input
-                  id="transfer-charges"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={transferCharges}
-                  onChange={(e) => setTransferCharges(e.target.value)}
-                  data-testid="input-transfer-charges"
-                />
-              </div>
-
-              {/* Transport Fees */}
-              <div className="space-y-2">
-                <Label>Transport Fees</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="Amount"
-                    value={transportFees}
-                    onChange={(e) => setTransportFees(e.target.value)}
-                    data-testid="input-transport-fees"
-                  />
-                  <AccountCombobox
-                    value={transportAccountId}
-                    onValueChange={setTransportAccountId}
-                    accounts={ledgerAccounts}
-                    placeholder="Select account"
-                    disabled={parseFloat(transportFees) === 0}
-                    testId="select-transport-account"
-                  />
-                </div>
-              </div>
-
-              {/* Additional Charges */}
-              <div className="space-y-2 pt-2 border-t">
-                <div className="flex items-center justify-between">
-                  <Label>Additional Charges (Optional)</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleAddCharge}
-                    className="gap-2"
-                    data-testid="button-add-charge"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add Charge
-                  </Button>
-                </div>
-                {additionalCharges.length > 0 && (
-                  <div className="space-y-2">
-                    {additionalCharges.map((charge) => (
-                      <div key={charge.id} className="grid grid-cols-12 gap-2 items-start">
-                        <Input
-                          placeholder="Description"
-                          value={charge.description}
-                          onChange={(e) => handleUpdateCharge(charge.id, "description", e.target.value)}
-                          className="col-span-4"
-                          data-testid={`input-charge-description-${charge.id}`}
-                        />
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="Amount"
-                          value={charge.amount}
-                          onChange={(e) => handleUpdateCharge(charge.id, "amount", e.target.value)}
-                          className="col-span-3"
-                          data-testid={`input-charge-amount-${charge.id}`}
-                        />
-                        <div className="col-span-4">
-                          <AccountCombobox
-                            value={charge.ledgerAccountId}
-                            onValueChange={(value) => handleUpdateCharge(charge.id, "ledgerAccountId", value)}
-                            accounts={ledgerAccounts}
-                            placeholder="Select account"
-                            testId={`select-charge-account-${charge.id}`}
-                          />
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveCharge(charge.id)}
-                          className="col-span-1"
-                          data-testid={`button-remove-charge-${charge.id}`}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                    {spDutiesMethod === "prepaid_expenses" ? (
+                      <div className="col-span-5 flex items-center h-9 px-3 rounded-md border bg-muted/40 text-sm text-muted-foreground">
+                        {spPrepaidExpAcct?.name ?? "Prepaid Expenses"}
                       </div>
-                    ))}
+                    ) : (
+                      <div className="col-span-5">
+                        <Select value={spDutiesAgentId} onValueChange={setSpDutiesAgentId}>
+                          <SelectTrigger data-testid="select-sp-duties-agent">
+                            <SelectValue placeholder="Select agent" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(parentAgents as any[]).map((a: any) => (
+                              <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
+                                {a.account_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </>
-          )}
+                </div>
+
+                {/* SP — Transport */}
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Transport</Label>
+                  <div className="grid grid-cols-12 gap-2 items-start">
+                    <div className="col-span-3">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Amount"
+                        value={spTransportAmount}
+                        onChange={(e) => setSpTransportAmount(e.target.value)}
+                        data-testid="input-sp-transport"
+                      />
+                    </div>
+                    <div className="col-span-4">
+                      <Select
+                        value={spTransportMethod}
+                        onValueChange={(v) => {
+                          setSpTransportMethod(v as "prepaid_expenses" | "parent_agent");
+                          setSpTransportAgentId("");
+                        }}
+                      >
+                        <SelectTrigger data-testid="select-sp-transport-method">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="prepaid_expenses">Prepaid Expenses</SelectItem>
+                          <SelectItem value="parent_agent">Agent via HADI L&apos;SHI</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {spTransportMethod === "prepaid_expenses" ? (
+                      <div className="col-span-5 flex items-center h-9 px-3 rounded-md border bg-muted/40 text-sm text-muted-foreground">
+                        {spPrepaidExpAcct?.name ?? "Prepaid Expenses"}
+                      </div>
+                    ) : (
+                      <div className="col-span-5">
+                        <Select value={spTransportAgentId} onValueChange={setSpTransportAgentId}>
+                          <SelectTrigger data-testid="select-sp-transport-agent">
+                            <SelectValue placeholder="Select agent" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(parentAgents as any[]).map((a: any) => (
+                              <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
+                                {a.account_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* ERP — Duties */}
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Duties</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Amount"
+                      value={duties}
+                      onChange={(e) => setDuties(e.target.value)}
+                      data-testid="input-duties"
+                    />
+                    <AccountCombobox
+                      value={dutiesAccountId}
+                      onValueChange={setDutiesAccountId}
+                      accounts={ledgerAccounts}
+                      placeholder="Select account"
+                      disabled={parseFloat(duties) === 0}
+                      testId="select-duties-account"
+                    />
+                  </div>
+                </div>
+
+                {/* ERP — Transport Fees */}
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Transport Fees</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Amount"
+                      value={transportFees}
+                      onChange={(e) => setTransportFees(e.target.value)}
+                      data-testid="input-transport-fees"
+                    />
+                    <AccountCombobox
+                      value={transportAccountId}
+                      onValueChange={setTransportAccountId}
+                      accounts={ledgerAccounts}
+                      placeholder="Select account"
+                      disabled={parseFloat(transportFees) === 0}
+                      testId="select-transport-account"
+                    />
+                  </div>
+                </div>
+
+                {/* ERP — Additional Charges */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-sm font-medium text-muted-foreground">Additional Charges</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddCharge}
+                      className="gap-1.5 h-7 text-xs"
+                      data-testid="button-add-charge"
+                    >
+                      <Plus className="h-3 w-3" />
+                      Add
+                    </Button>
+                  </div>
+                  {additionalCharges.length > 0 && (
+                    <div className="space-y-2">
+                      {additionalCharges.map((charge) => (
+                        <div key={charge.id} className="grid grid-cols-12 gap-2 items-start">
+                          <Input
+                            placeholder="Description"
+                            value={charge.description}
+                            onChange={(e) => handleUpdateCharge(charge.id, "description", e.target.value)}
+                            className="col-span-4"
+                            data-testid={`input-charge-description-${charge.id}`}
+                          />
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="Amount"
+                            value={charge.amount}
+                            onChange={(e) => handleUpdateCharge(charge.id, "amount", e.target.value)}
+                            className="col-span-3"
+                            data-testid={`input-charge-amount-${charge.id}`}
+                          />
+                          <div className="col-span-4">
+                            <AccountCombobox
+                              value={charge.ledgerAccountId}
+                              onValueChange={(value) => handleUpdateCharge(charge.id, "ledgerAccountId", value)}
+                              accounts={ledgerAccounts}
+                              placeholder="Select account"
+                              testId={`select-charge-account-${charge.id}`}
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveCharge(charge.id)}
+                            className="col-span-1"
+                            data-testid={`button-remove-charge-${charge.id}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Destination Location */}
-          <div className="space-y-2 pt-2 border-t">
-            <Label htmlFor="location">Destination Location</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="location" className="text-sm font-medium">Destination Location</Label>
             <LocationCombobox
               value={locationId?.toString() || ""}
               onValueChange={(value) => setLocationId(parseInt(value))}
@@ -781,103 +676,40 @@ export function OffloadDialog({
             />
           </div>
 
-          {/* Inventory Cost Correction — ERP only */}
-          {!isSpCompany && hasExistingInventory && locationId && (
-            <Collapsible
-              open={correctionSectionOpen}
-              onOpenChange={setCorrectionSectionOpen}
-              className="space-y-2 pt-2 border-t"
-            >
-              <CollapsibleTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="w-full justify-between gap-2"
-                  data-testid="button-toggle-cost-correction"
-                >
-                  <span className="text-sm font-medium">Inventory Cost Correction (Advanced)</span>
-                  <ChevronDown className={cn("h-4 w-4 transition-transform", correctionSectionOpen && "rotate-180")} />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  Use the closing rate from your monthly location summary to correct existing inventory costs before offloading.
-                </p>
-                {inventoryRates
-                  .filter((r: any) => parseFloat(r.quantity) > 0)
-                  .map((r: any) => (
-                    <div key={r.stockItemId} className="rounded-md border p-3 space-y-2">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <span className="text-sm font-medium" data-testid={`text-correction-item-${r.stockItemId}`}>{r.stockItemName}</span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-                        <div>
-                          <span>Qty: </span>
-                          <span className="font-medium" data-testid={`text-correction-qty-${r.stockItemId}`}>{formatNumber(parseFloat(r.quantity), 0)}</span>
-                        </div>
-                        <div>
-                          <span>Avg Rate: </span>
-                          <span className="font-medium" data-testid={`text-correction-rate-${r.stockItemId}`}>${formatNumber(parseFloat(r.averageRate))}</span>
-                        </div>
-                        <div>
-                          <span>Total: </span>
-                          <span className="font-medium">${formatNumber(parseFloat(r.totalValue))}</span>
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Correct rate to ($ per unit)</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="Leave empty to keep current rate"
-                          value={costCorrections[r.stockItemId] || ""}
-                          onChange={(e) =>
-                            setCostCorrections((prev) => ({ ...prev, [r.stockItemId]: e.target.value }))
-                          }
-                          data-testid={`input-correct-rate-${r.stockItemId}`}
-                        />
-                      </div>
-                    </div>
-                  ))}
-              </CollapsibleContent>
-            </Collapsible>
-          )}
-
           {/* Calculation Summary */}
-          <div className="rounded-md border p-4 space-y-2 bg-muted/50">
-            <h4 className="font-semibold text-sm">Calculation Summary</h4>
-            <div className="space-y-2 text-sm">
-              {manualCharges > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Manual Charges:</span>
-                  <span className="font-medium">${formatNumber(manualCharges)}</span>
+          {(totalCharges > 0 || totalBales > 0) && (
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Summary</p>
+              <div className="space-y-1.5 text-sm">
+                {manualCharges > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Manual Charges</span>
+                    <span className="font-medium tabular-nums">${formatNumber(manualCharges)}</span>
+                  </div>
+                )}
+                {poChargesTotal > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">PO Charges (Freight, Docs, etc.)</span>
+                    <span className="font-medium tabular-nums">${formatNumber(poChargesTotal)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-semibold border-t pt-2 mt-1">
+                  <span>Total Charges</span>
+                  <span className="tabular-nums" data-testid="text-total-charges">${formatNumber(totalCharges)}</span>
                 </div>
-              )}
-              {poChargesTotal > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">PO Charges (Freight, Document Charges, etc.):</span>
-                  <span className="font-medium">${formatNumber(poChargesTotal)}</span>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Total Bales</span>
+                  <span className="tabular-nums" data-testid="text-total-bales">{formatNumber(totalBales)}</span>
                 </div>
-              )}
-              <div className="flex justify-between font-semibold border-t pt-2">
-                <span className="text-muted-foreground">Total Charges:</span>
-                <span data-testid="text-total-charges">${formatNumber(totalCharges)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Bales:</span>
-                <span className="font-medium" data-testid="text-total-bales">{formatNumber(totalBales)}</span>
-              </div>
-              <div className="flex justify-between pt-2 border-t">
-                <span className="text-muted-foreground">Additional Cost per Bale:</span>
-                <span className="font-semibold" data-testid="text-cost-per-bale">
-                  ${formatNumber(additionalCostPerBale)}
-                </span>
+                <div className="flex justify-between font-semibold border-t pt-2 mt-1">
+                  <span>Cost Added per Bale</span>
+                  <span className="tabular-nums" data-testid="text-cost-per-bale">${formatNumber(additionalCostPerBale)}</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
-          <DialogFooter>
+          <DialogFooter className="gap-2 pt-1">
             <Button
               type="button"
               variant="outline"
