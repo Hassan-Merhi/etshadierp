@@ -2116,7 +2116,7 @@ export default function Analytics() {
                     <SelectItem value="all">All Suppliers</SelectItem>
                     {suppliers.map((supplier) => (
                       <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                        {supplier.name}
+                        {supplier.legalName}
                       </SelectItem>
                     ))}
                   </SelectContent>
