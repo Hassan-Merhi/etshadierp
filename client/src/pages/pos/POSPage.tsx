@@ -303,35 +303,25 @@ function SpPOS() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 w-full max-w-4xl">
           {(Array.isArray(allLocations) ? allLocations : []).map((loc) => (
-            <Card
+            <button
               key={loc.id}
-              className="cursor-pointer hover-elevate"
+              type="button"
               onClick={() => setSelectedLocation(loc as any)}
               data-testid={`card-location-${loc.id}`}
+              className="group text-left rounded-xl border bg-card p-5 hover-elevate active-elevate-2 transition-colors flex flex-col gap-3"
             >
-              <div className="p-4 md:p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="font-medium text-lg">{loc.name}</h3>
-                    <p className="text-sm text-muted-foreground">{loc.code}</p>
-                  </div>
-                  <MapPin className="h-5 w-5 text-muted-foreground" />
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10">
+                  <MapPin className="h-4 w-4 text-primary" />
                 </div>
                 {loc.city && (
-                  <p className="text-sm text-muted-foreground mb-2">{loc.city}</p>
+                  <span className="text-xs text-muted-foreground">{loc.city}</span>
                 )}
-                <Button
-                  className="w-full gap-2 mt-4"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedLocation(loc as any);
-                  }}
-                  data-testid={`button-use-location-${loc.id}`}
-                >
-                  Use Location
-                </Button>
               </div>
-            </Card>
+              <div>
+                <h3 className="font-semibold text-base leading-tight">{loc.name}</h3>
+              </div>
+            </button>
           ))}
         </div>
       </div>
