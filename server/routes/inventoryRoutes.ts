@@ -46,6 +46,7 @@ export function registerInventoryRoutes(app: Express) {
       const conditions: any[] = [
         eq(inventory.companyId, companyId),
         isNull(locations.deletedAt),
+        isNull(stockItems.deletedAt),
       ];
       if (locationId) {
         conditions.push(eq(inventory.locationId, parseInt(locationId as string)));

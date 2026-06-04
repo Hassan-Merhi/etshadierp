@@ -138,6 +138,14 @@ export function registerAuthRoutes(app: Express) {
         return res.status(403).json({ message: "Account is inactive" });
       }
 
+      // Pre-fetch company roles before regenerating the session (regenerate is callback-based)
+      const userCompanies = await storage.getUserCompaniesWithRoles(user.id);
+
+      // Regenerate session ID to prevent session fixation attacks
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => { if (err) reject(err); else resolve(); });
+      });
+
       req.session.userId = user.id;
       req.session.username = user.username;
 
@@ -159,7 +167,6 @@ export function registerAuthRoutes(app: Express) {
       (req.session as any).csrfToken = randomBytes(32).toString("hex");
 
       // Auto-select first company
-      const userCompanies = await storage.getUserCompaniesWithRoles(user.id);
       if (userCompanies.length > 0) {
         const firstCompany = userCompanies[0];
         req.session.currentCompanyId = firstCompany.companyId;
@@ -177,12 +184,12 @@ export function registerAuthRoutes(app: Express) {
 
       console.log("✅ Login successful, session saved");
 
-      // Record login history asynchronously
+      // Record login history asynchronously (fire-and-forget)
       const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
       const userAgentStr = req.headers['user-agent'] || 'unknown';
       const loginCompanyId = userCompanies.length > 0 ? userCompanies[0].companyId : null;
       const loginCompanyName = userCompanies.length > 0 ? (userCompanies[0] as any).companyName : null;
-      
+
       (async () => {
         try {
           let city: string | null = null;
@@ -217,20 +224,16 @@ export function registerAuthRoutes(app: Express) {
         }
       })();
 
-      // Return user without password — wait for session to be written to
-      // the PostgreSQL store before responding, so the immediately-following
-      // /api/auth/me request (triggered by window.location.href = "/") always
-      // finds an active session.
+      // Wait for session to be written to the PostgreSQL store before responding,
+      // so the immediately-following /api/auth/me request always finds an active session.
       const { password: _, ...userWithoutPassword } = user;
-      req.session.save((err) => {
-        if (err) {
-          console.error("Session save error:", err);
-          return res.status(500).json({ message: "Session could not be saved" });
-        }
-        res.json(userWithoutPassword);
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => { if (err) reject(err); else resolve(); });
       });
+      res.json(userWithoutPassword);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      console.error("[Auth] Login error:", error);
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 

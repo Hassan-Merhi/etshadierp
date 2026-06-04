@@ -871,30 +871,32 @@ export function startScheduler() {
  * Handles FK dependencies in the correct order.
  */
 async function purgeOldSoftDeletes(): Promise<void> {
+  const client = await pool.connect();
   try {
     const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    await client.query("BEGIN");
 
     // ── Stock Items (must clear FK children first) ──────────────────────────
-    const oldStockItems = await pool.query<{ id: number }>(
+    const oldStockItems = await client.query<{ id: number }>(
       `SELECT id FROM stock_items WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
       [cutoff]
     );
     if (oldStockItems.rows.length > 0) {
       const ids = oldStockItems.rows.map(r => r.id);
       const placeholders = ids.map((_, i) => `$${i + 1}`).join(",");
-      await pool.query(`DELETE FROM sales_items                       WHERE stock_item_id IN (${placeholders})`, ids);
-      await pool.query(`DELETE FROM stock_adjustment_items            WHERE stock_item_id IN (${placeholders})`, ids);
-      await pool.query(`DELETE FROM stock_transfer_items              WHERE stock_item_id IN (${placeholders})`, ids);
-      await pool.query(`DELETE FROM stock_transfer_revision_items     WHERE stock_item_id IN (${placeholders})`, ids);
-      await pool.query(`DELETE FROM po_line_items                     WHERE stock_item_id IN (${placeholders})`, ids);
-      await pool.query(`DELETE FROM container_offload_items           WHERE stock_item_id IN (${placeholders})`, ids);
-      await pool.query(`DELETE FROM credit_note_items                 WHERE stock_item_id IN (${placeholders})`, ids);
-      await pool.query(`DELETE FROM inventory                         WHERE stock_item_id IN (${placeholders})`, ids);
-      await pool.query(`DELETE FROM waste_dispatch_items              WHERE stock_item_id IN (${placeholders})`, ids);
-      await pool.query(`DELETE FROM stock_group_location_archive_items WHERE stock_item_id IN (${placeholders})`, ids);
-      await pool.query(`DELETE FROM stock_item_code_aliases           WHERE stock_item_id IN (${placeholders})`, ids);
-      await pool.query(`DELETE FROM stock_item_location_prices        WHERE stock_item_id IN (${placeholders})`, ids);
-      await pool.query(`DELETE FROM stock_items WHERE id IN (${placeholders})`, ids);
+      await client.query(`DELETE FROM sales_items                       WHERE stock_item_id IN (${placeholders})`, ids);
+      await client.query(`DELETE FROM stock_adjustment_items            WHERE stock_item_id IN (${placeholders})`, ids);
+      await client.query(`DELETE FROM stock_transfer_items              WHERE stock_item_id IN (${placeholders})`, ids);
+      await client.query(`DELETE FROM stock_transfer_revision_items     WHERE stock_item_id IN (${placeholders})`, ids);
+      await client.query(`DELETE FROM po_line_items                     WHERE stock_item_id IN (${placeholders})`, ids);
+      await client.query(`DELETE FROM container_offload_items           WHERE stock_item_id IN (${placeholders})`, ids);
+      await client.query(`DELETE FROM credit_note_items                 WHERE stock_item_id IN (${placeholders})`, ids);
+      await client.query(`DELETE FROM inventory                         WHERE stock_item_id IN (${placeholders})`, ids);
+      await client.query(`DELETE FROM waste_dispatch_items              WHERE stock_item_id IN (${placeholders})`, ids);
+      await client.query(`DELETE FROM stock_group_location_archive_items WHERE stock_item_id IN (${placeholders})`, ids);
+      await client.query(`DELETE FROM stock_item_code_aliases           WHERE stock_item_id IN (${placeholders})`, ids);
+      await client.query(`DELETE FROM stock_item_location_prices        WHERE stock_item_id IN (${placeholders})`, ids);
+      await client.query(`DELETE FROM stock_items WHERE id IN (${placeholders})`, ids);
       console.log(`[Purge] Permanently deleted ${ids.length} stock item(s) older than 30 days.`);
     }
 
@@ -919,7 +921,7 @@ async function purgeOldSoftDeletes(): Promise<void> {
     ];
 
     for (const { table, col } of simplePurges) {
-      const result = await pool.query(
+      const result = await client.query(
         `DELETE FROM ${table} WHERE ${col} IS NOT NULL AND ${col} < $1`,
         [cutoff]
       );
@@ -928,9 +930,13 @@ async function purgeOldSoftDeletes(): Promise<void> {
       }
     }
 
+    await client.query("COMMIT");
     console.log("[Purge] 30-day soft-delete purge complete.");
   } catch (err: any) {
-    console.error("[Purge] Error during soft-delete purge:", err.message);
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("[Purge] Error during soft-delete purge (rolled back):", err.message);
+  } finally {
+    client.release();
   }
 }
 

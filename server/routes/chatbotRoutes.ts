@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import rateLimit from "express-rate-limit";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
@@ -71,6 +72,19 @@ function decryptToken(cipher: string): string {
   }
 }
 
+const chatMessageRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: any) =>
+    `${req.session?.userId ?? "anon"}_${req.session?.currentCompanyId ?? "0"}`,
+  handler: (_req: any, res: any) => {
+    res.status(429).json({ message: "Too many messages. Please wait a moment before sending again." });
+  },
+  skip: (req: any) => !req.session?.userId,
+});
+
 export function registerChatbotRoutes(app: Express) {
   app.get("/api/chatbot/status", requireAuth, async (req, res) => {
     try {
@@ -111,7 +125,7 @@ export function registerChatbotRoutes(app: Express) {
         isAdminOrOwner: userRole === "Admin" || userRole === "Owner" || userRole === "Developer",
       });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -148,10 +162,10 @@ export function registerChatbotRoutes(app: Express) {
 
       res.json({ success: true, provider: normalizedProvider });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
-  app.post("/api/chatbot/message", requireAuth, async (req, res) => {
+  app.post("/api/chatbot/message", requireAuth, chatMessageRateLimiter, async (req, res) => {
     try {
       const userId = req.session.userId;
       const companyId = req.session.currentCompanyId;
@@ -287,7 +301,7 @@ export function registerChatbotRoutes(app: Express) {
 
       res.json(enrichedHistory);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -321,7 +335,7 @@ export function registerChatbotRoutes(app: Express) {
         lastMessageTime: r.lastMessageTime,
       })));
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -377,7 +391,7 @@ export function registerChatbotRoutes(app: Express) {
       );
       res.json({ success: true });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -455,7 +469,7 @@ export function registerChatbotRoutes(app: Express) {
         pendingPayrolls,
       });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -478,7 +492,7 @@ export function registerChatbotRoutes(app: Express) {
 
       res.json({ message: `Chatbot ${enabled ? "enabled" : "disabled"} for user` });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -502,7 +516,7 @@ export function registerChatbotRoutes(app: Express) {
 
       res.json(allUsers);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -535,12 +549,12 @@ export function registerChatbotRoutes(app: Express) {
       } as any);
       res.json({ success: true });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
   // ── Confirm Stock Transfer ────────────────────────────────────────────
-  app.post("/api/chatbot/confirm-stock-transfer", requireAuth, async (req, res) => {
+  app.post("/api/chatbot/confirm-stock-transfer", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       const userId = req.session.userId;
@@ -587,7 +601,7 @@ export function registerChatbotRoutes(app: Express) {
       res.json({ success: true, transferId: data.id, voucherId: data.voucherId });
     } catch (error: any) {
       console.error("[Chatbot] confirm-stock-transfer error:", error.message);
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -634,7 +648,7 @@ export function registerChatbotRoutes(app: Express) {
 
       res.json({ found: true, voucher: v, entries });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -698,7 +712,7 @@ export function registerChatbotRoutes(app: Express) {
 
       res.json({ results });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -943,12 +957,12 @@ export function registerChatbotRoutes(app: Express) {
 
     } catch (error: any) {
       console.error("PO file parse error:", error);
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
   // ── PO Import Confirm ─────────────────────────────────────────────
-  app.post("/api/chatbot/confirm-po-import", requireAuth, async (req, res) => {
+  app.post("/api/chatbot/confirm-po-import", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -1083,7 +1097,7 @@ export function registerChatbotRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error("PO import confirm error:", error);
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -1095,13 +1109,8 @@ export function registerChatbotRoutes(app: Express) {
   // Get list of legacy EMP-* salary accounts
 
   // ── Code Agent: apply file patch ───────────────────────────────────────────
-  app.post("/api/chatbot/apply-patch", requireAuth, requireNonPOS, async (req, res) => {
+  app.post("/api/chatbot/apply-patch", requireAuth, requireNonPOS, requireRole("Admin", "Owner"), async (req, res) => {
     try {
-      const userRole = req.session.currentRole;
-      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
-        return res.status(403).json({ message: "Only Admin/Developer users can apply code changes" });
-      }
-
       const { filePath, originalContent, newContent } = req.body;
       if (!filePath || newContent === undefined || newContent === null) {
         return res.status(400).json({ message: "filePath and newContent are required" });
@@ -1172,7 +1181,7 @@ export function registerChatbotRoutes(app: Express) {
       res.json({ success: true, filePath });
     } catch (error: any) {
       console.error("[Chatbot] apply-patch error:", error.message);
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -1202,19 +1211,15 @@ export function registerChatbotRoutes(app: Express) {
         .limit(100);
       res.json(rows);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
   // ── Code Agent: revert a patch ────────────────────────────────────────────
-  app.post("/api/chatbot/revert-patch/:id", requireAuth, requireNonPOS, async (req, res) => {
+  app.post("/api/chatbot/revert-patch/:id", requireAuth, requireNonPOS, requireRole("Admin", "Owner"), async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
-      const userRole = req.session.currentRole;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
-        return res.status(403).json({ message: "Only Admin/Developer users can revert patches" });
-      }
 
       const patchId = parseInt(req.params.id, 10);
       if (isNaN(patchId)) return res.status(400).json({ message: "Invalid patch id" });
@@ -1256,7 +1261,7 @@ export function registerChatbotRoutes(app: Express) {
       res.json({ success: true, filePath: row.filePath });
     } catch (error: any) {
       console.error("[Chatbot] revert-patch error:", error.message);
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -1286,13 +1291,8 @@ export function registerChatbotRoutes(app: Express) {
   }
 
   // ── Code Agent: commit and push to GitHub ─────────────────────────────────
-  app.post("/api/chatbot/git-push", requireAuth, requireNonPOS, async (req, res) => {
+  app.post("/api/chatbot/git-push", requireAuth, requireNonPOS, requireRole("Admin", "Owner"), async (req, res) => {
     try {
-      const userRole = req.session.currentRole;
-      if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
-        return res.status(403).json({ message: "Only Admin/Developer users can push to GitHub" });
-      }
-
       const { files, message: commitMessage } = req.body;
       if (!Array.isArray(files) || files.length === 0) {
         return res.status(400).json({ message: "files array is required" });
@@ -1364,7 +1364,7 @@ export function registerChatbotRoutes(app: Express) {
       res.json({ success: true, commitHash: result.commitHash, branch: result.branch });
     } catch (error: any) {
       console.error("[Chatbot] git-push error:", error.message);
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -1391,7 +1391,7 @@ export function registerChatbotRoutes(app: Express) {
 
       res.json({ repoUrl: safeUrl, hasToken, configured: !!baseUrl });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -1432,7 +1432,7 @@ export function registerChatbotRoutes(app: Express) {
 
       res.json({ success: true });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 }

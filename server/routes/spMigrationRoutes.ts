@@ -15,7 +15,7 @@
 import type { Express } from "express";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
-import { requireAuth } from "../auth";
+import { requireAuth, requireRole } from "../auth";
 import { ledgerAccounts, locations } from "@shared/schema";
 import { eq, and, isNull } from "drizzle-orm";
 
@@ -89,7 +89,7 @@ export function registerSpMigrationRoutes(app: Express) {
 
   // ── GET /api/sp/migration/preview ────────────────────────────────────────
   // Dry run — NO writes. Returns what WOULD be copied.
-  app.get("/api/sp/migration/preview", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/migration/preview", requireAuth, requireRole("Admin", "Owner"), async (req: any, res: any) => {
     try {
       const sourceId = parseInt(String(req.query.sourceCompanyId ?? ""), 10);
       const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
@@ -226,12 +226,12 @@ export function registerSpMigrationRoutes(app: Express) {
       });
     } catch (err: any) {
       console.error("[SP Migration] preview error:", err);
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ message: "Internal server error" });
     }
   });
 
   // ── GET /api/sp/migration/runs ──────────────────────────────────────────
-  app.get("/api/sp/migration/runs", requireAuth, async (_req: any, res: any) => {
+  app.get("/api/sp/migration/runs", requireAuth, requireRole("Admin", "Owner"), async (_req: any, res: any) => {
     try {
       const runs = (await db.execute(sql`
         SELECT
@@ -247,13 +247,13 @@ export function registerSpMigrationRoutes(app: Express) {
       `)).rows;
       return res.json({ runs });
     } catch (err: any) {
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ message: "Internal server error" });
     }
   });
 
   // ── POST /api/sp/migration/rehearsal ────────────────────────────────────
   // Requires: { sourceCompanyId, targetCompanyId, companyNameConfirm, confirmation: "REHEARSE" }
-  app.post("/api/sp/migration/rehearsal", requireAuth, async (req: any, res: any) => {
+  app.post("/api/sp/migration/rehearsal", requireAuth, requireRole("Admin", "Owner"), async (req: any, res: any) => {
     const { sourceCompanyId, targetCompanyId, companyNameConfirm, confirmation } = req.body ?? {};
 
     // Safety gate 1: typed action confirmation
@@ -427,18 +427,14 @@ export function registerSpMigrationRoutes(app: Express) {
         WHERE id = ${runId}
       `).catch(() => {});
       console.error("[SP Migration] rehearsal error:", err);
-      return res.status(500).json({ message: err.message, runId });
+      return res.status(500).json({ message: "Migration failed", runId });
     }
   });
 
   // ── POST /api/sp/migration/rollback ─────────────────────────────────────
   // Removes ONLY rows created by a specific rehearsal run.
   // Never touches source (ERP) company.
-  app.post("/api/sp/migration/rollback", requireAuth, async (req: any, res: any) => {
-    const role = req.session?.currentRole;
-    if (!["Admin", "Developer", "Owner"].includes(role)) {
-      return res.status(403).json({ message: "Rollback requires Admin, Developer, or Owner access." });
-    }
+  app.post("/api/sp/migration/rollback", requireAuth, requireRole("Admin", "Owner"), async (req: any, res: any) => {
     const { runId } = req.body ?? {};
     if (!runId) return res.status(400).json({ message: "runId is required" });
 
@@ -557,17 +553,13 @@ export function registerSpMigrationRoutes(app: Express) {
       return res.json({ success: true, runId, rowsDeleted: deleted });
     } catch (err: any) {
       console.error("[SP Migration] rollback error:", err);
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ message: "Internal server error" });
     }
   });
 
   // ── POST /api/sp/migration/create-sp-company ─────────────────────────────
   // Creates a new supplier_partner company for the GC-LSHI migration.
-  app.post("/api/sp/migration/create-sp-company", requireAuth, async (req: any, res: any) => {
-    const role = req.session?.currentRole;
-    if (!["Admin", "Developer", "Owner"].includes(role)) {
-      return res.status(403).json({ message: "Creating a company requires Admin, Developer, or Owner access." });
-    }
+  app.post("/api/sp/migration/create-sp-company", requireAuth, requireRole("Admin", "Owner"), async (req: any, res: any) => {
     try {
       const { name, code } = req.body ?? {};
       if (!name || !code) return res.status(400).json({ message: "name and code are required" });
@@ -585,13 +577,13 @@ export function registerSpMigrationRoutes(app: Express) {
       return res.json({ success: true, company: row });
     } catch (err: any) {
       console.error("[SP Migration] create-sp-company error:", err);
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ message: "Internal server error" });
     }
   });
 
   // ── GET /api/sp/migration/gc-preview ─────────────────────────────────────
   // Extended preview that also shows sale voucher counts for the GC migration.
-  app.get("/api/sp/migration/gc-preview", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/migration/gc-preview", requireAuth, requireRole("Admin", "Owner"), async (req: any, res: any) => {
     try {
       const sourceId = parseInt(String(req.query.sourceCompanyId ?? ""), 10);
       const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
@@ -688,7 +680,7 @@ export function registerSpMigrationRoutes(app: Express) {
       });
     } catch (err: any) {
       console.error("[SP Migration] gc-preview error:", err);
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -698,12 +690,7 @@ export function registerSpMigrationRoutes(app: Express) {
   //   2. GC profit accounts (2 accounts)
   //   3. Stock items + aliases (same as rehearsal)
   //   4. Sale vouchers from ERP → SP (with account remapping)
-  app.post("/api/sp/migration/gc-rehearsal", requireAuth, async (req: any, res: any) => {
-    const role = req.session?.currentRole;
-    if (!["Admin", "Developer", "Owner"].includes(role)) {
-      return res.status(403).json({ message: "GC migration requires Admin, Developer, or Owner access." });
-    }
-
+  app.post("/api/sp/migration/gc-rehearsal", requireAuth, requireRole("Admin", "Owner"), async (req: any, res: any) => {
     const { sourceCompanyId, targetCompanyId, companyNameConfirm, confirmation } = req.body ?? {};
 
     if (confirmation !== "MIGRATE") {
@@ -1040,20 +1027,20 @@ export function registerSpMigrationRoutes(app: Express) {
         WHERE id = ${runId}
       `).catch(() => {});
       console.error("[SP Migration] gc-rehearsal error:", err);
-      sendEvent("error", { message: err.message, runId });
+      sendEvent("error", { message: "Migration failed", runId });
       res.end();
     }
   });
 
   // ── GET /api/sp/migration/session-role ──────────────────────────────────
   // Returns the current session's role — used by the frontend to gate the page.
-  app.get("/api/sp/migration/session-role", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/migration/session-role", requireAuth, requireRole("Admin", "Owner"), async (req: any, res: any) => {
     return res.json({ role: req.session?.currentRole ?? null });
   });
 
   // ── GET /api/sp/migration/cash-accounts ─────────────────────────────────
   // Returns Cash/Bank ledger accounts for a given SP target company.
-  app.get("/api/sp/migration/cash-accounts", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/migration/cash-accounts", requireAuth, requireRole("Admin", "Owner"), async (req: any, res: any) => {
     try {
       const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
       if (!targetId) return res.status(400).json({ message: "targetCompanyId is required" });
@@ -1065,18 +1052,14 @@ export function registerSpMigrationRoutes(app: Express) {
       `)).rows as any[];
       return res.json({ accounts: rows });
     } catch (err: any) {
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ message: "Internal server error" });
     }
   });
 
   // ── POST /api/sp/migration/opening-balance ───────────────────────────────
   // Creates a Journal voucher: Dr selected Cash/Bank account → Cr SP-OPNBAL
   // Requires cashAccountId — no silent auto-pick.
-  app.post("/api/sp/migration/opening-balance", requireAuth, async (req: any, res: any) => {
-    const role = req.session?.currentRole;
-    if (!["Admin", "Developer", "Owner"].includes(role)) {
-      return res.status(403).json({ message: "Posting an opening balance requires Admin, Developer, or Owner access." });
-    }
+  app.post("/api/sp/migration/opening-balance", requireAuth, requireRole("Admin", "Owner"), async (req: any, res: any) => {
     try {
       const { targetCompanyId, cashAccountId, amount, date, narration } = req.body ?? {};
       const targetId = parseInt(String(targetCompanyId ?? ""), 10);
@@ -1140,7 +1123,7 @@ export function registerSpMigrationRoutes(app: Express) {
       return res.json({ success: true, voucherId, voucherNumber, amount: amtStr, cashAccountName: cashAcctRow.name });
     } catch (err: any) {
       console.error("[SP Migration] opening-balance error:", err);
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ message: "Internal server error" });
     }
   });
 

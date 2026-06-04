@@ -14,7 +14,7 @@ import type { Express } from "express";
 import { db } from "../db";
 import { aiAgentTasks, aiAgentApprovals } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { requireAuth } from "../auth";
+import { requireAuth, requireRole, requireNonPOS } from "../auth";
 import { TOOL_REGISTRY, TOOL_REGISTRY_MAP, runTool } from "../aiAgentTools";
 import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
@@ -216,7 +216,7 @@ async function executeStep(
 export function registerAiAgentRoutes(app: Express) {
 
   // ── POST /api/ai-agent/tasks — create task + generate plan ────────────────
-  app.post("/api/ai-agent/tasks", requireAuth, async (req, res) => {
+  app.post("/api/ai-agent/tasks", requireAuth, requireNonPOS, requireRole("Admin", "Owner", "Manager"), async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       const userId    = req.session.userId;
@@ -242,12 +242,12 @@ export function registerAiAgentRoutes(app: Express) {
 
       res.status(201).json({ ...task, plan });
     } catch (err: any) {
-      res.status(err.status ?? 500).json({ message: err.message });
+      res.status(err.status ?? 500).json({ message: err.status ? err.message : "Internal server error" });
     }
   });
 
   // ── GET /api/ai-agent/tasks — list tasks ─────────────────────────────────
-  app.get("/api/ai-agent/tasks", requireAuth, async (req, res) => {
+  app.get("/api/ai-agent/tasks", requireAuth, requireNonPOS, requireRole("Admin", "Owner", "Manager"), async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -261,12 +261,12 @@ export function registerAiAgentRoutes(app: Express) {
 
       res.json(tasks);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
   // ── GET /api/ai-agent/tasks/:id — task detail + approvals ────────────────
-  app.get("/api/ai-agent/tasks/:id", requireAuth, async (req, res) => {
+  app.get("/api/ai-agent/tasks/:id", requireAuth, requireNonPOS, requireRole("Admin", "Owner", "Manager"), async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -284,13 +284,13 @@ export function registerAiAgentRoutes(app: Express) {
 
       res.json({ ...task, approvals });
     } catch (err: any) {
-      res.status(err.status ?? 500).json({ message: err.message });
+      res.status(err.status ?? 500).json({ message: err.status ? err.message : "Internal server error" });
     }
   });
 
   // ── POST /api/ai-agent/tasks/:id/run — execute pending steps ─────────────
   // Runs all consecutive read-only steps, then stops at the first approval step.
-  app.post("/api/ai-agent/tasks/:id/run", requireAuth, async (req, res) => {
+  app.post("/api/ai-agent/tasks/:id/run", requireAuth, requireNonPOS, requireRole("Admin", "Owner", "Manager"), async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       const userId    = req.session.userId;
@@ -365,12 +365,12 @@ export function registerAiAgentRoutes(app: Express) {
 
       res.json({ status: newStatus, plan, approvalId });
     } catch (err: any) {
-      res.status(err.status ?? 500).json({ message: err.message });
+      res.status(err.status ?? 500).json({ message: err.status ? err.message : "Internal server error" });
     }
   });
 
   // ── DELETE /api/ai-agent/tasks/:id — cancel task ─────────────────────────
-  app.delete("/api/ai-agent/tasks/:id", requireAuth, async (req, res) => {
+  app.delete("/api/ai-agent/tasks/:id", requireAuth, requireNonPOS, requireRole("Admin", "Owner", "Manager"), async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -386,12 +386,12 @@ export function registerAiAgentRoutes(app: Express) {
 
       res.json({ success: true });
     } catch (err: any) {
-      res.status(err.status ?? 500).json({ message: err.message });
+      res.status(err.status ?? 500).json({ message: err.status ? err.message : "Internal server error" });
     }
   });
 
   // ── POST /api/ai-agent/approvals/:id/approve ─────────────────────────────
-  app.post("/api/ai-agent/approvals/:id/approve", requireAuth, async (req, res) => {
+  app.post("/api/ai-agent/approvals/:id/approve", requireAuth, requireNonPOS, requireRole("Admin", "Owner", "Manager"), async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       const userId    = req.session.userId;
@@ -463,12 +463,12 @@ export function registerAiAgentRoutes(app: Express) {
 
       res.json({ success: true, taskStatus: finalStatus, plan });
     } catch (err: any) {
-      res.status(err.status ?? 500).json({ message: err.message });
+      res.status(err.status ?? 500).json({ message: err.status ? err.message : "Internal server error" });
     }
   });
 
   // ── POST /api/ai-agent/approvals/:id/reject ───────────────────────────────
-  app.post("/api/ai-agent/approvals/:id/reject", requireAuth, async (req, res) => {
+  app.post("/api/ai-agent/approvals/:id/reject", requireAuth, requireNonPOS, requireRole("Admin", "Owner", "Manager"), async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       const userId    = req.session.userId;
@@ -512,7 +512,7 @@ export function registerAiAgentRoutes(app: Express) {
 
       res.json({ success: true, taskStatus: "cancelled" });
     } catch (err: any) {
-      res.status(err.status ?? 500).json({ message: err.message });
+      res.status(err.status ?? 500).json({ message: err.status ? err.message : "Internal server error" });
     }
   });
 }

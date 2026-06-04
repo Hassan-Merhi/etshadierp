@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../lib/parseId";
+import { requireNonPOS } from "../auth";
 import type { Express } from "express";
 import { db } from "../db";
 import {
@@ -43,7 +44,7 @@ export function registerGlobalTransactionRoutes(
 ) {
   // GET /api/global/transactions
   // Returns vouchers across all ERP companies the user has access to.
-  app.get("/api/global/transactions", requireAuth, async (req, res) => {
+  app.get("/api/global/transactions", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const userId = (req.session as any).userId as string;
       const userRole = (req.session as any).currentRole as string;
@@ -254,7 +255,7 @@ export function registerGlobalTransactionRoutes(
 
   // GET /api/global/transactions/voucher-types
   // Returns the distinct voucher types present across the user's companies
-  app.get("/api/global/transactions/voucher-types", requireAuth, async (req, res) => {
+  app.get("/api/global/transactions/voucher-types", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const userId = (req.session as any).userId as string;
       const userRole = (req.session as any).currentRole as string;
@@ -294,7 +295,7 @@ export function registerGlobalTransactionRoutes(
 
   // GET /api/global/transactions/:voucherId/detail
   // Returns full voucher + entries without session-company restriction (auth only).
-  app.get("/api/global/transactions/:voucherId/detail", requireAuth, async (req, res) => {
+  app.get("/api/global/transactions/:voucherId/detail", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const voucherId = parseId(req.params.voucherId);
       if (voucherId === null) return res.status(400).json({ message: "Invalid id" });
@@ -372,7 +373,7 @@ export function registerGlobalTransactionRoutes(
 
   // GET /api/global/transactions/:voucherId/view-entries
   // Returns rich entries (items for Sales/Purchase/StockTransfer/Mixed) — no company restriction.
-  app.get("/api/global/transactions/:voucherId/view-entries", requireAuth, async (req, res) => {
+  app.get("/api/global/transactions/:voucherId/view-entries", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const voucherId = parseId(req.params.voucherId);
       if (voucherId === null) return res.status(400).json({ message: "Invalid id" });
