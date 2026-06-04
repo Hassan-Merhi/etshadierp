@@ -617,7 +617,7 @@ export default function SupplierProfitCheck() {
         {loaded && (
           <div className="rounded-md border overflow-x-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-20 bg-background">
                 <TableRow className="bg-muted/50">
                   <TableHead className="min-w-[90px]">Code</TableHead>
                   <TableHead className="min-w-[200px]">Name</TableHead>
