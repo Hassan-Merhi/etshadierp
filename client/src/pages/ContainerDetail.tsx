@@ -1241,31 +1241,38 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                 ))}
               </div>
 
-              {/* Per-PO charges */}
-              {(() => {
-                const poCharges = [
-                  { label: "Freight", value: parseFloat(po.freight || "0") },
-                  { label: "Surcharge", value: parseFloat(po.surcharge || "0") },
-                  { label: "Fumigation", value: parseFloat(po.fumigation || "0") },
-                  { label: "Document Charges", value: parseFloat(po.documentCharges || "0") },
-                  { label: "Other Charges", value: parseFloat(po.otherCharges || "0") },
-                  { label: "Discount", value: -parseFloat(po.discount || "0") },
-                ].filter(c => Math.abs(c.value) > 0.001);
-                if (poCharges.length === 0) return null;
-                return (
-                  <div className="border-t bg-muted/20 px-4 py-3 space-y-1.5" data-testid={`po-charges-${po.id}`}>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Charges</p>
-                    {poCharges.map(c => (
-                      <div key={c.label} className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">{c.label}</span>
-                        <span className={`tabular-nums font-medium ${c.value < 0 ? "text-destructive" : ""}`}>{formatAmount(c.value)}</span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
             </div>
           ))}
+        </div>
+      )}
+
+      {charges.length > 0 && (
+        <div className="rounded-lg border bg-card overflow-hidden">
+          <div className="px-4 py-3 bg-muted/40 border-b">
+            <p className="text-sm font-semibold">Extra Charges</p>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Misc Type</th>
+                <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {charges.map((c: any, i: number) => (
+                <tr key={i} className="border-t first:border-t-0">
+                  <td className="px-4 py-2.5 text-muted-foreground">{c.chargeType}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatAmount(parseFloat(c.amount || "0"))}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t bg-muted/20">
+                <td className="px-4 py-2.5 font-semibold">Total Charges</td>
+                <td className="px-4 py-2.5 text-right tabular-nums font-semibold">{formatAmount(chargesTotal)}</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       )}
 
