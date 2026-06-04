@@ -1283,7 +1283,7 @@ export default function DailyProductionReport() {
             </div>
 
             {/* Row 2 — Employees */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3">
               {/* Employee Expected — collapsible */}
               <Collapsible open={empPayrollOpen} onOpenChange={setEmpPayrollOpen}>
                 <Card data-testid="card-employee-expected-salary">
@@ -1311,30 +1311,21 @@ export default function DailyProductionReport() {
                     <div className="border-t px-4 pb-3 pt-2 space-y-1">
                       {ms?.employeeBreakdown && ms.employeeBreakdown.length > 0 ? (
                         <>
-                          <div className="grid grid-cols-3 gap-1 text-xs font-medium text-muted-foreground mb-1.5 px-0.5">
+                          <div className="grid grid-cols-2 gap-1 text-xs font-medium text-muted-foreground mb-1.5 px-0.5">
                             <span>Employee</span>
                             <span className="text-right">Expected</span>
-                            <span className="text-right">Balance</span>
                           </div>
-                          {ms.employeeBreakdown.map((e) => {
-                            const adjExpected = Math.max(0, e.expected - Math.max(0, e.balance));
-                            return (
-                              <div key={e.id} className="grid grid-cols-3 gap-1 text-xs py-0.5">
-                                <span className="truncate text-foreground/90">{e.name}</span>
-                                <span className={`text-right tabular-nums ${adjExpected === 0 && e.expected > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
-                                  {fmtSalary(adjExpected)}
-                                  {adjExpected === 0 && e.expected > 0 && <span className="opacity-60 ml-1">covered</span>}
-                                </span>
-                                <span className={`text-right tabular-nums ${e.balance > 0 ? "text-amber-600 dark:text-amber-400" : e.balance < 0 ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"}`}>
-                                  {fmtSalary(Math.abs(e.balance))}{e.balance < 0 ? " cr" : ""}
-                                </span>
-                              </div>
-                            );
-                          })}
-                          <div className="grid grid-cols-3 gap-1 text-xs pt-1.5 border-t mt-1">
+                          {ms.employeeBreakdown.map((e) => (
+                            <div key={e.id} className="grid grid-cols-2 gap-1 text-xs py-0.5">
+                              <span className="truncate text-foreground/90">{e.name}</span>
+                              <span className="text-right tabular-nums text-foreground">
+                                {fmtSalary(e.expected)}
+                              </span>
+                            </div>
+                          ))}
+                          <div className="grid grid-cols-2 gap-1 text-xs pt-1.5 border-t mt-1">
                             <span className="font-medium text-muted-foreground">Total</span>
                             <span className="text-right tabular-nums font-semibold text-foreground">{fmtSalary(empExpected ?? 0)}</span>
-                            <span className="text-right tabular-nums font-semibold text-foreground">{fmtSalary(Math.abs(empBalance ?? 0))}</span>
                           </div>
                         </>
                       ) : (
@@ -1344,31 +1335,6 @@ export default function DailyProductionReport() {
                   </CollapsibleContent>
                 </Card>
               </Collapsible>
-
-              <Card className="border-amber-300 dark:border-amber-700" data-testid="card-employee-balance">
-                <CardContent className="py-3 px-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Employee Balance</p>
-                  {empBalance !== null ? (
-                    <p
-                      className={
-                        empBalance < 0
-                          ? "text-xl font-bold tabular-nums text-blue-600 dark:text-blue-400"
-                          : empBalance === 0
-                            ? "text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400"
-                            : "text-xl font-bold tabular-nums text-amber-600 dark:text-amber-400"
-                      }
-                      data-testid="text-employee-balance"
-                    >
-                      {empBalance < 0
-                        ? `Credit ${fmtSalary(Math.abs(empBalance))}`
-                        : fmtSalary(empBalance)}
-                    </p>
-                  ) : (
-                    <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-0.5 opacity-60">accumulated owed</p>
-                </CardContent>
-              </Card>
             </div>
           </div>
         );
