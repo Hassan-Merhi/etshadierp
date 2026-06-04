@@ -1963,7 +1963,7 @@ export default function Payroll() {
                                   </Button>
                                 }
                                 title="Delete Employee"
-                                description={`Are you sure you want to delete ${employee.firstName} ${employee.lastName}? This action cannot be undone.`}
+                                description={`Are you sure you want to delete ${[employee.firstName, employee.lastName].filter(Boolean).join(" ")}? This action cannot be undone.`}
                                 confirmText="Delete"
                                 variant="destructive"
                                 onConfirm={() => handleDeleteEmployee(employee)}
@@ -2195,7 +2195,7 @@ export default function Payroll() {
                                             className="flex items-center gap-1 text-primary hover:underline cursor-pointer whitespace-nowrap"
                                             data-testid={`link-worker-statement-${worker.id}`}
                                           >
-                                            {worker.firstName} {worker.lastName}
+                                            {[worker.firstName, worker.lastName].filter(Boolean).join(" ")}
                                             <DollarSign className="h-3 w-3" />
                                           </button>
                                         </TableCell>
@@ -2247,7 +2247,7 @@ export default function Payroll() {
                                               </Button>
                                             }
                                             title="Delete Worker"
-                                            description={`Are you sure you want to delete ${worker.firstName} ${worker.lastName}? This action cannot be undone.`}
+                                            description={`Are you sure you want to delete ${[worker.firstName, worker.lastName].filter(Boolean).join(" ")}? This action cannot be undone.`}
                                             confirmText="Delete"
                                             variant="destructive"
                                             onConfirm={() => handleDeleteWorker(worker)}
@@ -2328,7 +2328,7 @@ export default function Payroll() {
                                       className="flex items-center gap-1 text-primary hover:underline cursor-pointer whitespace-nowrap"
                                       data-testid={`link-worker-statement-${worker.id}`}
                                     >
-                                      {worker.firstName} {worker.lastName}
+                                      {[worker.firstName, worker.lastName].filter(Boolean).join(" ")}
                                       <DollarSign className="h-3 w-3" />
                                     </button>
                                   </TableCell>
@@ -2405,7 +2405,7 @@ export default function Payroll() {
                                           </Button>
                                         }
                                         title="Delete Worker"
-                                        description={`Are you sure you want to delete ${worker.firstName} ${worker.lastName}? This action cannot be undone.`}
+                                        description={`Are you sure you want to delete ${[worker.firstName, worker.lastName].filter(Boolean).join(" ")}? This action cannot be undone.`}
                                         confirmText="Delete"
                                         variant="destructive"
                                         onConfirm={() => handleDeleteWorker(worker)}
@@ -2531,7 +2531,7 @@ export default function Payroll() {
                                     data-testid={`checkbox-member-${worker.id}`}
                                   />
                                 </TableCell>
-                                <TableCell>{worker.firstName} {worker.lastName}</TableCell>
+                                <TableCell>{[worker.firstName, worker.lastName].filter(Boolean).join(" ")}</TableCell>
                                 <TableCell className="text-right font-mono">
                                   {formatAmount(parseFloat(worker.monthlySalary || "0"))}
                                 </TableCell>
