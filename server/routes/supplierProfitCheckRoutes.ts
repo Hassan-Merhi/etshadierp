@@ -94,10 +94,15 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         nCostMap.set(Number(row.stock_item_id), Number(row.rate));
       }
 
-      // 3b. Hassan's Price — selling_price set on the stock item (avg across locations if ever differs)
+      // 3b. Hassan's Price — base selling_price on the stock item; fall back to max location-specific price
       const hassansPriceResult = await pool.query(`
         SELECT si.id AS stock_item_id,
-          si.selling_price::numeric AS hassans_price
+          COALESCE(
+            NULLIF(si.selling_price::numeric, 0),
+            (SELECT MAX(silp.selling_price::numeric)
+             FROM stock_item_location_prices silp
+             WHERE silp.stock_item_id = si.id)
+          ) AS hassans_price
         FROM stock_items si
         WHERE si.company_id = $1
           AND si.id = ANY($2::int[])
