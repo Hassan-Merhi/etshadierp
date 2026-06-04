@@ -1536,26 +1536,49 @@ export default function DailyProductionReport() {
       {/* ── Expandable detail rows ── */}
 
       {/* Production by Category (each category expands to show its products) */}
-      <ExpandableCard
-        title="Production by Category"
-        badge={isLoading ? undefined : `${data?.production.byCategory.length ?? 0} categories · ${data?.production.byProduct.length ?? 0} products`}
-        icon={Tag}
-        testId="card-category-breakdown"
-      >
-        {isLoading ? (
-          <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
-        ) : !data || data.production.byCategory.length === 0 ? (
-          <p className="text-center text-muted-foreground py-6 text-sm">No bales produced in this period</p>
-        ) : (
-          <CategoryProductBreakdown
-            categories={data.production.byCategory}
-            products={data.production.byProduct as any}
-            totalBales={data.production.totalBales}
-            totalWeightKg={data.production.totalWeightKg}
-            totalValue={data.production.totalValue}
-          />
-        )}
-      </ExpandableCard>
+      {(() => {
+        const wgCats: { categoryName: string; qty: number; totalWeightKg: number; totalValue: number }[] = [];
+        const wgProds: { articleCode: string; productName: string; categoryName: string; qty: number; totalWeightKg: number; sellingPricePerBale: number; totalValue: number }[] = [];
+        if (data) {
+          const wipersRows = data.wipersGarbage.rows.filter((r: any) => r.subType === "wiper");
+          const garbageRows = data.wipersGarbage.rows.filter((r: any) => r.subType !== "wiper");
+          if (wipersRows.length > 0) {
+            wgCats.push({ categoryName: "Wipers", qty: wipersRows.reduce((s: number, r: any) => s + r.qty, 0), totalWeightKg: wipersRows.reduce((s: number, r: any) => s + r.totalWeightKg, 0), totalValue: wipersRows.reduce((s: number, r: any) => s + r.totalValue, 0) });
+            wgProds.push(...wipersRows.map((r: any) => ({ articleCode: r.categoryName.replace(/\s+/g, "-").toUpperCase(), productName: r.categoryName, categoryName: "Wipers", qty: r.qty, totalWeightKg: r.totalWeightKg, sellingPricePerBale: 0, totalValue: r.totalValue })));
+          }
+          if (garbageRows.length > 0) {
+            wgCats.push({ categoryName: "Garbage", qty: garbageRows.reduce((s: number, r: any) => s + r.qty, 0), totalWeightKg: garbageRows.reduce((s: number, r: any) => s + r.totalWeightKg, 0), totalValue: garbageRows.reduce((s: number, r: any) => s + r.totalValue, 0) });
+            wgProds.push(...garbageRows.map((r: any) => ({ articleCode: r.categoryName.replace(/\s+/g, "-").toUpperCase(), productName: r.categoryName, categoryName: "Garbage", qty: r.qty, totalWeightKg: r.totalWeightKg, sellingPricePerBale: 0, totalValue: r.totalValue })));
+          }
+        }
+        const mergedCategories = [...(data?.production.byCategory ?? []), ...wgCats];
+        const mergedProducts = [...(data?.production.byProduct ?? []) as any[], ...wgProds];
+        const mergedTotalBales = (data?.production.totalBales ?? 0) + wgCats.reduce((s, c) => s + c.qty, 0);
+        const mergedTotalWeightKg = (data?.production.totalWeightKg ?? 0) + wgCats.reduce((s, c) => s + c.totalWeightKg, 0);
+        const mergedTotalValue = (data?.production.totalValue ?? 0) + wgCats.reduce((s, c) => s + c.totalValue, 0);
+        return (
+          <ExpandableCard
+            title="Production by Category"
+            badge={isLoading ? undefined : `${mergedCategories.length} categories · ${mergedProducts.length} products`}
+            icon={Tag}
+            testId="card-category-breakdown"
+          >
+            {isLoading ? (
+              <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+            ) : !data || mergedCategories.length === 0 ? (
+              <p className="text-center text-muted-foreground py-6 text-sm">No bales produced in this period</p>
+            ) : (
+              <CategoryProductBreakdown
+                categories={mergedCategories}
+                products={mergedProducts}
+                totalBales={mergedTotalBales}
+                totalWeightKg={mergedTotalWeightKg}
+                totalValue={mergedTotalValue}
+              />
+            )}
+          </ExpandableCard>
+        );
+      })()}
 
       {/* Mix Batches */}
       <ExpandableCard
