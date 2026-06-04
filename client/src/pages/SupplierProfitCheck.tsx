@@ -923,15 +923,19 @@ export default function SupplierProfitCheck() {
                             value={qtyMap[row.stockItemId] ?? ""}
                             onChange={(e) => setQtyMap((prev) => ({ ...prev, [row.stockItemId]: e.target.value }))}
                             onKeyDown={(e) => {
-                              if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                                 e.preventDefault();
-                                const curr = Number(qtyMap[row.stockItemId] ?? 0);
-                                const next = e.key === "ArrowUp" ? curr + 1 : Math.max(0, curr - 1);
-                                setQtyMap((prev) => ({ ...prev, [row.stockItemId]: String(next) }));
+                                const inputs = Array.from(
+                                  document.querySelectorAll<HTMLInputElement>("[data-qty-input]")
+                                );
+                                const idx = inputs.indexOf(e.currentTarget as HTMLInputElement);
+                                const target = e.key === "ArrowDown" ? inputs[idx + 1] : inputs[idx - 1];
+                                if (target) { target.focus(); target.select(); }
                               }
                             }}
                             className="w-24 h-7 text-right ml-auto"
                             data-testid={`input-qty-${row.stockItemId}`}
+                            data-qty-input="true"
                           />
                         </TableCell>
                       )}
