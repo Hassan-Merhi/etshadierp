@@ -446,7 +446,7 @@ export default function SupplierProfitCheck() {
 
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sales Date Range</label>
-                <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter-sales" />
+                <PeriodFilter value={periodFilter} onChange={setPeriodFilter} hideCustomInputs data-testid="period-filter-sales" />
               </div>
 
               <div className="space-y-1">

@@ -24,6 +24,7 @@ interface PeriodFilterProps {
   onChange: (value: PeriodFilterValue) => void;
   defaultPreset?: PeriodPreset;
   className?: string;
+  hideCustomInputs?: boolean;
   "data-testid"?: string;
 }
 
@@ -89,6 +90,7 @@ export function PeriodFilter({
   value,
   onChange,
   className,
+  hideCustomInputs = false,
   "data-testid": testId,
 }: PeriodFilterProps) {
   const { formatDisplayDate } = useDateFormat();
@@ -192,7 +194,7 @@ export function PeriodFilter({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {isCustom && (
+      {isCustom && !hideCustomInputs && (
         <div className="flex items-center gap-1.5">
           <input
             type="date"
