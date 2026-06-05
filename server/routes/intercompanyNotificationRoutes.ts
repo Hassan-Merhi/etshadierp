@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { db } from "../db";
-import { requireAuth } from "../auth";
+import { requireAuth, requireRole } from "../auth";
 import {
   intercompanyAccountLinks,
   intercompanyLinkRecipients,
@@ -103,7 +103,7 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
   });
 
   // ── GET /api/intercompany-links/:id/recipients ──────────────────────────────
-  app.get("/api/intercompany-links/:id/recipients", requireAuth, async (req, res) => {
+  app.get("/api/intercompany-links/:id/recipients", requireAuth, requireRole("Admin", "Developer"), async (req, res) => {
     try {
       const linkId = parseInt(req.params.id);
       if (isNaN(linkId)) return res.status(400).json({ message: "Invalid ID" });
@@ -125,7 +125,7 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
   });
 
   // ── POST /api/intercompany-links ────────────────────────────────────────────
-  app.post("/api/intercompany-links", requireAuth, async (req, res) => {
+  app.post("/api/intercompany-links", requireAuth, requireRole("Admin", "Developer"), async (req, res) => {
     try {
       const { label, sourceCompanyId, sourceLedgerAccountId, destCompanyId, destLedgerAccountId, recipientUserIds = [] } = req.body;
       if (!sourceCompanyId || !sourceLedgerAccountId || !destCompanyId || !destLedgerAccountId) {
@@ -154,7 +154,7 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
   });
 
   // ── PUT /api/intercompany-links/:id ─────────────────────────────────────────
-  app.put("/api/intercompany-links/:id", requireAuth, async (req, res) => {
+  app.put("/api/intercompany-links/:id", requireAuth, requireRole("Admin", "Developer"), async (req, res) => {
     try {
       const linkId = parseInt(req.params.id);
       if (isNaN(linkId)) return res.status(400).json({ message: "Invalid ID" });
@@ -191,7 +191,7 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
   });
 
   // ── DELETE /api/intercompany-links/:id ──────────────────────────────────────
-  app.delete("/api/intercompany-links/:id", requireAuth, async (req, res) => {
+  app.delete("/api/intercompany-links/:id", requireAuth, requireRole("Admin", "Developer"), async (req, res) => {
     try {
       const linkId = parseInt(req.params.id);
       if (isNaN(linkId)) return res.status(400).json({ message: "Invalid ID" });
@@ -339,6 +339,8 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       const { destLedgerAccountId } = req.body;
       if (!destLedgerAccountId) return res.status(400).json({ message: "Please select an account" });
 
+      // Pre-flight: load request, recipient membership, link, and account ownership
+      // (all outside the transaction so we can return clean 403/404 before locking)
       const [request] = await db
         .select()
         .from(intercompanyPaymentRequests)
@@ -364,54 +366,90 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
         .where(eq(intercompanyAccountLinks.id, request.linkId));
       if (!link) return res.status(404).json({ message: "Link not found" });
 
+      // ── Validate that the chosen debit account belongs to the destination company ──
+      const [chosenAccount] = await db
+        .select({ id: ledgerAccounts.id, companyId: ledgerAccounts.companyId })
+        .from(ledgerAccounts)
+        .where(eq(ledgerAccounts.id, destLedgerAccountId));
+      if (!chosenAccount) return res.status(400).json({ message: "Selected account not found" });
+      if (chosenAccount.companyId !== link.destCompanyId) {
+        return res.status(400).json({ message: "Selected account does not belong to the destination company" });
+      }
+
       const destCompanyId = link.destCompanyId;
       const voucherNumber = `IC-RCPT-${Date.now()}`;
-      const today = new Date().toISOString().slice(0, 10);
+      const approvedAt = new Date();
 
-      // Create Receipt voucher in dest company
-      // DR: chosen account (cash/bank received)
-      // CR: link.destLedgerAccountId (the "from company" intercompany account in dest)
-      const [createdVoucher] = await db.insert(vouchers).values({
-        companyId: destCompanyId,
-        voucherNumber,
-        voucherType: "Receipt",
-        voucherDate: request.fromVoucherDate,
-        description: `Intercompany receipt from ${request.fromCompanyId} - ${request.fromVoucherNumber}`,
-        totalAmount: request.amount,
-        optional: false,
-        sourceModule: "ERP",
-      }).returning();
+      // ── Atomic transaction: conditional status claim + voucher creation ──────────
+      // The UPDATE WHERE status='pending' is the single concurrency gate.
+      // If zero rows update (already approved by another recipient), we abort.
+      const result = await db.transaction(async (tx) => {
+        // Claim the request atomically — only succeeds once
+        const claimed = await tx
+          .update(intercompanyPaymentRequests)
+          .set({
+            status: "approved",
+            destLedgerAccountId,
+            approvedByUserId: userId,
+            approvedAt,
+          })
+          .where(
+            and(
+              eq(intercompanyPaymentRequests.id, requestId),
+              eq(intercompanyPaymentRequests.status, "pending"),
+            ),
+          )
+          .returning({ id: intercompanyPaymentRequests.id });
 
-      await db.insert(voucherEntries).values([
-        {
-          voucherId: createdVoucher.id,
-          ledgerAccountId: destLedgerAccountId,
-          debitAmount: request.amount,
-          creditAmount: "0",
-          narration: `Intercompany receipt - ${request.fromVoucherNumber}`,
-        },
-        {
-          voucherId: createdVoucher.id,
-          ledgerAccountId: link.destLedgerAccountId,
-          debitAmount: "0",
-          creditAmount: request.amount,
-          narration: `Intercompany - ${request.fromVoucherNumber}`,
-        },
-      ]);
+        if (claimed.length === 0) {
+          throw new Error("ALREADY_PROCESSED");
+        }
 
-      // Mark request as approved
-      await db.update(intercompanyPaymentRequests)
-        .set({
-          status: "approved",
-          destLedgerAccountId,
-          destVoucherId: createdVoucher.id,
-          approvedByUserId: userId,
-          approvedAt: new Date(),
-        })
-        .where(eq(intercompanyPaymentRequests.id, requestId));
+        // Create Receipt voucher in dest company
+        // DR: chosen account (cash/bank received)
+        // CR: link.destLedgerAccountId (the intercompany account in dest)
+        const [createdVoucher] = await tx.insert(vouchers).values({
+          companyId: destCompanyId,
+          voucherNumber,
+          voucherType: "Receipt",
+          voucherDate: request.fromVoucherDate,
+          description: `Intercompany receipt from ${request.fromCompanyId} - ${request.fromVoucherNumber}`,
+          totalAmount: request.amount,
+          optional: false,
+          sourceModule: "ERP",
+        }).returning();
 
-      res.json({ success: true, voucherId: createdVoucher.id, voucherNumber });
+        await tx.insert(voucherEntries).values([
+          {
+            voucherId: createdVoucher.id,
+            ledgerAccountId: destLedgerAccountId,
+            debitAmount: request.amount,
+            creditAmount: "0",
+            narration: `Intercompany receipt - ${request.fromVoucherNumber}`,
+          },
+          {
+            voucherId: createdVoucher.id,
+            ledgerAccountId: link.destLedgerAccountId,
+            debitAmount: "0",
+            creditAmount: request.amount,
+            narration: `Intercompany - ${request.fromVoucherNumber}`,
+          },
+        ]);
+
+        // Store the mirror voucher ID back on the request
+        await tx
+          .update(intercompanyPaymentRequests)
+          .set({ destVoucherId: createdVoucher.id })
+          .where(eq(intercompanyPaymentRequests.id, requestId));
+
+        return { voucherId: createdVoucher.id, voucherNumber };
+      });
+
+      res.json({ success: true, voucherId: result.voucherId, voucherNumber: result.voucherNumber });
     } catch (err: any) {
+      if (err.message === "ALREADY_PROCESSED") {
+        return res.status(409).json({ message: "This request has already been processed by another user." });
+      }
       console.error("[IC approve]", err);
       res.status(500).json({ message: err.message });
     }
