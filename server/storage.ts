@@ -2018,7 +2018,15 @@ export class DbStorage implements IStorage {
         poId: schema.poLineItems.poId,
         stockItemId: schema.poLineItems.stockItemId,
         stockItemCode: schema.stockItems.code,
-        stockItemName: sql<string>`COALESCE(CASE WHEN ${schema.stockItems.deletedAt} IS NULL THEN ${schema.stockItems.name} ELSE NULL END, ${schema.poLineItems.itemName})`,
+        stockItemName: sql<string>`COALESCE(
+        CASE WHEN ${schema.stockItems.deletedAt} IS NULL THEN ${schema.stockItems.name} ELSE NULL END,
+        (SELECT si2.name FROM stock_items si2
+           JOIN stock_item_merge_logs sml ON sml.kept_item_id = si2.id
+           WHERE sml.merged_item_id = ${schema.poLineItems.stockItemId}
+           AND si2.deleted_at IS NULL
+           LIMIT 1),
+        ${schema.poLineItems.itemName}
+      )`,
         itemName: schema.poLineItems.itemName,
         quantity: schema.poLineItems.quantity,
         rate: schema.poLineItems.rate,
