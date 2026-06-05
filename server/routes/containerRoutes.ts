@@ -19,6 +19,7 @@ import {
   locations, employees, userLocations, auditLog, interCompanyTransfers,
   insertInterCompanyTransferSchema, FEATURE_KEYS,
   ledgerAccounts, intercompanyPosConfigs,
+  stockItemMergeLogs,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
@@ -1696,7 +1697,7 @@ export function registerContainerRoutes(app: Express) {
       const poIds = purchaseOrders.map(po => po.id);
       const [allLineItems, allStockItems] = poIds.length > 0 ? await Promise.all([
         db.select().from(poLineItems).where(inArray(poLineItems.purchaseOrderId, poIds)).execute(),
-        db.select({ id: stockItems.id, code: stockItems.code, name: stockItems.name })
+        db.select({ id: stockItems.id, code: stockItems.code, name: stockItems.name, deletedAt: stockItems.deletedAt })
           .from(stockItems)
           .where(inArray(stockItems.id,
             [...new Set((await db.select({ id: poLineItems.stockItemId }).from(poLineItems)
@@ -1706,6 +1707,25 @@ export function registerContainerRoutes(app: Express) {
       ]) : [[], []];
 
       const stockItemMap = new Map(allStockItems.map(s => [s.id, s]));
+
+      // Resolve deleted stock items → kept items via merge logs so OTW shows current names
+      const deletedItemIds = allStockItems.filter(s => s.deletedAt != null).map(s => s.id);
+      if (deletedItemIds.length > 0) {
+        const mergeLogs = await db.select()
+          .from(stockItemMergeLogs)
+          .where(inArray(stockItemMergeLogs.mergedItemId, deletedItemIds));
+        if (mergeLogs.length > 0) {
+          const keptIds = [...new Set(mergeLogs.map(l => l.keptItemId))];
+          const keptItems = await db.select({ id: stockItems.id, code: stockItems.code, name: stockItems.name, deletedAt: stockItems.deletedAt })
+            .from(stockItems)
+            .where(inArray(stockItems.id, keptIds));
+          const keptMap = new Map(keptItems.map(s => [s.id, s]));
+          for (const log of mergeLogs) {
+            const kept = keptMap.get(log.keptItemId);
+            if (kept) stockItemMap.set(log.mergedItemId, kept);
+          }
+        }
+      }
       const lineItemsByPO = new Map<number, typeof allLineItems>();
       for (const li of allLineItems) {
         const arr = lineItemsByPO.get(li.purchaseOrderId!) || [];

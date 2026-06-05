@@ -2911,16 +2911,16 @@ export function registerStockRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
+      let totalFixed = 0;
+
+      // ── Pass 1: fix via merge logs (mergedItemId → keptItemId) ───────────
       const mergeLogs = await db.select().from(stockItemMergeLogs)
         .where(eq(stockItemMergeLogs.companyId, companyId));
 
-      if (mergeLogs.length === 0) {
-        return res.json({ fixed: 0, mergesChecked: 0, message: "No merge history found — nothing to reconcile" });
-      }
-
-      let totalFixed = 0;
+      const coveredByLog = new Set<number>(); // deleted item IDs already handled by a log
 
       for (const log of mergeLogs) {
+        coveredByLog.add(log.mergedItemId);
         const [keptItem] = await db.select({ id: stockItems.id, name: stockItems.name })
           .from(stockItems)
           .where(eq(stockItems.id, log.keptItemId));
@@ -2934,7 +2934,49 @@ export function registerStockRoutes(app: Express) {
         totalFixed += updated.length;
       }
 
-      return res.json({ fixed: totalFixed, mergesChecked: mergeLogs.length });
+      // ── Pass 2: fix po_line_items that reference a deleted stock item with
+      //            no merge log — resolve via stockItemCodeAliases fallback ──
+      // Find distinct deleted stockItemIds referenced by po_line_items
+      const deletedRefsRaw = await db.execute(
+        sql`SELECT DISTINCT pli.stock_item_id AS "stockItemId", si.code AS "code"
+            FROM po_line_items pli
+            JOIN stock_items si ON si.id = pli.stock_item_id
+            WHERE si.company_id = ${companyId}
+              AND si.deleted_at IS NOT NULL`,
+      );
+      const deletedRefs: { stockItemId: number; code: string }[] =
+        ((deletedRefsRaw as any).rows ?? (deletedRefsRaw as unknown as any[]));
+
+      // Only process those NOT already handled by a merge log
+      const uncovered = deletedRefs.filter(r => !coveredByLog.has(r.stockItemId));
+
+      for (const ref of uncovered) {
+        // Look up the kept item via stockItemCodeAliases:
+        // when a merge happens, the old code is stored as an alias on the kept item
+        const [alias] = await db
+          .select({ stockItemId: stockItemCodeAliases.stockItemId })
+          .from(stockItemCodeAliases)
+          .where(and(
+            eq(stockItemCodeAliases.companyId, companyId),
+            eq(stockItemCodeAliases.aliasCode,  ref.code),
+          ));
+
+        if (!alias) continue;
+
+        const [keptItem] = await db.select({ id: stockItems.id, name: stockItems.name })
+          .from(stockItems)
+          .where(and(eq(stockItems.id, alias.stockItemId), isNull(stockItems.deletedAt)));
+        if (!keptItem) continue;
+
+        const updated = await db.update(poLineItems)
+          .set({ stockItemId: keptItem.id, itemName: keptItem.name })
+          .where(eq(poLineItems.stockItemId, ref.stockItemId))
+          .returning({ id: poLineItems.id });
+
+        totalFixed += updated.length;
+      }
+
+      return res.json({ fixed: totalFixed, mergesChecked: mergeLogs.length, aliasesChecked: uncovered.length });
     } catch (error: any) {
       return res.status(500).json({ message: error.message });
     }
