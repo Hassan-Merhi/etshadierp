@@ -99,7 +99,7 @@ export const A4_DESIGN_OPTIONS: { value: string; label: string; color: string; p
 ];
 
 function getDesignBannerUrl(design: string): string {
-  return `/labels/hmd-${design}.jpg?t=${Date.now()}`;
+  return `/labels/hmd-${design}.jpg`;
 }
 
 export function generateCombinedLabelsHtml(labels: LabelData[], designColor?: A4DesignColor) {

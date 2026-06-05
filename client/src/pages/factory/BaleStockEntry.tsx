@@ -421,7 +421,12 @@ import DailyScan from "./DailyScan";
           a4Window.document.write(labelHtml);
           a4Window.document.close();
           a4Window.focus();
-          setTimeout(() => a4Window.print(), 500);
+          const a4Imgs = a4Window.document.images;
+          let a4Loaded = 0;
+          const a4Total = a4Imgs.length;
+          const tryA4Print = () => { a4Loaded++; if (a4Loaded >= a4Total) setTimeout(() => a4Window.print(), 200); };
+          if (a4Total === 0) { setTimeout(() => a4Window.print(), 200); }
+          else { for (let i = 0; i < a4Total; i++) { if (a4Imgs[i].complete) tryA4Print(); else a4Imgs[i].onload = a4Imgs[i].onerror = tryA4Print; } }
         }
       } else {
         if (preOpened?.a4 && !preOpened.a4.closed) preOpened.a4.close();
@@ -1359,7 +1364,12 @@ import DailyScan from "./DailyScan";
           a4Window.document.write(labelHtml);
           a4Window.document.close();
           a4Window.focus();
-          setTimeout(() => a4Window.print(), 500);
+          const a4Imgs = a4Window.document.images;
+          let a4Loaded = 0;
+          const a4Total = a4Imgs.length;
+          const tryA4Print = () => { a4Loaded++; if (a4Loaded >= a4Total) setTimeout(() => a4Window.print(), 200); };
+          if (a4Total === 0) { setTimeout(() => a4Window.print(), 200); }
+          else { for (let i = 0; i < a4Total; i++) { if (a4Imgs[i].complete) tryA4Print(); else a4Imgs[i].onload = a4Imgs[i].onerror = tryA4Print; } }
         }
       }
 
