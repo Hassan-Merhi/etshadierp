@@ -1926,19 +1926,34 @@ export function registerRentalRoutes(
             }).returning();
             voucherId = v.id;
 
-            const debitEntries: { voucherId: number; ledgerAccountId: number; debitAmount: string; creditAmount: string; narration: string }[] = [];
+            // Payment always goes: Dr Rent Expense / Cr Cash (regardless of accrual).
+            // For accrued months an additional auto-clearing journal is posted:
+            //   Dr Accrued Rent Payable / Cr Rent Expense
+            // so the AP liability is zeroed out and no double-expense occurs.
+            const expenseId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
+            await tx.insert(voucherEntries).values([
+              { voucherId: v.id, ledgerAccountId: expenseId,       debitAmount: data.amount, creditAmount: "0",          narration },
+              { voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: "0",      creditAmount: data.amount,  narration },
+            ]);
+
             if (accrualChunk > 0) {
               const liabilityId = await findOrCreateLedgerAccount(tx, companyId, "Accrued Rent Payable", "Liability", "ACCR-RENT-PAY");
-              debitEntries.push({ voucherId: v.id, ledgerAccountId: liabilityId, debitAmount: String(accrualChunk), creditAmount: "0", narration });
+              const clearNarration = `AP clearing — ${narration}`;
+              const [clv] = await tx.insert(vouchers).values({
+                companyId,
+                voucherNumber: `AP-CLEAR-${v.id}`,
+                voucherType:   "Journal",
+                voucherDate:   data.paymentDate as any,
+                description:   clearNarration,
+                totalAmount:   String(accrualChunk),
+                currency:      voucherCurrency,
+                sourceModule:  "ERP",
+              }).returning();
+              await tx.insert(voucherEntries).values([
+                { voucherId: clv.id, ledgerAccountId: liabilityId, debitAmount: String(accrualChunk), creditAmount: "0",                narration: clearNarration },
+                { voucherId: clv.id, ledgerAccountId: expenseId,   debitAmount: "0",                  creditAmount: String(accrualChunk), narration: clearNarration },
+              ]);
             }
-            if (expenseChunk > 0) {
-              const expenseId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
-              debitEntries.push({ voucherId: v.id, ledgerAccountId: expenseId, debitAmount: String(expenseChunk), creditAmount: "0", narration });
-            }
-            await tx.insert(voucherEntries).values([
-              ...debitEntries,
-              { voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: "0", creditAmount: data.amount, narration },
-            ]);
           } else {
             const incomeAccountId = await findOrCreateLedgerAccount(tx, companyId, incomeAccountName, "Income", "RENT-INC", "Indirect Income");
             const narration = `Rent received - ${unitLabel} - ${monthSpan}`;
@@ -2154,19 +2169,32 @@ export function registerRentalRoutes(
                 description: narration, totalAmount: data.amount, currency: voucherCurrency, sourceModule: "ERP",
               }).returning();
               voucherId = v.id;
-              const bulkDebitEntries: { voucherId: number; ledgerAccountId: number; debitAmount: string; creditAmount: string; narration: string }[] = [];
+              // Same flow as single payment: Dr Rent Expense / Cr Cash always.
+              // Accrued months get an auto-clearing journal: Dr AP / Cr Rent Expense.
+              const expenseId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
+              await tx.insert(voucherEntries).values([
+                { voucherId: v.id, ledgerAccountId: expenseId,          debitAmount: data.amount, creditAmount: "0",         narration },
+                { voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: "0",         creditAmount: data.amount, narration },
+              ]);
+
               if (accrualChunk > 0) {
                 const liabilityId = await findOrCreateLedgerAccount(tx, companyId, "Accrued Rent Payable", "Liability", "ACCR-RENT-PAY");
-                bulkDebitEntries.push({ voucherId: v.id, ledgerAccountId: liabilityId, debitAmount: String(accrualChunk), creditAmount: "0", narration });
+                const clearNarration = `AP clearing — ${narration}`;
+                const [clv] = await tx.insert(vouchers).values({
+                  companyId,
+                  voucherNumber: `AP-CLEAR-${v.id}`,
+                  voucherType:   "Journal",
+                  voucherDate:   data.paymentDate as any,
+                  description:   clearNarration,
+                  totalAmount:   String(accrualChunk),
+                  currency:      voucherCurrency,
+                  sourceModule:  "ERP",
+                }).returning();
+                await tx.insert(voucherEntries).values([
+                  { voucherId: clv.id, ledgerAccountId: liabilityId, debitAmount: String(accrualChunk), creditAmount: "0",                narration: clearNarration },
+                  { voucherId: clv.id, ledgerAccountId: expenseId,   debitAmount: "0",                  creditAmount: String(accrualChunk), narration: clearNarration },
+                ]);
               }
-              if (expenseChunk > 0) {
-                const expenseId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
-                bulkDebitEntries.push({ voucherId: v.id, ledgerAccountId: expenseId, debitAmount: String(expenseChunk), creditAmount: "0", narration });
-              }
-              await tx.insert(voucherEntries).values([
-                ...bulkDebitEntries,
-                { voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: "0", creditAmount: data.amount, narration },
-              ]);
             } else {
               const incomeAccountId = await findOrCreateLedgerAccount(tx, companyId, incomeAccountName, "Income", "RENT-INC", "Indirect Income");
               const narration = `Rent received - ${unitLabel} - ${monthSpan}`;
@@ -2263,6 +2291,13 @@ export function registerRentalRoutes(
           if (siblings.length === 0) {
             await tx.execute(sql`
               UPDATE vouchers SET deleted_at = NOW() WHERE id = ${payment.voucherId}
+            `);
+            // Also soft-delete the AP-CLEAR auto-clearing journal created alongside this payment
+            await tx.execute(sql`
+              UPDATE vouchers SET deleted_at = NOW()
+              WHERE voucher_number = ${'AP-CLEAR-' + payment.voucherId}
+                AND company_id = ${companyId}
+                AND deleted_at IS NULL
             `);
           }
         }
@@ -2595,7 +2630,37 @@ export function registerRentalRoutes(
               ))
               .limit(1);
 
+            // Also check for AP-CLEAR auto-clearing journals linked to these payment vouchers.
+            // New payment flow posts a separate journal (voucherNumber = "AP-CLEAR-{payVoucherId}")
+            // with the AP debit instead of embedding it in the payment voucher itself.
+            let apClearJournalDebit = false;
             if (!apDebitEntry) {
+              for (const pvId of payVoucherIds) {
+                const [clj] = await db
+                  .select({ id: vouchers.id })
+                  .from(vouchers)
+                  .where(and(
+                    eq(vouchers.companyId, companyId),
+                    eq(vouchers.voucherNumber, `AP-CLEAR-${pvId}`),
+                    isNull(vouchers.deletedAt),
+                  ))
+                  .limit(1);
+                if (clj) {
+                  const [apDr] = await db
+                    .select({ id: voucherEntries.id })
+                    .from(voucherEntries)
+                    .where(and(
+                      eq(voucherEntries.voucherId, clj.id),
+                      eq(voucherEntries.ledgerAccountId, apAcct.id),
+                      sql`${voucherEntries.debitAmount}::numeric > 0`,
+                    ))
+                    .limit(1);
+                  if (apDr) { apClearJournalDebit = true; break; }
+                }
+              }
+            }
+
+            if (!apDebitEntry && !apClearJournalDebit) {
               // No AP debit in any payment → pre-accrual payment → phantom
               const correction = Math.min(paid, Number(row.expectedAmount));
               phantomRows.push({ id: row.id, correction });
