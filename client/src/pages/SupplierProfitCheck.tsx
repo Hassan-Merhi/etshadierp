@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PeriodFilter, PeriodFilterValue } from "@/components/ui/period-filter";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -160,6 +160,7 @@ export default function SupplierProfitCheck() {
   const [sourceType, setSourceType] = useState<"all" | "proforma">("all");
   const [proformaId, setProformaId] = useState<string>("");
   const [manualPoPrices, setManualPoPrices] = useState<Record<number, string>>({});
+  const debounceTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
   const [freight, setFreight] = useState("");
   const [duties, setDuties] = useState("");
@@ -238,6 +239,40 @@ export default function SupplierProfitCheck() {
     },
   });
 
+  // ─── PO price overrides (persisted to DB) ─────────────────────────────────
+  const { data: overridesData } = useQuery<{ stockItemId: number; poPrice: string }[]>({
+    queryKey: ["/api/supplier-profit-check/po-overrides", supplierId],
+    enabled: !!supplierId,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/supplier-profit-check/po-overrides?supplierId=${supplierId}`);
+      return res.json();
+    },
+  });
+
+  useEffect(() => {
+    const init: Record<number, string> = {};
+    for (const o of (overridesData ?? [])) init[o.stockItemId] = String(o.poPrice);
+    setManualPoPrices(init);
+  }, [overridesData]);
+
+  const saveOverrideMutation = useMutation({
+    mutationFn: async (payload: { supplierId: number; stockItemId: number; poPrice: number }) => {
+      const res = await apiRequest("PUT", "/api/supplier-profit-check/po-overrides", payload);
+      return res.json();
+    },
+  });
+
+  const handleManualPoChange = useCallback((stockItemId: number, value: string) => {
+    setManualPoPrices(prev => ({ ...prev, [stockItemId]: value }));
+    clearTimeout(debounceTimers.current[stockItemId]);
+    const num = parseFloat(value);
+    if (!isNaN(num) && num > 0 && supplierId) {
+      debounceTimers.current[stockItemId] = setTimeout(() => {
+        saveOverrideMutation.mutate({ supplierId: Number(supplierId), stockItemId, poPrice: num });
+      }, 800);
+    }
+  }, [supplierId, saveOverrideMutation]);
+
   useEffect(() => {
     const initialQty: Record<number, string> = {};
     for (const r of rows) {
@@ -245,7 +280,6 @@ export default function SupplierProfitCheck() {
     }
     setQtyMap(initialQty);
     setSavedProforma(null);
-    setManualPoPrices({});
   }, [rows]);
 
   const loaded = queryEnabled && !isLoading && rows.length >= 0;
@@ -828,12 +862,7 @@ export default function SupplierProfitCheck() {
                                   step="0.01"
                                   placeholder="—"
                                   value={manualPoPrices[row.stockItemId] ?? ""}
-                                  onChange={(e) =>
-                                    setManualPoPrices((prev) => ({
-                                      ...prev,
-                                      [row.stockItemId]: e.target.value,
-                                    }))
-                                  }
+                                  onChange={(e) => handleManualPoChange(row.stockItemId, e.target.value)}
                                   className="h-7 w-20 text-right text-xs px-1.5 font-mono border-orange-300 dark:border-orange-700 focus-visible:ring-orange-400"
                                   data-testid={`input-manual-po-price-${row.stockItemId}`}
                                 />

@@ -649,4 +649,41 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       res.status(500).json({ message: err.message });
     }
   });
+
+  // ── PO Price Overrides ──────────────────────────────────────────────────────
+
+  app.get("/api/supplier-profit-check/po-overrides", requireAuth, async (req: any, res: any) => {
+    try {
+      const supplierId = parseInt(req.query.supplierId as string);
+      if (!supplierId) return res.status(400).json({ message: "supplierId required" });
+      const result = await pool.query(
+        `SELECT stock_item_id AS "stockItemId", po_price AS "poPrice"
+         FROM supplier_profit_po_overrides
+         WHERE supplier_id = $1`,
+        [supplierId]
+      );
+      res.json(result.rows);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.put("/api/supplier-profit-check/po-overrides", requireAuth, async (req: any, res: any) => {
+    try {
+      const { supplierId, stockItemId, poPrice } = req.body;
+      if (!supplierId || !stockItemId || poPrice == null) {
+        return res.status(400).json({ message: "supplierId, stockItemId, poPrice required" });
+      }
+      await pool.query(
+        `INSERT INTO supplier_profit_po_overrides (supplier_id, stock_item_id, po_price, updated_at)
+         VALUES ($1, $2, $3, now())
+         ON CONFLICT (supplier_id, stock_item_id)
+         DO UPDATE SET po_price = EXCLUDED.po_price, updated_at = now()`,
+        [supplierId, stockItemId, poPrice]
+      );
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
 }

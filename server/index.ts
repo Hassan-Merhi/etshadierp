@@ -3903,6 +3903,14 @@ let migrationsDone = false;
     `CREATE INDEX IF NOT EXISTS factory_worker_deductions_company_idx ON factory_worker_deductions (company_id)`,
     `CREATE INDEX IF NOT EXISTS factory_worker_deductions_worker_idx ON factory_worker_deductions (worker_id)`,
     `ALTER TABLE factory_worker_deductions ADD COLUMN IF NOT EXISTS payroll_id integer`,
+    `CREATE TABLE IF NOT EXISTS supplier_profit_po_overrides (
+      id serial PRIMARY KEY,
+      supplier_id integer NOT NULL,
+      stock_item_id integer NOT NULL,
+      po_price decimal(20,4) NOT NULL,
+      updated_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS supplier_profit_po_overrides_uniq ON supplier_profit_po_overrides (supplier_id, stock_item_id)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

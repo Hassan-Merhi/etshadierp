@@ -6032,3 +6032,15 @@ export const importBatches = pgTable("import_batches", {
 }, (t) => ({
   companyIdx: index("import_batches_company_idx").on(t.companyId),
 }));
+
+// ── Supplier Profit PO Price Overrides ────────────────────────────────────────
+// Stores manually-entered PO prices for items that have no purchase order price.
+export const supplierProfitPoOverrides = pgTable("supplier_profit_po_overrides", {
+  id: serial("id").primaryKey(),
+  supplierId: integer("supplier_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull(),
+  poPrice: decimal("po_price", { precision: 20, scale: 4 }).notNull(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniq: uniqueIndex("supplier_profit_po_overrides_uniq").on(t.supplierId, t.stockItemId),
+}));
