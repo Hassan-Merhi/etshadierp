@@ -60,6 +60,7 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
   const [prices, setPrices] = useState<Record<string, string>>({});
   const [showZeroItems, setShowZeroItems] = useState(false);
   const [hideNonPositive, setHideNonPositive] = useState(false);
+  const [showGarbageWipers, setShowGarbageWipers] = useState(false);
   const [appliedPrice, setAppliedPrice] = useState<"sell" | "prod" | null>(null);
   const [initialized, setInitialized] = useState(false);
   const qtyRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -120,6 +121,7 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
       setAppliedPrice(null);
       setShowZeroItems(false);
       setHideNonPositive(false);
+      setShowGarbageWipers(false);
     }
   }, [open]);
 
@@ -222,8 +224,14 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
 
   const map = productMap();
 
+  function isGarbageOrWipers(row: ArticleRow) {
+    const n = row.productName.toLowerCase();
+    return n.includes("wiper") || n.includes("garbage");
+  }
+
   const zeroItemCount = articleRows.filter(r => r.stockAvailable === 0).length;
   const nonPositiveCount = articleRows.filter(r => r.freeToPromise <= 0).length;
+  const garbageWipersCount = articleRows.filter(isGarbageOrWipers).length;
 
   // Keep rows that have existing/entered quantities even when hiding zeros
   const visibleRows = (() => {
@@ -231,6 +239,7 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
       ? articleRows
       : articleRows.filter(r => r.stockAvailable > 0 || r.expectedToLoad > 0 || (quantities[r.articleCode] && parseInt(quantities[r.articleCode]) > 0));
     if (hideNonPositive) base = base.filter(r => r.freeToPromise > 0 || (quantities[r.articleCode] && parseInt(quantities[r.articleCode]) > 0));
+    if (!showGarbageWipers) base = base.filter(r => !isGarbageOrWipers(r));
     return base.slice().sort((a, b) => a.productName.localeCompare(b.productName));
   })();
 
@@ -317,6 +326,19 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
                     data-testid="button-edit-v5-hide-non-positive"
                   >
                     {hideNonPositive ? `Show all (${nonPositiveCount} hidden)` : `Hide 0 & negative (${nonPositiveCount})`}
+                  </Button>
+                </div>
+              )}
+
+              {garbageWipersCount > 0 && (
+                <div>
+                  <Button
+                    size="default"
+                    variant={showGarbageWipers ? "secondary" : "outline"}
+                    onClick={() => setShowGarbageWipers(v => !v)}
+                    data-testid="button-edit-v5-toggle-garbage-wipers"
+                  >
+                    {showGarbageWipers ? `Hide Garbage/Wipers (${garbageWipersCount})` : `Show Garbage/Wipers (${garbageWipersCount})`}
                   </Button>
                 </div>
               )}
