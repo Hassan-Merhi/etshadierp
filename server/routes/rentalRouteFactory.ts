@@ -2660,7 +2660,116 @@ export function registerRentalRoutes(
       //     postRentAccrualForCompany queries WHERE accrualVoucherId IS NULL, so
       //     those rows would never be picked up.  Clear every stale reference now
       //     so the normal flow can proceed unblocked.
-      const danglingCleared = await db
+      //
+      //     Before clearing: detect "orphaned AP debits" — months whose accrual
+      //     was deleted AFTER payments had already debited AP.  Those Dr AP entries
+      //     have no matching Cr AP from an accrual anymore, leaving a phantom debit
+      //     that makes the AP balance lower than the real outstanding.
+      //     Auto-fix: Dr Rent Expense / Cr AP for the orphaned amount so AP nets
+      //     to zero for those months and the next accrual starts clean.
+      const danglingRows = await db
+        .select({
+          id:         propertyMonthlyLedger.id,
+          paidAmount: propertyMonthlyLedger.paidAmount,
+        })
+        .from(propertyMonthlyLedger)
+        .where(and(
+          inArray(propertyMonthlyLedger.contractId, contractIds),
+          isNotNull(propertyMonthlyLedger.accrualVoucherId),
+          sql`${propertyMonthlyLedger.accrualVoucherId} NOT IN (
+            SELECT id FROM vouchers WHERE deleted_at IS NULL
+          )`,
+          sql`${propertyMonthlyLedger.paidAmount}::numeric > 0`,
+        ));
+
+      if (danglingRows.length > 0) {
+        const [apAcctD] = await db.select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(and(
+            eq(ledgerAccounts.companyId, companyId),
+            eq(ledgerAccounts.code, "ACCR-RENT-PAY"),
+            isNull(ledgerAccounts.deletedAt),
+          ));
+        const [expAcctD] = await db.select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(and(
+            eq(ledgerAccounts.companyId, companyId),
+            eq(ledgerAccounts.code, "SHOP-RENT-EXP"),
+            isNull(ledgerAccounts.deletedAt),
+          ));
+
+        if (apAcctD && expAcctD) {
+          // For each dangling paid row, find how much was debited from AP in payment vouchers
+          let orphanedTotal = 0;
+          type OrphanRow = { ledgerRowId: number; apDebit: number };
+          const orphanRows: OrphanRow[] = [];
+
+          for (const dr of danglingRows) {
+            const payVouchers = await db
+              .select({ voucherId: propertyPayments.voucherId })
+              .from(propertyPayments)
+              .where(eq(propertyPayments.ledgerRowId, dr.id));
+            const payVoucherIds = payVouchers
+              .map(p => p.voucherId)
+              .filter((id): id is number => id !== null && id !== undefined);
+            if (payVoucherIds.length === 0) continue;
+
+            const apDebits = await db
+              .select({ amount: voucherEntries.debitAmount })
+              .from(voucherEntries)
+              .where(and(
+                inArray(voucherEntries.voucherId, payVoucherIds),
+                eq(voucherEntries.ledgerAccountId, apAcctD.id),
+                sql`${voucherEntries.debitAmount}::numeric > 0`,
+              ));
+            const rowApDebit = apDebits.reduce((s, e) => s + Number(e.amount), 0);
+            if (rowApDebit > 0) {
+              orphanRows.push({ ledgerRowId: dr.id, apDebit: rowApDebit });
+              orphanedTotal += rowApDebit;
+            }
+          }
+
+          if (orphanRows.length > 0) {
+            await db.transaction(async (tx) => {
+              const [corrV] = await tx.insert(vouchers).values({
+                companyId,
+                voucherNumber: `ORPHAN-AP-FIX-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                voucherType:   "Journal",
+                voucherDate:   new Date().toISOString().slice(0, 10) as any,
+                description:   `Orphaned AP debit correction (${orphanRows.length} row${orphanRows.length > 1 ? "s" : ""}) — Dr Rent Expense / Cr AP`,
+                totalAmount:   String(orphanedTotal),
+                currency:      "USD",
+                sourceModule:  module as any,
+              }).returning();
+
+              const corrEntries: {
+                voucherId: number; ledgerAccountId: number;
+                debitAmount: string; creditAmount: string; narration: string;
+              }[] = [];
+              for (const o of orphanRows) {
+                corrEntries.push({
+                  voucherId:       corrV.id,
+                  ledgerAccountId: expAcctD.id,
+                  debitAmount:     String(o.apDebit),
+                  creditAmount:    "0",
+                  narration:       `Orphaned AP debit correction — ledger row ${o.ledgerRowId}`,
+                });
+                corrEntries.push({
+                  voucherId:       corrV.id,
+                  ledgerAccountId: apAcctD.id,
+                  debitAmount:     "0",
+                  creditAmount:    String(o.apDebit),
+                  narration:       `Orphaned AP debit correction — ledger row ${o.ledgerRowId}`,
+                });
+              }
+              await tx.insert(voucherEntries).values(corrEntries);
+            });
+            console.log(`[re-accrue] orphaned AP debit fix: ${orphanRows.length} rows, total corrected=${orphanedTotal}`);
+          }
+        }
+      }
+
+      await db
         .update(propertyMonthlyLedger)
         .set({ accrualVoucherId: null })
         .where(and(
