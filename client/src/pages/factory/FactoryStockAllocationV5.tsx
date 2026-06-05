@@ -515,7 +515,7 @@ export default function FactoryStockAllocationV5() {
   }
 
   /* ── Article rows for the drawer ──────────────────────────────────────── */
-  const drawerRows = useMemo(() => rows.map(r => ({
+  const drawerRows = useMemo(() => allRows.map(r => ({
     articleCode:    r.articleCode,
     productName:    r.productName,
     stockAvailable: r.stockAvailable,
