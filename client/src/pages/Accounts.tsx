@@ -57,6 +57,7 @@ import {
   Scale,
   FileText,
   Lock,
+  Filter,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -243,6 +244,7 @@ export default function Accounts() {
   );
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [showDeletedVouchers, setShowDeletedVouchers] = useState(false);
+  const [filterCurrency, setFilterCurrency] = useState<"all" | "CFA">("all");
 
   // Export language selection
   const [exportLang, setExportLang] = useState<"en" | "fr" | "ar">("en");
@@ -895,6 +897,9 @@ export default function Accounts() {
   };
 
   const { vouchers: vouchersWithBalance, finalRunningBalances } = calculateGroupedRunningBalance();
+  const displayedVouchers = filterCurrency === "CFA"
+    ? vouchersWithBalance.filter((v) => v.currency === "CFA")
+    : vouchersWithBalance;
 
   const transactionTotals = vouchersWithBalance.reduce(
     (acc, v) => ({
@@ -2347,6 +2352,15 @@ export default function Accounts() {
                       </Button>
                     )}
                     <Button
+                      variant={filterCurrency === "CFA" ? "secondary" : "outline"}
+                      size="sm"
+                      onClick={() => setFilterCurrency((c) => c === "CFA" ? "all" : "CFA")}
+                      data-testid="button-filter-cfa"
+                    >
+                      <Filter className="h-4 w-4 mr-1" />
+                      {filterCurrency === "CFA" ? "CFA Only ×" : "CFA Only"}
+                    </Button>
+                    <Button
                       variant={showDeletedVouchers ? "secondary" : "outline"}
                       size="sm"
                       onClick={() => setShowDeletedVouchers((v) => !v)}
@@ -2528,7 +2542,7 @@ export default function Accounts() {
                                 </TableCell>
                               </TableRow>
                             ) : (
-                              vouchersWithBalance.map((voucher) => (
+                              displayedVouchers.map((voucher) => (
                                 <TableRow
                                   key={voucher.voucherId}
                                   className="hover-elevate"
@@ -2645,13 +2659,13 @@ export default function Accounts() {
                             </div>
                           </CardContent>
                         </Card>
-                        {vouchersWithBalance.length === 0 ? (
+                        {displayedVouchers.length === 0 ? (
                           <div className="text-center py-8 text-muted-foreground">
                             <Search className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                            <p>No transactions found for this account</p>
+                            <p>{filterCurrency === "CFA" ? "No CFA transactions found" : "No transactions found for this account"}</p>
                           </div>
                         ) : (
-                          vouchersWithBalance.map((voucher) => (
+                          displayedVouchers.map((voucher) => (
                             <Card
                               key={voucher.voucherId}
                               className="hover-elevate"
