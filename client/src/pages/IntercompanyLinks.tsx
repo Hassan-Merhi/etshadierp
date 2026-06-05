@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -129,6 +129,13 @@ export default function IntercompanyLinks() {
     enabled: !!recipientsDialogLink,
   });
 
+  // Seed recipientForm once the query resolves for the open dialog
+  useEffect(() => {
+    if (recipientsDialogLink && recipientsData.length >= 0) {
+      setRecipientForm(recipientsData.map((r: any) => r.userId));
+    }
+  }, [recipientsData, recipientsDialogLink?.id]);
+
   const srcAccounts = allAccounts.filter(a => form.sourceCompanyId && a.companyId === parseInt(form.sourceCompanyId));
   const dstAccounts = allAccounts.filter(a => form.destCompanyId && a.companyId === parseInt(form.destCompanyId));
 
@@ -225,7 +232,7 @@ export default function IntercompanyLinks() {
 
   function openRecipients(link: ICLink) {
     setRecipientsDialogLink(link);
-    setRecipientForm([]);
+    setRecipientForm([]); // will be seeded by useEffect once query resolves
   }
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
@@ -460,17 +467,15 @@ export default function IntercompanyLinks() {
             </p>
             <div className="flex flex-wrap gap-1.5">
               {allUsers.map(u => {
-                const currentIds = recipientForm.length > 0 ? recipientForm : recipientsData.map(r => r.userId);
-                const selected = currentIds.includes(u.id);
+                const selected = recipientForm.includes(u.id);
                 return (
                   <Badge
                     key={u.id}
                     variant={selected ? "default" : "outline"}
                     className="cursor-pointer select-none"
                     onClick={() => {
-                      const base = recipientForm.length > 0 ? recipientForm : recipientsData.map(r => r.userId);
                       setRecipientForm(
-                        selected ? base.filter(id => id !== u.id) : [...base, u.id]
+                        selected ? recipientForm.filter(id => id !== u.id) : [...recipientForm, u.id]
                       );
                     }}
                     data-testid={`badge-recipient-${u.id}`}
@@ -489,8 +494,7 @@ export default function IntercompanyLinks() {
             <Button
               onClick={() => {
                 if (!recipientsDialogLink) return;
-                const ids = recipientForm.length > 0 ? recipientForm : recipientsData.map(r => r.userId);
-                saveRecipientsMutation.mutate({ id: recipientsDialogLink.id, userIds: ids });
+                saveRecipientsMutation.mutate({ id: recipientsDialogLink.id, userIds: recipientForm });
               }}
               disabled={saveRecipientsMutation.isPending}
               data-testid="button-save-recipients"

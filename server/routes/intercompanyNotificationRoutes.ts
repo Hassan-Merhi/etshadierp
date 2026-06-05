@@ -64,7 +64,7 @@ export async function triggerIntercompanyNotifications(
 
 export function registerIntercompanyNotificationRoutes(app: Express) {
   // ── GET /api/intercompany-links ─────────────────────────────────────────────
-  app.get("/api/intercompany-links", requireAuth, async (req, res) => {
+  app.get("/api/intercompany-links", requireAuth, requireRole("Admin", "Developer"), async (req, res) => {
     try {
       const links = await db
         .select({
@@ -482,14 +482,25 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
         );
       if (!recipient) return res.status(403).json({ message: "You are not authorised to dismiss this request" });
 
-      await db.update(intercompanyPaymentRequests)
+      // Atomic conditional claim — same pattern as approve to prevent TOCTOU race
+      const claimed = await db.update(intercompanyPaymentRequests)
         .set({
           status: "dismissed",
           approvedByUserId: userId,
           approvedAt: new Date(),
           dismissNote: note || null,
         })
-        .where(eq(intercompanyPaymentRequests.id, requestId));
+        .where(
+          and(
+            eq(intercompanyPaymentRequests.id, requestId),
+            eq(intercompanyPaymentRequests.status, "pending"),
+          ),
+        )
+        .returning({ id: intercompanyPaymentRequests.id });
+
+      if (claimed.length === 0) {
+        return res.status(409).json({ message: "This request has already been processed by another user." });
+      }
 
       res.json({ success: true });
     } catch (err: any) {
