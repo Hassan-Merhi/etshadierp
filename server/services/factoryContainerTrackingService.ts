@@ -573,6 +573,43 @@ async function trackViaParcelsApp(
     return await trackViaParcelsAppFallback(containerId, containerNumber, detectedCarrier, fallbackReason, now, currentEta);
   }
 
+  // ── CMA CGM API — leasing / unknown-carrier containers ───────────────────────
+  // Leasing containers (TCNU, TIIU, UETU, ECNU…) may be shipped by CMA CGM.
+  // The DCSA API looks up by equipmentReference regardless of container prefix;
+  // if the box is on a CMA vessel we get full tracking — a 404/no_data comes
+  // back quickly for non-CMA cargo so the overhead is negligible.
+  // Maersk and CMA-prefix containers are already handled above.
+  const MAERSK_PREFIXES_FC = /^(MAEU|MSKU|MRKU|MRSU|HASU|HJSC|HJCU|SUDU|SAFM|CAJU)/i;
+  if (!CMA_PREFIXES.test(containerNumber) && !MAERSK_PREFIXES_FC.test(containerNumber) && cmaCgmApiProvider.isConfigured()) {
+    ep(containerId, "CMA CGM API", "running", "checking if container is on a CMA ship");
+    console.log(`[FactoryTracking] ${containerNumber}: trying CMA CGM API (leasing/unknown carrier)...`);
+    const cmaFallResult = await cmaCgmApiProvider.track(containerNumber);
+    await saveTrackingCheck(containerId, "cma_cgm_api",
+      cmaFallResult.success ? "success" : cmaFallResult.noData ? "no_data" : "error",
+      cmaFallResult.error ?? null, cmaFallResult.raw ?? null);
+    if (cmaFallResult.success && (cmaFallResult.latestStatus || cmaFallResult.events.length > 0)) {
+      await saveDirectEvents(containerId, cmaFallResult);
+      const { eta: finalEta } = resolveEtaFromProvider(cmaFallResult.eta ?? null, cmaFallResult.events, currentEta);
+      const updateSet: Record<string, unknown> = {
+        trackingLastCheckedAt: now,
+        trackingLastStatus: cmaFallResult.latestStatus,
+        trackingLastEventDate: cmaFallResult.latestEventDate,
+        trackingLastDescription: cmaFallResult.latestDescription,
+        trackingError: null,
+        trackingChangedAt: now,
+        trackingProvider: "cma_cgm_api",
+        trackingDetectedCarrier: detectedCarrier,
+      };
+      if (finalEta) updateSet.arrivalDate = finalEta;
+      await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+      ep(containerId, "CMA CGM API", "success", cmaFallResult.latestStatus ?? "got data");
+      console.log(`[FactoryTracking] ${containerNumber} → cma_cgm_api (leasing): status=${cmaFallResult.latestStatus ?? "?"}`);
+      return { success: true, lastStatus: cmaFallResult.latestStatus, lastLocation: cmaFallResult.latestLocation, lastDescription: cmaFallResult.latestDescription, lastCheckedAt: now, error: null };
+    }
+    ep(containerId, "CMA CGM API", cmaFallResult.noData ? "skip" : "fail", cmaFallResult.error ?? "not on CMA ship");
+    console.log(`[FactoryTracking] ${containerNumber}: CMA API — not on CMA ship (${cmaFallResult.error ?? "no data"}) — proceeding`);
+  }
+
   // ── Puppeteer scraper ─────────────────────────────────────────────────────
   if (isScraperAvailable()) {
     ep(containerId, "Puppeteer scraper", "running");
