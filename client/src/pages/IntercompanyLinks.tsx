@@ -100,13 +100,39 @@ export default function IntercompanyLinks() {
     queryKey: ["/api/companies"],
   });
 
-  const { data: allAccounts = [] } = useQuery<LedgerAccount[]>({
-    queryKey: ["/api/ledger-accounts"],
+  // Fetch accounts per selected company so cross-company picks always populate
+  const { data: srcAccounts = [] } = useQuery<LedgerAccount[]>({
+    queryKey: ["/api/ledger-accounts", "company", form.sourceCompanyId],
     queryFn: async () => {
-      const r = await fetch("/api/ledger-accounts", { credentials: "include" });
+      if (!form.sourceCompanyId) return [];
+      const r = await fetch(`/api/ledger-accounts?companyId=${form.sourceCompanyId}`, { credentials: "include" });
       if (!r.ok) return [];
       return r.json();
     },
+    enabled: !!form.sourceCompanyId,
+  });
+
+  const { data: dstAccounts = [] } = useQuery<LedgerAccount[]>({
+    queryKey: ["/api/ledger-accounts", "company", form.destCompanyId],
+    queryFn: async () => {
+      if (!form.destCompanyId) return [];
+      const r = await fetch(`/api/ledger-accounts?companyId=${form.destCompanyId}`, { credentials: "include" });
+      if (!r.ok) return [];
+      return r.json();
+    },
+    enabled: !!form.destCompanyId,
+  });
+
+  // Dest-company members for the create-dialog recipient picker
+  const { data: createDialogMemberIds = [] } = useQuery<string[]>({
+    queryKey: ["/api/companies", form.destCompanyId, "member-ids"],
+    queryFn: async () => {
+      if (!form.destCompanyId) return [];
+      const r = await fetch(`/api/companies/${form.destCompanyId}/member-ids`, { credentials: "include" });
+      if (!r.ok) return [];
+      return r.json();
+    },
+    enabled: !!form.destCompanyId && dialogOpen && !editingLink,
   });
 
   const { data: allUsers = [] } = useQuery<User[]>({
@@ -147,9 +173,6 @@ export default function IntercompanyLinks() {
       setRecipientForm(recipientsData.map((r: any) => r.userId));
     }
   }, [recipientsData, recipientsDialogLink?.id]);
-
-  const srcAccounts = allAccounts.filter(a => form.sourceCompanyId && a.companyId === parseInt(form.sourceCompanyId));
-  const dstAccounts = allAccounts.filter(a => form.destCompanyId && a.companyId === parseInt(form.destCompanyId));
 
   // Mutations
   const createMutation = useMutation({
@@ -438,8 +461,13 @@ export default function IntercompanyLinks() {
             {!editingLink && (
               <div className="space-y-1.5">
                 <Label>Recipients (who gets notified)</Label>
+                {!form.destCompanyId && (
+                  <p className="text-xs text-muted-foreground">Select a destination company first.</p>
+                )}
                 <div className="flex flex-wrap gap-1.5">
-                  {allUsers.map(u => {
+                  {allUsers
+                    .filter(u => !form.destCompanyId || createDialogMemberIds.includes(u.id))
+                    .map(u => {
                     const selected = recipientUserIds.includes(u.id);
                     return (
                       <Badge
