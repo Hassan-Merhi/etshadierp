@@ -233,13 +233,15 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
   const nonPositiveCount = articleRows.filter(r => r.freeToPromise <= 0).length;
   const garbageWipersCount = articleRows.filter(isGarbageOrWipers).length;
 
+  const existingLineCodes = new Set((proformaQuery.data?.lines ?? []).map(l => l.articleCode));
+
   // Keep rows that have existing/entered quantities even when hiding zeros
   const visibleRows = (() => {
     let base = showZeroItems
       ? articleRows
       : articleRows.filter(r => r.stockAvailable > 0 || r.expectedToLoad > 0 || (quantities[r.articleCode] && parseInt(quantities[r.articleCode]) > 0));
     if (hideNonPositive) base = base.filter(r => r.freeToPromise > 0 || (quantities[r.articleCode] && parseInt(quantities[r.articleCode]) > 0));
-    if (!showGarbageWipers) base = base.filter(r => !isGarbageOrWipers(r));
+    if (!showGarbageWipers) base = base.filter(r => !isGarbageOrWipers(r) || existingLineCodes.has(r.articleCode) || (quantities[r.articleCode] && parseInt(quantities[r.articleCode]) > 0));
     return base.slice().sort((a, b) => a.productName.localeCompare(b.productName));
   })();
 
