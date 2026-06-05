@@ -4072,7 +4072,7 @@ let migrationsDone = false;
     const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
     const requiresSSL = !isLocalReplitDB && !sslExplicitlyDisabled;
 
-    const migrationClient = new Client({
+    let migrationClient = new Client({
       connectionString,
       ssl: requiresSSL ? { rejectUnauthorized: false } : false,
     });
@@ -4104,14 +4104,84 @@ let migrationsDone = false;
 END $mig$`;
       }
 
+      const failedMigrations: Array<{ sql: string; error: string }> = [];
+
       for (const migration of migrations) {
         try {
           await migrationClient.query(safeMigration(migration));
         } catch (err: any) {
-          console.warn(`Migration skipped: ${err.message?.split('\n')[0]}`);
+          const errMsg: string = err.message ?? String(err);
+          const errCode: string = err.code ?? "";
+          // PG connection-drop codes: 57P01 admin_shutdown, 08006 connection_failure,
+          // 08003 connection_does_not_exist, 08001 unable_to_connect
+          const isConnDrop =
+            ["57P01", "08006", "08003", "08001", "08004"].includes(errCode) ||
+            /terminating connection|connection.*reset|could not connect|connection closed|socket.*hang/i.test(errMsg);
+
+          if (isConnDrop) {
+            console.error(`[Migration] Connection dropped — reconnecting... (${errMsg.split("\n")[0]})`);
+            try {
+              await migrationClient.end().catch(() => {});
+              migrationClient = new Client({
+                connectionString,
+                ssl: requiresSSL ? { rejectUnauthorized: false } : false,
+              });
+              await migrationClient.connect();
+              await migrationClient.query(`SET lock_timeout = '3s'`);
+              await migrationClient.query(`SET statement_timeout = '60s'`);
+              // Retry the same migration after reconnecting
+              await migrationClient.query(safeMigration(migration));
+              console.log(`[Migration] Reconnected and retried successfully`);
+            } catch (retryErr: any) {
+              const retryMsg: string = retryErr.message ?? String(retryErr);
+              console.error(`[Migration] Reconnect+retry failed: ${retryMsg.split("\n")[0]}`);
+              failedMigrations.push({
+                sql: migration.trim().substring(0, 120),
+                error: retryMsg.split("\n")[0],
+              });
+            }
+          } else {
+            // Expected non-fatal skip: lock timeout race, already-applied migration, etc.
+            console.warn(`[Migration] Skipped: ${errMsg.split("\n")[0]}`);
+          }
         }
       }
-      console.log("✓ Database tables and columns verified/migrated");
+
+      if (failedMigrations.length > 0) {
+        console.error(`✗ ${failedMigrations.length} migration(s) FAILED at startup:`);
+        for (const { sql, error } of failedMigrations) {
+          console.error(`  SQL: ${sql}`);
+          console.error(`  ERR: ${error}`);
+        }
+      } else {
+        console.log("✓ Database tables and columns verified/migrated");
+      }
+
+      // ── Post-migration critical-table existence check ────────────────────────
+      // If any IC tables are missing (e.g. migration silently failed on a prior
+      // deploy) log a clear startup ERROR so the ops team can act immediately.
+      try {
+        const IC_TABLES = [
+          "intercompany_account_links",
+          "intercompany_link_recipients",
+          "intercompany_payment_requests",
+        ];
+        const tableCheck = await migrationClient.query(
+          `SELECT table_name FROM information_schema.tables
+           WHERE table_schema = 'public' AND table_name = ANY($1)`,
+          [IC_TABLES],
+        );
+        const found = new Set<string>(tableCheck.rows.map((r: any) => r.table_name as string));
+        const missing = IC_TABLES.filter(t => !found.has(t));
+        if (missing.length > 0) {
+          console.error(
+            `✗ Missing critical tables after migration: ${missing.join(", ")} — ` +
+            `IC notification feature will not work. Run the CREATE TABLE statements manually.`,
+          );
+        }
+      } catch (tableCheckErr: any) {
+        console.warn(`[Migration] Could not verify IC table existence: ${tableCheckErr.message}`);
+      }
 
       // Backfill POS_EXPENSE daybook entries for any factory POS sales
       // that have expenses_json stored but no corresponding daybook rows yet
