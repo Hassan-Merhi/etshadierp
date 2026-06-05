@@ -747,7 +747,11 @@ let migrationsDone = false;
       total_amount decimal(15,2) NOT NULL
     )`,
     // Factory waste type column (missed in original factory_waste_entries creation)
-    `ALTER TABLE factory_waste_entries ADD COLUMN IF NOT EXISTS waste_type varchar(50)`,
+    `DO $$ BEGIN
+       IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'factory_waste_entries') THEN
+         ALTER TABLE factory_waste_entries ADD COLUMN IF NOT EXISTS waste_type varchar(50);
+       END IF;
+     END $$`,
     // POS draft sales (saved cart state for POS users)
     `CREATE TABLE IF NOT EXISTS draft_pos_sales (
       id serial PRIMARY KEY,
@@ -950,12 +954,16 @@ let migrationsDone = false;
       UNIQUE(company_id, proforma_id, article_code)
     )`,
     // factory_settings columns added in phases — add missing boolean columns
-    `ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS net_profit_enabled boolean NOT NULL DEFAULT false`,
-    `ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS production_summary_enabled boolean NOT NULL DEFAULT false`,
-    `ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS supplier_report_enabled boolean NOT NULL DEFAULT false`,
-    `ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS supplier_statement_enabled boolean NOT NULL DEFAULT false`,
-    `ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS hide_selling_price boolean NOT NULL DEFAULT false`,
-    `ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS hide_avg_cost boolean NOT NULL DEFAULT false`,
+    `DO $$ BEGIN
+       IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'factory_settings') THEN
+         ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS net_profit_enabled boolean NOT NULL DEFAULT false;
+         ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS production_summary_enabled boolean NOT NULL DEFAULT false;
+         ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS supplier_report_enabled boolean NOT NULL DEFAULT false;
+         ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS supplier_statement_enabled boolean NOT NULL DEFAULT false;
+         ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS hide_selling_price boolean NOT NULL DEFAULT false;
+         ALTER TABLE factory_settings ADD COLUMN IF NOT EXISTS hide_avg_cost boolean NOT NULL DEFAULT false;
+       END IF;
+     END $$`,
     // Several factory tables have created_by as integer but users now use UUID strings — migrate all
     `DO $$ BEGIN
        IF EXISTS (
@@ -1159,7 +1167,8 @@ let migrationsDone = false;
      UPDATE voucher_entries
      SET narration = debit_narrations.new_narration
      FROM debit_narrations
-     WHERE voucher_entries.id = debit_narrations.entry_id`,
+     WHERE voucher_entries.id = debit_narrations.entry_id
+       AND (voucher_entries.narration IS NULL OR voucher_entries.narration = '')`,
 
     // Credit entries (SALES account side of credit sale vouchers) — use CTE
     `WITH credit_narrations AS (
@@ -1180,7 +1189,8 @@ let migrationsDone = false;
      UPDATE voucher_entries
      SET narration = credit_narrations.new_narration
      FROM credit_narrations
-     WHERE voucher_entries.id = credit_narrations.entry_id`,
+     WHERE voucher_entries.id = credit_narrations.entry_id
+       AND (voucher_entries.narration IS NULL OR voucher_entries.narration = '')`,
 
     // Net position scheduled export — configurable group + frequency
     `CREATE TABLE IF NOT EXISTS net_position_export_settings (
@@ -1194,7 +1204,11 @@ let migrationsDone = false;
        last_sent_at timestamp
     )`,
     // container_offloads.optional — marks optional bale lines (added Apr 2026)
-    `ALTER TABLE container_offloads ADD COLUMN IF NOT EXISTS optional BOOLEAN NOT NULL DEFAULT false`,
+    `DO $$ BEGIN
+       IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'container_offloads') THEN
+         ALTER TABLE container_offloads ADD COLUMN IF NOT EXISTS optional BOOLEAN NOT NULL DEFAULT false;
+       END IF;
+     END $$`,
     // Rename waste-dispatched bale status from REMOVED → DISPATCHED (Apr 2026)
     `UPDATE factory_bales SET status = 'DISPATCHED' WHERE status = 'REMOVED' AND waste_dispatch_id IS NOT NULL`,
     // Any remaining REMOVED bales (manual deletions, no waste dispatch) → DELETED (Apr 2026)
