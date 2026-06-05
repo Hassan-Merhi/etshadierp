@@ -75,9 +75,10 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
   const [draftStatus, setDraftStatus]           = useState<"idle" | "saved">("idle");
   const [appliedPrice, setAppliedPrice]         = useState<"sell" | "prod" | null>(null);
   const [errors, setErrors]                     = useState<Record<string, string>>({});
-  const [showZeroItems, setShowZeroItems]       = useState(false);
-  const [hideNonPositive, setHideNonPositive]   = useState(false);
-  const [showNegativeOnly, setShowNegativeOnly] = useState(false);
+  const [showZeroItems, setShowZeroItems]         = useState(false);
+  const [hideNonPositive, setHideNonPositive]     = useState(false);
+  const [showNegativeOnly, setShowNegativeOnly]   = useState(false);
+  const [showGarbageWipers, setShowGarbageWipers] = useState(false);
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const qtyRefs    = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -98,6 +99,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
       setShowZeroItems(false);
       setHideNonPositive(false);
       setShowNegativeOnly(false);
+      setShowGarbageWipers(false);
     }
   }, [open]);
 
@@ -197,6 +199,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
     setShowZeroItems(false);
     setHideNonPositive(false);
     setShowNegativeOnly(false);
+    setShowGarbageWipers(false);
   }
 
   const createMutation = useMutation({
@@ -364,6 +367,13 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
   const map = productMap();
   const n = sendToLoading ? containerNames.length : 0;
 
+  function isGarbageOrWipers(row: ArticleRow) {
+    const name = row.productName.toLowerCase();
+    return name.includes("wiper") || name.includes("garbage");
+  }
+
+  const garbageWipersCount = articleRows.filter(isGarbageOrWipers).length;
+
   const totalQty = articleRows.reduce((s, r) => {
     const v = parseInt(quantities[r.articleCode] || "0");
     return s + (isNaN(v) || v < 0 ? 0 : v);
@@ -402,6 +412,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
     if (showNegativeOnly) return articleRows.filter(r => r.freeToPromise < 0);
     let base = showZeroItems ? articleRows : articleRows.filter(r => r.stockAvailable > 0 || r.expectedToLoad > 0);
     if (hideNonPositive) base = base.filter(r => r.freeToPromise > 0);
+    if (!showGarbageWipers) base = base.filter(r => !isGarbageOrWipers(r) || (quantities[r.articleCode] && parseInt(quantities[r.articleCode]) > 0));
     return base;
   })();
 
@@ -526,6 +537,17 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
                   data-testid="button-v5-show-negative-only"
                 >
                   {showNegativeOnly ? `Negative Only (${negativeCount})` : `Negative Only (${negativeCount})`}
+                </Button>
+              )}
+
+              {garbageWipersCount > 0 && (
+                <Button
+                  size="sm"
+                  variant={showGarbageWipers ? "secondary" : "outline"}
+                  onClick={() => setShowGarbageWipers(v => !v)}
+                  data-testid="button-v5-toggle-garbage-wipers"
+                >
+                  {showGarbageWipers ? `Hide Garbage/Wipers (${garbageWipersCount})` : `Show Garbage/Wipers (${garbageWipersCount})`}
                 </Button>
               )}
 
