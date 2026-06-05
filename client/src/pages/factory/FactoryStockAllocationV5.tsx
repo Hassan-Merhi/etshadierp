@@ -522,7 +522,7 @@ export default function FactoryStockAllocationV5() {
     totalLoaded:    r.totalLoaded,
     expectedToLoad: r.expectedToLoad,
     freeToPromise:  r.freeToPromise,
-  })), [rows]);
+  })), [allRows]);
 
   /* ── Render ───────────────────────────────────────────────────────────── */
   return (

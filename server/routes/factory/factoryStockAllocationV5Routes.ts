@@ -82,7 +82,6 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       );
       const inStockMap = new Map<string, number>(
         ((inStockRaw as any).rows ?? (inStockRaw as unknown as any[]))
-          .filter((r: any) => !excludedCodes.has(r.articleCode))
           .map((r: any) => [r.articleCode, Number(r.count)]),
       );
 
@@ -102,7 +101,6 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       );
       const inLoadingMap = new Map<string, number>(
         ((inLoadingRaw as any).rows ?? (inLoadingRaw as unknown as any[]))
-          .filter((r: any) => !excludedCodes.has(r.articleCode))
           .map((r: any) => [r.articleCode, Number(r.count)]),
       );
 
@@ -151,8 +149,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
           })
           .from(customerProformaLines)
           .where(inArray(customerProformaLines.proformaId, proformaIds))
-        ).map(l => ({ ...l, quantity: Number(l.quantity) }))
-          .filter(l => !excludedCodes.has(l.articleCode));
+        ).map(l => ({ ...l, quantity: Number(l.quantity) }));
       }
 
       // 4. Active orders per proforma (ACTIVE_ORDER_STATUSES, excludes CANCELLED)
@@ -284,8 +281,6 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       const allProductsMap = new Map<string, string>();
       const weightMap = new Map<string, number>();
       ((allProductsRaw as any).rows ?? (allProductsRaw as unknown as any[])).forEach((r: any) => {
-        // Skip products in excluded (wiper/garbage) categories
-        if (excludedCodes.has(r.code) || excludedCodes.has(r.articleCode)) return;
         if (r.name && r.articleCode) {
           // Use only the canonical articleCode (COALESCE(article_code, code)) as the map key.
           // Adding the raw `code` separately would create phantom zero-stock rows for products
