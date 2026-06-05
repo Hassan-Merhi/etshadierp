@@ -2903,6 +2903,43 @@ export function registerStockRoutes(app: Express) {
     }
   });
 
+  // ── Reconcile OTW Names: POST /api/stock-items/reconcile-otw-names ──────────
+  // Re-points any po_line_items that still reference a merged/deleted stock item
+  // to the kept item, updating both stockItemId and itemName in one pass.
+  app.post("/api/stock-items/reconcile-otw-names", requireAuth, requireNonPOS, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const mergeLogs = await db.select().from(stockItemMergeLogs)
+        .where(eq(stockItemMergeLogs.companyId, companyId));
+
+      if (mergeLogs.length === 0) {
+        return res.json({ fixed: 0, mergesChecked: 0, message: "No merge history found — nothing to reconcile" });
+      }
+
+      let totalFixed = 0;
+
+      for (const log of mergeLogs) {
+        const [keptItem] = await db.select({ id: stockItems.id, name: stockItems.name })
+          .from(stockItems)
+          .where(eq(stockItems.id, log.keptItemId));
+        if (!keptItem) continue;
+
+        const updated = await db.update(poLineItems)
+          .set({ stockItemId: keptItem.id, itemName: keptItem.name })
+          .where(eq(poLineItems.stockItemId, log.mergedItemId))
+          .returning({ id: poLineItems.id });
+
+        totalFixed += updated.length;
+      }
+
+      return res.json({ fixed: totalFixed, mergesChecked: mergeLogs.length });
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  });
+
   // ── Merge Logs: GET /api/stock-items/merge-logs ──────────────────────────
   app.get("/api/stock-items/merge-logs", requireAuth, requireNonPOS, async (req: any, res: any) => {
     try {
