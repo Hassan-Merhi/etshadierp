@@ -183,18 +183,14 @@ export default function IntercompanyRequests() {
                   <StatusBadge status={req.status} />
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                  <div>
-                    <p className="text-muted-foreground text-xs">Voucher</p>
-                    <p className="font-medium">{req.fromVoucherNumber}</p>
-                  </div>
+                <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
                   <div>
                     <p className="text-muted-foreground text-xs">Date</p>
                     <p className="font-medium">{req.fromVoucherDate}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground text-xs">Amount</p>
-                    <p className="font-medium">{parseFloat(req.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                    <p className="font-medium">${Number.isInteger(parseFloat(req.amount)) ? parseFloat(req.amount).toLocaleString() : parseFloat(req.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground text-xs">IC Account (CR)</p>
@@ -257,8 +253,7 @@ export default function IntercompanyRequests() {
             <div className="space-y-4 py-2">
               <div className="text-sm space-y-1">
                 <p><span className="text-muted-foreground">From:</span> {approveDialogRequest.fromCompanyName}</p>
-                <p><span className="text-muted-foreground">Voucher:</span> {approveDialogRequest.fromVoucherNumber}</p>
-                <p><span className="text-muted-foreground">Amount:</span> {parseFloat(approveDialogRequest.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                <p><span className="text-muted-foreground">Amount:</span> ${Number.isInteger(parseFloat(approveDialogRequest.amount)) ? parseFloat(approveDialogRequest.amount).toLocaleString() : parseFloat(approveDialogRequest.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 <p><span className="text-muted-foreground">CR side:</span> {approveDialogRequest.linkDestLedgerName}</p>
               </div>
               <div className="space-y-2">
