@@ -3888,6 +3888,7 @@ let migrationsDone = false;
     )`,
     `CREATE INDEX IF NOT EXISTS factory_worker_deductions_company_idx ON factory_worker_deductions (company_id)`,
     `CREATE INDEX IF NOT EXISTS factory_worker_deductions_worker_idx ON factory_worker_deductions (worker_id)`,
+    `ALTER TABLE factory_worker_deductions ADD COLUMN IF NOT EXISTS payroll_id integer`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
