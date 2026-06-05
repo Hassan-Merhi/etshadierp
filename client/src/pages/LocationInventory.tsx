@@ -42,6 +42,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -116,8 +118,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [allStockGroupFilter, setAllStockGroupFilter] = useState<string>("");
   const [allStockSearchTerm, setAllStockSearchTerm] = useState("");
   const [allStockLocationFilter, setAllStockLocationFilter] = useState<string>("");
-  const [allStockCategoryFilter, setAllStockCategoryFilter] = useState<string>("");
-  const [itemCategoryFilter, setItemCategoryFilter] = useState<string>("");
+  const [allStockCategoryFilter, setAllStockCategoryFilter] = useState<string[]>([]);
+  const [itemCategoryFilter, setItemCategoryFilter] = useState<string[]>([]);
   const tableRef = useRef<HTMLDivElement>(null);
 
   // All Stock keyboard navigation + Stock Movement dialog
@@ -430,12 +432,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             if (String(row.stockGroupId) !== allStockGroupFilter) return false;
           }
         }
-        if (allStockCategoryFilter) {
-          if (allStockCategoryFilter === "none") {
-            if (row.categoryId !== null && row.categoryId !== undefined) return false;
-          } else {
-            if (String(row.categoryId) !== allStockCategoryFilter) return false;
-          }
+        if (allStockCategoryFilter.length > 0) {
+          const rowCatId = row.categoryId == null ? "none" : String(row.categoryId);
+          if (!allStockCategoryFilter.includes(rowCatId)) return false;
         }
         if (allStockLocationFilter) {
           const locId = parseInt(allStockLocationFilter, 10);
@@ -548,11 +547,11 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       (group.groupName ?? "").toLowerCase().includes(groupSearchTerm.toLowerCase()) ||
       (group.groupCode ?? "").toLowerCase().includes(groupSearchTerm.toLowerCase());
     if (!matchesSearch) return false;
-    if (itemCategoryFilter) {
-      const catId = itemCategoryFilter === "none" ? null : parseInt(itemCategoryFilter, 10);
-      return group.items.some((item) =>
-        catId === null ? item.categoryId == null : item.categoryId === catId
-      );
+    if (itemCategoryFilter.length > 0) {
+      return group.items.some((item) => {
+        const itemCatId = item.categoryId == null ? "none" : String(item.categoryId);
+        return itemCategoryFilter.includes(itemCatId);
+      });
     }
     return true;
   });
@@ -565,9 +564,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     if (!selectedGroup) return [];
 
     const matchesCategory = (item: InventoryItem) => {
-      if (!itemCategoryFilter) return true;
-      if (itemCategoryFilter === "none") return item.categoryId == null;
-      return item.categoryId === parseInt(itemCategoryFilter, 10);
+      if (itemCategoryFilter.length === 0) return true;
+      const itemCatId = item.categoryId == null ? "none" : String(item.categoryId);
+      return itemCategoryFilter.includes(itemCatId);
     };
 
     if (showMovement) {
@@ -2050,22 +2049,39 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 </SelectContent>
               </Select>
               {categoriesList.length > 0 && (
-                <Select
-                  value={allStockCategoryFilter || "__all__"}
-                  onValueChange={(v) => setAllStockCategoryFilter(v === "__all__" ? "" : v)}
-                >
-                  <SelectTrigger className="w-full sm:w-48" data-testid="select-all-stock-category">
-                    <SelectValue placeholder="All Categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">All Categories</SelectItem>
-                    {categoriesList.map((cat) => (
-                      <SelectItem key={cat.id} value={String(cat.id)}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full sm:w-48 justify-between font-normal" data-testid="select-all-stock-category">
+                      <span className="truncate">
+                        {allStockCategoryFilter.length === 0
+                          ? "All Categories"
+                          : allStockCategoryFilter.length === 1
+                          ? (categoriesList.find(c => String(c.id) === allStockCategoryFilter[0])?.name ?? allStockCategoryFilter[0] === "none" ? "No Category" : allStockCategoryFilter[0])
+                          : `${allStockCategoryFilter.length} Categories`}
+                      </span>
+                      <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-2" align="start">
+                    <div className="space-y-1 max-h-64 overflow-y-auto">
+                      {categoriesList.map((cat) => {
+                        const val = String(cat.id);
+                        const checked = allStockCategoryFilter.includes(val);
+                        return (
+                          <div key={cat.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover-elevate cursor-pointer" onClick={() => setAllStockCategoryFilter(prev => checked ? prev.filter(v => v !== val) : [...prev, val])}>
+                            <Checkbox checked={checked} />
+                            <span className="text-sm">{cat.name}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {allStockCategoryFilter.length > 0 && (
+                      <div className="border-t mt-2 pt-2">
+                        <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setAllStockCategoryFilter([])}>Clear</Button>
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
               )}
             </div>
 
@@ -2431,23 +2447,40 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             </div>
             {categoriesList.length > 0 && (
               <div className="mb-4">
-                <Select
-                  value={itemCategoryFilter || "__all__"}
-                  onValueChange={(v) => setItemCategoryFilter(v === "__all__" ? "" : v)}
-                >
-                  <SelectTrigger className="w-full" data-testid="select-item-category-filter">
-                    <SelectValue placeholder="All Categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">All Categories</SelectItem>
-                    {categoriesList.map((cat) => (
-                      <SelectItem key={cat.id} value={String(cat.id)}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {itemCategoryFilter && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between font-normal" data-testid="select-item-category-filter">
+                      <span className="truncate">
+                        {itemCategoryFilter.length === 0
+                          ? "All Categories"
+                          : itemCategoryFilter.length === 1
+                          ? (categoriesList.find(c => String(c.id) === itemCategoryFilter[0])?.name ?? "1 Category")
+                          : `${itemCategoryFilter.length} Categories`}
+                      </span>
+                      <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-2" align="start">
+                    <div className="space-y-1 max-h-64 overflow-y-auto">
+                      {categoriesList.map((cat) => {
+                        const val = String(cat.id);
+                        const checked = itemCategoryFilter.includes(val);
+                        return (
+                          <div key={cat.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover-elevate cursor-pointer" onClick={() => setItemCategoryFilter(prev => checked ? prev.filter(v => v !== val) : [...prev, val])}>
+                            <Checkbox checked={checked} />
+                            <span className="text-sm">{cat.name}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {itemCategoryFilter.length > 0 && (
+                      <div className="border-t mt-2 pt-2">
+                        <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setItemCategoryFilter([])}>Clear</Button>
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
+                {itemCategoryFilter.length > 0 && (
                   <p className="text-xs text-muted-foreground mt-1.5">
                     Showing groups with items in selected category only
                   </p>
@@ -2781,22 +2814,39 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             </div>
             {categoriesList.length > 0 && (
               <div className="mb-4">
-                <Select
-                  value={itemCategoryFilter || "__all__"}
-                  onValueChange={(v) => setItemCategoryFilter(v === "__all__" ? "" : v)}
-                >
-                  <SelectTrigger className="w-full" data-testid="select-item-category-items">
-                    <SelectValue placeholder="All Categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">All Categories</SelectItem>
-                    {categoriesList.map((cat) => (
-                      <SelectItem key={cat.id} value={String(cat.id)}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between font-normal" data-testid="select-item-category-items">
+                      <span className="truncate">
+                        {itemCategoryFilter.length === 0
+                          ? "All Categories"
+                          : itemCategoryFilter.length === 1
+                          ? (categoriesList.find(c => String(c.id) === itemCategoryFilter[0])?.name ?? "1 Category")
+                          : `${itemCategoryFilter.length} Categories`}
+                      </span>
+                      <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-2" align="start">
+                    <div className="space-y-1 max-h-64 overflow-y-auto">
+                      {categoriesList.map((cat) => {
+                        const val = String(cat.id);
+                        const checked = itemCategoryFilter.includes(val);
+                        return (
+                          <div key={cat.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover-elevate cursor-pointer" onClick={() => setItemCategoryFilter(prev => checked ? prev.filter(v => v !== val) : [...prev, val])}>
+                            <Checkbox checked={checked} />
+                            <span className="text-sm">{cat.name}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {itemCategoryFilter.length > 0 && (
+                      <div className="border-t mt-2 pt-2">
+                        <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setItemCategoryFilter([])}>Clear</Button>
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
               </div>
             )}
 
@@ -3162,22 +3212,39 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               )}
             </div>
             {categoriesList.length > 0 && (
-              <Select
-                value={itemCategoryFilter || "__all__"}
-                onValueChange={(v) => setItemCategoryFilter(v === "__all__" ? "" : v)}
-              >
-                <SelectTrigger className="w-full sm:w-48" data-testid="select-view-all-stock-category">
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">All Categories</SelectItem>
-                  {categoriesList.map((cat) => (
-                    <SelectItem key={cat.id} value={String(cat.id)}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full sm:w-48 justify-between font-normal" data-testid="select-view-all-stock-category">
+                    <span className="truncate">
+                      {itemCategoryFilter.length === 0
+                        ? "All Categories"
+                        : itemCategoryFilter.length === 1
+                        ? (categoriesList.find(c => String(c.id) === itemCategoryFilter[0])?.name ?? "1 Category")
+                        : `${itemCategoryFilter.length} Categories`}
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-2" align="start">
+                  <div className="space-y-1 max-h-64 overflow-y-auto">
+                    {categoriesList.map((cat) => {
+                      const val = String(cat.id);
+                      const checked = itemCategoryFilter.includes(val);
+                      return (
+                        <div key={cat.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover-elevate cursor-pointer" onClick={() => setItemCategoryFilter(prev => checked ? prev.filter(v => v !== val) : [...prev, val])}>
+                          <Checkbox checked={checked} />
+                          <span className="text-sm">{cat.name}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {itemCategoryFilter.length > 0 && (
+                    <div className="border-t mt-2 pt-2">
+                      <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setItemCategoryFilter([])}>Clear</Button>
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
             )}
           </div>
 
