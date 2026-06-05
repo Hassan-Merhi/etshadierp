@@ -2596,7 +2596,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                         ? "border-amber-400/40 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
                         : "border-emerald-400/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
                     )}>
-                      {item.stock === 0 ? "Out" : item.stock}
+                      {item.stock === 0 ? "Out" : Math.round(item.stock)}
                     </Badge>
                   </div>
                 </button>
