@@ -1102,6 +1102,12 @@ function AuthenticatedApp() {
   }
   // ── End route-level access guard ───────────────────────────────────────────
 
+  // Auto-redirect: user is on a factory URL but has switched to an ERP company.
+  // Wait for access data to load before deciding so we don't bounce mid-flight.
+  if (isFactoryRoute && !isFactoryCompany && !myAccessLoading && hasErpAccess) {
+    return <Redirect to="/" />;
+  }
+
   if (isFactoryRoute || isFactoryCompany) {
     return (
       <AppModeProvider mode="factory">
@@ -1124,14 +1130,6 @@ function AuthenticatedApp() {
                       <span className="hidden sm:inline text-xs text-orange-600/70 font-normal normal-case tracking-normal border-l border-orange-600/20 pl-2">{myAccess.companyName}</span>
                     )}
                   </div>
-                }
-                extraActions={
-                  !isFactoryCompany && hasErpAccess ? (
-                    <Button variant="outline" size="sm" onClick={() => setLocation("/")} data-testid="button-switch-erp">
-                      <Package className="h-4 w-4 sm:mr-1" />
-                      <span className="hidden sm:inline">Switch to ERP</span>
-                    </Button>
-                  ) : undefined
                 }
               />
               <OfflineBanner />
