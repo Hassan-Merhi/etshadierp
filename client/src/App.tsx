@@ -1008,7 +1008,7 @@ function AuthenticatedApp() {
     return "/factory/production-report";
   })();
 
-  if (isFactoryCompany && !isFactoryRoute && currentLocation !== "/my-settings") {
+  if (isFactoryCompany && !isFactoryRoute && currentLocation !== "/my-settings" && currentLocation !== "/intercompany-requests") {
     // Wait for myAccess before redirecting so restricted users land on their real first page.
     // If the query is still in-flight show a spinner; if it hard-failed after retries fall
     // through so the user gets the factory shell rather than a permanent blank screen.
@@ -1027,7 +1027,7 @@ function AuthenticatedApp() {
     return <Redirect to="/" />;
   }
 
-  if (!isFactoryCompany && !hasErpAccess && hasFactoryAccess && !isFactoryRoute && currentLocation !== "/my-settings") {
+  if (!isFactoryCompany && !hasErpAccess && hasFactoryAccess && !isFactoryRoute && currentLocation !== "/my-settings" && currentLocation !== "/intercompany-requests") {
     return <Redirect to={factoryDefaultPage} />;
   }
 

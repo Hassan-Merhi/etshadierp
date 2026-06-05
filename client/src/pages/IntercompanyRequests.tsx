@@ -91,7 +91,7 @@ export default function IntercompanyRequests() {
 
   const approveMutation = useMutation({
     mutationFn: async ({ id, destLedgerAccountId }: { id: number; destLedgerAccountId: number }) => {
-      return apiRequest(`/api/intercompany-requests/${id}/approve`, { method: "POST", body: JSON.stringify({ destLedgerAccountId }) });
+      return apiRequest("POST", `/api/intercompany-requests/${id}/approve`, { destLedgerAccountId });
     },
     onSuccess: (data: any) => {
       toast({ title: "Approved", description: `Mirror voucher ${data.voucherNumber} created in destination company.` });
@@ -105,7 +105,7 @@ export default function IntercompanyRequests() {
 
   const dismissMutation = useMutation({
     mutationFn: async ({ id, note }: { id: number; note: string }) => {
-      return apiRequest(`/api/intercompany-requests/${id}/dismiss`, { method: "POST", body: JSON.stringify({ note }) });
+      return apiRequest("POST", `/api/intercompany-requests/${id}/dismiss`, { note });
     },
     onSuccess: () => {
       toast({ title: "Dismissed" });
