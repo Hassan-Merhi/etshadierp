@@ -699,7 +699,6 @@ export function registerAuthRoutes(app: Express) {
     async (req, res) => {
       try {
         const users = await storage.getAllUsers();
-        const requesterIsDeveloper = req.user?.role === "Developer";
 
         // Collect user IDs that have the Developer role in any company
         const devRoles = await db
@@ -708,9 +707,9 @@ export function registerAuthRoutes(app: Express) {
           .where(eq(userCompanyRoles.role, "Developer"));
         const devUserIds = new Set(devRoles.map((r) => r.userId));
 
-        // Developer accounts are invisible to everyone except other Developers
+        // Developer accounts are never visible to anyone in user lists
         const usersWithoutPasswords = users
-          .filter((u) => requesterIsDeveloper || !devUserIds.has(u.id))
+          .filter((u) => !devUserIds.has(u.id))
           .map(({ password, ...user }) => user);
         res.json(usersWithoutPasswords);
       } catch (error: any) {

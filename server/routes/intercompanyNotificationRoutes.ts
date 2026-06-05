@@ -12,7 +12,7 @@ import {
   users,
   userCompanyRoles,
 } from "@shared/schema";
-import { eq, and, inArray, desc, sql } from "drizzle-orm";
+import { eq, and, ne, inArray, desc, sql } from "drizzle-orm";
 
 // ── Helper: fire-and-forget intercompany notification trigger ────────────────
 // Call after a voucher is successfully saved. Checks if any ledger entry in
@@ -139,7 +139,12 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       const rows = await db
         .select({ userId: userCompanyRoles.userId })
         .from(userCompanyRoles)
-        .where(eq(userCompanyRoles.companyId, companyId));
+        .where(
+          and(
+            eq(userCompanyRoles.companyId, companyId),
+            ne(userCompanyRoles.role, "Developer"),
+          )
+        );
       res.json(rows.map(r => r.userId));
     } catch (err: any) {
       res.status(500).json({ message: err.message });
