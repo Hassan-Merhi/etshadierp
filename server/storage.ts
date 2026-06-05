@@ -2018,7 +2018,7 @@ export class DbStorage implements IStorage {
         poId: schema.poLineItems.poId,
         stockItemId: schema.poLineItems.stockItemId,
         stockItemCode: schema.stockItems.code,
-        stockItemName: schema.poLineItems.itemName,
+        stockItemName: sql<string>`COALESCE(${schema.stockItems.name}, ${schema.poLineItems.itemName})`,
         itemName: schema.poLineItems.itemName,
         quantity: schema.poLineItems.quantity,
         rate: schema.poLineItems.rate,

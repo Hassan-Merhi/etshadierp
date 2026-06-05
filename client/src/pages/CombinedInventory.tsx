@@ -38,7 +38,7 @@ interface StockItem {
 }
 
 interface CombinedRow {
-  stockItemId: number;
+  stockItemId: number | null;
   stockItemName: string;
   stockGroupId: number | null;
   stockGroupName: string;
@@ -104,24 +104,36 @@ export default function CombinedInventory() {
   const loadedOtwCount = containerDetailsQueries.filter((q) => !q.isLoading && q.data).length;
 
   const combinedData = useMemo((): CombinedRow[] => {
-    const map = new Map<number, CombinedRow>();
+    // Use string keys so we can handle null stockItemId gracefully.
+    // Key strategy:
+    //   - stockItemId is set (non-null, non-zero) → "id:N"
+    //   - stockItemId is null/0 (legacy rows)     → "name:<normalised name>"
+    const map = new Map<string, CombinedRow>();
+
+    const idKey   = (id: number | null | undefined) =>
+      id != null && id !== 0 ? `id:${id}` : null;
+    const nameKey = (name: string) =>
+      `name:${(name || "").toLowerCase().trim()}`;
 
     containerDetailsQueries.forEach((q) => {
       if (!q.data) return;
       const containerData = q.data as any;
       containerData?.pos?.forEach((po: any) => {
         po.items?.forEach((item: any) => {
-          const qty = parseFloat(item.quantity || "0");
+          const qty  = parseFloat(item.quantity || "0");
           const rate = parseFloat(item.rate || "0");
-          const existing = map.get(item.stockItemId);
+          const itemName = item.stockItemName || item.itemName || "";
+          const key  = idKey(item.stockItemId) ?? nameKey(itemName);
+
+          const existing = map.get(key);
           if (existing) {
             existing.otwQty += qty;
             existing.totalQty += qty;
             existing.otwWeightedCostSum += qty * rate;
           } else {
-            map.set(item.stockItemId, {
-              stockItemId: item.stockItemId,
-              stockItemName: item.stockItemName || item.itemName || "",
+            map.set(key, {
+              stockItemId: item.stockItemId ?? null,
+              stockItemName: itemName,
               stockGroupId: item.stockGroupId ?? null,
               stockGroupName: item.stockGroupName || "",
               otwQty: qty,
@@ -138,19 +150,44 @@ export default function CombinedInventory() {
     });
 
     inventoryRows.forEach((inv) => {
-      const qty = parseFloat(inv.quantity || "0");
+      const qty   = parseFloat(inv.quantity   || "0");
       const value = parseFloat(inv.totalValue || "0");
-      const existing = map.get(inv.stockItemId);
+
+      // Try ID key first; if OTW data for this item was stored under a name
+      // key (because its stockItemId was null at the time), find it that way.
+      const primaryKey   = idKey(inv.stockItemId);
+      const fallbackKey  = nameKey(inv.stockItemName);
+      let key = primaryKey ?? fallbackKey;
+
+      if (primaryKey && !map.has(primaryKey) && map.has(fallbackKey)) {
+        // The OTW entry exists under the name key — promote it to the ID key.
+        const otwEntry = map.get(fallbackKey)!;
+        otwEntry.stockItemId = inv.stockItemId;
+        if (!otwEntry.stockGroupId && inv.stockGroupId) {
+          otwEntry.stockGroupId  = inv.stockGroupId;
+          otwEntry.stockGroupName = inv.stockGroupName;
+        }
+        map.set(primaryKey, otwEntry);
+        map.delete(fallbackKey);
+        key = primaryKey;
+      }
+
+      const existing = map.get(key);
       if (existing) {
         existing.inHandQty += qty;
-        existing.totalQty += qty;
+        existing.totalQty  += qty;
         existing.inHandValue += value;
+        // Backfill group info if the OTW entry lacked it
         if (!existing.stockGroupId && inv.stockGroupId) {
-          existing.stockGroupId = inv.stockGroupId;
+          existing.stockGroupId   = inv.stockGroupId;
           existing.stockGroupName = inv.stockGroupName;
         }
+        // Prefer the canonical name from inventory (from stockItems.name join)
+        if (!existing.stockItemName && inv.stockItemName) {
+          existing.stockItemName = inv.stockItemName;
+        }
       } else {
-        map.set(inv.stockItemId, {
+        map.set(key, {
           stockItemId: inv.stockItemId,
           stockItemName: inv.stockItemName,
           stockGroupId: inv.stockGroupId ?? null,
@@ -168,8 +205,9 @@ export default function CombinedInventory() {
 
     if (includeZero) {
       allStockItems.forEach((item) => {
-        if (!map.has(item.id)) {
-          map.set(item.id, {
+        const zeroKey = `id:${item.id}`;
+        if (!map.has(zeroKey)) {
+          map.set(zeroKey, {
             stockItemId: item.id,
             stockItemName: item.name,
             stockGroupId: item.stockGroupId ?? null,
@@ -625,7 +663,7 @@ function ItemsTable({
           </TableHeader>
           <TableBody>
             {rows.map((row) => (
-              <TableRow key={row.stockItemId} data-testid={`row-combined-${row.stockItemId}`}>
+              <TableRow key={row.stockItemId ?? row.stockItemName} data-testid={`row-combined-${row.stockItemId ?? row.stockItemName}`}>
                 <TableCell className="font-medium">
                   {row.stockItemName}
                   {row.stockGroupName && (
@@ -673,9 +711,9 @@ function ItemsTable({
       <div className="md:hidden space-y-2">
         {rows.map((row) => (
           <div
-            key={row.stockItemId}
+            key={row.stockItemId ?? row.stockItemName}
             className="bg-card border rounded-xl p-4"
-            data-testid={`row-combined-${row.stockItemId}`}
+            data-testid={`row-combined-${row.stockItemId ?? row.stockItemName}`}
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
