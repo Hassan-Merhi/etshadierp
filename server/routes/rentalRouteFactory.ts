@@ -488,6 +488,36 @@ async function postRentAccrualForCompany(
       sql`${propertyMonthlyLedger.expectedAmount}::numeric > 0`,
     ));
 
+  // Compute contract-level net outstanding (same formula as the shops-page
+  // outstanding calculation) for every contract that has unaccrued rows.
+  // A contract with advance payments covering all current/past months has a
+  // net outstanding ≤ 0 — we must NOT accrue those rows, because the AP
+  // credit would exceed the actual liability and future payments would
+  // incorrectly debit AP instead of Rent Expense.
+  const unaccruedContractIds = [...new Set(allUnaccrued.map(r => r.contractId))];
+  const contractsWithPositiveOutstanding = new Set<number>();
+  if (unaccruedContractIds.length > 0) {
+    const outstandingRows = await db.select({
+      contractId: propertyMonthlyLedger.contractId,
+      expected: sql<string>`COALESCE(SUM(
+        CASE WHEN (
+          ${propertyMonthlyLedger.year} < ${curYear}
+          OR (${propertyMonthlyLedger.year} = ${curYear} AND ${propertyMonthlyLedger.month} <= ${curMonth})
+        ) THEN ${propertyMonthlyLedger.expectedAmount}::numeric ELSE 0 END
+      ), 0)`,
+      paid: sql<string>`COALESCE(SUM(${propertyMonthlyLedger.paidAmount}::numeric), 0)`,
+    })
+      .from(propertyMonthlyLedger)
+      .where(inArray(propertyMonthlyLedger.contractId, unaccruedContractIds))
+      .groupBy(propertyMonthlyLedger.contractId);
+
+    for (const r of outstandingRows) {
+      if (Number(r.expected) - Number(r.paid) > 0.005) {
+        contractsWithPositiveOutstanding.add(r.contractId);
+      }
+    }
+  }
+
   // Separately count already-accrued due rows so the caller can report "skipped"
   const allAccruedForSkip = await db.select({ id: propertyMonthlyLedger.id })
     .from(propertyMonthlyLedger)
@@ -504,10 +534,16 @@ async function postRentAccrualForCompany(
     return false;
   };
 
-  const pendingRows = allUnaccrued.filter(isDue);
+  // Only accrue for contracts that have a genuine positive net outstanding.
+  // Contracts covered by advance payments have outstanding ≤ 0 and must be
+  // skipped — otherwise paying their current month debits AP even though
+  // no real liability was created.
+  const pendingRows = allUnaccrued.filter(r =>
+    isDue(r) && contractsWithPositiveOutstanding.has(r.contractId),
+  );
   const alreadyDone = allAccruedForSkip.length; // count only — not filtered by isDue for simplicity
 
-  console.log(`[postRentAccrual] company=${companyId} unaccrued=${allUnaccrued.length} pendingDue=${pendingRows.length} alreadyDone=${alreadyDone} curYear=${curYear} curMonth=${curMonth} curDay=${curDay}`);
+  console.log(`[postRentAccrual] company=${companyId} unaccrued=${allUnaccrued.length} pendingDue=${pendingRows.length} alreadyDone=${alreadyDone} curYear=${curYear} curMonth=${curMonth} curDay=${curDay} contractsWithPositiveOutstanding=${contractsWithPositiveOutstanding.size}`);
   if (pendingRows.length > 0) {
     console.log(`[postRentAccrual] pendingRows sample:`, JSON.stringify(pendingRows.slice(0, 3).map(r => ({ id: r.id, year: r.year, month: r.month, contractId: r.contractId, paid: r.paidAmount, expected: r.expectedAmount }))));
   }
