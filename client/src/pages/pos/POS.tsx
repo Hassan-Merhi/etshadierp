@@ -1123,6 +1123,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       // Populate rows with draft items
       const draftRows = (Array.isArray(draft.items) ? draft.items : []).map((item: any, index: number) => {
         const rate = parseFloat(item.rate);
+        const inventoryItem = inventory.find((i) => i.stockItemId === item.stockItemId);
         return {
           id: String(index + 1),
           itemName: item.stockItemName,
@@ -1132,6 +1133,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           rate: rate,
           rateUSD: rate,
           amount: parseFloat(item.amount),
+          configuredPrice: inventoryItem?.configuredPrice,
         };
       });
 
