@@ -12,6 +12,9 @@ import { Preferences } from "@capacitor/preferences";
 import { BiometricAuth, BiometryType } from "@aparajita/capacitor-biometric-auth";
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 
+// Set to true to re-enable passkey registration & login
+const PASSKEY_ENABLED = false;
+
 function passkeyStorageKey(username: string) { return `passkey_registered_${username}`; }
 function passkeySnoozeKey(username: string) { return `passkey_snoozed_${username}`; }
 function isPasskeySnoozed(username: string) {
@@ -106,7 +109,7 @@ export default function Login() {
   }, [isNative]);
 
   const [, navigate] = useLocation();
-  const passkeySupported = !isNative && typeof window !== "undefined" && !!(window as any).PublicKeyCredential;
+  const passkeySupported = PASSKEY_ENABLED && !isNative && typeof window !== "undefined" && !!(window as any).PublicKeyCredential;
 
   const finalizeLogin = () => {
     if (!pendingUserData.current) return;
