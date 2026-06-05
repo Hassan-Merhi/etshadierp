@@ -241,6 +241,8 @@ const SpOpeningStock    = lazy(() => import("@/pages/sp/SpOpeningStock"));
 const SpAliases             = lazy(() => import("@/pages/sp/SpAliases"));
 const SpMigrationRehearsal  = lazy(() => import("@/pages/sp/SpMigrationRehearsal"));
 const GcLshiMigration       = lazy(() => import("@/pages/sp/GcLshiMigration"));
+const IntercompanyLinks     = lazy(() => import("@/pages/IntercompanyLinks"));
+const IntercompanyRequests  = lazy(() => import("@/pages/IntercompanyRequests"));
 
 import { CommandPalette } from "@/components/CommandPalette";
 import { AppTopBar } from "@/components/AppTopBar";
@@ -504,6 +506,8 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
 
       {/* Admin/Developer-only system pages */}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/settings" component={Settings} />}
+      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/intercompany-links" component={IntercompanyLinks} />}
+      <Route path="/intercompany-requests" component={IntercompanyRequests} />
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/orphaned-records" component={OrphanedRecords} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/deleted-items" component={DeletedItems} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/chatbot-settings" component={ChatbotSettings} />}

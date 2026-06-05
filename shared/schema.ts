@@ -1466,6 +1466,48 @@ export const intercompanyPosConfigs = pgTable("intercompany_pos_configs", {
 
 export type IntercompanyPosConfig = typeof intercompanyPosConfigs.$inferSelect;
 
+// ── Intercompany Payment Notification & Approval ──────────────────────────────
+export const intercompanyAccountLinks = pgTable("intercompany_account_links", {
+  id: serial("id").primaryKey(),
+  label: text("label"),
+  sourceCompanyId: integer("source_company_id").notNull(),
+  sourceLedgerAccountId: integer("source_ledger_account_id").notNull(),
+  destCompanyId: integer("dest_company_id").notNull(),
+  destLedgerAccountId: integer("dest_ledger_account_id").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+export type IntercompanyAccountLink = typeof intercompanyAccountLinks.$inferSelect;
+export const insertIntercompanyAccountLinkSchema = createInsertSchema(intercompanyAccountLinks).omit({ id: true, createdAt: true });
+export type InsertIntercompanyAccountLink = z.infer<typeof insertIntercompanyAccountLinkSchema>;
+
+export const intercompanyLinkRecipients = pgTable("intercompany_link_recipients", {
+  id: serial("id").primaryKey(),
+  linkId: integer("link_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+export type IntercompanyLinkRecipient = typeof intercompanyLinkRecipients.$inferSelect;
+
+export const intercompanyPaymentRequests = pgTable("intercompany_payment_requests", {
+  id: serial("id").primaryKey(),
+  linkId: integer("link_id").notNull(),
+  fromCompanyId: integer("from_company_id").notNull(),
+  fromVoucherId: integer("from_voucher_id").notNull(),
+  fromVoucherNumber: text("from_voucher_number").notNull(),
+  fromVoucherDate: date("from_voucher_date").notNull(),
+  amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("pending"),
+  destLedgerAccountId: integer("dest_ledger_account_id"),
+  destVoucherId: integer("dest_voucher_id"),
+  approvedByUserId: varchar("approved_by_user_id"),
+  approvedAt: timestamp("approved_at"),
+  dismissNote: text("dismiss_note"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+export type IntercompanyPaymentRequest = typeof intercompanyPaymentRequests.$inferSelect;
+
 // Salary Advances - track advances given to employees
 export const salaryAdvances = pgTable("salary_advances", {
   id: serial("id").primaryKey(),

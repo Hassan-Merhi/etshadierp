@@ -3913,6 +3913,43 @@ let migrationsDone = false;
     `CREATE UNIQUE INDEX IF NOT EXISTS supplier_profit_po_overrides_uniq ON supplier_profit_po_overrides (supplier_id, stock_item_id)`,
     `ALTER TABLE supplier_profit_po_overrides ALTER COLUMN po_price DROP NOT NULL`,
     `ALTER TABLE supplier_profit_po_overrides ADD COLUMN IF NOT EXISTS avg_price decimal(20,4)`,
+    // ── Intercompany Payment Notification & Approval ─────────────────────────
+    `CREATE TABLE IF NOT EXISTS intercompany_account_links (
+      id serial PRIMARY KEY,
+      label text,
+      source_company_id integer NOT NULL,
+      source_ledger_account_id integer NOT NULL,
+      dest_company_id integer NOT NULL,
+      dest_ledger_account_id integer NOT NULL,
+      active boolean NOT NULL DEFAULT true,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE TABLE IF NOT EXISTS intercompany_link_recipients (
+      id serial PRIMARY KEY,
+      link_id integer NOT NULL REFERENCES intercompany_account_links(id) ON DELETE CASCADE,
+      user_id varchar NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS intercompany_link_recipients_uniq ON intercompany_link_recipients (link_id, user_id)`,
+    `CREATE TABLE IF NOT EXISTS intercompany_payment_requests (
+      id serial PRIMARY KEY,
+      link_id integer NOT NULL,
+      from_company_id integer NOT NULL,
+      from_voucher_id integer NOT NULL,
+      from_voucher_number text NOT NULL,
+      from_voucher_date date NOT NULL,
+      amount decimal(20,2) NOT NULL,
+      description text,
+      status text NOT NULL DEFAULT 'pending',
+      dest_ledger_account_id integer,
+      dest_voucher_id integer,
+      approved_by_user_id varchar,
+      approved_at timestamp,
+      dismiss_note text,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS intercompany_payment_requests_status_idx ON intercompany_payment_requests(status)`,
+    `CREATE INDEX IF NOT EXISTS intercompany_payment_requests_link_idx ON intercompany_payment_requests(link_id)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

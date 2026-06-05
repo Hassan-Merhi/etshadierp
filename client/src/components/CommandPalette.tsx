@@ -180,6 +180,11 @@ const adminPages: PageEntry[] = [
   { label: "Net Position Details", description: "Detailed net position breakdown (assets vs liabilities)", path: "/net-position-details", icon: PieChart },
   { label: "Import Cycle Diagnostics", description: "Diagnose import cycle issues", path: "/import-cycle-diagnostics", icon: AlertTriangle },
   { label: "Account Migration", description: "Move a ledger account with its full statement to another company", path: "/account-migration", icon: ArrowRight },
+  { label: "Intercompany Links", description: "Configure cross-company payment notification links", path: "/intercompany-links", icon: ArrowRight },
+];
+
+const intercompanyPages: PageEntry[] = [
+  { label: "Intercompany Requests", description: "Review and approve intercompany payment notifications", path: "/intercompany-requests", icon: ArrowRight },
 ];
 
 const posPages: PageEntry[] = [
@@ -356,6 +361,11 @@ export function CommandPalette({
             {adminPages.map((p) => <PaletteItem key={p.path} page={p} onSelect={navigate} />)}
           </CommandGroup>
         )}
+
+        <CommandSeparator />
+        <CommandGroup heading="Intercompany">
+          {intercompanyPages.map((p) => <PaletteItem key={p.path} page={p} onSelect={navigate} />)}
+        </CommandGroup>
 
         <CommandSeparator />
         <CommandGroup heading="AI Assistant">

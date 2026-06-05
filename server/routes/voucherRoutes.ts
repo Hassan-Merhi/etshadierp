@@ -4,6 +4,7 @@ import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { requireActionAccess } from "../lib/permissionMiddleware";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries, snapshotVoucherEntries, buildVoucherChangesForCreate, buildVoucherChangesForUpdate, buildItemLevelChanges } from "./_helpers";
+import { triggerIntercompanyNotifications } from "./intercompanyNotificationRoutes";
 import {
   inventory, stockItems, stockGroups, stockItemCodeAliases,
   stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
@@ -621,6 +622,17 @@ export function registerVoucherRoutes(app: Express) {
           changes: buildVoucherChangesForCreate(createdVoucher, _createEntriesSnap),
         });
 
+        // Fire-and-forget intercompany notification check
+        triggerIntercompanyNotifications(
+          req.session.currentCompanyId!,
+          createdVoucher.id,
+          createdVoucher.voucherNumber,
+          createdVoucher.voucherDate,
+          createdVoucher.totalAmount || "0",
+          createdVoucher.description,
+          createdEntries.map(e => e.ledgerAccountId),
+        ).catch(() => {});
+
         res.json(result);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -923,6 +935,17 @@ export function registerVoucherRoutes(app: Express) {
             changes: buildVoucherChangesForCreate(result.voucher, _prEntriesSnap),
           });
         } catch { /* non-fatal */ }
+
+        // Fire-and-forget intercompany notification check
+        triggerIntercompanyNotifications(
+          req.session.currentCompanyId!,
+          result.voucher.id,
+          result.voucher.voucherNumber,
+          result.voucher.voucherDate,
+          result.voucher.totalAmount || "0",
+          result.voucher.description,
+          result.entries.map(e => e.ledgerAccountId),
+        ).catch(() => {});
 
         res.json({ ...result, whatsapp: waResult });
       } catch (error: any) {

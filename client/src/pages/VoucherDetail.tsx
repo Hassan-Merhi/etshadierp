@@ -14,6 +14,7 @@ import {
   Building,
   Package,
   DollarSign,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,6 +71,65 @@ interface VoucherDetailData {
     debit: number;
     credit: number;
   };
+}
+
+interface ICStatus {
+  id: number;
+  status: string;
+  destCompanyName: string;
+  amount: string;
+  approvedByUsername: string | null;
+  approvedAt: string | null;
+  destVoucherId: number | null;
+  dismissNote: string | null;
+}
+
+function IntercompanyStatusPanel({ voucherId }: { voucherId: number }) {
+  const { data: statuses = [] } = useQuery<ICStatus[]>({
+    queryKey: ["/api/vouchers", voucherId, "intercompany-status"],
+    queryFn: async () => {
+      const r = await fetch(`/api/vouchers/${voucherId}/intercompany-status`, { credentials: "include" });
+      if (!r.ok) return [];
+      return r.json();
+    },
+    enabled: !!voucherId,
+  });
+
+  if (statuses.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <ArrowRight className="h-4 w-4" />
+          Intercompany Notifications
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {statuses.map(s => (
+          <div key={s.id} className="flex flex-wrap items-center gap-2 text-sm">
+            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="text-muted-foreground">{s.destCompanyName}</span>
+            {s.status === "approved" && (
+              <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-xs">Approved</Badge>
+            )}
+            {s.status === "dismissed" && (
+              <Badge className="bg-rose-500/10 text-rose-600 border-rose-500/30 text-xs">Dismissed</Badge>
+            )}
+            {s.status === "pending" && (
+              <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-xs">Pending approval</Badge>
+            )}
+            {s.approvedByUsername && (
+              <span className="text-muted-foreground text-xs">by {s.approvedByUsername}</span>
+            )}
+            {s.destVoucherId && (
+              <span className="text-xs text-muted-foreground">· Mirror voucher #{s.destVoucherId}</span>
+            )}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
 }
 
 const voucherTypeColors: Record<string, string> = {
@@ -241,6 +301,9 @@ export default function VoucherDetail() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Intercompany Notification Status */}
+            <IntercompanyStatusPanel voucherId={data.id} />
 
             {/* Items Table (for Purchase/Sales vouchers) */}
             {Array.isArray(data.items) && data.items.length > 0 && (

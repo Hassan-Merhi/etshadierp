@@ -39,6 +39,7 @@ import {
   Wrench,
   Bot,
   ShieldCheck,
+  ArrowRight,
 } from "lucide-react";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
@@ -378,8 +379,12 @@ export function AppSidebar({ user }: { user?: any }) {
           {!["Admin", "Owner", "Developer"].includes(user?.currentRole ?? user?.role ?? "") && (
             <SidebarFlatLink href="/my-settings" icon={KeyRound} label="My Settings" testId="link-my-settings" />
           )}
+          <SidebarFlatLink href="/intercompany-requests" icon={ArrowRight} label="IC Requests" testId="link-ic-requests" />
           {isItemVisible({ title: "Settings", url: "/settings", icon: Settings }) && (
             <SidebarFlatLink href="/settings" icon={Settings} label="Settings" testId="link-settings" />
+          )}
+          {isItemVisible({ title: "IC Links", url: "/intercompany-links", icon: Settings }) && (
+            <SidebarFlatLink href="/intercompany-links" icon={ArrowRight} label="IC Links" testId="link-ic-links" />
           )}
         </div>
       </SidebarContent>

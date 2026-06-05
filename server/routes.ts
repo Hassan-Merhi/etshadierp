@@ -76,6 +76,7 @@ import { registerAiValidationRoutes } from "./routes/aiValidationRoutes";
 import { registerAiAgentRoutes } from "./routes/aiAgentRoutes";
 import { registerApprovalRoutes } from "./routes/approvalRoutes";
 import { registerBusinessAlertRoutes } from "./routes/businessAlertsRoutes";
+import { registerIntercompanyNotificationRoutes } from "./routes/intercompanyNotificationRoutes";
 import {
   requireAuth,
   requireRole,
@@ -1802,6 +1803,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerAiAgentRoutes(app);
   registerApprovalRoutes(app);
   registerBusinessAlertRoutes(app);
+  registerIntercompanyNotificationRoutes(app);
 
   const httpServer = createServer(app);
 
