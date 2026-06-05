@@ -130,12 +130,46 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
     }
   });
 
+  // ── GET /api/companies/:id/member-ids ─────────────────────────────────────
+  // Returns IDs of users that have any role in the given company (Admin/Dev only)
+  app.get("/api/companies/:id/member-ids", requireAuth, requireRole("Admin", "Developer"), async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.id);
+      if (isNaN(companyId)) return res.status(400).json({ message: "Invalid company ID" });
+      const rows = await db
+        .select({ userId: userCompanyRoles.userId })
+        .from(userCompanyRoles)
+        .where(eq(userCompanyRoles.companyId, companyId));
+      res.json(rows.map(r => r.userId));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── POST /api/intercompany-links ────────────────────────────────────────────
   app.post("/api/intercompany-links", requireAuth, requireRole("Admin", "Developer"), async (req, res) => {
     try {
       const { label, sourceCompanyId, sourceLedgerAccountId, destCompanyId, destLedgerAccountId, recipientUserIds = [] } = req.body;
       if (!sourceCompanyId || !sourceLedgerAccountId || !destCompanyId || !destLedgerAccountId) {
         return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Validate recipients belong to the destination company
+      if (Array.isArray(recipientUserIds) && recipientUserIds.length > 0) {
+        const destMembers = await db
+          .select({ userId: userCompanyRoles.userId })
+          .from(userCompanyRoles)
+          .where(
+            and(
+              eq(userCompanyRoles.companyId, destCompanyId),
+              inArray(userCompanyRoles.userId, recipientUserIds),
+            ),
+          );
+        const validIds = new Set(destMembers.map(r => r.userId));
+        const invalid = (recipientUserIds as string[]).filter(uid => !validIds.has(uid));
+        if (invalid.length > 0) {
+          return res.status(400).json({ message: "Some selected recipients do not have a role in the destination company" });
+        }
       }
 
       const [link] = await db.insert(intercompanyAccountLinks).values({
@@ -182,6 +216,24 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       if (!updated) return res.status(404).json({ message: "Link not found" });
 
       if (Array.isArray(recipientUserIds)) {
+        // Validate recipients belong to the destination company
+        const effectiveDestCompanyId = destCompanyId ?? updated.destCompanyId;
+        if (recipientUserIds.length > 0) {
+          const destMembers = await db
+            .select({ userId: userCompanyRoles.userId })
+            .from(userCompanyRoles)
+            .where(
+              and(
+                eq(userCompanyRoles.companyId, effectiveDestCompanyId),
+                inArray(userCompanyRoles.userId, recipientUserIds),
+              ),
+            );
+          const validIds = new Set(destMembers.map(r => r.userId));
+          const invalid = (recipientUserIds as string[]).filter(uid => !validIds.has(uid));
+          if (invalid.length > 0) {
+            return res.status(400).json({ message: "Some selected recipients do not have a role in the destination company" });
+          }
+        }
         await db.delete(intercompanyLinkRecipients).where(eq(intercompanyLinkRecipients.linkId, linkId));
         if (recipientUserIds.length > 0) {
           await db.insert(intercompanyLinkRecipients).values(
@@ -249,13 +301,33 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
 
       const statusFilter = req.query.status as string | undefined;
 
+      // Get links this user is a recipient of, then intersect with links whose
+      // destCompanyId the user actually belongs to (defense-in-depth against stale recipients)
       const recipientLinks = await db
         .select({ linkId: intercompanyLinkRecipients.linkId })
         .from(intercompanyLinkRecipients)
         .where(eq(intercompanyLinkRecipients.userId, userId));
 
       if (recipientLinks.length === 0) return res.json([]);
-      const linkIds = recipientLinks.map(r => r.linkId);
+      const candidateLinkIds = recipientLinks.map(r => r.linkId);
+
+      // Load links and filter to those where user has a destCompany role
+      const candidateLinks = await db
+        .select({ id: intercompanyAccountLinks.id, destCompanyId: intercompanyAccountLinks.destCompanyId })
+        .from(intercompanyAccountLinks)
+        .where(inArray(intercompanyAccountLinks.id, candidateLinkIds));
+
+      const userCompanies = await db
+        .select({ companyId: userCompanyRoles.companyId })
+        .from(userCompanyRoles)
+        .where(eq(userCompanyRoles.userId, userId));
+      const userCompanySet = new Set(userCompanies.map(r => r.companyId));
+
+      const linkIds = candidateLinks
+        .filter(l => userCompanySet.has(l.destCompanyId))
+        .map(l => l.id);
+
+      if (linkIds.length === 0) return res.json([]);
 
       const requestRows = await db
         .select()

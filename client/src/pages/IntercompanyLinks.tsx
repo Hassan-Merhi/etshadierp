@@ -129,6 +129,18 @@ export default function IntercompanyLinks() {
     enabled: !!recipientsDialogLink,
   });
 
+  // Load user IDs that have a role in the dest company — constrains recipient dialog
+  const { data: destCompanyMemberIds = [] } = useQuery<string[]>({
+    queryKey: ["/api/companies", recipientsDialogLink?.destCompanyId, "member-ids"],
+    queryFn: async () => {
+      if (!recipientsDialogLink?.destCompanyId) return [];
+      const r = await fetch(`/api/companies/${recipientsDialogLink.destCompanyId}/member-ids`, { credentials: "include" });
+      if (!r.ok) return [];
+      return r.json();
+    },
+    enabled: !!recipientsDialogLink?.destCompanyId,
+  });
+
   // Seed recipientForm once the query resolves for the open dialog
   useEffect(() => {
     if (recipientsDialogLink && recipientsData.length >= 0) {
@@ -215,18 +227,19 @@ export default function IntercompanyLinks() {
   }
 
   function handleSave() {
-    const payload = {
+    const basePayload = {
       label: form.label || null,
       sourceCompanyId: parseInt(form.sourceCompanyId),
       sourceLedgerAccountId: parseInt(form.sourceLedgerAccountId),
       destCompanyId: parseInt(form.destCompanyId),
       destLedgerAccountId: parseInt(form.destLedgerAccountId),
-      recipientUserIds,
     };
     if (editingLink) {
-      updateMutation.mutate({ id: editingLink.id, payload });
+      // Do NOT include recipientUserIds on edit — recipients are managed separately
+      // via the dedicated Manage Recipients dialog to avoid accidentally wiping them
+      updateMutation.mutate({ id: editingLink.id, payload: basePayload });
     } else {
-      createMutation.mutate(payload);
+      createMutation.mutate({ ...basePayload, recipientUserIds });
     }
   }
 
@@ -466,24 +479,29 @@ export default function IntercompanyLinks() {
               Select users in <strong>{recipientsDialogLink?.destCompanyName}</strong> who should receive notifications for this link.
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {allUsers.map(u => {
-                const selected = recipientForm.includes(u.id);
-                return (
-                  <Badge
-                    key={u.id}
-                    variant={selected ? "default" : "outline"}
-                    className="cursor-pointer select-none"
-                    onClick={() => {
-                      setRecipientForm(
-                        selected ? recipientForm.filter(id => id !== u.id) : [...recipientForm, u.id]
-                      );
-                    }}
-                    data-testid={`badge-recipient-${u.id}`}
-                  >
-                    {u.username}
-                  </Badge>
-                );
-              })}
+              {allUsers
+                .filter(u => destCompanyMemberIds.includes(u.id))
+                .map(u => {
+                  const selected = recipientForm.includes(u.id);
+                  return (
+                    <Badge
+                      key={u.id}
+                      variant={selected ? "default" : "outline"}
+                      className="cursor-pointer select-none"
+                      onClick={() => {
+                        setRecipientForm(
+                          selected ? recipientForm.filter(id => id !== u.id) : [...recipientForm, u.id]
+                        );
+                      }}
+                      data-testid={`badge-recipient-${u.id}`}
+                    >
+                      {u.username}
+                    </Badge>
+                  );
+                })}
+              {destCompanyMemberIds.length === 0 && (
+                <p className="text-xs text-muted-foreground">No users found for this company.</p>
+              )}
             </div>
             <div className="text-xs text-muted-foreground">
               Current: {recipientsData.map(r => r.username || r.userId).join(", ") || "none"}
