@@ -567,7 +567,6 @@ let migrationsDone = false;
     `ALTER TABLE factory_worker_advances ADD COLUMN IF NOT EXISTS cash_account_id integer`,
     `ALTER TABLE factory_worker_advances ADD COLUMN IF NOT EXISTS fully_paid boolean NOT NULL DEFAULT false`,
     `ALTER TABLE factory_worker_advances ADD COLUMN IF NOT EXISTS repayment_type VARCHAR(30) NOT NULL DEFAULT 'salary_deduction'`,
-    `ALTER TABLE factory_advance_repayments ADD COLUMN IF NOT EXISTS payroll_id INTEGER`,
     `CREATE TABLE IF NOT EXISTS factory_advance_repayments (
       id serial PRIMARY KEY,
       company_id integer NOT NULL,
@@ -581,6 +580,7 @@ let migrationsDone = false;
     )`,
     `CREATE INDEX IF NOT EXISTS factory_advance_repayments_advance_idx ON factory_advance_repayments (advance_id)`,
     `CREATE INDEX IF NOT EXISTS factory_advance_repayments_company_idx ON factory_advance_repayments (company_id)`,
+    `ALTER TABLE factory_advance_repayments ADD COLUMN IF NOT EXISTS payroll_id INTEGER`,
     // Live spreadsheet links (shared Google Sheet / external links)
     `CREATE TABLE IF NOT EXISTS live_spreadsheets (
       id serial PRIMARY KEY,
