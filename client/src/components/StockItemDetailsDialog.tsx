@@ -122,7 +122,7 @@ export function StockItemDetailsDialog({
 
   // Fetch stock item details
   const { data: stockItem, isLoading: loadingItem } = useQuery<StockItem>({
-    queryKey: ["/api/stock-items", stockItemId],
+    queryKey: [`/api/stock-items/${stockItemId}`],
     enabled: open,
   });
 
@@ -162,13 +162,13 @@ export function StockItemDetailsDialog({
 
   // Fetch transactions
   const { data: transactions = [], isLoading: loadingTransactions } = useQuery<Transaction[]>({
-    queryKey: ["/api/stock-items", stockItemId, "transactions"],
+    queryKey: [`/api/stock-items/${stockItemId}/voucher-history`],
     enabled: open,
   });
 
   // Fetch code aliases
   const { data: codeAliases = [], isLoading: loadingAliases } = useQuery<CodeAlias[]>({
-    queryKey: ["/api/stock-items", stockItemId, "code-aliases"],
+    queryKey: [`/api/stock-items/${stockItemId}/code-aliases`],
     enabled: open,
   });
 
@@ -180,7 +180,7 @@ export function StockItemDetailsDialog({
 
   // Fetch location prices
   const { data: locationPrices = [], isLoading: loadingLocationPrices } = useQuery<any[]>({
-    queryKey: ["/api/stock-items", stockItemId, "location-prices"],
+    queryKey: [`/api/stock-items/${stockItemId}/location-prices`],
     enabled: open,
   });
 
@@ -191,7 +191,7 @@ export function StockItemDetailsDialog({
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items", stockItemId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stock-items/${stockItemId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       setIsEditingDetails(false);
@@ -220,7 +220,7 @@ export function StockItemDetailsDialog({
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items", stockItemId, "transactions"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stock-items/${stockItemId}/voucher-history`] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       setEditingTransaction(null);
       toast({
@@ -245,7 +245,7 @@ export function StockItemDetailsDialog({
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items", stockItemId, "code-aliases"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stock-items/${stockItemId}/code-aliases`] });
       setNewAliasCode("");
       setNewAliasDescription("");
       toast({
@@ -269,7 +269,7 @@ export function StockItemDetailsDialog({
       await apiRequest("DELETE", `/api/stock-item-code-aliases/${aliasId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items", stockItemId, "code-aliases"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stock-items/${stockItemId}/code-aliases`] });
       toast({
         title: "Alias Deleted",
         description: "Code alias deleted successfully",
@@ -291,7 +291,7 @@ export function StockItemDetailsDialog({
       return await apiRequest("POST", `/api/stock-items/${stockItemId}/location-prices`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items", stockItemId, "location-prices"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stock-items/${stockItemId}/location-prices`] });
       setNewLocationId("");
       setNewLocationPrice("");
       setEditingLocationPriceId(null);
@@ -316,7 +316,7 @@ export function StockItemDetailsDialog({
       await apiRequest("DELETE", `/api/stock-item-location-prices/${priceId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items", stockItemId, "location-prices"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/stock-items/${stockItemId}/location-prices`] });
       toast({
         title: "Deleted",
         description: "Location price deleted successfully",
