@@ -2607,7 +2607,12 @@ export function registerStockRoutes(app: Express) {
           }
         }
 
-        // Step 4 — soft-delete the duplicate
+        // Step 4a — re-point all PO line items from the duplicate to the kept item
+        await tx.update(poLineItems)
+          .set({ stockItemId: keptId, itemName: keptItem.name })
+          .where(eq(poLineItems.stockItemId, duplicateId));
+
+        // Step 4b — soft-delete the duplicate
         await tx.update(stockItems)
           .set({ active: false, deletedAt: new Date(), name: `[MERGED] ${duplicateItem.name}` })
           .where(eq(stockItems.id, duplicateId));
@@ -2837,6 +2842,11 @@ export function registerStockRoutes(app: Express) {
                 await tx.delete(stockItemLocationPrices).where(eq(stockItemLocationPrices.id, price.id));
               }
             }
+
+            // Re-point all PO line items from the duplicate to the kept item
+            await tx.update(poLineItems)
+              .set({ stockItemId: keptId, itemName: keptItem.name })
+              .where(eq(poLineItems.stockItemId, duplicateId));
 
             await tx.update(stockItems)
               .set({ active: false, deletedAt: new Date(), name: `[MERGED] ${duplicateItem.name}` })

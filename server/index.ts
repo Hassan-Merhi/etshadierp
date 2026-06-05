@@ -3950,6 +3950,16 @@ let migrationsDone = false;
     )`,
     `CREATE INDEX IF NOT EXISTS intercompany_payment_requests_status_idx ON intercompany_payment_requests(status)`,
     `CREATE INDEX IF NOT EXISTS intercompany_payment_requests_link_idx ON intercompany_payment_requests(link_id)`,
+    // Backfill: re-point any po_line_items still referencing a merged-away stock item
+    // to the kept item (and update item_name to the kept item's current name).
+    // Uses stock_item_merge_logs to find which duplicate IDs were merged into which kept IDs.
+    // Idempotent — once pli.stock_item_id is already keptId the WHERE never matches again.
+    `UPDATE po_line_items pli
+       SET stock_item_id = sml.kept_item_id,
+           item_name     = si.name
+       FROM stock_item_merge_logs sml
+       JOIN stock_items si ON si.id = sml.kept_item_id AND si.deleted_at IS NULL
+      WHERE pli.stock_item_id = sml.merged_item_id`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
