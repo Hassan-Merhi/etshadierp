@@ -159,6 +159,7 @@ export default function SupplierProfitCheck() {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>({ fromDate: "", toDate: "", preset: "all_time" });
   const [sourceType, setSourceType] = useState<"all" | "proforma">("all");
   const [proformaId, setProformaId] = useState<string>("");
+  const [manualPoPrices, setManualPoPrices] = useState<Record<number, string>>({});
 
   const [freight, setFreight] = useState("");
   const [duties, setDuties] = useState("");
@@ -244,6 +245,7 @@ export default function SupplierProfitCheck() {
     }
     setQtyMap(initialQty);
     setSavedProforma(null);
+    setManualPoPrices({});
   }, [rows]);
 
   const loaded = queryEnabled && !isLoading && rows.length >= 0;
@@ -262,7 +264,9 @@ export default function SupplierProfitCheck() {
   const computedRows = useMemo((): ComputedRow[] => {
     return rows.map((row) => {
       const sell = row.avgSellingPrice;
-      const poP = row.poPrice;
+      const manualVal = manualPoPrices[row.stockItemId];
+      const manualNum = manualVal !== undefined ? parseFloat(manualVal) : NaN;
+      const poP = row.poPrice ?? (!isNaN(manualNum) && manualNum > 0 ? manualNum : null);
       const landingCost = poP != null ? poP + extraCostPerBale : null;
       const costProfit = sell != null && landingCost != null ? sell - landingCost : null;
       const costProfitPct = costProfit != null && sell != null && sell > 0 ? (costProfit / sell) * 100 : null;
@@ -274,7 +278,7 @@ export default function SupplierProfitCheck() {
       const hassanProfit = row.configPrice - row.inventoryAvgCost;
       return { ...row, landingCost, costProfit, costProfitPct, computedStatus, hassanProfit };
     });
-  }, [rows, extraCostPerBale]);
+  }, [rows, extraCostPerBale, manualPoPrices]);
 
   // ─── Multi-status filter ──────────────────────────────────────────────────
   const toggleStatus = useCallback((val: string) => {
@@ -816,7 +820,24 @@ export default function SupplierProfitCheck() {
                                 )}
                               </div>
                             ) : (
-                              <span className="text-orange-500 text-xs font-medium">No PO price</span>
+                              <div className="flex items-center justify-end gap-1">
+                                <span className="text-muted-foreground text-xs">$</span>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  placeholder="—"
+                                  value={manualPoPrices[row.stockItemId] ?? ""}
+                                  onChange={(e) =>
+                                    setManualPoPrices((prev) => ({
+                                      ...prev,
+                                      [row.stockItemId]: e.target.value,
+                                    }))
+                                  }
+                                  className="h-7 w-20 text-right text-xs px-1.5 font-mono border-orange-300 dark:border-orange-700 focus-visible:ring-orange-400"
+                                  data-testid={`input-manual-po-price-${row.stockItemId}`}
+                                />
+                              </div>
                             )}
                           </TableCell>
                         )}
