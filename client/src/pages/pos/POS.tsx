@@ -1542,7 +1542,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     const filteredItems = getFilteredInventory();
 
     // Special handling for item name field with filtered items
-    if (isItemNameField && activeRow === rowIndex && filteredItems.length > 0) {
+    if (isItemNameField && filteredItems.length > 0) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
         setHighlightedIndex((prev) => Math.min(prev + 1, filteredItems.length - 1));
@@ -1556,7 +1556,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       if (e.key === "Enter") {
         e.preventDefault();
         if (filteredItems[highlightedIndex]) {
-          selectItem(filteredItems[highlightedIndex]);
+          selectItem(filteredItems[highlightedIndex], rowIndex);
         }
         return;
       }
