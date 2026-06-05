@@ -2496,6 +2496,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                     clearTimeout(clearActiveRowTimerRef.current);
                     clearActiveRowTimerRef.current = null;
                   }
+                  // Ensure activeRow is set so the highlight & Enter key work
+                  // even when the user starts typing here directly (autoFocus path).
+                  if (activeRow === null) {
+                    setActiveRow(selectedCell.row);
+                  }
                   // Clear the search text so the cashier can immediately type a
                   // new search. Fix 5: do NOT clear stockItemId here — a confirmed
                   // item should only be invalidated when the cashier actually changes
@@ -2571,7 +2576,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                   onMouseDown={(e) => { e.preventDefault(); selectItem(item); }}
                   className={`w-full text-left px-3 py-3 rounded-md hover-elevate active-elevate-2 ${
                     item.stock === 0 ? "opacity-60" : ""
-                  } ${idx === highlightedIndex && activeRow !== null ? "bg-primary/20 ring-1 ring-primary/40" : ""}`}
+                  } ${idx === highlightedIndex && searchTerm.trim() ? "bg-primary/20 ring-1 ring-primary/40" : ""}`}
                   data-testid={`item-${idx}`}
                 >
                   <div className="flex items-start justify-between gap-3">
