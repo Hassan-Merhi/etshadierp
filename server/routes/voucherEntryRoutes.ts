@@ -37,6 +37,7 @@ import {
   
   propertyPayments, propertyMonthlyLedger,
   erpPayrollRuns, erpPayrollRunItems,
+  intercompanyPaymentRequests,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
@@ -826,6 +827,17 @@ export function registerVoucherEntryRoutes(app: Express) {
             }
           }
 
+          // Clean up any pending IC notification requests for this voucher
+          // so recipients stop seeing the bell notification for a deleted payment.
+          await tx
+            .delete(intercompanyPaymentRequests)
+            .where(
+              and(
+                eq(intercompanyPaymentRequests.fromVoucherId, id),
+                eq(intercompanyPaymentRequests.status, "pending"),
+              ),
+            );
+
           // Soft delete: Keep voucher entries but set deletedAt on voucher
           // This automatically excludes entries from balance calculations
           // (calculateAccountBalance filters by isNull(vouchers.deletedAt))
@@ -1086,6 +1098,16 @@ export function registerVoucherEntryRoutes(app: Express) {
                 await tx.delete(vouchers).where(eq(vouchers.id, otherVoucherId));
               }
             }
+
+            // Clean up any pending IC notification requests for this voucher
+            await tx
+              .delete(intercompanyPaymentRequests)
+              .where(
+                and(
+                  eq(intercompanyPaymentRequests.fromVoucherId, id),
+                  eq(intercompanyPaymentRequests.status, "pending"),
+                ),
+              );
 
             // Soft delete: Set deletedAt instead of hard delete
             await tx.update(vouchers).set({ deletedAt: new Date() }).where(eq(vouchers.id, id));
