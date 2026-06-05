@@ -3972,6 +3972,32 @@ let migrationsDone = false;
                                  AND si_kept.deleted_at IS NULL
       WHERE a.description LIKE 'Merged from:%'
         AND pli.stock_item_id = si_merged.id`,
+
+    // Make the stock_items (company_id, code) unique index partial so that
+    // soft-deleted items don't block re-use of the same code in the same company.
+    // Previously the index covered ALL rows, causing a PG unique-constraint error
+    // when a user tried to create an item whose code matched a deleted record.
+    // Idempotent: drops the old full index only if it is NOT already partial,
+    // then creates the partial index if missing.
+    `DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE tablename = 'stock_items'
+      AND indexname  = 'stock_items_company_code_unique'
+      AND indexdef   NOT LIKE '%WHERE%'
+  ) THEN
+    DROP INDEX stock_items_company_code_unique;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE tablename = 'stock_items'
+      AND indexname  = 'stock_items_company_code_unique'
+  ) THEN
+    CREATE UNIQUE INDEX stock_items_company_code_unique
+      ON stock_items (company_id, code)
+      WHERE deleted_at IS NULL;
+  END IF;
+END $$`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
