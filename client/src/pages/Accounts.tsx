@@ -150,7 +150,7 @@ export default function Accounts() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
-  const { formatAmount } = useCurrencyContext();
+  const { formatAmount, isMultiCurrency } = useCurrencyContext();
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hideBalances = (myErpPages?.hiddenErpCostFields ?? []).includes("accounts_balances");
   const appMode = useAppMode();
@@ -1999,7 +1999,7 @@ export default function Accounts() {
                               return { currency: row.currency, net };
                             });
                             if (signedOb !== 0 && !rows.find((r) => r.currency === baseCurr)) rows.push({ currency: baseCurr, net: signedOb });
-                            const nonZeroRows = rows.filter((r) => Math.abs(r.net) >= 0.005);
+                            const nonZeroRows = rows.filter((r) => Math.abs(r.net) >= 0.005 && (isMultiCurrency || r.currency === "USD"));
                             if (nonZeroRows.length > 1) {
                               return (
                                 <div className="flex flex-col gap-0" data-testid="text-account-balance">
