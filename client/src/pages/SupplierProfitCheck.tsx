@@ -280,6 +280,15 @@ export default function SupplierProfitCheck() {
     }
   }, [supplierId, saveOverrideMutation]);
 
+  const handleArrowNav = useCallback((e: React.KeyboardEvent<HTMLInputElement>, dataAttr: string) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const inputs = Array.from(document.querySelectorAll<HTMLInputElement>(`[${dataAttr}]`));
+    const idx = inputs.indexOf(e.currentTarget);
+    const target = e.key === "ArrowDown" ? inputs[idx + 1] : inputs[idx - 1];
+    if (target) { target.focus(); target.select(); }
+  }, []);
+
   const handleManualAvgChange = useCallback((stockItemId: number, value: string) => {
     setManualAvgPrices(prev => ({ ...prev, [stockItemId]: value }));
     clearTimeout(debounceAvgTimers.current[stockItemId]);
@@ -867,8 +876,10 @@ export default function SupplierProfitCheck() {
                                 placeholder={row.avgSellingPrice != null ? fmt(row.avgSellingPrice) : "—"}
                                 value={manualAvgPrices[row.stockItemId] ?? ""}
                                 onChange={(e) => handleManualAvgChange(row.stockItemId, e.target.value)}
-                                className="h-7 w-20 text-right text-xs px-1.5 font-mono"
+                                onKeyDown={(e) => handleArrowNav(e, "data-avg-input")}
+                                className="h-7 w-20 text-right text-xs px-1.5 font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 data-testid={`input-manual-avg-price-${row.stockItemId}`}
+                                data-avg-input="true"
                               />
                               {manualAvgPrices[row.stockItemId] && row.avgSellingPrice != null && (
                                 <span className="text-[10px] text-muted-foreground leading-tight">auto ${fmt(row.avgSellingPrice)}</span>
@@ -888,8 +899,10 @@ export default function SupplierProfitCheck() {
                                   placeholder={row.poPrice != null ? fmt(row.poPrice) : "—"}
                                   value={manualPoPrices[row.stockItemId] ?? ""}
                                   onChange={(e) => handleManualPoChange(row.stockItemId, e.target.value)}
-                                  className="h-7 w-20 text-right text-xs px-1.5 font-mono border-amber-300 dark:border-amber-700 focus-visible:ring-amber-400"
+                                  onKeyDown={(e) => handleArrowNav(e, "data-po-input")}
+                                  className="h-7 w-20 text-right text-xs px-1.5 font-mono border-amber-300 dark:border-amber-700 focus-visible:ring-amber-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   data-testid={`input-manual-po-price-${row.stockItemId}`}
+                                  data-po-input="true"
                                 />
                               </div>
                               {manualPoPrices[row.stockItemId] && row.poPrice != null && (
