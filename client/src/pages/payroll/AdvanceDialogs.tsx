@@ -97,14 +97,14 @@ export function AdvanceDialogs({
                               {workerStaff.map((worker) => (
                                 <CommandItem
                                   key={worker.id}
-                                  value={`${worker.firstName} ${worker.lastName} ${worker.code}`}
+                                  value={`${[worker.firstName, worker.lastName].filter(Boolean).join(" ")} ${worker.code}`}
                                   onSelect={() => {
                                     field.onChange(worker.id.toString());
                                     setAdvanceWorkerComboOpen(false);
                                   }}
                                 >
                                   <Check className={cn("mr-2 h-4 w-4", field.value === worker.id.toString() ? "opacity-100" : "opacity-0")} />
-                                  {worker.firstName} {worker.lastName} ({worker.code})
+                                  {[worker.firstName, worker.lastName].filter(Boolean).join(" ")} ({worker.code})
                                 </CommandItem>
                               ))}
                             </CommandGroup>

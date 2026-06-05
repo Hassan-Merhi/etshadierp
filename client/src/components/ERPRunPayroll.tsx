@@ -569,7 +569,7 @@ export default function ERPRunPayroll() {
   // ── Worker card ────────────────────────────────────────────────────────────
   function renderWorkerCard(worker: Employee) {
     if (!filtered.has(worker.id)) return null;
-    const fullName = `${worker.firstName} ${worker.lastName}`.trim();
+    const fullName = [worker.firstName, worker.lastName].filter(Boolean).join(" ");
     const isSelected = selectedWorkers.has(worker.id);
     const advanceBalance = advanceBalanceByEmployee[worker.id] || 0;
     const salary = parseFloat(worker.monthlySalary || "0");
@@ -596,7 +596,6 @@ export default function ERPRunPayroll() {
             </div>
             <div className="mt-3 pt-3 border-t space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground font-mono">{worker.code || "—"}</span>
                 <span className="text-xs font-medium">{formatAmount(salary)}</span>
               </div>
               {advanceBalance > 0 && (
