@@ -1235,6 +1235,8 @@ function AuthenticatedApp() {
                     <Route path="/factory/conflicts" component={ConflictCenter} />
                     {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/settings" component={Settings} />}
                     <Route path="/my-settings" component={MySettings} />
+                    <Route path="/intercompany-requests" component={IntercompanyRequests} />
+                    <Route path="/intercompany-links" component={IntercompanyLinks} />
                     {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/deleted-items" component={DeletedItems} />}
                     {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/orphaned-records" component={OrphanedRecords} />}
                     {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/chatbot-settings" component={ChatbotSettings} />}
