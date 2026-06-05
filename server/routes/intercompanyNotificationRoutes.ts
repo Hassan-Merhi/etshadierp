@@ -10,6 +10,7 @@ import {
   companies,
   ledgerAccounts,
   users,
+  userCompanyRoles,
 } from "@shared/schema";
 import { eq, and, inArray, desc, sql } from "drizzle-orm";
 
@@ -25,8 +26,13 @@ export async function triggerIntercompanyNotifications(
   amount: string,
   description: string | null,
   entryLedgerAccountIds: (number | null)[],
+  voucherType?: string,
 ) {
   try {
+    // Only trigger for Payment and Receipt vouchers — other types (Journal, Sales, etc.)
+    // touch intercompany ledgers in ways that don't represent a cross-company payment
+    if (voucherType && voucherType !== "Payment" && voucherType !== "Receipt") return;
+
     const ledgerIds = entryLedgerAccountIds.filter((id): id is number => id !== null && id !== undefined);
     if (ledgerIds.length === 0) return;
 
@@ -299,6 +305,25 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       const voucherId = parseInt(req.params.id);
       if (isNaN(voucherId)) return res.json([]);
 
+      // Verify the voucher belongs to a company the requester has access to
+      const [voucherRow] = await db
+        .select({ companyId: vouchers.companyId })
+        .from(vouchers)
+        .where(eq(vouchers.id, voucherId));
+      if (!voucherRow) return res.json([]);
+
+      const userId = req.session.userId!;
+      const [hasAccess] = await db
+        .select({ id: userCompanyRoles.id })
+        .from(userCompanyRoles)
+        .where(
+          and(
+            eq(userCompanyRoles.userId, userId),
+            eq(userCompanyRoles.companyId, voucherRow.companyId),
+          ),
+        );
+      if (!hasAccess) return res.status(403).json({ message: "Access denied" });
+
       const requests = await db
         .select()
         .from(intercompanyPaymentRequests)
@@ -365,6 +390,20 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
         .from(intercompanyAccountLinks)
         .where(eq(intercompanyAccountLinks.id, request.linkId));
       if (!link) return res.status(404).json({ message: "Link not found" });
+
+      // Verify the approver has a role in the destination company
+      const [destMembership] = await db
+        .select({ id: userCompanyRoles.id })
+        .from(userCompanyRoles)
+        .where(
+          and(
+            eq(userCompanyRoles.userId, userId),
+            eq(userCompanyRoles.companyId, link.destCompanyId),
+          ),
+        );
+      if (!destMembership) {
+        return res.status(403).json({ message: "You do not have a role in the destination company" });
+      }
 
       // ── Validate that the chosen debit account belongs to the destination company ──
       const [chosenAccount] = await db
@@ -481,6 +520,26 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
           ),
         );
       if (!recipient) return res.status(403).json({ message: "You are not authorised to dismiss this request" });
+
+      // Verify the dismisser has a role in the destination company
+      const [dimLink] = await db
+        .select({ destCompanyId: intercompanyAccountLinks.destCompanyId })
+        .from(intercompanyAccountLinks)
+        .where(eq(intercompanyAccountLinks.id, request.linkId));
+      if (dimLink) {
+        const [dimMembership] = await db
+          .select({ id: userCompanyRoles.id })
+          .from(userCompanyRoles)
+          .where(
+            and(
+              eq(userCompanyRoles.userId, userId),
+              eq(userCompanyRoles.companyId, dimLink.destCompanyId),
+            ),
+          );
+        if (!dimMembership) {
+          return res.status(403).json({ message: "You do not have a role in the destination company" });
+        }
+      }
 
       // Atomic conditional claim — same pattern as approve to prevent TOCTOU race
       const claimed = await db.update(intercompanyPaymentRequests)

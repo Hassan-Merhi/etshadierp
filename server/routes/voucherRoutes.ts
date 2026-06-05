@@ -622,7 +622,7 @@ export function registerVoucherRoutes(app: Express) {
           changes: buildVoucherChangesForCreate(createdVoucher, _createEntriesSnap),
         });
 
-        // Fire-and-forget intercompany notification check
+        // Fire-and-forget intercompany notification check (Payment/Receipt only)
         triggerIntercompanyNotifications(
           req.session.currentCompanyId!,
           createdVoucher.id,
@@ -631,6 +631,7 @@ export function registerVoucherRoutes(app: Express) {
           createdVoucher.totalAmount || "0",
           createdVoucher.description,
           createdEntries.map(e => e.ledgerAccountId),
+          createdVoucher.voucherType,
         ).catch(() => {});
 
         res.json(result);
@@ -936,7 +937,7 @@ export function registerVoucherRoutes(app: Express) {
           });
         } catch { /* non-fatal */ }
 
-        // Fire-and-forget intercompany notification check
+        // Fire-and-forget intercompany notification check (Payment/Receipt only)
         triggerIntercompanyNotifications(
           req.session.currentCompanyId!,
           result.voucher.id,
@@ -945,6 +946,7 @@ export function registerVoucherRoutes(app: Express) {
           result.voucher.totalAmount || "0",
           result.voucher.description,
           result.entries.map(e => e.ledgerAccountId),
+          result.voucher.voucherType,
         ).catch(() => {});
 
         res.json({ ...result, whatsapp: waResult });
