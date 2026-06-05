@@ -4119,6 +4119,7 @@ END $mig$`;
             /terminating connection|connection.*reset|could not connect|connection closed|socket.*hang/i.test(errMsg);
 
           if (isConnDrop) {
+            // Reconnect and retry once — if retry also fails, record as a failure
             console.error(`[Migration] Connection dropped — reconnecting... (${errMsg.split("\n")[0]})`);
             try {
               await migrationClient.end().catch(() => {});
@@ -4129,26 +4130,28 @@ END $mig$`;
               await migrationClient.connect();
               await migrationClient.query(`SET lock_timeout = '3s'`);
               await migrationClient.query(`SET statement_timeout = '60s'`);
-              // Retry the same migration after reconnecting
               await migrationClient.query(safeMigration(migration));
               console.log(`[Migration] Reconnected and retried successfully`);
             } catch (retryErr: any) {
               const retryMsg: string = retryErr.message ?? String(retryErr);
-              console.error(`[Migration] Reconnect+retry failed: ${retryMsg.split("\n")[0]}`);
               failedMigrations.push({
                 sql: migration.trim().substring(0, 120),
                 error: retryMsg.split("\n")[0],
               });
             }
           } else {
-            // Expected non-fatal skip: lock timeout race, already-applied migration, etc.
-            console.warn(`[Migration] Skipped: ${errMsg.split("\n")[0]}`);
+            // All other errors (lock timeout, syntax error, constraint, etc.) are
+            // recorded as failures so the ops team has full visibility at ERROR level.
+            failedMigrations.push({
+              sql: migration.trim().substring(0, 120),
+              error: errMsg.split("\n")[0],
+            });
           }
         }
       }
 
       if (failedMigrations.length > 0) {
-        console.error(`✗ ${failedMigrations.length} migration(s) FAILED at startup:`);
+        console.error(`✗ ${failedMigrations.length} migration(s) failed at startup:`);
         for (const { sql, error } of failedMigrations) {
           console.error(`  SQL: ${sql}`);
           console.error(`  ERR: ${error}`);
@@ -4180,7 +4183,7 @@ END $mig$`;
           );
         }
       } catch (tableCheckErr: any) {
-        console.warn(`[Migration] Could not verify IC table existence: ${tableCheckErr.message}`);
+        console.error(`[Migration] ✗ Could not verify IC table existence: ${tableCheckErr.message}`);
       }
 
       // Backfill POS_EXPENSE daybook entries for any factory POS sales
