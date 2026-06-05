@@ -206,19 +206,33 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
 
       const { label, sourceCompanyId, sourceLedgerAccountId, destCompanyId, destLedgerAccountId, active, recipientUserIds } = req.body;
 
-      const [updated] = await db.update(intercompanyAccountLinks)
-        .set({
-          ...(label !== undefined ? { label } : {}),
-          ...(sourceCompanyId !== undefined ? { sourceCompanyId } : {}),
-          ...(sourceLedgerAccountId !== undefined ? { sourceLedgerAccountId } : {}),
-          ...(destCompanyId !== undefined ? { destCompanyId } : {}),
-          ...(destLedgerAccountId !== undefined ? { destLedgerAccountId } : {}),
-          ...(active !== undefined ? { active } : {}),
-        })
-        .where(eq(intercompanyAccountLinks.id, linkId))
-        .returning();
+      const linkFields = {
+        ...(label !== undefined ? { label } : {}),
+        ...(sourceCompanyId !== undefined ? { sourceCompanyId } : {}),
+        ...(sourceLedgerAccountId !== undefined ? { sourceLedgerAccountId } : {}),
+        ...(destCompanyId !== undefined ? { destCompanyId } : {}),
+        ...(destLedgerAccountId !== undefined ? { destLedgerAccountId } : {}),
+        ...(active !== undefined ? { active } : {}),
+      };
 
-      if (!updated) return res.status(404).json({ message: "Link not found" });
+      let updated: typeof intercompanyAccountLinks.$inferSelect | undefined;
+      if (Object.keys(linkFields).length > 0) {
+        const [row] = await db.update(intercompanyAccountLinks)
+          .set(linkFields)
+          .where(eq(intercompanyAccountLinks.id, linkId))
+          .returning();
+        updated = row;
+        if (!updated) return res.status(404).json({ message: "Link not found" });
+      } else {
+        // Only recipients are being updated — fetch the link for validation below
+        const [row] = await db
+          .select()
+          .from(intercompanyAccountLinks)
+          .where(eq(intercompanyAccountLinks.id, linkId))
+          .limit(1);
+        updated = row;
+        if (!updated) return res.status(404).json({ message: "Link not found" });
+      }
 
       if (Array.isArray(recipientUserIds)) {
         // Validate recipients belong to the destination company
