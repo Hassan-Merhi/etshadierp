@@ -176,7 +176,7 @@ export default function IntercompanyLinks() {
 
   // Mutations
   const createMutation = useMutation({
-    mutationFn: (payload: any) => apiRequest("/api/intercompany-links", { method: "POST", body: JSON.stringify(payload) }),
+    mutationFn: (payload: any) => apiRequest("POST", "/api/intercompany-links", payload),
     onSuccess: () => {
       toast({ title: "Link created" });
       queryClient.invalidateQueries({ queryKey: ["/api/intercompany-links"] });
@@ -187,7 +187,7 @@ export default function IntercompanyLinks() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: any }) =>
-      apiRequest(`/api/intercompany-links/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+      apiRequest("PUT", `/api/intercompany-links/${id}`, payload),
     onSuccess: () => {
       toast({ title: "Link updated" });
       queryClient.invalidateQueries({ queryKey: ["/api/intercompany-links"] });
@@ -197,7 +197,7 @@ export default function IntercompanyLinks() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest(`/api/intercompany-links/${id}`, { method: "DELETE" }),
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/intercompany-links/${id}`),
     onSuccess: () => {
       toast({ title: "Link deleted" });
       queryClient.invalidateQueries({ queryKey: ["/api/intercompany-links"] });
@@ -207,14 +207,14 @@ export default function IntercompanyLinks() {
 
   const toggleActiveMutation = useMutation({
     mutationFn: ({ id, active }: { id: number; active: boolean }) =>
-      apiRequest(`/api/intercompany-links/${id}`, { method: "PUT", body: JSON.stringify({ active }) }),
+      apiRequest("PUT", `/api/intercompany-links/${id}`, { active }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/intercompany-links"] }),
     onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const saveRecipientsMutation = useMutation({
     mutationFn: ({ id, userIds }: { id: number; userIds: string[] }) =>
-      apiRequest(`/api/intercompany-links/${id}`, { method: "PUT", body: JSON.stringify({ recipientUserIds: userIds }) }),
+      apiRequest("PUT", `/api/intercompany-links/${id}`, { recipientUserIds: userIds }),
     onSuccess: () => {
       toast({ title: "Recipients saved" });
       queryClient.invalidateQueries({ queryKey: ["/api/intercompany-links"] });
