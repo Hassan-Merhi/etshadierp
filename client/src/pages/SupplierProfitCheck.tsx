@@ -160,7 +160,9 @@ export default function SupplierProfitCheck() {
   const [sourceType, setSourceType] = useState<"all" | "proforma">("all");
   const [proformaId, setProformaId] = useState<string>("");
   const [manualPoPrices, setManualPoPrices] = useState<Record<number, string>>({});
+  const [manualAvgPrices, setManualAvgPrices] = useState<Record<number, string>>({});
   const debounceTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  const debounceAvgTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
   const [freight, setFreight] = useState("");
   const [duties, setDuties] = useState("");
@@ -250,13 +252,18 @@ export default function SupplierProfitCheck() {
   });
 
   useEffect(() => {
-    const init: Record<number, string> = {};
-    for (const o of (overridesData ?? [])) init[o.stockItemId] = String(o.poPrice);
-    setManualPoPrices(init);
+    const initPo: Record<number, string> = {};
+    const initAvg: Record<number, string> = {};
+    for (const o of (overridesData ?? [])) {
+      if (o.poPrice != null) initPo[o.stockItemId] = String(o.poPrice);
+      if (o.avgPrice != null) initAvg[o.stockItemId] = String(o.avgPrice);
+    }
+    setManualPoPrices(initPo);
+    setManualAvgPrices(initAvg);
   }, [overridesData]);
 
   const saveOverrideMutation = useMutation({
-    mutationFn: async (payload: { supplierId: number; stockItemId: number; poPrice: number }) => {
+    mutationFn: async (payload: { supplierId: number; stockItemId: number; poPrice?: number; avgPrice?: number }) => {
       const res = await apiRequest("PUT", "/api/supplier-profit-check/po-overrides", payload);
       return res.json();
     },
@@ -269,6 +276,17 @@ export default function SupplierProfitCheck() {
     if (!isNaN(num) && num > 0 && supplierId) {
       debounceTimers.current[stockItemId] = setTimeout(() => {
         saveOverrideMutation.mutate({ supplierId: Number(supplierId), stockItemId, poPrice: num });
+      }, 800);
+    }
+  }, [supplierId, saveOverrideMutation]);
+
+  const handleManualAvgChange = useCallback((stockItemId: number, value: string) => {
+    setManualAvgPrices(prev => ({ ...prev, [stockItemId]: value }));
+    clearTimeout(debounceAvgTimers.current[stockItemId]);
+    const num = parseFloat(value);
+    if (!isNaN(num) && num > 0 && supplierId) {
+      debounceAvgTimers.current[stockItemId] = setTimeout(() => {
+        saveOverrideMutation.mutate({ supplierId: Number(supplierId), stockItemId, avgPrice: num });
       }, 800);
     }
   }, [supplierId, saveOverrideMutation]);
@@ -297,10 +315,10 @@ export default function SupplierProfitCheck() {
   // ─── Computed rows ────────────────────────────────────────────────────────
   const computedRows = useMemo((): ComputedRow[] => {
     return rows.map((row) => {
-      const sell = row.avgSellingPrice;
-      const manualVal = manualPoPrices[row.stockItemId];
-      const manualNum = manualVal !== undefined ? parseFloat(manualVal) : NaN;
-      const poP = row.poPrice ?? (!isNaN(manualNum) && manualNum > 0 ? manualNum : null);
+      const manualPoNum = parseFloat(manualPoPrices[row.stockItemId] ?? "");
+      const poP = (!isNaN(manualPoNum) && manualPoNum > 0) ? manualPoNum : row.poPrice;
+      const manualAvgNum = parseFloat(manualAvgPrices[row.stockItemId] ?? "");
+      const sell = (!isNaN(manualAvgNum) && manualAvgNum > 0) ? manualAvgNum : row.avgSellingPrice;
       const landingCost = poP != null ? poP + extraCostPerBale : null;
       const costProfit = sell != null && landingCost != null ? sell - landingCost : null;
       const costProfitPct = costProfit != null && sell != null && sell > 0 ? (costProfit / sell) * 100 : null;
@@ -312,7 +330,7 @@ export default function SupplierProfitCheck() {
       const hassanProfit = row.configPrice - row.inventoryAvgCost;
       return { ...row, landingCost, costProfit, costProfitPct, computedStatus, hassanProfit };
     });
-  }, [rows, extraCostPerBale, manualPoPrices]);
+  }, [rows, extraCostPerBale, manualPoPrices, manualAvgPrices]);
 
   // ─── Multi-status filter ──────────────────────────────────────────────────
   const toggleStatus = useCallback((val: string) => {
@@ -841,33 +859,46 @@ export default function SupplierProfitCheck() {
                         )}
                         {colVisibility.avgSell && (
                           <TableCell className="text-right text-sm font-medium py-2.5">
-                            {row.avgSellingPrice != null ? `$${fmt(row.avgSellingPrice)}` : <span className="text-muted-foreground text-xs">—</span>}
+                            <div className="flex flex-col items-end gap-0.5">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder={row.avgSellingPrice != null ? fmt(row.avgSellingPrice) : "—"}
+                                value={manualAvgPrices[row.stockItemId] ?? ""}
+                                onChange={(e) => handleManualAvgChange(row.stockItemId, e.target.value)}
+                                className="h-7 w-20 text-right text-xs px-1.5 font-mono"
+                                data-testid={`input-manual-avg-price-${row.stockItemId}`}
+                              />
+                              {manualAvgPrices[row.stockItemId] && row.avgSellingPrice != null && (
+                                <span className="text-[10px] text-muted-foreground leading-tight">auto ${fmt(row.avgSellingPrice)}</span>
+                              )}
+                            </div>
                           </TableCell>
                         )}
                         {colVisibility.dubaiPrice && (
                           <TableCell className="text-right text-sm py-2.5 bg-amber-500/5">
-                            {row.poPrice != null ? (
-                              <div>
-                                <span className="font-mono font-medium">${fmt(row.poPrice)}</span>
-                                {row.poPriceSource === "any_po_fallback" && (
-                                  <div className="text-[10px] text-amber-500/80 leading-tight">any supplier</div>
-                                )}
-                              </div>
-                            ) : (
+                            <div className="flex flex-col items-end gap-0.5">
                               <div className="flex items-center justify-end gap-1">
                                 <span className="text-muted-foreground text-xs">$</span>
                                 <Input
                                   type="number"
                                   min="0"
                                   step="0.01"
-                                  placeholder="—"
+                                  placeholder={row.poPrice != null ? fmt(row.poPrice) : "—"}
                                   value={manualPoPrices[row.stockItemId] ?? ""}
                                   onChange={(e) => handleManualPoChange(row.stockItemId, e.target.value)}
-                                  className="h-7 w-20 text-right text-xs px-1.5 font-mono border-orange-300 dark:border-orange-700 focus-visible:ring-orange-400"
+                                  className="h-7 w-20 text-right text-xs px-1.5 font-mono border-amber-300 dark:border-amber-700 focus-visible:ring-amber-400"
                                   data-testid={`input-manual-po-price-${row.stockItemId}`}
                                 />
                               </div>
-                            )}
+                              {manualPoPrices[row.stockItemId] && row.poPrice != null && (
+                                <span className="text-[10px] text-muted-foreground leading-tight">auto ${fmt(row.poPrice)}</span>
+                              )}
+                              {!manualPoPrices[row.stockItemId] && row.poPriceSource === "any_po_fallback" && (
+                                <span className="text-[10px] text-amber-500/80 leading-tight">any supplier</span>
+                              )}
+                            </div>
                           </TableCell>
                         )}
                         {colVisibility.extraPerBale && (

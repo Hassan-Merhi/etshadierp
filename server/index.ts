@@ -3911,6 +3911,8 @@ let migrationsDone = false;
       updated_at timestamp NOT NULL DEFAULT now()
     )`,
     `CREATE UNIQUE INDEX IF NOT EXISTS supplier_profit_po_overrides_uniq ON supplier_profit_po_overrides (supplier_id, stock_item_id)`,
+    `ALTER TABLE supplier_profit_po_overrides ALTER COLUMN po_price DROP NOT NULL`,
+    `ALTER TABLE supplier_profit_po_overrides ADD COLUMN IF NOT EXISTS avg_price decimal(20,4)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
