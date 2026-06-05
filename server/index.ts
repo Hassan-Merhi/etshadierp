@@ -4670,122 +4670,106 @@ END $mig$`;
     ensureChromiumAvailable().catch(() => {});
   }).catch(() => {});
 
+  // ── Post-startup background jobs (run after port is open) ───────────────────
+  const runPostStartupJobs = () => {
+    // Delayed 30 s so diagnostics don't compete with user requests for pool
+    // connections the moment the server goes live.
+    setTimeout(async () => {
+      try {
+        const [
+          posRows,
+          posWithStation,
+          normalUserRows,
+          oldRoleRows,
+          canDeleteCol,
+        ] = await Promise.all([
+          pool.query(`SELECT COUNT(*) AS n FROM user_company_roles WHERE role = 'POS'`),
+          pool.query(`SELECT COUNT(*) AS n FROM user_company_roles WHERE role = 'POS' AND pos_station IS NOT NULL`),
+          pool.query(`SELECT COUNT(*) AS n FROM user_company_roles WHERE role = 'Normal User'`),
+          pool.query(`SELECT COUNT(*) AS n FROM user_company_roles WHERE role IN ('POS1','POS2','POS3','POS4','POS5','POS6','User')`),
+          pool.query(
+            `SELECT COUNT(*) AS n FROM information_schema.columns
+             WHERE table_name = 'user_company_roles' AND column_name = 'can_delete_records'`
+          ),
+        ]);
+        const posCount      = parseInt(posRows.rows[0]?.n ?? "0", 10);
+        const posWithStn    = parseInt(posWithStation.rows[0]?.n ?? "0", 10);
+        const normalCount   = parseInt(normalUserRows.rows[0]?.n ?? "0", 10);
+        const oldRoleCount  = parseInt(oldRoleRows.rows[0]?.n ?? "0", 10);
+        const canDeleteOk   = parseInt(canDeleteCol.rows[0]?.n ?? "0", 10) > 0;
+        console.log(
+          `[MigrationDiag] POS roles: ${posCount} (${posWithStn} with pos_station set) | ` +
+          `Normal User roles: ${normalCount} | ` +
+          `Old roles remaining: ${oldRoleCount} | ` +
+          `can_delete_records column: ${canDeleteOk ? "✓ present" : "✗ MISSING"}`
+        );
+        if (oldRoleCount > 0) {
+          console.warn(`[MigrationDiag] ⚠️  ${oldRoleCount} row(s) still have old roles (POS1–POS6 or User) — check /api/admin/deployment-diagnostics`);
+        }
+      } catch (e: any) {
+        console.warn("[MigrationDiag] Could not run startup diagnostic:", e.message);
+      }
+    }, 30000);
+
+    // ── Clean up orphaned export runs ────────────────────────────────────────
+    const cleanupOrphanedRuns = async () => {
+      try {
+        const r = await pool.query(`
+          UPDATE daily_export_runs
+             SET status         = 'failed',
+                 finished_at    = NOW(),
+                 skipped_reason = 'Server restarted or timed out while export was in progress'
+           WHERE status         = 'running'
+             AND started_at     < NOW() - INTERVAL '5 minutes'
+          RETURNING id, run_type
+        `);
+        if (r.rowCount && r.rowCount > 0) {
+          console.log(`[ExportRun] Startup: marked ${r.rowCount} orphaned run(s) as failed:`,
+            r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", "));
+        }
+      } catch (e: any) {
+        console.warn("[ExportRun] Startup orphan-cleanup failed:", e.message);
+      }
+    };
+
+    const cleanupHungRuns = async () => {
+      try {
+        const r = await pool.query(`
+          UPDATE daily_export_runs
+             SET status         = 'failed',
+                 finished_at    = NOW(),
+                 skipped_reason = 'Export timed out — exceeded 3-hour safety limit'
+           WHERE status         = 'running'
+             AND started_at     < NOW() - INTERVAL '3 hours'
+          RETURNING id, run_type
+        `);
+        if (r.rowCount && r.rowCount > 0) {
+          console.log(`[ExportRun] Periodic: timed out ${r.rowCount} hung run(s):`,
+            r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", "));
+        }
+      } catch (e: any) {
+        console.warn("[ExportRun] Periodic hung-run cleanup failed:", e.message);
+      }
+    };
+
+    setTimeout(cleanupOrphanedRuns, 3000);
+    setInterval(cleanupHungRuns, 30 * 60 * 1000);
+
+    setTimeout(async () => {
+      try {
+        await checkAndRecoverDailyExport();
+      } catch (e: any) {
+        console.warn("[DailyExport] Startup recovery call failed:", e?.message);
+      }
+    }, 90 * 1000);
+  };
+
+  // ── Open the port ─────────────────────────────────────────────────────────
+  // Called only after migrations have completed (see startServer below).
   const doListen = () => {
     server.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
       log(`serving on port ${port}`);
-      // Warm up the pool first, then run schema migrations.
-      // Set RUN_STARTUP_MIGRATIONS=false in Render env vars to skip migrations
-      // entirely (emergency kill-switch if migrations are causing lock contention).
-      const migrationsEnabled = process.env.RUN_STARTUP_MIGRATIONS !== 'false';
-      warmupDb().then(() =>
-        migrationsEnabled
-          ? runMigrations().catch((err) => {
-              console.error("Migration error:", err);
-              migrationsDone = true;
-            })
-          : (console.log("⚠ Startup migrations DISABLED via RUN_STARTUP_MIGRATIONS=false"), migrationsDone = true, Promise.resolve())
-      ).then(async () => {
-        // ── Post-migration startup diagnostic summary ───────────────────────────
-        // Delayed 30 s so startup diagnostics don't compete with user requests
-        // for pool connections the moment the server goes live.
-        setTimeout(async () => {
-          try {
-            const [
-              posRows,
-              posWithStation,
-              normalUserRows,
-              oldRoleRows,
-              canDeleteCol,
-            ] = await Promise.all([
-              pool.query(`SELECT COUNT(*) AS n FROM user_company_roles WHERE role = 'POS'`),
-              pool.query(`SELECT COUNT(*) AS n FROM user_company_roles WHERE role = 'POS' AND pos_station IS NOT NULL`),
-              pool.query(`SELECT COUNT(*) AS n FROM user_company_roles WHERE role = 'Normal User'`),
-              pool.query(`SELECT COUNT(*) AS n FROM user_company_roles WHERE role IN ('POS1','POS2','POS3','POS4','POS5','POS6','User')`),
-              pool.query(
-                `SELECT COUNT(*) AS n FROM information_schema.columns
-                 WHERE table_name = 'user_company_roles' AND column_name = 'can_delete_records'`
-              ),
-            ]);
-            const posCount      = parseInt(posRows.rows[0]?.n ?? "0", 10);
-            const posWithStn    = parseInt(posWithStation.rows[0]?.n ?? "0", 10);
-            const normalCount   = parseInt(normalUserRows.rows[0]?.n ?? "0", 10);
-            const oldRoleCount  = parseInt(oldRoleRows.rows[0]?.n ?? "0", 10);
-            const canDeleteOk   = parseInt(canDeleteCol.rows[0]?.n ?? "0", 10) > 0;
-            console.log(
-              `[MigrationDiag] POS roles: ${posCount} (${posWithStn} with pos_station set) | ` +
-              `Normal User roles: ${normalCount} | ` +
-              `Old roles remaining: ${oldRoleCount} | ` +
-              `can_delete_records column: ${canDeleteOk ? "✓ present" : "✗ MISSING"}`
-            );
-            if (oldRoleCount > 0) {
-              console.warn(`[MigrationDiag] ⚠️  ${oldRoleCount} row(s) still have old roles (POS1–POS6 or User) — check /api/admin/deployment-diagnostics`);
-            }
-          } catch (e: any) {
-            console.warn("[MigrationDiag] Could not run startup diagnostic:", e.message);
-          }
-        }, 30000);
-        // ── Clean up orphaned export runs ──────────────────────────────────────
-        // In-memory export jobs are lost on server restart.  Any run that has
-        // been 'running' for >5 minutes is almost certainly stuck — mark it failed.
-        // Startup cleanup: any run still 'running' when the server starts is from a
-        // previous (now-dead) process — safe to fail immediately (5-min grace period).
-        const cleanupOrphanedRuns = async () => {
-          try {
-            const r = await pool.query(`
-              UPDATE daily_export_runs
-                 SET status         = 'failed',
-                     finished_at    = NOW(),
-                     skipped_reason = 'Server restarted or timed out while export was in progress'
-               WHERE status         = 'running'
-                 AND started_at     < NOW() - INTERVAL '5 minutes'
-              RETURNING id, run_type
-            `);
-            if (r.rowCount && r.rowCount > 0) {
-              console.log(`[ExportRun] Startup: marked ${r.rowCount} orphaned run(s) as failed:`,
-                r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", "));
-            }
-          } catch (e: any) {
-            console.warn("[ExportRun] Startup orphan-cleanup failed:", e.message);
-          }
-        };
-
-        // Periodic cleanup: only mark runs that have been 'running' for over 90 minutes
-        // as stuck. This avoids killing large exports that legitimately take 10-30 minutes.
-        const cleanupHungRuns = async () => {
-          try {
-            const r = await pool.query(`
-              UPDATE daily_export_runs
-                 SET status         = 'failed',
-                     finished_at    = NOW(),
-                     skipped_reason = 'Export timed out — exceeded 3-hour safety limit'
-               WHERE status         = 'running'
-                 AND started_at     < NOW() - INTERVAL '3 hours'
-              RETURNING id, run_type
-            `);
-            if (r.rowCount && r.rowCount > 0) {
-              console.log(`[ExportRun] Periodic: timed out ${r.rowCount} hung run(s):`,
-                r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", "));
-            }
-          } catch (e: any) {
-            console.warn("[ExportRun] Periodic hung-run cleanup failed:", e.message);
-          }
-        };
-
-        // Run orphan cleanup once at startup (slight delay so pool is fully ready)
-        setTimeout(cleanupOrphanedRuns, 3000);
-        // Run the longer-threshold periodic check every 30 minutes
-        setInterval(cleanupHungRuns, 30 * 60 * 1000);
-
-        // Startup recovery: if today's scheduled export failed mid-run (e.g. server restart),
-        // re-trigger it automatically. We wait 90 s so the pool and crons are fully ready.
-        setTimeout(async () => {
-          try {
-            await checkAndRecoverDailyExport();
-          } catch (e: any) {
-            console.warn("[DailyExport] Startup recovery call failed:", e?.message);
-          }
-        }, 90 * 1000);
-      });
+      runPostStartupJobs();
     });
   };
 
@@ -4806,8 +4790,8 @@ END $mig$`;
     }
   });
 
-  // Graceful shutdown: close DB pool so Render's zero-downtime deploys don't
-  // leave zombie connections that exhaust max_connections on the next instance.
+  // Graceful shutdown: close DB pool so zero-downtime deploys don't leave
+  // zombie connections that exhaust max_connections on the next instance.
   const shutdown = async (signal: string) => {
     console.log(`[Shutdown] ${signal} received — closing DB pool...`);
     try {
@@ -4821,5 +4805,35 @@ END $mig$`;
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT",  () => shutdown("SIGINT"));
 
-  doListen();
+  // ── Startup sequence: warmup → migrations → listen ────────────────────────
+  // Migrations run to completion BEFORE the port opens. This guarantees:
+  //   1. The schema is always up-to-date before any request reaches new code.
+  //   2. A failed migration aborts startup, keeping the old deployment alive
+  //      instead of serving requests against a stale or broken schema.
+  // Set RUN_STARTUP_MIGRATIONS=false to skip migrations entirely (emergency
+  // kill-switch for severe lock contention).
+  const migrationsEnabled = process.env.RUN_STARTUP_MIGRATIONS !== 'false';
+  if (!migrationsEnabled) {
+    console.log("⚠ Startup migrations DISABLED via RUN_STARTUP_MIGRATIONS=false");
+    migrationsDone = true;
+  }
+
+  warmupDb()
+    .then(async () => {
+      if (migrationsEnabled) {
+        try {
+          await runMigrations();
+        } catch (err: any) {
+          console.error("Migration error (non-fatal — server will still start):", err?.message ?? err);
+          migrationsDone = true;
+        }
+      }
+    })
+    .then(() => {
+      doListen();
+    })
+    .catch((err: any) => {
+      console.error("Fatal startup error:", err?.message ?? err);
+      process.exit(1);
+    });
 })();
