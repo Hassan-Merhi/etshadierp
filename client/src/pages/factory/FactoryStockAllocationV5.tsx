@@ -86,6 +86,7 @@ export default function FactoryStockAllocationV5() {
   const [expandedRows, setExpandedRows]         = useState<Set<string>>(new Set());
   const [hideZero, setHideZero]                 = useState(true);
   const [showNegativeOnly, setShowNegativeOnly] = useState(false);
+  const [showGarbageWipers, setShowGarbageWipers] = useState(false);
   const [refreshFlash, setRefreshFlash]         = useState(false);
 
   /* ── Export dialog state ─────────────────────────────────────────────────── */
@@ -363,8 +364,15 @@ export default function FactoryStockAllocationV5() {
     retry: 1,
   });
 
+  function isGarbageOrWipers(row: V5Row) {
+    const n = row.productName.toLowerCase();
+    return n.includes("wiper") || n.includes("garbage");
+  }
+
   const allRows = (query.data?.rows ?? []).slice().sort((a, b) => a.productName.localeCompare(b.productName));
-  const rows    = showNegativeOnly ? allRows.filter(r => r.freeToPromise < 0) : allRows;
+  const garbageWipersCount = allRows.filter(isGarbageOrWipers).length;
+  const filteredRows = showGarbageWipers ? allRows : allRows.filter(r => !isGarbageOrWipers(r));
+  const rows = showNegativeOnly ? filteredRows.filter(r => r.freeToPromise < 0) : filteredRows;
   const totals  = query.data?.totals;
 
   // Auto-expand rows that contain the focused proforma, then scroll to first match
@@ -547,6 +555,16 @@ export default function FactoryStockAllocationV5() {
             data-testid="button-v5-toggle-negative-only"
           >
             {showNegativeOnly ? `Negative Only (${rows.length})` : "Negative Only"}
+          </Button>
+          <Button
+            variant={showGarbageWipers ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setShowGarbageWipers(v => !v)}
+            data-testid="button-v5-toggle-garbage-wipers"
+          >
+            {showGarbageWipers
+              ? `Hide Garbage/Wipers (${garbageWipersCount})`
+              : `Show Garbage/Wipers${garbageWipersCount > 0 ? ` (${garbageWipersCount})` : ""}`}
           </Button>
 
           <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
