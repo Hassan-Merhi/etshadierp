@@ -163,6 +163,7 @@ export default function SupplierProfitCheck() {
   const [freight, setFreight] = useState("");
   const [duties, setDuties] = useState("");
   const [otherCharges, setOtherCharges] = useState("");
+  const [surcharge, setSurcharge] = useState("");
 
   const [colVisibility, setColVisibility] = useState<ColVisibility>(loadColVisibility);
   const [showColPicker, setShowColPicker] = useState(false);
@@ -254,7 +255,7 @@ export default function SupplierProfitCheck() {
     return Object.values(qtyMap).reduce((s, v) => s + (Number(v) || 0), 0);
   }, [rows, qtyMap]);
 
-  const totalExtraCharges = (Number(freight) || 0) + (Number(duties) || 0) + (Number(otherCharges) || 0);
+  const totalExtraCharges = (Number(freight) || 0) + (Number(duties) || 0) + (Number(otherCharges) || 0) + (Number(surcharge) || 0);
   const extraCostPerBale = totalBales > 0 ? totalExtraCharges / totalBales : 0;
 
   // ─── Computed rows ────────────────────────────────────────────────────────
@@ -514,9 +515,10 @@ export default function SupplierProfitCheck() {
               {/* Inputs */}
               <div className="flex flex-wrap gap-3 flex-1">
                 {[
-                  { label: "Freight",       value: freight,       set: setFreight,       id: "input-freight"        },
-                  { label: "Duties",        value: duties,        set: setDuties,        id: "input-duties"         },
-                  { label: "Other Charges", value: otherCharges,  set: setOtherCharges,  id: "input-other-charges"  },
+                  { label: "Freight",        value: freight,       set: setFreight,       id: "input-freight"        },
+                  { label: "Duties",         value: duties,        set: setDuties,        id: "input-duties"         },
+                  { label: "Transportation", value: otherCharges,  set: setOtherCharges,  id: "input-other-charges"  },
+                  { label: "Surcharge",      value: surcharge,     set: setSurcharge,     id: "input-surcharge"      },
                 ].map(({ label, value, set, id }) => (
                   <div key={id} className="space-y-1 w-32">
                     <label className="text-[11px] text-muted-foreground font-medium">{label}</label>
