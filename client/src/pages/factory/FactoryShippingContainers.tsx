@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useLocation } from "wouter";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1027,6 +1028,7 @@ function ShippingAvailabilityTable() {
 
 export default function FactoryShippingContainers() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [filterDocs, setFilterDocs] = useState<"all" | "has" | "missing">("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -1384,9 +1386,23 @@ export default function FactoryShippingContainers() {
 
                     {colVis.status && (
                       <TableCell>
-                        <Badge className={cn("text-xs no-default-active-elevate whitespace-nowrap", statusColor(r.status))}>
-                          {statusLabel(r.status)}
-                        </Badge>
+                        <button
+                          className="focus:outline-none"
+                          title="Open order"
+                          onClick={() => {
+                            if (!r.customerOrderId) return;
+                            if (r.status === "FINALIZED") {
+                              navigate(`/factory/sales/invoices/${r.customerOrderId}`);
+                            } else {
+                              navigate(`/factory/sales/pending-invoices/${r.customerOrderId}/verify`);
+                            }
+                          }}
+                          data-testid={`button-status-${r.id}`}
+                        >
+                          <Badge className={cn("text-xs whitespace-nowrap cursor-pointer", statusColor(r.status))}>
+                            {statusLabel(r.status)}
+                          </Badge>
+                        </button>
                       </TableCell>
                     )}
 
