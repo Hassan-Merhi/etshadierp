@@ -4,7 +4,7 @@ import { getExportPriceVisibility } from "../../helpers/exportVisibility";
 import { syncProformaReservations, isFactoryV2Company, computeFreeToPromise } from "./_stockReservationHelper";
 import { sqlArray } from "../../lib/sqlArray";
 import type { Express } from "express";
-import { db } from "../../db";
+import { db, pool } from "../../db";
 import { requireAuth } from "../../auth";
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
@@ -54,6 +54,23 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
+
+async function autoSavePriceToPriceList(
+  companyId: number,
+  customerId: number,
+  articleCode: string,
+  pricePerBale: string | number,
+) {
+  const price = parseFloat(String(pricePerBale));
+  if (!articleCode || isNaN(price) || price <= 0) return;
+  await pool.query(
+    `INSERT INTO customer_price_lists (company_id, customer_id, article_code, price_per_bale, updated_at)
+     VALUES ($1, $2, $3, $4, now())
+     ON CONFLICT (company_id, customer_id, article_code)
+     DO UPDATE SET price_per_bale = EXCLUDED.price_per_bale, updated_at = now()`,
+    [companyId, customerId, articleCode, price],
+  );
+}
 
 export function registerFactoryCustomerProformaRoutes(app: Express) {
   /* Single proforma by ID — used by EditProformaV5Drawer */
@@ -498,6 +515,14 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const [line] = await db.insert(customerProformaLines).values(parsed).returning();
       // Sync — new line changes reservedNotYetLoaded for this proforma
       await syncProformaReservations(db, companyId, parsed.proformaId);
+
+      // Auto-save price to customer price list
+      const [proforma] = await db.select({ customerId: customerProformas.customerId })
+        .from(customerProformas).where(eq(customerProformas.id, parsed.proformaId)).limit(1);
+      if (proforma?.customerId && parsed.articleCode && parsed.pricePerBale) {
+        await autoSavePriceToPriceList(companyId, proforma.customerId, parsed.articleCode, parsed.pricePerBale).catch(() => {});
+      }
+
       res.json({ ...line, ...(stockWarning ? { stockWarning } : {}) });
     } catch (error: any) {
       console.error("Error creating proforma line:", error);
@@ -540,6 +565,16 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       if (!updated) return res.status(404).json({ message: "Proforma line not found" });
       // Sync — quantity change alters reservedNotYetLoaded
       await syncProformaReservations(db, companyId, existingLine.proformaId);
+
+      // Auto-save price to customer price list if price was part of the update
+      if (updateData.pricePerBale !== undefined && existingLine.articleCode) {
+        const [proforma] = await db.select({ customerId: customerProformas.customerId })
+          .from(customerProformas).where(eq(customerProformas.id, existingLine.proformaId)).limit(1);
+        if (proforma?.customerId) {
+          await autoSavePriceToPriceList(companyId, proforma.customerId, existingLine.articleCode, updateData.pricePerBale).catch(() => {});
+        }
+      }
+
       res.json({ ...updated, ...(stockWarning ? { stockWarning } : {}) });
     } catch (error: any) {
       console.error("Error updating proforma line:", error);
@@ -606,6 +641,14 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
       // Sync outside transaction — reservations are derived, not transactional
       await syncProformaReservations(db, companyId, result.id);
+
+      // Auto-save all line prices to customer price list
+      for (const l of validLines) {
+        if (l.articleCode && l.pricePerBale) {
+          await autoSavePriceToPriceList(companyId, customerId, l.articleCode, l.pricePerBale).catch(() => {});
+        }
+      }
+
       res.json(result);
     } catch (error: any) {
       console.error("Error bulk creating proforma:", error);

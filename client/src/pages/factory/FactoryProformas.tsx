@@ -118,6 +118,16 @@ export default function FactoryProformas() {
     enabled: isAddLineOpen || expandedProformaIds.size > 0,
   });
 
+  // Customer price list — used to auto-fill price when adding a new line
+  const { data: customerPriceList = [] } = useQuery<{ articleCode: string; pricePerBale: string }[]>({
+    queryKey: [`/api/factory/customer-price-lists/${customerId}`, customerId],
+    enabled: !!customerId && isAddLineOpen,
+  });
+
+  const priceListMap = Object.fromEntries(
+    customerPriceList.map((p) => [p.articleCode, p.pricePerBale])
+  );
+
   const { data: locations = [] } = useQuery<{ id: number; name: string; code: string }[]>({
     queryKey: ["/api/locations"],
     enabled: !!createLoadingProforma,
@@ -235,6 +245,7 @@ export default function FactoryProformas() {
     onSuccess: () => {
       toast({ title: "Success", description: "Line added" });
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-price-lists/${customerId}`, customerId] });
       setIsAddLineOpen(false);
       setAddLineProformaId(null);
       setNewLine({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
@@ -258,6 +269,7 @@ export default function FactoryProformas() {
     onSuccess: () => {
       toast({ title: "Success", description: "Line updated" });
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-price-lists/${customerId}`, customerId] });
       setEditingLine(null);
     },
     onError: (error: Error) => {
@@ -1144,13 +1156,15 @@ export default function FactoryProformas() {
                         if (filtered.length === 0) return (
                           <p className="text-sm text-muted-foreground text-center py-6">No items match "{catalogSearch}"</p>
                         );
-                        return filtered.map((item: any) => (
+                        return filtered.map((item: any) => {
+                          const savedPrice = item.code ? priceListMap[item.code] : undefined;
+                          return (
                           <button
                             key={item.id}
                             className="w-full flex items-center justify-between px-3 py-2.5 text-left hover-elevate border-b last:border-b-0"
                             onClick={() => {
                               setCatalogSelectedItem(item);
-                              setNewLine((prev) => ({ ...prev, articleCode: item.code || "", productName: item.name || "" }));
+                              setNewLine((prev) => ({ ...prev, articleCode: item.code || "", productName: item.name || "", pricePerBale: savedPrice ?? "" }));
                             }}
                             data-testid={`button-catalog-item-${item.id}`}
                           >
@@ -1158,11 +1172,17 @@ export default function FactoryProformas() {
                               <p className="text-sm font-medium">{item.name}</p>
                               {item.code && <p className="text-xs text-muted-foreground font-mono">{item.code}</p>}
                             </div>
-                            {item.stockGroup?.name && (
-                              <span className="text-xs text-muted-foreground ml-2 shrink-0">{item.stockGroup.name}</span>
-                            )}
+                            <div className="flex items-center gap-2 ml-2 shrink-0">
+                              {savedPrice && (
+                                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">${parseFloat(savedPrice).toFixed(2)}</span>
+                              )}
+                              {item.stockGroup?.name && (
+                                <span className="text-xs text-muted-foreground">{item.stockGroup.name}</span>
+                              )}
+                            </div>
                           </button>
-                        ));
+                          );
+                        });
                       })()}
                     </div>
                     <p className="text-xs text-muted-foreground">{allStockItems.length} items in catalog</p>
@@ -1209,6 +1229,11 @@ export default function FactoryProformas() {
                           onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); }}
                           data-testid="input-line-price"
                         />
+                        {catalogSelectedItem?.code && priceListMap[catalogSelectedItem.code] && (
+                          <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                            Auto-filled from price list — you can override
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
