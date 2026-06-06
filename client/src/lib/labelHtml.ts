@@ -26,27 +26,34 @@ function _blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
+// Session-level barcode cache: referenceNumber → base64 data URL.
+// Barcodes are immutable so we never need to invalidate this.
+const _barcodeBase64Cache = new Map<string, string>();
+
 export async function prefetchBarcodeDataUrls(labels: LabelData[]): Promise<LabelData[]> {
   const refs = Array.from(new Set(labels.map(l => l.referenceNumber)));
-  const results = await Promise.all(
-    refs.map(async (ref) => {
-      try {
-        const r = await fetch(`/api/barcode/${encodeURIComponent(ref)}`, { credentials: "include" });
-        if (!r.ok) return [ref, null] as [string, string | null];
-        const blob = await r.blob();
-        const dataUrl = await _blobToBase64(blob);
-        return [ref, dataUrl] as [string, string];
-      } catch {
-        return [ref, null] as [string, string | null];
-      }
-    })
-  );
-  const map = new Map<string, string>(
-    results.filter(([, v]) => v !== null) as [string, string][]
-  );
+  const uncached = refs.filter(r => !_barcodeBase64Cache.has(r));
+  if (uncached.length > 0) {
+    const results = await Promise.all(
+      uncached.map(async (ref) => {
+        try {
+          const r = await fetch(`/api/barcode/${encodeURIComponent(ref)}`, { credentials: "include" });
+          if (!r.ok) return [ref, null] as [string, string | null];
+          const blob = await r.blob();
+          const dataUrl = await _blobToBase64(blob);
+          return [ref, dataUrl] as [string, string];
+        } catch {
+          return [ref, null] as [string, string | null];
+        }
+      })
+    );
+    for (const [ref, dataUrl] of results) {
+      if (dataUrl) _barcodeBase64Cache.set(ref, dataUrl);
+    }
+  }
   return labels.map(l => ({
     ...l,
-    barcodeDataUrl: map.get(l.referenceNumber) ?? l.barcodeDataUrl,
+    barcodeDataUrl: _barcodeBase64Cache.get(l.referenceNumber) ?? l.barcodeDataUrl,
   }));
 }
 

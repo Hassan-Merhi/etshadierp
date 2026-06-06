@@ -120,6 +120,7 @@ export default function WasteDispatch() {
   const [newLoadingOpen, setNewLoadingOpen] = useState(false);
   const [nlCustomerId, setNlCustomerId] = useState<string>("");
   const [nlProformaId, setNlProformaId] = useState<string>("none");
+  const preOpenedStickerRef = useRef<Window | null>(null);
 
   // ── Dispatch queries ───────────────────────────────────────────
   const { data, isLoading } = useQuery<{ bales: Bale[]; categories: any[] }>({
@@ -459,7 +460,9 @@ export default function WasteDispatch() {
       // Reset form
       setEntryProductId("");
       setEntryQty("1");
-      // Print sticker labels — pre-fetch barcodes in parallel before opening popup
+      // Print sticker labels — use the pre-opened window (opened synchronously in the
+      // button click handler) so popup blockers never fire, then fill it with HTML
+      // once barcodes are pre-fetched from the session cache or in parallel.
       if (createdBales.length > 0) {
         const rawLabels: LabelData[] = createdBales.map((b: any) => ({
           referenceNumber: b.referenceNumber,
@@ -468,8 +471,10 @@ export default function WasteDispatch() {
           approxWeightKg: String(b.weightKg || "0"),
           productName: b.productName || "",
         }));
+        const preOpened = preOpenedStickerRef.current;
+        preOpenedStickerRef.current = null;
         prefetchBarcodeDataUrls(rawLabels).then((labels) => {
-          const win = window.open("", "_blank");
+          const win = (preOpened && !preOpened.closed) ? preOpened : window.open("", "_blank");
           if (win) {
             win.document.write(generateStickerLabelsHtml(labels));
             win.document.close();
@@ -1010,7 +1015,10 @@ export default function WasteDispatch() {
 
                 {/* Submit */}
                 <Button
-                  onClick={() => createBalesMutation.mutate()}
+                  onClick={() => {
+                    preOpenedStickerRef.current = window.open("", "_blank");
+                    createBalesMutation.mutate();
+                  }}
                   disabled={createBalesMutation.isPending || !entryProductId || !entryLocationId}
                   className="gap-2 self-end"
                   data-testid="button-create-bales"
