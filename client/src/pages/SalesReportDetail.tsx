@@ -475,7 +475,7 @@ export default function SalesReportDetail() {
                   : <><ChevronsUpDown className="h-3.5 w-3.5 mr-1" />Expand All</>}
               </Button>
             )}
-            {viewMode === "items" && (
+            {viewMode === "bySale" && (
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" data-testid="button-toggle-columns">
