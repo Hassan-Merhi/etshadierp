@@ -58,7 +58,20 @@ import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositio
 import path from "path";
 import fs from "fs";
 
+// Module-level bwip-js cache — loaded once on first barcode request, then reused.
+// This avoids the cold-start latency of re-importing the library on every request.
+let _bwipjs: any = null;
+async function getBwipjs(): Promise<any> {
+  if (!_bwipjs) {
+    // @ts-ignore - bwip-js types are incomplete
+    _bwipjs = await import("bwip-js");
+  }
+  return _bwipjs;
+}
+
 export function registerBaleRoutes(app: Express) {
+  // Pre-warm bwip-js at server startup so the first barcode render is instant.
+  getBwipjs().catch(() => {});
   app.get("/api/bales", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -2369,8 +2382,7 @@ export function registerBaleRoutes(app: Express) {
         return res.status(400).json({ message: "Barcode text is required" });
       }
 
-      // @ts-ignore - bwip-js types are incomplete
-      const bwipjs = await import("bwip-js");
+      const bwipjs = await getBwipjs();
       
       // Render to PNG buffer
       const png = await bwipjs.toBuffer({
@@ -2400,8 +2412,7 @@ export function registerBaleRoutes(app: Express) {
         return res.status(400).json({ message: "Barcode code is required" });
       }
 
-      // @ts-ignore - bwip-js types are incomplete
-      const bwipjs = await import("bwip-js");
+      const bwipjs = await getBwipjs();
       
       const png = await bwipjs.toBuffer({
         bcid: "code128",

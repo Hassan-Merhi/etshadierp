@@ -1716,6 +1716,33 @@ export function registerFactoryBalesRoutes(app: Express) {
     }
   });
 
+  // Lightweight daily summary — counts and weights by category for a single date.
+  // Much faster than the full /api/factory/bales endpoint which returns up to 2000 rows.
+  app.get("/api/factory/bales/daily-summary", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { date } = req.query as Record<string, string>;
+      if (!date) return res.status(400).json({ message: "date is required (YYYY-MM-DD)" });
+
+      const rows = await db.execute(sql`
+        SELECT
+          LOWER(TRIM(COALESCE(category, ''))) AS "category",
+          COUNT(*)::int                        AS "count",
+          ROUND(COALESCE(SUM(CAST(weight_kg AS numeric)), 0), 3)::text AS "totalKg"
+        FROM factory_bales
+        WHERE company_id = ${companyId}
+          AND stock_entry_date::text = ${date}
+          AND status NOT IN ('DELETED', 'REMOVED')
+        GROUP BY LOWER(TRIM(COALESCE(category, '')))
+      `);
+
+      res.json(rows.rows ?? rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/factory/bales/stock-entry-history", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;

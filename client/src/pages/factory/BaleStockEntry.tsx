@@ -2281,29 +2281,26 @@ import DailyScan from "./DailyScan";
   function DailyStockSummary({ date }: { date: string }) {
     const todayStr = new Date().toLocaleDateString('en-CA');
 
-    const { data: balesData } = useQuery<any[]>({
-      queryKey: ["/api/factory/bales"],
+    const { data: summaryRows = [] } = useQuery<any[]>({
+      queryKey: ["/api/factory/bales/daily-summary", date],
+      queryFn: () =>
+        fetch(`/api/factory/bales/daily-summary?date=${date}`, { credentials: "include" })
+          .then(r => r.json()),
+      staleTime: 30000,
     });
 
-    // Filter by stockEntryDate (same field the Stock Entry History tab uses) — not createdAt
-    const dayAll = (balesData || []).filter((row: any) => {
-      const bale = row.bale;
-      // stockEntryDate is stored as "YYYY-MM-DD" string already
-      return (bale.stockEntryDate || "").slice(0, 10) === date;
-    });
+    let totalQty = 0, totalKg = 0;
+    let garbageQty = 0, garbageKg = 0;
+    let wipersQty = 0, wipersKg = 0;
 
-    const getCategory = (row: any) => (row.bale.category || "").toLowerCase().trim();
-    const dayGarbage = dayAll.filter((row: any) => getCategory(row) === "garbage");
-    const dayWipers  = dayAll.filter((row: any) => getCategory(row) === "wipers");
-    const dayRegular = dayAll.filter((row: any) => getCategory(row) !== "garbage" && getCategory(row) !== "wipers");
-
-    // Count bale records (same as the COUNT(*) baleCount used by the history tab)
-    const totalQty  = dayRegular.length;
-    const totalKg   = dayRegular.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
-    const garbageQty = dayGarbage.length;
-    const garbageKg  = dayGarbage.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
-    const wipersQty  = dayWipers.length;
-    const wipersKg   = dayWipers.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+    for (const row of summaryRows) {
+      const cat = (row.category || "").toLowerCase().trim();
+      const qty = Number(row.count || 0);
+      const kg = parseFloat(row.totalKg || "0");
+      if (cat === "garbage") { garbageQty += qty; garbageKg += kg; }
+      else if (cat === "wipers") { wipersQty += qty; wipersKg += kg; }
+      else { totalQty += qty; totalKg += kg; }
+    }
 
     const isToday = date === todayStr;
 
@@ -2356,6 +2353,10 @@ import DailyScan from "./DailyScan";
     const todayStr = new Date().toLocaleDateString('en-CA');
     const [summaryDate, setSummaryDate] = useState<string>(todayStr);
     const { toast } = useToast();
+    // Track which tabs have ever been activated so we only mount heavy components on demand.
+    const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(["entry"]));
+    const handleTabChange = (tab: string) =>
+      setMountedTabs(prev => prev.has(tab) ? prev : new Set([...prev, tab]));
 
     const { data: settings } = useQuery<any>({
       queryKey: ["/api/factory/settings"],
@@ -2467,7 +2468,7 @@ import DailyScan from "./DailyScan";
 
         <DailyStockSummary date={summaryDate} />
 
-        <Tabs defaultValue={showEntry ? "entry" : "history"}>
+        <Tabs defaultValue={showEntry ? "entry" : "history"} onValueChange={handleTabChange}>
           <TabsList>
             {showEntry && (
               <TabsTrigger value="entry" data-testid="tab-stock-entry">
@@ -2505,19 +2506,21 @@ import DailyScan from "./DailyScan";
           )}
           {showHistory && (
             <TabsContent value="history" className="mt-0 p-0">
-              <StockEntryHistory
-                onActiveDateChange={(d) => setSummaryDate(d ?? todayStr)}
-              />
+              {mountedTabs.has("history") && (
+                <StockEntryHistory
+                  onActiveDateChange={(d) => setSummaryDate(d ?? todayStr)}
+                />
+              )}
             </TabsContent>
           )}
           {showGroundScan && (
             <TabsContent value="ground-scan" className="mt-0 p-0">
-              <GroundScan />
+              {mountedTabs.has("ground-scan") && <GroundScan />}
             </TabsContent>
           )}
           {showDailyScan && (
             <TabsContent value="daily-scan" className="mt-0 p-0">
-              <DailyScan />
+              {mountedTabs.has("daily-scan") && <DailyScan />}
             </TabsContent>
           )}
           <TabsContent value="worker-categories" className="mt-4">
