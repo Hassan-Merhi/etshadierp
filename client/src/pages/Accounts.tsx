@@ -247,6 +247,7 @@ export default function Accounts() {
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [showDeletedVouchers, setShowDeletedVouchers] = useState(false);
   const [filterCurrency, setFilterCurrency] = useState<"all" | "CFA">("all");
+  const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
 
   // Export language selection
   const [exportLang, setExportLang] = useState<"en" | "fr" | "ar">("en");
@@ -2416,15 +2417,17 @@ export default function Accounts() {
                         Delete Selected ({selectedVoucherIds.size})
                       </Button>
                     )}
-                    <Button
-                      variant={filterCurrency === "CFA" ? "secondary" : "outline"}
-                      size="sm"
-                      onClick={() => setFilterCurrency((c) => c === "CFA" ? "all" : "CFA")}
-                      data-testid="button-filter-cfa"
-                    >
-                      <Filter className="h-4 w-4 mr-1" />
-                      {filterCurrency === "CFA" ? "CFA Only ×" : "CFA Only"}
-                    </Button>
+                    {currentUser?.role === "Developer" && (
+                      <Button
+                        variant={filterCurrency === "CFA" ? "secondary" : "outline"}
+                        size="sm"
+                        onClick={() => setFilterCurrency((c) => c === "CFA" ? "all" : "CFA")}
+                        data-testid="button-filter-cfa"
+                      >
+                        <Filter className="h-4 w-4 mr-1" />
+                        {filterCurrency === "CFA" ? "CFA Only ×" : "CFA Only"}
+                      </Button>
+                    )}
                     <Button
                       variant={showDeletedVouchers ? "secondary" : "outline"}
                       size="sm"
