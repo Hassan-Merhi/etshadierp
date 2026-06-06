@@ -58,6 +58,8 @@ import {
   FileText,
   Lock,
   Filter,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -456,20 +458,35 @@ export default function Accounts() {
 
   const { data: ledgerAccounts = [], isLoading: ledgerAccountsLoading } =
     useQuery<LedgerAccount[]>({
-      queryKey: ["/api/ledger-accounts", selectedCompany?.id],
+      queryKey: ["/api/ledger-accounts", selectedCompany?.id, import.meta.env.DEV],
       queryFn: async () => {
         if (!selectedCompany) return [];
-        const response = await fetch(
-          `/api/ledger-accounts?companyId=${selectedCompany.id}`,
-          {
-            credentials: "include",
-          },
-        );
+        const url = import.meta.env.DEV
+          ? `/api/ledger-accounts?companyId=${selectedCompany.id}&includeHidden=true`
+          : `/api/ledger-accounts?companyId=${selectedCompany.id}`;
+        const response = await fetch(url, { credentials: "include" });
         if (!response.ok) throw new Error("Failed to fetch ledger accounts");
         return await response.json();
       },
       enabled: !!selectedCompany,
     });
+
+  const toggleHideMutation = useMutation({
+    mutationFn: async ({ id, isHidden }: { id: number; isHidden: boolean }) => {
+      const res = await fetch(`/api/ledger-accounts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ isHidden }),
+      });
+      if (!res.ok) throw new Error("Failed to update account");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+    },
+  });
 
   // Bank accounts are only needed in the account detail/edit views — not the initial list.
   const { data: bankAccounts = [], isLoading: bankAccountsLoading } = useQuery<
@@ -1902,7 +1919,7 @@ export default function Accounts() {
                                     handleAccountChange(account.id)
                                   }
                                   disabled={accountsLoading || !selectedCompany}
-                                  className={`flex-1 p-3 text-left hover-elevate ${account.children.length === 0 ? "ml-8" : ""}`}
+                                  className={`flex-1 p-3 text-left hover-elevate ${account.children.length === 0 ? "ml-8" : ""} ${import.meta.env.DEV && account.isHidden ? "opacity-40" : ""}`}
                                   data-testid={`button-select-account-${account.id}`}
                                 >
                                   <div className="flex items-center gap-2 w-full">
@@ -1922,12 +1939,24 @@ export default function Accounts() {
                                     )}
                                   </div>
                                 </button>
+                                {import.meta.env.DEV && account.type === "ledger" && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); toggleHideMutation.mutate({ id: account.accountId, isHidden: !account.isHidden }); }}
+                                    className="p-2 hover-elevate shrink-0"
+                                    title={account.isHidden ? "Unhide account" : "Hide account"}
+                                    data-testid={`button-toggle-hidden-${account.accountId}`}
+                                  >
+                                    {account.isHidden
+                                      ? <Eye className="h-3.5 w-3.5 text-orange-500" />
+                                      : <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />}
+                                  </button>
+                                )}
                               </div>
                               {expandedParents.has(account.id) &&
                                 account.children.map((child) => (
                                   <div
                                     key={child.id}
-                                    className="border-b last:border-b-0 bg-muted/20"
+                                    className="border-b last:border-b-0 bg-muted/20 flex items-center"
                                   >
                                     <button
                                       onClick={() =>
@@ -1936,7 +1965,7 @@ export default function Accounts() {
                                       disabled={
                                         accountsLoading || !selectedCompany
                                       }
-                                      className="w-full p-2.5 pl-14 text-left hover-elevate"
+                                      className={`flex-1 p-2.5 pl-14 text-left hover-elevate ${import.meta.env.DEV && child.isHidden ? "opacity-40" : ""}`}
                                       data-testid={`button-select-account-${child.id}`}
                                     >
                                       <div className="flex items-center gap-2 w-full">
@@ -1956,6 +1985,18 @@ export default function Accounts() {
                                         )}
                                       </div>
                                     </button>
+                                    {import.meta.env.DEV && child.type === "ledger" && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); toggleHideMutation.mutate({ id: child.accountId, isHidden: !child.isHidden }); }}
+                                        className="p-2 hover-elevate shrink-0"
+                                        title={child.isHidden ? "Unhide account" : "Hide account"}
+                                        data-testid={`button-toggle-hidden-${child.accountId}`}
+                                      >
+                                        {child.isHidden
+                                          ? <Eye className="h-3.5 w-3.5 text-orange-500" />
+                                          : <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />}
+                                      </button>
+                                    )}
                                   </div>
                                 ))}
                             </div>

@@ -26,7 +26,7 @@ import { z } from "zod";
 export function registerLedgerRoutes(app: Express) {
   app.get("/api/ledger-accounts", requireAuth, async (req, res) => {
     try {
-      const { companyId, accountType, search } = req.query;
+      const { companyId, accountType, search, includeHidden } = req.query;
       const effectiveCompanyId = companyId
         ? parseInt(companyId as string)
         : req.session.currentCompanyId;
@@ -34,7 +34,7 @@ export function registerLedgerRoutes(app: Express) {
       if (!effectiveCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      let accounts = await storage.getAllLedgerAccounts(effectiveCompanyId);
+      let accounts = await storage.getAllLedgerAccounts(effectiveCompanyId, includeHidden === "true");
       if (accountType && typeof accountType === "string" && accountType.trim()) {
         accounts = accounts.filter(a => a.accountType === accountType.trim());
       }
