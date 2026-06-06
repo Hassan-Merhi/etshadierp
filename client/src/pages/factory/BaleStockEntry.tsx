@@ -49,7 +49,7 @@ import GroundScan from "./GroundScan";
 import DailyScan from "./DailyScan";
   import { AdminAuthDialog } from "@/components/AdminAuthDialog";
   import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
-  import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, prefetchBarcodeDataUrls, formatLabelNum, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
+  import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, prefetchBarcodeDataUrls, prefetchLogoDataUrl, prefetchLogoEager, formatLabelNum, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
   import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
   import { consumeRef } from "@/lib/refPool";
   import { enqueueRequest } from "@/lib/offlineQueue";
@@ -454,77 +454,58 @@ import DailyScan from "./DailyScan";
 
     const printLabels = async (bales: any[]) => {
       try {
-        const labelData = bales.map((bale: any) => {
-          const cartItem = cart.find((c) => c.productId === bale.productId);
-          return {
-            productionBaleId: bale.id,
-            productId: bale.productId,
-            articleCode: bale.articleCode || cartItem?.product.articleCode || cartItem?.product.code || "",
-            pieces: 1,
-            approxWeightKg: bale.weightKg || "0",
-          };
-        });
+        // Fire-and-forget audit record — don't block printing on this insert
+        modeApiRequest("POST", "/api/bale-label-prints", {
+          bales: bales.map((bale: any) => {
+            const cartItem = cart.find((c) => c.productId === bale.productId);
+            return {
+              productionBaleId: bale.id,
+              productId: bale.productId,
+              articleCode: bale.articleCode || cartItem?.product.articleCode || cartItem?.product.code || "",
+              pieces: 1,
+              approxWeightKg: bale.weightKg || "0",
+            };
+          }),
+        }).catch(() => {});
 
-        const labelResponse = await modeApiRequest("POST", "/api/bale-label-prints", { bales: labelData });
-
-        if (!labelResponse.ok) {
-          const err = await labelResponse.json();
-          throw new Error(err.message || "Failed to create label records");
-        }
-
-        const { labelPrints } = await labelResponse.json();
-
-        // Build label productId map for logo assignment
+        // Build labels directly from the stock-entry response — no extra round-trip needed
         const labelProductIds: number[] = [];
-        const labels: LabelData[] = labelPrints.map((lp: any) => {
-          const bale = bales.find((b: any) => b.id === lp.productionBaleId);
-          const product = baleProducts?.find((p) => p.id === bale?.productId);
-          const cartItem = cart.find((c) => c.productId === bale?.productId);
-          labelProductIds.push(bale?.productId ?? 0);
-          // Only use product default color if no logo will be applied (per-bale or global)
+        const labels: LabelData[] = bales.map((bale: any) => {
+          const product = baleProducts?.find((p) => p.id === bale.productId);
+          const cartItem = cart.find((c) => c.productId === bale.productId);
+          labelProductIds.push(bale.productId ?? 0);
           const hasLogo = cartItem?.overrideLogoId || selectedLogoId;
           const effectiveColor: A4DesignColor | null = hasLogo
             ? null
             : ((product?.labelDesignColor as A4DesignColor | null | undefined) || null);
           return {
-            referenceNumber: lp.referenceNumber,
-            articleCode: lp.articleCode || bale?.articleCode || "",
-            pieces: lp.pieces || 1,
-            approxWeightKg: lp.approxWeightKg || bale?.weightKg || "0",
-            productName: bale?.productName || "",
+            referenceNumber: bale.referenceNumber,
+            articleCode: bale.articleCode || cartItem?.product.articleCode || cartItem?.product.code || "",
+            pieces: 1,
+            approxWeightKg: bale.weightKg || "0",
+            productName: bale.productName || "",
             ...(effectiveColor ? { designColor: effectiveColor } : {}),
           };
         });
 
-        // Fetch all needed logos (per-bale overrides + global fallback) and embed as base64
+        // Fetch logos via session cache (instant on reprint, parallel on first use)
         if (!isZebraMode()) {
-          const logoIdToUrl = new Map<number, string>();
           const logoIdsNeeded = new Set<number>();
           for (let i = 0; i < labels.length; i++) {
             const cartItem = cart.find((c) => c.productId === labelProductIds[i]);
             const logoId = cartItem?.overrideLogoId ?? selectedLogoId ?? null;
             if (logoId) logoIdsNeeded.add(logoId);
           }
-          await Promise.all([...logoIdsNeeded].map(async (logoId) => {
-            try {
-              const logoResp = await fetch(`/api/factory/customer-logos/${logoId}/image`, { credentials: "include" });
-              if (logoResp.ok) {
-                const blob = await logoResp.blob();
-                const logoDataUrl = await new Promise<string>((resolve) => {
-                  const reader = new FileReader();
-                  reader.onloadend = () => resolve(reader.result as string);
-                  reader.readAsDataURL(blob);
-                });
-                logoIdToUrl.set(logoId, logoDataUrl);
-              }
-            } catch { /* logo fetch failed — fall back to HMD default */ }
-          }));
+          await Promise.all([...logoIdsNeeded].map(prefetchLogoDataUrl));
           for (let i = 0; i < labels.length; i++) {
             const cartItem = cart.find((c) => c.productId === labelProductIds[i]);
             const logoId = cartItem?.overrideLogoId ?? selectedLogoId ?? null;
-            if (logoId && logoIdToUrl.has(logoId)) {
-              labels[i].customerLogoUrl = logoIdToUrl.get(logoId);
-              delete labels[i].designColor;
+            if (logoId) {
+              const dataUrl = await prefetchLogoDataUrl(logoId);
+              if (dataUrl) {
+                labels[i].customerLogoUrl = dataUrl;
+                delete labels[i].designColor;
+              }
             }
           }
         }
@@ -1017,7 +998,11 @@ import DailyScan from "./DailyScan";
                         <button
                           key={logo.id}
                           type="button"
-                          onClick={() => setSelectedLogoId(selectedLogoId === logo.id ? null : logo.id)}
+                          onClick={() => {
+                            const next = selectedLogoId === logo.id ? null : logo.id;
+                            setSelectedLogoId(next);
+                            if (next) prefetchLogoEager(next);
+                          }}
                           className={`flex flex-col items-center gap-1 p-2 rounded-md border text-xs ${selectedLogoId === logo.id ? "border-primary bg-primary/10" : "border-border hover-elevate"}`}
                           data-testid={`button-select-logo-${logo.id}`}
                         >

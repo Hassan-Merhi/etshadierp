@@ -30,6 +30,28 @@ function _blobToBase64(blob: Blob): Promise<string> {
 // Barcodes are immutable so we never need to invalidate this.
 const _barcodeBase64Cache = new Map<string, string>();
 
+// Session-level logo cache: logoId → base64 data URL.
+const _logoBase64Cache = new Map<number, string>();
+
+export async function prefetchLogoDataUrl(logoId: number): Promise<string | null> {
+  if (_logoBase64Cache.has(logoId)) return _logoBase64Cache.get(logoId)!;
+  try {
+    const r = await fetch(`/api/factory/customer-logos/${logoId}/image`, { credentials: "include" });
+    if (!r.ok) return null;
+    const blob = await r.blob();
+    const dataUrl = await _blobToBase64(blob);
+    _logoBase64Cache.set(logoId, dataUrl);
+    return dataUrl;
+  } catch {
+    return null;
+  }
+}
+
+export function prefetchLogoEager(logoId: number): void {
+  if (_logoBase64Cache.has(logoId)) return;
+  prefetchLogoDataUrl(logoId).catch(() => {});
+}
+
 export async function prefetchBarcodeDataUrls(labels: LabelData[]): Promise<LabelData[]> {
   const refs = Array.from(new Set(labels.map(l => l.referenceNumber)));
   const uncached = refs.filter(r => !_barcodeBase64Cache.has(r));
