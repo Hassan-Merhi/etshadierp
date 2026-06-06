@@ -13,7 +13,8 @@ import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Star, Pencil, FileText, LayoutGrid, Download, RefreshCw, Search, BookOpen, PenLine, Truck, ArrowRightLeft, Upload, AlertCircle, Layers, BookmarkCheck } from "lucide-react";
+import { Plus, Trash2, Star, Pencil, FileText, LayoutGrid, Download, RefreshCw, Search, BookOpen, PenLine, Truck, ArrowRightLeft, Upload, AlertCircle, Layers, BookmarkCheck, ChevronDown, ChevronRight, Users, Package, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -485,15 +486,18 @@ export default function FactoryProformas() {
   };
 
   return (
-    <div className="flex flex-col h-full p-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+    <div className="flex flex-col h-full">
+      {/* ── Top bar ──────────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 pt-6 pb-4 border-b">
         <div>
-          <PageHeader title="Customer Proformas" subtitle="Manage customer-specific price lists for bale sales" />
+          <h1 className="text-xl font-semibold tracking-tight">Customer Proformas</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Price lists for bale sales per customer</p>
         </div>
         {customerId && (
           <div className="flex items-center gap-2 flex-wrap">
             <Button
               variant="outline"
+              size="sm"
               data-testid="button-import-excel-proforma"
               onClick={() => {
                 setExcelImportName("");
@@ -502,246 +506,293 @@ export default function FactoryProformas() {
                 setIsExcelImportOpen(true);
               }}
             >
-              <Upload className="mr-2 h-4 w-4" />
+              <Upload className="mr-1.5 h-3.5 w-3.5" />
               Import Excel
             </Button>
             <Button
+              size="sm"
               data-testid="button-create-proforma"
               onClick={() => setIsCreateOpen(true)}
             >
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
               New Proforma
             </Button>
           </div>
         )}
       </div>
 
-      <div className="mb-6 max-w-sm">
-        <label className="text-sm font-medium mb-2 block">Select Customer</label>
-        {customersLoading ? (
-          <Skeleton className="h-9 w-full" />
-        ) : (
-          <Select value={selectedCustomerId} onValueChange={(val) => {
-            setSelectedCustomerId(val);
-            setExpandedProformaId(null);
-          }}>
-            <SelectTrigger data-testid="select-customer">
-              <SelectValue placeholder="Choose a customer..." />
-            </SelectTrigger>
-            <SelectContent>
-              {customers.map((c) => (
-                <SelectItem key={c.id} value={c.id.toString()} data-testid={`select-customer-option-${c.id}`}>
-                  {c.legalName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+      {/* ── Customer picker ──────────────────────────────────────────────── */}
+      <div className="px-6 py-4 border-b bg-muted/30">
+        <div className="flex items-center gap-3 max-w-sm">
+          <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+          {customersLoading ? (
+            <Skeleton className="h-9 flex-1" />
+          ) : (
+            <Select value={selectedCustomerId} onValueChange={(val) => {
+              setSelectedCustomerId(val);
+              setExpandedProformaId(null);
+            }}>
+              <SelectTrigger data-testid="select-customer" className="flex-1">
+                <SelectValue placeholder="Select a customer to view proformas..." />
+              </SelectTrigger>
+              <SelectContent>
+                {customers.map((c) => (
+                  <SelectItem key={c.id} value={c.id.toString()} data-testid={`select-customer-option-${c.id}`}>
+                    {c.legalName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </div>
 
-      {customerId && proformasLoading && (
-        <div className="space-y-4">
-          {[...Array(3)].map((_, i) => (
-            <Skeleton className="h-24 w-full" key={i} />
-          ))}
-        </div>
-      )}
+      {/* ── Content area ─────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-auto px-6 py-5">
 
-      {customerId && !proformasLoading && proformas.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground" data-testid="text-no-proformas">
-          <FileText className="h-12 w-12 mx-auto mb-3 opacity-40" />
-          <p>No proformas found for this customer</p>
-          <p className="text-sm mt-1">Create one to get started</p>
-        </div>
-      )}
+        {/* Loading skeletons */}
+        {customerId && proformasLoading && (
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton className="h-20 w-full rounded-lg" key={i} />
+            ))}
+          </div>
+        )}
 
-      {!customerId && !customersLoading && (
-        <div className="text-center py-12 text-muted-foreground" data-testid="text-select-customer">
-          <FileText className="h-12 w-12 mx-auto mb-3 opacity-40" />
-          <p>Select a customer to manage their proformas</p>
-        </div>
-      )}
+        {/* Empty: no customer selected */}
+        {!customerId && !customersLoading && (
+          <div className="flex flex-col items-center justify-center py-20 text-center" data-testid="text-select-customer">
+            <div className="rounded-full bg-muted p-4 mb-4">
+              <Users className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <p className="font-medium text-muted-foreground">No customer selected</p>
+            <p className="text-sm text-muted-foreground mt-1">Pick a customer above to view their proformas</p>
+          </div>
+        )}
 
-      {customerId && !proformasLoading && proformas.length > 0 && (
-        <div className="space-y-4">
-          {(() => {
-            const inactiveCount = proformas.filter(p => !p.isActive).length;
-            return inactiveCount > 0 ? (
-              <div className="flex justify-end">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowInactive(v => !v)}
-                  data-testid="button-toggle-inactive-proformas"
+        {/* Empty: customer selected but no proformas */}
+        {customerId && !proformasLoading && proformas.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-center" data-testid="text-no-proformas">
+            <div className="rounded-full bg-muted p-4 mb-4">
+              <FileText className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <p className="font-medium text-muted-foreground">No proformas yet</p>
+            <p className="text-sm text-muted-foreground mt-1">Create a proforma to define this customer's pricing</p>
+            <Button size="sm" className="mt-4" onClick={() => setIsCreateOpen(true)}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              New Proforma
+            </Button>
+          </div>
+        )}
+
+        {/* Proforma list */}
+        {customerId && !proformasLoading && proformas.length > 0 && (
+          <div className="space-y-3">
+            {/* Inactive toggle */}
+            {(() => {
+              const inactiveCount = proformas.filter(p => !p.isActive).length;
+              return inactiveCount > 0 ? (
+                <div className="flex justify-end">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowInactive(v => !v)}
+                    data-testid="button-toggle-inactive-proformas"
+                    className="text-muted-foreground"
+                  >
+                    {showInactive ? `Hide inactive (${inactiveCount})` : `Show inactive (${inactiveCount})`}
+                  </Button>
+                </div>
+              ) : null;
+            })()}
+
+            {proformas.filter(p => p.isActive || showInactive).sort((a, b) => a.name.localeCompare(b.name)).map((proforma) => {
+              const isExpanded = expandedProformaId === proforma.id;
+              const totalQty = proforma.lines?.reduce((s, l) => s + l.quantity, 0) ?? 0;
+              const totalWeight = proforma.lines?.reduce((s, l) => s + l.quantity * parseFloat(l.weightPerBaleKg || "0"), 0) ?? 0;
+              const totalAmount = proforma.lines?.reduce((s, l) => s + l.quantity * parseFloat(l.pricePerBale), 0) ?? 0;
+              const lineCount = proforma.lines?.length ?? 0;
+              const d = formatProformaDate(proforma.createdAt, proforma.updatedAt);
+
+              return (
+                <div
+                  key={proforma.id}
+                  data-testid={`card-proforma-${proforma.id}`}
+                  className={`rounded-lg border bg-card transition-shadow ${isExpanded ? "shadow-sm" : ""} ${!proforma.isActive ? "opacity-60" : ""}`}
                 >
-                  {showInactive ? `Hide inactive (${inactiveCount})` : `Show inactive (${inactiveCount})`}
-                </Button>
-              </div>
-            ) : null;
-          })()}
-          {proformas.filter(p => p.isActive || showInactive).sort((a, b) => a.name.localeCompare(b.name)).map((proforma) => {
-            const isExpanded = expandedProformaId === proforma.id;
-            return (
-              <Card key={proforma.id} data-testid={`card-proforma-${proforma.id}`}>
-                <div className="p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
+                  {/* Card header row */}
+                  <div className="flex items-center gap-2 px-4 py-3">
+                    {/* Expand toggle */}
                     <button
-                      className="flex items-center gap-2 cursor-pointer text-left"
+                      className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
                       onClick={() => setExpandedProformaId(isExpanded ? null : proforma.id)}
                       data-testid={`button-expand-proforma-${proforma.id}`}
                     >
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-semibold">{proforma.name}</span>
+                      {isExpanded
+                        ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                        : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+                      <span className="font-semibold truncate">{proforma.name}</span>
                       {proforma.isActive && (
-                        <Badge variant="default" className="bg-green-600 text-white no-default-hover-elevate no-default-active-elevate" data-testid={`badge-active-${proforma.id}`}>
+                        <Badge className="bg-green-600 text-white shrink-0 no-default-hover-elevate no-default-active-elevate" data-testid={`badge-active-${proforma.id}`}>
                           Active
                         </Badge>
                       )}
-                      <Badge variant="secondary" data-testid={`badge-lines-count-${proforma.id}`}>
-                        {proforma.lines?.length || 0} lines
-                      </Badge>
-                      {(() => {
-                        const d = formatProformaDate(proforma.createdAt, proforma.updatedAt);
-                        return d.value ? (
-                          <span className="text-xs text-muted-foreground" data-testid={`text-proforma-date-${proforma.id}`}>
-                            {d.label} {d.value}
-                          </span>
-                        ) : null;
-                      })()}
                     </button>
-                    <div className="flex items-center gap-1">
+
+                    {/* Stats chips (hidden on tiny screens) */}
+                    <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                      <span data-testid={`badge-lines-count-${proforma.id}`} className="flex items-center gap-1">
+                        <Package className="h-3 w-3" />{lineCount} lines
+                      </span>
+                      {totalQty > 0 && (
+                        <span data-testid={`text-total-qty-${proforma.id}`} className="font-mono">
+                          {totalQty.toLocaleString()} bales
+                        </span>
+                      )}
+                      {totalWeight > 0 && (
+                        <span data-testid={`text-total-weight-${proforma.id}`} className="font-mono">
+                          {totalWeight.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kg
+                        </span>
+                      )}
+                      {!hideProformaPrice && totalAmount > 0 && (
+                        <span data-testid={`text-total-amount-${proforma.id}`} className="font-mono font-medium text-foreground">
+                          {formatAmount(totalAmount)}
+                        </span>
+                      )}
+                      {d.value && (
+                        <span data-testid={`text-proforma-date-${proforma.id}`} className="text-muted-foreground/70">
+                          {d.label} {d.value}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-0.5 shrink-0 ml-1">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => toggleActiveMutation.mutate({ id: proforma.id, isActive: !proforma.isActive })}
                         disabled={toggleActiveMutation.isPending}
                         data-testid={`button-toggle-active-proforma-${proforma.id}`}
-                        title={proforma.isActive ? "Deactivate proforma" : "Set as active"}
+                        title={proforma.isActive ? "Deactivate" : "Set active"}
                       >
-                        <Star className={proforma.isActive ? "h-4 w-4 fill-yellow-400 text-yellow-500" : "h-4 w-4"} />
+                        <Star className={proforma.isActive ? "h-4 w-4 fill-yellow-400 text-yellow-500" : "h-4 w-4 text-muted-foreground"} />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => navigate(`/factory/dispatch-batches?customerId=${customerId}&proformaId=${proforma.id}&openCreate=1`)}
                         data-testid={`button-create-dispatch-batch-${proforma.id}`}
-                        title="Create dispatch batch from this proforma"
+                        title="Create dispatch batch"
                       >
-                        <Truck className="h-4 w-4" />
+                        <Truck className="h-4 w-4 text-muted-foreground" />
                       </Button>
                       {canEdit && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setRenamingProforma(proforma);
-                              setRenameValue(proforma.name);
-                            }}
-                            data-testid={`button-rename-proforma-${proforma.id}`}
-                            title="Rename proforma"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setTransferProforma(proforma);
-                              setTransferTargetCustomerId("");
-                            }}
-                            data-testid={`button-transfer-proforma-${proforma.id}`}
-                            title="Transfer to another customer"
-                          >
-                            <ArrowRightLeft className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setPendingDelete(() => () => deleteProformaMutation.mutate(proforma.id));
-                            }}
-                            disabled={deleteProformaMutation.isPending}
-                            data-testid={`button-delete-proforma-${proforma.id}`}
-                            title="Delete proforma"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" data-testid={`button-proforma-menu-${proforma.id}`}>
+                              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => { setRenamingProforma(proforma); setRenameValue(proforma.name); }}
+                              data-testid={`button-rename-proforma-${proforma.id}`}
+                            >
+                              <Pencil className="h-3.5 w-3.5 mr-2" />
+                              Rename
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => { setTransferProforma(proforma); setTransferTargetCustomerId(""); }}
+                              data-testid={`button-transfer-proforma-${proforma.id}`}
+                            >
+                              <ArrowRightLeft className="h-3.5 w-3.5 mr-2" />
+                              Transfer customer
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => setPendingDelete(() => () => deleteProformaMutation.mutate(proforma.id))}
+                              data-testid={`button-delete-proforma-${proforma.id}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                     </div>
                   </div>
 
+                  {/* Expanded content */}
                   {isExpanded && (
-                    <div className="mt-4">
-                      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-                        <span className="text-sm font-medium text-muted-foreground">Price Lines</span>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {canEdit && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setAddLineProformaId(proforma.id);
-                                setAddLineMode("catalog");
-                                setCatalogSelectedItem(null);
-                                setCatalogSearch("");
-                                setNewLine({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
-                                setIsAddLineOpen(true);
-                              }}
-                              data-testid={`button-add-line-${proforma.id}`}
-                            >
-                              <Plus className="mr-1 h-3 w-3" />
-                              Add Item
-                            </Button>
-                          )}
+                    <div className="border-t">
+                      {/* Toolbar */}
+                      <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/30 flex-wrap">
+                        {canEdit && (
                           <Button
                             size="sm"
-                            variant="outline"
-                            onClick={() => saveAgreedPricesMutation.mutate(proforma.id)}
-                            disabled={saveAgreedPricesMutation.isPending}
-                            data-testid={`button-save-agreed-prices-${proforma.id}`}
-                            title="Save these prices as the customer's agreed prices — future proformas will auto-fill them"
-                          >
-                            <BookmarkCheck className="mr-1 h-3 w-3" />
-                            Save as Agreed Prices
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => window.open(`/api/factory/customer-proformas/${proforma.id}/export/excel`, "_blank")}
-                            data-testid={`button-export-excel-${proforma.id}`}
-                          >
-                            <Download className="mr-1 h-3 w-3" />
-                            Excel
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
                             onClick={() => {
-                              if (!navigator.onLine) { window.print(); return; }
-                              window.open(`/api/factory/customer-proformas/${proforma.id}/export/pdf`, "_blank");
+                              setAddLineProformaId(proforma.id);
+                              setAddLineMode("catalog");
+                              setCatalogSelectedItem(null);
+                              setCatalogSearch("");
+                              setNewLine({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
+                              setIsAddLineOpen(true);
                             }}
-                            data-testid={`button-export-pdf-${proforma.id}`}
+                            data-testid={`button-add-line-${proforma.id}`}
                           >
-                            <Download className="mr-1 h-3 w-3" />
-                            PDF
+                            <Plus className="mr-1.5 h-3.5 w-3.5" />
+                            Add Item
                           </Button>
-                        </div>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => saveAgreedPricesMutation.mutate(proforma.id)}
+                          disabled={saveAgreedPricesMutation.isPending}
+                          data-testid={`button-save-agreed-prices-${proforma.id}`}
+                          title="Save these prices as the customer's agreed prices"
+                        >
+                          <BookmarkCheck className="mr-1.5 h-3.5 w-3.5" />
+                          Save as Agreed Prices
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(`/api/factory/customer-proformas/${proforma.id}/export/excel`, "_blank")}
+                          data-testid={`button-export-excel-${proforma.id}`}
+                        >
+                          <Download className="mr-1.5 h-3.5 w-3.5" />
+                          Excel
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            if (!navigator.onLine) { window.print(); return; }
+                            window.open(`/api/factory/customer-proformas/${proforma.id}/export/pdf`, "_blank");
+                          }}
+                          data-testid={`button-export-pdf-${proforma.id}`}
+                        >
+                          <Download className="mr-1.5 h-3.5 w-3.5" />
+                          PDF
+                        </Button>
                       </div>
 
+                      {/* Price lines table */}
                       {proforma.lines && proforma.lines.length > 0 ? (
                         <div>
-                          <Table wrapperClassName="max-h-[420px] overflow-auto">
+                          <Table wrapperClassName="max-h-[400px] overflow-auto">
                             <TableHeader className="sticky top-0 z-30 bg-background">
                               <TableRow>
-                                <TableHead>Article Code</TableHead>
-                                <TableHead>Product Name</TableHead>
-                                <TableHead className="text-right">Qty</TableHead>
-                                <TableHead className="text-right">Kg/Bale</TableHead>
-                                <TableHead className="text-right">Total Kg</TableHead>
-                                {!hideProformaPrice && <TableHead className="text-right">Price/Bale</TableHead>}
-                                {canEdit && <TableHead className="w-[80px]"></TableHead>}
+                                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Article Code</TableHead>
+                                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Product Name</TableHead>
+                                <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground font-medium">Qty</TableHead>
+                                <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground font-medium">Kg/Bale</TableHead>
+                                <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground font-medium">Total Kg</TableHead>
+                                {!hideProformaPrice && <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground font-medium">Price/Bale</TableHead>}
+                                {canEdit && <TableHead className="w-[72px]"></TableHead>}
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -750,128 +801,143 @@ export default function FactoryProformas() {
                                 const lineTotal = line.quantity * lineWt;
                                 const isEditingQty = inlineQtyLineId === line.id;
                                 return (
-                                <TableRow key={line.id} data-testid={`row-line-${line.id}`}>
-                                  <TableCell className="font-mono text-sm" data-testid={`text-article-code-${line.id}`}>
-                                    {line.articleCode}
-                                  </TableCell>
-                                  <TableCell data-testid={`text-product-name-${line.id}`}>
-                                    {line.productName}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono" data-testid={`text-quantity-${line.id}`}>
-                                    {canEdit && isEditingQty ? (
-                                      <Input
-                                        type="number"
-                                        min="1"
-                                        className="w-20 h-7 text-right font-mono text-sm ml-auto"
-                                        value={inlineQtyValue}
-                                        onChange={(e) => setInlineQtyValue(e.target.value)}
-                                        onBlur={() => commitInlineQty(line.id)}
-                                        onKeyDown={(e) => {
-                                          if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
-                                          if (e.key === "Enter") commitInlineQty(line.id);
-                                          if (e.key === "Escape") setInlineQtyLineId(null);
-                                        }}
-                                        autoFocus
-                                        data-testid={`input-inline-qty-${line.id}`}
-                                      />
-                                    ) : canEdit ? (
-                                      <button
-                                        className="font-mono hover:underline hover:text-primary cursor-pointer w-full text-right"
-                                        title="Click to edit quantity"
-                                        onClick={() => { setInlineQtyLineId(line.id); setInlineQtyValue(String(line.quantity)); }}
-                                        data-testid={`button-inline-qty-${line.id}`}
-                                      >
-                                        {line.quantity}
-                                      </button>
-                                    ) : (
-                                      <span className="font-mono">{line.quantity}</span>
+                                  <TableRow key={line.id} className="hover:bg-muted/40" data-testid={`row-line-${line.id}`}>
+                                    <TableCell className="font-mono text-xs text-muted-foreground py-2.5" data-testid={`text-article-code-${line.id}`}>
+                                      {line.articleCode}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium py-2.5" data-testid={`text-product-name-${line.id}`}>
+                                      {line.productName}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono py-2.5" data-testid={`text-quantity-${line.id}`}>
+                                      {canEdit && isEditingQty ? (
+                                        <Input
+                                          type="number"
+                                          min="1"
+                                          className="w-20 h-7 text-right font-mono text-sm ml-auto"
+                                          value={inlineQtyValue}
+                                          onChange={(e) => setInlineQtyValue(e.target.value)}
+                                          onBlur={() => commitInlineQty(line.id)}
+                                          onKeyDown={(e) => {
+                                            if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
+                                            if (e.key === "Enter") commitInlineQty(line.id);
+                                            if (e.key === "Escape") setInlineQtyLineId(null);
+                                          }}
+                                          autoFocus
+                                          data-testid={`input-inline-qty-${line.id}`}
+                                        />
+                                      ) : canEdit ? (
+                                        <button
+                                          className="font-mono hover:underline hover:text-primary cursor-pointer w-full text-right"
+                                          title="Click to edit quantity"
+                                          onClick={() => { setInlineQtyLineId(line.id); setInlineQtyValue(String(line.quantity)); }}
+                                          data-testid={`button-inline-qty-${line.id}`}
+                                        >
+                                          {line.quantity}
+                                        </button>
+                                      ) : (
+                                        <span className="font-mono">{line.quantity}</span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-sm text-muted-foreground py-2.5" data-testid={`text-kg-bale-${line.id}`}>
+                                      {lineWt % 1 === 0 ? lineWt.toLocaleString() : lineWt.toFixed(2)}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-sm text-muted-foreground py-2.5" data-testid={`text-total-kg-${line.id}`}>
+                                      {lineTotal > 0 ? (lineTotal % 1 === 0 ? lineTotal.toLocaleString() : lineTotal.toFixed(1)) : "—"}
+                                    </TableCell>
+                                    {!hideProformaPrice && (
+                                      <TableCell className="text-right font-mono font-medium py-2.5" data-testid={`text-price-${line.id}`}>
+                                        {formatAmount(parseFloat(line.pricePerBale))}
+                                      </TableCell>
                                     )}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono text-sm" data-testid={`text-kg-bale-${line.id}`}>
-                                    {lineWt % 1 === 0 ? lineWt.toLocaleString() : lineWt.toFixed(2)}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono text-sm text-muted-foreground" data-testid={`text-total-kg-${line.id}`}>
-                                    {lineTotal > 0 ? (lineTotal % 1 === 0 ? lineTotal.toLocaleString() : lineTotal.toFixed(1)) : "—"}
-                                  </TableCell>
-                                  {!hideProformaPrice && (
-                                    <TableCell className="text-right font-mono" data-testid={`text-price-${line.id}`}>
-                                      {formatAmount(parseFloat(line.pricePerBale))}
-                                    </TableCell>
-                                  )}
-                                  {canEdit && (
-                                    <TableCell>
-                                      <div className="flex items-center gap-1">
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          onClick={() => {
-                                            setEditingLine(line);
-                                            setEditLineValues({
-                                              productName: line.productName,
-                                              quantity: String(line.quantity),
-                                              pricePerBale: line.pricePerBale,
-                                            });
-                                          }}
-                                          data-testid={`button-edit-line-${line.id}`}
-                                        >
-                                          <Pencil className="h-3 w-3" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          onClick={() => {
-                                            setPendingDelete(() => () => deleteLineMutation.mutate(line.id));
-                                          }}
-                                          disabled={deleteLineMutation.isPending}
-                                          data-testid={`button-delete-line-${line.id}`}
-                                        >
-                                          <Trash2 className="h-3 w-3" />
-                                        </Button>
-                                      </div>
-                                    </TableCell>
-                                  )}
-                                </TableRow>
-                              );
+                                    {canEdit && (
+                                      <TableCell className="py-2.5">
+                                        <div className="flex items-center gap-0.5 justify-end">
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7"
+                                            onClick={() => {
+                                              setEditingLine(line);
+                                              setEditLineValues({
+                                                productName: line.productName,
+                                                quantity: String(line.quantity),
+                                                pricePerBale: line.pricePerBale,
+                                              });
+                                            }}
+                                            data-testid={`button-edit-line-${line.id}`}
+                                          >
+                                            <Pencil className="h-3 w-3" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7"
+                                            onClick={() => setPendingDelete(() => () => deleteLineMutation.mutate(line.id))}
+                                            disabled={deleteLineMutation.isPending}
+                                            data-testid={`button-delete-line-${line.id}`}
+                                          >
+                                            <Trash2 className="h-3 w-3 text-destructive/70" />
+                                          </Button>
+                                        </div>
+                                      </TableCell>
+                                    )}
+                                  </TableRow>
+                                );
                               })}
                             </TableBody>
                           </Table>
-                          {(() => {
-                            const totalQty = proforma.lines.reduce((s, l) => s + l.quantity, 0);
-                            const totalWeight = proforma.lines.reduce((s, l) => s + l.quantity * parseFloat(l.weightPerBaleKg || "0"), 0);
-                            const totalAmount = proforma.lines.reduce((s, l) => s + l.quantity * parseFloat(l.pricePerBale), 0);
-                            return (
-                              <div className="flex items-center gap-4 mt-3 pt-3 border-t flex-wrap">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-xs text-muted-foreground">Total Bales:</span>
-                                  <span className="text-sm font-semibold" data-testid={`text-total-qty-${proforma.id}`}>{totalQty.toLocaleString()}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-xs text-muted-foreground">Total Weight:</span>
-                                  <span className="text-sm font-semibold" data-testid={`text-total-weight-${proforma.id}`}>{totalWeight.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg</span>
-                                </div>
-                                {!hideProformaPrice && (
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-xs text-muted-foreground">Total Amount:</span>
-                                    <span className="text-sm font-semibold" data-testid={`text-total-amount-${proforma.id}`}>{formatAmount(totalAmount)}</span>
-                                  </div>
-                                )}
+
+                          {/* Summary footer */}
+                          <div className="flex items-center gap-6 px-4 py-3 bg-muted/20 border-t text-sm flex-wrap">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-muted-foreground">Bales</span>
+                              <span className="font-semibold font-mono" data-testid={`text-total-qty-${proforma.id}`}>{totalQty.toLocaleString()}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-muted-foreground">Weight</span>
+                              <span className="font-semibold font-mono" data-testid={`text-total-weight-${proforma.id}`}>{totalWeight.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg</span>
+                            </div>
+                            {!hideProformaPrice && (
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-muted-foreground">Total</span>
+                                <span className="font-semibold font-mono" data-testid={`text-total-amount-${proforma.id}`}>{formatAmount(totalAmount)}</span>
                               </div>
-                            );
-                          })()}
+                            )}
+                          </div>
                         </div>
                       ) : (
-                        <p className="text-sm text-muted-foreground text-center py-4" data-testid={`text-no-lines-${proforma.id}`}>
-                          No price lines yet
-                        </p>
+                        <div className="flex flex-col items-center py-10 text-center" data-testid={`text-no-lines-${proforma.id}`}>
+                          <Package className="h-8 w-8 text-muted-foreground/40 mb-2" />
+                          <p className="text-sm text-muted-foreground">No price lines yet</p>
+                          {canEdit && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="mt-3"
+                              onClick={() => {
+                                setAddLineProformaId(proforma.id);
+                                setAddLineMode("catalog");
+                                setCatalogSelectedItem(null);
+                                setCatalogSearch("");
+                                setNewLine({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
+                                setIsAddLineOpen(true);
+                              }}
+                            >
+                              <Plus className="mr-1.5 h-3.5 w-3.5" />
+                              Add first item
+                            </Button>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
                 </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
 
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="max-w-md">
