@@ -1831,6 +1831,7 @@ export default function FactoryContainers() {
                     </TableHead>
                     <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Container #</TableHead>
                     <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Commission</TableHead>
+                    <TableHead className="text-right text-xs uppercase tracking-wide font-medium text-muted-foreground">Weight (kg)</TableHead>
                     <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Total Value</TableHead>
                     <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Status</TableHead>
                     <TableHead className="w-24 text-xs uppercase tracking-wide font-medium text-muted-foreground">Actions</TableHead>
@@ -1873,6 +1874,12 @@ export default function FactoryContainers() {
                             <span className="text-base font-bold">{supplierName}</span>
                             <Badge variant="outline">{count} container{count !== 1 ? "s" : ""}</Badge>
                           </div>
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-semibold">
+                          {(() => {
+                            const totalKg = groupContainers.reduce((s, c) => s + parseFloat(c.totalKg || "0"), 0);
+                            return totalKg > 0 ? formatNumber(totalKg) : <span className="text-muted-foreground">—</span>;
+                          })()}
                         </TableCell>
                         <TableCell className="font-mono font-semibold">
                           {Array.from(groupTotals.entries()).map(([cc, amt]) => (
@@ -1925,6 +1932,11 @@ export default function FactoryContainers() {
                             </TableCell>
                             <TableCell className="font-mono">
                               {commAmt > 0 ? `${commCcy} ${formatNumber(commAmt)}` : <span className="text-muted-foreground">—</span>}
+                            </TableCell>
+                            <TableCell className="text-right font-mono" data-testid={`text-weight-${c.id}`}>
+                              {parseFloat(c.totalKg || "0") > 0
+                                ? formatNumber(parseFloat(c.totalKg || "0"))
+                                : <span className="text-muted-foreground">—</span>}
                             </TableCell>
                             <TableCell className="font-mono font-semibold">
                               {totalValue > 0 ? `${ccy} ${formatNumber(totalValue)}` : <span className="text-muted-foreground">—</span>}
