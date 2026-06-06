@@ -6,7 +6,9 @@ import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, TrendingUp, TrendingDown, LayoutList, ChevronDown, ChevronRight, Receipt, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, LayoutList, ChevronDown, ChevronRight, Receipt, ChevronsDownUp, ChevronsUpDown, SlidersHorizontal } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { formatNumber } from "@/lib/formatNumber";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -115,6 +117,28 @@ export default function SalesReportDetail() {
   const [expandedLocations, setExpandedLocations] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"items" | "bySale">("items");
   const [expandedVouchers, setExpandedVouchers] = useState<Set<number>>(new Set());
+
+  const ITEM_COLUMNS = [
+    { id: "qty" as const, label: "Qty" },
+    { id: "costPrice" as const, label: "Cost Price" },
+    { id: "hassanPrice" as const, label: "Hassan's Price" },
+    { id: "pricePerBale" as const, label: "Price / Bale" },
+    { id: "costProfitBale" as const, label: "Cost Profit / Bale" },
+    { id: "hassanProfitBale" as const, label: "Hassan's Profit / Bale" },
+    { id: "costProfitTotal" as const, label: "Cost Profit" },
+    { id: "hassanProfitTotal" as const, label: "Hassan's Profit" },
+  ];
+  type ItemColumnId = typeof ITEM_COLUMNS[number]["id"];
+  const [hiddenColumns, setHiddenColumns] = useState<Set<ItemColumnId>>(new Set());
+  const col = (id: ItemColumnId) => !hiddenColumns.has(id);
+  const toggleColumn = (id: ItemColumnId) => {
+    setHiddenColumns((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   useEscapeToParent("/sales-report");
 
   const params = new URLSearchParams(window.location.search);
@@ -451,6 +475,44 @@ export default function SalesReportDetail() {
                   : <><ChevronsUpDown className="h-3.5 w-3.5 mr-1" />Expand All</>}
               </Button>
             )}
+            {viewMode === "items" && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="button-toggle-columns">
+                    <SlidersHorizontal className="h-3.5 w-3.5 mr-1" />
+                    Columns
+                    {hiddenColumns.size > 0 && <span className="ml-1 text-xs text-muted-foreground">({hiddenColumns.size} hidden)</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-2" align="end">
+                  <p className="text-xs font-medium text-muted-foreground px-2 pb-1">Show / hide columns</p>
+                  <div className="space-y-1">
+                    {ITEM_COLUMNS.map((c) => (
+                      <div
+                        key={c.id}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
+                        onClick={() => toggleColumn(c.id)}
+                        data-testid={`toggle-col-${c.id}`}
+                      >
+                        <Checkbox checked={!hiddenColumns.has(c.id)} className="h-4 w-4 pointer-events-none" />
+                        <span className="text-sm">{c.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {hiddenColumns.size > 0 && (
+                    <div className="border-t mt-1 pt-1 px-2">
+                      <button
+                        className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                        onClick={() => setHiddenColumns(new Set())}
+                        data-testid="button-show-all-columns"
+                      >
+                        Show all
+                      </button>
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
           {plFilter !== "all" && (
             <div className="flex items-center gap-1 rounded-md border p-1" data-testid="filter-basis-toggle">
@@ -715,14 +777,14 @@ export default function SalesReportDetail() {
                     <TableRow>
                       <TableHead className="w-6"></TableHead>
                       <TableHead>Item / Location</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Price / Bale</TableHead>
-                      <TableHead className="text-right">Total Sales</TableHead>
-                      <TableHead className="text-right">Cost Price</TableHead>
-                      <TableHead className="text-right">Total Cost</TableHead>
-                      <TableHead className="text-right">Cost Profit</TableHead>
-                      <TableHead className="text-right">Hassan's Price</TableHead>
-                      <TableHead className="text-right">Hassan's Profit</TableHead>
+                      {col("qty") && <TableHead className="text-right">Qty</TableHead>}
+                      {col("costPrice") && <TableHead className="text-right">Cost Price</TableHead>}
+                      {col("hassanPrice") && <TableHead className="text-right">Hassan's Price</TableHead>}
+                      {col("pricePerBale") && <TableHead className="text-right">Price / Bale</TableHead>}
+                      {col("costProfitBale") && <TableHead className="text-right">Cost Profit / Bale</TableHead>}
+                      {col("hassanProfitBale") && <TableHead className="text-right">Hassan's Profit / Bale</TableHead>}
+                      {col("costProfitTotal") && <TableHead className="text-right">Cost Profit</TableHead>}
+                      {col("hassanProfitTotal") && <TableHead className="text-right">Hassan's Profit</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -764,24 +826,14 @@ export default function SalesReportDetail() {
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell className="text-right font-mono py-2">{formatNumber(group.totalQty)}</TableCell>
-                            <TableCell className="text-right font-mono py-2">
-                              {group.totalQty > 0 ? formatAmount(group.totalSales / group.totalQty) : "—"}
-                            </TableCell>
-                            <TableCell className="text-right font-mono py-2">{formatAmount(group.totalSales)}</TableCell>
-                            <TableCell className="text-right font-mono py-2 text-muted-foreground">
-                              {group.totalQty > 0 ? formatAmount(group.totalCost / group.totalQty) : "—"}
-                            </TableCell>
-                            <TableCell className="text-right font-mono py-2">{formatAmount(group.totalCost)}</TableCell>
-                            <TableCell className={`text-right font-mono py-2 ${profitColor(group.costProfit)}`}>
-                              {formatAmount(Math.abs(group.costProfit))}
-                            </TableCell>
-                            <TableCell className="text-right font-mono py-2 text-muted-foreground">
-                              {group.totalQty > 0 ? formatAmount(group.totalConfiguredCost / group.totalQty) : "—"}
-                            </TableCell>
-                            <TableCell className={`text-right font-mono py-2 ${profitColor(group.configuredProfit)}`}>
-                              {formatAmount(Math.abs(group.configuredProfit))}
-                            </TableCell>
+                            {col("qty") && <TableCell className="text-right font-mono py-2">{formatNumber(group.totalQty)}</TableCell>}
+                            {col("costPrice") && <TableCell className="text-right font-mono py-2 text-muted-foreground">{group.totalQty > 0 ? formatAmount(group.totalCost / group.totalQty) : "—"}</TableCell>}
+                            {col("hassanPrice") && <TableCell className="text-right font-mono py-2 text-muted-foreground">{group.totalQty > 0 ? formatAmount(group.totalConfiguredCost / group.totalQty) : "—"}</TableCell>}
+                            {col("pricePerBale") && <TableCell className="text-right font-mono py-2">{group.totalQty > 0 ? formatAmount(group.totalSales / group.totalQty) : "—"}</TableCell>}
+                            {col("costProfitBale") && <TableCell className={`text-right font-mono py-2 ${profitColor(group.costProfit)}`}>{group.totalQty > 0 ? formatAmount(Math.abs(group.costProfit) / group.totalQty) : "—"}</TableCell>}
+                            {col("hassanProfitBale") && <TableCell className={`text-right font-mono py-2 ${profitColor(group.configuredProfit)}`}>{group.totalQty > 0 ? formatAmount(Math.abs(group.configuredProfit) / group.totalQty) : "—"}</TableCell>}
+                            {col("costProfitTotal") && <TableCell className={`text-right font-mono py-2 ${profitColor(group.costProfit)}`}>{formatAmount(Math.abs(group.costProfit))}</TableCell>}
+                            {col("hassanProfitTotal") && <TableCell className={`text-right font-mono py-2 ${profitColor(group.configuredProfit)}`}>{formatAmount(Math.abs(group.configuredProfit))}</TableCell>}
                           </TableRow>
 
                           {/* Expanded: per-location totals */}
@@ -825,51 +877,41 @@ export default function SalesReportDetail() {
                                       )}
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-right font-mono py-1.5">{formatNumber(loc.totalQty)}</TableCell>
-                                  <TableCell className="text-right font-mono py-1.5">
-                                    {loc.totalQty > 0 ? formatAmount(loc.totalSales / loc.totalQty) : "—"}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono py-1.5">{formatAmount(loc.totalSales)}</TableCell>
-                                  <TableCell className="text-right font-mono py-1.5 text-muted-foreground">
-                                    {loc.totalQty > 0 ? formatAmount(loc.totalCost / loc.totalQty) : "—"}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono py-1.5">{formatAmount(loc.totalCost)}</TableCell>
-                                  <TableCell className={`text-right font-mono py-1.5 ${profitColor(loc.costProfit)}`}>
-                                    {formatAmount(Math.abs(loc.costProfit))}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono py-1.5 text-muted-foreground">
-                                    {loc.totalQty > 0 ? formatAmount(loc.totalConfiguredCost / loc.totalQty) : "—"}
-                                  </TableCell>
-                                  <TableCell className={`text-right font-mono py-1.5 ${profitColor(loc.configuredProfit)}`}>
-                                    {formatAmount(Math.abs(loc.configuredProfit))}
-                                  </TableCell>
+                                  {col("qty") && <TableCell className="text-right font-mono py-1.5">{formatNumber(loc.totalQty)}</TableCell>}
+                                  {col("costPrice") && <TableCell className="text-right font-mono py-1.5 text-muted-foreground">{loc.totalQty > 0 ? formatAmount(loc.totalCost / loc.totalQty) : "—"}</TableCell>}
+                                  {col("hassanPrice") && <TableCell className="text-right font-mono py-1.5 text-muted-foreground">{loc.totalQty > 0 ? formatAmount(loc.totalConfiguredCost / loc.totalQty) : "—"}</TableCell>}
+                                  {col("pricePerBale") && <TableCell className="text-right font-mono py-1.5">{loc.totalQty > 0 ? formatAmount(loc.totalSales / loc.totalQty) : "—"}</TableCell>}
+                                  {col("costProfitBale") && <TableCell className={`text-right font-mono py-1.5 ${profitColor(loc.costProfit)}`}>{loc.totalQty > 0 ? formatAmount(Math.abs(loc.costProfit) / loc.totalQty) : "—"}</TableCell>}
+                                  {col("hassanProfitBale") && <TableCell className={`text-right font-mono py-1.5 ${profitColor(loc.configuredProfit)}`}>{loc.totalQty > 0 ? formatAmount(Math.abs(loc.configuredProfit) / loc.totalQty) : "—"}</TableCell>}
+                                  {col("costProfitTotal") && <TableCell className={`text-right font-mono py-1.5 ${profitColor(loc.costProfit)}`}>{formatAmount(Math.abs(loc.costProfit))}</TableCell>}
+                                  {col("hassanProfitTotal") && <TableCell className={`text-right font-mono py-1.5 ${profitColor(loc.configuredProfit)}`}>{formatAmount(Math.abs(loc.configuredProfit))}</TableCell>}
                                 </TableRow>
 
                                 {/* Individual sale records within this location */}
-                                {isLocExpanded && loc.items.map((item) => (
-                                  <TableRow
-                                    key={item.id}
-                                    data-testid={`row-detail-${item.id}`}
-                                    className="text-xs bg-muted/10"
-                                  >
-                                    <TableCell className="py-1 w-6"></TableCell>
-                                    <TableCell className="py-1 pl-10 text-muted-foreground">
-                                      <span className="text-muted-foreground/60">{item.voucherDate?.slice(0, 10)}</span>
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono py-1">{formatNumericValue(item.quantity)}</TableCell>
-                                    <TableCell className="text-right font-mono py-1">{formatAmount(item.actualSellingPrice)}</TableCell>
-                                    <TableCell className="text-right font-mono py-1">{formatAmount(item.totalSales)}</TableCell>
-                                    <TableCell className="text-right font-mono py-1">{formatAmount(item.costPrice)}</TableCell>
-                                    <TableCell className="text-right font-mono py-1">{formatAmount(item.totalCost)}</TableCell>
-                                    <TableCell className={`text-right font-mono py-1 ${profitColor(parseFloat(item.costProfit))}`}>
-                                      {formatAmount(Math.abs(parseFloat(item.costProfit)))}
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono py-1">{formatAmount(item.configuredSellingPrice)}</TableCell>
-                                    <TableCell className={`text-right font-mono py-1 ${profitColor(item.configuredProfit)}`}>
-                                      {formatAmount(Math.abs(item.configuredProfit))}
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
+                                {isLocExpanded && loc.items.map((item) => {
+                                  const qty = parseFloat(item.quantity) || 0;
+                                  const itemCostProfit = parseFloat(item.costProfit) || 0;
+                                  return (
+                                    <TableRow
+                                      key={item.id}
+                                      data-testid={`row-detail-${item.id}`}
+                                      className="text-xs bg-muted/10"
+                                    >
+                                      <TableCell className="py-1 w-6"></TableCell>
+                                      <TableCell className="py-1 pl-10 text-muted-foreground">
+                                        <span className="text-muted-foreground/60">{item.voucherDate?.slice(0, 10)}</span>
+                                      </TableCell>
+                                      {col("qty") && <TableCell className="text-right font-mono py-1">{formatNumericValue(item.quantity)}</TableCell>}
+                                      {col("costPrice") && <TableCell className="text-right font-mono py-1">{formatAmount(item.costPrice)}</TableCell>}
+                                      {col("hassanPrice") && <TableCell className="text-right font-mono py-1">{formatAmount(item.configuredSellingPrice)}</TableCell>}
+                                      {col("pricePerBale") && <TableCell className="text-right font-mono py-1">{formatAmount(item.actualSellingPrice)}</TableCell>}
+                                      {col("costProfitBale") && <TableCell className={`text-right font-mono py-1 ${profitColor(itemCostProfit)}`}>{qty > 0 ? formatAmount(Math.abs(itemCostProfit) / qty) : "—"}</TableCell>}
+                                      {col("hassanProfitBale") && <TableCell className={`text-right font-mono py-1 ${profitColor(item.configuredProfit)}`}>{qty > 0 ? formatAmount(Math.abs(item.configuredProfit) / qty) : "—"}</TableCell>}
+                                      {col("costProfitTotal") && <TableCell className={`text-right font-mono py-1 ${profitColor(itemCostProfit)}`}>{formatAmount(Math.abs(itemCostProfit))}</TableCell>}
+                                      {col("hassanProfitTotal") && <TableCell className={`text-right font-mono py-1 ${profitColor(item.configuredProfit)}`}>{formatAmount(Math.abs(item.configuredProfit))}</TableCell>}
+                                    </TableRow>
+                                  );
+                                })}
                               </>
                             );
                           })}
@@ -884,18 +926,14 @@ export default function SalesReportDetail() {
                         Total ({itemGroups.length} item{itemGroups.length !== 1 ? "s" : ""}
                         {plFilter !== "all" ? `, ${plFilter === "gain" ? "gaining" : "losing"} only` : ""})
                       </TableCell>
-                      <TableCell className="text-right font-mono">{formatNumber(totalQty)}</TableCell>
-                      <TableCell></TableCell>
-                      <TableCell className="text-right font-mono">{formatAmount(totalSales)}</TableCell>
-                      <TableCell></TableCell>
-                      <TableCell className="text-right font-mono">{formatAmount(totalCost)}</TableCell>
-                      <TableCell className={`text-right font-mono ${profitColor(costProfit)}`}>
-                        {formatAmount(Math.abs(costProfit))}
-                      </TableCell>
-                      <TableCell></TableCell>
-                      <TableCell className={`text-right font-mono ${profitColor(configuredProfit)}`}>
-                        {formatAmount(Math.abs(configuredProfit))}
-                      </TableCell>
+                      {col("qty") && <TableCell className="text-right font-mono">{formatNumber(totalQty)}</TableCell>}
+                      {col("costPrice") && <TableCell className="text-right font-mono text-muted-foreground">{totalQty > 0 ? formatAmount(totalCost / totalQty) : "—"}</TableCell>}
+                      {col("hassanPrice") && <TableCell className="text-right font-mono text-muted-foreground">{totalQty > 0 ? formatAmount(totalConfiguredCost / totalQty) : "—"}</TableCell>}
+                      {col("pricePerBale") && <TableCell className="text-right font-mono">{totalQty > 0 ? formatAmount(totalSales / totalQty) : "—"}</TableCell>}
+                      {col("costProfitBale") && <TableCell className={`text-right font-mono ${profitColor(costProfit)}`}>{totalQty > 0 ? formatAmount(Math.abs(costProfit) / totalQty) : "—"}</TableCell>}
+                      {col("hassanProfitBale") && <TableCell className={`text-right font-mono ${profitColor(configuredProfit)}`}>{totalQty > 0 ? formatAmount(Math.abs(configuredProfit) / totalQty) : "—"}</TableCell>}
+                      {col("costProfitTotal") && <TableCell className={`text-right font-mono ${profitColor(costProfit)}`}>{formatAmount(Math.abs(costProfit))}</TableCell>}
+                      {col("hassanProfitTotal") && <TableCell className={`text-right font-mono ${profitColor(configuredProfit)}`}>{formatAmount(Math.abs(configuredProfit))}</TableCell>}
                     </TableRow>
                   </TableFooter>
                 </Table>
