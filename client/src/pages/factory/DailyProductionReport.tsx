@@ -1169,9 +1169,9 @@ export default function DailyProductionReport() {
         const transportExpected = ms ? ms.totalWorkerTransport  * ratio : null;
         const workerTotal       = workerExpected !== null && transportExpected !== null ? workerExpected + transportExpected : null;
         const workerRemaining   = ms && workerTotal !== null ? workerTotal - ms.totalWorkerPaid : null;
-        // Employee expected: prorated salary minus already-credited balance (pre-payment aware)
+        // Employee expected: total prorated salary for the period
         const empExpected = ms
-          ? ms.employeeBreakdown.reduce((sum, e) => sum + Math.max(0, e.expected - Math.max(0, e.balance)), 0)
+          ? ms.employeeBreakdown.reduce((sum, e) => sum + e.expected, 0)
           : null;
         const empBalance        = ms ? ms.totalEmployeeBalance : null;
         const presetLabel = presets.find(p => p.key === preset)?.label ?? (from && to && from !== to ? `${from} → ${to}` : from || "");
