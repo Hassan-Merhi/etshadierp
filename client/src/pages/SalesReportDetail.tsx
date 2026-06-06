@@ -6,7 +6,7 @@ import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, TrendingUp, TrendingDown, LayoutList, ChevronDown, ChevronRight, Receipt } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, LayoutList, ChevronDown, ChevronRight, Receipt, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { formatNumber } from "@/lib/formatNumber";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -409,8 +409,48 @@ export default function SalesReportDetail() {
               data-testid="button-view-by-sale"
             >
               <Receipt className="h-3.5 w-3.5 mr-1" />
-              By Sale
+              MHD
             </Button>
+          </div>
+          <div className="flex items-center gap-1">
+            {viewMode === "bySale" && voucherGroups.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const allExpanded = expandedVouchers.size >= voucherGroups.length;
+                  if (allExpanded) {
+                    setExpandedVouchers(new Set());
+                  } else {
+                    setExpandedVouchers(new Set(voucherGroups.map((v) => v.voucherId)));
+                  }
+                }}
+                data-testid="button-expand-collapse-all"
+              >
+                {expandedVouchers.size >= voucherGroups.length
+                  ? <><ChevronsDownUp className="h-3.5 w-3.5 mr-1" />Collapse All</>
+                  : <><ChevronsUpDown className="h-3.5 w-3.5 mr-1" />Expand All</>}
+              </Button>
+            )}
+            {viewMode === "items" && itemGroups.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const allExpanded = expandedItems.size >= itemGroups.length;
+                  if (allExpanded) {
+                    setExpandedItems(new Set());
+                  } else {
+                    setExpandedItems(new Set(itemGroups.map((g) => String(g.stockItemId))));
+                  }
+                }}
+                data-testid="button-expand-collapse-all-items"
+              >
+                {expandedItems.size >= itemGroups.length
+                  ? <><ChevronsDownUp className="h-3.5 w-3.5 mr-1" />Collapse All</>
+                  : <><ChevronsUpDown className="h-3.5 w-3.5 mr-1" />Expand All</>}
+              </Button>
+            )}
           </div>
           {plFilter !== "all" && (
             <div className="flex items-center gap-1 rounded-md border p-1" data-testid="filter-basis-toggle">
