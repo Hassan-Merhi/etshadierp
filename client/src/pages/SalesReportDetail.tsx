@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useBackToParent } from "@/hooks/use-back-to-parent";
@@ -626,7 +626,7 @@ export default function SalesReportDetail() {
                         const isExpanded = expandedVouchers.has(vg.voucherId);
                         const groupPricePerBale = vg.totalQty > 0 ? vg.totalSales / vg.totalQty : 0;
                         return (
-                          <>
+                          <Fragment key={vg.voucherId}>
                             <TableRow
                               key={`vr-${vg.voucherId}`}
                               data-testid={`row-voucher-${vg.voucherId}`}
@@ -673,7 +673,7 @@ export default function SalesReportDetail() {
                                 </TableRow>
                               );
                             })}
-                          </>
+                          </Fragment>
                         );
                       })}
                     </TableBody>
@@ -793,7 +793,7 @@ export default function SalesReportDetail() {
                       const itemKey = String(group.stockItemId);
                       const isExpanded = expandedItems.has(itemKey);
                       return (
-                        <>
+                        <Fragment key={itemKey}>
                           {/* Item summary row */}
                           <TableRow
                             key={`item-${itemKey}`}
@@ -842,7 +842,7 @@ export default function SalesReportDetail() {
                             const locRowKey = `${itemKey}-${loc.locationKey}`;
                             const isLocExpanded = expandedLocations.has(locRowKey);
                             return (
-                              <>
+                              <Fragment key={locRowKey}>
                                 {/* Location summary row for this item */}
                                 <TableRow
                                   key={`loc-${locRowKey}`}
@@ -900,7 +900,10 @@ export default function SalesReportDetail() {
                                     >
                                       <TableCell className="py-1 w-6"></TableCell>
                                       <TableCell className="py-1 pl-10 text-muted-foreground">
-                                        <span className="text-muted-foreground/60">{item.voucherDate?.slice(0, 10)}</span>
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-mono text-foreground/80">{item.voucherNumber}</span>
+                                          <span className="text-muted-foreground/60">{item.voucherDate?.slice(0, 10)}</span>
+                                        </div>
                                       </TableCell>
                                       {col("qty") && <TableCell className="text-right font-mono py-1">{formatNumericValue(item.quantity)}</TableCell>}
                                       {col("costPrice") && <TableCell className="text-right font-mono py-1">{formatAmount(item.costPrice)}</TableCell>}
@@ -913,10 +916,10 @@ export default function SalesReportDetail() {
                                     </TableRow>
                                   );
                                 })}
-                              </>
+                              </Fragment>
                             );
                           })}
-                        </>
+                        </Fragment>
                       );
                     })}
                   </TableBody>
@@ -1047,7 +1050,8 @@ export default function SalesReportDetail() {
                                   <div className="border border-t-0 rounded-b-md p-2 space-y-1 bg-muted/10">
                                     {loc.items.map((item) => (
                                       <div key={item.id} className="text-xs p-1 border-b last:border-b-0">
-                                        <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-mono text-foreground/80">{item.voucherNumber}</span>
                                           <span className="text-muted-foreground/60">{item.voucherDate?.slice(0, 10)}</span>
                                         </div>
                                         <div className="grid grid-cols-2 gap-1 mt-1">
