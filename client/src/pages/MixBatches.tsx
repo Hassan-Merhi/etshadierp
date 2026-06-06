@@ -57,6 +57,7 @@ export default function MixBatches() {
 
   // Delete state
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [showAllBatches, setShowAllBatches] = useState(false);
 
   useEscapeBack(selectedBatchId !== null ? () => setSelectedBatchId(null) : null);
   const appMode = useAppMode();
@@ -296,11 +297,14 @@ export default function MixBatches() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {[...filteredBatches].sort((a, b) => {
-                  const da = (a as any).batchDate || a.createdAt || "";
-                  const db = (b as any).batchDate || b.createdAt || "";
-                  return db > da ? 1 : db < da ? -1 : b.id - a.id;
-                }).map((batch) => {
+                {(() => {
+                  const sorted = [...filteredBatches].sort((a, b) => {
+                    const da = (a as any).batchDate || a.createdAt || "";
+                    const db = (b as any).batchDate || b.createdAt || "";
+                    return db > da ? 1 : db < da ? -1 : b.id - a.id;
+                  });
+                  return (showAllBatches ? sorted : sorted.slice(0, 15));
+                })().map((batch) => {
                   const total = parseFloat(batch.totalWeightKg || "0");
                   return (
                     <TableRow
@@ -368,6 +372,20 @@ export default function MixBatches() {
                 );
               })()}
             </Table>
+            {filteredBatches.length > 15 && (
+              <div className="flex justify-center py-3 border-t">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllBatches(v => !v)}
+                  data-testid="button-toggle-show-all-batches"
+                >
+                  {showAllBatches
+                    ? `Show less`
+                    : `Show all ${filteredBatches.length} batches`}
+                </Button>
+              </div>
+            )}
             </div>
           ) : (
             <div className="text-center py-12">
