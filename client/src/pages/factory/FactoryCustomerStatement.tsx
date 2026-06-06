@@ -330,8 +330,14 @@ export default function FactoryCustomerStatement() {
             variant="outline"
             size="sm"
             onClick={() => {
+              const params = new URLSearchParams();
+              if (filterDateFrom) params.set("dateFrom", filterDateFrom);
+              if (filterDateTo) params.set("dateTo", filterDateTo);
+              if (filterDestination) params.set("destination", filterDestination);
+              const qs = params.toString();
+              const url = `/api/factory/customers/${customerId}/statement/export-pdf${qs ? `?${qs}` : ""}`;
               if (!navigator.onLine) { window.print(); return; }
-              window.open(`/api/factory/customers/${customerId}/statement/export-pdf`, "_blank");
+              window.open(url, "_blank");
             }}
             data-testid="button-export-pdf"
           >
@@ -341,7 +347,14 @@ export default function FactoryCustomerStatement() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => window.open(`/api/factory/customers/${customerId}/statement/export-excel`, "_blank")}
+            onClick={() => {
+              const params = new URLSearchParams();
+              if (filterDateFrom) params.set("dateFrom", filterDateFrom);
+              if (filterDateTo) params.set("dateTo", filterDateTo);
+              if (filterDestination) params.set("destination", filterDestination);
+              const qs = params.toString();
+              window.open(`/api/factory/customers/${customerId}/statement/export-excel${qs ? `?${qs}` : ""}`, "_blank");
+            }}
             data-testid="button-export-excel"
           >
             <FileSpreadsheet className="mr-2 h-4 w-4" />

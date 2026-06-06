@@ -613,6 +613,11 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const openingSide = customer.openingBalanceSide || "Dr";
       let runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
 
+      // Read filter params (forwarded from the frontend export button)
+      const dateFromParam   = ((req.query.dateFrom    as string) || "").trim();
+      const dateToParam     = ((req.query.dateTo      as string) || "").trim();
+      const destFilterParam = ((req.query.destination as string) || "").trim().toLowerCase();
+
       // Build container number + destination maps for INVOICE-type rows
       const invoiceRefIds = [...new Set(
         allRowsPdf.filter((r: any) => r.referenceType === "INVOICE" && r.referenceId).map((r: any) => r.referenceId as number)
@@ -630,14 +635,12 @@ export function registerFactoryCustomersRoutes(app: Express) {
         }
       }
 
-      const rows = allRowsPdf.map((row: any) => {
+      // First pass: enrich ALL rows with running balance (needed before filtering)
+      const allEnrichedPdf = allRowsPdf.map((row: any) => {
         const debit = parseFloat(row.debitAmount || "0");
         const credit = parseFloat(row.creditAmount || "0");
         runningBalance += debit - credit;
-        // container  — real container number for INVOICE rows only
-        // particulars — destination for INVOICE rows; narration/description for all others
-        let container   = "";
-        let particulars = "";
+        let container = "", particulars = "";
         if (row.referenceType === "INVOICE" && row.referenceId) {
           container   = containerNumMap.get(row.referenceId) || "";
           particulars = destinationMapPdf.get(row.referenceId) || "";
@@ -647,10 +650,35 @@ export function registerFactoryCustomersRoutes(app: Express) {
         return { ...row, debit, credit, container, particulars };
       });
 
+      // Compute "brought forward" balance (running balance at the start of the filter period)
+      let bfRunning = openingSide === "Dr" ? openingBalance : -openingBalance;
+      if (dateFromParam) {
+        for (const r of allEnrichedPdf) {
+          const rDate = (r.transactionDate || "").toString().slice(0, 10);
+          if (rDate < dateFromParam) bfRunning += r.debit - r.credit;
+          else break;
+        }
+      }
+
+      // Apply filters (mirrors frontend filteredHistory logic)
+      const rows = allEnrichedPdf.filter((row: any) => {
+        if (destFilterParam) {
+          if (!(row.particulars || "").toLowerCase().includes(destFilterParam)) return false;
+        }
+        if (dateFromParam && row.transactionDate) {
+          if ((row.transactionDate || "").toString().slice(0, 10) < dateFromParam) return false;
+        }
+        if (dateToParam && row.transactionDate) {
+          if ((row.transactionDate || "").toString().slice(0, 10) > dateToParam) return false;
+        }
+        return true;
+      });
+
       const totalDr = rows.reduce((s: number, r: any) => s + r.debit, 0);
       const totalCr = rows.reduce((s: number, r: any) => s + r.credit, 0);
-      const closingBalance = Math.abs(runningBalance);
-      const closingBalanceSide = runningBalance >= 0 ? "Dr" : "Cr";
+      const closingRaw = bfRunning + (totalDr - totalCr);
+      const closingBalance = Math.abs(closingRaw);
+      const closingBalanceSide = closingRaw >= 0 ? "Dr" : "Cr";
 
       // Format: $1,234 (no .00 for whole numbers)
       const fmtAmt = (n: number) => {
@@ -817,10 +845,41 @@ export function registerFactoryCustomersRoutes(app: Express) {
       } else {
         doc.font("Helvetica-Bold").fontSize(9).text(lnm);
       }
-      y += 18;
+      y += 14;
+
+      // ── Period / filter info ──
+      if (dateFromParam || dateToParam || destFilterParam) {
+        const periodParts: string[] = [];
+        if (dateFromParam || dateToParam) {
+          periodParts.push(`Period: ${dateFromParam ? fmtDate(dateFromParam) : "Start"} – ${dateToParam ? fmtDate(dateToParam) : "End"}`);
+        }
+        if (destFilterParam) periodParts.push(`Destination: ${destFilterParam.toUpperCase()}`);
+        doc.fillColor("#555555").font("Helvetica").fontSize(8)
+          .text(periodParts.join("   |   "), MARGIN, y, { width: CONTENT_W, align: "center", lineBreak: false });
+        y += 12;
+      }
+      y += 4;
 
       // ── Table header ──
       drawTableHdr();
+
+      // ── Balance B/F row (only when date-filtered and there's a prior balance) ──
+      if (dateFromParam && Math.abs(bfRunning) > 0.005) {
+        const bfAbs  = Math.abs(bfRunning);
+        const bfSide = bfRunning >= 0 ? "Dr" : "Cr";
+        const bfRowH = MIN_ROW + ROW_PAD * 2;
+        ensureSpace(bfRowH);
+        doc.rect(MARGIN, y, CONTENT_W, bfRowH - 1).fill("#EFF3FB");
+        doc.fillColor("#000000").font("Helvetica-Bold").fontSize(FS);
+        doc.text("Balance B/F", colX[3] + CP, y + ROW_PAD, { width: colW[3] - CP * 2, lineBreak: false });
+        if (bfSide === "Dr") {
+          doc.text(fmtAmt(bfAbs), colX[4] + CP, y + ROW_PAD, { width: colW[4] - CP * 2, align: "right", lineBreak: false });
+        } else {
+          doc.text(fmtAmt(bfAbs), colX[5] + CP, y + ROW_PAD, { width: colW[5] - CP * 2, align: "right", lineBreak: false });
+        }
+        doc.fillColor("#000000").font("Helvetica").fontSize(FS);
+        y += bfRowH;
+      }
 
       // ── Data rows ──
       rows.forEach((row: any, idx: number) => {
@@ -987,7 +1046,13 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const openingSide = customer.openingBalanceSide || "Dr";
       let runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
 
-      const rows = allRowsXlsx.map((row: any) => {
+      // Read filter params (forwarded from frontend export button)
+      const dateFromXlsx   = ((req.query.dateFrom    as string) || "").trim();
+      const dateToXlsx     = ((req.query.dateTo      as string) || "").trim();
+      const destFilterXlsx = ((req.query.destination as string) || "").trim().toLowerCase();
+
+      // First pass: enrich ALL rows with running balance (needed before filtering)
+      const allEnrichedXlsx = allRowsXlsx.map((row: any) => {
         const debit = parseFloat(row.debitAmount || "0");
         const credit = parseFloat(row.creditAmount || "0");
         runningBalance += debit - credit;
@@ -998,10 +1063,35 @@ export function registerFactoryCustomersRoutes(app: Express) {
         return { ...row, debit, credit, destination };
       });
 
+      // Compute brought-forward balance (balance before dateFromXlsx)
+      let bfRunningXlsx = openingSide === "Dr" ? openingBalance : -openingBalance;
+      if (dateFromXlsx) {
+        for (const r of allEnrichedXlsx) {
+          const rDate = (r.transactionDate || "").toString().slice(0, 10);
+          if (rDate < dateFromXlsx) bfRunningXlsx += r.debit - r.credit;
+          else break;
+        }
+      }
+
+      // Apply filters (mirrors frontend filteredHistory logic)
+      const rows = allEnrichedXlsx.filter((row: any) => {
+        if (destFilterXlsx) {
+          if (!(row.destination || "").toLowerCase().includes(destFilterXlsx)) return false;
+        }
+        if (dateFromXlsx && row.transactionDate) {
+          if ((row.transactionDate || "").toString().slice(0, 10) < dateFromXlsx) return false;
+        }
+        if (dateToXlsx && row.transactionDate) {
+          if ((row.transactionDate || "").toString().slice(0, 10) > dateToXlsx) return false;
+        }
+        return true;
+      });
+
       const totalDr = rows.reduce((s: number, r: any) => s + r.debit, 0);
       const totalCr = rows.reduce((s: number, r: any) => s + r.credit, 0);
-      const closingBalance = Math.abs(runningBalance);
-      const closingBalanceSide = runningBalance >= 0 ? "Dr" : "Cr";
+      const closingRawXlsx = bfRunningXlsx + (totalDr - totalCr);
+      const closingBalance = Math.abs(closingRawXlsx);
+      const closingBalanceSide = closingRawXlsx >= 0 ? "Dr" : "Cr";
 
       const txLabel = (type: string) => {
         const map: Record<string, string> = { SALE: "Sale", PAYMENT: "Payment", RECEIPT: "Receipt", ADJUSTMENT: "Adjustment", JOURNAL: "Journal", OPENING_BALANCE: "Opening Bal." };
@@ -1051,6 +1141,14 @@ export function registerFactoryCustomersRoutes(app: Express) {
       sheet.mergeCells(`A${r3.number}:G${r3.number}`);
       const r4 = sheet.addRow([`Opening Balance: ${openingBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${openingSide}`]);
       sheet.mergeCells(`A${r4.number}:G${r4.number}`);
+      if (dateFromXlsx || dateToXlsx || destFilterXlsx) {
+        const periodParts: string[] = [];
+        if (dateFromXlsx || dateToXlsx) periodParts.push(`Period: ${dateFromXlsx || "Start"} to ${dateToXlsx || "End"}`);
+        if (destFilterXlsx) periodParts.push(`Destination filter: ${destFilterXlsx.toUpperCase()}`);
+        const r4b = sheet.addRow([periodParts.join("   |   ")]);
+        sheet.mergeCells(`A${r4b.number}:G${r4b.number}`);
+        r4b.getCell(1).font = { italic: true, color: { argb: "FF555555" } };
+      }
       const r5 = sheet.addRow([`Printed: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`]);
       sheet.mergeCells(`A${r5.number}:G${r5.number}`);
       // spacer
@@ -1065,8 +1163,8 @@ export function registerFactoryCustomersRoutes(app: Express) {
         cell.alignment = { horizontal: "center" };
       });
 
-      // Opening balance row if non-zero
-      if (openingBalance > 0) {
+      // Opening balance row if non-zero (suppressed when date-filtered because B/F row replaces it)
+      if (openingBalance > 0 && !dateFromXlsx) {
         const obRow = sheet.addRow([
           new Date().toLocaleDateString("en-GB"),
           "Opening Bal.",
@@ -1081,6 +1179,30 @@ export function registerFactoryCustomersRoutes(app: Express) {
         });
         obRow.getCell(5).numFmt = numFmt;
         obRow.getCell(6).numFmt = numFmt;
+      }
+
+      // Balance B/F row (when date-filtered and there's a prior balance)
+      if (dateFromXlsx && Math.abs(bfRunningXlsx) > 0.005) {
+        const bfAbsXlsx  = Math.abs(bfRunningXlsx);
+        const bfSideXlsx = bfRunningXlsx >= 0 ? "Dr" : "Cr";
+        const bfRow = sheet.addRow([
+          new Date(dateFromXlsx + "T00:00:00"),
+          "Balance B/F",
+          "Balance Brought Forward",
+          "",
+          bfSideXlsx === "Dr" ? bfAbsXlsx : null,
+          bfSideXlsx === "Cr" ? bfAbsXlsx : null,
+        ]);
+        bfRow.eachCell((cell) => {
+          cell.fill = lightBlueFill;
+          cell.font = { bold: true };
+          cell.border = allBorders;
+        });
+        bfRow.getCell(1).numFmt = "dd/mm/yyyy";
+        bfRow.getCell(5).numFmt = numFmt;
+        bfRow.getCell(6).numFmt = numFmt;
+        bfRow.getCell(5).alignment = { horizontal: "right" };
+        bfRow.getCell(6).alignment = { horizontal: "right" };
       }
 
       // Data rows
