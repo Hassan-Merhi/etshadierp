@@ -11,8 +11,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, Pencil, Search, Tag, RefreshCw, AlertCircle } from "lucide-react";
+import { Check, X, Pencil, Search, Tag, RefreshCw, AlertCircle, Download, Upload } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { ExcelJS, readFile } from "@/lib/excelHelper";
 
 interface FactoryBaleProduct {
   id: number;
@@ -42,7 +43,9 @@ export default function FactoryPriceList() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [showZeroOnly, setShowZeroOnly] = useState(false);
   const [editingCell, setEditingCell] = useState<{ productId: number; field: "sellingPrice" | "productionPrice"; value: string } | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: products = [], isLoading } = useQuery<FactoryBaleProduct[]>({
     queryKey: ["/api/factory/bale-products"],
@@ -99,6 +102,109 @@ export default function FactoryPriceList() {
     if (e.key === "Escape") setEditingCell(null);
   };
 
+  const downloadTemplate = async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Price List");
+
+    ws.columns = [
+      { header: "ID (do not edit)", key: "id", width: 18 },
+      { header: "Article Code", key: "articleCode", width: 18 },
+      { header: "Bale Name", key: "name", width: 36 },
+      { header: "Selling Price ($/bale)", key: "sellingPrice", width: 24 },
+      { header: "Production Cost ($/bale)", key: "productionPrice", width: 26 },
+    ];
+
+    const headerRow = ws.getRow(1);
+    headerRow.font = { bold: true, color: { argb: "FF1F4E79" } };
+    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFBDD7EE" } };
+    headerRow.alignment = { vertical: "middle" };
+    headerRow.height = 18;
+
+    const activeProducts = products.filter(p => p.active);
+    for (const p of activeProducts) {
+      const sp = parseFloat(p.sellingPrice || "0");
+      const pp = parseFloat(p.productionPrice || "0");
+      const row = ws.addRow({
+        id: p.id,
+        articleCode: p.articleCode || p.code || "",
+        name: p.name,
+        sellingPrice: sp > 0 ? sp : "",
+        productionPrice: pp > 0 ? pp : "",
+      });
+      // Gray out read-only columns (ID, Article Code, Bale Name)
+      for (let c = 1; c <= 3; c++) {
+        row.getCell(c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F2F2" } };
+        row.getCell(c).font = { color: { argb: "FF666666" } };
+      }
+      // Highlight editable price columns
+      for (let c = 4; c <= 5; c++) {
+        row.getCell(c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF9E6" } };
+      }
+    }
+
+    ws.views = [{ state: "frozen", ySplit: 1 }];
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer as ArrayBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `factory_price_list_${new Date().toLocaleDateString("en-CA")}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    setIsUploading(true);
+    try {
+      const wb = await readFile(file);
+      const ws = wb.worksheets[0];
+      if (!ws) throw new Error("No worksheet found in the file");
+
+      const prices: { id: number; sellingPrice?: string; productionPrice?: string }[] = [];
+
+      ws.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return; // skip header
+        const rawId = row.getCell(1).value;
+        const id = parseInt(String(rawId ?? ""));
+        if (isNaN(id) || id <= 0) return;
+
+        const rawSell = row.getCell(4).value;
+        const rawProd = row.getCell(5).value;
+
+        prices.push({
+          id,
+          sellingPrice: rawSell !== null && rawSell !== undefined ? String(rawSell) : undefined,
+          productionPrice: rawProd !== null && rawProd !== undefined ? String(rawProd) : undefined,
+        });
+      });
+
+      if (prices.length === 0) throw new Error("No valid rows found — make sure the file matches the template format");
+
+      const res = await modeApiRequest("POST", "/api/factory/bale-products/bulk-update-prices", { prices });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Upload failed");
+      }
+      const result = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
+      toast({
+        title: "Prices Updated",
+        description: `${result.updated} product(s) updated${result.skipped > 0 ? `, ${result.skipped} skipped` : ""}.`,
+      });
+    } catch (err: any) {
+      toast({ title: "Upload Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const filteredProducts = products.filter((p) => {
     if (!p.active) return false;
     const matchSearch = !search ||
@@ -117,14 +223,45 @@ export default function FactoryPriceList() {
 
   return (
     <div className="flex flex-col h-full p-3 sm:p-6 space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        className="hidden"
+        onChange={handleUpload}
+        data-testid="input-price-upload-file"
+      />
+
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 flex-wrap">
         <div>
           <PageHeader title="Factory Price List" subtitle="Set selling prices for bale products." />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="secondary" data-testid="text-price-coverage">
             {updatedCount} / {totalActive} priced
           </Badge>
+          <Button
+            variant="outline"
+            onClick={downloadTemplate}
+            disabled={isLoading || products.length === 0}
+            className="gap-2"
+            data-testid="button-download-price-template"
+          >
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Download Template</span>
+            <span className="sm:hidden">Template</span>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="gap-2"
+            data-testid="button-upload-price-excel"
+          >
+            {isUploading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            <span className="hidden sm:inline">{isUploading ? "Uploading…" : "Upload Prices"}</span>
+            <span className="sm:hidden">{isUploading ? "…" : "Upload"}</span>
+          </Button>
         </div>
       </div>
 

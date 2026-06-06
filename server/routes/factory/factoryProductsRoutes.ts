@@ -1199,6 +1199,50 @@ export function registerFactoryProductsRoutes(app: Express) {
     }
   });
 
+  app.post("/api/factory/bale-products/bulk-update-prices", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { prices } = req.body;
+      if (!Array.isArray(prices) || prices.length === 0) {
+        return res.status(400).json({ message: "prices array is required" });
+      }
+
+      let updated = 0;
+      let skipped = 0;
+
+      for (const row of prices) {
+        const id = parseInt(String(row.id));
+        if (isNaN(id) || id <= 0) { skipped++; continue; }
+
+        const updates: Record<string, any> = { updatedAt: new Date() };
+
+        if (row.sellingPrice !== undefined && row.sellingPrice !== null && String(row.sellingPrice).trim() !== "") {
+          const sp = parseFloat(String(row.sellingPrice));
+          if (!isNaN(sp) && sp >= 0) updates.sellingPrice = sp.toFixed(2);
+        }
+        if (row.productionPrice !== undefined && row.productionPrice !== null && String(row.productionPrice).trim() !== "") {
+          const pp = parseFloat(String(row.productionPrice));
+          if (!isNaN(pp) && pp >= 0) updates.productionPrice = pp.toFixed(2);
+        }
+
+        if (Object.keys(updates).length <= 1) { skipped++; continue; }
+
+        await db
+          .update(factoryBaleProducts)
+          .set(updates)
+          .where(and(eq(factoryBaleProducts.id, id), eq(factoryBaleProducts.companyId, companyId)));
+        updated++;
+      }
+
+      res.json({ updated, skipped });
+    } catch (error: any) {
+      console.error("Error bulk-updating bale product prices:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/bale-products/import-excel", requireAuth, async (req: any, res: any) => {
     try {
       const multer = (await import("multer")).default;
