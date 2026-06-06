@@ -4259,6 +4259,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { hideSelling: hideSellingXls2 } = await getExportPriceVisibility(req);
+      const noChargesXls = req.query.noCharges === "1";
       const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
       const [order] = await db
         .select({
@@ -4453,8 +4454,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       sheet.addRow([]);
 
-      // ── Financial summary block (omit when selling prices are hidden) ──
-      if (!hideSellingXls2) {
+      // ── Financial summary block (omit when selling prices are hidden or noCharges) ──
+      if (!hideSellingXls2 && !noChargesXls) {
         const subtotal = parseFloat(order.subtotalBales || "0");
         const freight = parseFloat(order.freightAmount || "0");
         const otherChargesTotal2 = parseFloat(order.otherChargesTotal || "0");
@@ -4631,6 +4632,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { hideSelling: hideSellingPdf } = await getExportPriceVisibility(req);
+      const noChargesPdf = req.query.noCharges === "1";
 
       const [order] = await db
         .select({
@@ -4805,8 +4807,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       });
       y += 20;
 
-      // ── Charges & grand-total summary (admin only) ────────────────────────────
-      if (!hideSellingPdf) {
+      // ── Charges & grand-total summary (omit when hiding prices or noCharges) ──
+      if (!hideSellingPdf && !noChargesPdf) {
         const freightCharges = charges.filter((ch: any) => ch.chargeType === "FREIGHT");
         const otherCharges = charges.filter((ch: any) => ch.chargeType !== "FREIGHT");
         const hasCharges = freightCharges.length > 0 || otherCharges.length > 0;

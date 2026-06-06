@@ -459,9 +459,19 @@ export default function FactoryInvoiceDetail() {
     window.open(`/api/factory/customer-orders/${orderId}/export-excel`, "_blank");
   };
 
+  const handleExportExcelNoCharges = () => {
+    if (!orderId) return;
+    window.open(`/api/factory/customer-orders/${orderId}/export-excel?noCharges=1`, "_blank");
+  };
+
   const handleExportPdf = () => {
     if (!orderId) return;
     window.open(`/api/factory/customer-orders/${orderId}/export-pdf`, "_blank");
+  };
+
+  const handleExportPdfNoCharges = () => {
+    if (!orderId) return;
+    window.open(`/api/factory/customer-orders/${orderId}/export-pdf?noCharges=1`, "_blank");
   };
 
   const handleExportLoadingStatus = () => {
@@ -676,9 +686,17 @@ export default function FactoryInvoiceDetail() {
                 <FileSpreadsheet className="h-4 w-4" />
                 Download Excel
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportExcelNoCharges} data-testid="button-export-excel-no-charges">
+                <FileSpreadsheet className="h-4 w-4" />
+                Download Excel (No Charges)
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={handleExportPdf} data-testid="button-export-pdf">
                 <FileDown className="h-4 w-4" />
                 Download PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportPdfNoCharges} data-testid="button-export-pdf-no-charges">
+                <FileDown className="h-4 w-4" />
+                Download PDF (No Charges)
               </DropdownMenuItem>
               {isAdmin && (
                 <DropdownMenuItem onClick={handleExportLoadingStatus} data-testid="button-export-loading-status">

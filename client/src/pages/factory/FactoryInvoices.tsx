@@ -400,8 +400,14 @@ export default function FactoryInvoices() {
                                 <DropdownMenuItem onClick={() => window.open(`/api/factory/customer-orders/${order.id}/export/excel`, "_blank")} data-testid={`button-download-excel-${order.id}`}>
                                   <FileSpreadsheet className="h-4 w-4 mr-2" />Excel
                                 </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => window.open(`/api/factory/customer-orders/${order.id}/export-excel?noCharges=1`, "_blank")} data-testid={`button-download-excel-no-charges-${order.id}`}>
+                                  <FileSpreadsheet className="h-4 w-4 mr-2" />Excel (No Charges)
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => window.open(`/api/factory/customer-orders/${order.id}/export-pdf`, "_blank")} data-testid={`button-download-pdf-${order.id}`}>
                                   <FileText className="h-4 w-4 mr-2" />PDF
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => window.open(`/api/factory/customer-orders/${order.id}/export-pdf?noCharges=1`, "_blank")} data-testid={`button-download-pdf-no-charges-${order.id}`}>
+                                  <FileText className="h-4 w-4 mr-2" />PDF (No Charges)
                                 </DropdownMenuItem>
                                 {isAdmin && (
                                   <DropdownMenuItem onClick={() => window.open(`/api/factory/customer-orders/${order.id}/loading-status-export`, "_blank")} data-testid={`button-download-loading-status-${order.id}`}>
