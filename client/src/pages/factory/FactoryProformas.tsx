@@ -60,10 +60,10 @@ export default function FactoryProformas() {
     const params = new URLSearchParams(window.location.search);
     return params.get("customerId") || "";
   });
-  const [expandedProformaId, setExpandedProformaId] = useState<number | null>(() => {
+  const [expandedProformaIds, setExpandedProformaIds] = useState<Set<number>>(() => {
     const params = new URLSearchParams(window.location.search);
     const ep = params.get("expandProformaId");
-    return ep ? parseInt(ep, 10) : null;
+    return ep ? new Set([parseInt(ep, 10)]) : new Set();
   });
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newProformaName, setNewProformaName] = useState("");
@@ -115,7 +115,7 @@ export default function FactoryProformas() {
 
   const { data: allStockItems = [] } = useQuery<any[]>({
     queryKey: ["/api/stock-items"],
-    enabled: isAddLineOpen || expandedProformaId !== null,
+    enabled: isAddLineOpen || expandedProformaIds.size > 0,
   });
 
   const { data: locations = [] } = useQuery<{ id: number; name: string; code: string }[]>({
@@ -530,7 +530,7 @@ export default function FactoryProformas() {
           ) : (
             <Select value={selectedCustomerId} onValueChange={(val) => {
               setSelectedCustomerId(val);
-              setExpandedProformaId(null);
+              setExpandedProformaIds(new Set());
             }}>
               <SelectTrigger data-testid="select-customer" className="flex-1">
                 <SelectValue placeholder="Select a customer to view proformas..." />
@@ -591,23 +591,42 @@ export default function FactoryProformas() {
             {/* Inactive toggle */}
             {(() => {
               const inactiveCount = proformas.filter(p => !p.isActive).length;
-              return inactiveCount > 0 ? (
-                <div className="flex justify-end">
+              const visibleProformas = proformas.filter(p => p.isActive || showInactive);
+              const allExpanded = visibleProformas.length > 0 && visibleProformas.every(p => expandedProformaIds.has(p.id));
+              return (
+                <div className="flex items-center justify-end gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setShowInactive(v => !v)}
-                    data-testid="button-toggle-inactive-proformas"
+                    onClick={() => {
+                      if (allExpanded) {
+                        setExpandedProformaIds(new Set());
+                      } else {
+                        setExpandedProformaIds(new Set(visibleProformas.map(p => p.id)));
+                      }
+                    }}
+                    data-testid="button-expand-collapse-all"
                     className="text-muted-foreground"
                   >
-                    {showInactive ? `Hide inactive (${inactiveCount})` : `Show inactive (${inactiveCount})`}
+                    {allExpanded ? "Collapse all" : "Expand all"}
                   </Button>
+                  {inactiveCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowInactive(v => !v)}
+                      data-testid="button-toggle-inactive-proformas"
+                      className="text-muted-foreground"
+                    >
+                      {showInactive ? `Hide inactive (${inactiveCount})` : `Show inactive (${inactiveCount})`}
+                    </Button>
+                  )}
                 </div>
-              ) : null;
+              );
             })()}
 
             {proformas.filter(p => p.isActive || showInactive).sort((a, b) => a.name.localeCompare(b.name)).map((proforma) => {
-              const isExpanded = expandedProformaId === proforma.id;
+              const isExpanded = expandedProformaIds.has(proforma.id);
               const totalQty = proforma.lines?.reduce((s, l) => s + l.quantity, 0) ?? 0;
               const totalWeight = proforma.lines?.reduce((s, l) => s + l.quantity * parseFloat(l.weightPerBaleKg || "0"), 0) ?? 0;
               const totalAmount = proforma.lines?.reduce((s, l) => s + l.quantity * parseFloat(l.pricePerBale), 0) ?? 0;
@@ -625,7 +644,11 @@ export default function FactoryProformas() {
                     {/* Expand toggle */}
                     <button
                       className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
-                      onClick={() => setExpandedProformaId(isExpanded ? null : proforma.id)}
+                      onClick={() => setExpandedProformaIds(prev => {
+                        const next = new Set(prev);
+                        if (next.has(proforma.id)) next.delete(proforma.id); else next.add(proforma.id);
+                        return next;
+                      })}
                       data-testid={`button-expand-proforma-${proforma.id}`}
                     >
                       {isExpanded
