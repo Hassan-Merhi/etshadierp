@@ -114,7 +114,7 @@ export default function FactoryProformas() {
 
   const { data: allStockItems = [] } = useQuery<any[]>({
     queryKey: ["/api/stock-items"],
-    enabled: isAddLineOpen && addLineMode === "catalog",
+    enabled: isAddLineOpen || expandedProformaId !== null,
   });
 
   const { data: locations = [] } = useQuery<{ id: number; name: string; code: string }[]>({
@@ -677,15 +677,24 @@ export default function FactoryProformas() {
                       <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
                         <span className="text-sm font-medium text-muted-foreground">Price Lines</span>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => navigate(`/factory/stock-allocation-v5?proformaId=${proforma.id}&openEdit=true`)}
-                            data-testid={`button-open-stock-allocation-${proforma.id}`}
-                          >
-                            <Layers className="mr-1 h-3 w-3" />
-                            Stock Allocation
-                          </Button>
+                          {canEdit && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setAddLineProformaId(proforma.id);
+                                setAddLineMode("catalog");
+                                setCatalogSelectedItem(null);
+                                setCatalogSearch("");
+                                setNewLine({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
+                                setIsAddLineOpen(true);
+                              }}
+                              data-testid={`button-add-line-${proforma.id}`}
+                            >
+                              <Plus className="mr-1 h-3 w-3" />
+                              Add Item
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="outline"
