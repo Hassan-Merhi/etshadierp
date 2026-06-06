@@ -1490,6 +1490,12 @@ export default function ProductionRawStock() {
   const totalUsedValue = rawStock?.reduce((sum, r) => sum + parseFloat(r.usedKg) * (parseFloat(r.costPerKgUsd || r.costPerKg) || 0), 0) || 0;
 
   const filteredMixBatches = useMemo(() => mixBatches || [], [mixBatches]);
+  const [showAllMixBatches, setShowAllMixBatches] = useState(false);
+  const BATCH_PREVIEW_COUNT = 15;
+  const visibleMixBatches = useMemo(
+    () => showAllMixBatches ? filteredMixBatches : filteredMixBatches.slice(0, BATCH_PREVIEW_COUNT),
+    [filteredMixBatches, showAllMixBatches]
+  );
 
   const mixBatchKpis = useMemo(() => {
     const active = (mixBatches || []).filter((b) => b.status === "OPEN" || b.status === "ACTIVE" || b.status === "CARRY_FORWARD");
@@ -2148,7 +2154,7 @@ export default function ProductionRawStock() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredMixBatches.map((batch) => {
+                {visibleMixBatches.map((batch) => {
                   const total = parseFloat(batch.totalWeightKg) || 0;
                   const remaining = parseFloat(batch.remainingKg) || 0;
                   const statusColors: Record<string, string> = {
@@ -2202,6 +2208,25 @@ export default function ProductionRawStock() {
                   );
                 })}
               </TableBody>
+              {filteredMixBatches.length > BATCH_PREVIEW_COUNT && (
+                <tbody>
+                  <tr>
+                    <td colSpan={6} className="py-2 text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowAllMixBatches(!showAllMixBatches)}
+                        data-testid="button-toggle-show-all-batches"
+                        className="text-xs text-muted-foreground"
+                      >
+                        {showAllMixBatches
+                          ? `Show less`
+                          : `Show all ${filteredMixBatches.length} batches (${filteredMixBatches.length - BATCH_PREVIEW_COUNT} hidden)`}
+                      </Button>
+                    </td>
+                  </tr>
+                </tbody>
+              )}
               {(() => {
                 const sumTotal = filteredMixBatches.reduce((s, b) => s + (parseFloat(b.totalWeightKg) || 0), 0);
                 const sumUsed = filteredMixBatches.reduce((s, b) => s + (parseFloat(b.usedKg) || 0), 0);
