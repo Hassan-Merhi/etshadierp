@@ -658,7 +658,6 @@ export default function BalesHistory() {
                     <TableHead>Article</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
                     <TableHead className="text-right">Weight (kg)</TableHead>
-                    {!hiddenCost.includes("bales_list_cost_per_kg") && <TableHead className="text-right">Sell Price</TableHead>}
                     <TableHead>Status</TableHead>
                     <TableHead>Last Printed</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -713,13 +712,6 @@ export default function BalesHistory() {
                         <TableCell className="text-xs text-muted-foreground">{group.articleCode}</TableCell>
                         <TableCell className="text-right font-semibold">{group.totalQty}</TableCell>
                         <TableCell className="text-right font-mono font-semibold">{formatLabelNum(group.totalWeightKg)}</TableCell>
-                        {!hiddenCost.includes("bales_list_cost_per_kg") && (
-                          <TableCell className="text-right font-mono text-muted-foreground">
-                            {group.sellingPrice && parseFloat(String(group.sellingPrice)) > 0
-                              ? formatLabelNum(String(group.sellingPrice))
-                              : "—"}
-                          </TableCell>
-                        )}
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
                             {uniqueStatuses.map((s) => (
@@ -778,13 +770,6 @@ export default function BalesHistory() {
                             <TableCell className="text-xs text-muted-foreground">{product?.articleCode || bale.category || "-"}</TableCell>
                             <TableCell className="text-right">{bale.quantity}</TableCell>
                             <TableCell className="text-right font-mono">{formatLabelNum(bale.weightKg)}</TableCell>
-                            {!hiddenCost.includes("bales_list_cost_per_kg") && (
-                              <TableCell className="text-right font-mono text-muted-foreground">
-                                {product?.sellingPrice && parseFloat(String(product.sellingPrice)) > 0
-                                  ? formatLabelNum(String(product.sellingPrice))
-                                  : "—"}
-                              </TableCell>
-                            )}
                             <TableCell>
                               <Select
                                 value={bale.status}
