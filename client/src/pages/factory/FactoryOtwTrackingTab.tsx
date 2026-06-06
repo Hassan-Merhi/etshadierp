@@ -489,6 +489,17 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     return acc;
   }, {});
 
+  // Freight totals grouped by currency
+  const freightByCurrency = filtered.reduce<Record<string, { symbol: string; amount: number }>>((acc, c) => {
+    const freightAmt = num((c as any).freight);
+    if (freightAmt <= 0) return acc;
+    const ccy = (c as any).freightCurrencyCode || c.currencyCode || "USD";
+    const sym = ccySym(ccy);
+    if (!acc[ccy]) acc[ccy] = { symbol: sym, amount: 0 };
+    acc[ccy].amount += freightAmt;
+    return acc;
+  }, {});
+
   const docsReceived = filtered.filter((c) => docs[String(c.id)]).length;
   const timelineContainer = otwContainers.find((c) => c.id === timelineId) ?? null;
   const trackingEnabledCount = otwContainers.filter((c) => (c as any).trackingEnabled !== false).length;
@@ -616,6 +627,15 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
             value={`${symbol} ${Math.round(amount).toLocaleString()}`}
             icon={<DollarSign className="h-4 w-4 text-emerald-600" />}
             accent="bg-emerald-100 dark:bg-emerald-900/30"
+          />
+        ))}
+        {Object.entries(freightByCurrency).map(([ccy, { symbol, amount }]) => (
+          <SummaryCard
+            key={`freight-${ccy}`}
+            label={`Freight (${ccy})`}
+            value={`${symbol} ${Math.round(amount).toLocaleString()}`}
+            icon={<Ship className="h-4 w-4 text-sky-600" />}
+            accent="bg-sky-100 dark:bg-sky-900/30"
           />
         ))}
       </div>
