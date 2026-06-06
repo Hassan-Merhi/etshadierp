@@ -972,7 +972,6 @@ export default function FactoryProformas() {
           </div>
         )}
       </div>
-    </div>
 
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="max-w-md">
