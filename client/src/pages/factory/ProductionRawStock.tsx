@@ -1486,6 +1486,8 @@ export default function ProductionRawStock() {
   const totalRemaining = rawStock?.reduce((sum, r) => sum + parseFloat(r.remainingKg), 0) || 0;
   const totalValue = rawStock?.reduce((sum, r) => sum + parseFloat(r.valueRemainingUsd || r.valueRemaining), 0) || 0;
   const totalFree = rawStock?.reduce((sum, r) => sum + parseFloat(r.freeKg || "0"), 0) || 0;
+  const totalReceivedValue = rawStock?.reduce((sum, r) => sum + parseFloat(r.receivedKg) * (parseFloat(r.costPerKgUsd || r.costPerKg) || 0), 0) || 0;
+  const totalUsedValue = rawStock?.reduce((sum, r) => sum + parseFloat(r.usedKg) * (parseFloat(r.costPerKgUsd || r.costPerKg) || 0), 0) || 0;
 
   const filteredMixBatches = useMemo(() => mixBatches || [], [mixBatches]);
 
@@ -1509,12 +1511,15 @@ export default function ProductionRawStock() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-4">
             <p className="text-sm text-muted-foreground">Total Received</p>
             <p className="text-xl font-bold font-mono" data-testid="text-total-received">
               {fmtKg(totalReceived)} kg
+            </p>
+            <p className="text-sm text-muted-foreground font-mono mt-0.5" data-testid="text-total-received-value">
+              ${formatNumber(totalReceivedValue)}
             </p>
           </CardContent>
         </Card>
@@ -1524,6 +1529,9 @@ export default function ProductionRawStock() {
             <p className="text-xl font-bold font-mono" data-testid="text-total-used">
               {fmtKg(totalUsed)} kg
             </p>
+            <p className="text-sm text-muted-foreground font-mono mt-0.5" data-testid="text-total-used-value">
+              ${formatNumber(totalUsedValue)}
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -1532,13 +1540,8 @@ export default function ProductionRawStock() {
             <p className="text-xl font-bold font-mono text-green-600 dark:text-green-400" data-testid="text-total-free">
               {fmtKg(totalFree)} kg
             </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">Stock Value</p>
-            <p className="text-xl font-bold font-mono" data-testid="text-total-value">
-              ${formatNumber(totalValue)}
+            <p className="text-sm font-mono mt-0.5 text-muted-foreground" data-testid="text-total-value">
+              Stock Value: <span className="text-foreground font-semibold">${formatNumber(totalValue)}</span>
             </p>
           </CardContent>
         </Card>
