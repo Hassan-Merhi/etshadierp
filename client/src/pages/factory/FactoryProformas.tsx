@@ -1156,15 +1156,13 @@ export default function FactoryProformas() {
                         if (filtered.length === 0) return (
                           <p className="text-sm text-muted-foreground text-center py-6">No items match "{catalogSearch}"</p>
                         );
-                        return filtered.map((item: any) => {
-                          const savedPrice = item.code ? priceListMap[item.code] : undefined;
-                          return (
+                        return filtered.map((item: any) => (
                           <button
                             key={item.id}
                             className="w-full flex items-center justify-between px-3 py-2.5 text-left hover-elevate border-b last:border-b-0"
                             onClick={() => {
                               setCatalogSelectedItem(item);
-                              setNewLine((prev) => ({ ...prev, articleCode: item.code || "", productName: item.name || "", pricePerBale: savedPrice ?? "" }));
+                              setNewLine((prev) => ({ ...prev, articleCode: item.code || "", productName: item.name || "", pricePerBale: (item.code && priceListMap[item.code]) ? priceListMap[item.code] : "" }));
                             }}
                             data-testid={`button-catalog-item-${item.id}`}
                           >
@@ -1173,16 +1171,15 @@ export default function FactoryProformas() {
                               {item.code && <p className="text-xs text-muted-foreground font-mono">{item.code}</p>}
                             </div>
                             <div className="flex items-center gap-2 ml-2 shrink-0">
-                              {savedPrice && (
-                                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">${parseFloat(savedPrice).toFixed(2)}</span>
+                              {item.code && priceListMap[item.code] && (
+                                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">${parseFloat(priceListMap[item.code]).toFixed(2)}</span>
                               )}
                               {item.stockGroup?.name && (
                                 <span className="text-xs text-muted-foreground">{item.stockGroup.name}</span>
                               )}
                             </div>
                           </button>
-                          );
-                        });
+                        ));
                       })()}
                     </div>
                     <p className="text-xs text-muted-foreground">{allStockItems.length} items in catalog</p>
