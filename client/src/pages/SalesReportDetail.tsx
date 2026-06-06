@@ -464,6 +464,7 @@ export default function SalesReportDetail() {
                   const allExpanded = expandedItems.size >= itemGroups.length;
                   if (allExpanded) {
                     setExpandedItems(new Set());
+                    setExpandedLocations(new Set());
                   } else {
                     setExpandedItems(new Set(itemGroups.map((g) => String(g.stockItemId))));
                   }
