@@ -907,6 +907,16 @@ export default function FactorySuppliers() {
   const standaloneCount = activeTopLevel.filter((s) => !isBroker(s)).length;
   const totalContainers = activeTopLevel.reduce((sum, s) => sum + (s.totalContainers || 0), 0);
 
+  // Total USD owed (positive balance = we owe them) and overpaid (negative = they owe us)
+  const totalUsdOwed = activeTopLevel.reduce((sum, s) => {
+    const v = parseFloat(s.totalValue || "0");
+    return sum + (v > 0 ? v : 0);
+  }, 0);
+  const totalUsdOverpaid = activeTopLevel.reduce((sum, s) => {
+    const v = parseFloat(s.totalValue || "0");
+    return sum + (v < 0 ? Math.abs(v) : 0);
+  }, 0);
+
   // ── Broker Overview ──────────────────────────────────────────────────────
   if (parentViewSupplierId && !statementSupplierId) {
     const parentSup = allSuppliers.find(s => s.id === parentViewSupplierId);
@@ -2510,7 +2520,7 @@ export default function FactorySuppliers() {
         </label>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card>
           <CardContent className="p-4">
             <div className="text-xs text-muted-foreground">Brokers</div>
@@ -2532,6 +2542,30 @@ export default function FactorySuppliers() {
             <div className="text-xs text-muted-foreground">Total Containers</div>
             <div className="text-2xl font-bold mt-1" data-testid="text-total-containers">
               {totalContainers}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-1 flex-wrap">
+              <div className="text-xs text-muted-foreground">Total USD</div>
+              {listIncludeOtw && (
+                <div className="text-xs text-amber-500 font-medium">incl. OTW</div>
+              )}
+            </div>
+            <div className="mt-1 space-y-0.5">
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className="text-xs text-muted-foreground w-14 shrink-0">We owe</span>
+                <span className="text-lg font-bold tabular-nums text-foreground" data-testid="text-total-usd-owed">
+                  ${totalUsdOwed.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className="text-xs text-muted-foreground w-14 shrink-0">Overpaid</span>
+                <span className="text-lg font-bold tabular-nums text-green-600 dark:text-green-400" data-testid="text-total-usd-overpaid">
+                  ${totalUsdOverpaid.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
             </div>
           </CardContent>
         </Card>
