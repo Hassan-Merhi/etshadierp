@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Search, Package, Clock, User, Scale, Hash, Layers, Container, Truck, FlaskConical, Box, CheckCircle2, AlertCircle, XCircle, ArchiveX, Ship, FileText, User2, Trash2, Pencil, ArchiveRestore, Undo2, AlertTriangle, History } from "lucide-react";
+import { Search, Package, Clock, User, Scale, Hash, Layers, Container, Truck, FlaskConical, Box, CheckCircle2, AlertCircle, XCircle, ArchiveX, Ship, FileText, User2, Trash2, Pencil, ArchiveRestore, Undo2, AlertTriangle, History, ArrowLeftRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,6 +79,15 @@ export default function BarcodeLookup() {
   const [changeProductSearch, setChangeProductSearch] = useState("");
   const [selectedNewProductId, setSelectedNewProductId] = useState<number | null>(null);
   const [showReturnToStockDialog, setShowReturnToStockDialog] = useState(false);
+  const [showSwapDialog, setShowSwapDialog] = useState(false);
+  const [swapRef, setSwapRef] = useState("");
+  const [swapPreview, setSwapPreview] = useState<{
+    referenceNumber: string;
+    productName: string | null;
+    weightKg: string;
+    status: string;
+    articleCode: string | null;
+  } | null>(null);
 
   const [referenceResult, setReferenceResult] = useState<{
     labelPrint: BaleLabelPrint | null;
@@ -340,6 +349,63 @@ export default function BarcodeLookup() {
     },
   });
 
+  // Preview lookup for the replacement bale in the swap dialog
+  const swapPreviewMutation = useMutation({
+    mutationFn: async (ref: string) => {
+      const response = await modeApiRequest("GET", `/api/lookup/reference/${encodeURIComponent(ref.trim())}`);
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Bale not found");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      const b = data?.baleInfo;
+      if (!b) throw new Error("Bale not found");
+      setSwapPreview({
+        referenceNumber: data.labelPrint?.referenceNumber || swapRef.trim(),
+        productName: b.productName ?? null,
+        weightKg: b.weightKg,
+        status: b.status,
+        articleCode: data.labelPrint?.articleCode ?? null,
+      });
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      setSwapPreview(null);
+      toast({ title: "Lookup Failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Perform the actual swap
+  const swapMutation = useMutation({
+    mutationFn: async ({ currentBaleRef, replacementBaleRef }: { currentBaleRef: string; replacementBaleRef: string }) => {
+      const response = await modeApiRequest("POST", "/api/factory/bales/swap", { currentBaleRef, replacementBaleRef });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Swap failed");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setShowSwapDialog(false);
+      setSwapRef("");
+      setSwapPreview(null);
+      // Re-run the lookup for the current bale to refresh its state (now IN_STOCK)
+      if (referenceResult?.labelPrint?.referenceNumber) {
+        referenceLookup.mutate(referenceResult.labelPrint.referenceNumber);
+      }
+      const invoiceMsg = data.invoiceNumber
+        ? ` Invoice ${data.invoiceNumber} updated to $${parseFloat(data.newGrandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`
+        : "";
+      toast({ title: "Bale swapped", description: `${data.replacedRef} → ${data.replacementRef} in the order.${invoiceMsg}` });
+    },
+    onError: (error: Error) => {
+      if ((error as any)?._handledGlobally) return;
+      toast({ title: "Swap Failed", description: error.message, variant: "destructive" });
+    },
+  });
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get("ref");
@@ -558,15 +624,30 @@ export default function BarcodeLookup() {
                           </Button>
                         )}
                         {(referenceResult.baleInfo?.status === "RESERVED_FOR_ORDER" || referenceResult.baleInfo?.status === "RESERVED" || referenceResult.baleInfo?.status === "SOLD") && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setShowReturnToStockDialog(true)}
-                            data-testid="button-return-to-stock"
-                          >
-                            <Undo2 className="h-3.5 w-3.5 mr-1 text-blue-500" />
-                            Return to Stock
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSwapRef("");
+                                setSwapPreview(null);
+                                setShowSwapDialog(true);
+                              }}
+                              data-testid="button-swap-bale"
+                            >
+                              <ArrowLeftRight className="h-3.5 w-3.5 mr-1 text-amber-500" />
+                              Swap Bale
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setShowReturnToStockDialog(true)}
+                              data-testid="button-return-to-stock"
+                            >
+                              <Undo2 className="h-3.5 w-3.5 mr-1 text-blue-500" />
+                              Return to Stock
+                            </Button>
+                          </>
                         )}
                         <Button
                           size="sm"
@@ -1060,6 +1141,121 @@ export default function BarcodeLookup() {
               data-testid="button-confirm-change-product"
             >
               {changeProductMutation.isPending ? "Saving..." : "Confirm Change"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Swap Bale Dialog */}
+      <Dialog open={showSwapDialog} onOpenChange={(open) => {
+        if (!open) { setShowSwapDialog(false); setSwapRef(""); setSwapPreview(null); }
+      }}>
+        <DialogContent className="max-w-md" data-testid="dialog-swap-bale">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowLeftRight className="h-5 w-5 text-amber-500" />
+              Swap Bale
+            </DialogTitle>
+            <DialogDescription>
+              Replace <span className="font-mono font-semibold">{referenceResult?.labelPrint?.referenceNumber}</span> with another in-stock bale. The current bale returns to stock; the replacement takes its place in the order.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-1">
+            {/* Replacement ref input + lookup */}
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Replacement Bale Reference</p>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="e.g. REF200012"
+                  value={swapRef}
+                  onChange={(e) => { setSwapRef(e.target.value); setSwapPreview(null); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" && swapRef.trim()) swapPreviewMutation.mutate(swapRef); }}
+                  data-testid="input-swap-ref"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!swapRef.trim() || swapPreviewMutation.isPending}
+                  onClick={() => swapPreviewMutation.mutate(swapRef)}
+                  data-testid="button-lookup-swap-ref"
+                >
+                  {swapPreviewMutation.isPending ? "Looking…" : "Look Up"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Preview of replacement bale */}
+            {swapPreview && (
+              <div className="rounded-md border p-3 space-y-2 text-sm">
+                <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Replacement Bale</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Reference</p>
+                    <p className="font-mono font-semibold">{swapPreview.referenceNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Status</p>
+                    <p>{swapPreview.status === "IN_STOCK" ? (
+                      <span className="text-green-600 dark:text-green-400 font-medium">In Stock</span>
+                    ) : (
+                      <span className="text-destructive font-medium">{swapPreview.status}</span>
+                    )}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Product</p>
+                    <p>{swapPreview.productName ?? "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Weight</p>
+                    <p>{swapPreview.weightKg} KG</p>
+                  </div>
+                  {swapPreview.articleCode && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Article Code</p>
+                      <p className="font-mono">{swapPreview.articleCode}</p>
+                    </div>
+                  )}
+                </div>
+                {swapPreview.status !== "IN_STOCK" && (
+                  <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 text-destructive text-xs">
+                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <p>This bale is not IN_STOCK. Only in-stock bales can be used as replacements.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Info note */}
+            <p className="text-xs text-muted-foreground">
+              The price used in the order remains unchanged. Order totals will be recalculated based on the replacement bale's weight.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setShowSwapDialog(false); setSwapRef(""); setSwapPreview(null); }}
+              data-testid="button-cancel-swap"
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                !swapPreview ||
+                swapPreview.status !== "IN_STOCK" ||
+                swapMutation.isPending
+              }
+              onClick={() => {
+                if (!referenceResult?.labelPrint?.referenceNumber || !swapPreview) return;
+                swapMutation.mutate({
+                  currentBaleRef: referenceResult.labelPrint.referenceNumber,
+                  replacementBaleRef: swapPreview.referenceNumber,
+                });
+              }}
+              data-testid="button-confirm-swap"
+            >
+              {swapMutation.isPending ? "Swapping…" : "Confirm Swap"}
             </Button>
           </DialogFooter>
         </DialogContent>
