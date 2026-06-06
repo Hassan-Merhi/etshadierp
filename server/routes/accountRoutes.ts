@@ -508,9 +508,23 @@ export function registerAccountRoutes(app: Express) {
       const q = ((req.query.q as string) || "").trim();
       if (!q) return res.json([]);
 
+      // Split into individual keywords so "avance transport" matches both words anywhere
+      const keywords = q.split(/\s+/).filter(Boolean);
+
       // Strip currency symbols / commas so "$3,967" → "3967" for amount matching
       const amountQ = q.replace(/[$,\s]/g, "");
-      const isNumericSearch = /^\d+(\.\d+)?$/.test(amountQ);
+      const isNumericSearch = keywords.length === 1 && /^\d+(\.\d+)?$/.test(amountQ);
+
+      // Each keyword must appear in description OR voucherNumber (AND across keywords)
+      const keywordConditions = keywords.map((kw) =>
+        or(
+          ilike(vouchers.voucherNumber, `%${kw}%`),
+          ilike(vouchers.description, `%${kw}%`),
+          isNumericSearch
+            ? sql`CAST(${vouchers.totalAmount} AS TEXT) LIKE ${"%" + amountQ + "%"}`
+            : sql`false`,
+        )
+      );
 
       const results = await db
         .select({
@@ -528,17 +542,11 @@ export function registerAccountRoutes(app: Express) {
           and(
             eq(vouchers.companyId, req.session.currentCompanyId),
             isNull(vouchers.deletedAt),
-            or(
-              ilike(vouchers.voucherNumber, `%${q}%`),
-              ilike(vouchers.description, `%${q}%`),
-              isNumericSearch
-                ? sql`CAST(${vouchers.totalAmount} AS TEXT) LIKE ${"%" + amountQ + "%"}`
-                : sql`false`,
-            )
+            ...keywordConditions,
           )
         )
         .orderBy(desc(vouchers.voucherDate))
-        .limit(20);
+        .limit(100);
 
       res.json(results);
     } catch (error: any) {
