@@ -1793,6 +1793,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         LEFT JOIN factory_bale_products fbp ON fb.product_id = fbp.id AND fbp.company_id = ${companyId}
         LEFT JOIN locations l ON fb.erp_location_id = l.id AND l.company_id = ${companyId}
         WHERE fb.company_id = ${companyId}
+          AND fb.deleted_at IS NULL
           AND fb.stock_entry_date IS NOT NULL
           AND fb.stock_entry_date >= ${effectiveStart}
           AND fb.stock_entry_date <= ${effectiveEnd}
@@ -1864,6 +1865,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         LEFT JOIN factory_bale_products fbp ON fb.product_id = fbp.id AND fbp.company_id = ${companyId}
         LEFT JOIN locations l ON fb.erp_location_id = l.id AND l.company_id = ${companyId}
         WHERE fb.company_id = ${companyId}
+          AND fb.deleted_at IS NULL
           AND fb.stock_entry_date IS NOT NULL
           AND fb.stock_entry_date >= ${effectiveStart}
           AND fb.stock_entry_date <= ${effectiveEnd}
