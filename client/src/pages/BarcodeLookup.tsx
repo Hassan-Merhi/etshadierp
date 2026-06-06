@@ -595,8 +595,8 @@ export default function BarcodeLookup() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {/* Row 1: Ref + Article Code (with Printed At) + Product Name (with Printed By) */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {/* Row 1: Ref + Article Code (with Printed At) + Product Name (with Printed By) + Worker */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Reference Number</p>
                       <p className="font-mono text-lg font-semibold" data-testid="text-reference-number">{referenceResult.labelPrint.referenceNumber}</p>
@@ -619,9 +619,18 @@ export default function BarcodeLookup() {
                         </p>
                       </div>
                     )}
+                    {referenceResult.baleInfo?.workerName && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Worker Name</p>
+                        <p className="font-semibold flex items-center gap-1" data-testid="text-bale-worker-name">
+                          <User className="h-3.5 w-3.5 text-muted-foreground" />
+                          {referenceResult.baleInfo.workerName}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Row 2: Weight + Grade + Worker + Mark as Scanned */}
+                  {/* Row 2: Weight + Grade + Mark as Scanned */}
                   <div className="flex items-center gap-6 flex-wrap">
                     {referenceResult.baleInfo && (
                       <div>
@@ -633,15 +642,6 @@ export default function BarcodeLookup() {
                       <div>
                         <p className="text-sm text-muted-foreground">Grade</p>
                         <p className="font-medium">{referenceResult.baleInfo.grade}</p>
-                      </div>
-                    )}
-                    {referenceResult.baleInfo?.workerName && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Worker</p>
-                        <p className="font-medium flex items-center gap-1">
-                          <User className="h-3.5 w-3.5 text-muted-foreground" />
-                          {referenceResult.baleInfo.workerName}
-                        </p>
                       </div>
                     )}
                     {!referenceResult.labelPrint.scannedAt && (
@@ -803,7 +803,6 @@ export default function BarcodeLookup() {
                           <InfoRow label="Shipping Company" value={o.shippingCompany} />
                         )}
                         <InfoRow label="Total Bales in Order" value={o.totalQtyBales.toLocaleString()} />
-                        <InfoRow label="This Bale — Price Used" value={smartNum(o.priceUsed)} />
                         <InfoRow label="This Bale — Weight" value={`${smartNum(o.baleWeight)} KG`} />
                         {o.loadingStartedAt && (
                           <InfoRow label="Loading Started" value={formatDate(o.loadingStartedAt)} />
