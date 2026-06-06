@@ -1908,6 +1908,9 @@ export default function Accounts() {
                                   <div className="flex items-center gap-2 w-full">
                                     <span className="text-sm flex-1 font-medium">
                                       {account.name}
+                                      {import.meta.env.DEV && (
+                                        <span className="ml-1.5 text-xs font-mono text-orange-500 dark:text-orange-400 opacity-60">#{account.accountId}</span>
+                                      )}
                                     </span>
                                     {!hideBalances && account.balance !== 0 && (
                                       <span className="ml-auto text-xs tabular-nums text-muted-foreground shrink-0 font-mono">
@@ -1939,6 +1942,9 @@ export default function Accounts() {
                                       <div className="flex items-center gap-2 w-full">
                                         <span className="text-sm flex-1 text-muted-foreground">
                                           {child.name}
+                                          {import.meta.env.DEV && (
+                                            <span className="ml-1.5 text-xs font-mono text-orange-500 dark:text-orange-400 opacity-60">#{child.accountId}</span>
+                                          )}
                                         </span>
                                         {!hideBalances && child.balance !== 0 && (
                                           <span className="ml-auto text-xs tabular-nums text-muted-foreground shrink-0 font-mono">
@@ -1967,6 +1973,9 @@ export default function Accounts() {
                       <p className="text-xs text-muted-foreground leading-none mb-0.5">Account</p>
                       <span className="font-semibold text-sm leading-tight" data-testid="text-account-name">
                         {selectedAccount.name}
+                        {import.meta.env.DEV && (
+                          <span className="ml-2 text-xs font-mono text-orange-500 dark:text-orange-400 opacity-70">#{selectedAccount.accountId}</span>
+                        )}
                       </span>
                     </div>
                   </div>
