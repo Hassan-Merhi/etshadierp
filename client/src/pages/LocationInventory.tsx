@@ -235,16 +235,16 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   });
 
   const sendStockWaMutation = useMutation({
-    mutationFn: async ({ locationId, stockGroupId, groupName }: { locationId: number; stockGroupId?: number | null; groupName?: string | null }) => {
-      const res = await apiRequest("POST", `/api/locations/${locationId}/send-stock-whatsapp`, { stockGroupId, groupName });
+    mutationFn: async ({ locationId }: { locationId: number }) => {
+      const res = await apiRequest("POST", `/api/pos/send-stock-pdf-backend`, { locationId });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Failed to send");
       }
       return res.json();
     },
-    onSuccess: (data) => {
-      toast({ title: "Sent to WhatsApp", description: `${data.itemCount} items sent.` });
+    onSuccess: () => {
+      toast({ title: "Stock PDF sent to WhatsApp" });
     },
     onError: (error: Error) => {
       toast({ title: "WhatsApp send failed", description: error.message, variant: "destructive" });
@@ -2786,11 +2786,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               {!posUser && (selectedLocationLocal as any).whatsappGroupChatId && (
                 <Button
                   variant="outline"
-                  onClick={() => sendStockWaMutation.mutate({
-                    locationId: selectedLocationLocal.id,
-                    stockGroupId: selectedGroup?.groupId ?? null,
-                    groupName: selectedGroup?.groupName ?? null,
-                  })}
+                  onClick={() => sendStockWaMutation.mutate({ locationId: selectedLocationLocal.id })}
                   disabled={sendStockWaMutation.isPending}
                   data-testid="button-send-stock-whatsapp"
                   className="gap-2 flex-1 sm:flex-none"
