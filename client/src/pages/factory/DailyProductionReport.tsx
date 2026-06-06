@@ -1202,6 +1202,12 @@ export default function DailyProductionReport() {
                         ) : (
                           <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
                         )}
+                        {ms && ms.daysInMonth > 0 && (
+                          <p className="text-sm font-semibold tabular-nums text-muted-foreground">
+                            {fmtSalary((ms.totalWorkerBaseSalary + ms.totalWorkerTransport) / ms.daysInMonth)}
+                            <span className="text-xs font-normal opacity-60 ml-1">/day</span>
+                          </p>
+                        )}
                       </div>
                       <div className="flex gap-3 mt-0.5 flex-wrap">
                         {workerExpected !== null && (
@@ -1226,22 +1232,30 @@ export default function DailyProductionReport() {
                     <div className="border-t px-4 pb-3 pt-2 space-y-1">
                       {ms?.workerBreakdown && ms.workerBreakdown.length > 0 ? (
                         <>
-                          <div className="grid grid-cols-3 gap-1 text-xs font-medium text-muted-foreground mb-1.5 px-0.5">
+                          <div className="grid grid-cols-4 gap-1 text-xs font-medium text-muted-foreground mb-1.5 px-0.5">
                             <span>Worker</span>
                             <span className="text-right">Salary</span>
                             <span className="text-right">Transport</span>
+                            <span className="text-right">Daily</span>
                           </div>
-                          {ms.workerBreakdown.map((w) => (
-                            <div key={w.id} className="grid grid-cols-3 gap-1 text-xs py-0.5">
-                              <span className="truncate text-foreground/90">{w.name}</span>
-                              <span className="text-right tabular-nums text-foreground">{fmtSalary(w.expected)}</span>
-                              <span className="text-right tabular-nums text-muted-foreground">{fmtSalary(w.transportProrated)}</span>
-                            </div>
-                          ))}
-                          <div className="grid grid-cols-3 gap-1 text-xs pt-1.5 border-t mt-1">
+                          {ms.workerBreakdown.map((w) => {
+                            const daily = ms.daysInMonth > 0 ? (w.baseSalary + w.transport) / ms.daysInMonth : 0;
+                            return (
+                              <div key={w.id} className="grid grid-cols-4 gap-1 text-xs py-0.5">
+                                <span className="truncate text-foreground/90">{w.name}</span>
+                                <span className="text-right tabular-nums text-foreground">{fmtSalary(w.expected)}</span>
+                                <span className="text-right tabular-nums text-muted-foreground">{fmtSalary(w.transportProrated)}</span>
+                                <span className="text-right tabular-nums text-sky-600 dark:text-sky-400">{fmtSalary(daily)}</span>
+                              </div>
+                            );
+                          })}
+                          <div className="grid grid-cols-4 gap-1 text-xs pt-1.5 border-t mt-1">
                             <span className="font-medium text-muted-foreground">Total</span>
                             <span className="text-right tabular-nums font-semibold text-foreground">{fmtSalary(workerExpected ?? 0)}</span>
                             <span className="text-right tabular-nums font-semibold text-foreground">{fmtSalary(transportExpected ?? 0)}</span>
+                            <span className="text-right tabular-nums font-semibold text-sky-600 dark:text-sky-400">
+                              {ms.daysInMonth > 0 ? fmtSalary((ms.totalWorkerBaseSalary + ms.totalWorkerTransport) / ms.daysInMonth) : "—"}
+                            </span>
                           </div>
                         </>
                       ) : (
