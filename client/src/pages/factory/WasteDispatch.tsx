@@ -85,6 +85,7 @@ export default function WasteDispatch() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedHistoryIds, setExpandedHistoryIds] = useState<Set<number>>(new Set());
+  const [showAllHistory, setShowAllHistory] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [printData, setPrintData] = useState<any | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
@@ -600,7 +601,7 @@ export default function WasteDispatch() {
               <p className="text-sm text-muted-foreground p-4">No dispatches yet.</p>
             ) : (
               <div className="divide-y">
-                {history.map((d: any) => {
+                {(showAllHistory ? history : history.slice(0, 10)).map((d: any) => {
                   const isOpen = expandedHistoryIds.has(d.id);
                   const dispatchBales: any[] = d.bales || [];
                   return (
@@ -688,6 +689,22 @@ export default function WasteDispatch() {
                     </div>
                   );
                 })}
+                {history.length > 10 && (
+                  <div className="px-4 py-3 flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">
+                      {showAllHistory ? `Showing all ${history.length} dispatches` : `Showing 10 of ${history.length} dispatches`}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-7 px-3"
+                      onClick={() => setShowAllHistory(v => !v)}
+                      data-testid="button-toggle-history"
+                    >
+                      {showAllHistory ? "Show less" : `Show all ${history.length}`}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
