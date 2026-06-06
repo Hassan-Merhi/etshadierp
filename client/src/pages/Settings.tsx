@@ -679,7 +679,7 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
       }
     };
   
-    const [activeSection, setActiveSection] = useState("hub");
+    const [activeSection, setActiveSection] = useState("users-permissions");
 
     const sidebarGroups = [
       {
@@ -728,17 +728,8 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
 
     return (
       <div className="flex flex-col sm:flex-row sm:h-full">
-        {/* Mobile section selector — visible only on small screens, hidden on hub */}
-        {activeSection !== "hub" && (
+        {/* Mobile section selector */}
         <div className="sm:hidden border-b p-3 flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setActiveSection("hub")}
-            data-testid="button-back-to-hub-mobile"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
           <Select value={activeSection} onValueChange={setActiveSection}>
             <SelectTrigger data-testid="select-settings-section" className="flex-1">
               <SelectValue />
@@ -754,20 +745,10 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
             </SelectContent>
           </Select>
         </div>
-        )}
 
-        {/* Desktop sidebar nav — hidden on small screens and when on hub */}
-        {activeSection !== "hub" && (
+        {/* Desktop sidebar nav */}
         <nav className="hidden sm:flex sm:flex-col w-56 shrink-0 border-r bg-muted/30 p-3 gap-3 overflow-y-auto" data-testid="tabs-settings">
-          <button
-            onClick={() => setActiveSection("hub")}
-            className="flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-sm text-muted-foreground hover-elevate"
-            data-testid="button-back-to-hub"
-          >
-            <ArrowLeft className="h-4 w-4 shrink-0" />
-            <span className="truncate font-medium">Settings Hub</span>
-          </button>
-          <div className="border-t pt-2 space-y-4">
+          <div className="space-y-4">
           {sidebarGroups.map((group) => (
             <div key={group.label}>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-1">{group.label}</p>
@@ -792,18 +773,8 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
           ))}
           </div>
         </nav>
-        )}
 
-        <div className={`flex-1 sm:overflow-y-auto ${activeSection !== "hub" ? "p-4 sm:p-6" : ""}`}>
-
-          {/* Settings Hub landing page */}
-          {activeSection === "hub" && (
-            <SettingsHubPage
-              onNavigate={setActiveSection}
-              currentUser={currentUser}
-              appMode={appMode}
-            />
-          )}
+        <div className="flex-1 sm:overflow-y-auto p-4 sm:p-6">
 
           {activeSection === "companies" && (
             <div className="space-y-5">
