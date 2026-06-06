@@ -1307,13 +1307,21 @@ export default function DailyProductionReport() {
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Employee Expected</p>
                         <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform duration-150 ${empPayrollOpen ? "rotate-180" : ""}`} />
                       </div>
-                      {empExpected !== null ? (
-                        <p className="text-xl font-bold tabular-nums text-foreground mt-1" data-testid="text-employee-expected-salary">
-                          {fmtSalary(empExpected)}
-                        </p>
-                      ) : (
-                        <p className="text-xl font-bold tabular-nums text-muted-foreground mt-1">—</p>
-                      )}
+                      <div className="flex items-baseline gap-3 mt-1 flex-wrap">
+                        {empExpected !== null ? (
+                          <p className="text-xl font-bold tabular-nums text-foreground" data-testid="text-employee-expected-salary">
+                            {fmtSalary(empExpected)}
+                          </p>
+                        ) : (
+                          <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
+                        )}
+                        {ms && ms.daysInMonth > 0 && (
+                          <p className="text-sm font-semibold tabular-nums text-muted-foreground">
+                            {fmtSalary(ms.totalEmployeeMonthlySalary / ms.daysInMonth)}
+                            <span className="text-xs font-normal opacity-60 ml-1">/day</span>
+                          </p>
+                        )}
+                      </div>
                       {ms && (
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {fmtSalary(ms.totalEmployeeMonthlySalary)} <span className="opacity-60">monthly total</span>
@@ -1325,21 +1333,29 @@ export default function DailyProductionReport() {
                     <div className="border-t px-4 pb-3 pt-2 space-y-1">
                       {ms?.employeeBreakdown && ms.employeeBreakdown.length > 0 ? (
                         <>
-                          <div className="grid grid-cols-2 gap-1 text-xs font-medium text-muted-foreground mb-1.5 px-0.5">
+                          <div className="grid grid-cols-3 gap-1 text-xs font-medium text-muted-foreground mb-1.5 px-0.5">
                             <span>Employee</span>
                             <span className="text-right">Expected</span>
+                            <span className="text-right">Daily</span>
                           </div>
-                          {ms.employeeBreakdown.map((e) => (
-                            <div key={e.id} className="grid grid-cols-2 gap-1 text-xs py-0.5">
-                              <span className="truncate text-foreground/90">{e.name}</span>
-                              <span className="text-right tabular-nums text-foreground">
-                                {fmtSalary(e.expected)}
-                              </span>
-                            </div>
-                          ))}
-                          <div className="grid grid-cols-2 gap-1 text-xs pt-1.5 border-t mt-1">
+                          {ms.employeeBreakdown.map((e) => {
+                            const daily = ms.daysInMonth > 0 ? e.monthlySalary / ms.daysInMonth : 0;
+                            return (
+                              <div key={e.id} className="grid grid-cols-3 gap-1 text-xs py-0.5">
+                                <span className="truncate text-foreground/90">{e.name}</span>
+                                <span className="text-right tabular-nums text-foreground">{fmtSalary(e.expected)}</span>
+                                <span className="text-right tabular-nums text-sky-600 dark:text-sky-400">{fmtSalary(daily)}</span>
+                              </div>
+                            );
+                          })}
+                          <div className="grid grid-cols-3 gap-1 text-xs pt-1.5 border-t mt-1">
                             <span className="font-medium text-muted-foreground">Total</span>
-                            <span className="text-right tabular-nums font-semibold text-foreground">{fmtSalary(empExpected ?? 0)}</span>
+                            <span className="text-right tabular-nums font-semibold text-foreground">
+                              {fmtSalary(ms.employeeBreakdown.reduce((sum, e) => sum + e.expected, 0))}
+                            </span>
+                            <span className="text-right tabular-nums font-semibold text-sky-600 dark:text-sky-400">
+                              {ms.daysInMonth > 0 ? fmtSalary(ms.totalEmployeeMonthlySalary / ms.daysInMonth) : "—"}
+                            </span>
                           </div>
                         </>
                       ) : (
