@@ -353,16 +353,10 @@ export default function Analytics() {
   const [factoryContainerPaymentStatus, setFactoryContainerPaymentStatus] = useState("all");
   const [expandedCustomerRows, setExpandedCustomerRows] = useState<Set<number>>(new Set());
   
-  const [activeSection, setActiveSection] = useState("reports");
-  useEscapeBack(activeSection !== "reports" ? () => setActiveSection("reports") : null);
+  const [activeSection, setActiveSection] = useState("assets");
+  useEscapeBack(activeSection !== "assets" ? () => setActiveSection("assets") : null);
 
   const sidebarGroups: { label: string; items: { key: string; label: string; icon: LucideIcon }[] }[] = [
-    {
-      label: "Financial Summary",
-      items: [
-        { key: "reports", label: "Net Profit (P&L)", icon: DollarSign },
-      ],
-    },
     {
       label: "Account Balances",
       items: [
