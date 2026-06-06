@@ -18,10 +18,42 @@ function getCompanyId(req: any): number | null {
   return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId || null;
 }
 
-const scrUpload = multer({
+const ALLOWED_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "text/csv",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
+
+const scrUploadBase = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB
+  fileFilter(_req, file, cb) {
+    if (ALLOWED_MIME_TYPES.has(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Unsupported file type"));
+    }
+  },
 });
+
+function scrUpload(req: any, res: any, next: any) {
+  scrUploadBase.single("file")(req, res, (err: any) => {
+    if (err) return res.status(400).json({ message: err.message });
+    next();
+  });
+}
+
+function safeDownloadName(name: string | null | undefined): string {
+  if (!name) return "download";
+  const safe = name.replace(/[\r\n]+/g, "").replace(/"/g, "'").replace(/;/g, "").trim();
+  return safe || "download";
+}
 
 /** Internal HTTP fetch — reuses session cookie so requireAuth passes. */
 function fetchInternalBuffer(req: any, urlPath: string): Promise<Buffer | null> {
@@ -549,7 +581,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
   app.post(
     "/api/factory/shipping-container-rows/:id/documents",
     requireAuth,
-    scrUpload.single("file"),
+    scrUpload,
     async (req: any, res: any) => {
       try {
         const companyId = getCompanyId(req);
@@ -700,14 +732,13 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
 
       const filename = req.params.filename;
 
-      // Try disk cache first
+      // Path traversal guard (applied before any I/O)
       const base = path.resolve(process.cwd(), "uploads", "shipping-container-docs");
       const target = path.resolve(base, filename);
       const relative = path.relative(base, target);
       if (relative.startsWith("..") || path.isAbsolute(relative)) return res.status(400).json({ message: "Invalid filename" });
-      if (fs.existsSync(target)) return res.sendFile(target);
 
-      // Fall back to DB
+      // A. Query DB first — ownership must be verified before serving any file
       const [docRow] = await db
         .select({
           fileData: factoryShippingContainerDocuments.fileData,
@@ -718,8 +749,15 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         .from(factoryShippingContainerDocuments)
         .where(eq(factoryShippingContainerDocuments.fileName, filename));
 
+      // B. No DB row → 404
       if (!docRow) return res.status(404).json({ message: "File not found. This file may have been uploaded on a different server instance and is no longer available. Please delete and re-upload the document." });
+      // C. Company mismatch → 403
       if (docRow.companyId !== companyId) return res.status(403).json({ message: "Forbidden" });
+
+      // D. Serve from disk cache if available
+      if (fs.existsSync(target)) return res.sendFile(target);
+
+      // E. Fall back to DB base64 data
       if (!docRow.fileData) return res.status(404).json({ message: "File content is not stored in the database. This document was uploaded before cloud storage was enabled. Please delete and re-upload the file." });
 
       const buffer = Buffer.from(docRow.fileData, "base64");
@@ -727,7 +765,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       res.setHeader("Content-Type", ct);
       const isInline = ct.startsWith("image/") || ct === "application/pdf";
       const disposition = isInline ? "inline" : "attachment";
-      res.setHeader("Content-Disposition", `${disposition}; filename="${docRow.originalName}"`);
+      res.setHeader("Content-Disposition", `${disposition}; filename="${safeDownloadName(docRow.originalName)}"`);
       res.send(buffer);
     } catch (error: any) {
       console.error("Error serving document:", error);
@@ -739,7 +777,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
   app.post(
     "/api/factory/shipping-container-rows/:id/shipping-invoice",
     requireAuth,
-    scrUpload.single("file"),
+    scrUpload,
     async (req: any, res: any) => {
       try {
         const companyId = getCompanyId(req);
@@ -843,16 +881,15 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const filename = req.params.filename;
 
-      // Try disk cache first
+      // Path traversal guard (applied before any I/O)
       const base = path.resolve(process.cwd(), "uploads", "shipping-invoice-docs");
       const diskPath = path.resolve(base, filename);
       const relative = path.relative(base, diskPath);
       if (relative.startsWith("..") || path.isAbsolute(relative)) {
         return res.status(400).json({ message: "Invalid filename" });
       }
-      if (fs.existsSync(diskPath)) return res.sendFile(diskPath);
 
-      // Fall back to DB
+      // A. Query DB first — ownership must be verified before serving any file
       const [row] = await db
         .select({
           shippingInvoiceFileData: factoryShippingContainerRows.shippingInvoiceFileData,
@@ -863,13 +900,20 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         .from(factoryShippingContainerRows)
         .where(eq(factoryShippingContainerRows.shippingInvoiceFileName, filename));
 
+      // B. No DB row → 404
       if (!row) return res.status(404).json({ message: "File not found" });
+      // C. Company mismatch → 403
       if (row.companyId !== companyId) return res.status(403).json({ message: "Forbidden" });
+
+      // D. Serve from disk cache if available
+      if (fs.existsSync(diskPath)) return res.sendFile(diskPath);
+
+      // E. Fall back to DB data
       if (!row.shippingInvoiceFileData) return res.status(404).json({ message: "File data unavailable" });
 
       const buffer = Buffer.from(row.shippingInvoiceFileData, "base64");
       if (row.shippingInvoiceFileType) res.setHeader("Content-Type", row.shippingInvoiceFileType);
-      res.setHeader("Content-Disposition", `inline; filename="${row.shippingInvoiceOriginalName}"`);
+      res.setHeader("Content-Disposition", `inline; filename="${safeDownloadName(row.shippingInvoiceOriginalName)}"`);
       res.send(buffer);
     } catch (error: any) {
       console.error("Error serving shipping invoice:", error);

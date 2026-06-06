@@ -17,8 +17,8 @@ export function setAppTimezone(tz: string | null | undefined) {
 /* ── CSRF token plumbing ─────────────────────────────────────────────────── */
 // Synchronizer-token CSRF protection. The token is fetched from the server
 // once per session and attached to every state-changing request as
-// X-CSRF-Token. Server is currently in WARN-ONLY mode and will start
-// enforcing once CSRF_ENFORCE=1 is set in production.
+// X-CSRF-Token. Enforcement is on by default; set CSRF_ENFORCE=0 to
+// switch to warn-only mode (logs mismatches but does not block requests).
 let _csrfToken: string | null = null;
 let _csrfFetchPromise: Promise<string | null> | null = null;
 
