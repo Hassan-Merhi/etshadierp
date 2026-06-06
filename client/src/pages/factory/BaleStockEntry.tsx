@@ -49,7 +49,7 @@ import GroundScan from "./GroundScan";
 import DailyScan from "./DailyScan";
   import { AdminAuthDialog } from "@/components/AdminAuthDialog";
   import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
-  import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, formatLabelNum, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
+  import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, prefetchBarcodeDataUrls, formatLabelNum, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
   import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
   import { consumeRef } from "@/lib/refPool";
   import { enqueueRequest } from "@/lib/offlineQueue";
@@ -536,12 +536,14 @@ import DailyScan from "./DailyScan";
             toast({ title: "Labels sent to Zebra printer" });
           } catch (err: any) {
             toast({ title: "Zebra print failed", description: err.message + " — Falling back to browser print.", variant: "destructive" });
-            openBrowserPrint(labels);
+            const prefetchedLabels = await prefetchBarcodeDataUrls(labels);
+            openBrowserPrint(prefetchedLabels);
           }
         } else {
-          // Use openBrowserPrint which handles the color picker dialog and
-          // correctly consumes the pre-opened windows (no blank tabs).
-          openBrowserPrint(labels);
+          // Pre-fetch all barcode images in parallel before opening the popup so
+          // the print window contains fully self-contained HTML (no network requests).
+          const prefetchedLabels = await prefetchBarcodeDataUrls(labels);
+          openBrowserPrint(prefetchedLabels);
         }
       } catch (error: any) {
         toast({ title: "Label Error", description: error.message || "Failed to generate labels", variant: "destructive" });

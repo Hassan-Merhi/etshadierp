@@ -53,7 +53,7 @@ import {
   Truck,
   ClipboardList,
 } from "lucide-react";
-import { generateStickerLabelsHtml, type LabelData } from "@/lib/labelHtml";
+import { generateStickerLabelsHtml, prefetchBarcodeDataUrls, type LabelData } from "@/lib/labelHtml";
 
 function fmt(n: number) {
   if (n === 0) return "$0";
@@ -459,29 +459,26 @@ export default function WasteDispatch() {
       // Reset form
       setEntryProductId("");
       setEntryQty("1");
-      // Print sticker labels
+      // Print sticker labels — pre-fetch barcodes in parallel before opening popup
       if (createdBales.length > 0) {
-        const labels: LabelData[] = createdBales.map((b: any) => ({
+        const rawLabels: LabelData[] = createdBales.map((b: any) => ({
           referenceNumber: b.referenceNumber,
           articleCode: b.articleCode || "",
           pieces: 1,
           approxWeightKg: String(b.weightKg || "0"),
           productName: b.productName || "",
         }));
-        const win = window.open("", "_blank");
-        if (win) {
-          win.document.write(generateStickerLabelsHtml(labels));
-          win.document.close();
-          win.focus();
-          const imgs = win.document.images;
-          const total = imgs.length;
-          let loaded = 0;
-          const tryPrint = () => { loaded++; if (loaded >= total) setTimeout(() => win.print(), 300); };
-          if (total === 0) { setTimeout(() => win.print(), 300); }
-          else { Array.from(imgs).forEach((img) => { img.onload = tryPrint; img.onerror = tryPrint; }); }
-        } else {
-          toast({ title: "Allow pop-ups", description: "Enable pop-ups to print labels", variant: "destructive" });
-        }
+        prefetchBarcodeDataUrls(rawLabels).then((labels) => {
+          const win = window.open("", "_blank");
+          if (win) {
+            win.document.write(generateStickerLabelsHtml(labels));
+            win.document.close();
+            win.focus();
+            setTimeout(() => win.print(), 300);
+          } else {
+            toast({ title: "Allow pop-ups", description: "Enable pop-ups to print labels", variant: "destructive" });
+          }
+        });
       }
       // Refresh the dispatch tab bale list too
       queryClient.invalidateQueries({ queryKey: ["/api/factory/waste-dispatch/bales"] });

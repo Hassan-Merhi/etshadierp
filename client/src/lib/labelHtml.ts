@@ -14,7 +14,41 @@ export type LabelData = {
   productName: string;
   designColor?: A4DesignColor | null;
   customerLogoUrl?: string;
+  barcodeDataUrl?: string;
 };
+
+function _blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+export async function prefetchBarcodeDataUrls(labels: LabelData[]): Promise<LabelData[]> {
+  const refs = Array.from(new Set(labels.map(l => l.referenceNumber)));
+  const results = await Promise.all(
+    refs.map(async (ref) => {
+      try {
+        const r = await fetch(`/api/barcode/${encodeURIComponent(ref)}`, { credentials: "include" });
+        if (!r.ok) return [ref, null] as [string, string | null];
+        const blob = await r.blob();
+        const dataUrl = await _blobToBase64(blob);
+        return [ref, dataUrl] as [string, string];
+      } catch {
+        return [ref, null] as [string, string | null];
+      }
+    })
+  );
+  const map = new Map<string, string>(
+    results.filter(([, v]) => v !== null) as [string, string][]
+  );
+  return labels.map(l => ({
+    ...l,
+    barcodeDataUrl: map.get(l.referenceNumber) ?? l.barcodeDataUrl,
+  }));
+}
 
 function getHeaderImage(code: string): string {
   if (!code) return HMD_LOGO_BASE64;
@@ -42,7 +76,7 @@ function buildDetailBlock(label: LabelData) {
       </div>
     </div>
     <div class="barcode-area">
-      <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
+      <img class="barcode-img" src="${label.barcodeDataUrl || `/api/barcode/${encodeURIComponent(label.referenceNumber)}`}" alt="Barcode" />
       <div class="barcode-number">${label.referenceNumber}</div>
       <div class="barcode-subtext">${label.productName}</div>
     </div>
@@ -62,7 +96,7 @@ function buildDetailBlockNoBanner(label: LabelData) {
       </div>
     </div>
     <div class="barcode-area">
-      <img class="barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
+      <img class="barcode-img" src="${label.barcodeDataUrl || `/api/barcode/${encodeURIComponent(label.referenceNumber)}`}" alt="Barcode" />
       <div class="barcode-number">${label.referenceNumber}</div>
       <div class="barcode-subtext">${label.productName}</div>
     </div>
@@ -290,7 +324,7 @@ export function generateStickerLabelsHtml(labels: LabelData[]) {
               </div>
             </div>
             <div class="ref-barcode-section">
-              <img class="ref-barcode-img" src="/api/barcode/${encodeURIComponent(label.referenceNumber)}" alt="Barcode" />
+              <img class="ref-barcode-img" src="${label.barcodeDataUrl || `/api/barcode/${encodeURIComponent(label.referenceNumber)}`}" alt="Barcode" />
               <div class="ref-barcode-number">${label.referenceNumber}</div>
             </div>
             <div class="name-barcode-section">
