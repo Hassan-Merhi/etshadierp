@@ -46,6 +46,7 @@ interface V5Row {
   freeToPromise: number;
   totalKg: number;
   proformaDetails: ProformaDetail[];
+  isGarbageOrWipers?: boolean;
 }
 interface V5Totals {
   stockAvailable: number;
@@ -365,6 +366,7 @@ export default function FactoryStockAllocationV5() {
   });
 
   function isGarbageOrWipers(row: V5Row) {
+    if (row.isGarbageOrWipers !== undefined) return row.isGarbageOrWipers;
     const n = row.productName.toLowerCase();
     return n.includes("wiper") || n.includes("garbage");
   }

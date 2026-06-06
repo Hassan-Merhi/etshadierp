@@ -434,7 +434,8 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         const productName = productNamesMap[articleCode] || articleCode;
         const weightKg    = weightMap.get(articleCode) ?? 0;
         const totalKg     = Math.round(stockAvailable * weightKg);
-        return { articleCode, productName, stockAvailable, totalLoaded, expectedToLoad, freeToPromise, totalKg, proformaDetails };
+        const isGarbageOrWipers = excludedCodes.has(articleCode);
+        return { articleCode, productName, stockAvailable, totalLoaded, expectedToLoad, freeToPromise, totalKg, proformaDetails, isGarbageOrWipers };
       });
 
       // 11. Apply frontend filters
