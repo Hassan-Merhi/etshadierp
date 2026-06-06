@@ -187,6 +187,14 @@ export default function FactoryContainerLoadingScan() {
     queryKey: ["/api/locations"],
   });
 
+  // Auto-select when there's exactly one location
+  useEffect(() => {
+    if (orderId) return; // don't override when resuming an existing order
+    if (locations.length === 1) {
+      setSelectedLocationId(String(locations[0].id));
+    }
+  }, [locations, orderId]);
+
   const { data: proformas = [] } = useQuery<Proforma[]>({
     queryKey: [
       `/api/factory/customer-proformas?customerId=${customerId}`,
