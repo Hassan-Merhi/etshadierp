@@ -103,13 +103,46 @@ export const A4_DESIGN_OPTIONS: { value: string; label: string; color: string; p
 // Key = slug (e.g. "purple"), value = imageUpdatedAt ms timestamp.
 let _bannerTimestamps: Record<string, number | null> = {};
 
+// In-memory base64 cache: slug → data URL. Avoids slow image fetch in print window.
+const _bannerBase64Cache: Record<string, string> = {};
+
+function _getBannerNetworkUrl(design: string): string {
+  const ts = _bannerTimestamps[design];
+  return ts ? `/labels/hmd-${design}.jpg?t=${ts}` : `/labels/hmd-${design}.jpg`;
+}
+
+function _prefetchBanner(slug: string): void {
+  if (_bannerBase64Cache[slug]) return;
+  const url = _getBannerNetworkUrl(slug);
+  fetch(url, { credentials: "include" })
+    .then(r => r.ok ? r.blob() : Promise.reject())
+    .then(blob => new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    }))
+    .then(b64 => { _bannerBase64Cache[slug] = b64; })
+    .catch(() => {});
+}
+
 export function setBannerTimestamps(ts: Record<string, number | null>) {
   _bannerTimestamps = ts;
+  // Clear stale cache for any slug whose timestamp changed, then re-prefetch all
+  for (const slug of Object.keys(ts)) delete _bannerBase64Cache[slug];
+  const allSlugs = new Set([...A4_DESIGN_OPTIONS.map(o => o.value), ...Object.keys(ts)]);
+  for (const slug of allSlugs) _prefetchBanner(slug);
+}
+
+// Kick off prefetch for static banners immediately on module load (browser only).
+// This means images are almost always cached before the user clicks Print.
+if (typeof window !== "undefined") {
+  for (const opt of A4_DESIGN_OPTIONS) _prefetchBanner(opt.value);
 }
 
 function getDesignBannerUrl(design: string): string {
-  const ts = _bannerTimestamps[design];
-  return ts ? `/labels/hmd-${design}.jpg?t=${ts}` : `/labels/hmd-${design}.jpg`;
+  // Prefer cached base64 (instant), fall back to network URL
+  return _bannerBase64Cache[design] ?? _getBannerNetworkUrl(design);
 }
 
 export function generateCombinedLabelsHtml(labels: LabelData[], designColor?: A4DesignColor) {
