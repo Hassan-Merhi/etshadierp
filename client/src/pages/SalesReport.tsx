@@ -635,7 +635,7 @@ export default function SalesReport() {
             <PopoverContent className="w-52 p-2" align="start">
               <div className="space-y-1">
                 <div className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer" onClick={() => setSelectedCompanies([])} data-testid="option-all-companies">
-                  <Checkbox checked={selectedCompanies.length === 0} className="h-4 w-4" />
+                  <Checkbox checked={selectedCompanies.length === 0} className="h-4 w-4 pointer-events-none" />
                   <span className="text-sm font-medium">All Companies</span>
                 </div>
                 <div className="border-t my-1" />
@@ -644,7 +644,7 @@ export default function SalesReport() {
                     onClick={() => setSelectedCompanies(prev => prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code])}
                     data-testid={`option-company-${code}`}
                   >
-                    <Checkbox checked={selectedCompanies.includes(code)} className="h-4 w-4" />
+                    <Checkbox checked={selectedCompanies.includes(code)} className="h-4 w-4 pointer-events-none" />
                     <span className="text-sm">{name}</span>
                   </div>
                 ))}
