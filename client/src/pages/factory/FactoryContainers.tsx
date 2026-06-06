@@ -114,7 +114,7 @@ function OtwCurrencyInline({ amounts }: { amounts: Record<string, number> }) {
   return (
     <div className="flex flex-col items-end gap-0.5">
       {entries.map(([ccy, amt]) => (
-        <span key={ccy} className="font-mono text-sm font-semibold whitespace-nowrap">
+        <span key={ccy} className="font-mono text-base font-semibold whitespace-nowrap">
           {otwFmtCcy(otwCcySymbol(ccy), amt)}
         </span>
       ))}
@@ -1571,13 +1571,13 @@ export default function FactoryContainers() {
                           data-testid={`row-otw-supplier-${key}`}
                         >
                           <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span className="font-medium text-sm flex-1 min-w-0 truncate">
+                          <span className="font-semibold text-base flex-1 min-w-0 truncate">
                             {group.supplierName}
                           </span>
-                          <Badge variant="secondary" className="text-xs shrink-0">
+                          <Badge variant="secondary" className="shrink-0">
                             {group.containers.length} ctr{group.containers.length !== 1 ? "s" : ""}
                           </Badge>
-                          <span className="text-sm font-mono text-muted-foreground shrink-0 hidden sm:block w-28 text-right">
+                          <span className="font-mono text-sm text-muted-foreground shrink-0 hidden sm:block w-32 text-right">
                             {fmtOtwKg(group.totalKg)} kg
                           </span>
                           <div className="shrink-0 min-w-[100px] text-right">
@@ -1593,11 +1593,11 @@ export default function FactoryContainers() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead>Container</TableHead>
-                                <TableHead>Origin</TableHead>
-                                <TableHead className="text-right">KG</TableHead>
-                                <TableHead className="text-right">Value</TableHead>
-                                <TableHead>Status</TableHead>
+                                <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Container</TableHead>
+                                <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Origin</TableHead>
+                                <TableHead className="text-right text-xs uppercase tracking-wide font-medium text-muted-foreground">KG</TableHead>
+                                <TableHead className="text-right text-xs uppercase tracking-wide font-medium text-muted-foreground">Value</TableHead>
+                                <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Status</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1610,20 +1610,20 @@ export default function FactoryContainers() {
                                     onClick={() => setViewContainer(c)}
                                     data-testid={`row-otw-container-${c.id}`}
                                   >
-                                    <TableCell className="font-mono text-sm font-medium">
+                                    <TableCell className="font-mono font-semibold">
                                       {c.containerNumber}
                                     </TableCell>
-                                    <TableCell className="text-sm text-muted-foreground">
+                                    <TableCell className="text-muted-foreground">
                                       {c.origin || "—"}
                                     </TableCell>
-                                    <TableCell className="text-right font-mono text-sm">
+                                    <TableCell className="text-right font-mono">
                                       {fmtOtwKg(otwNum(c.totalKg))}
                                     </TableCell>
                                     <TableCell className="text-right">
                                       <OtwCurrencyInline amounts={byCurrency} />
                                     </TableCell>
                                     <TableCell>
-                                      <Badge variant="outline" className="text-xs">
+                                      <Badge variant="outline">
                                         {OTW_STATUS_LABEL[c.status] || c.status}
                                       </Badge>
                                     </TableCell>
@@ -1633,10 +1633,10 @@ export default function FactoryContainers() {
                             </TableBody>
                             <tfoot>
                               <TableRow className="bg-muted/30 font-medium">
-                                <TableCell colSpan={2} className="text-sm text-muted-foreground">
+                                <TableCell colSpan={2} className="text-muted-foreground">
                                   Supplier total
                                 </TableCell>
-                                <TableCell className="text-right font-mono text-sm">
+                                <TableCell className="text-right font-mono font-semibold">
                                   {fmtOtwKg(group.totalKg)} kg
                                 </TableCell>
                                 <TableCell className="text-right">
@@ -1829,11 +1829,11 @@ export default function FactoryContainers() {
                         data-testid="checkbox-select-all"
                       />
                     </TableHead>
-                    <TableHead>Container #</TableHead>
-                    <TableHead>Commission</TableHead>
-                    <TableHead>Total Value</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-24">Actions</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Container #</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Commission</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Total Value</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Status</TableHead>
+                    <TableHead className="w-24 text-xs uppercase tracking-wide font-medium text-muted-foreground">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1870,11 +1870,11 @@ export default function FactoryContainers() {
                         </TableCell>
                         <TableCell colSpan={2}>
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold">{supplierName}</span>
-                            <Badge variant="outline" className="text-xs">{count} container{count !== 1 ? "s" : ""}</Badge>
+                            <span className="text-base font-bold">{supplierName}</span>
+                            <Badge variant="outline">{count} container{count !== 1 ? "s" : ""}</Badge>
                           </div>
                         </TableCell>
-                        <TableCell className="font-mono text-sm font-medium">
+                        <TableCell className="font-mono font-semibold">
                           {Array.from(groupTotals.entries()).map(([cc, amt]) => (
                             <div key={cc}>{cc} {formatNumber(amt)}</div>
                           ))}
@@ -1914,7 +1914,7 @@ export default function FactoryContainers() {
                                 data-testid={`checkbox-container-${c.id}`}
                               />
                             </TableCell>
-                            <TableCell className="font-medium font-mono">
+                            <TableCell className="font-semibold font-mono">
                               <button
                                 className="hover:underline text-left cursor-pointer text-foreground"
                                 onClick={() => setViewContainer(c)}
@@ -1923,10 +1923,10 @@ export default function FactoryContainers() {
                                 {c.containerNumber}
                               </button>
                             </TableCell>
-                            <TableCell className="font-mono text-sm">
+                            <TableCell className="font-mono">
                               {commAmt > 0 ? `${commCcy} ${formatNumber(commAmt)}` : <span className="text-muted-foreground">—</span>}
                             </TableCell>
-                            <TableCell className="font-mono text-sm font-medium">
+                            <TableCell className="font-mono font-semibold">
                               {totalValue > 0 ? `${ccy} ${formatNumber(totalValue)}` : <span className="text-muted-foreground">—</span>}
                             </TableCell>
                             <TableCell>
