@@ -3,7 +3,8 @@
 import { PageHeader } from "@/components/PageHeader";
   import {
     Plus, Minus, Trash2, Printer, ScanLine, AlertCircle, Package, CheckCircle,
-    XCircle, ShieldAlert, Lock, Upload, FileSpreadsheet, CalendarDays, List, LayoutList, Download, Palette, Square, Loader2, MessageCircle, ImagePlus
+    XCircle, ShieldAlert, Lock, Upload, FileSpreadsheet, CalendarDays, List, LayoutList, Download, Palette, Square, Loader2, MessageCircle, ImagePlus,
+    Pencil, Layers, Tag,
   } from "lucide-react";
   import { Button } from "@/components/ui/button";
   import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +42,7 @@ import { PageHeader } from "@/components/PageHeader";
   import { buildZplBatch } from "@/lib/zplBuilder";
   import { LabelPrintSettings, getPaperFormat } from "@/components/LabelPrintSettings";
   import { Label } from "@/components/ui/label";
+  import { Checkbox } from "@/components/ui/checkbox";
   import * as XLSX from "@/lib/excelHelper";
   import StockEntryHistory from "../StockEntryHistory";
 import GroundScan from "./GroundScan";
@@ -2379,6 +2381,64 @@ import DailyScan from "./DailyScan";
     });
     const productionAlreadyEnded = !!productionSession?.productionEndedAt;
 
+    // ── Worker Categories management ───────────────────────────────────────
+    const { appMode } = useAppMode();
+    const catApiRequest = getApiRequest(appMode);
+    const [catDialogOpen, setCatDialogOpen] = useState(false);
+    const [editingCat, setEditingCat] = useState<any>(null);
+    const [catName, setCatName] = useState("");
+    const [catWorkerIds, setCatWorkerIds] = useState<number[]>([]);
+
+    const { data: catWorkers = [] } = useQuery<any[]>({
+      queryKey: ["/api/factory/workers"],
+      queryFn: () => fetch("/api/factory/workers", { credentials: "include" }).then(r => r.json()),
+    });
+    const { data: workerCategories = [], isLoading: catsLoading } = useQuery<any[]>({
+      queryKey: ["/api/factory/worker-categories"],
+      queryFn: () => fetch("/api/factory/worker-categories", { credentials: "include" }).then(r => r.json()),
+    });
+
+    const createCatMutation = useMutation({
+      mutationFn: (data: { name: string; workerIds: number[] }) =>
+        catApiRequest("POST", "/api/factory/worker-categories", data),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/factory/worker-categories"] });
+        setCatDialogOpen(false);
+        toast({ title: "Category created" });
+      },
+      onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    });
+    const updateCatMutation = useMutation({
+      mutationFn: (data: { id: number; name: string; workerIds: number[] }) =>
+        catApiRequest("PATCH", `/api/factory/worker-categories/${data.id}`, { name: data.name, workerIds: data.workerIds }),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/factory/worker-categories"] });
+        setCatDialogOpen(false);
+        toast({ title: "Category updated" });
+      },
+      onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    });
+    const deleteCatMutation = useMutation({
+      mutationFn: (id: number) => catApiRequest("DELETE", `/api/factory/worker-categories/${id}`),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/factory/worker-categories"] });
+        toast({ title: "Category deleted" });
+      },
+      onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    });
+
+    const openNewCat = () => { setEditingCat(null); setCatName(""); setCatWorkerIds([]); setCatDialogOpen(true); };
+    const openEditCat = (cat: any) => { setEditingCat(cat); setCatName(cat.name); setCatWorkerIds(Array.isArray(cat.workerIds) ? cat.workerIds : []); setCatDialogOpen(true); };
+    const toggleCatWorker = (id: number) => setCatWorkerIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    const saveCat = () => {
+      if (!catName.trim()) { toast({ title: "Name is required", variant: "destructive" }); return; }
+      const activeIds = catWorkers.filter((w: any) => w.active !== false).map((w: any) => w.id);
+      const filtered = catWorkerIds.filter(id => activeIds.includes(id));
+      if (editingCat) updateCatMutation.mutate({ id: editingCat.id, name: catName.trim(), workerIds: filtered });
+      else createCatMutation.mutate({ name: catName.trim(), workerIds: filtered });
+    };
+    // ── End Worker Categories ──────────────────────────────────────────────
+
     const endProductionMutation = useMutation({
       mutationFn: async () => {
         const res = await apiRequest("POST", "/api/factory/stock-entry/end-production", { date: todayStr });
@@ -2433,6 +2493,10 @@ import DailyScan from "./DailyScan";
                 Daily Scan
               </TabsTrigger>
             )}
+            <TabsTrigger value="worker-categories" data-testid="tab-worker-categories">
+              <Tag className="h-4 w-4 mr-1" />
+              Worker Categories
+            </TabsTrigger>
           </TabsList>
           {showEntry && (
             <TabsContent value="entry" className="mt-4">
@@ -2456,7 +2520,147 @@ import DailyScan from "./DailyScan";
               <DailyScan />
             </TabsContent>
           )}
+          <TabsContent value="worker-categories" className="mt-4">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <p className="font-medium">Worker Categories</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Group workers into categories to quickly filter them during stock entry.
+                  </p>
+                </div>
+                <Button onClick={openNewCat} data-testid="button-add-worker-category">
+                  <Plus className="h-4 w-4 mr-2" />New Category
+                </Button>
+              </div>
+
+              {catsLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1,2,3].map(i => <div key={i} className="h-28 rounded-md bg-muted animate-pulse" />)}
+                </div>
+              ) : workerCategories.length === 0 ? (
+                <div className="text-center py-16 text-muted-foreground border rounded-md">
+                  <Layers className="mx-auto h-8 w-8 mb-3 opacity-40" />
+                  <p className="font-medium">No categories yet</p>
+                  <p className="text-sm mt-1">Create a category to group workers for quick filtering</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {workerCategories.map((cat: any) => {
+                    const ids: number[] = Array.isArray(cat.workerIds) ? cat.workerIds : [];
+                    const members = catWorkers.filter((w: any) => ids.includes(w.id));
+                    const activeMembers = members.filter((w: any) => w.active !== false);
+                    return (
+                      <Card key={cat.id} data-testid={`card-wcat-${cat.id}`}>
+                        <CardContent className="p-4 space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="font-semibold text-sm">{cat.name}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {activeMembers.length} active worker{activeMembers.length !== 1 ? "s" : ""}
+                                {ids.length > activeMembers.length && (
+                                  <span className="ml-1">({ids.length - activeMembers.length} inactive)</span>
+                                )}
+                              </p>
+                            </div>
+                            <div className="flex gap-1 flex-shrink-0">
+                              <Button size="icon" variant="ghost" onClick={() => openEditCat(cat)} data-testid={`button-edit-wcat-${cat.id}`}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="icon" variant="ghost"
+                                onClick={() => deleteCatMutation.mutate(cat.id)}
+                                disabled={deleteCatMutation.isPending}
+                                data-testid={`button-delete-wcat-${cat.id}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                              </Button>
+                            </div>
+                          </div>
+                          {activeMembers.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {activeMembers.slice(0, 6).map((w: any) => (
+                                <Badge key={w.id} variant="secondary" className="text-xs font-normal no-default-active-elevate">
+                                  {w.fullName}
+                                </Badge>
+                              ))}
+                              {activeMembers.length > 6 && (
+                                <Badge variant="outline" className="text-xs font-normal no-default-active-elevate">
+                                  +{activeMembers.length - 6} more
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </TabsContent>
         </Tabs>
+
+        {/* Worker Categories Dialog */}
+        <Dialog open={catDialogOpen} onOpenChange={(open) => { if (!open) setCatDialogOpen(false); }}>
+          <DialogContent className="max-w-md" data-testid="dialog-wcat-form">
+            <DialogHeader>
+              <DialogTitle>{editingCat ? "Edit Category" : "New Category"}</DialogTitle>
+              <DialogDescription>
+                {editingCat ? "Update the category name and worker assignments." : "Create a group of workers for easy filtering."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label className="text-xs">Category Name *</Label>
+                <Input
+                  value={catName}
+                  onChange={(e) => setCatName(e.target.value)}
+                  placeholder="e.g. Pressing Team A"
+                  data-testid="input-wcat-name"
+                  onKeyDown={(e) => { if (e.key === "Enter") saveCat(); }}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Workers</Label>
+                <div className="border rounded-md divide-y max-h-64 overflow-y-auto">
+                  {catWorkers.filter((w: any) => w.active !== false || catWorkerIds.includes(w.id)).map((w: any) => (
+                    <label
+                      key={w.id}
+                      className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover-elevate ${w.active === false ? "opacity-50" : ""}`}
+                      data-testid={`label-wcat-worker-${w.id}`}
+                    >
+                      <Checkbox
+                        checked={catWorkerIds.includes(w.id)}
+                        onCheckedChange={() => w.active !== false ? toggleCatWorker(w.id) : undefined}
+                        disabled={w.active === false}
+                        data-testid={`checkbox-wcat-worker-${w.id}`}
+                      />
+                      <span className="text-sm flex-1">{w.fullName}</span>
+                      {w.active === false && <Badge variant="secondary" className="text-xs no-default-active-elevate">Inactive</Badge>}
+                    </label>
+                  ))}
+                  {catWorkers.filter((w: any) => w.active !== false || catWorkerIds.includes(w.id)).length === 0 && (
+                    <p className="text-sm text-muted-foreground px-3 py-4 text-center">No workers available</p>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {catWorkerIds.filter(id => catWorkers.find((w: any) => w.id === id && w.active !== false)).length} active workers selected.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCatDialogOpen(false)} data-testid="button-cancel-wcat">Cancel</Button>
+              <Button
+                onClick={saveCat}
+                disabled={createCatMutation.isPending || updateCatMutation.isPending}
+                data-testid="button-save-wcat"
+              >
+                {(createCatMutation.isPending || updateCatMutation.isPending) ? "Saving..." : editingCat ? "Update" : "Create"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
