@@ -213,12 +213,14 @@ export default function Daybook({ user }: { user?: any } = {}) {
   }, [purchaseOrderData?.supplierId]);
 
   // Fetch voucher entries when viewing (includes account names and stock items)
+  // staleTime: 0 ensures we always see the latest account names / edits, never a 5-min cached copy
   const { data: viewVoucherEntriesRaw, isLoading: viewEntriesLoading } =
     useQuery<any>({
       queryKey: selectedVoucher
         ? [`/api/vouchers/${selectedVoucher.id}/view-entries`]
         : [],
       enabled: !!selectedVoucher && viewDialogOpen,
+      staleTime: 0,
     });
 
   // Handle the response which can be either array (most types) or object with entries/purchaseOrder (Purchase type)
@@ -237,6 +239,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const { data: expandedEntriesRaw, isLoading: expandedLoading } = useQuery<any>({
     queryKey: expandedVoucherId ? [`/api/vouchers/${expandedVoucherId}/view-entries`] : [],
     enabled: !!expandedVoucherId,
+    staleTime: 0,
   });
   const expandedEntries: ViewVoucherEntry[] = useMemo(() => {
     if (!expandedEntriesRaw) return [];
