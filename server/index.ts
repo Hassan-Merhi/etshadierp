@@ -4641,6 +4641,76 @@ END $mig$`;
         console.error("[StockAdjFix] Error:", e.message);
       }
 
+      // ── Auto-fix credit note variance entries posted to wrong account ────────
+      // Voucher entries narrated "Variance between refund and inventory cost"
+      // used to fall back to a random Indirect Expense account when no
+      // "Sales Returns" account existed. Re-route them to the correct account.
+      try {
+        const badVariance = await migrationClient.query(`
+          SELECT ve.id, v.company_id
+          FROM voucher_entries ve
+          JOIN vouchers v ON v.id = ve.voucher_id
+          JOIN ledger_accounts la ON la.id = ve.ledger_account_id
+          WHERE ve.narration IN (
+                  'Variance between refund and inventory cost',
+                  'Variance between debit note amount and inventory cost'
+                )
+            AND LOWER(la.name) NOT LIKE '%sales return%'
+            AND LOWER(la.name) NOT LIKE '%return%allowance%'
+            AND la.code != 'SALES-RETURNS'
+        `);
+
+        if (badVariance.rows.length > 0) {
+          const companyIds: number[] = [...new Set<number>(badVariance.rows.map((r: any) => Number(r.company_id)))];
+          let totalFixed = 0;
+
+          for (const cid of companyIds) {
+            // Find existing "Sales Returns" account or create one
+            const { rows: existing } = await migrationClient.query(`
+              SELECT id FROM ledger_accounts
+              WHERE company_id = $1
+                AND (LOWER(name) LIKE '%sales return%' OR code = 'SALES-RETURNS')
+              LIMIT 1
+            `, [cid]);
+
+            let accountId: number;
+            if (existing.length > 0) {
+              accountId = existing[0].id;
+            } else {
+              const { rows: created } = await migrationClient.query(`
+                INSERT INTO ledger_accounts (company_id, code, name, account_type, active, is_hidden)
+                VALUES ($1, 'SALES-RETURNS', 'Sales Returns & Allowances', 'Income', true, false)
+                ON CONFLICT DO NOTHING
+                RETURNING id
+              `, [cid]);
+              if (created.length === 0) {
+                const { rows: refetch } = await migrationClient.query(
+                  `SELECT id FROM ledger_accounts WHERE company_id = $1 AND code = 'SALES-RETURNS' LIMIT 1`, [cid]
+                );
+                accountId = refetch[0]?.id;
+              } else {
+                accountId = created[0].id;
+              }
+            }
+            if (!accountId!) continue;
+
+            const entryIds = badVariance.rows
+              .filter((r: any) => Number(r.company_id) === cid)
+              .map((r: any) => r.id);
+
+            await migrationClient.query(
+              `UPDATE voucher_entries SET ledger_account_id = $1 WHERE id = ANY($2)`,
+              [accountId, entryIds]
+            );
+            totalFixed += entryIds.length;
+          }
+
+          console.log(`[CreditNoteVarianceFix] Moved ${totalFixed} variance entry/entries → Sales Returns & Allowances`);
+        }
+      } catch (e: any) {
+        console.error("[CreditNoteVarianceFix] Error:", e.message);
+      }
+
       // ── Auto-fix orphaned RESERVED_FOR_ORDER bales ───────────────────────────
       // Bales stuck in RESERVED_FOR_ORDER with no active customer order referencing
       // them (order deleted / container row deleted) are returned to IN_STOCK.

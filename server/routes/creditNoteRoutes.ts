@@ -47,6 +47,60 @@ import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositio
 import path from "path";
 import fs from "fs";
 
+/**
+ * Find the "Sales Returns & Allowances" account for a company, or create one
+ * if it doesn't exist. Used to post the variance between refund price and
+ * inventory cost on Credit / Debit Notes.
+ * Never falls back to a random Indirect Expense account.
+ */
+async function getOrCreateSalesReturnsAccount(
+  companyId: number,
+  txOrDb: any = db,
+): Promise<number | null> {
+  // 1. Existing account whose name contains "sales return" (case-insensitive)
+  const byName = await txOrDb
+    .select({ id: ledgerAccounts.id })
+    .from(ledgerAccounts)
+    .where(
+      and(
+        eq(ledgerAccounts.companyId, companyId),
+        or(
+          ilike(ledgerAccounts.name, "%sales return%"),
+          ilike(ledgerAccounts.name, "%return%allowance%"),
+        ),
+      ),
+    )
+    .limit(1);
+  if (byName.length > 0) return byName[0].id;
+
+  // 2. Already auto-created under the canonical code
+  const byCode = await txOrDb
+    .select({ id: ledgerAccounts.id })
+    .from(ledgerAccounts)
+    .where(
+      and(
+        eq(ledgerAccounts.companyId, companyId),
+        eq(ledgerAccounts.code, "SALES-RETURNS"),
+      ),
+    )
+    .limit(1);
+  if (byCode.length > 0) return byCode[0].id;
+
+  // 3. Create it — Income type because it's a contra-revenue account
+  const [created] = await txOrDb
+    .insert(ledgerAccounts)
+    .values({
+      companyId,
+      code: "SALES-RETURNS",
+      name: "Sales Returns & Allowances",
+      accountType: "Income",
+      active: true,
+      isHidden: false,
+    })
+    .returning({ id: ledgerAccounts.id });
+  return created?.id ?? null;
+}
+
 export function registerCreditNoteRoutes(app: Express) {
   app.post("/api/credit-notes", requireAuth, requireNonPOS, async (req, res) => {
     try {
@@ -228,35 +282,12 @@ export function registerCreditNoteRoutes(app: Express) {
         // Handle variance
         const variance = totalRefundAmount - totalInventoryValue;
         if (Math.abs(variance) > 0.01) {
-          let salesReturnsAccount = await tx
-            .select()
-            .from(ledgerAccounts)
-            .where(
-              and(
-                eq(ledgerAccounts.companyId, companyId),
-                ilike(ledgerAccounts.name, "%sales return%")
-              )
-            )
-            .limit(1);
-
-          if (salesReturnsAccount.length === 0) {
-            salesReturnsAccount = await tx
-              .select()
-              .from(ledgerAccounts)
-              .where(
-                and(
-                  eq(ledgerAccounts.companyId, companyId),
-                  eq(ledgerAccounts.accountType, "Indirect Expense")
-                )
-              )
-              .limit(1);
-          }
-
-          if (salesReturnsAccount.length > 0) {
+          const salesReturnsAccountId = await getOrCreateSalesReturnsAccount(companyId, tx);
+          if (salesReturnsAccountId) {
             if (noteType === "Credit Note") {
               await tx.insert(voucherEntries).values({
                 voucherId: createdVoucher.id,
-                ledgerAccountId: salesReturnsAccount[0].id,
+                ledgerAccountId: salesReturnsAccountId,
                 debitAmount: variance > 0 ? variance.toFixed(2) : "0",
                 creditAmount: variance < 0 ? Math.abs(variance).toFixed(2) : "0",
                 narration: `Variance between refund and inventory cost`,
@@ -264,7 +295,7 @@ export function registerCreditNoteRoutes(app: Express) {
             } else {
               await tx.insert(voucherEntries).values({
                 voucherId: createdVoucher.id,
-                ledgerAccountId: salesReturnsAccount[0].id,
+                ledgerAccountId: salesReturnsAccountId,
                 debitAmount: variance < 0 ? Math.abs(variance).toFixed(2) : "0",
                 creditAmount: variance > 0 ? variance.toFixed(2) : "0",
                 narration: `Variance between debit note amount and inventory cost`,
@@ -653,35 +684,12 @@ export function registerCreditNoteRoutes(app: Express) {
         // Handle variance
         const variance = totalRefundAmount - totalInventoryValue;
         if (Math.abs(variance) > 0.01) {
-          let salesReturnsAccount = await tx
-            .select()
-            .from(ledgerAccounts)
-            .where(
-              and(
-                eq(ledgerAccounts.companyId, companyId),
-                ilike(ledgerAccounts.name, "%sales return%")
-              )
-            )
-            .limit(1);
-
-          if (salesReturnsAccount.length === 0) {
-            salesReturnsAccount = await tx
-              .select()
-              .from(ledgerAccounts)
-              .where(
-                and(
-                  eq(ledgerAccounts.companyId, companyId),
-                  eq(ledgerAccounts.accountType, "Indirect Expense")
-                )
-              )
-              .limit(1);
-          }
-
-          if (salesReturnsAccount.length > 0) {
+          const salesReturnsAccountId = await getOrCreateSalesReturnsAccount(companyId, tx);
+          if (salesReturnsAccountId) {
             if (noteType === "Credit Note") {
               await tx.insert(voucherEntries).values({
                 voucherId,
-                ledgerAccountId: salesReturnsAccount[0].id,
+                ledgerAccountId: salesReturnsAccountId,
                 debitAmount: variance > 0 ? variance.toFixed(2) : "0",
                 creditAmount: variance < 0 ? Math.abs(variance).toFixed(2) : "0",
                 narration: `Variance between refund and inventory cost`,
@@ -689,7 +697,7 @@ export function registerCreditNoteRoutes(app: Express) {
             } else {
               await tx.insert(voucherEntries).values({
                 voucherId,
-                ledgerAccountId: salesReturnsAccount[0].id,
+                ledgerAccountId: salesReturnsAccountId,
                 debitAmount: variance < 0 ? Math.abs(variance).toFixed(2) : "0",
                 creditAmount: variance > 0 ? variance.toFixed(2) : "0",
                 narration: `Variance between debit note amount and inventory cost`,
