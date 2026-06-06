@@ -5,7 +5,7 @@ import type { CompanyExportData } from "./exportDataService";
 const HDR_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
 const HDR_FONT: Partial<ExcelJS.Font> = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
 const ALT_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF0F4FA" } };
-const MAX_ROWS = 60000;
+const MAX_ROWS = 30000;
 
 // Convert snake_case db column name to a readable Title Case header
 function toHeader(key: string): string {
@@ -594,15 +594,15 @@ export async function streamCompanyWorkbookDirect(
 
   // ── Suppliers ──────────────────────────────────────────────────────────────
   await fetch1("Suppliers",               `SELECT s.* FROM suppliers s INNER JOIN ledger_accounts la ON la.id = s.ledger_account_id WHERE la.company_id = ${cid} AND s.deleted_at IS NULL ORDER BY s.legal_name`);
-  await fetch1("Supplier Transactions",   `SELECT ve.*, v.voucher_number, v.voucher_type, v.voucher_date, v.narration AS voucher_narration FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = ${cid} AND ve.supplier_id IS NOT NULL ${df("v.voucher_date")} ORDER BY v.voucher_date, ve.id`);
+  await fetch1("Supplier Transactions",   `SELECT ve.*, v.voucher_number, v.voucher_type, v.voucher_date, v.description AS voucher_narration FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = ${cid} AND ve.supplier_id IS NOT NULL ${df("v.voucher_date")} ORDER BY v.voucher_date, ve.id`);
   await fetch1("Supplier Proformas",      `SELECT * FROM supplier_proformas WHERE company_id = ${cid} ORDER BY id DESC`);
   await fetch1("Supplier Proforma Lines", `SELECT spl.* FROM supplier_proforma_lines spl INNER JOIN supplier_proformas sp ON sp.id = spl.proforma_id WHERE sp.company_id = ${cid} ORDER BY spl.id`);
-  await fetch1("Supplier Containers",     `SELECT sc.* FROM supplier_containers sc INNER JOIN suppliers s ON s.id = sc.supplier_id WHERE s.company_id = ${cid} ORDER BY sc.id DESC`);
-  await fetch1("Supplier Container Items",`SELECT scl.* FROM supplier_container_loaded_items scl INNER JOIN supplier_containers sc ON sc.id = scl.container_id INNER JOIN suppliers s ON s.id = sc.supplier_id WHERE s.company_id = ${cid} ORDER BY scl.id`);
+  await fetch1("Supplier Containers",     `SELECT sc.* FROM supplier_containers sc INNER JOIN suppliers s ON s.id = sc.supplier_id INNER JOIN ledger_accounts la ON la.id = s.ledger_account_id WHERE la.company_id = ${cid} ORDER BY sc.id DESC`);
+  await fetch1("Supplier Container Items",`SELECT scl.* FROM supplier_container_loaded_items scl INNER JOIN supplier_containers sc ON sc.id = scl.container_id INNER JOIN suppliers s ON s.id = sc.supplier_id INNER JOIN ledger_accounts la ON la.id = s.ledger_account_id WHERE la.company_id = ${cid} ORDER BY scl.id`);
 
   // ── Customers ──────────────────────────────────────────────────────────────
   await fetch1("Customers",              `SELECT * FROM customers WHERE company_id = ${cid} AND deleted_at IS NULL ORDER BY legal_name`);
-  await fetch1("Customer Transactions",  `SELECT ve.*, v.voucher_number, v.voucher_type, v.voucher_date, v.narration AS voucher_narration FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = ${cid} AND ve.customer_id IS NOT NULL ${df("v.voucher_date")} ORDER BY v.voucher_date, ve.id`);
+  await fetch1("Customer Transactions",  `SELECT ve.*, v.voucher_number, v.voucher_type, v.voucher_date, v.description AS voucher_narration FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = ${cid} AND ve.customer_id IS NOT NULL ${df("v.voucher_date")} ORDER BY v.voucher_date, ve.id`);
   await fetch1("Customer Balances",      `SELECT * FROM customer_balances WHERE company_id = ${cid} ORDER BY id`);
   await fetch1("Customer Orders",        `SELECT * FROM customer_orders WHERE company_id = ${cid} ${df("order_date")} ORDER BY order_date DESC, id`);
   await fetch1("Customer Order Lines",   `SELECT col.* FROM customer_order_lines col INNER JOIN customer_orders co ON co.id = col.order_id WHERE co.company_id = ${cid} ORDER BY col.id`);
@@ -614,16 +614,16 @@ export async function streamCompanyWorkbookDirect(
 
   // ── Employees ──────────────────────────────────────────────────────────────
   await fetch1("Employees",                  `SELECT * FROM employees WHERE company_id = ${cid} AND deleted_at IS NULL ORDER BY first_name, last_name`);
-  await fetch1("Payroll Runs",               `SELECT * FROM erp_payroll_runs WHERE company_id = ${cid} ${df("pay_date")} ORDER BY pay_date, id`);
-  await fetch1("Payroll Run Items",          `SELECT p.* FROM erp_payroll_run_items p INNER JOIN erp_payroll_runs r ON r.id = p.payroll_run_id WHERE r.company_id = ${cid} ${df("r.pay_date")} ORDER BY r.pay_date, p.id`);
+  await fetch1("Payroll Runs",               `SELECT * FROM erp_payroll_runs WHERE company_id = ${cid} ${df("date")} ORDER BY date, id`);
+  await fetch1("Payroll Run Items",          `SELECT p.* FROM erp_payroll_run_items p INNER JOIN erp_payroll_runs r ON r.id = p.run_id WHERE r.company_id = ${cid} ${df("r.date")} ORDER BY r.date, p.id`);
   await fetch1("Employee Advances",          `SELECT * FROM employee_advances WHERE company_id = ${cid} ORDER BY id`);
   await fetch1("Salary Advances",            `SELECT * FROM salary_advances WHERE company_id = ${cid} ${df("advance_date")} ORDER BY advance_date, id`);
-  await fetch1("Salary Advance Deductions",  `SELECT sad.* FROM salary_advance_deductions sad INNER JOIN salary_advances sa ON sa.id = sad.advance_id WHERE sa.company_id = ${cid} ORDER BY sad.id`);
+  await fetch1("Salary Advance Deductions",  `SELECT sad.* FROM salary_advance_deductions sad INNER JOIN salary_advances sa ON sa.id = sad.salary_advance_id WHERE sa.company_id = ${cid} ORDER BY sad.id`);
   await fetch1("Employee Advance Repayments",`SELECT * FROM employee_advance_repayments WHERE company_id = ${cid} ORDER BY id`);
   await fetch1("Employee Attendance",        `SELECT * FROM employee_attendance WHERE company_id = ${cid} ${df("attendance_date")} ORDER BY attendance_date, id`);
   await fetch1("Employee Bonuses",           `SELECT * FROM employee_bonuses WHERE company_id = ${cid} ${df("bonus_date")} ORDER BY bonus_date, id`);
   await fetch1("Employee Groups",            `SELECT * FROM employee_groups WHERE company_id = ${cid} ORDER BY name`);
-  await fetch1("Employee Group Members",     `SELECT egm.* FROM employee_group_members egm INNER JOIN employee_groups eg ON eg.id = egm.group_id WHERE eg.company_id = ${cid} ORDER BY egm.id`);
+  await fetch1("Employee Group Members",     `SELECT egm.* FROM employee_group_members egm INNER JOIN employee_groups eg ON eg.id = egm.employee_group_id WHERE eg.company_id = ${cid} ORDER BY egm.id`);
   await fetch1("Employee Bale Rates",        `SELECT * FROM employee_bale_rates WHERE company_id = ${cid} ORDER BY id`);
   await fetch1("Employee Bale Pct Rates",    `SELECT * FROM employee_bale_pct_rates WHERE company_id = ${cid} ORDER BY id`);
   await fetch1("Worker Documents",           `SELECT * FROM erp_worker_docs WHERE company_id = ${cid} ORDER BY id`);
@@ -650,13 +650,13 @@ export async function streamCompanyWorkbookDirect(
 
   // ── Factory Raw / Production ───────────────────────────────────────────────
   await fetch1("Factory Raw Stock",           `SELECT * FROM factory_raw_stock WHERE company_id = ${cid} ORDER BY id`);
-  await fetch1("Raw Material Adjustments",    `SELECT * FROM factory_raw_material_adjustments WHERE company_id = ${cid} ${df("adjustment_date")} ORDER BY adjustment_date DESC, id`);
+  await fetch1("Raw Material Adjustments",    `SELECT * FROM factory_raw_material_adjustments WHERE company_id = ${cid} ${df("date")} ORDER BY date DESC, id`);
   await fetch1("Factory Pressing Batches",    `SELECT * FROM factory_pressing_batches WHERE company_id = ${cid} ${df("created_at::date")} ORDER BY created_at DESC, id`);
   await fetch1("Pressing Batches",            `SELECT * FROM pressing_batches WHERE company_id = ${cid} ORDER BY id DESC`);
   await fetch1("Factory Mix Batches",         `SELECT * FROM factory_mix_batches WHERE company_id = ${cid} ORDER BY id DESC`);
   await fetch1("Factory Mix Batch Sources",   `SELECT fms.* FROM factory_mix_batch_sources fms INNER JOIN factory_mix_batches fmb ON fmb.id = fms.mix_batch_id WHERE fmb.company_id = ${cid} ORDER BY fms.id`);
   await fetch1("Mix Batches",                 `SELECT * FROM mix_batches WHERE company_id = ${cid} ORDER BY id DESC`);
-  await fetch1("Mix Batch Sources",           `SELECT mbs.* FROM mix_batch_sources mbs INNER JOIN mix_batches mb ON mb.id = mbs.batch_id WHERE mb.company_id = ${cid} ORDER BY mbs.id`);
+  await fetch1("Mix Batch Sources",           `SELECT mbs.* FROM mix_batch_sources mbs INNER JOIN mix_batches mb ON mb.id = mbs.mix_batch_id WHERE mb.company_id = ${cid} ORDER BY mbs.id`);
   await fetch1("Production Bales",            `SELECT * FROM production_bales WHERE company_id = ${cid} ORDER BY id DESC LIMIT 100000`);
   await fetch1("Production Raw Stock",        `SELECT * FROM production_raw_stock WHERE company_id = ${cid} ORDER BY id`);
 
@@ -666,7 +666,7 @@ export async function streamCompanyWorkbookDirect(
   await fetch1("Factory Bale Sequences",      `SELECT * FROM factory_bale_sequences WHERE company_id = ${cid} ORDER BY id`);
   await fetch1("Factory Bale Cost Snapshots", `SELECT * FROM factory_bale_cost_snapshots WHERE company_id = ${cid} ORDER BY id DESC LIMIT 50000`);
   await fetch1("Factory Bale Waste Dispatches",`SELECT * FROM factory_bale_waste_dispatches WHERE company_id = ${cid} ORDER BY id DESC`);
-  await fetch1("Factory Waste Entries",       `SELECT * FROM factory_waste_entries WHERE company_id = ${cid} ${df("entry_date")} ORDER BY entry_date DESC, id`);
+  await fetch1("Factory Waste Entries",       `SELECT * FROM factory_waste_entries WHERE company_id = ${cid} ${df("date")} ORDER BY date DESC, id`);
 
   // ── Factory Containers ─────────────────────────────────────────────────────
   await fetch1("Factory Containers",          `SELECT * FROM factory_containers WHERE company_id = ${cid} ORDER BY id DESC`);
@@ -711,8 +711,8 @@ export async function streamCompanyWorkbookDirect(
   await fetch1("Transfer Items",           `SELECT sti.* FROM stock_transfer_items sti INNER JOIN stock_transfer_vouchers stv ON stv.id = sti.transfer_id INNER JOIN vouchers v ON v.id = stv.voucher_id WHERE v.company_id = ${cid} ORDER BY sti.id`);
   await fetch1("Transfer Revisions",       `SELECT r.* FROM stock_transfer_revisions r INNER JOIN stock_transfer_vouchers stv ON stv.id = r.transfer_id INNER JOIN vouchers v ON v.id = stv.voucher_id WHERE v.company_id = ${cid} ORDER BY r.id`);
   await fetch1("Revision Items",           `SELECT ri.* FROM stock_transfer_revision_items ri INNER JOIN stock_transfer_revisions r ON r.id = ri.revision_id INNER JOIN stock_transfer_vouchers stv ON stv.id = r.transfer_id INNER JOIN vouchers v ON v.id = stv.voucher_id WHERE v.company_id = ${cid} ORDER BY ri.id`);
-  await fetch1("Stock Adjustments",        `SELECT * FROM stock_adjustment_vouchers WHERE company_id = ${cid} ${df("adjustment_date")} ORDER BY adjustment_date, id`);
-  await fetch1("Adjustment Items",         `SELECT ai.* FROM stock_adjustment_items ai INNER JOIN stock_adjustment_vouchers av ON av.id = ai.adjustment_voucher_id WHERE av.company_id = ${cid} ORDER BY ai.id`);
+  await fetch1("Stock Adjustments",        `SELECT sav.* FROM stock_adjustment_vouchers sav INNER JOIN vouchers v ON v.id = sav.voucher_id WHERE v.company_id = ${cid} ${df("v.voucher_date")} ORDER BY sav.id`);
+  await fetch1("Adjustment Items",         `SELECT ai.* FROM stock_adjustment_items ai INNER JOIN stock_adjustment_vouchers av ON av.id = ai.adjustment_id INNER JOIN vouchers v ON v.id = av.voucher_id WHERE v.company_id = ${cid} ORDER BY ai.id`);
   await fetch1("Proforma Reservations",    `SELECT * FROM proforma_stock_reservations WHERE company_id = ${cid} ORDER BY id`);
 
   // ── Containers ─────────────────────────────────────────────────────────────
@@ -721,7 +721,7 @@ export async function streamCompanyWorkbookDirect(
       c.border_date, c.offload_date, c.item_name, c.total_kg, c.rate_per_kg,
       c.items_total, c.charges_total, c.grand_total, c.transport_fee, c.duty_fee,
       c.agent, c.transporter, c.number_plate, c.shop_name, c.tracking_location,
-      c.tracking_description, c.doc_received, s.name AS supplier_name, s.phone AS supplier_phone,
+      c.tracking_description, c.doc_received, s.legal_name AS supplier_name, s.phone AS supplier_phone,
       COALESCE(ch.total_charges, 0) AS total_other_charges, COALESCE(ch.charge_breakdown,'') AS charge_breakdown,
       COALESCE(fr.freight_amount_usd, 0) AS freight_usd, COALESCE(fr.freight_amount_local, 0) AS freight_local,
       COALESCE(off.total_bales, 0) AS offloaded_bales, COALESCE(off.duties, 0) AS offload_duties,
@@ -748,7 +748,7 @@ export async function streamCompanyWorkbookDirect(
   await fetch1("Container Sales",           `SELECT * FROM container_sales WHERE company_id = ${cid} ORDER BY id DESC`);
 
   // ── Purchase Orders ────────────────────────────────────────────────────────
-  await fetch1("Purchase Orders",`SELECT po.* FROM purchase_orders po WHERE po.company_id = ${cid} ${df("po.po_date")} ORDER BY po.po_date, po.id`);
+  await fetch1("Purchase Orders",`SELECT po.* FROM purchase_orders po WHERE po.company_id = ${cid} ${df("po.created_at::date")} ORDER BY po.created_at, po.id`);
   await fetch1("PO Line Items",  `SELECT pli.* FROM po_line_items pli INNER JOIN purchase_orders po ON po.id = pli.po_id WHERE po.company_id = ${cid} ORDER BY pli.id`);
 
   // ── POS ────────────────────────────────────────────────────────────────────

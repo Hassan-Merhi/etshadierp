@@ -373,15 +373,15 @@ export async function fetchCompanyExportData(
 
     // ── Suppliers ─────────────────────────────────────────────────────────────
     q(`SELECT s.* FROM suppliers s INNER JOIN ledger_accounts la ON la.id = s.ledger_account_id WHERE la.company_id = ${cid} AND s.deleted_at IS NULL ORDER BY s.legal_name`),
-    q(`SELECT ve.*, v.voucher_number, v.voucher_type, v.voucher_date, v.narration AS voucher_narration FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = ${cid} AND ve.supplier_id IS NOT NULL ${df("v.voucher_date")} ORDER BY v.voucher_date, ve.id`),
+    q(`SELECT ve.*, v.voucher_number, v.voucher_type, v.voucher_date, v.description AS voucher_narration FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = ${cid} AND ve.supplier_id IS NOT NULL ${df("v.voucher_date")} ORDER BY v.voucher_date, ve.id`),
     q(`SELECT * FROM supplier_proformas WHERE company_id = ${cid} ORDER BY id DESC`),
     q(`SELECT spl.* FROM supplier_proforma_lines spl INNER JOIN supplier_proformas sp ON sp.id = spl.proforma_id WHERE sp.company_id = ${cid} ORDER BY spl.id`),
-    q(`SELECT sc.* FROM supplier_containers sc INNER JOIN suppliers s ON s.id = sc.supplier_id WHERE s.company_id = ${cid} ORDER BY sc.id DESC`),
-    q(`SELECT scl.* FROM supplier_container_loaded_items scl INNER JOIN supplier_containers sc ON sc.id = scl.container_id INNER JOIN suppliers s ON s.id = sc.supplier_id WHERE s.company_id = ${cid} ORDER BY scl.id`),
+    q(`SELECT sc.* FROM supplier_containers sc INNER JOIN suppliers s ON s.id = sc.supplier_id INNER JOIN ledger_accounts la ON la.id = s.ledger_account_id WHERE la.company_id = ${cid} ORDER BY sc.id DESC`),
+    q(`SELECT scl.* FROM supplier_container_loaded_items scl INNER JOIN supplier_containers sc ON sc.id = scl.container_id INNER JOIN suppliers s ON s.id = sc.supplier_id INNER JOIN ledger_accounts la ON la.id = s.ledger_account_id WHERE la.company_id = ${cid} ORDER BY scl.id`),
 
     // ── Customers ─────────────────────────────────────────────────────────────
     q(`SELECT * FROM customers WHERE company_id = ${cid} AND deleted_at IS NULL ORDER BY legal_name`),
-    q(`SELECT ve.*, v.voucher_number, v.voucher_type, v.voucher_date, v.narration AS voucher_narration FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = ${cid} AND ve.customer_id IS NOT NULL ${df("v.voucher_date")} ORDER BY v.voucher_date, ve.id`),
+    q(`SELECT ve.*, v.voucher_number, v.voucher_type, v.voucher_date, v.description AS voucher_narration FROM voucher_entries ve INNER JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = ${cid} AND ve.customer_id IS NOT NULL ${df("v.voucher_date")} ORDER BY v.voucher_date, ve.id`),
     q(`SELECT * FROM customer_balances WHERE company_id = ${cid} ORDER BY id`),
     q(`SELECT * FROM customer_orders WHERE company_id = ${cid} ${df("order_date")} ORDER BY order_date DESC, id`),
     q(`SELECT col.* FROM customer_order_lines col INNER JOIN customer_orders co ON co.id = col.order_id WHERE co.company_id = ${cid} ORDER BY col.id`),
@@ -393,16 +393,16 @@ export async function fetchCompanyExportData(
 
     // ── Employees ─────────────────────────────────────────────────────────────
     q(`SELECT * FROM employees WHERE company_id = ${cid} AND deleted_at IS NULL ORDER BY first_name, last_name`),
-    q(`SELECT * FROM erp_payroll_runs WHERE company_id = ${cid} ${df("pay_date")} ORDER BY pay_date, id`),
-    q(`SELECT p.* FROM erp_payroll_run_items p INNER JOIN erp_payroll_runs r ON r.id = p.payroll_run_id WHERE r.company_id = ${cid} ${df("r.pay_date")} ORDER BY r.pay_date, p.id`),
+    q(`SELECT * FROM erp_payroll_runs WHERE company_id = ${cid} ${df("date")} ORDER BY date, id`),
+    q(`SELECT p.* FROM erp_payroll_run_items p INNER JOIN erp_payroll_runs r ON r.id = p.run_id WHERE r.company_id = ${cid} ${df("r.date")} ORDER BY r.date, p.id`),
     q(`SELECT * FROM employee_advances WHERE company_id = ${cid} ORDER BY id`),
     q(`SELECT * FROM salary_advances WHERE company_id = ${cid} ${df("advance_date")} ORDER BY advance_date, id`),
-    q(`SELECT sad.* FROM salary_advance_deductions sad INNER JOIN salary_advances sa ON sa.id = sad.advance_id WHERE sa.company_id = ${cid} ORDER BY sad.id`),
+    q(`SELECT sad.* FROM salary_advance_deductions sad INNER JOIN salary_advances sa ON sa.id = sad.salary_advance_id WHERE sa.company_id = ${cid} ORDER BY sad.id`),
     q(`SELECT * FROM employee_advance_repayments WHERE company_id = ${cid} ORDER BY id`),
     q(`SELECT * FROM employee_attendance WHERE company_id = ${cid} ${df("attendance_date")} ORDER BY attendance_date, id`),
     q(`SELECT * FROM employee_bonuses WHERE company_id = ${cid} ${df("bonus_date")} ORDER BY bonus_date, id`),
     q(`SELECT * FROM employee_groups WHERE company_id = ${cid} ORDER BY name`),
-    q(`SELECT egm.* FROM employee_group_members egm INNER JOIN employee_groups eg ON eg.id = egm.group_id WHERE eg.company_id = ${cid} ORDER BY egm.id`),
+    q(`SELECT egm.* FROM employee_group_members egm INNER JOIN employee_groups eg ON eg.id = egm.employee_group_id WHERE eg.company_id = ${cid} ORDER BY egm.id`),
     q(`SELECT * FROM employee_bale_rates WHERE company_id = ${cid} ORDER BY id`),
     q(`SELECT * FROM employee_bale_pct_rates WHERE company_id = ${cid} ORDER BY id`),
     q(`SELECT * FROM erp_worker_docs WHERE company_id = ${cid} ORDER BY id`),
@@ -429,13 +429,13 @@ export async function fetchCompanyExportData(
 
     // ── Factory Raw / Production ──────────────────────────────────────────────
     q(`SELECT * FROM factory_raw_stock WHERE company_id = ${cid} ORDER BY id`),
-    q(`SELECT * FROM factory_raw_material_adjustments WHERE company_id = ${cid} ${df("adjustment_date")} ORDER BY adjustment_date DESC, id`),
+    q(`SELECT * FROM factory_raw_material_adjustments WHERE company_id = ${cid} ${df("date")} ORDER BY date DESC, id`),
     q(`SELECT * FROM factory_pressing_batches WHERE company_id = ${cid} ${df("created_at::date")} ORDER BY created_at DESC, id`),
     q(`SELECT * FROM pressing_batches WHERE company_id = ${cid} ORDER BY id DESC`),
     q(`SELECT * FROM factory_mix_batches WHERE company_id = ${cid} ORDER BY id DESC`),
     q(`SELECT fms.* FROM factory_mix_batch_sources fms INNER JOIN factory_mix_batches fmb ON fmb.id = fms.mix_batch_id WHERE fmb.company_id = ${cid} ORDER BY fms.id`),
     q(`SELECT * FROM mix_batches WHERE company_id = ${cid} ORDER BY id DESC`),
-    q(`SELECT mbs.* FROM mix_batch_sources mbs INNER JOIN mix_batches mb ON mb.id = mbs.batch_id WHERE mb.company_id = ${cid} ORDER BY mbs.id`),
+    q(`SELECT mbs.* FROM mix_batch_sources mbs INNER JOIN mix_batches mb ON mb.id = mbs.mix_batch_id WHERE mb.company_id = ${cid} ORDER BY mbs.id`),
     q(`SELECT * FROM production_bales WHERE company_id = ${cid} ORDER BY id DESC LIMIT 100000`),
     q(`SELECT * FROM production_raw_stock WHERE company_id = ${cid} ORDER BY id`),
 
@@ -445,7 +445,7 @@ export async function fetchCompanyExportData(
     q(`SELECT * FROM factory_bale_sequences WHERE company_id = ${cid} ORDER BY id`),
     q(`SELECT * FROM factory_bale_cost_snapshots WHERE company_id = ${cid} ORDER BY id DESC LIMIT 50000`),
     q(`SELECT * FROM factory_bale_waste_dispatches WHERE company_id = ${cid} ORDER BY id DESC`),
-    q(`SELECT * FROM factory_waste_entries WHERE company_id = ${cid} ${df("entry_date")} ORDER BY entry_date DESC, id`),
+    q(`SELECT * FROM factory_waste_entries WHERE company_id = ${cid} ${df("date")} ORDER BY date DESC, id`),
 
     // ── Factory Containers ────────────────────────────────────────────────────
     q(`SELECT * FROM factory_containers WHERE company_id = ${cid} ORDER BY id DESC`),
@@ -492,8 +492,8 @@ export async function fetchCompanyExportData(
     q(`SELECT sti.* FROM stock_transfer_items sti INNER JOIN stock_transfer_vouchers stv ON stv.id = sti.transfer_id INNER JOIN vouchers v ON v.id = stv.voucher_id WHERE v.company_id = ${cid} ORDER BY sti.id`),
     q(`SELECT r.* FROM stock_transfer_revisions r INNER JOIN stock_transfer_vouchers stv ON stv.id = r.transfer_id INNER JOIN vouchers v ON v.id = stv.voucher_id WHERE v.company_id = ${cid} ORDER BY r.id`),
     q(`SELECT ri.* FROM stock_transfer_revision_items ri INNER JOIN stock_transfer_revisions r ON r.id = ri.revision_id INNER JOIN stock_transfer_vouchers stv ON stv.id = r.transfer_id INNER JOIN vouchers v ON v.id = stv.voucher_id WHERE v.company_id = ${cid} ORDER BY ri.id`),
-    q(`SELECT * FROM stock_adjustment_vouchers WHERE company_id = ${cid} ${df("adjustment_date")} ORDER BY adjustment_date, id`),
-    q(`SELECT ai.* FROM stock_adjustment_items ai INNER JOIN stock_adjustment_vouchers av ON av.id = ai.adjustment_voucher_id WHERE av.company_id = ${cid} ORDER BY ai.id`),
+    q(`SELECT sav.* FROM stock_adjustment_vouchers sav INNER JOIN vouchers v ON v.id = sav.voucher_id WHERE v.company_id = ${cid} ${df("v.voucher_date")} ORDER BY sav.id`),
+    q(`SELECT ai.* FROM stock_adjustment_items ai INNER JOIN stock_adjustment_vouchers av ON av.id = ai.adjustment_id INNER JOIN vouchers v ON v.id = av.voucher_id WHERE v.company_id = ${cid} ORDER BY ai.id`),
     q(`SELECT * FROM proforma_stock_reservations WHERE company_id = ${cid} ORDER BY id`),
 
     // ── Containers ────────────────────────────────────────────────────────────
@@ -521,7 +521,7 @@ export async function fetchCompanyExportData(
         c.tracking_location,
         c.tracking_description,
         c.doc_received,
-        s.name                                    AS supplier_name,
+        s.legal_name                              AS supplier_name,
         s.phone                                   AS supplier_phone,
 
         COALESCE(ch.total_charges, 0)             AS total_other_charges,
@@ -604,7 +604,7 @@ export async function fetchCompanyExportData(
     q(`SELECT * FROM container_sales WHERE company_id = ${cid} ORDER BY id DESC`),
 
     // ── Purchase Orders ───────────────────────────────────────────────────────
-    q(`SELECT po.* FROM purchase_orders po WHERE po.company_id = ${cid} ${df("po.po_date")} ORDER BY po.po_date, po.id`),
+    q(`SELECT po.* FROM purchase_orders po WHERE po.company_id = ${cid} ${df("po.created_at::date")} ORDER BY po.created_at, po.id`),
     q(`SELECT pli.* FROM po_line_items pli INNER JOIN purchase_orders po ON po.id = pli.po_id WHERE po.company_id = ${cid} ORDER BY pli.id`),
 
     // ── POS ───────────────────────────────────────────────────────────────────
