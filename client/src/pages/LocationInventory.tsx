@@ -234,6 +234,23 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     staleTime: 60_000,
   });
 
+  const sendStockWaMutation = useMutation({
+    mutationFn: async ({ locationId, stockGroupId, groupName }: { locationId: number; stockGroupId?: number | null; groupName?: string | null }) => {
+      const res = await apiRequest("POST", `/api/locations/${locationId}/send-stock-whatsapp`, { stockGroupId, groupName });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to send");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "Sent to WhatsApp", description: `${data.itemCount} items sent.` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "WhatsApp send failed", description: error.message, variant: "destructive" });
+    },
+  });
+
   const waGroupMutation = useMutation({
     mutationFn: async ({ id, name, whatsappGroupChatId }: { id: number; name: string; whatsappGroupChatId: string | null }) => {
       const res = await apiRequest("PATCH", `/api/locations/${id}`, { name, whatsappGroupChatId });
@@ -2766,6 +2783,24 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 <Eye className="w-4 h-4" />
                 <span>{showZeroStock ? "Hide zero stock" : "Show zero stock"}</span>
               </Button>
+              {!posUser && (selectedLocationLocal as any).whatsappGroupChatId && (
+                <Button
+                  variant="outline"
+                  onClick={() => sendStockWaMutation.mutate({
+                    locationId: selectedLocationLocal.id,
+                    stockGroupId: selectedGroup?.groupId ?? null,
+                    groupName: selectedGroup?.groupName ?? null,
+                  })}
+                  disabled={sendStockWaMutation.isPending}
+                  data-testid="button-send-stock-whatsapp"
+                  className="gap-2 flex-1 sm:flex-none"
+                >
+                  {sendStockWaMutation.isPending
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <MessageCircle className="h-4 w-4 text-green-600 dark:text-green-400" />}
+                  Send to WhatsApp
+                </Button>
+              )}
               {!posUser && (
                 <Button
                   variant="outline"
