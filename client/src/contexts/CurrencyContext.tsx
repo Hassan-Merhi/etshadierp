@@ -12,6 +12,7 @@ interface CurrencyContextType {
   exchangeRate: number | null;
   isLoadingRate: boolean;
   isLoadingCompany: boolean;
+  baseCurrency: string;
   displayCurrency: string | null;
   isMultiCurrency: boolean;
   /** Converts USD → display currency and formats with symbol */
@@ -199,6 +200,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       exchangeRate,
       isLoadingRate,
       isLoadingCompany,
+      baseCurrency,
       displayCurrency,
       isMultiCurrency,
       formatAmount,

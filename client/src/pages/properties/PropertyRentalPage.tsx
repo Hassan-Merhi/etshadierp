@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -862,10 +863,12 @@ function VacantUnitInfoForm({ unit, testIdPrefix }: { unit: Unit; testIdPrefix: 
 function StartContractForm({ unitId, testIdPrefix, onClose, unitType }: { unitId: number; testIdPrefix: string; onClose: () => void; unitType: "WAREHOUSE" | "SHOP" }) {
   const apiBase = useApiBase();
   const { toast } = useToast();
+  const { baseCurrency } = useCurrencyContext();
+  const defaultCurrency = (baseCurrency === "CFA" || baseCurrency === "EUR") ? baseCurrency : "USD";
   const [form, setForm] = useState({
     tenantName: "", rentalAmount: "", guaranteeAmount: "",
     guaranteePeriod: "", startDate: new Date().toISOString().slice(0, 10), notes: "",
-    currency: "USD",
+    currency: defaultCurrency,
   });
   const [isInternal, setIsInternal] = useState(false);
 

@@ -458,6 +458,16 @@ async function postRentAccrualForCompany(
 
   if (allContracts.length === 0) return { accrued: 0, skipped: 0 };
 
+  // Determine the dominant currency for this batch of contracts.
+  // For single-currency companies (e.g. all CFA), this will be "CFA".
+  // For mixed, we pick the most common; if truly mixed we fall back to "USD".
+  const currencyCount = new Map<string, number>();
+  for (const c of allContracts) {
+    const cur = c.currency || "USD";
+    currencyCount.set(cur, (currencyCount.get(cur) ?? 0) + 1);
+  }
+  const batchCurrency = [...currencyCount.entries()].sort((a, b) => b[1] - a[1])[0][0];
+
   const contractIds = allContracts.map(c => c.id);
 
   // Unit name (display label) keyed by unitId
@@ -630,7 +640,7 @@ async function postRentAccrualForCompany(
         voucherDate:  new Date().toISOString().slice(0, 10) as any,
         description:  voucherDesc,
         totalAmount:  String(totalAmount),
-        currency:     "USD",
+        currency:     batchCurrency,
         sourceModule: moduleParam as any,
       }).returning();
 
@@ -1371,7 +1381,7 @@ export function registerRentalRoutes(
               const [v] = await tx.insert(vouchers).values({
                 companyId, voucherNumber: `GUAR-REFUND-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${id}`,
                 voucherType: "Receipt", voucherDate: dateStr as any,
-                description: narration, totalAmount: amt, currency: "USD", sourceModule: "ERP",
+                description: narration, totalAmount: amt, currency: contract.currency || "USD", sourceModule: "ERP",
               }).returning();
               await tx.insert(voucherEntries).values([
                 { voucherId: v.id, ledgerAccountId: refundCashAccountId, debitAmount: amt,  creditAmount: "0",  narration },
@@ -1383,7 +1393,7 @@ export function registerRentalRoutes(
               const [v] = await tx.insert(vouchers).values({
                 companyId, voucherNumber: `GUAR-REFUND-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${id}`,
                 voucherType: "Payment", voucherDate: dateStr as any,
-                description: narration, totalAmount: amt, currency: "USD", sourceModule: "ERP",
+                description: narration, totalAmount: amt, currency: contract.currency || "USD", sourceModule: "ERP",
               }).returning();
               await tx.insert(voucherEntries).values([
                 { voucherId: v.id, ledgerAccountId: depositAccountId,    debitAmount: amt,  creditAmount: "0",  narration },
@@ -1454,7 +1464,7 @@ export function registerRentalRoutes(
             const [v] = await tx.insert(vouchers).values({
               companyId, voucherNumber: `GUAR-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${id}`,
               voucherType: "Payment", voucherDate: dateStr as any,
-              description: narration, totalAmount: amount, currency: "USD", sourceModule: "ERP",
+              description: narration, totalAmount: amount, currency: contract.currency || "USD", sourceModule: "ERP",
             }).returning();
             await tx.insert(voucherEntries).values([
               { voucherId: v.id, ledgerAccountId: depositAccountId, debitAmount: amount, creditAmount: "0", narration },
@@ -1467,7 +1477,7 @@ export function registerRentalRoutes(
             const [v] = await tx.insert(vouchers).values({
               companyId, voucherNumber: `GUAR-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${id}`,
               voucherType: "Receipt", voucherDate: dateStr as any,
-              description: narration, totalAmount: amount, currency: "USD", sourceModule: "ERP",
+              description: narration, totalAmount: amount, currency: contract.currency || "USD", sourceModule: "ERP",
             }).returning();
             await tx.insert(voucherEntries).values([
               { voucherId: v.id, ledgerAccountId: cashAccountId, debitAmount: amount, creditAmount: "0", narration },
