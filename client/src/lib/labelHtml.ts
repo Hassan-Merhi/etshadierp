@@ -98,8 +98,18 @@ export const A4_DESIGN_OPTIONS: { value: string; label: string; color: string; p
   { value: "red",    label: "HMD Intl (#5)", color: "#B91C1C", previewUrl: "/labels/hmd-red.jpg"    },
 ];
 
+// Cache-busting timestamps for custom banner images.
+// Populated by useLabelDesignColors after every successful API fetch.
+// Key = slug (e.g. "purple"), value = imageUpdatedAt ms timestamp.
+let _bannerTimestamps: Record<string, number | null> = {};
+
+export function setBannerTimestamps(ts: Record<string, number | null>) {
+  _bannerTimestamps = ts;
+}
+
 function getDesignBannerUrl(design: string): string {
-  return `/labels/hmd-${design}.jpg`;
+  const ts = _bannerTimestamps[design];
+  return ts ? `/labels/hmd-${design}.jpg?t=${ts}` : `/labels/hmd-${design}.jpg`;
 }
 
 export function generateCombinedLabelsHtml(labels: LabelData[], designColor?: A4DesignColor) {
