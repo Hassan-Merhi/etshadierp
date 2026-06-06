@@ -456,12 +456,14 @@ export default function Accounts() {
     ? [...baseAccounts, ...factorySupplierAccounts, ...factoryWorkerAccounts]
     : baseAccounts;
 
+  const [showHidden, setShowHidden] = useState(false);
+
   const { data: ledgerAccounts = [], isLoading: ledgerAccountsLoading } =
     useQuery<LedgerAccount[]>({
-      queryKey: ["/api/ledger-accounts", selectedCompany?.id, import.meta.env.DEV],
+      queryKey: ["/api/ledger-accounts", selectedCompany?.id, showHidden],
       queryFn: async () => {
         if (!selectedCompany) return [];
-        const url = import.meta.env.DEV
+        const url = showHidden
           ? `/api/ledger-accounts?companyId=${selectedCompany.id}&includeHidden=true`
           : `/api/ledger-accounts?companyId=${selectedCompany.id}`;
         const response = await fetch(url, { credentials: "include" });
@@ -1866,18 +1868,31 @@ export default function Accounts() {
               {!selectedAccount ? (
                 <div className="space-y-2">
                   <div className="space-y-2">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="account-search"
-                        placeholder="Search by name or type..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyDown={(e) => handleListArrowScroll(e, accountListRef)}
-                        className="pl-9"
-                        disabled={accountsLoading || !selectedCompany}
-                        data-testid="input-account-search"
-                      />
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="account-search"
+                          placeholder="Search by name or type..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          onKeyDown={(e) => handleListArrowScroll(e, accountListRef)}
+                          className="pl-9"
+                          disabled={accountsLoading || !selectedCompany}
+                          data-testid="input-account-search"
+                        />
+                      </div>
+                      {import.meta.env.DEV && (
+                        <Button
+                          size="icon"
+                          variant={showHidden ? "secondary" : "outline"}
+                          onClick={() => setShowHidden(v => !v)}
+                          title={showHidden ? "Hide hidden accounts" : "Show hidden accounts"}
+                          data-testid="button-toggle-show-hidden"
+                        >
+                          {showHidden ? <Eye className="h-4 w-4 text-orange-500" /> : <EyeOff className="h-4 w-4" />}
+                        </Button>
+                      )}
                     </div>
 
                     {accountsLoading || !selectedCompany ? (
@@ -1919,7 +1934,7 @@ export default function Accounts() {
                                     handleAccountChange(account.id)
                                   }
                                   disabled={accountsLoading || !selectedCompany}
-                                  className={`flex-1 p-3 text-left hover-elevate ${account.children.length === 0 ? "ml-8" : ""} ${import.meta.env.DEV && account.isHidden ? "opacity-40" : ""}`}
+                                  className={`flex-1 p-3 text-left hover-elevate ${account.children.length === 0 ? "ml-8" : ""} ${showHidden && account.isHidden ? "opacity-40" : ""}`}
                                   data-testid={`button-select-account-${account.id}`}
                                 >
                                   <div className="flex items-center gap-2 w-full">
@@ -1939,7 +1954,7 @@ export default function Accounts() {
                                     )}
                                   </div>
                                 </button>
-                                {import.meta.env.DEV && account.type === "ledger" && (
+                                {import.meta.env.DEV && showHidden && account.type === "ledger" && (
                                   <button
                                     onClick={(e) => { e.stopPropagation(); toggleHideMutation.mutate({ id: account.accountId, isHidden: !account.isHidden }); }}
                                     className="p-2 hover-elevate shrink-0"
@@ -1965,7 +1980,7 @@ export default function Accounts() {
                                       disabled={
                                         accountsLoading || !selectedCompany
                                       }
-                                      className={`flex-1 p-2.5 pl-14 text-left hover-elevate ${import.meta.env.DEV && child.isHidden ? "opacity-40" : ""}`}
+                                      className={`flex-1 p-2.5 pl-14 text-left hover-elevate ${showHidden && child.isHidden ? "opacity-40" : ""}`}
                                       data-testid={`button-select-account-${child.id}`}
                                     >
                                       <div className="flex items-center gap-2 w-full">
@@ -1985,7 +2000,7 @@ export default function Accounts() {
                                         )}
                                       </div>
                                     </button>
-                                    {import.meta.env.DEV && child.type === "ledger" && (
+                                    {import.meta.env.DEV && showHidden && child.type === "ledger" && (
                                       <button
                                         onClick={(e) => { e.stopPropagation(); toggleHideMutation.mutate({ id: child.accountId, isHidden: !child.isHidden }); }}
                                         className="p-2 hover-elevate shrink-0"
