@@ -19,7 +19,7 @@ import { ConfirmPasswordDialog } from "@/components/ConfirmPasswordDialog";
 import { PermissionSummaryCard } from "./PermissionSummaryCard";
 
 const ROLE_OPTIONS = [
-  "Admin", "Owner", "Manager", "POS", "Normal User",
+  "Admin", "Owner", "Manager", "POS", "Normal User", "View Only",
 ];
 
 interface RolePreset {
