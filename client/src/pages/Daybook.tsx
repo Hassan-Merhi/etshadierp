@@ -155,6 +155,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
   const [selectedDialogRow, setSelectedDialogRow] = useState<number | null>(null);
+  const [viewProfitFilter, setViewProfitFilter] = useState<"all" | "gain" | "loss">("all");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [voucherToEdit, setVoucherToEdit] = useState<Voucher | null>(null);
   const [editFormInitialized, setEditFormInitialized] = useState(false);
@@ -570,6 +571,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
         const voucher = await res.json();
         if (voucher?.id) {
           setSelectedVoucher(voucher);
+          setViewProfitFilter("all");
           setViewDialogOpen(true);
           setUrlVoucherHandled(true);
           // Clear the param from the URL without reloading
@@ -929,6 +931,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   // Handler functions
   const handleView = async (voucher: Voucher) => {
     setSelectedVoucher(voucher);
+    setViewProfitFilter("all");
     setViewDialogOpen(true);
   };
 
@@ -2340,7 +2343,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Type</p>
-                  <div className="flex gap-2 items-center">
+                  <div className="flex gap-2 items-center flex-wrap">
                     <Badge
                       {...getVoucherTypeBadge(selectedVoucher.voucherType)}
                     >
@@ -2354,18 +2357,36 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   </div>
                 </div>
               </div>
-              {selectedVoucher.description && (
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">
-                    Description
-                  </p>
-                  <p className="text-sm">{selectedVoucher.description}</p>
-                </div>
-              )}
-              {selectedVoucher.locationName && (
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Location</p>
-                  <p className="text-sm">{selectedVoucher.locationName}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {selectedVoucher.description && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">
+                      Description
+                    </p>
+                    <p className="text-sm">{selectedVoucher.description}</p>
+                  </div>
+                )}
+                {selectedVoucher.locationName && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Location</p>
+                    <p className="text-sm">{selectedVoucher.locationName}</p>
+                  </div>
+                )}
+              </div>
+              {selectedVoucher.voucherType === "Sales" && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground mr-1">Filter:</span>
+                  {(["all", "gain", "loss"] as const).map((f) => (
+                    <Button
+                      key={f}
+                      size="sm"
+                      variant={viewProfitFilter === f ? "default" : "outline"}
+                      onClick={() => setViewProfitFilter(f)}
+                      data-testid={`button-profit-filter-${f}`}
+                    >
+                      {f.charAt(0).toUpperCase() + f.slice(1)}
+                    </Button>
+                  ))}
                 </div>
               )}
 
@@ -2452,9 +2473,14 @@ export default function Daybook({ user }: { user?: any } = {}) {
                     const ledgerEntries = viewVoucherEntries.filter(
                       (e: ViewVoucherEntry) => !e.isStockItem && !e.stockItemId,
                     );
-                    const salesItems = viewVoucherEntries.filter(
+                    const allSalesItems = viewVoucherEntries.filter(
                       (e: ViewVoucherEntry) => e.isStockItem || e.stockItemId,
                     );
+                    const salesItems = allSalesItems.filter((e: ViewVoucherEntry) => {
+                      if (viewProfitFilter === "all") return true;
+                      const p = parseFloat(e.profit || "0");
+                      return viewProfitFilter === "gain" ? p > 0 : p <= 0;
+                    });
 
                     // Find cash entry (debit) and revenue entry (credit)
                     const cashEntry = ledgerEntries.find(
@@ -2557,7 +2583,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                         </TableCell>
                                       )}
                                       {canSeeProfitCost && (
-                                        <TableCell className="text-right font-mono text-muted-foreground">
+                                        <TableCell className={`text-right font-mono ${item.hassansPercentage ? (parseFloat(item.hassansPercentage) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400") : "text-muted-foreground"}`}>
                                           {item.hassansPercentage ? `${item.hassansPercentage}%` : "-"}
                                         </TableCell>
                                       )}
