@@ -1266,30 +1266,51 @@ export default function DailyProductionReport() {
               </Collapsible>
 
               <Card className="border-amber-300 dark:border-amber-700" data-testid="card-worker-remaining">
-                <CardContent className="py-3 px-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Worker Remaining</p>
-                  {workerRemaining !== null ? (
-                    <p
-                      className={
-                        workerRemaining < 0
-                          ? "text-xl font-bold tabular-nums text-blue-600 dark:text-blue-400"
-                          : workerRemaining === 0
-                            ? "text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400"
-                            : "text-xl font-bold tabular-nums text-amber-600 dark:text-amber-400"
-                      }
-                      data-testid="text-worker-remaining"
-                    >
-                      {workerRemaining < 0
-                        ? `Overpaid ${fmtSalary(Math.abs(workerRemaining))}`
-                        : fmtSalary(workerRemaining)}
-                    </p>
-                  ) : (
-                    <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
-                  )}
-                  {ms && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {fmtSalary(ms.totalWorkerPaid)} <span className="opacity-60">paid this month</span>
-                    </p>
+                <CardContent className="py-3 px-4 space-y-3">
+                  {/* KPI 1 — Worker Remaining */}
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Worker Remaining</p>
+                    {workerRemaining !== null ? (
+                      <p
+                        className={
+                          workerRemaining < 0
+                            ? "text-xl font-bold tabular-nums text-blue-600 dark:text-blue-400"
+                            : workerRemaining === 0
+                              ? "text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400"
+                              : "text-xl font-bold tabular-nums text-amber-600 dark:text-amber-400"
+                        }
+                        data-testid="text-worker-remaining"
+                      >
+                        {workerRemaining < 0
+                          ? `Overpaid ${fmtSalary(Math.abs(workerRemaining))}`
+                          : fmtSalary(workerRemaining)}
+                      </p>
+                    ) : (
+                      <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
+                    )}
+                    {ms && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {fmtSalary(ms.totalWorkerPaid)} <span className="opacity-60">paid this month</span>
+                      </p>
+                    )}
+                  </div>
+
+                  {/* KPI 2 — Combined Total (Workers+Transport + Employee Expected) */}
+                  {workerTotal !== null && empExpected !== null && (
+                    <div className="border-t pt-2.5">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Total Payroll</p>
+                      <div className="flex items-baseline gap-3 flex-wrap">
+                        <p className="text-xl font-bold tabular-nums text-foreground" data-testid="text-combined-total">
+                          {fmtSalary(workerTotal + empExpected)}
+                        </p>
+                        {ms && ms.currentDay > 0 && ms.daysInMonth > 0 && (
+                          <p className="text-sm font-semibold tabular-nums text-muted-foreground">
+                            {fmtSalary((workerTotal / ms.currentDay) + (ms.totalEmployeeMonthlySalary / ms.daysInMonth))}
+                            <span className="text-xs font-normal opacity-60 ml-1">/day</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </CardContent>
               </Card>
