@@ -155,7 +155,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
   const [selectedDialogRow, setSelectedDialogRow] = useState<number | null>(null);
-  const [viewProfitFilter, setViewProfitFilter] = useState<"all" | "gain" | "loss">("all");
+  const [viewProfitFilter, setViewProfitFilter] = useState<"all" | "gain" | "loss" | "even">("all");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [voucherToEdit, setVoucherToEdit] = useState<Voucher | null>(null);
   const [editFormInitialized, setEditFormInitialized] = useState(false);
@@ -2376,7 +2376,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
               {selectedVoucher.voucherType === "Sales" && (
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground mr-1">Filter:</span>
-                  {(["all", "gain", "loss"] as const).map((f) => (
+                  {(["all", "gain", "loss", "even"] as const).map((f) => (
                     <Button
                       key={f}
                       size="sm"
@@ -2479,7 +2479,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
                     const salesItems = allSalesItems.filter((e: ViewVoucherEntry) => {
                       if (viewProfitFilter === "all") return true;
                       const p = parseFloat(e.profit || "0");
-                      return viewProfitFilter === "gain" ? p >= 0 : p < 0;
+                      if (viewProfitFilter === "gain") return p > 0;
+                      if (viewProfitFilter === "loss") return p < 0;
+                      return p === 0; // even
                     });
 
                     // Find cash entry (debit) and revenue entry (credit)
