@@ -2478,10 +2478,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
                     );
                     const salesItems = allSalesItems.filter((e: ViewVoucherEntry) => {
                       if (viewProfitFilter === "all") return true;
-                      const p = parseFloat(e.profit || "0");
-                      if (viewProfitFilter === "gain") return p > 0;
-                      if (viewProfitFilter === "loss") return p < 0;
-                      return p === 0; // even
+                      // Filter by Hassan's profit (vs Hassan's reference price), not regular profit
+                      const hp = parseFloat(e.hassansProfit || "0");
+                      if (viewProfitFilter === "gain") return hp > 0;
+                      if (viewProfitFilter === "loss") return hp < 0;
+                      return Math.abs(hp) < 0.005; // even — sold at exactly Hassan's price
                     });
 
                     // Find cash entry (debit) and revenue entry (credit)
