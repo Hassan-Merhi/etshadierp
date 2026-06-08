@@ -88,6 +88,40 @@ function parseBalesMeta(entry: DaybookEntry): BaleMeta[] {
   }
 }
 
+// A DisplayEntry is a DaybookEntry augmented with a stable React key and a
+// reference back to the original entry (used by the detail panel so it always
+// shows all bales, not just the per-bale virtual row).
+type DisplayEntry = DaybookEntry & { _vKey: string; _source: DaybookEntry };
+
+// Expand multi-bale BALE_STOCK_ENTRY rows into one virtual row per bale so
+// each bale gets its own named row (like single-bale entries already do).
+// The cost is divided equally across bales.
+function expandBaleEntries(entries: DaybookEntry[]): DisplayEntry[] {
+  const out: DisplayEntry[] = [];
+  for (const e of entries) {
+    if (e.txType === "BALE_STOCK_ENTRY") {
+      const bales = parseBalesMeta(e);
+      if (bales.length > 1) {
+        const totalAmt = parseFloat(e.amountCurrency || "0");
+        const totalUsd = parseFloat(e.amountUsd || "0");
+        bales.forEach((bale, i) => {
+          out.push({
+            ...e,
+            metaJson: JSON.stringify({ bales: [bale] }),
+            amountCurrency: (totalAmt / bales.length).toFixed(2),
+            amountUsd: (totalUsd / bales.length).toFixed(2),
+            _vKey: `${e.id}_b${i}`,
+            _source: e,
+          } as DisplayEntry);
+        });
+        continue;
+      }
+    }
+    out.push({ ...e, _vKey: String(e.id), _source: e } as DisplayEntry);
+  }
+  return out;
+}
+
 function formatDaybookDescription(entry: DaybookEntry): string {
   if (entry.txType === "BALE_STOCK_ENTRY") {
     const bales = parseBalesMeta(entry);
@@ -1389,6 +1423,9 @@ export default function FactoryDaybook() {
     return filteredEntries.filter((e) => !hiddenRowIds.has(String(e.id)));
   }, [filteredEntries, hiddenRowIds, showHidden]);
 
+  // Each multi-bale BALE_STOCK_ENTRY is expanded into one row per bale
+  const displayVisibleEntries = useMemo(() => expandBaleEntries(visibleEntries), [visibleEntries]);
+
   // ── Keyboard navigation: arrows, Ctrl+H / Ctrl+U (detailed view only) ────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -1457,7 +1494,9 @@ export default function FactoryDaybook() {
       if (!grouped[key]) {
         grouped[key] = { date: e.txDate, txType: e.txType, currencyCode: e.currencyCode, count: 0, totalAmountCurrency: 0, fxRateToUsd: e.fxRateToUsd, totalAmountUsd: 0, key };
       }
-      grouped[key].count += 1;
+      // Count individual bales for BALE_STOCK_ENTRY so the count reflects bales not batches
+      const baleCount = e.txType === "BALE_STOCK_ENTRY" ? Math.max(parseBalesMeta(e).length, 1) : 1;
+      grouped[key].count += baleCount;
       grouped[key].totalAmountCurrency += parseFloat(e.amountCurrency || "0");
       grouped[key].totalAmountUsd += parseFloat(e.amountUsd || "0");
       if (grouped[key].fxRateToUsd !== e.fxRateToUsd) grouped[key].fxRateToUsd = null;
@@ -1468,9 +1507,10 @@ export default function FactoryDaybook() {
     });
   }, [filteredEntries]);
 
-  const getEntriesForCondensedRow = (rowKey: string): DaybookEntry[] => {
+  const getEntriesForCondensedRow = (rowKey: string): DisplayEntry[] => {
     const [date, txType, currencyCode] = rowKey.split("|");
-    return filteredEntries.filter((e) => e.txDate === date && e.txType === txType && e.currencyCode === currencyCode);
+    const raw = filteredEntries.filter((e) => e.txDate === date && e.txType === txType && e.currencyCode === currencyCode);
+    return expandBaleEntries(raw);
   };
 
   // ── Active filters detection ──────────────────────────────────────────────
@@ -1804,7 +1844,7 @@ export default function FactoryDaybook() {
     return (
       <div className="flex gap-1">
         <Button size={size} variant="ghost" title="View details"
-          onClick={(e) => { e.stopPropagation(); setViewEntry(entry); }}
+          onClick={(e) => { e.stopPropagation(); setViewEntry((entry as DisplayEntry)._source ?? entry); }}
           data-testid={`button-view-${entry.id}`}
         ><Eye className="h-3 w-3" /></Button>
         {canEditEntry && (
@@ -2106,12 +2146,13 @@ export default function FactoryDaybook() {
 
                             {/* Expanded entry sub-rows */}
                             {isExpanded && expandedEntries.map((entry) => {
+                              const de = entry as DisplayEntry;
                               const isBaleTransfer = entry.txType === "BALE_TRANSFER";
                               const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
                               const canEdit = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId && entry.txType !== "BALE_STOCK_ENTRY";
                               return (
                                 <div
-                                  key={entry.id}
+                                  key={de._vKey ?? entry.id}
                                   data-testid={`row-expanded-${entry.id}`}
                                   onClick={isBaleTransfer ? (e) => handleEntryClick(entry, e) : undefined}
                                   className={cn(
@@ -2159,7 +2200,7 @@ export default function FactoryDaybook() {
                                   ) : (
                                     <div className="flex items-center justify-end gap-1 pr-2 py-2">
                                       <Button size="icon" variant="ghost" title="View details"
-                                        onClick={(e) => { e.stopPropagation(); setViewEntry(entry); }}
+                                        onClick={(e) => { e.stopPropagation(); setViewEntry((entry as DisplayEntry)._source ?? entry); }}
                                         data-testid={`button-view-${entry.id}`}
                                       ><Eye className="h-3 w-3" /></Button>
                                     </div>
@@ -2180,13 +2221,14 @@ export default function FactoryDaybook() {
             <>
               {/* Mobile card layout */}
               <div className="md:hidden space-y-3 p-3">
-                {visibleEntries.map((entry) => {
+                {displayVisibleEntries.map((entry) => {
+                  const de = entry as DisplayEntry;
                   const rid = String(entry.id);
                   const isHidden = hiddenRowIds.has(rid);
                   const { variant: bv, className: bc } = getFactoryTxTypeBadge(entry.txType);
                   return (
                     <div
-                      key={entry.id}
+                      key={de._vKey ?? entry.id}
                       data-row-id={rid}
                       className={cn(
                         "border rounded-md p-3 space-y-2 transition-colors",
@@ -2249,7 +2291,8 @@ export default function FactoryDaybook() {
                   <TableBody>
                     {(() => {
                       let prevDate = "";
-                      return visibleEntries.map((entry) => {
+                      return displayVisibleEntries.map((entry) => {
+                      const de = entry as DisplayEntry;
                       const rid = String(entry.id);
                       const isHidden = hiddenRowIds.has(rid);
                       const isBaleTransfer = entry.txType === "BALE_TRANSFER";
@@ -2260,7 +2303,7 @@ export default function FactoryDaybook() {
                       if (showDateSep) prevDate = entry.txDate;
                       const colSpan = 3 + (showAmounts ? 1 : 0) + 1;
                       const dayEntries = showDateSep
-                        ? visibleEntries.filter((e) => e.txDate === entry.txDate)
+                        ? displayVisibleEntries.filter((e) => e.txDate === entry.txDate)
                         : [];
                       const dayTotal = showAmounts && showDateSep
                         ? dayEntries.reduce((s, e) => s + parseFloat(e.amountUsd || e.amountCurrency || "0"), 0)
@@ -2283,7 +2326,7 @@ export default function FactoryDaybook() {
                             </TableRow>
                           )}
                         <TableRow
-                          key={entry.id}
+                          key={de._vKey ?? entry.id}
                           data-testid={`row-daybook-${entry.id}`}
                           data-row-id={rid}
                           className={cn(
