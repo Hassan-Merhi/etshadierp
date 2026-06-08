@@ -1312,7 +1312,7 @@ export default function FactoryDaybook() {
 
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hiddenErpCosts: string[] = myErpPages?.hiddenErpCostFields ?? [];
-  const showAmounts = isAdminOrOwner && !hiddenErpCosts.includes("daybook_amounts");
+  const showAmounts = !hiddenErpCosts.includes("daybook_amounts");
 
   const { data: expandedInlineEntries = [], isLoading: expandedInlineLoading } = useQuery<any[]>({
     queryKey: ["/api/vouchers", expandedInlineVoucherId, "view-entries"],

@@ -375,7 +375,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   };
 
   const canEdit = !posUser;
-  const showCostPrice = isPrivileged && !posUser;
+  const showCostPrice = (isPrivileged || currentUser?.role === "View Only") && !posUser;
 
   const [exporting, setExporting] = useState(false);
 
