@@ -4427,6 +4427,7 @@ export const supplierProformas = pgTable("supplier_proformas", {
   supplierId: integer("supplier_id").notNull().references(() => suppliers.id, { onDelete: "restrict" }),
   reference: varchar("reference", { length: 200 }).notNull(),
   notes: text("notes"),
+  isStarred: boolean("is_starred").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({

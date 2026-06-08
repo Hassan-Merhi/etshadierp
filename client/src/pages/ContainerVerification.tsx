@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { ArrowLeft, Plus, Trash2, Upload, Download, FileCheck, Pencil, Save, X, AlertTriangle, CheckCircle2, ArrowUpRight, ArrowDownRight, MinusCircle, DollarSign, RefreshCw, List } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Upload, Download, FileCheck, Pencil, Save, X, AlertTriangle, CheckCircle2, ArrowUpRight, ArrowDownRight, MinusCircle, DollarSign, RefreshCw, List, Star } from "lucide-react";
 import * as XLSX from "@/lib/excelHelper";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -248,11 +248,13 @@ export default function ContainerVerification() {
     }
   }, [loadedItems, loadingItems, containerData]);
 
-  // Auto-select latest proforma when opened via "Compare" button from Daybook
+  // Auto-select proforma when opened via "Compare" button from Daybook.
+  // Prefers the starred proforma; falls back to the most recent if none is starred.
   useEffect(() => {
     if (!autoCompare || !selectedSupplierId || proformas.length === 0 || selectedProformaId) return;
-    const latest = proformas[proformas.length - 1];
-    if (latest) setSelectedProformaId(String(latest.id));
+    const starred = proformas.find((p: any) => p.isStarred);
+    const pick = starred ?? proformas[proformas.length - 1];
+    if (pick) setSelectedProformaId(String(pick.id));
   }, [autoCompare, selectedSupplierId, proformas, selectedProformaId]);
 
   // Auto-generate comparison once supplier + proforma are both set
@@ -406,10 +408,20 @@ export default function ContainerVerification() {
                 </SelectTrigger>
                 <SelectContent>
                   {proformas.map((p: any) => (
-                    <SelectItem key={p.id} value={String(p.id)}>{p.reference}</SelectItem>
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      <span className="flex items-center gap-1.5">
+                        {p.isStarred && <Star className="h-3 w-3 fill-amber-400 text-amber-400 shrink-0" />}
+                        {p.reference}
+                      </span>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {proformas.length > 0 && !proformas.some((p: any) => p.isStarred) && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Tip: star a proforma on the supplier page to auto-select it here
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Button onClick={() => generateComparison()} disabled={!selectedSupplierId || !selectedProformaId} className="flex-1" data-testid="button-generate-comparison">

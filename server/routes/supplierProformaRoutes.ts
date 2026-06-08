@@ -2,7 +2,7 @@ import { parseId, parseOptionalId } from "../lib/parseId";
 import { logAudit } from "./_helpers";
 import { Express } from "express";
 import { db } from "../db";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, ne } from "drizzle-orm";
 import ExcelJS from "exceljs";
 import {
   supplierProformas,
@@ -1293,6 +1293,50 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       res.end(buf);
     } catch (error: any) {
       console.error("Proforma export error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Star / unstar a proforma ──────────────────────────────────────────────
+  // PATCH /api/suppliers/:supplierId/proformas/:proformaId/star
+  // Toggles the starred state. Only one proforma per supplier+company can be
+  // starred at a time — starring a new one automatically unstarches the old one.
+  app.patch("/api/suppliers/:supplierId/proformas/:proformaId/star", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const supplierId = parseId(req.params.supplierId);
+      const proformaId = parseId(req.params.proformaId);
+      if (supplierId === null || proformaId === null) return res.status(400).json({ message: "Invalid id" });
+
+      const [current] = await db
+        .select({ id: supplierProformas.id, isStarred: supplierProformas.isStarred })
+        .from(supplierProformas)
+        .where(and(eq(supplierProformas.id, proformaId), eq(supplierProformas.companyId, companyId)));
+      if (!current) return res.status(404).json({ message: "Proforma not found" });
+
+      const newStarred = !current.isStarred;
+
+      if (newStarred) {
+        // Unstar all other proformas for this supplier+company first
+        await db
+          .update(supplierProformas)
+          .set({ isStarred: false })
+          .where(and(
+            eq(supplierProformas.companyId, companyId),
+            eq(supplierProformas.supplierId, supplierId),
+            ne(supplierProformas.id, proformaId),
+          ));
+      }
+
+      const [updated] = await db
+        .update(supplierProformas)
+        .set({ isStarred: newStarred })
+        .where(eq(supplierProformas.id, proformaId))
+        .returning();
+
+      res.json(updated);
+    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });

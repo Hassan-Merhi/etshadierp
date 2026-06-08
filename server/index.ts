@@ -4005,6 +4005,8 @@ let migrationsDone = false;
 END $$`,
     // ── Prepaid rent accounting: track which ledger rows used Prepaid/Deferred accounts ──
     `ALTER TABLE property_monthly_ledger ADD COLUMN IF NOT EXISTS used_prepaid_account boolean NOT NULL DEFAULT false`,
+    // ── Starred proforma for container verification comparison ──
+    `ALTER TABLE supplier_proformas ADD COLUMN IF NOT EXISTS is_starred boolean NOT NULL DEFAULT false`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

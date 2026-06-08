@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { ArrowLeft, Plus, Trash2, Upload, Download, FileText, Pencil, Save, X } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Upload, Download, FileText, Pencil, Save, X, Star } from "lucide-react";
 import { format } from "date-fns";
 import * as XLSX from "@/lib/excelHelper";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
@@ -35,6 +35,7 @@ interface Proforma {
   supplierId: number;
   reference: string;
   notes: string | null;
+  isStarred: boolean;
   createdAt: string;
   updatedAt: string;
   lines?: ProformaLine[];
@@ -139,6 +140,17 @@ export default function SupplierProformas() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers", supplierId, "proformas", selectedProformaId] });
+    },
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Error", description: e.message, variant: "destructive" }); },
+  });
+
+  const starMutation = useMutation({
+    mutationFn: async (proformaId: number) => {
+      const res = await apiRequest("PATCH", `/api/suppliers/${supplierId}/proformas/${proformaId}/star`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers", supplierId, "proformas"] });
     },
     onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Error", description: e.message, variant: "destructive" }); },
   });
@@ -260,10 +272,24 @@ export default function SupplierProformas() {
                   onClick={() => setSelectedProformaId(p.id)}
                   data-testid={`row-proforma-${p.id}`}
                 >
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium truncate">{p.reference}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      {p.isStarred && (
+                        <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-400" />
+                      )}
+                      <span className="text-sm font-medium truncate">{p.reference}</span>
+                    </div>
                     <div className="text-xs text-muted-foreground">{format(new Date(p.createdAt), "MMM d, yyyy")}</div>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => { e.stopPropagation(); starMutation.mutate(p.id); }}
+                    data-testid={`button-star-proforma-${p.id}`}
+                    title={p.isStarred ? "Unstar (remove as default)" : "Star (use for auto-comparison)"}
+                  >
+                    <Star className={`h-3.5 w-3.5 ${p.isStarred ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}`} />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
