@@ -2509,6 +2509,12 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       // Pin it for subsequent requests this session
       (req.session as any).factoryCompanyId = companyId;
 
+      // ── As-of date ────────────────────────────────────────────────────────────
+      // All date-sensitive queries are filtered to data created/dated on or before asOf.
+      const asOf: string = typeof req.query.asOf === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.asOf)
+        ? req.query.asOf
+        : new Date().toISOString().slice(0, 10);
+
       const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
       // Load user-configured display FX rates (set in Settings → FX Rates)
@@ -2531,13 +2537,22 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         .orderBy(factorySuppliers.name);
 
       const allContainersF = await db.select().from(factoryContainers)
-        .where(eq(factoryContainers.companyId, companyId));
+        .where(and(
+          eq(factoryContainers.companyId, companyId),
+          sql`DATE(${factoryContainers.createdAt}) <= ${asOf}::date`,
+        ));
 
       const allPaymentsF = await db.select().from(factorySupplierPayments)
-        .where(eq(factorySupplierPayments.companyId, companyId));
+        .where(and(
+          eq(factorySupplierPayments.companyId, companyId),
+          lte(factorySupplierPayments.date, asOf),
+        ));
 
       const allFxTransfersF = await db.select().from(factorySupplierFxTransfers)
-        .where(eq(factorySupplierFxTransfers.companyId, companyId));
+        .where(and(
+          eq(factorySupplierFxTransfers.companyId, companyId),
+          lte(factorySupplierFxTransfers.date, asOf),
+        ));
 
       // Additional charge sources — must match buildBrokerStatement exactly
       const allOffloadChargesF = await db.select({
@@ -2554,7 +2569,10 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         containerCurrencyCode: factoryContainers.currencyCode,
       }).from(factoryContainerOtherCharges)
         .innerJoin(factoryContainers, eq(factoryContainerOtherCharges.containerId, factoryContainers.id))
-        .where(eq(factoryContainerOtherCharges.companyId, companyId));
+        .where(and(
+          eq(factoryContainerOtherCharges.companyId, companyId),
+          sql`DATE(${factoryContainers.createdAt}) <= ${asOf}::date`,
+        ));
 
       const allColOtherChargesF = await db.select({
         otherChargesSupplierId: factoryContainers.otherChargesSupplierId,
@@ -2564,7 +2582,8 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         .where(and(
           eq(factoryContainers.companyId, companyId),
           sql`${factoryContainers.otherChargesSupplierId} IS NOT NULL`,
-          sql`CAST(COALESCE(${factoryContainers.otherCharges}, '0') AS numeric) > 0`
+          sql`CAST(COALESCE(${factoryContainers.otherCharges}, '0') AS numeric) > 0`,
+          sql`DATE(${factoryContainers.createdAt}) <= ${asOf}::date`,
         ));
 
       // Voucher-based payments (exclude auto-generated FACTORY-PAY-* and optional vouchers)
@@ -2586,7 +2605,8 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           .where(and(
             inArray(voucherEntries.factorySupplierId, allSupplierIds),
             sql`${voucherEntries.debitAmount}::numeric > 0`,
-            sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`
+            sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`,
+            lte(vouchers.voucherDate, asOf),
           ));
         for (const row of voucherRows as any[]) {
           const sid = row.factorySupplierId;
@@ -2999,7 +3019,12 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
 
       const factoryVouchers = await db.select({ id: vouchers.id })
         .from(vouchers)
-        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)));
+        .where(and(
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.optional, false),
+          isNull(vouchers.deletedAt),
+          lte(vouchers.voucherDate, asOf),
+        ));
 
       const fVoucherIds = factoryVouchers.map((v: any) => v.id);
       const factoryEntries = fVoucherIds.length > 0
@@ -3098,6 +3123,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           .where(and(
             inArray(customerBalances.customerId, cIds),
             eq(customerBalances.companyId, companyId),
+            lte(customerBalances.transactionDate, asOf),
           ))
           .groupBy(customerBalances.customerId);
 
@@ -3114,11 +3140,13 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
             eq(customerOrders.id, customerBalances.referenceId as any),
             eq(customerOrders.companyId, companyId),
             eq(customerOrders.status, "FINALIZED"),
+            lte(customerOrders.orderDate, asOf),
           ))
           .where(and(
             inArray(customerBalances.customerId, cIds),
             eq(customerBalances.companyId, companyId),
             sql`${customerBalances.referenceType} = 'INVOICE'`,
+            lte(customerBalances.transactionDate, asOf),
           ))
           .groupBy(customerBalances.customerId);
 
@@ -3136,6 +3164,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
                 eq(vouchers.companyId, companyId),
                 sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
                 sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`,
+                lte(vouchers.voucherDate, asOf),
               ))
               .where(inArray(voucherEntries.ledgerAccountId as any, custLedgerIds))
               .groupBy(voucherEntries.ledgerAccountId)
@@ -3155,6 +3184,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
             eq(vouchers.companyId, companyId),
             sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
             sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`,
+            lte(vouchers.voucherDate, asOf),
           ))
           .where(and(
             inArray(voucherEntries.customerId as any, cIds),
@@ -3337,6 +3367,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         .where(and(
           eq(customerOrders.companyId, companyId),
           inArray(customerOrders.status, ["PENDING_VERIFICATION", "VERIFIED", "LOADING"]),
+          lte(customerOrders.orderDate, asOf),
         ))
         .orderBy(desc(customerOrders.orderDate));
 
@@ -3476,6 +3507,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       ];
 
       res.json({
+        asOf,
         forUsTotal,
         onUsTotal,
         netPosition,

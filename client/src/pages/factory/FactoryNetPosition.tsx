@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/PageHeader";
 import {
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   TrendingUp,
   TrendingDown,
   Equal,
@@ -21,6 +22,7 @@ import {
   Eye,
   RotateCcw,
   ExternalLink,
+  CalendarDays,
 } from "lucide-react";
 
 interface BrokerBreakdownLine {
@@ -556,19 +558,36 @@ function CustomNetPositionView({ data }: { data: NetPositionData }) {
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+function shiftDate(date: string, days: number): string {
+  const d = new Date(date + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+function formatDateLabel(date: string): string {
+  const d = new Date(date + "T12:00:00Z");
+  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
+}
+
 export default function FactoryNetPosition() {
+  const [asOf, setAsOf] = useState<string>(todayStr);
+  const isToday = asOf === todayStr();
+
   const { data: rawData, isLoading, error, refetch, isFetching } = useQuery<NetPositionData>({
-    queryKey: ["/api/factory/net-position"],
+    queryKey: ["/api/factory/net-position", asOf],
     queryFn: async () => {
-      const res = await fetch("/api/factory/net-position", { credentials: "include" });
+      const res = await fetch(`/api/factory/net-position?asOf=${asOf}`, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    staleTime: 30_000,
-    refetchInterval: 30_000,
+    staleTime: isToday ? 30_000 : Infinity,
+    refetchInterval: isToday ? 30_000 : false,
   });
 
-  // Authoritative supplier balances — same source as Factory Suppliers page (OTW included)
+  // Authoritative supplier balances — only used for today (live override).
+  // For historical dates we rely solely on the date-filtered net-position endpoint.
   const { data: supplierWithBalances = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/suppliers/with-balances", "net-position-merge"],
     queryFn: async () => {
@@ -578,7 +597,7 @@ export default function FactoryNetPosition() {
     },
     staleTime: 30_000,
     refetchInterval: 30_000,
-    enabled: !!rawData,
+    enabled: !!rawData && isToday,
   });
 
   // Merge: override supplier balances with the authoritative with-balances data,
@@ -677,19 +696,79 @@ export default function FactoryNetPosition() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <PageHeader title="Net Position" subtitle="What we have vs what we owe — current standing" />
+          <PageHeader
+            title="Net Position"
+            subtitle={isToday ? "What we have vs what we owe — current standing" : `Historical snapshot — as of ${formatDateLabel(asOf)}`}
+          />
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refetch()}
-          disabled={isFetching}
-          data-testid="button-refresh"
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Date navigation */}
+          <div className="flex items-center gap-1 border rounded-md px-1 py-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setAsOf(shiftDate(asOf, -1))}
+              data-testid="button-date-prev"
+              title="Previous day"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-1.5 px-1">
+              <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                type="date"
+                value={asOf}
+                max={todayStr()}
+                onChange={(e) => e.target.value && setAsOf(e.target.value)}
+                className="text-sm bg-transparent border-none outline-none cursor-pointer w-[120px]"
+                data-testid="input-as-of-date"
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setAsOf(shiftDate(asOf, 1))}
+              disabled={isToday}
+              data-testid="button-date-next"
+              title="Next day"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          {!isToday && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAsOf(todayStr())}
+              data-testid="button-date-today"
+            >
+              Today
+            </Button>
+          )}
+          {isToday && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              data-testid="button-refresh"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Historical mode banner */}
+      {!isToday && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-sm">
+          <CalendarDays className="h-4 w-4 shrink-0" />
+          <span>
+            Showing net position as of <strong>{formatDateLabel(asOf)}</strong>. Supplier payments, vouchers, and customer balances are filtered to that date. Inventory reflects current stock.
+          </span>
+        </div>
+      )}
 
       {/* Net Position Banner */}
       {isLoading ? (
