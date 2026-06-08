@@ -1447,10 +1447,13 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const customerId = parseInt(req.params.customerId, 10);
       if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customerId" });
       const result = await pool.query(
-        `SELECT article_code, price_per_bale, updated_at
-         FROM customer_price_lists
-         WHERE company_id = $1 AND customer_id = $2
-         ORDER BY article_code`,
+        `SELECT cpl.article_code, cpl.price_per_bale, cpl.updated_at,
+                COALESCE(fbp.name, '') AS item_name
+         FROM customer_price_lists cpl
+         LEFT JOIN factory_bale_products fbp
+           ON fbp.company_id = $1 AND fbp.article_code = cpl.article_code AND fbp.deleted_at IS NULL
+         WHERE cpl.company_id = $1 AND cpl.customer_id = $2
+         ORDER BY cpl.article_code`,
         [companyId, customerId],
       );
       return res.json(result.rows);

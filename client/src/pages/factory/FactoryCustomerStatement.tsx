@@ -62,6 +62,7 @@ interface StatementData {
 
 interface PriceListEntry {
   article_code: string;
+  item_name: string;
   price_per_bale: string;
   updated_at: string;
 }
@@ -644,6 +645,7 @@ export default function FactoryCustomerStatement() {
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead>Article Code</TableHead>
+                  <TableHead>Name</TableHead>
                   <TableHead className="text-right">Price per Bale ($)</TableHead>
                   <TableHead className="text-right">Last Updated</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
@@ -652,13 +654,13 @@ export default function FactoryCustomerStatement() {
               <TableBody>
                 {priceListQuery.isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-6">
+                    <TableCell colSpan={5} className="text-center py-6">
                       <Skeleton className="h-4 w-48 mx-auto" />
                     </TableCell>
                   </TableRow>
                 ) : (priceListQuery.data ?? []).length === 0 && !newCode ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8" data-testid="text-no-prices">
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8" data-testid="text-no-prices">
                       No prices set yet. Upload an Excel file or add manually below.
                     </TableCell>
                   </TableRow>
@@ -667,6 +669,9 @@ export default function FactoryCustomerStatement() {
                     <TableRow key={entry.article_code} data-testid={`row-price-${entry.article_code}`}>
                       <TableCell className="font-mono text-sm font-medium" data-testid={`text-price-code-${entry.article_code}`}>
                         {entry.article_code}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {entry.item_name || "-"}
                       </TableCell>
                       <TableCell className="text-right">
                         <Input
