@@ -61,6 +61,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
   const selectedRole = form.watch("role");
   const selectedCompanyId = form.watch("companyId");
   const isPOSRole = selectedRole === "POS";
+  const isViewOnly = selectedRole === "View Only";
 
   useEffect(() => {
     if (open) {
@@ -238,6 +239,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
                       <SelectItem value="Manager">Manager</SelectItem>
                       <SelectItem value="POS">POS</SelectItem>
                       <SelectItem value="Normal User">Normal User</SelectItem>
+                      <SelectItem value="View Only">View Only</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -347,7 +349,13 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
               </>
             )}
 
-            {selectedRole !== "Admin" && selectedRole !== "Owner" && selectedRole !== "Developer" && (
+            {isViewOnly && (
+              <div className="rounded-md bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 px-3 py-2.5 text-sm text-sky-700 dark:text-sky-300">
+                This user can only view data — all create, edit, and delete actions are blocked system-wide.
+              </div>
+            )}
+
+            {selectedRole !== "Admin" && selectedRole !== "Owner" && selectedRole !== "Developer" && !isViewOnly && (
               <FormField
                 control={form.control}
                 name="daybookEditDays"
@@ -374,7 +382,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
               />
             )}
 
-            {!isPOSRole && (
+            {!isPOSRole && !isViewOnly && (
               <FormField
                 control={form.control}
                 name="cashAccountId"
@@ -404,27 +412,29 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
               />
             )}
 
-            <FormField
-              control={form.control}
-              name="canSellNegativeStock"
-              render={({ field }) => (
-                <FormItem className="flex items-center justify-between rounded-md border p-3">
-                  <div>
-                    <FormLabel className="cursor-pointer">Allow Selling 0-Stock Items</FormLabel>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Lets this user add items to POS even when stock is at 0
-                    </p>
-                  </div>
-                  <FormControl>
-                    <Switch
-                      checked={field.value ?? false}
-                      onCheckedChange={field.onChange}
-                      data-testid="switch-can-sell-negative-stock"
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+            {!isViewOnly && (
+              <FormField
+                control={form.control}
+                name="canSellNegativeStock"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-md border p-3">
+                    <div>
+                      <FormLabel className="cursor-pointer">Allow Selling 0-Stock Items</FormLabel>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Lets this user add items to POS even when stock is at 0
+                      </p>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value ?? false}
+                        onCheckedChange={field.onChange}
+                        data-testid="switch-can-sell-negative-stock"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div className="flex gap-2 justify-end border-t pt-4">
               <Button

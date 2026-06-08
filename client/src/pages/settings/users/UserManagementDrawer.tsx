@@ -122,6 +122,7 @@ export function UserManagementDrawer({
 }: UserManagementDrawerProps) {
   const { toast } = useToast();
   const isPrivileged = ["admin", "owner", "developer"].includes(user?.role?.toLowerCase() ?? "");
+  const isViewOnly = user?.role?.toLowerCase() === "view only";
 
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -386,6 +387,11 @@ export function UserManagementDrawer({
                   {user.role}
                 </Badge>
               )}
+              {isViewOnly && (
+                <Badge variant="outline" className="gap-1 shrink-0 border-sky-300 bg-sky-100 text-sky-700 dark:border-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                  View Only
+                </Badge>
+              )}
             </div>
           </SheetHeader>
 
@@ -490,6 +496,36 @@ export function UserManagementDrawer({
                   <p className="text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2.5">
                     <strong>{user.role}</strong> accounts always have full access to both ERP and Factory — this cannot be restricted.
                   </p>
+                ) : isViewOnly ? (
+                  <>
+                    <p className="text-xs rounded-md bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 px-3 py-2.5 text-sky-700 dark:text-sky-300">
+                      This user can only view data — all write actions are blocked. Use the toggles below to choose which sections they can access. If both are on, they can view everything.
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex items-center justify-between rounded-md border p-3">
+                        <div>
+                          <p className="text-sm font-medium">ERP</p>
+                          <p className="text-xs text-muted-foreground">Accounting &amp; sales</p>
+                        </div>
+                        <Switch
+                          checked={hasErpAccess}
+                          onCheckedChange={setHasErpAccess}
+                          data-testid="switch-drawer-erp-access"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between rounded-md border p-3">
+                        <div>
+                          <p className="text-sm font-medium">Factory</p>
+                          <p className="text-xs text-muted-foreground">Production &amp; bales</p>
+                        </div>
+                        <Switch
+                          checked={hasFactoryAccess}
+                          onCheckedChange={setHasFactoryAccess}
+                          data-testid="switch-drawer-factory-access"
+                        />
+                      </div>
+                    </div>
+                  </>
                 ) : (
                   <>
                     <div className="grid grid-cols-2 gap-3">

@@ -82,7 +82,7 @@ export const insertUserCompanyRoleSchema = createInsertSchema(userCompanyRoles).
 }).extend({
   userId: z.string().min(1, "User ID is required"),
   companyId: z.number().min(1, "Company ID is required"),
-  role: z.enum(["Developer", "Admin", "Owner", "Manager", "POS", "Normal User"]),
+  role: z.enum(["Developer", "Admin", "Owner", "Manager", "POS", "Normal User", "View Only"]),
 });
 
 export type InsertUserCompanyRole = z.infer<typeof insertUserCompanyRoleSchema>;
@@ -2279,7 +2279,7 @@ export const insertRoleFeaturePermissionSchema = createInsertSchema(roleFeatureP
   updatedAt: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
-  role: z.enum(["Developer", "Admin", "Owner", "Manager", "POS", "Normal User"]),
+  role: z.enum(["Developer", "Admin", "Owner", "Manager", "POS", "Normal User", "View Only"]),
   featureKey: z.string().min(1, "Feature key is required"),
   enabled: z.boolean().default(true),
 });

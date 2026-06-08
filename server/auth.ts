@@ -273,6 +273,31 @@ export function requirePasswordConfirmation(req: Request, res: Response, next: N
   next();
 }
 
+// Block all write (mutation) operations for the View Only role.
+// GET / HEAD / OPTIONS pass through. Every other method is rejected with 403.
+// Applied globally so no individual route needs to remember to add it.
+export function blockViewOnlyWrites(req: Request, res: Response, next: NextFunction) {
+  const method = req.method.toUpperCase();
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") return next();
+  if (!req.path.startsWith("/api")) return next();
+
+  // Read role from session (available before requireAuth populates req.user)
+  const role = (req.session as any)?.currentRole;
+  if (role === "View Only") {
+    logDenied({
+      userId: req.session.userId ?? null,
+      username: req.session.username ?? null,
+      role,
+      companyId: req.session.currentCompanyId ?? null,
+      method: req.method,
+      path: req.path,
+      reason: "View Only role attempted a write operation",
+    });
+    return res.status(403).json({ message: "View Only accounts cannot make changes" });
+  }
+  next();
+}
+
 // Block POS users from accessing sensitive routes
 export function requireNonPOS(req: Request, res: Response, next: NextFunction) {
   if (!req.user || !req.user.role) {

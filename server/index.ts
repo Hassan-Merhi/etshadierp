@@ -7,6 +7,7 @@ import path from "path";
 import fs from "fs";
 import { randomBytes } from "crypto";
 import { registerRoutes } from "./routes";
+import { blockViewOnlyWrites } from "./auth";
 import { setupWS } from "./wsServer";
 import { startScheduler, checkAndRecoverDailyExport } from "./services/schedulerService";
 import { setupVite, log } from "./vite";
@@ -200,6 +201,10 @@ if (process.env.DATABASE_URL || process.env.PGHOST) {
 }
 
 app.use(session(sessionConfig));
+
+// Globally block all mutation requests (POST/PUT/PATCH/DELETE) for View Only role.
+// Must run after session middleware so req.session.currentRole is populated.
+app.use(blockViewOnlyWrites);
 
 // Add build version header to all responses for cache tracking
 app.use((_req, res, next) => {

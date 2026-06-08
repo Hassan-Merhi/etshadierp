@@ -55,8 +55,9 @@ function isAllowed(
     return stored === true;
   }
 
-  // Owner / Manager / POS: allow-by-default
-  // Block only when an explicit enabled=false record exists
+  // Owner / Manager / POS / View Only: allow-by-default for read access.
+  // Block only when an explicit enabled=false record exists.
+  // (Write operations for View Only are blocked globally before they reach here.)
   return stored !== false;
 }
 
