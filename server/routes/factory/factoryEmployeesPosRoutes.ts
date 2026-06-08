@@ -43,6 +43,7 @@ import {
   factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
   factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
   factoryPosSales, factoryPosSaleItems, proformaStockReservations,
+  propertyContracts, propertyMonthlyLedger,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -3410,15 +3411,58 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const totalCustomerDr = round2(customerDrItems.reduce((s, c) => s + c.balanceUsd, 0));
       const totalCustomerCr = round2(customerCrItems.reduce((s, c) => s + Math.abs(c.balanceUsd), 0));
 
+      // ── Rental Outstanding (Tenant Receivables / Advances) ───────────────────
+      // Query all active rental contracts for this factory company (any module).
+      // Positive net (expected > paid) → tenant owes us → asset.
+      // Negative net (paid > expected) → tenant prepaid → liability.
+      let tenantReceivables = 0;
+      let tenantAdvances = 0;
+      {
+        const activeContracts = await db
+          .select({ id: propertyContracts.id })
+          .from(propertyContracts)
+          .where(and(
+            eq(propertyContracts.companyId, companyId),
+            eq(propertyContracts.status, "ACTIVE"),
+          ));
+        if (activeContracts.length > 0) {
+          const contractIds = activeContracts.map(c => c.id);
+          const ledgerRows = await db.select({
+            contractId: propertyMonthlyLedger.contractId,
+            expected: sql<string>`COALESCE(SUM(
+              CASE WHEN (
+                ${propertyMonthlyLedger.year} < EXTRACT(YEAR FROM NOW())
+                OR (
+                  ${propertyMonthlyLedger.year} = EXTRACT(YEAR FROM NOW())
+                  AND ${propertyMonthlyLedger.month} <= EXTRACT(MONTH FROM NOW())
+                )
+              ) THEN CAST(${propertyMonthlyLedger.expectedAmount} AS numeric) ELSE 0 END
+            ), 0)`,
+            paid: sql<string>`COALESCE(SUM(CAST(${propertyMonthlyLedger.paidAmount} AS numeric)), 0)`,
+          })
+            .from(propertyMonthlyLedger)
+            .where(inArray(propertyMonthlyLedger.contractId, contractIds))
+            .groupBy(propertyMonthlyLedger.contractId);
+          for (const row of ledgerRows) {
+            const net = parseFloat(row.expected) - parseFloat(row.paid);
+            if (net > 0) tenantReceivables += net;
+            else if (net < 0) tenantAdvances += Math.abs(net);
+          }
+          tenantReceivables = round2(tenantReceivables);
+          tenantAdvances    = round2(tenantAdvances);
+        }
+      }
+
       // forUsTotal: ledger assets + inventory + raw material + balance on table + stock OTW
       //             + customer receivables (DR) + pending orders + verified orders + loading orders
       //             + overpaid suppliers (they owe us the overpayment back)
+      //             + tenant rent outstanding (receivable)
       //             (bales are reserved/excluded from baleInventoryValue — no double-count)
       const totalSupplierOverpaymentsRounded = round2(totalSupplierOverpayments);
       const forUsTotal = round2(
         cleanLedgerForUsTotal + baleInventoryValue + rawMaterialStockValue + balanceOnTableValue +
         stockOtwValue + totalCustomerDr + pendingTotal + verifiedTotal + loadingTotal +
-        totalSupplierOverpaymentsRounded,
+        totalSupplierOverpaymentsRounded + tenantReceivables,
       );
       // ── Employee Salaries Payable — directly from employees.currentBalance ───────
       // Employee balances are tracked via employees.currentBalance (not through a
@@ -3439,8 +3483,8 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       }
       employeeSalariesPayable = round2(employeeSalariesPayable);
 
-      // onUsTotal: ledger liabilities + supplier balances + customer credit balances (CR) + employee salaries
-      const onUsTotal = round2(ledgerOnUsTotal + totalSupplierLiabilities + totalCustomerCr + employeeSalariesPayable);
+      // onUsTotal: ledger liabilities + supplier balances + customer credit balances (CR) + employee salaries + tenant advances
+      const onUsTotal = round2(ledgerOnUsTotal + totalSupplierLiabilities + totalCustomerCr + employeeSalariesPayable + tenantAdvances);
       const netPosition = round2(forUsTotal - onUsTotal);
 
       // Inject factory-specific lines explicitly (always present so the UI
@@ -3467,6 +3511,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         ...(pendingTotal > 0 ? [{ name: "Pending Orders", code: "PENDING_ORDERS", value: pendingTotal, category: "Pending Orders" }] : []),
         ...(verifiedTotal > 0 ? [{ name: "Verified Orders", code: "VERIFIED_ORDERS", value: verifiedTotal, category: "Verified Orders" }] : []),
         ...(loadingTotal > 0 ? [{ name: "Loading Orders", code: "LOADING_ORDERS", value: loadingTotal, category: "Loading Orders" }] : []),
+        ...(tenantReceivables > 0 ? [{ name: "Tenant Rent Outstanding", code: "RENTAL_OUTSTANDING", value: tenantReceivables, category: "Rental Receivables" }] : []),
       ];
 
       // Group ledger on-us by category
@@ -3485,6 +3530,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         ...customerCrItems
           .sort((a, b) => Math.abs(b.balanceUsd) - Math.abs(a.balanceUsd))
           .map(c => ({ ...(c.ledgerAccountId ? { id: c.ledgerAccountId } : {}), name: c.name, code: "CUSTOMER_CR", value: round2(Math.abs(c.balanceUsd)), category: "Customer" })),
+        ...(tenantAdvances > 0 ? [{ name: "Tenant Rent Advance/Credit", code: "RENTAL_ADVANCE", value: tenantAdvances, category: "Rental Advances" }] : []),
       ];
 
       const forUsBreakdown = Object.entries(
@@ -3504,6 +3550,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           .map(([name, value]) => ({ name, value: round2(value) }))
           .sort((a, b) => b.value - a.value),
         ...(totalCustomerCr > 0 ? [{ name: "Customer", value: totalCustomerCr }] : []),
+        ...(tenantAdvances > 0 ? [{ name: "Rental Advances", value: tenantAdvances }] : []),
       ];
 
       res.json({
