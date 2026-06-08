@@ -1234,16 +1234,17 @@ export default function DailyProductionReport() {
                           <div className="grid grid-cols-4 gap-1 text-xs font-medium text-muted-foreground mb-1.5 px-0.5">
                             <span>Worker</span>
                             <span className="text-right">Salary</span>
-                            <span className="text-right">Transport</span>
+                            <span className="text-right">Transport/d</span>
                             <span className="text-right">Daily</span>
                           </div>
                           {salaryKpi.perWorker.map((w) => {
+                            const dailyTransport = ms && ms.daysInMonth > 0 ? w.transport / ms.daysInMonth : 0;
                             const daily = ms && ms.daysInMonth > 0 ? (w.baseSalary + w.transport) / ms.daysInMonth : 0;
                             return (
                               <div key={w.code} className="grid grid-cols-4 gap-1 text-xs py-0.5">
                                 <span className="truncate text-foreground/90">{w.name}</span>
                                 <span className="text-right tabular-nums text-foreground">{fmtSalary(w.attendanceSalary)}</span>
-                                <span className="text-right tabular-nums text-muted-foreground">{fmtSalary(w.transport)}</span>
+                                <span className="text-right tabular-nums text-muted-foreground">{fmtSalary(dailyTransport)}</span>
                                 <span className="text-right tabular-nums text-sky-600 dark:text-sky-400">{fmtSalary(daily)}</span>
                               </div>
                             );
@@ -1251,7 +1252,9 @@ export default function DailyProductionReport() {
                           <div className="grid grid-cols-4 gap-1 text-xs pt-1.5 border-t mt-1">
                             <span className="font-medium text-muted-foreground">Total</span>
                             <span className="text-right tabular-nums font-semibold text-foreground">{fmtSalary(attSalaryTotal ?? 0)}</span>
-                            <span className="text-right tabular-nums font-semibold text-foreground">{fmtSalary(attTransportTotal ?? 0)}</span>
+                            <span className="text-right tabular-nums font-semibold text-foreground">
+                              {ms && ms.daysInMonth > 0 ? fmtSalary((attTransportTotal ?? 0) / ms.daysInMonth) : "—"}
+                            </span>
                             <span className="text-right tabular-nums font-semibold text-sky-600 dark:text-sky-400">
                               {ms && ms.daysInMonth > 0 ? fmtSalary((ms.totalWorkerBaseSalary + ms.totalWorkerTransport) / ms.daysInMonth) : "—"}
                             </span>
