@@ -2479,7 +2479,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                     const salesItems = allSalesItems.filter((e: ViewVoucherEntry) => {
                       if (viewProfitFilter === "all") return true;
                       const p = parseFloat(e.profit || "0");
-                      return viewProfitFilter === "gain" ? p > 0 : p <= 0;
+                      return viewProfitFilter === "gain" ? p >= 0 : p < 0;
                     });
 
                     // Find cash entry (debit) and revenue entry (credit)
