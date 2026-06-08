@@ -31,7 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar, DollarSign, Package, Eye, EyeOff, Lock, Pencil, Save, X, Plus, Trash2, ArrowRight, Printer } from "lucide-react";
+import { Calendar, DollarSign, Package, Eye, EyeOff, Lock, Pencil, Save, X, Plus, Trash2, ArrowRight, Printer, TrendingUp, TrendingDown, LayoutList } from "lucide-react";
 import { useRef } from "react";
 import { useReactToPrint } from "react-to-print";
 import { format, startOfDay, endOfDay, isValid, parseISO, addDays } from "date-fns";
@@ -96,6 +96,7 @@ export default function POSDaybook() {
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [itemSearch, setItemSearch] = useState("");
   const [selectedDialogRow, setSelectedDialogRow] = useState<number | null>(null);
+  const [plFilter, setPlFilter] = useState<"all" | "gain" | "loss">("all");
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
   const reprintRef = useRef<HTMLDivElement>(null);
@@ -250,9 +251,10 @@ export default function POSDaybook() {
     }
   }, [voucherIdParam, vouchers, selectedVoucher, toast]);
 
-  // Reset selected row when dialog opens/closes or mode changes
+  // Reset selected row and filter when dialog opens/closes or mode changes
   useEffect(() => {
     setSelectedDialogRow(null);
+    setPlFilter("all");
   }, [selectedVoucher, isEditMode]);
 
   // Scroll highlighted row into view when using arrow keys
@@ -1000,10 +1002,58 @@ export default function POSDaybook() {
                 )}
 
                 <div className="table-responsive">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                     <p className="text-sm font-medium text-muted-foreground">Items Sold</p>
-                    <p className="text-xs text-muted-foreground">Hover or use ↑↓ to select · Alt+S to view item</p>
+                    <div className="flex items-center gap-1">
+                      {canSeeProfitCost && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={plFilter === "all" ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
+                            onClick={() => setPlFilter("all")}
+                            data-testid="button-filter-all"
+                          >
+                            <LayoutList className="h-3.5 w-3.5 mr-1" />
+                            All
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={plFilter === "gain" ? "toggle-elevate toggle-elevated text-green-600" : "toggle-elevate"}
+                            onClick={() => setPlFilter("gain")}
+                            data-testid="button-filter-gaining"
+                          >
+                            <TrendingUp className="h-3.5 w-3.5 mr-1" />
+                            Gaining
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={plFilter === "loss" ? "toggle-elevate toggle-elevated text-red-600" : "toggle-elevate"}
+                            onClick={() => setPlFilter("loss")}
+                            data-testid="button-filter-losing"
+                          >
+                            <TrendingDown className="h-3.5 w-3.5 mr-1" />
+                            Losing
+                          </Button>
+                          <div className="w-px h-5 bg-border mx-0.5" />
+                        </>
+                      )}
+                      <p className="text-xs text-muted-foreground">↑↓ · Alt+S</p>
+                    </div>
                   </div>
+                  {(() => {
+                    const displayedItems = canSeeProfitCost
+                      ? voucherDetails.salesItems.filter((item: any) => {
+                          if (plFilter === "all") return true;
+                          const hp = parseFloat(item.hassansProfit || "0");
+                          if (plFilter === "gain") return hp > 0;
+                          if (plFilter === "loss") return hp < 0;
+                          return true;
+                        })
+                      : voucherDetails.salesItems;
+                    return (
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1019,7 +1069,7 @@ export default function POSDaybook() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {voucherDetails.salesItems.map((item: any, idx: number) => {
+                      {displayedItems.map((item: any, idx: number) => {
                         const profit = parseFloat(item.profit || "0");
                         const isPositiveProfit = profit >= 0;
                         const hassansProfit = parseFloat(item.hassansProfit || "0");
@@ -1074,8 +1124,14 @@ export default function POSDaybook() {
                       })}
                     </TableBody>
                   </Table>
+                    );
+                  })()}
                 </div>
 
+                {(() => {
+                  const totalProfit = voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.profit || "0"), 0);
+                  const totalHassansProfit = voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.hassansProfit || "0"), 0);
+                  return (
                 <div className="border-t pt-4 flex flex-wrap gap-4 justify-between">
                   <div className="text-sm">
                     <span className="text-muted-foreground">Total Sales: </span>
@@ -1093,8 +1149,8 @@ export default function POSDaybook() {
                       </div>
                       <div className="text-sm">
                         <span className="text-muted-foreground">Total Profit: </span>
-                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
-                          {formatCashAmount(voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.profit || "0"), 0))}
+                        <span className={`font-mono font-semibold ${totalProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {formatCashAmount(totalProfit)}
                         </span>
                       </div>
                       <div className="text-sm">
@@ -1105,13 +1161,15 @@ export default function POSDaybook() {
                       </div>
                       <div className="text-sm">
                         <span className="text-muted-foreground">Hassan's Profit: </span>
-                        <span className={`font-mono font-semibold ${voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.hassansProfit || "0"), 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {formatCashAmount(voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.hassansProfit || "0"), 0))}
+                        <span className={`font-mono font-semibold ${totalHassansProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {formatCashAmount(totalHassansProfit)}
                         </span>
                       </div>
                     </>
                   )}
                 </div>
+                  );
+                })()}
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
