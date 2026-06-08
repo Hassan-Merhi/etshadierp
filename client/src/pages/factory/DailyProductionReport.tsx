@@ -880,7 +880,7 @@ export default function DailyProductionReport() {
 
   const { data: attendanceData } = useQuery<{
     dates: { date: string; isWeekend: boolean }[];
-    workers: { baseSalary: string; salaryType: string; transportAllowance: string; attendance: Record<string, string>; paidSalary: string }[];
+    workers: { id: number; employeeCode: string; baseSalary: string; salaryType: string; transportAllowance: string; attendance: Record<string, string>; paidSalary: string }[];
   }>({
     queryKey: ["/api/factory/workers/attendance-report", from, to],
     queryFn: async () => {
@@ -922,11 +922,16 @@ export default function DailyProductionReport() {
     if (!attendanceData || !attendanceData.dates.length) return null;
     let totalExpected = 0;
     let totalPaid = 0;
+    const perWorker: { code: string; attendanceSalary: number; transport: number; baseSalary: number }[] = [];
     for (const w of attendanceData.workers) {
-      totalExpected += computeWorkerExpectedSalary(w, attendanceData.dates);
+      const transport = parseFloat(w.transportAllowance || "0");
+      const fullExpected = computeWorkerExpectedSalary(w, attendanceData.dates);
+      const attendanceSalary = fullExpected - transport;
+      totalExpected += fullExpected;
       totalPaid     += parseFloat(w.paidSalary || "0");
+      perWorker.push({ code: w.employeeCode || String(w.id), attendanceSalary, transport, baseSalary: parseFloat(w.baseSalary || "0") });
     }
-    return { totalExpected, totalPaid, totalRemaining: totalExpected - totalPaid };
+    return { totalExpected, totalPaid, totalRemaining: totalExpected - totalPaid, perWorker };
   }, [attendanceData]);
 
   const presets: { key: Preset; label: string }[] = [
@@ -1164,11 +1169,10 @@ export default function DailyProductionReport() {
       {/* ── Salary Overview ── */}
       {(() => {
         const ms = monthlySalarySummary;
-        const ratio = ms ? ms.currentDay / ms.daysInMonth : 0;
-        const workerExpected    = ms ? ms.totalWorkerBaseSalary * ratio : null;
-        const transportExpected = ms ? ms.totalWorkerTransport  * ratio : null;
-        const workerTotal       = workerExpected !== null && transportExpected !== null ? workerExpected + transportExpected : null;
+        const workerTotal       = salaryKpi ? salaryKpi.totalExpected : null;
         const workerRemaining   = ms && workerTotal !== null ? workerTotal - ms.totalWorkerPaid : null;
+        const attSalaryTotal    = salaryKpi ? salaryKpi.totalExpected - (ms?.totalWorkerTransport ?? 0) : null;
+        const attTransportTotal = ms ? ms.totalWorkerTransport : null;
         // Employee expected: total prorated salary for the period
         const empExpected = ms
           ? ms.employeeBreakdown.reduce((sum, e) => sum + e.expected, 0)
@@ -1202,59 +1206,54 @@ export default function DailyProductionReport() {
                         ) : (
                           <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
                         )}
-                        {ms && ms.daysInMonth > 0 && (
+                        {workerTotal !== null && ms && ms.currentDay > 0 && (
                           <p className="text-sm font-semibold tabular-nums text-muted-foreground">
-                            {fmtSalary((ms.totalWorkerBaseSalary + ms.totalWorkerTransport) / ms.daysInMonth)}
+                            {fmtSalary(workerTotal / ms.currentDay)}
                             <span className="text-xs font-normal opacity-60 ml-1">/day</span>
                           </p>
                         )}
                       </div>
                       <div className="flex gap-3 mt-0.5 flex-wrap">
-                        {workerExpected !== null && (
+                        {attSalaryTotal !== null && (
                           <p className="text-xs text-muted-foreground">
-                            {fmtSalary(workerExpected)} <span className="opacity-60">salary</span>
+                            {fmtSalary(attSalaryTotal)} <span className="opacity-60">salary</span>
                           </p>
                         )}
-                        {transportExpected !== null && (
+                        {attTransportTotal !== null && (
                           <p className="text-xs text-muted-foreground">
-                            {fmtSalary(transportExpected)} <span className="opacity-60">transport</span>
+                            {fmtSalary(attTransportTotal)} <span className="opacity-60">transport</span>
                           </p>
                         )}
                       </div>
-                      {salaryKpi && (
-                        <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-worker-expected-attendance">
-                          {fmtSalary(salaryKpi.totalExpected)} <span className="opacity-60">attendance-based</span>
-                        </p>
-                      )}
                     </div>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <div className="border-t px-4 pb-3 pt-2 space-y-1">
-                      {ms?.workerBreakdown && ms.workerBreakdown.length > 0 ? (
+                      {salaryKpi && salaryKpi.perWorker.length > 0 ? (
                         <>
                           <div className="grid grid-cols-4 gap-1 text-xs font-medium text-muted-foreground mb-1.5 px-0.5">
-                            <span>Worker</span>
+                            <span>Code</span>
                             <span className="text-right">Salary</span>
                             <span className="text-right">Transport</span>
                             <span className="text-right">Daily</span>
                           </div>
-                          {ms.workerBreakdown.map((w) => {
-                            const daily = ms.daysInMonth > 0 ? (w.baseSalary + w.transport) / ms.daysInMonth : 0;
+                          {salaryKpi.perWorker.map((w) => {
+                            const daily = ms && ms.daysInMonth > 0 ? (w.baseSalary + w.transport) / ms.daysInMonth : 0;
                             return (
-                              <div key={w.id} className="grid grid-cols-4 gap-1 text-xs py-0.5">
-                                <span className="truncate text-foreground/90">{w.name}</span>
-                                <span className="text-right tabular-nums text-foreground">{fmtSalary(w.expected)}</span>
-                                <span className="text-right tabular-nums text-muted-foreground">{fmtSalary(w.transportProrated)}</span>
+                              <div key={w.code} className="grid grid-cols-4 gap-1 text-xs py-0.5">
+                                <span className="truncate text-foreground/90 font-mono">{w.code}</span>
+                                <span className="text-right tabular-nums text-foreground">{fmtSalary(w.attendanceSalary)}</span>
+                                <span className="text-right tabular-nums text-muted-foreground">{fmtSalary(w.transport)}</span>
                                 <span className="text-right tabular-nums text-sky-600 dark:text-sky-400">{fmtSalary(daily)}</span>
                               </div>
                             );
                           })}
                           <div className="grid grid-cols-4 gap-1 text-xs pt-1.5 border-t mt-1">
                             <span className="font-medium text-muted-foreground">Total</span>
-                            <span className="text-right tabular-nums font-semibold text-foreground">{fmtSalary(workerExpected ?? 0)}</span>
-                            <span className="text-right tabular-nums font-semibold text-foreground">{fmtSalary(transportExpected ?? 0)}</span>
+                            <span className="text-right tabular-nums font-semibold text-foreground">{fmtSalary(attSalaryTotal ?? 0)}</span>
+                            <span className="text-right tabular-nums font-semibold text-foreground">{fmtSalary(attTransportTotal ?? 0)}</span>
                             <span className="text-right tabular-nums font-semibold text-sky-600 dark:text-sky-400">
-                              {ms.daysInMonth > 0 ? fmtSalary((ms.totalWorkerBaseSalary + ms.totalWorkerTransport) / ms.daysInMonth) : "—"}
+                              {ms && ms.daysInMonth > 0 ? fmtSalary((ms.totalWorkerBaseSalary + ms.totalWorkerTransport) / ms.daysInMonth) : "—"}
                             </span>
                           </div>
                         </>
