@@ -68,6 +68,7 @@ interface DaybookEntry {
   createdAt: string;
   createdBy: number | null;
   voucherNumber?: string;
+  effectiveDate?: string | null;
 }
 
 interface BaleMeta {
@@ -2354,6 +2355,11 @@ export default function FactoryDaybook() {
                           <TableCell className="w-[12%] whitespace-nowrap py-2 font-medium">
                             <div className="flex flex-col">
                               <span>{formatDisplayDate(entry.txDate + "T00:00:00")}</span>
+                              {entry.effectiveDate && entry.effectiveDate !== entry.txDate && (
+                                <span className="text-xs text-blue-600 dark:text-blue-400" title="Effective date for accounts/ledger">
+                                  eff. {formatDisplayDate(entry.effectiveDate + "T00:00:00")}
+                                </span>
+                              )}
                               <span className="text-xs text-muted-foreground">{formatDisplayTime(entry.createdAt)}</span>
                             </div>
                           </TableCell>

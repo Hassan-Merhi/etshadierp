@@ -425,7 +425,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
     try {
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const { bonuses, deductions, advances, overtimeHours, overtimePay, notes, status, paymentSource, paymentDate, paymentReference } = req.body;
+      const { bonuses, deductions, advances, overtimeHours, overtimePay, notes, status, paymentSource, paymentDate, paymentReference, effectiveDate } = req.body;
 
       const [existing] = await db
         .select()
@@ -485,6 +485,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
             amountCurrency: netSalary,
             amountUsd: netSalary,
             metaJson: JSON.stringify({ paymentSource: source, paymentReference: paymentReference || null }),
+            effectiveDate: (effectiveDate as string) || null,
           });
         } else {
           await writeDaybookEntry(db, {

@@ -4010,6 +4010,9 @@ END $$`,
     `ALTER TABLE property_monthly_ledger ADD COLUMN IF NOT EXISTS used_advance_account boolean NOT NULL DEFAULT false`,
     // ── Starred proforma for container verification comparison ──
     `ALTER TABLE supplier_proformas ADD COLUMN IF NOT EXISTS is_starred boolean NOT NULL DEFAULT false`,
+    // ── Effective Date for factory transactions ──
+    `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS effective_date date`,
+    `ALTER TABLE factory_daybook_entries ADD COLUMN IF NOT EXISTS effective_date date`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

@@ -930,6 +930,7 @@ export const vouchers = pgTable("vouchers", {
   isCreditSale: boolean("is_credit_sale").default(false),
   clientSaleId: varchar("client_sale_id", { length: 36 }),
   deletedAt: timestamp("deleted_at"),
+  effectiveDate: date("effective_date"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   companyIdx: index("vouchers_company_idx").on(t.companyId),
@@ -955,6 +956,7 @@ export const insertVoucherSchema = createInsertSchema(vouchers).omit({
   exchangeRate: z.string().optional(),
   sourceModule: z.enum(["ERP", "FACTORY"]).optional().default("ERP"),
   isCreditSale: z.boolean().optional(),
+  effectiveDate: z.string().optional().nullable(),
 });
 
 export type InsertVoucher = z.infer<typeof insertVoucherSchema>;
@@ -3660,6 +3662,7 @@ export const factoryDaybookEntries = pgTable("factory_daybook_entries", {
   amountCurrency: decimal("amount_currency", { precision: 20, scale: 2 }).notNull().default("0"),
   fxRateToUsd: decimal("fx_rate_to_usd", { precision: 20, scale: 8 }).notNull().default("1"),
   amountUsd: decimal("amount_usd", { precision: 20, scale: 2 }).notNull().default("0"),
+  effectiveDate: date("effective_date"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   createdBy: varchar("created_by"),
 }, (t) => ({
@@ -3683,6 +3686,7 @@ export const insertFactoryDaybookEntrySchema = createInsertSchema(factoryDaybook
   referenceTable: z.string().optional().nullable(),
   metaJson: z.string().optional().nullable(),
   createdBy: z.string().optional().nullable(),
+  effectiveDate: z.string().optional().nullable(),
 });
 
 export type InsertFactoryDaybookEntry = z.infer<typeof insertFactoryDaybookEntrySchema>;

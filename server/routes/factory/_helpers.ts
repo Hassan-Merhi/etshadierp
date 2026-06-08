@@ -50,6 +50,7 @@ export async function writeDaybookEntry(dbOrTx: any, opts: {
   fxRateToUsd?: number;
   amountUsd?: number;
   createdBy?: string | null;
+  effectiveDate?: string | null;
 }) {
   const currency = opts.currencyCode || "USD";
   const fxRate = opts.fxRateToUsd || 1;
@@ -68,6 +69,7 @@ export async function writeDaybookEntry(dbOrTx: any, opts: {
     fxRateToUsd: String(fxRate),
     amountUsd: String(amtUsd),
     createdBy: opts.createdBy || null,
+    effectiveDate: opts.effectiveDate || null,
   });
 }
 

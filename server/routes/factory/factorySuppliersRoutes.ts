@@ -831,6 +831,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           currency: payment.currencyCode || "USD",
           exchangeRate: String(parseFloat(payment.fxRateToUsd as string || "1")),
           sourceModule: "FACTORY",
+          effectiveDate: (req.body.effectiveDate as string) || null,
         }).returning();
 
         // DR: Factory Supplier (debit reduces the liability we owe them)
@@ -869,6 +870,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
         amountCurrency: parseFloat(created.amount),
         amountUsd: parseFloat(created.amountUsd),
         currencyCode: created.currencyCode,
+        effectiveDate: (req.body.effectiveDate as string) || null,
       });
       res.json(created);
     } catch (error: any) {
@@ -1135,6 +1137,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
         amountCurrency: parseFloat(created.fromAmount),
         amountUsd: parseFloat(created.toAmountUsd),
         currencyCode: created.fromCurrencyCode,
+        effectiveDate: (req.body.effectiveDate as string) || null,
       });
 
       res.json(created);

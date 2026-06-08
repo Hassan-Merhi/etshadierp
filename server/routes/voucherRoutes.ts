@@ -663,6 +663,7 @@ export function registerVoucherRoutes(app: Express) {
           optional,
           currency,
           exchangeRate,
+          effectiveDate,
         } = req.body;
 
         // Validate required fields
@@ -761,6 +762,7 @@ export function registerVoucherRoutes(app: Express) {
               optional: optional ?? false,
               currency: currency || "USD",
               exchangeRate: exchangeRate || null,
+              effectiveDate: effectiveDate || null,
             })
             .returning();
 
@@ -902,6 +904,7 @@ export function registerVoucherRoutes(app: Express) {
               fxRateToUsd: String(fxRate),
               amountUsd: String(amtUsd),
               createdBy: null,
+              effectiveDate: result.voucher.effectiveDate || null,
             });
           }
         } catch (dbErr) {

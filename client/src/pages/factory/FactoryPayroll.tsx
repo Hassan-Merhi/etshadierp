@@ -118,6 +118,7 @@ export default function FactoryPayrollPage() {
   const [paySource, setPaySource] = useState("Cash");
   const [payDate, setPayDate] = useState(today);
   const [payReference, setPayReference] = useState("");
+  const [payEffectiveDate, setPayEffectiveDate] = useState("");
 
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
@@ -251,6 +252,7 @@ export default function FactoryPayrollPage() {
       setPayDate(today);
       setPaySource("Cash");
       setPayReference("");
+      setPayEffectiveDate("");
       setShowPayDialog(true);
       return;
     }
@@ -281,6 +283,7 @@ export default function FactoryPayrollPage() {
         paymentSource: paySource,
         paymentDate: payDate,
         paymentReference: payReference,
+        effectiveDate: payEffectiveDate || null,
       },
     });
   };
@@ -664,6 +667,10 @@ export default function FactoryPayrollPage() {
               <div className="space-y-1">
                 <Label>Reference / Notes <span className="text-muted-foreground">(optional)</span></Label>
                 <Input value={payReference} onChange={(e) => setPayReference(e.target.value)} placeholder="e.g. cheque no. or transfer ref" data-testid="input-pay-reference" />
+              </div>
+              <div className="space-y-1">
+                <Label>Effective Date <span className="text-muted-foreground">(optional — defaults to payment date)</span></Label>
+                <Input type="date" value={payEffectiveDate} onChange={(e) => setPayEffectiveDate(e.target.value)} data-testid="input-pay-effective-date" />
               </div>
             </div>
           )}

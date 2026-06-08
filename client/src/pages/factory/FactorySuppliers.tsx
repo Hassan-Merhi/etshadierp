@@ -276,6 +276,7 @@ export default function FactorySuppliers() {
     fxRateToUsd: "1",
     paidFromAccountId: "",
     notes: "",
+    effectiveDate: "",
   });
 
   const { data: ledgerAccounts } = useQuery<{ id: number; name: string; code: string }[]>({
@@ -299,6 +300,7 @@ export default function FactorySuppliers() {
     fxRateToUsd: "",
     date: today,
     notes: "",
+    effectiveDate: "",
   });
 
   // Bulk FX Settlement state (broker-level: settle all linked suppliers in one go)
@@ -490,6 +492,7 @@ export default function FactorySuppliers() {
         date: data.date,
         notes: data.notes || null,
         sourceType: (data as any).sourceType || "supplier",
+        effectiveDate: data.effectiveDate || null,
       };
       const res = await factoryApiRequest("POST", "/api/factory/supplier-fx-transfers", payload);
       if (!res.ok) {
@@ -531,6 +534,7 @@ export default function FactorySuppliers() {
         amountUsd: amountUsd.toFixed(4),
         paidFromAccountId: data.paidFromAccountId ? parseInt(data.paidFromAccountId) : null,
         notes: data.notes || null,
+        effectiveDate: data.effectiveDate || null,
       };
       const res = await factoryApiRequest("POST", "/api/factory/supplier-payments", payload);
       if (!res.ok) {
@@ -2384,14 +2388,25 @@ export default function FactorySuppliers() {
                 </div>
               )}
 
-              <div>
-                <Label>Date</Label>
-                <Input
-                  type="date"
-                  value={fxConversionForm.date}
-                  onChange={(e) => setFxConversionForm(prev => ({ ...prev, date: e.target.value }))}
-                  data-testid="input-fx-date"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Date</Label>
+                  <Input
+                    type="date"
+                    value={fxConversionForm.date}
+                    onChange={(e) => setFxConversionForm(prev => ({ ...prev, date: e.target.value }))}
+                    data-testid="input-fx-date"
+                  />
+                </div>
+                <div>
+                  <Label>Effective Date <span className="text-muted-foreground">(optional)</span></Label>
+                  <Input
+                    type="date"
+                    value={fxConversionForm.effectiveDate}
+                    onChange={(e) => setFxConversionForm(prev => ({ ...prev, effectiveDate: e.target.value }))}
+                    data-testid="input-fx-effective-date"
+                  />
+                </div>
               </div>
 
               <div>
@@ -2913,14 +2928,25 @@ export default function FactorySuppliers() {
               );
             })()}
 
-            <div>
-              <Label>Date</Label>
-              <Input
-                type="date"
-                value={paymentForm.date}
-                onChange={(e) => setPaymentForm(prev => ({ ...prev, date: e.target.value }))}
-                data-testid="input-payment-date"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Date</Label>
+                <Input
+                  type="date"
+                  value={paymentForm.date}
+                  onChange={(e) => setPaymentForm(prev => ({ ...prev, date: e.target.value }))}
+                  data-testid="input-payment-date"
+                />
+              </div>
+              <div>
+                <Label>Effective Date <span className="text-muted-foreground">(optional)</span></Label>
+                <Input
+                  type="date"
+                  value={paymentForm.effectiveDate}
+                  onChange={(e) => setPaymentForm(prev => ({ ...prev, effectiveDate: e.target.value }))}
+                  data-testid="input-payment-effective-date"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
