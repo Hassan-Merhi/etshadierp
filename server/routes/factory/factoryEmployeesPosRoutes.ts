@@ -3416,7 +3416,6 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       // Positive net (expected > paid) → tenant owes us → asset.
       // Negative net (paid > expected) → tenant prepaid → liability.
       let tenantReceivables = 0;
-      let tenantAdvances = 0;
       {
         const activeContracts = await db
           .select({ id: propertyContracts.id })
@@ -3445,11 +3444,12 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
             .groupBy(propertyMonthlyLedger.contractId);
           for (const row of ledgerRows) {
             const net = parseFloat(row.expected) - parseFloat(row.paid);
+            // Only count positive outstanding (tenant owes us).
+            // Negative (tenant prepaid / credit) is already captured as cash in
+            // the main ledger accounts — including it here would double-count.
             if (net > 0) tenantReceivables += net;
-            else if (net < 0) tenantAdvances += Math.abs(net);
           }
           tenantReceivables = round2(tenantReceivables);
-          tenantAdvances    = round2(tenantAdvances);
         }
       }
 
@@ -3483,8 +3483,8 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       }
       employeeSalariesPayable = round2(employeeSalariesPayable);
 
-      // onUsTotal: ledger liabilities + supplier balances + customer credit balances (CR) + employee salaries + tenant advances
-      const onUsTotal = round2(ledgerOnUsTotal + totalSupplierLiabilities + totalCustomerCr + employeeSalariesPayable + tenantAdvances);
+      // onUsTotal: ledger liabilities + supplier balances + customer credit balances (CR) + employee salaries
+      const onUsTotal = round2(ledgerOnUsTotal + totalSupplierLiabilities + totalCustomerCr + employeeSalariesPayable);
       const netPosition = round2(forUsTotal - onUsTotal);
 
       // Inject factory-specific lines explicitly (always present so the UI
@@ -3530,7 +3530,6 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         ...customerCrItems
           .sort((a, b) => Math.abs(b.balanceUsd) - Math.abs(a.balanceUsd))
           .map(c => ({ ...(c.ledgerAccountId ? { id: c.ledgerAccountId } : {}), name: c.name, code: "CUSTOMER_CR", value: round2(Math.abs(c.balanceUsd)), category: "Customer" })),
-        ...(tenantAdvances > 0 ? [{ name: "Tenant Rent Advance/Credit", code: "RENTAL_ADVANCE", value: tenantAdvances, category: "Rental Advances" }] : []),
       ];
 
       const forUsBreakdown = Object.entries(
@@ -3550,7 +3549,6 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           .map(([name, value]) => ({ name, value: round2(value) }))
           .sort((a, b) => b.value - a.value),
         ...(totalCustomerCr > 0 ? [{ name: "Customer", value: totalCustomerCr }] : []),
-        ...(tenantAdvances > 0 ? [{ name: "Rental Advances", value: tenantAdvances }] : []),
       ];
 
       res.json({

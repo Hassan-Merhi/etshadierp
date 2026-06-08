@@ -497,27 +497,21 @@ export function registerStatsRoutes(app: Express) {
             .groupBy(propertyMonthlyLedger.contractId);
 
           let tenantReceivables = 0;
-          let tenantAdvances = 0;
           for (const row of ledgerRows) {
             const net = parseFloat(row.expected) - parseFloat(row.paid);
-            // Convert CFA contracts to USD if needed
+            // Only count positive outstanding (tenant owes us).
+            // Negative (tenant prepaid / credit) is already captured as cash in
+            // the main ledger accounts — including it here would double-count.
             const contract = activeContracts.find(c => c.id === row.contractId);
             const isCfa = contract?.currency === "CFA";
             const usd = isCfa && currentCfaRate > 0 ? net / currentCfaRate : net;
             if (usd > 0) tenantReceivables += usd;
-            else if (usd < 0) tenantAdvances += Math.abs(usd);
           }
           if (tenantReceivables > 0.005) {
             const val = round2(tenantReceivables);
             forUsTotal = round2(forUsTotal + val);
             categoryTotals["asset_Rental Receivables"] = (categoryTotals["asset_Rental Receivables"] || 0) + val;
             forUsAccounts.push({ name: "Tenant Rent Outstanding", code: "RENTAL_OUTSTANDING", value: val, category: "Rental Receivables" });
-          }
-          if (tenantAdvances > 0.005) {
-            const val = round2(tenantAdvances);
-            onUsTotal = round2(onUsTotal + val);
-            categoryTotals["liability_Rental Advances"] = (categoryTotals["liability_Rental Advances"] || 0) + val;
-            onUsAccounts.push({ name: "Tenant Rent Advance/Credit", code: "RENTAL_ADVANCE", value: val, category: "Rental Advances" });
           }
         }
       }
