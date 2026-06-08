@@ -4998,6 +4998,7 @@ export const propertyMonthlyLedger = pgTable("property_monthly_ledger", {
   notes: text("notes"),
   accrualVoucherId: integer("accrual_voucher_id"),
   usedPrepaidAccount: boolean("used_prepaid_account").notNull().default(false),
+  usedAdvanceAccount: boolean("used_advance_account").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   companyIdx: index("property_monthly_ledger_company_idx").on(t.companyId),

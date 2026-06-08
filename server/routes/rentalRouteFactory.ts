@@ -511,6 +511,7 @@ export async function postRentAccrualForCompany(
         inArray(propertyMonthlyLedger.contractId, contractIds),
         isNull(propertyMonthlyLedger.accrualVoucherId),
         eq(propertyMonthlyLedger.usedPrepaidAccount, false),
+        eq(propertyMonthlyLedger.usedAdvanceAccount, false),
         sql`${propertyMonthlyLedger.expectedAmount}::numeric > 0`,
       ));
 
@@ -574,6 +575,7 @@ export async function postRentAccrualForCompany(
          WHERE id IN (${idListSql})
            AND accrual_voucher_id IS NULL
            AND expected_amount::numeric > 0
+           AND used_advance_account = false
          FOR UPDATE SKIP LOCKED`,
       ));
 
@@ -669,7 +671,7 @@ export async function postRentAccrualForCompany(
         .set({ accrualVoucherId: v.id })
         .where(inArray(propertyMonthlyLedger.id, entries.map(e => e.id)));
 
-      accrued = entries.length;
+      accrued += entries.length;
     });
   } catch (e: any) {
     // Log the full error — Drizzle formats errors as "Failed query:\n<SQL>\n<pg error>",
@@ -680,6 +682,94 @@ export async function postRentAccrualForCompany(
   }
   } // end if (pendingRows.length > 0)
   } // end if (contractIds.length > 0) — Pass 1
+
+  // ── Pass 1.5: Advance Rent Paid recognition ───────────────────────────────
+  // When a payment is made for a current/due month BEFORE the accrual runs,
+  // the payment uses Dr Advance Rent Paid / Cr Cash (visible in Net Position).
+  // Pass 1.5 recognises the expense: Dr Rent Expense / Cr Advance Rent Paid.
+  // Any remaining unpaid portion is also credited to Accrued Rent Payable.
+  if (contractIds.length > 0) {
+    try {
+      const advanceRows = await db.select()
+        .from(propertyMonthlyLedger)
+        .where(and(
+          inArray(propertyMonthlyLedger.contractId, contractIds),
+          isNull(propertyMonthlyLedger.accrualVoucherId),
+          eq(propertyMonthlyLedger.usedAdvanceAccount, true),
+          sql`${propertyMonthlyLedger.expectedAmount}::numeric > 0`,
+        ));
+      const dueAdvanceRows = advanceRows.filter(r => isDue(r));
+      if (dueAdvanceRows.length > 0) {
+        await db.transaction(async (tx) => {
+          const pendingIds15 = dueAdvanceRows.map(r => r.id);
+          const idListSql15 = pendingIds15.join(",");
+          const lock15 = await tx.execute(sql.raw(
+            `SELECT id, expected_amount, paid_amount, unit_id, month, year
+             FROM property_monthly_ledger
+             WHERE id IN (${idListSql15})
+               AND accrual_voucher_id IS NULL
+               AND used_advance_account = true
+             FOR UPDATE SKIP LOCKED`,
+          ));
+          if (!lock15.rows || lock15.rows.length === 0) return;
+          type LR15 = { id: number; expected_amount: string; paid_amount: string; unit_id: number; month: number; year: number };
+          const locked15 = lock15.rows as LR15[];
+
+          const expenseAcctId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
+          const advanceAcctId = await findOrCreateLedgerAccount(tx, companyId, "Advance Rent Paid", "Asset", "ADV-RENT-PAID");
+          const liabilityAcctId = await findOrCreateLedgerAccount(tx, companyId, "Accrued Rent Payable", "Liability", "ACCR-RENT-PAY");
+
+          const months15 = [...new Set(locked15.map(r => `${String(Number(r.month)).padStart(2,"0")}/${r.year}`))].sort();
+          const period15 = months15.length === 1 ? months15[0] : `${months15[0]}–${months15[months15.length-1]}`;
+          const desc15 = `Advance rent recognition - ${companyId} - ${period15}`;
+
+          let totalExpense15 = 0;
+          let totalAdvCredit15 = 0;
+          let totalApCredit15 = 0;
+          const debitEntries15: any[] = [];
+
+          for (const r of locked15) {
+            const expected = Number(r.expected_amount);
+            const paid = Number(r.paid_amount || "0");
+            const advCredit = Math.min(paid, expected);
+            const apCredit = Math.max(0, expected - paid);
+            const narr15 = `Advance rent recognition - unit${r.unit_id} - ${String(Number(r.month)).padStart(2,"0")}/${r.year}`;
+            debitEntries15.push({ ledgerAccountId: expenseAcctId, debitAmount: String(expected), creditAmount: "0", narration: narr15 });
+            totalExpense15 += expected;
+            totalAdvCredit15 += advCredit;
+            totalApCredit15 += apCredit;
+          }
+
+          const [v15] = await tx.insert(vouchers).values({
+            companyId,
+            voucherNumber: `ADV-REC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            voucherType: "Journal",
+            voucherDate: new Date().toISOString().slice(0, 10) as any,
+            description: desc15,
+            totalAmount: String(totalExpense15),
+            currency: batchCurrency,
+            sourceModule: moduleParam as any,
+          }).returning();
+
+          const allEntries15: any[] = debitEntries15.map(e => ({ ...e, voucherId: v15.id }));
+          if (totalAdvCredit15 > 0.005) {
+            allEntries15.push({ voucherId: v15.id, ledgerAccountId: advanceAcctId, debitAmount: "0", creditAmount: String(totalAdvCredit15), narration: desc15 });
+          }
+          if (totalApCredit15 > 0.005) {
+            allEntries15.push({ voucherId: v15.id, ledgerAccountId: liabilityAcctId, debitAmount: "0", creditAmount: String(totalApCredit15), narration: desc15 });
+          }
+          await tx.insert(voucherEntries).values(allEntries15);
+          await tx.update(propertyMonthlyLedger)
+            .set({ accrualVoucherId: v15.id })
+            .where(inArray(propertyMonthlyLedger.id, locked15.map(r => Number(r.id))));
+          accrued += locked15.length;
+        });
+      }
+    } catch (e: any) {
+      const detail = (e.message ?? String(e)).replace(/\n/g, " | ");
+      console.error(`[ERP/rental] advance recognition pass failed company ${companyId}: ${detail}`);
+    }
+  } // end Pass 1.5
 
   // ── Pass 2: Tenant prepaid rent recognition ──────────────────────────────
   // For rows where usedPrepaidAccount=true, accrualVoucherId IS NULL, and isDue:
@@ -2065,6 +2155,9 @@ export function registerRentalRoutes(
           });
         }
 
+        // Track non-accrued due months that use Advance Rent Paid account (set inside isShop block below)
+        const advanceDueMonthKeys = new Set<string>();
+
         // Create ONE voucher for the full payment total
         let voucherId: number | null = null;
         if (data.cashAccountId) {
@@ -2096,12 +2189,16 @@ export function registerRentalRoutes(
               allocRows.push({ ...alloc, isAccrued: !!(existingRow?.accrualVoucherId), isFuture });
             }
 
-            // Future months: Dr Prepaid Rent / Cr Cash  (deferred — not yet an expense)
-            // Due months:    Dr Rent Expense  / Cr Cash  (standard path)
-            // Accrued-due months also get an AP-CLEAR journal (unchanged)
-            const accrualChunk = allocRows.filter(a => a.isAccrued && !a.isFuture).reduce((s, a) => s + Number(a.chunk), 0);
-            const prepaidChunk = allocRows.filter(a => a.isFuture).reduce((s, a) => s + Number(a.chunk), 0);
-            const dueChunk = parseFloat(data.amount) - prepaidChunk;
+            // Three-way split of the payment:
+            // 1. accrualChunk     → months already accrued (AP liability exists) → Dr Accrued Rent Payable / Cr Cash
+            // 2. advanceDueChunk  → months not yet accrued but currently due     → Dr Advance Rent Paid / Cr Cash (asset, visible in Net Position)
+            // 3. prepaidChunk     → future months                                → Dr Prepaid Rent / Cr Cash
+            const accrualChunk    = allocRows.filter(a =>  a.isAccrued && !a.isFuture).reduce((s, a) => s + Number(a.chunk), 0);
+            const advanceDueChunk = allocRows.filter(a => !a.isAccrued && !a.isFuture).reduce((s, a) => s + Number(a.chunk), 0);
+            const prepaidChunk    = allocRows.filter(a =>  a.isFuture).reduce((s, a) => s + Number(a.chunk), 0);
+            for (const ar of allocRows) {
+              if (!ar.isAccrued && !ar.isFuture) advanceDueMonthKeys.add(`${ar.year}-${ar.month}`);
+            }
 
             const narration = `Rent paid - ${unitLabel} - ${monthSpan}`;
             const [v] = await tx.insert(vouchers).values({
@@ -2111,10 +2208,14 @@ export function registerRentalRoutes(
             }).returning();
             voucherId = v.id;
 
-            const expenseId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
             const shopEntries: any[] = [];
-            if (dueChunk > 0.005) {
-              shopEntries.push({ voucherId: v.id, ledgerAccountId: expenseId, debitAmount: dueChunk.toFixed(2), creditAmount: "0", narration });
+            if (accrualChunk > 0.005) {
+              const liabilityId = await findOrCreateLedgerAccount(tx, companyId, "Accrued Rent Payable", "Liability", "ACCR-RENT-PAY");
+              shopEntries.push({ voucherId: v.id, ledgerAccountId: liabilityId, debitAmount: accrualChunk.toFixed(2), creditAmount: "0", narration });
+            }
+            if (advanceDueChunk > 0.005) {
+              const advanceId = await findOrCreateLedgerAccount(tx, companyId, "Advance Rent Paid", "Asset", "ADV-RENT-PAID");
+              shopEntries.push({ voucherId: v.id, ledgerAccountId: advanceId, debitAmount: advanceDueChunk.toFixed(2), creditAmount: "0", narration });
             }
             if (prepaidChunk > 0.005) {
               const prepaidId = await findOrCreateLedgerAccount(tx, companyId, "Prepaid Rent", "Asset", "PREP-RENT");
@@ -2122,25 +2223,7 @@ export function registerRentalRoutes(
             }
             shopEntries.push({ voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: "0", creditAmount: data.amount, narration });
             await tx.insert(voucherEntries).values(shopEntries);
-
-            if (accrualChunk > 0) {
-              const liabilityId = await findOrCreateLedgerAccount(tx, companyId, "Accrued Rent Payable", "Liability", "ACCR-RENT-PAY");
-              const clearNarration = `AP clearing — ${narration}`;
-              const [clv] = await tx.insert(vouchers).values({
-                companyId,
-                voucherNumber: `AP-CLEAR-${v.id}`,
-                voucherType:   "Journal",
-                voucherDate:   data.paymentDate as any,
-                description:   clearNarration,
-                totalAmount:   String(accrualChunk),
-                currency:      voucherCurrency,
-                sourceModule:  "ERP",
-              }).returning();
-              await tx.insert(voucherEntries).values([
-                { voucherId: clv.id, ledgerAccountId: liabilityId, debitAmount: String(accrualChunk), creditAmount: "0",                narration: clearNarration },
-                { voucherId: clv.id, ledgerAccountId: expenseId,   debitAmount: "0",                  creditAmount: String(accrualChunk), narration: clearNarration },
-              ]);
-            }
+            // No separate AP clearing journal — paying an accrued month debits the liability directly.
           } else {
             const incomeAccountId = await findOrCreateLedgerAccount(tx, companyId, incomeAccountName, "Income", "RENT-INC", "Indirect Income");
             const narration = `Rent received - ${unitLabel} - ${monthSpan}`;
@@ -2271,6 +2354,12 @@ export function registerRentalRoutes(
               .set({ usedPrepaidAccount: true })
               .where(eq(propertyMonthlyLedger.id, row.id));
           }
+          // Mark non-accrued due rows paid before accrual (→ Advance Rent Paid asset)
+          if (!isFutureAlloc && data.cashAccountId && advanceDueMonthKeys.has(`${alloc.year}-${alloc.month}`)) {
+            await tx.update(propertyMonthlyLedger)
+              .set({ usedAdvanceAccount: true })
+              .where(eq(propertyMonthlyLedger.id, row.id));
+          }
 
           await tx.execute(sql`
             UPDATE property_monthly_ledger SET paid_amount = paid_amount + ${alloc.chunk}::numeric WHERE id = ${row.id}
@@ -2341,6 +2430,9 @@ export function registerRentalRoutes(
             });
           }
 
+          // Track non-accrued due months that use Advance Rent Paid account (bulk path)
+          const advanceDueMonthKeysBulk = new Set<string>();
+
           let voucherId: number | null = null;
           if (data.cashAccountId) {
             const isShop = unit?.unitType === "SHOP";
@@ -2367,9 +2459,16 @@ export function registerRentalRoutes(
                 const isFuture = alloc.year > payYear || (alloc.year === payYear && alloc.month > payMonth);
                 allocRows.push({ ...alloc, isAccrued: !!(existingRow?.accrualVoucherId), isFuture });
               }
-              const accrualChunk = allocRows.filter(a => a.isAccrued && !a.isFuture).reduce((s, a) => s + Number(a.chunk), 0);
-              const prepaidChunk = allocRows.filter(a => a.isFuture).reduce((s, a) => s + Number(a.chunk), 0);
-              const dueChunk = parseFloat(data.amount) - prepaidChunk;
+              // Three-way split (bulk path — mirrors single-payment logic):
+              // 1. accrualChunk     → already-accrued months  → Dr Accrued Rent Payable / Cr Cash
+              // 2. advanceDueChunk  → due but not yet accrued → Dr Advance Rent Paid / Cr Cash (asset)
+              // 3. prepaidChunk     → future months           → Dr Prepaid Rent / Cr Cash
+              const accrualChunk    = allocRows.filter(a =>  a.isAccrued && !a.isFuture).reduce((s, a) => s + Number(a.chunk), 0);
+              const advanceDueChunk = allocRows.filter(a => !a.isAccrued && !a.isFuture).reduce((s, a) => s + Number(a.chunk), 0);
+              const prepaidChunk    = allocRows.filter(a =>  a.isFuture).reduce((s, a) => s + Number(a.chunk), 0);
+              for (const ar of allocRows) {
+                if (!ar.isAccrued && !ar.isFuture) advanceDueMonthKeysBulk.add(`${ar.year}-${ar.month}`);
+              }
 
               const narration = `Rent paid - ${unitLabel} - ${monthSpan}`;
               const [v] = await tx.insert(vouchers).values({
@@ -2378,10 +2477,14 @@ export function registerRentalRoutes(
                 description: narration, totalAmount: data.amount, currency: voucherCurrency, sourceModule: "ERP",
               }).returning();
               voucherId = v.id;
-              const expenseId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
               const bulkShopEntries: any[] = [];
-              if (dueChunk > 0.005) {
-                bulkShopEntries.push({ voucherId: v.id, ledgerAccountId: expenseId, debitAmount: dueChunk.toFixed(2), creditAmount: "0", narration });
+              if (accrualChunk > 0.005) {
+                const liabilityId = await findOrCreateLedgerAccount(tx, companyId, "Accrued Rent Payable", "Liability", "ACCR-RENT-PAY");
+                bulkShopEntries.push({ voucherId: v.id, ledgerAccountId: liabilityId, debitAmount: accrualChunk.toFixed(2), creditAmount: "0", narration });
+              }
+              if (advanceDueChunk > 0.005) {
+                const advanceId = await findOrCreateLedgerAccount(tx, companyId, "Advance Rent Paid", "Asset", "ADV-RENT-PAID");
+                bulkShopEntries.push({ voucherId: v.id, ledgerAccountId: advanceId, debitAmount: advanceDueChunk.toFixed(2), creditAmount: "0", narration });
               }
               if (prepaidChunk > 0.005) {
                 const prepaidId = await findOrCreateLedgerAccount(tx, companyId, "Prepaid Rent", "Asset", "PREP-RENT");
@@ -2389,25 +2492,7 @@ export function registerRentalRoutes(
               }
               bulkShopEntries.push({ voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: "0", creditAmount: data.amount, narration });
               await tx.insert(voucherEntries).values(bulkShopEntries);
-
-              if (accrualChunk > 0) {
-                const liabilityId = await findOrCreateLedgerAccount(tx, companyId, "Accrued Rent Payable", "Liability", "ACCR-RENT-PAY");
-                const clearNarration = `AP clearing — ${narration}`;
-                const [clv] = await tx.insert(vouchers).values({
-                  companyId,
-                  voucherNumber: `AP-CLEAR-${v.id}`,
-                  voucherType:   "Journal",
-                  voucherDate:   data.paymentDate as any,
-                  description:   clearNarration,
-                  totalAmount:   String(accrualChunk),
-                  currency:      voucherCurrency,
-                  sourceModule:  "ERP",
-                }).returning();
-                await tx.insert(voucherEntries).values([
-                  { voucherId: clv.id, ledgerAccountId: liabilityId, debitAmount: String(accrualChunk), creditAmount: "0",                narration: clearNarration },
-                  { voucherId: clv.id, ledgerAccountId: expenseId,   debitAmount: "0",                  creditAmount: String(accrualChunk), narration: clearNarration },
-                ]);
-              }
+              // No separate AP clearing journal — paying an accrued month debits the liability directly.
             } else {
               const incomeAccountId = await findOrCreateLedgerAccount(tx, companyId, incomeAccountName, "Income", "RENT-INC", "Indirect Income");
               const narration = `Rent received - ${unitLabel} - ${monthSpan}`;
@@ -2459,6 +2544,12 @@ export function registerRentalRoutes(
             if (isFutureAllocB && data.cashAccountId) {
               await tx.update(propertyMonthlyLedger)
                 .set({ usedPrepaidAccount: true })
+                .where(eq(propertyMonthlyLedger.id, row.id));
+            }
+            // Mark non-accrued due rows paid before accrual (→ Advance Rent Paid asset)
+            if (!isFutureAllocB && data.cashAccountId && advanceDueMonthKeysBulk.has(`${alloc.year}-${alloc.month}`)) {
+              await tx.update(propertyMonthlyLedger)
+                .set({ usedAdvanceAccount: true })
                 .where(eq(propertyMonthlyLedger.id, row.id));
             }
             await tx.execute(sql`
