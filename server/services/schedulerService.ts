@@ -4,6 +4,7 @@ import { PassThrough } from "stream";
 import { fetchAllCompanies } from "./exportDataService";
 import { sendExportEmail } from "./emailService";
 import { pool } from "../db";
+import { ensureMonthlyForCompany, postRentAccrualForCompany } from "../routes/rentalRouteFactory";
 import { getWaSettings, getActiveRecipients, sendWhatsAppFile, sendWhatsAppFileToChatId, sendWhatsAppText } from "./whatsappService";
 import { generateNetPositionExcel } from "../helpers/generateNetPositionExcel";
 import { generateStockPdf } from "../helpers/generateStockPdf";
@@ -799,6 +800,39 @@ async function checkAndRunScheduledDailyExport(): Promise<void> {
   }
 }
 
+/**
+ * Auto-post monthly rent accrual vouchers for every active rental contract
+ * across all modules (ERP, FACTORY, PROPERTIES) and all companies.
+ * Safe to run multiple times — already-accrued rows are skipped.
+ */
+async function runMonthlyRentalAccrual() {
+  console.log("[RentalAccrual] Monthly auto-accrual started.");
+  try {
+    const { rows } = await pool.query<{ id: number }>("SELECT id FROM companies");
+    const modules: Array<{ module: string; income: string; expense: string }> = [
+      { module: "ERP",        income: "Rental Income - ERP",        expense: "Rent Expense - ERP Shops" },
+      { module: "FACTORY",    income: "Rental Income - Factory",    expense: "Rent Expense - Factory Shops" },
+      { module: "PROPERTIES", income: "Rental Income - Properties", expense: "Rent Expense - Property Shops" },
+    ];
+
+    let totalAccrued = 0;
+    for (const { id: companyId } of rows) {
+      for (const { module, income, expense } of modules) {
+        try {
+          await ensureMonthlyForCompany(companyId, module as any);
+          const { accrued } = await postRentAccrualForCompany(companyId, expense, module, income);
+          totalAccrued += accrued;
+        } catch (err: any) {
+          console.error(`[RentalAccrual] company=${companyId} module=${module}: ${err?.message}`);
+        }
+      }
+    }
+    console.log(`[RentalAccrual] Monthly auto-accrual complete — ${totalAccrued} rows accrued.`);
+  } catch (err: any) {
+    console.error("[RentalAccrual] Fatal error:", err?.message);
+  }
+}
+
 export function startScheduler() {
   if (schedulerStarted) return;
   schedulerStarted = true;
@@ -806,6 +840,13 @@ export function startScheduler() {
   // Run on the 1st of every month at 7:00 AM EST — send net-position Excel via WhatsApp
   cron.schedule("0 7 1 * *", async () => {
     await runMonthlyWhatsAppNetPosition();
+  }, {
+    timezone: "America/New_York",
+  });
+
+  // Run on the 2nd of every month at 6:00 AM EST — auto-post rent accrual vouchers
+  cron.schedule("0 6 2 * *", async () => {
+    await runMonthlyRentalAccrual();
   }, {
     timezone: "America/New_York",
   });
@@ -860,6 +901,7 @@ export function startScheduler() {
   console.log("[ContainerTracking] Auto-tracking scheduler started — runs every 6 hours (00:00, 06:00, 12:00, 18:00 EST).");
   console.log("[DailyExport] Scheduler started — time-configurable via export settings (checked every hour).");
   console.log("[WhatsApp] Monthly net-position scheduler started — runs on the 1st of each month at 7:00 AM EST.");
+  console.log("[RentalAccrual] Monthly auto-accrual scheduler started — runs on the 2nd of each month at 6:00 AM EST.");
   console.log("[StockReport] Independent scheduler started — checks every hour.");
   console.log("[NetPositionExport] Scheduled export checker started — checks every hour.");
   console.log("[OverdueCheck] Payment reminder scheduler started — runs daily at 9:00 AM EST.");

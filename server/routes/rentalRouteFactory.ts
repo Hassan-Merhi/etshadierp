@@ -353,7 +353,7 @@ async function buildAllocations(
   return allocations;
 }
 
-async function ensureMonthlyForCompany(companyId: number, module: RentalModule) {
+export async function ensureMonthlyForCompany(companyId: number, module: RentalModule) {
   const active = await db
     .select({ id: propertyContracts.id })
     .from(propertyContracts)
@@ -407,7 +407,7 @@ async function postRentAccrualForContract(
  *   accrued = number of ledger rows newly stamped with the combined voucher
  *   skipped = due+unpaid rows already accrued in a prior run
  */
-async function postRentAccrualForCompany(
+export async function postRentAccrualForCompany(
   companyId: number,
   shopExpenseAccountName: string,
   moduleParam: string = "ERP",
