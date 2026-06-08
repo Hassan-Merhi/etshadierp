@@ -2522,15 +2522,15 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const fxRateRows = await db.execute(sql`
         SELECT DISTINCT ON (currency_code) currency_code, rate_to_usd
         FROM factory_fx_rates
-        WHERE company_id = ${companyId}
-        ORDER BY currency_code, source DESC, effective_date DESC
+        WHERE company_id = ${companyId} AND source = 'manual'
+        ORDER BY currency_code, effective_date DESC
       `);
       const configFxRates: Record<string, number> = {};
       for (const row of fxRateRows.rows as any[]) {
         configFxRates[row.currency_code as string] = parseFloat(row.rate_to_usd as string);
       }
-      // Fallback to legacy hardcoded values if no configured rate exists
-      const getConfigFx = (cc: string): number => configFxRates[cc] ?? (cc === "EUR" ? 1.17 : cc === "AUD" ? 0.75 : 1);
+      // Only use manually configured rates — no hardcoded fallbacks
+      const getConfigFx = (cc: string): number => configFxRates[cc] ?? 1;
 
       // ── 1. Factory supplier balances (What We Owe) ──────────────────────
       const suppliersList = await db.select().from(factorySuppliers)

@@ -1713,8 +1713,8 @@ export function registerFactorySuppliersRoutes(app: Express) {
       const fxRateRows = await db.execute(sql`
         SELECT DISTINCT ON (currency_code) currency_code, rate_to_usd
         FROM factory_fx_rates
-        WHERE company_id = ${companyId}
-        ORDER BY currency_code, source DESC, effective_date DESC
+        WHERE company_id = ${companyId} AND source = 'manual'
+        ORDER BY currency_code, effective_date DESC
       `);
       const configuredFxRates: Record<string, number> = {};
       for (const row of fxRateRows.rows as any[]) {
@@ -1742,7 +1742,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat(c.freight || "0");
           const containerCc = c.currencyCode || "USD";
-          const fx = configuredFxRates[containerCc] ?? parseFloat(c.fxRateToUsd || "1");
+          const fx = configuredFxRates[containerCc] ?? 1;
           const freightCc = c.freightCurrencyCode || containerCc;
           const freightFx = configuredFxRates[freightCc] ?? fx;
           const freightInContainerCurr = freightCc === containerCc ? freight : 0;
@@ -1757,7 +1757,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           const commCurr = c.commissionCurrencyCode || c.currencyCode || "USD";
           // Linked supplier: USD commission is absorbed by the parent broker — skip here
           if (s.parentId && commCurr === "USD") return sum;
-          const commFx = commCurr === "USD" ? 1 : (configuredFxRates[commCurr] ?? parseFloat(c.fxRateToUsd || "1"));
+          const commFx = commCurr === "USD" ? 1 : (configuredFxRates[commCurr] ?? 1);
           return sum + (commCurr === "USD" ? commAmt : commAmt * commFx);
         }, 0);
         const pendingConts = supplierContainers.filter((c: any) => c.status === "PENDING" || c.status === "IN_TRANSIT");
