@@ -74,13 +74,29 @@ export async function writeDaybookEntry(dbOrTx: any, opts: {
 export async function getOrFetchFxRateToUsd(companyId: number, currencyCode: string, dateISO: string): Promise<string> {
   if (currencyCode === "USD") return "1";
 
+  // Manual rates always take priority — use the most recent one for this currency.
+  const [manualRate] = await db
+    .select()
+    .from(factoryFxRates)
+    .where(and(
+      eq(factoryFxRates.companyId, companyId),
+      eq(factoryFxRates.currencyCode, currencyCode.toUpperCase()),
+      eq(factoryFxRates.source, "manual"),
+    ))
+    .orderBy(desc(factoryFxRates.effectiveDate))
+    .limit(1);
+
+  if (manualRate) return manualRate.rateToUsd;
+
+  // No manual rate — check for an auto-cached row for this exact date.
   const [existing] = await db
     .select()
     .from(factoryFxRates)
     .where(and(
       eq(factoryFxRates.companyId, companyId),
       eq(factoryFxRates.currencyCode, currencyCode.toUpperCase()),
-      eq(factoryFxRates.effectiveDate, dateISO)
+      eq(factoryFxRates.effectiveDate, dateISO),
+      eq(factoryFxRates.source, "auto"),
     ))
     .limit(1);
 
