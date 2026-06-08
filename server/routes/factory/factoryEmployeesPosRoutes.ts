@@ -2540,6 +2540,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const allContainersF = await db.select().from(factoryContainers)
         .where(and(
           eq(factoryContainers.companyId, companyId),
+          isNull(factoryContainers.deletedAt),
           sql`DATE(${factoryContainers.createdAt}) <= ${asOf}::date`,
         ));
 
@@ -2572,6 +2573,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         .innerJoin(factoryContainers, eq(factoryContainerOtherCharges.containerId, factoryContainers.id))
         .where(and(
           eq(factoryContainerOtherCharges.companyId, companyId),
+          isNull(factoryContainers.deletedAt),
           sql`DATE(${factoryContainers.createdAt}) <= ${asOf}::date`,
         ));
 
@@ -2582,6 +2584,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       }).from(factoryContainers)
         .where(and(
           eq(factoryContainers.companyId, companyId),
+          isNull(factoryContainers.deletedAt),
           sql`${factoryContainers.otherChargesSupplierId} IS NOT NULL`,
           sql`CAST(COALESCE(${factoryContainers.otherCharges}, '0') AS numeric) > 0`,
           sql`DATE(${factoryContainers.createdAt}) <= ${asOf}::date`,
