@@ -1657,7 +1657,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
       const containers = await db
         .select()
         .from(factoryContainers)
-        .where(eq(factoryContainers.companyId, companyId));
+        .where(and(eq(factoryContainers.companyId, companyId), isNull(factoryContainers.deletedAt)));
 
       const allPayments = await db
         .select()
