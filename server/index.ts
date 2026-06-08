@@ -2497,6 +2497,7 @@ let migrationsDone = false;
     `DO $$ BEGIN ALTER TABLE factory_fx_allocations ADD CONSTRAINT factory_fx_allocations_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
     `DO $$ BEGIN ALTER TABLE factory_fx_rates ADD CONSTRAINT factory_fx_rates_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
     `ALTER TABLE factory_fx_rates ADD COLUMN IF NOT EXISTS source VARCHAR(10) NOT NULL DEFAULT 'auto'`,
+    `UPDATE ledger_accounts SET deleted_at = NOW() WHERE (name ILIKE '%Accrued Rent Payable%' OR code = 'ACCR-RENT-PAY') AND deleted_at IS NULL`,
     `DO $$ BEGIN ALTER TABLE factory_invoice_loading_bales ADD CONSTRAINT factory_invoice_loading_bales_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
     `DO $$ BEGIN ALTER TABLE factory_invoice_loading_sessions ADD CONSTRAINT factory_invoice_loading_sessions_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
     `DO $$ BEGIN ALTER TABLE factory_mix_batches ADD CONSTRAINT factory_mix_batches_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
