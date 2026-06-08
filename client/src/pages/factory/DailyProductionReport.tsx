@@ -1188,7 +1188,7 @@ export default function DailyProductionReport() {
             </p>
 
             {/* Row 1 — Workers (combined + collapsible) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Combined: Worker Expected + Transport */}
               <Collapsible open={workerPayrollOpen} onOpenChange={setWorkerPayrollOpen}>
                 <Card data-testid="card-worker-expected-salary">
@@ -1268,40 +1268,42 @@ export default function DailyProductionReport() {
                 </Card>
               </Collapsible>
 
+              {/* Worker Remaining */}
               <Card className="border-amber-300 dark:border-amber-700" data-testid="card-worker-remaining">
-                <CardContent className="py-3 px-4 space-y-3">
-                  {/* KPI 1 — Worker Remaining */}
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Worker Remaining</p>
-                    {workerRemaining !== null ? (
-                      <p
-                        className={
-                          workerRemaining < 0
-                            ? "text-xl font-bold tabular-nums text-blue-600 dark:text-blue-400"
-                            : workerRemaining === 0
-                              ? "text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400"
-                              : "text-xl font-bold tabular-nums text-amber-600 dark:text-amber-400"
-                        }
-                        data-testid="text-worker-remaining"
-                      >
-                        {workerRemaining < 0
-                          ? `Overpaid ${fmtSalary(Math.abs(workerRemaining))}`
-                          : fmtSalary(workerRemaining)}
-                      </p>
-                    ) : (
-                      <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
-                    )}
-                    {ms && (
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {fmtSalary(ms.totalWorkerPaid)} <span className="opacity-60">paid this month</span>
-                      </p>
-                    )}
-                  </div>
+                <CardContent className="py-3 px-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Worker Remaining</p>
+                  {workerRemaining !== null ? (
+                    <p
+                      className={
+                        workerRemaining < 0
+                          ? "text-xl font-bold tabular-nums text-blue-600 dark:text-blue-400"
+                          : workerRemaining === 0
+                            ? "text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400"
+                            : "text-xl font-bold tabular-nums text-amber-600 dark:text-amber-400"
+                      }
+                      data-testid="text-worker-remaining"
+                    >
+                      {workerRemaining < 0
+                        ? `Overpaid ${fmtSalary(Math.abs(workerRemaining))}`
+                        : fmtSalary(workerRemaining)}
+                    </p>
+                  ) : (
+                    <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
+                  )}
+                  {ms && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {fmtSalary(ms.totalWorkerPaid)} <span className="opacity-60">paid this month</span>
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
 
-                  {/* KPI 2 — Combined Total (Workers+Transport + Employee Expected) */}
-                  {workerTotal !== null && empExpected !== null && (
-                    <div className="border-t pt-2.5">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Total Payroll</p>
+              {/* Total Payroll */}
+              <Card data-testid="card-total-payroll">
+                <CardContent className="py-3 px-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Total Payroll</p>
+                  {workerTotal !== null && empExpected !== null ? (
+                    <>
                       <div className="flex items-baseline gap-3 flex-wrap">
                         <p className="text-xl font-bold tabular-nums text-foreground" data-testid="text-combined-total">
                           {fmtSalary(workerTotal + empExpected)}
@@ -1313,7 +1315,14 @@ export default function DailyProductionReport() {
                           </p>
                         )}
                       </div>
-                    </div>
+                      {ms && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {fmtSalary(ms.totalEmployeeMonthlySalary)} <span className="opacity-60">employee monthly</span>
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-xl font-bold tabular-nums text-muted-foreground">—</p>
                   )}
                 </CardContent>
               </Card>
