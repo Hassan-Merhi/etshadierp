@@ -156,6 +156,22 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
   const [selectedDialogRow, setSelectedDialogRow] = useState<number | null>(null);
   const [viewProfitFilter, setViewProfitFilter] = useState<"all" | "gain" | "loss" | "even">("all");
+
+  useEffect(() => {
+    if (!viewDialogOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      const key = e.key.toLowerCase();
+      if (key === "g") { e.preventDefault(); setViewProfitFilter("gain"); }
+      else if (key === "l") { e.preventDefault(); setViewProfitFilter("loss"); }
+      else if (key === "e") { e.preventDefault(); setViewProfitFilter("even"); }
+      else if (key === "a") { e.preventDefault(); setViewProfitFilter("all"); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [viewDialogOpen]);
+
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [voucherToEdit, setVoucherToEdit] = useState<Voucher | null>(null);
   const [editFormInitialized, setEditFormInitialized] = useState(false);
