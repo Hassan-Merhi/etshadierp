@@ -467,8 +467,9 @@ export function registerStatsRoutes(app: Express) {
       // ── Rental Outstanding (Tenant Receivables) ──────────────────────────────
       // For every active rental contract under this company (any module), compute
       // outstanding = SUM(expected for past+current months) - SUM(paid).
-      // Positive → tenants owe us → forUs asset.
-      // Negative → we owe tenants (advance/overpaid) → onUs liability.
+      // Company is the TENANT paying rent to landlords.
+      // paid > expected → we overpaid → prepaid rent asset → forUs
+      // expected > paid → we still owe → rent payable → onUs
       {
         const activeContracts = await db
           .select({ id: propertyContracts.id, currency: propertyContracts.currency })
@@ -496,22 +497,27 @@ export function registerStatsRoutes(app: Express) {
             .where(inArray(propertyMonthlyLedger.contractId, contractIds))
             .groupBy(propertyMonthlyLedger.contractId);
 
-          let tenantReceivables = 0;
+          let prepaidRent = 0;
+          let rentPayable = 0;
           for (const row of ledgerRows) {
-            const net = parseFloat(row.expected) - parseFloat(row.paid);
-            // Only count positive outstanding (tenant owes us).
-            // Negative (tenant prepaid / credit) is already captured as cash in
-            // the main ledger accounts — including it here would double-count.
+            const net = parseFloat(row.paid) - parseFloat(row.expected); // positive = overpaid
             const contract = activeContracts.find(c => c.id === row.contractId);
             const isCfa = contract?.currency === "CFA";
             const usd = isCfa && currentCfaRate > 0 ? net / currentCfaRate : net;
-            if (usd > 0) tenantReceivables += usd;
+            if (usd > 0) prepaidRent += usd;
+            else if (usd < 0) rentPayable += -usd;
           }
-          if (tenantReceivables > 0.005) {
-            const val = round2(tenantReceivables);
+          if (prepaidRent > 0.005) {
+            const val = round2(prepaidRent);
             forUsTotal = round2(forUsTotal + val);
-            categoryTotals["asset_Rental Receivables"] = (categoryTotals["asset_Rental Receivables"] || 0) + val;
-            forUsAccounts.push({ name: "Tenant Rent Outstanding", code: "RENTAL_OUTSTANDING", value: val, category: "Rental Receivables" });
+            categoryTotals["asset_Prepaid Rent"] = (categoryTotals["asset_Prepaid Rent"] || 0) + val;
+            forUsAccounts.push({ name: "Prepaid Rent", code: "PREPAID_RENT", value: val, category: "Prepaid Rent" });
+          }
+          if (rentPayable > 0.005) {
+            const val = round2(rentPayable);
+            onUsTotal = round2(onUsTotal + val);
+            categoryTotals["liability_Rent Payable"] = (categoryTotals["liability_Rent Payable"] || 0) + val;
+            onUsAccounts.push({ name: "Rent Payable", code: "RENT_PAYABLE", value: val, category: "Rent Payable" });
           }
         }
       }

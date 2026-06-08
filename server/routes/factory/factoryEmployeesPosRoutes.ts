@@ -3411,11 +3411,11 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const totalCustomerDr = round2(customerDrItems.reduce((s, c) => s + c.balanceUsd, 0));
       const totalCustomerCr = round2(customerCrItems.reduce((s, c) => s + Math.abs(c.balanceUsd), 0));
 
-      // ── Rental Outstanding (Tenant Receivables / Advances) ───────────────────
-      // Query all active rental contracts for this factory company (any module).
-      // Positive net (expected > paid) → tenant owes us → asset.
-      // Negative net (paid > expected) → tenant prepaid → liability.
-      let tenantReceivables = 0;
+      // ── Rental (company is the TENANT paying rent) ───────────────────────────
+      // paid > expected → we overpaid our landlord → prepaid rent asset → For Us
+      // expected > paid → we still owe the landlord → rent payable → On Us
+      let prepaidRent = 0;
+      let rentPayable = 0;
       {
         const activeContracts = await db
           .select({ id: propertyContracts.id })
@@ -3443,26 +3443,25 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
             .where(inArray(propertyMonthlyLedger.contractId, contractIds))
             .groupBy(propertyMonthlyLedger.contractId);
           for (const row of ledgerRows) {
-            const net = parseFloat(row.expected) - parseFloat(row.paid);
-            // Only count positive outstanding (tenant owes us).
-            // Negative (tenant prepaid / credit) is already captured as cash in
-            // the main ledger accounts — including it here would double-count.
-            if (net > 0) tenantReceivables += net;
+            const net = parseFloat(row.paid) - parseFloat(row.expected); // positive = overpaid
+            if (net > 0) prepaidRent += net;      // we overpaid → asset
+            else if (net < 0) rentPayable += -net; // we underpaid → liability
           }
-          tenantReceivables = round2(tenantReceivables);
+          prepaidRent  = round2(prepaidRent);
+          rentPayable  = round2(rentPayable);
         }
       }
 
       // forUsTotal: ledger assets + inventory + raw material + balance on table + stock OTW
       //             + customer receivables (DR) + pending orders + verified orders + loading orders
       //             + overpaid suppliers (they owe us the overpayment back)
-      //             + tenant rent outstanding (receivable)
+      //             + prepaidRent (we overpaid our landlord → asset)
       //             (bales are reserved/excluded from baleInventoryValue — no double-count)
       const totalSupplierOverpaymentsRounded = round2(totalSupplierOverpayments);
       const forUsTotal = round2(
         cleanLedgerForUsTotal + baleInventoryValue + rawMaterialStockValue + balanceOnTableValue +
         stockOtwValue + totalCustomerDr + pendingTotal + verifiedTotal + loadingTotal +
-        totalSupplierOverpaymentsRounded + tenantReceivables,
+        totalSupplierOverpaymentsRounded + prepaidRent,
       );
       // ── Employee Salaries Payable — directly from employees.currentBalance ───────
       // Employee balances are tracked via employees.currentBalance (not through a
@@ -3483,8 +3482,8 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       }
       employeeSalariesPayable = round2(employeeSalariesPayable);
 
-      // onUsTotal: ledger liabilities + supplier balances + customer credit balances (CR) + employee salaries
-      const onUsTotal = round2(ledgerOnUsTotal + totalSupplierLiabilities + totalCustomerCr + employeeSalariesPayable);
+      // onUsTotal: ledger liabilities + supplier balances + customer credit balances (CR) + employee salaries + rent payable
+      const onUsTotal = round2(ledgerOnUsTotal + totalSupplierLiabilities + totalCustomerCr + employeeSalariesPayable + rentPayable);
       const netPosition = round2(forUsTotal - onUsTotal);
 
       // Inject factory-specific lines explicitly (always present so the UI
@@ -3511,7 +3510,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         ...(pendingTotal > 0 ? [{ name: "Pending Orders", code: "PENDING_ORDERS", value: pendingTotal, category: "Pending Orders" }] : []),
         ...(verifiedTotal > 0 ? [{ name: "Verified Orders", code: "VERIFIED_ORDERS", value: verifiedTotal, category: "Verified Orders" }] : []),
         ...(loadingTotal > 0 ? [{ name: "Loading Orders", code: "LOADING_ORDERS", value: loadingTotal, category: "Loading Orders" }] : []),
-        ...(tenantReceivables > 0 ? [{ name: "Tenant Rent Outstanding", code: "RENTAL_OUTSTANDING", value: tenantReceivables, category: "Rental Receivables" }] : []),
+        ...(prepaidRent > 0 ? [{ name: "Prepaid Rent", code: "PREPAID_RENT", value: prepaidRent, category: "Prepaid Rent" }] : []),
       ];
 
       // Group ledger on-us by category
@@ -3530,6 +3529,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         ...customerCrItems
           .sort((a, b) => Math.abs(b.balanceUsd) - Math.abs(a.balanceUsd))
           .map(c => ({ ...(c.ledgerAccountId ? { id: c.ledgerAccountId } : {}), name: c.name, code: "CUSTOMER_CR", value: round2(Math.abs(c.balanceUsd)), category: "Customer" })),
+        ...(rentPayable > 0 ? [{ name: "Rent Payable", code: "RENT_PAYABLE", value: rentPayable, category: "Rent Payable" }] : []),
       ];
 
       const forUsBreakdown = Object.entries(
@@ -3549,6 +3549,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           .map(([name, value]) => ({ name, value: round2(value) }))
           .sort((a, b) => b.value - a.value),
         ...(totalCustomerCr > 0 ? [{ name: "Customer", value: totalCustomerCr }] : []),
+        ...(rentPayable > 0 ? [{ name: "Rent Payable", value: rentPayable }] : []),
       ];
 
       res.json({
