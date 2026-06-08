@@ -3626,6 +3626,7 @@ export const factoryFxRates = pgTable("factory_fx_rates", {
   currencyCode: varchar("currency_code", { length: 10 }).notNull(),
   rateToUsd: decimal("rate_to_usd", { precision: 20, scale: 8 }).notNull(),
   effectiveDate: date("effective_date").notNull(),
+  source: varchar("source", { length: 10 }).notNull().default("auto"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   companyDateIdx: index("factory_fx_rates_company_date_idx").on(t.companyId, t.effectiveDate),

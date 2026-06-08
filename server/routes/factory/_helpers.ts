@@ -99,6 +99,7 @@ export async function getOrFetchFxRateToUsd(companyId: number, currencyCode: str
       currencyCode: currencyCode.toUpperCase(),
       rateToUsd: rateStr,
       effectiveDate: dateISO,
+      source: "auto",
     });
 
     return rateStr;

@@ -2757,7 +2757,11 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { currencyCode } = req.query;
-      const conditions: any[] = [eq(factoryFxRates.companyId, companyId)];
+      // Only return manually-set rates in the UI list (auto rows are internal cache only)
+      const conditions: any[] = [
+        eq(factoryFxRates.companyId, companyId),
+        eq(factoryFxRates.source, "manual"),
+      ];
       if (currencyCode) conditions.push(eq(factoryFxRates.currencyCode, currencyCode as string));
       const results = await db.select().from(factoryFxRates).where(and(...conditions)).orderBy(desc(factoryFxRates.effectiveDate));
       res.json(results);
@@ -2811,7 +2815,13 @@ export function registerFactoryBalesRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const parsed = insertFactoryFxRateSchema.parse({ ...req.body, companyId });
+      const today = getClientDate(req);
+      const parsed = insertFactoryFxRateSchema.parse({
+        effectiveDate: today,
+        ...req.body,
+        companyId,
+        source: "manual",
+      });
       const [rate] = await db.insert(factoryFxRates).values(parsed).returning();
       res.json(rate);
     } catch (error: any) {
@@ -2819,15 +2829,18 @@ export function registerFactoryBalesRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/fx-rates/:id", requireAuth, async (req: any, res: any) => {
+  // DELETE by currency code — removes all manual rows for that currency
+  app.delete("/api/factory/fx-rates/:currency", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const [deleted] = await db.delete(factoryFxRates)
-        .where(and(eq(factoryFxRates.id, parseId(req.params.id) ?? -1), eq(factoryFxRates.companyId, companyId)))
-        .returning();
-      if (!deleted) return res.status(404).json({ message: "Rate not found" });
-      res.json(deleted);
+      const currency = req.params.currency.toUpperCase();
+      await db.delete(factoryFxRates).where(and(
+        eq(factoryFxRates.companyId, companyId),
+        eq(factoryFxRates.currencyCode, currency),
+        eq(factoryFxRates.source, "manual"),
+      ));
+      res.json({ ok: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
