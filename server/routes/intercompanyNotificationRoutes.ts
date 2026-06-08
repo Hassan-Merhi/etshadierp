@@ -454,7 +454,7 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       if (isNaN(requestId)) return res.status(400).json({ message: "Invalid ID" });
 
       const userId = req.session.userId!;
-      const { destLedgerAccountId } = req.body;
+      const { destLedgerAccountId, description: customDescription } = req.body;
       if (!destLedgerAccountId) return res.status(400).json({ message: "Please select an account" });
 
       // Pre-flight: load request, recipient membership, link, and account ownership
@@ -500,13 +500,24 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
 
       // ── Validate that the chosen debit account belongs to the destination company ──
       const [chosenAccount] = await db
-        .select({ id: ledgerAccounts.id, companyId: ledgerAccounts.companyId })
+        .select({ id: ledgerAccounts.id, name: ledgerAccounts.name, companyId: ledgerAccounts.companyId })
         .from(ledgerAccounts)
         .where(eq(ledgerAccounts.id, destLedgerAccountId));
       if (!chosenAccount) return res.status(400).json({ message: "Selected account not found" });
       if (chosenAccount.companyId !== link.destCompanyId) {
         return res.status(400).json({ message: "Selected account does not belong to the destination company" });
       }
+
+      // Resolve the CR (IC) account name for the auto-description
+      const [crAccount] = await db
+        .select({ name: ledgerAccounts.name })
+        .from(ledgerAccounts)
+        .where(eq(ledgerAccounts.id, link.destLedgerAccountId));
+
+      // Use provided description or fall back to "Received from [CR] into [DR]"
+      const resolvedDescription = (customDescription && customDescription.trim())
+        ? customDescription.trim()
+        : `Received from ${crAccount?.name ?? "IC account"} into ${chosenAccount.name}`;
 
       const destCompanyId = link.destCompanyId;
       const voucherNumber = `IC-RCPT-${Date.now()}`;
@@ -545,7 +556,7 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
           voucherNumber,
           voucherType: "Receipt",
           voucherDate: request.fromVoucherDate,
-          description: `Intercompany receipt from ${request.fromCompanyId} - ${request.fromVoucherNumber}`,
+          description: resolvedDescription,
           totalAmount: request.amount,
           optional: false,
           sourceModule: "ERP",
@@ -557,14 +568,14 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
             ledgerAccountId: destLedgerAccountId,
             debitAmount: request.amount,
             creditAmount: "0",
-            narration: `Intercompany receipt - ${request.fromVoucherNumber}`,
+            narration: resolvedDescription,
           },
           {
             voucherId: createdVoucher.id,
             ledgerAccountId: link.destLedgerAccountId,
             debitAmount: "0",
             creditAmount: request.amount,
-            narration: `Intercompany - ${request.fromVoucherNumber}`,
+            narration: resolvedDescription,
           },
         ]);
 

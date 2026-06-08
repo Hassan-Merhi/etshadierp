@@ -66,6 +66,7 @@ export default function IntercompanyRequests() {
   const [approveDialogRequest, setApproveDialogRequest] = useState<ICRequest | null>(null);
   const [dismissDialogRequest, setDismissDialogRequest] = useState<ICRequest | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
+  const [approveDescription, setApproveDescription] = useState<string>("");
   const [dismissNote, setDismissNote] = useState("");
 
   const { data: requests = [], isLoading } = useQuery<ICRequest[]>({
@@ -90,8 +91,8 @@ export default function IntercompanyRequests() {
   });
 
   const approveMutation = useMutation({
-    mutationFn: async ({ id, destLedgerAccountId }: { id: number; destLedgerAccountId: number }) => {
-      return apiRequest("POST", `/api/intercompany-requests/${id}/approve`, { destLedgerAccountId });
+    mutationFn: async ({ id, destLedgerAccountId, description }: { id: number; destLedgerAccountId: number; description?: string }) => {
+      return apiRequest("POST", `/api/intercompany-requests/${id}/approve`, { destLedgerAccountId, description: description || undefined });
     },
     onSuccess: (data: any) => {
       toast({ title: "Approved", description: `Mirror voucher ${data.voucherNumber} created in destination company.` });
@@ -99,6 +100,7 @@ export default function IntercompanyRequests() {
       queryClient.invalidateQueries({ queryKey: ["/api/intercompany-requests/pending-count"] });
       setApproveDialogRequest(null);
       setSelectedAccountId("");
+      setApproveDescription("");
     },
     onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
@@ -119,7 +121,11 @@ export default function IntercompanyRequests() {
 
   function handleApprove() {
     if (!approveDialogRequest || !selectedAccountId) return;
-    approveMutation.mutate({ id: approveDialogRequest.id, destLedgerAccountId: parseInt(selectedAccountId) });
+    approveMutation.mutate({
+      id: approveDialogRequest.id,
+      destLedgerAccountId: parseInt(selectedAccountId),
+      description: approveDescription.trim() || undefined,
+    });
   }
 
   function handleDismiss() {
@@ -220,7 +226,7 @@ export default function IntercompanyRequests() {
                   <div className="mt-3 flex gap-2">
                     <Button
                       size="sm"
-                      onClick={() => { setApproveDialogRequest(req); setSelectedAccountId(""); }}
+                      onClick={() => { setApproveDialogRequest(req); setSelectedAccountId(""); setApproveDescription(""); }}
                       data-testid={`button-approve-${req.id}`}
                     >
                       <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
@@ -244,7 +250,7 @@ export default function IntercompanyRequests() {
       )}
 
       {/* Approve Dialog */}
-      <Dialog open={!!approveDialogRequest} onOpenChange={open => { if (!open) setApproveDialogRequest(null); }}>
+      <Dialog open={!!approveDialogRequest} onOpenChange={open => { if (!open) { setApproveDialogRequest(null); setApproveDescription(""); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Approve Payment Request</DialogTitle>
@@ -270,6 +276,24 @@ export default function IntercompanyRequests() {
                       ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="approve-description">Description <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Textarea
+                  id="approve-description"
+                  rows={2}
+                  placeholder={(() => {
+                    const drName = selectedAccountId
+                      ? (destAccounts.find(a => a.id === parseInt(selectedAccountId))?.name ?? "selected account")
+                      : "selected account";
+                    return `Received from ${approveDialogRequest.linkDestLedgerName} into ${drName}`;
+                  })()}
+                  value={approveDescription}
+                  onChange={e => setApproveDescription(e.target.value)}
+                  data-testid="input-approve-description"
+                  className="resize-none text-sm"
+                />
+                <p className="text-xs text-muted-foreground">Leave blank to use the placeholder text automatically.</p>
               </div>
               <p className="text-xs text-muted-foreground">
                 A Receipt voucher will be created in <strong>{approveDialogRequest.destCompanyName}</strong>:
