@@ -47,307 +47,167 @@ export function registerImportCycleRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      // Helper function to calculate account balance by account type
-      const getAccountTypeBalance = async (accountType: string, isLiability: boolean = false) => {
-        const accounts = await db
-          .select()
-          .from(ledgerAccounts)
-          .where(
-            and(
-              eq(ledgerAccounts.companyId, companyId),
-              eq(ledgerAccounts.accountType, accountType),
-              isNull(ledgerAccounts.deletedAt)
-            )
-          );
-
-        let totalBalance = 0;
-        for (const account of accounts) {
-          const entries = await db
-            .select({
-              creditAmount: voucherEntries.creditAmount,
-              debitAmount: voucherEntries.debitAmount,
-            })
-            .from(voucherEntries)
-            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-            .where(
-              and(
-                eq(voucherEntries.ledgerAccountId, account.id),
-                eq(vouchers.companyId, companyId),
-                isNull(vouchers.deletedAt),
-                eq(vouchers.optional, false)
-              )
-            );
-
-          // Fix: Properly sign opening balance based on openingBalanceSide
-          const openingBalanceRaw = parseFloat(account.openingBalance || "0");
-          const openingSide = account.openingBalanceSide || "Dr";
-          let signedOpening: number;
-          if (isLiability) {
-            // Liability/Income accounts: Cr opening = positive, Dr opening = negative
-            signedOpening = openingSide === "Cr" ? openingBalanceRaw : -openingBalanceRaw;
-          } else {
-            // Asset/Expense accounts: Dr opening = positive, Cr opening = negative
-            signedOpening = openingSide === "Dr" ? openingBalanceRaw : -openingBalanceRaw;
-          }
-          
-          const balance = entries.reduce((sum, entry) => {
-            const credit = parseFloat(entry.creditAmount || "0");
-            const debit = parseFloat(entry.debitAmount || "0");
-            
-            if (isLiability) {
-              // Liability accounts: Credits increase (positive), Debits decrease (negative)
-              return sum + credit - debit;
-            } else {
-              // Asset/Expense accounts: Debits increase (positive), Credits decrease (negative)
-              return sum + debit - credit;
-            }
-          }, signedOpening);
-          
-          totalBalance += balance;
-        }
-        return totalBalance;
-      };
-
-      // Helper: transaction-only balance (no opening balances) for an account type
-      // isLiability=true → returns Cr - Dr (positive = net credit/liability)
-      const getTransactionOnlyBalance = async (accountType: string, isLiability: boolean = true) => {
-        const result = await db
-          .select({
-            totalCredit: sql<string>`COALESCE(SUM(CAST(${voucherEntries.creditAmount} AS DECIMAL)), 0)`,
-            totalDebit: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS DECIMAL)), 0)`,
-          })
-          .from(voucherEntries)
-          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-          .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
-          .where(
-            and(
-              eq(ledgerAccounts.companyId, companyId),
-              eq(ledgerAccounts.accountType, accountType),
-              isNull(ledgerAccounts.deletedAt),
-              eq(vouchers.companyId, companyId),
-              isNull(vouchers.deletedAt),
-              eq(vouchers.optional, false)
-            )
-          );
-        const totalCredit = parseFloat(result[0]?.totalCredit || "0");
-        const totalDebit = parseFloat(result[0]?.totalDebit || "0");
-        return isLiability ? totalCredit - totalDebit : totalDebit - totalCredit;
-      };
-
-      // 1. Supplier Balance - calculated from voucher entries + opening balances
-      // Credits to suppliers increase what we owe (liability), debits decrease it
-      const supplierEntries = await db
+      // ── Single-pass voucher entry scan (same approach as /api/stats/net-profit)
+      // Builds accountBalances + supplierBalancesMap in one query so all component
+      // values are derived from identical data as the Net Position page.
+      const companyEntries = await db
         .select({
-          supplierId: voucherEntries.supplierId,
-          creditAmount: voucherEntries.creditAmount,
-          debitAmount: voucherEntries.debitAmount,
+          ledgerAccountId: voucherEntries.ledgerAccountId,
+          supplierId:      voucherEntries.supplierId,
+          employeeId:      voucherEntries.employeeId,
+          debitAmount:     voucherEntries.debitAmount,
+          creditAmount:    voucherEntries.creditAmount,
         })
         .from(voucherEntries)
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-        .where(
-          and(
-            isNotNull(voucherEntries.supplierId),
-            eq(vouchers.companyId, companyId),
-            isNull(vouchers.deletedAt),
-            eq(vouchers.optional, false)
-          )
-        );
-      
-      // Include supplier opening balances only for the primary (parent) company.
-      // Sub-companies start from zero — they must not inherit the parent's historical debt.
-      const allCompaniesNP = await storage.getAllCompanies();
-      const primaryCompanyIdNP = allCompaniesNP.length > 0
-        ? Math.min(...allCompaniesNP.map((c: any) => c.id))
-        : null;
-      const isParentContextNP = companyId === primaryCompanyIdNP;
+        .where(and(
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.optional, false),
+          isNull(vouchers.deletedAt),
+        ))
+        .execute();
 
-      let supplierOpeningTotal = 0;
-      if (isParentContextNP) {
-        const allSuppliersNP = await storage.getAllSuppliers();
-        const supplierIdsWithActivity = new Set(supplierEntries.map(e => e.supplierId).filter(Boolean));
-        const companyContainers = await db.select({ supplierId: containers.supplierId }).from(containers).where(eq(containers.companyId, companyId));
-        for (const c of companyContainers) {
-          if (c.supplierId) supplierIdsWithActivity.add(c.supplierId);
+      const accountBalances = new Map<number, { debit: number; credit: number }>();
+      const supplierBalancesMap = new Map<number, { debit: number; credit: number }>();
+
+      for (const entry of companyEntries) {
+        if (entry.ledgerAccountId) {
+          const d = parseFloat(entry.debitAmount || "0");
+          const c = parseFloat(entry.creditAmount || "0");
+          const cur = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
+          accountBalances.set(entry.ledgerAccountId, { debit: cur.debit + d, credit: cur.credit + c });
         }
-        supplierOpeningTotal = allSuppliersNP
-          .filter(s => supplierIdsWithActivity.has(s.id))
-          .reduce((sum, s) => sum + parseFloat(s.openingBalance || "0"), 0);
+        if (entry.supplierId) {
+          const d = parseFloat(entry.debitAmount || "0");
+          const c = parseFloat(entry.creditAmount || "0");
+          const cur = supplierBalancesMap.get(entry.supplierId) || { debit: 0, credit: 0 };
+          // Pure-credit or pure-debit only — avoids FX settlement double-counting
+          // (identical filter to /api/stats/net-profit)
+          if (c > 0 && d === 0) {
+            supplierBalancesMap.set(entry.supplierId, { debit: cur.debit, credit: cur.credit + c });
+          } else if (d > 0 && c === 0) {
+            supplierBalancesMap.set(entry.supplierId, { debit: cur.debit + d, credit: cur.credit });
+          }
+        }
       }
 
-      // Supplier is a liability: Credits increase (we owe more), Debits decrease (we paid)
-      const supplierBalance = supplierEntries.reduce((sum, entry) => {
-        const credit = parseFloat(entry.creditAmount || "0");
-        const debit = parseFloat(entry.debitAmount || "0");
-        return sum + credit - debit;
-      }, supplierOpeningTotal);
+      // All ledger accounts (including hidden) — same flag as net-profit route
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
 
-      // 2. Stock OTW (containers with OTW status - asset, shows as positive/debit)
+      // Signed net balance for a single account (mirrors getAccountNetBalance from netPositionHelper)
+      const nb = (acc: (typeof companyAccounts)[0]) =>
+        getAccountNetBalance(acc, accountBalances);
+
+      // Sum net balances for accounts matching the given type(s)
+      const sumNB = (types: string[]) =>
+        companyAccounts
+          .filter((a) => types.includes(a.accountType || ""))
+          .reduce((s, a) => s + nb(a), 0);
+
+      // 1. Supplier Balance — same pure-debit/credit logic as /api/stats/net-profit
+      const parentCompanyId = await storage.getParentCompanyId();
+      const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
+
+      let supplierLiabilities = 0;
+      let supplierAssets = 0;
+      if (shouldIncludeSuppliers) {
+        const allSuppliers = await db.select().from(suppliers).where(isNull(suppliers.deletedAt)).execute();
+        for (const sup of allSuppliers) {
+          const bal = supplierBalancesMap.get(sup.id);
+          if (!bal) continue;
+          const opening = parseFloat(sup.openingBalance || "0");
+          const netBalance = opening + bal.credit - bal.debit;
+          if (netBalance > 0) supplierLiabilities += netBalance;
+          else if (netBalance < 0) supplierAssets += Math.abs(netBalance);
+        }
+      }
+      const supplierBalance = supplierLiabilities - supplierAssets;
+
+      // 2. Stock OTW (containers with OTW status — asset)
       const otwContainers = await db
         .select()
         .from(containers)
-        .where(
-          and(
-            eq(containers.companyId, companyId),
-            eq(containers.status, "OTW")
-          )
-        );
-      const stockOtwValue = otwContainers.reduce((sum, container) => {
-        return sum + parseFloat(container.grandTotal || "0");
+        .where(and(eq(containers.companyId, companyId), eq(containers.status, "OTW")));
+      const stockOtwValue = otwContainers.reduce((sum, c) => {
+        const gTotal = parseFloat(c.grandTotal ?? "0");
+        return sum + (gTotal || parseFloat(c.itemsTotal ?? "0"));
       }, 0);
 
-      // 3. Duty Agent Loan accounts (liability)
-      const dutyAgentBalance = await getAccountTypeBalance("Duty Agent", true);
+      // 3-5. Duty Agent / Transporter Agent / Loans
+      // NOTE: account type is "Loan" (singular) — matches netPositionHelper constants and DB values
+      const dutyAgentBalance        = Math.max(0, -sumNB(["Duty Agent"]));
+      const transporterAgentBalance = Math.max(0, -sumNB(["Transporter Agent"]));
+      const loansBalance            = Math.max(0, -sumNB(["Loan"]));
 
-      // 4. Transporter Agent Loan accounts (liability)
-      const transporterAgentBalance = await getAccountTypeBalance("Transporter Agent", true);
+      // 6. Cash (asset — positive debit balance)
+      const cashBalance = Math.max(0, sumNB(["Cash"]));
 
-      // 5. Loans accounts (liability)
-      const loansBalance = await getAccountTypeBalance("Loans", true);
+      // 7. Bank — ledger "Bank" accounts + standalone bank accounts (no linked ledger)
+      const ledgerBankBalance = Math.max(0, sumNB(["Bank"]));
 
-      // 6. Cash accounts (asset)
-      const cashBalance = await getAccountTypeBalance("Cash", false);
-
-      // 7. Bank accounts (asset)
-      // Part 1: Ledger accounts with type "Bank" (includes linked bank accounts)
-      const ledgerBankBalance = await getAccountTypeBalance("Bank", false);
-      
-      // Part 2: Bank accounts from bankAccounts table WITHOUT linked ledger accounts
-      // These are standalone bank accounts that track entries via bankAccountId only
-      // IMPORTANT: Only include entries where ledgerAccountId is NULL to avoid double-counting
+      // Standalone bank accounts: entries where ledgerAccountId IS NULL and bank has no linkedLedgerId
       const standaloneBankAccountEntries = await db
         .select({
           bankAccountId: voucherEntries.bankAccountId,
-          creditAmount: voucherEntries.creditAmount,
-          debitAmount: voucherEntries.debitAmount,
+          creditAmount:  voucherEntries.creditAmount,
+          debitAmount:   voucherEntries.debitAmount,
         })
         .from(voucherEntries)
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
         .innerJoin(bankAccounts, eq(voucherEntries.bankAccountId, bankAccounts.id))
-        .where(
-          and(
-            isNotNull(voucherEntries.bankAccountId),
-            isNull(voucherEntries.ledgerAccountId), // Only entries that don't also hit a ledger account
-            isNull(bankAccounts.linkedLedgerId), // Only standalone bank accounts
-            eq(bankAccounts.companyId, companyId),
-            isNull(bankAccounts.deletedAt),
-            eq(vouchers.companyId, companyId),
-            isNull(vouchers.deletedAt),
-            eq(vouchers.optional, false)
-          )
-        );
-      
-      // Get opening balances only from bank accounts NOT linked to a ledger account
+        .where(and(
+          isNotNull(voucherEntries.bankAccountId),
+          isNull(voucherEntries.ledgerAccountId),
+          isNull(bankAccounts.linkedLedgerId),
+          eq(bankAccounts.companyId, companyId),
+          isNull(bankAccounts.deletedAt),
+          eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
+          eq(vouchers.optional, false),
+        ));
+
       const standaloneBankAccounts = await db
         .select()
         .from(bankAccounts)
-        .where(
-          and(
-            eq(bankAccounts.companyId, companyId),
-            isNull(bankAccounts.deletedAt),
-            isNull(bankAccounts.linkedLedgerId) // Only standalone bank accounts
-          )
-        );
-      
-      // Calculate opening balance total for standalone bank accounts only
+        .where(and(
+          eq(bankAccounts.companyId, companyId),
+          isNull(bankAccounts.deletedAt),
+          isNull(bankAccounts.linkedLedgerId),
+        ));
+
       const standaloneBankOpeningBalance = standaloneBankAccounts.reduce((sum, account) => {
-        const openingBalanceRaw = parseFloat(account.openingBalance || "0");
-        const openingSide = account.openingBalanceSide || "Dr";
-        return sum + (openingSide === "Dr" ? openingBalanceRaw : -openingBalanceRaw);
+        const raw  = parseFloat(account.openingBalance || "0");
+        const side = account.openingBalanceSide || "Dr";
+        return sum + (side === "Dr" ? raw : -raw);
       }, 0);
-      
-      // Bank accounts are assets: Debits increase (positive), Credits decrease (negative)
       const standaloneBankVoucherBalance = standaloneBankAccountEntries.reduce((sum, entry) => {
-        const credit = parseFloat(entry.creditAmount || "0");
-        const debit = parseFloat(entry.debitAmount || "0");
-        return sum + debit - credit;
+        return sum + parseFloat(entry.debitAmount || "0") - parseFloat(entry.creditAmount || "0");
       }, 0);
-      
-      // Total bank balance = ledger bank accounts + standalone bank account entries
       const bankBalance = ledgerBankBalance + standaloneBankOpeningBalance + standaloneBankVoucherBalance;
 
-      // 8. Import Charges (only accounts under IMPORT_CHARGES parent - for import cycle tracking)
-      // This is more specific than "Direct Expense" to avoid including unrelated expenses
-      const getImportChargesBalance = async () => {
-        // First find the IMPORT_CHARGES parent account
-        const [importChargesParent] = await db
-          .select()
-          .from(ledgerAccounts)
-          .where(
-            and(
-              eq(ledgerAccounts.companyId, companyId),
-              eq(ledgerAccounts.code, "IMPORT_CHARGES"),
-              isNull(ledgerAccounts.deletedAt)
-            )
-          )
-          .limit(1);
-        
-        if (!importChargesParent) {
-          return 0; // No import charges yet
+      // 8. Import Charges (directExpenseBalance) — accounts under IMPORT_CHARGES parent
+      // Uses already-loaded companyAccounts + accountBalances map (no extra DB query)
+      const importChargesParentAcc = companyAccounts.find((a) => a.code === "IMPORT_CHARGES");
+      let directExpenseBalance = 0;
+      if (importChargesParentAcc) {
+        const importChargeIds = new Set([
+          importChargesParentAcc.id,
+          ...companyAccounts
+            .filter((a) => a.parentId === importChargesParentAcc.id)
+            .map((a) => a.id),
+        ]);
+        for (const acc of companyAccounts) {
+          if (importChargeIds.has(acc.id)) {
+            directExpenseBalance += Math.max(0, nb(acc));
+          }
         }
-        
-        // Get all accounts under IMPORT_CHARGES parent (including the parent itself)
-        const importChargeAccounts = await db
-          .select()
-          .from(ledgerAccounts)
-          .where(
-            and(
-              eq(ledgerAccounts.companyId, companyId),
-              or(
-                eq(ledgerAccounts.id, importChargesParent.id),
-                eq(ledgerAccounts.parentId, importChargesParent.id)
-              ),
-              isNull(ledgerAccounts.deletedAt)
-            )
-          );
-        
-        if (importChargeAccounts.length === 0) {
-          return 0;
-        }
-        
-        const accountIds = importChargeAccounts.map(a => a.id);
-        
-        // Get opening balances
-        let totalBalance = importChargeAccounts.reduce((sum, account) => {
-          const openingBalanceRaw = parseFloat(account.openingBalance || "0");
-          const openingSide = account.openingBalanceSide || "Dr";
-          // Expense accounts: Dr opening = positive
-          return sum + (openingSide === "Dr" ? openingBalanceRaw : -openingBalanceRaw);
-        }, 0);
-        
-        // Get all voucher entries for these accounts
-        const entries = await db
-          .select({
-            creditAmount: voucherEntries.creditAmount,
-            debitAmount: voucherEntries.debitAmount,
-          })
-          .from(voucherEntries)
-          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-          .where(
-            and(
-              inArray(voucherEntries.ledgerAccountId, accountIds),
-              eq(vouchers.companyId, companyId),
-              isNull(vouchers.deletedAt),
-              eq(vouchers.optional, false)
-            )
-          );
-        
-        // Expense accounts: Debits increase (positive), Credits decrease (negative)
-        totalBalance += entries.reduce((sum, entry) => {
-          const credit = parseFloat(entry.creditAmount || "0");
-          const debit = parseFloat(entry.debitAmount || "0");
-          return sum + debit - credit;
-        }, 0);
-        
-        return totalBalance;
-      };
-      
-      const directExpenseBalance = await getImportChargesBalance();
+      }
 
-      // 9. Indirect Expense accounts (expense)
-      const indirectExpenseBalance = await getAccountTypeBalance("Indirect Expense", false);
+      // 9. Indirect Expense
+      const indirectExpenseBalance = Math.max(0, sumNB(["Indirect Expense"]));
 
-      // 10. Income accounts (revenue - offsets cash from sales)
-      const incomeBalance = await getAccountTypeBalance("Income", true);
+      // 10. Income (credit balance = liability / revenue received)
+      const incomeBalance = Math.max(0, -sumNB(["Income"]));
 
       // 11. Stock Value on Floor (inventory in locations)
       // Only include inventory at valid, non-deleted locations (excludes orphaned inventory)
@@ -457,60 +317,10 @@ export function registerImportCycleRoutes(app: Express) {
         return sum;
       }, 0);
 
-      // 13. Payroll Expenses - get from Expense accounts related to salaries
-      // Uses a single optimized query with aggregation instead of N+1 pattern
-      const payrollExpenseAccounts = await db
-        .select({
-          id: ledgerAccounts.id,
-          openingBalance: ledgerAccounts.openingBalance,
-        })
-        .from(ledgerAccounts)
-        .where(
-          and(
-            eq(ledgerAccounts.companyId, companyId),
-            eq(ledgerAccounts.accountType, "Expense"),
-            sql`(${ledgerAccounts.name} ILIKE '%salary%' OR ${ledgerAccounts.name} ILIKE '%payroll%' OR ${ledgerAccounts.name} ILIKE '%wage%')`,
-            isNull(ledgerAccounts.deletedAt)
-          )
-        );
-
-      let payrollExpenseBalance = 0;
-      if (payrollExpenseAccounts.length > 0) {
-        const payrollAccountIds = payrollExpenseAccounts.map(a => a.id);
-        
-        // Get all entries for payroll accounts in a single query
-        const payrollEntries = await db
-          .select({
-            ledgerAccountId: voucherEntries.ledgerAccountId,
-            creditAmount: voucherEntries.creditAmount,
-            debitAmount: voucherEntries.debitAmount,
-          })
-          .from(voucherEntries)
-          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-          .where(
-            and(
-              inArray(voucherEntries.ledgerAccountId, payrollAccountIds),
-              eq(vouchers.companyId, companyId),
-              isNull(vouchers.deletedAt),
-              eq(vouchers.optional, false)
-            )
-          );
-
-        // Calculate opening balances
-        const openingTotal = payrollExpenseAccounts.reduce((sum, acc) => {
-          return sum + parseFloat(acc.openingBalance || "0");
-        }, 0);
-
-        // Calculate transaction balance
-        const transactionBalance = payrollEntries.reduce((sum, entry) => {
-          const credit = parseFloat(entry.creditAmount || "0");
-          const debit = parseFloat(entry.debitAmount || "0");
-          // Expense accounts: Debits increase (positive), Credits decrease (negative)
-          return sum + debit - credit;
-        }, 0);
-
-        payrollExpenseBalance = openingTotal + transactionBalance;
-      }
+      // 13. Payroll Expenses (Expense accounts named salary / payroll / wage)
+      const payrollExpenseBalance = companyAccounts
+        .filter((a) => a.accountType === "Expense" && /salary|payroll|wage/i.test(a.name || ""))
+        .reduce((s, a) => s + Math.max(0, nb(a)), 0);
 
       // 14. Salary Advances - outstanding advances given to employees (asset - recoverable)
       const advancesData = await db
@@ -549,57 +359,52 @@ export function registerImportCycleRoutes(app: Express) {
         return sum + (balance > 0 ? balance : 0);
       }, 0);
 
-      // 16. Asset accounts (properties, guarantees, receivables - asset/debit side)
-      const assetBalance = await getAccountTypeBalance("Asset", false);
+      // 16. Asset accounts (properties, guarantees, receivables — debit side)
+      const assetBalance = Math.max(0, sumNB(["Asset", "Current Asset"]));
 
-      // 17. General Expense accounts (Purchases, Duties, Transport - expense/debit side)
-      // This is different from payrollExpenseBalance which only includes salary-related expenses
-      const generalExpenseBalance = await getAccountTypeBalance("Expense", false);
+      // 17. General Expense (Purchases — excluded from formula to avoid double-counting stockOnFloor)
+      const generalExpenseBalance = Math.max(0, sumNB(["Expense"]));
 
-      // 18. Government Taxes accounts (expense/debit side)
-      const governmentTaxesBalance = await getAccountTypeBalance("Government Taxes", false);
+      // 18. Government Taxes
+      const governmentTaxesBalance = Math.max(0, sumNB(["Government Taxes"]));
 
-      // 19. Liability accounts (non-payroll liabilities - credit side)
-      const liabilityBalance = await getAccountTypeBalance("Liability", true);
+      // 19. Liability accounts
+      const liabilityBalance = Math.max(0, -sumNB(["Liability"]));
 
-      // 20. Profit/Equity accounts (retained earnings - credit side)
-      const profitBalance = await getAccountTypeBalance("Profit", true);
+      // 20. Profit / Retained Earnings (credit balance = liability)
+      const profitBalance = Math.max(0, -sumNB(["Profit"]));
 
-      // 20a. Equity account transactions (e.g. capital injections DR Cash CR Equity)
-      // Opening balances for Equity are already handled by openingBalanceEquity offset
-      // Only ongoing voucher transactions need to be captured here
-      const equityTransactionBalance = await getTransactionOnlyBalance("Equity", true);
+      // 20a. Equity — transactions only (opening balances are already counted in openingBalanceEquity)
+      const equityTransactionBalance = (() => {
+        let total = 0;
+        for (const acc of companyAccounts) {
+          if (acc.accountType !== "Equity") continue;
+          const bal = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+          total += bal.credit - bal.debit;
+        }
+        return Math.max(0, total);
+      })();
 
-      // 20b. Accounts Payable transactions (AP credits = liability increase)
-      // Opening balances for AP are handled by openingBalanceEquity offset
-      const apTransactionBalance = await getTransactionOnlyBalance("Accounts Payable", true);
+      // 20b. Accounts Payable — transactions only
+      const apTransactionBalance = (() => {
+        let total = 0;
+        for (const acc of companyAccounts) {
+          if (acc.accountType !== "Accounts Payable") continue;
+          const bal = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+          total += bal.credit - bal.debit;
+        }
+        return Math.max(0, total);
+      })();
 
       // 21. Opening Balance Equity - automatically balance opening entries
       // When opening balances are added without matching entries (e.g., cash opening balance without 
       // corresponding capital), this creates an imbalance. We calculate the net of all opening balances
       // and treat the difference as implicit equity/capital that should be on the liability side.
-      const allLedgerAccounts = await db
-        .select({
-          openingBalance: ledgerAccounts.openingBalance,
-          openingBalanceSide: ledgerAccounts.openingBalanceSide,
-          accountType: ledgerAccounts.accountType,
-        })
-        .from(ledgerAccounts)
-        .where(
-          and(
-            eq(ledgerAccounts.companyId, companyId),
-            isNull(ledgerAccounts.deletedAt)
-          )
-        );
-
-      // Calculate net opening balance equity
-      // Dr opening balances = Assets brought forward (positive on asset side)
-      // Cr opening balances = Liabilities/Capital brought forward (positive on liability side)
-      // The difference (Dr - Cr) represents implicit equity that needs to offset
+      // Calculate net opening balance equity using already-loaded companyAccounts
       let totalDrOpenings = 0;
       let totalCrOpenings = 0;
-      
-      for (const account of allLedgerAccounts) {
+
+      for (const account of companyAccounts) {
         const openingBalanceRaw = parseFloat(account.openingBalance || "0");
         if (openingBalanceRaw === 0) continue;
         
