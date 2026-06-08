@@ -257,8 +257,8 @@ export function registerFactoryDaybookRoutes(app: Express) {
           sql`${vouchers.deletedAt} IS NULL`,
           inArray(vouchers.voucherType, ["Payment", "Receipt", "Journal"]),
         ];
-        if (startDate) voucherConds.push(sql`${vouchers.voucherDate} >= ${startDate}`);
-        if (endDate) voucherConds.push(sql`${vouchers.voucherDate} <= ${endDate}`);
+        if (startDate) voucherConds.push(sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) >= ${startDate}`);
+        if (endDate) voucherConds.push(sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${endDate}`);
         if (txType && txType in voucherTypesReversed) {
           voucherConds.push(eq(vouchers.voucherType, voucherTypesReversed[txType as string]));
         }

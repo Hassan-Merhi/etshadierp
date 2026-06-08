@@ -307,6 +307,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [transactionRate, setTransactionRate] = useState<number | null>(null);
   // Use transaction rate if set, otherwise fall back to daily rate
   const exchangeRate = transactionRate || dailyExchangeRate;
+  const [voucherEffectiveDate, setVoucherEffectiveDate] = useState<string>("");
   const [location, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
   const hydratedVoucherIdRef = useRef<number | null>(null);
@@ -905,6 +906,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       if (voucherToEdit.exchangeRate) {
         setTransactionRate(parseFloat(voucherToEdit.exchangeRate));
       }
+      // Initialize effective date from voucher
+      setVoucherEffectiveDate(voucherToEdit.effectiveDate || "");
     }
   }, [voucherToEdit, allAccounts, bankAccounts, ledgerAccounts, suppliers, employees, fixedAssets, customers, factorySuppliersList, form]);
 
@@ -1157,6 +1160,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         optional: data.optional,
         currency: selectedCurrency,
         exchangeRate: exchangeRate ? exchangeRate.toString() : undefined,
+        effectiveDate: voucherEffectiveDate || null,
       };
 
       // Use batch endpoint for both create and update
@@ -4065,6 +4069,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               voucherNumber={voucherToEdit?.voucherNumber}
               onAccountPickerOpen={() => setAccountPickersNeeded(true)}
               onAccountSearchChange={setLiveAccountSearch}
+              effectiveDate={voucherEffectiveDate}
+              onEffectiveDateChange={setVoucherEffectiveDate}
             />
           </div>
         )}
@@ -4133,6 +4139,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               voucherNumber={voucherToEdit?.voucherNumber}
               onAccountPickerOpen={() => setAccountPickersNeeded(true)}
               onAccountSearchChange={setLiveAccountSearch}
+              effectiveDate={voucherEffectiveDate}
+              onEffectiveDateChange={setVoucherEffectiveDate}
             />
           </div>
         )}

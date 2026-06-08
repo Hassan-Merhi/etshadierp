@@ -2390,7 +2390,7 @@ export default function FactorySuppliers() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label>Date</Label>
+                  <Label>Entry Date</Label>
                   <Input
                     type="date"
                     value={fxConversionForm.date}
@@ -2930,7 +2930,7 @@ export default function FactorySuppliers() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Date</Label>
+                <Label>Entry Date</Label>
                 <Input
                   type="date"
                   value={paymentForm.date}
@@ -3451,7 +3451,7 @@ export default function FactorySuppliers() {
                   )}
                 </div>
                 <div className="space-y-1">
-                  <Label>Date</Label>
+                  <Label>Entry Date</Label>
                   <Input
                     type="date"
                     value={bulkFxForm.date}

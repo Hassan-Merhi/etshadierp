@@ -987,6 +987,7 @@ export function registerVoucherRoutes(app: Express) {
           optional,
           currency,
           exchangeRate,
+          effectiveDate,
         } = req.body;
 
         // Validate required fields
@@ -1032,6 +1033,7 @@ export function registerVoucherRoutes(app: Express) {
               description: notes || null,
               totalAmount: total.toFixed(2),
               optional: optional ?? false,
+              effectiveDate: effectiveDate || null,
             })
             .where(eq(vouchers.id, voucherId))
             .returning();

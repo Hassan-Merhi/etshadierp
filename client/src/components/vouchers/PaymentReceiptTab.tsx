@@ -94,6 +94,8 @@ export interface PaymentReceiptTabProps {
   voucherNumber?: string;
   onAccountPickerOpen?: () => void;
   onAccountSearchChange?: (term: string) => void;
+  effectiveDate?: string | null;
+  onEffectiveDateChange?: (v: string) => void;
 }
 
 export function PaymentReceiptTab({
@@ -133,6 +135,8 @@ export function PaymentReceiptTab({
   voucherNumber,
   onAccountPickerOpen,
   onAccountSearchChange,
+  effectiveDate,
+  onEffectiveDateChange,
 }: PaymentReceiptTabProps) {
   const { formatAmount } = useCurrencyContext();
   const { formatDisplayDate } = useDateFormat();
@@ -301,7 +305,7 @@ export function PaymentReceiptTab({
                   )}
                 </div>
 
-                {/* Date input */}
+                {/* Entry Date input */}
                 <FormField
                   control={form.control}
                   name="voucherDate"
@@ -326,11 +330,27 @@ export function PaymentReceiptTab({
                             )
                           }
                           data-testid="input-date-picker"
+                          title="Entry Date"
                         />
                       </FormControl>
                     </FormItem>
                   )}
                 />
+
+                {/* Effective Date (optional) */}
+                {onEffectiveDateChange && (
+                  <div className="shrink-0 flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">Eff.</span>
+                    <Input
+                      type="date"
+                      className="w-36"
+                      value={effectiveDate || ""}
+                      onChange={(e) => onEffectiveDateChange(e.target.value)}
+                      data-testid="input-effective-date"
+                      title="Effective Date (optional — used for ledger/accounts)"
+                    />
+                  </div>
+                )}
 
                 {/* Print */}
                 <Tooltip>

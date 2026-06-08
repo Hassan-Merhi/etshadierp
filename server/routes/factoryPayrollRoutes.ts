@@ -29,6 +29,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
     referenceId?: number; referenceTable?: string; description: string;
     metaJson?: string; currencyCode?: string; amountCurrency?: number;
     fxRateToUsd?: number; amountUsd?: number; createdBy?: number;
+    effectiveDate?: string | null;
   }) {
     const currency = opts.currencyCode || "USD";
     const fxRate = opts.fxRateToUsd || 1;
@@ -40,6 +41,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       description: opts.description, metaJson: opts.metaJson || null,
       currencyCode: currency, amountCurrency: String(amtCurrency),
       fxRateToUsd: String(fxRate), amountUsd: String(amtUsd), createdBy: opts.createdBy || null,
+      effectiveDate: opts.effectiveDate || null,
     });
   }
 
