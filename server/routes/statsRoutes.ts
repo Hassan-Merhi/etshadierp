@@ -30,6 +30,7 @@ import {
   bales, baleProducts, baleProductCategories, storedFiles,
   stockItemLocationPrices, exchangeRates,
   factoryWorkerAdvances,
+  propertyContracts, propertyMonthlyLedger,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
@@ -460,6 +461,64 @@ export function registerStatsRoutes(app: Express) {
           forUsTotal += stockOtwValue;
           categoryTotals["asset_Stock OTW"] = stockOtwValue;
           forUsAccounts.push({ name: "Stock On The Way", code: "STOCK_OTW", value: stockOtwValue, category: "Stock OTW" });
+        }
+      }
+
+      // ── Rental Outstanding (Tenant Receivables) ──────────────────────────────
+      // For every active rental contract under this company (any module), compute
+      // outstanding = SUM(expected for past+current months) - SUM(paid).
+      // Positive → tenants owe us → forUs asset.
+      // Negative → we owe tenants (advance/overpaid) → onUs liability.
+      {
+        const activeContracts = await db
+          .select({ id: propertyContracts.id, currency: propertyContracts.currency })
+          .from(propertyContracts)
+          .where(and(
+            eq(propertyContracts.companyId, companyId),
+            eq(propertyContracts.status, "ACTIVE"),
+          ));
+        if (activeContracts.length > 0) {
+          const contractIds = activeContracts.map(c => c.id);
+          const ledgerRows = await db.select({
+            contractId: propertyMonthlyLedger.contractId,
+            expected: sql<string>`COALESCE(SUM(
+              CASE WHEN (
+                ${propertyMonthlyLedger.year} < EXTRACT(YEAR FROM NOW())
+                OR (
+                  ${propertyMonthlyLedger.year} = EXTRACT(YEAR FROM NOW())
+                  AND ${propertyMonthlyLedger.month} <= EXTRACT(MONTH FROM NOW())
+                )
+              ) THEN CAST(${propertyMonthlyLedger.expectedAmount} AS numeric) ELSE 0 END
+            ), 0)`,
+            paid: sql<string>`COALESCE(SUM(CAST(${propertyMonthlyLedger.paidAmount} AS numeric)), 0)`,
+          })
+            .from(propertyMonthlyLedger)
+            .where(inArray(propertyMonthlyLedger.contractId, contractIds))
+            .groupBy(propertyMonthlyLedger.contractId);
+
+          let tenantReceivables = 0;
+          let tenantAdvances = 0;
+          for (const row of ledgerRows) {
+            const net = parseFloat(row.expected) - parseFloat(row.paid);
+            // Convert CFA contracts to USD if needed
+            const contract = activeContracts.find(c => c.id === row.contractId);
+            const isCfa = contract?.currency === "CFA";
+            const usd = isCfa && currentCfaRate > 0 ? net / currentCfaRate : net;
+            if (usd > 0) tenantReceivables += usd;
+            else if (usd < 0) tenantAdvances += Math.abs(usd);
+          }
+          if (tenantReceivables > 0.005) {
+            const val = round2(tenantReceivables);
+            forUsTotal = round2(forUsTotal + val);
+            categoryTotals["asset_Rental Receivables"] = (categoryTotals["asset_Rental Receivables"] || 0) + val;
+            forUsAccounts.push({ name: "Tenant Rent Outstanding", code: "RENTAL_OUTSTANDING", value: val, category: "Rental Receivables" });
+          }
+          if (tenantAdvances > 0.005) {
+            const val = round2(tenantAdvances);
+            onUsTotal = round2(onUsTotal + val);
+            categoryTotals["liability_Rental Advances"] = (categoryTotals["liability_Rental Advances"] || 0) + val;
+            onUsAccounts.push({ name: "Tenant Rent Advance/Credit", code: "RENTAL_ADVANCE", value: val, category: "Rental Advances" });
+          }
         }
       }
 
