@@ -2829,7 +2829,7 @@ export function registerFactoryBalesRoutes(app: Express) {
     }
   });
 
-  // DELETE by currency code — removes all manual rows for that currency
+  // DELETE by currency code — removes all rows (manual + auto) for that currency
   app.delete("/api/factory/fx-rates/:currency", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -2838,7 +2838,6 @@ export function registerFactoryBalesRoutes(app: Express) {
       await db.delete(factoryFxRates).where(and(
         eq(factoryFxRates.companyId, companyId),
         eq(factoryFxRates.currencyCode, currency),
-        eq(factoryFxRates.source, "manual"),
       ));
       res.json({ ok: true });
     } catch (error: any) {
