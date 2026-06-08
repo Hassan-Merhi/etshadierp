@@ -30,7 +30,7 @@ import {
   bales, baleProducts, baleProductCategories, storedFiles,
   stockItemLocationPrices, exchangeRates,
   factoryWorkerAdvances,
-  propertyContracts, propertyMonthlyLedger,
+  propertyContracts, propertyMonthlyLedger, propertyPayments,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
@@ -480,27 +480,41 @@ export function registerStatsRoutes(app: Express) {
           ));
         if (activeContracts.length > 0) {
           const contractIds = activeContracts.map(c => c.id);
-          const ledgerRows = await db.select({
+          const asOfExpr = toDate ? sql`${toDate}::date` : sql`CURRENT_DATE`;
+          // Expected: months on or before the asOf date
+          const expectedRows = await db.select({
             contractId: propertyMonthlyLedger.contractId,
             expected: sql<string>`COALESCE(SUM(
               CASE WHEN (
-                ${propertyMonthlyLedger.year} < EXTRACT(YEAR FROM NOW())
+                ${propertyMonthlyLedger.year} < EXTRACT(YEAR FROM ${asOfExpr})
                 OR (
-                  ${propertyMonthlyLedger.year} = EXTRACT(YEAR FROM NOW())
-                  AND ${propertyMonthlyLedger.month} <= EXTRACT(MONTH FROM NOW())
+                  ${propertyMonthlyLedger.year} = EXTRACT(YEAR FROM ${asOfExpr})
+                  AND ${propertyMonthlyLedger.month} <= EXTRACT(MONTH FROM ${asOfExpr})
                 )
               ) THEN CAST(${propertyMonthlyLedger.expectedAmount} AS numeric) ELSE 0 END
             ), 0)`,
-            paid: sql<string>`COALESCE(SUM(CAST(${propertyMonthlyLedger.paidAmount} AS numeric)), 0)`,
           })
             .from(propertyMonthlyLedger)
             .where(inArray(propertyMonthlyLedger.contractId, contractIds))
             .groupBy(propertyMonthlyLedger.contractId);
+          // Paid: only payments made on or before the asOf date
+          const paidConditions: any[] = [inArray(propertyPayments.contractId, contractIds)];
+          if (toDate) paidConditions.push(lte(propertyPayments.paymentDate, toDate));
+          const paidRows = await db.select({
+            contractId: propertyPayments.contractId,
+            paid: sql<string>`COALESCE(SUM(CAST(${propertyPayments.amount} AS numeric)), 0)`,
+          })
+            .from(propertyPayments)
+            .where(and(...paidConditions))
+            .groupBy(propertyPayments.contractId);
+          const paidMap = new Map(paidRows.map(r => [r.contractId, parseFloat(r.paid)]));
 
           let prepaidRent = 0;
           let rentPayable = 0;
-          for (const row of ledgerRows) {
-            const net = parseFloat(row.paid) - parseFloat(row.expected); // positive = overpaid
+          for (const row of expectedRows) {
+            const expected = parseFloat(row.expected);
+            const paid = paidMap.get(row.contractId) ?? 0;
+            const net = paid - expected; // positive = overpaid
             const contract = activeContracts.find(c => c.id === row.contractId);
             const isCfa = contract?.currency === "CFA";
             const usd = isCfa && currentCfaRate > 0 ? net / currentCfaRate : net;

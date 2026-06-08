@@ -43,7 +43,7 @@ import {
   factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
   factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
   factoryPosSales, factoryPosSaleItems, proformaStockReservations,
-  propertyContracts, propertyMonthlyLedger,
+  propertyContracts, propertyMonthlyLedger, propertyPayments,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -3426,24 +3426,38 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           ));
         if (activeContracts.length > 0) {
           const contractIds = activeContracts.map(c => c.id);
-          const ledgerRows = await db.select({
+          // Expected: months on or before the asOf date
+          const expectedRows = await db.select({
             contractId: propertyMonthlyLedger.contractId,
             expected: sql<string>`COALESCE(SUM(
               CASE WHEN (
-                ${propertyMonthlyLedger.year} < EXTRACT(YEAR FROM NOW())
+                ${propertyMonthlyLedger.year} < EXTRACT(YEAR FROM ${asOf}::date)
                 OR (
-                  ${propertyMonthlyLedger.year} = EXTRACT(YEAR FROM NOW())
-                  AND ${propertyMonthlyLedger.month} <= EXTRACT(MONTH FROM NOW())
+                  ${propertyMonthlyLedger.year} = EXTRACT(YEAR FROM ${asOf}::date)
+                  AND ${propertyMonthlyLedger.month} <= EXTRACT(MONTH FROM ${asOf}::date)
                 )
               ) THEN CAST(${propertyMonthlyLedger.expectedAmount} AS numeric) ELSE 0 END
             ), 0)`,
-            paid: sql<string>`COALESCE(SUM(CAST(${propertyMonthlyLedger.paidAmount} AS numeric)), 0)`,
           })
             .from(propertyMonthlyLedger)
             .where(inArray(propertyMonthlyLedger.contractId, contractIds))
             .groupBy(propertyMonthlyLedger.contractId);
-          for (const row of ledgerRows) {
-            const net = parseFloat(row.paid) - parseFloat(row.expected); // positive = overpaid
+          // Paid: only payments made on or before asOf
+          const paidRows = await db.select({
+            contractId: propertyPayments.contractId,
+            paid: sql<string>`COALESCE(SUM(CAST(${propertyPayments.amount} AS numeric)), 0)`,
+          })
+            .from(propertyPayments)
+            .where(and(
+              inArray(propertyPayments.contractId, contractIds),
+              lte(propertyPayments.paymentDate, asOf),
+            ))
+            .groupBy(propertyPayments.contractId);
+          const paidMap = new Map(paidRows.map(r => [r.contractId, parseFloat(r.paid)]));
+          for (const row of expectedRows) {
+            const expected = parseFloat(row.expected);
+            const paid = paidMap.get(row.contractId) ?? 0;
+            const net = paid - expected; // positive = overpaid
             if (net > 0) prepaidRent += net;      // we overpaid → asset
             else if (net < 0) rentPayable += -net; // we underpaid → liability
           }
