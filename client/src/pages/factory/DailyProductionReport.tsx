@@ -1244,7 +1244,9 @@ export default function DailyProductionReport() {
                               <div key={w.code} className="grid grid-cols-4 gap-1 text-xs py-0.5">
                                 <span className="truncate text-foreground/90">{w.name}</span>
                                 <span className="text-right tabular-nums text-foreground">{fmtSalary(w.attendanceSalary)}</span>
-                                <span className="text-right tabular-nums text-muted-foreground">{fmtSalary(dailyTransport)}</span>
+                                <span className="text-right tabular-nums text-muted-foreground">
+                                  {w.transport > 0 ? fmtSalary(dailyTransport) : <span className="opacity-40">—</span>}
+                                </span>
                                 <span className="text-right tabular-nums text-sky-600 dark:text-sky-400">{fmtSalary(daily)}</span>
                               </div>
                             );
