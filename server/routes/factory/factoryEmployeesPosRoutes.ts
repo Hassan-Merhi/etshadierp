@@ -2523,7 +2523,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         SELECT DISTINCT ON (currency_code) currency_code, rate_to_usd
         FROM factory_fx_rates
         WHERE company_id = ${companyId}
-        ORDER BY currency_code, effective_date DESC
+        ORDER BY currency_code, source DESC, effective_date DESC
       `);
       const configFxRates: Record<string, number> = {};
       for (const row of fxRateRows.rows as any[]) {
