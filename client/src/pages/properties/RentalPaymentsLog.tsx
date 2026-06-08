@@ -18,7 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ClipboardList, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, ClipboardList, Search, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -55,6 +55,8 @@ type PaymentRow = {
   contractId: number;
   unitId: number;
   currency?: string;
+  cashAccountId: number | null;
+  voucherId: number | null;
   tenantName: string | null;
   unitNumber: string | null;
   locationGroup: string | null;
@@ -177,6 +179,7 @@ export default function RentalPaymentsLog({
                     <th className="text-right px-3 py-2 font-semibold">Amount</th>
                     <th className="text-left px-3 py-2 font-semibold">For Month</th>
                     <th className="text-left px-3 py-2 font-semibold">Notes</th>
+                    <th className="text-left px-3 py-2 font-semibold">Daybook</th>
                     <th className="w-10"></th>
                   </tr>
                 </thead>
@@ -200,6 +203,16 @@ export default function RentalPaymentsLog({
                         {MONTH_NAMES[p.forMonth]} {p.forYear}
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{p.notes ?? ""}</td>
+                      <td className="px-3 py-2">
+                        {p.voucherId ? (
+                          <span className="text-xs text-muted-foreground font-mono">#{p.voucherId}</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400" title="No accounting entry — payment was recorded without a cash account">
+                            <AlertTriangle className="h-3 w-3" />
+                            No entry
+                          </span>
+                        )}
+                      </td>
                       <td className="px-2 py-1 text-right">
                         <Button
                           size="icon"
@@ -219,7 +232,7 @@ export default function RentalPaymentsLog({
                     <td className="px-3 py-2 text-right tabular-nums font-bold text-green-700 dark:text-green-400">
                       {fmtMoney(total)}
                     </td>
-                    <td colSpan={3}></td>
+                    <td colSpan={4}></td>
                   </tr>
                 </tfoot>
               </table>

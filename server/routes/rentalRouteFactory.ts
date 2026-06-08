@@ -2777,6 +2777,8 @@ export function registerRentalRoutes(
           unitId: propertyPayments.unitId,
           currency: propertyPayments.currency,
           exchangeRate: propertyPayments.exchangeRate,
+          cashAccountId: propertyPayments.cashAccountId,
+          voucherId: propertyPayments.voucherId,
           tenantName: propertyContracts.tenantName,
           unitNumber: propertyUnits.unitNumber,
           locationGroup: propertyUnits.locationGroup,

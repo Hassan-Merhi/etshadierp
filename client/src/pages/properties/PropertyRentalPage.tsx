@@ -1326,8 +1326,13 @@ function PaymentForm({ contract, cashAccounts, testIdPrefix, unitId, ledger }: {
         </div>
       )}
 
+      {!form.cashAccountId && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          Select a cash/bank account so this payment is posted to the Daybook.
+        </p>
+      )}
       <DialogFooter>
-        <Button onClick={() => pay.mutate()} disabled={!form.amount || pay.isPending} data-testid={`button-${testIdPrefix}-confirm-payment`}>
+        <Button onClick={() => pay.mutate()} disabled={!form.amount || !form.cashAccountId || pay.isPending} data-testid={`button-${testIdPrefix}-confirm-payment`}>
           {pay.isPending ? "Recording…" : "Confirm Payment"}
         </Button>
       </DialogFooter>
