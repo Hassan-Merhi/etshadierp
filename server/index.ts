@@ -3998,6 +3998,8 @@ let migrationsDone = false;
       WHERE deleted_at IS NULL;
   END IF;
 END $$`,
+    // ── Prepaid rent accounting: track which ledger rows used Prepaid/Deferred accounts ──
+    `ALTER TABLE property_monthly_ledger ADD COLUMN IF NOT EXISTS used_prepaid_account boolean NOT NULL DEFAULT false`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
