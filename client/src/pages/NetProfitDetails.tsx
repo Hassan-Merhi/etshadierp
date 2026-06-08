@@ -25,7 +25,6 @@ import {
   ArrowLeft,
   Plus,
   Minus,
-  Equal,
   AlertCircle,
   ChevronDown,
   ChevronRight,
@@ -37,6 +36,10 @@ import {
   ExternalLink,
   MoreHorizontal,
   TrendingUp,
+  Wallet,
+  ArrowUpRight,
+  ArrowDownRight,
+  Scale,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -74,27 +77,29 @@ interface NetProfitData {
 function CategoryGroup({
   category,
   accounts,
-  amountColor,
-  amountPrefix,
+  side,
   formatAmount,
-  accentColor,
 }: {
   category: string;
   accounts: AccountItem[];
-  amountColor: (val: number) => string;
-  amountPrefix: (val: number) => string;
+  side: "asset" | "liability";
   formatAmount: (n: number) => string;
-  accentColor: string;
 }) {
   const [open, setOpen] = useState(true);
   const total = accounts.reduce((s, a) => s + Math.abs(a.value), 0);
+  const color = side === "asset"
+    ? "text-emerald-600 dark:text-emerald-400"
+    : "text-rose-600 dark:text-rose-400";
+  const headerBg = side === "asset"
+    ? "bg-emerald-50/60 dark:bg-emerald-950/30"
+    : "bg-rose-50/60 dark:bg-rose-950/30";
 
   return (
-    <div className="border border-border rounded-md overflow-hidden">
+    <div className="rounded-md overflow-hidden border border-border/60">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-2.5 bg-muted/40 hover-elevate text-sm font-semibold"
+        className={`w-full flex items-center justify-between px-3 py-2 ${headerBg} text-sm font-semibold hover-elevate`}
         data-testid={`button-category-${category.toLowerCase().replace(/\s+/g, "-")}`}
       >
         <div className="flex items-center gap-2">
@@ -103,17 +108,17 @@ function CategoryGroup({
           ) : (
             <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           )}
-          <span>{category}</span>
-          <Badge variant="outline" className="text-xs font-normal">
+          <span className="text-foreground">{category}</span>
+          <span className="text-xs font-normal text-muted-foreground bg-background/60 rounded px-1.5 py-0.5">
             {accounts.length}
-          </Badge>
+          </span>
         </div>
-        <span className={`font-mono font-bold ${accentColor}`}>
+        <span className={`font-mono font-bold tabular-nums ${color}`}>
           {formatAmount(total)}
         </span>
       </button>
       {open && (
-        <div className="divide-y divide-border">
+        <div className="divide-y divide-border/50">
           {accounts.map((acc, i) => {
             const ledgerBase = window.location.pathname.startsWith("/properties")
               ? "/properties/ledger-monthly"
@@ -121,23 +126,23 @@ function CategoryGroup({
             return (
               <div
                 key={i}
-                className="flex items-center justify-between px-4 py-2 text-sm"
+                className="flex items-center justify-between px-3 py-2 text-sm hover:bg-muted/30 transition-colors"
                 data-testid={`row-account-${i}`}
               >
                 {acc.id ? (
                   <button
                     type="button"
                     onClick={() => window.open(`${ledgerBase}/${acc.id}`, "_blank")}
-                    className="font-medium text-foreground hover:underline text-left flex items-center gap-1"
+                    className="text-foreground hover:text-foreground/80 text-left flex items-center gap-1 group"
                   >
-                    {acc.name}
-                    <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
+                    <span>{acc.name}</span>
+                    <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
                   </button>
                 ) : (
-                  <span className="font-medium text-foreground">{acc.name}</span>
+                  <span className="text-foreground">{acc.name}</span>
                 )}
-                <span className={`font-mono tabular-nums ${amountColor(acc.value)}`}>
-                  {amountPrefix(acc.value)}{formatAmount(Math.abs(acc.value))}
+                <span className={`font-mono tabular-nums font-medium ${color}`}>
+                  {formatAmount(Math.abs(acc.value))}
                 </span>
               </div>
             );
@@ -148,31 +153,21 @@ function CategoryGroup({
   );
 }
 
-function CollapsibleSection({
+function SidePanel({
   id,
   title,
   subtitle,
-  accentColor,
-  icon,
+  side,
   total,
-  totalLabel,
-  totalColor,
   accounts,
-  amountColor,
-  amountPrefix,
   formatAmount,
 }: {
   id: string;
   title: string;
   subtitle?: string;
-  accentColor: string;
-  icon: React.ReactNode;
+  side: "asset" | "liability";
   total: number;
-  totalLabel: string;
-  totalColor: string;
   accounts: AccountItem[];
-  amountColor: (val: number) => string;
-  amountPrefix: (val: number) => string;
   formatAmount: (n: number) => string;
 }) {
   const [open, setOpen] = useState(true);
@@ -190,39 +185,55 @@ function CollapsibleSection({
       a.reduce((s, x) => s + Math.abs(x.value), 0)
   );
 
+  const isAsset = side === "asset";
+  const headerGradient = isAsset
+    ? "from-emerald-500/10 to-transparent dark:from-emerald-500/15"
+    : "from-rose-500/10 to-transparent dark:from-rose-500/15";
+  const totalColor = isAsset
+    ? "text-emerald-600 dark:text-emerald-400"
+    : "text-rose-600 dark:text-rose-400";
+  const iconBg = isAsset
+    ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400"
+    : "bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400";
+  const footerBg = isAsset
+    ? "bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-200/60 dark:border-emerald-800/40"
+    : "bg-rose-50/50 dark:bg-rose-950/30 border-rose-200/60 dark:border-rose-800/40";
+
   return (
-    <Card data-testid={`card-${id}`} className="flex flex-col">
-      <CardHeader
-        className="cursor-pointer select-none pb-3"
+    <Card data-testid={`card-${id}`} className="flex flex-col overflow-hidden">
+      <div
+        className={`bg-gradient-to-r ${headerGradient} px-5 py-4 cursor-pointer select-none`}
         onClick={() => setOpen((v) => !v)}
       >
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <span className={accentColor}>{icon}</span>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${iconBg}`}>
+              {isAsset
+                ? <ArrowUpRight className="h-4 w-4" />
+                : <ArrowDownRight className="h-4 w-4" />
+              }
+            </div>
             <div>
-              <CardTitle className={`flex items-center gap-2 text-lg ${accentColor}`}>
-                {title}
-              </CardTitle>
+              <div className={`font-semibold text-base ${totalColor}`}>{title}</div>
               {subtitle && (
-                <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+                <div className="text-xs text-muted-foreground mt-0.5">{subtitle}</div>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className={`text-2xl font-bold font-mono ${totalColor}`}>
+          <div className="flex items-center gap-2">
+            <span className={`text-2xl font-bold font-mono tabular-nums ${totalColor}`}>
               {formatAmount(total)}
             </span>
-            {open ? (
-              <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-            )}
+            {open
+              ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+              : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+            }
           </div>
         </div>
-      </CardHeader>
+      </div>
 
       {open && (
-        <CardContent className="pt-0 flex-1 space-y-2">
+        <CardContent className="pt-3 pb-4 flex-1 space-y-2">
           {sortedCategories.length > 0 ? (
             <>
               {sortedCategories.map(([cat, catAccounts]) => (
@@ -230,19 +241,21 @@ function CollapsibleSection({
                   key={cat}
                   category={cat}
                   accounts={catAccounts}
-                  amountColor={amountColor}
-                  amountPrefix={amountPrefix}
+                  side={side}
                   formatAmount={formatAmount}
-                  accentColor={totalColor}
                 />
               ))}
-              <div className="flex justify-between items-center px-4 py-2.5 rounded-md bg-muted/60 font-bold text-sm mt-1">
-                <span>{totalLabel}</span>
-                <span className={`font-mono ${totalColor}`}>{formatAmount(total)}</span>
+              <div className={`flex justify-between items-center px-3 py-2.5 rounded-md border font-semibold text-sm mt-2 ${footerBg}`}>
+                <span className="text-muted-foreground">
+                  {isAsset ? "Total Assets" : "Total Liabilities"}
+                </span>
+                <span className={`font-mono tabular-nums ${totalColor}`}>
+                  {formatAmount(total)}
+                </span>
               </div>
             </>
           ) : (
-            <p className="text-muted-foreground text-center py-4">No data recorded</p>
+            <p className="text-muted-foreground text-center py-6 text-sm">No data recorded</p>
           )}
         </CardContent>
       )}
@@ -251,31 +264,25 @@ function CollapsibleSection({
 }
 
 function todayStr() {
-  return new Date().toLocaleDateString('en-CA');
+  return new Date().toLocaleDateString("en-CA");
 }
 
 export default function NetProfitDetails() {
   const { formatAmount } = useCurrencyContext();
   const { toast } = useToast();
-  // Local input state — updates freely as user types (no API trigger)
   const [fromInput, setFromInput] = useState<string>("");
   const [toInput, setToInput] = useState<string>("");
-  // Committed state — only set on blur with a valid complete date (triggers API call)
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
 
   const isValidDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
-
   const commitFrom = (v: string) => { if (v === "" || isValidDate(v)) setFromDate(v); };
   const commitTo   = (v: string) => { if (v === "" || isValidDate(v)) setToDate(v); };
-
   const clearDates = () => {
     setFromInput(""); setToInput("");
     setFromDate(""); setToDate("");
   };
 
-  // Calculation is cumulative up to toDate (balance-sheet approach).
-  // fromDate is display-only — the API only receives toDate.
   const queryParam = toDate ? `?toDate=${toDate}` : "";
 
   const { data, isLoading, error, refetch } = useQuery<NetProfitData>({
@@ -314,12 +321,14 @@ export default function NetProfitDetails() {
     return (
       <div className="p-6 space-y-4">
         <div className="flex items-center gap-4">
-          <Skeleton className="h-10 w-10" />
+          <Skeleton className="h-10 w-10 rounded-lg" />
           <Skeleton className="h-8 w-64" />
         </div>
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-16 w-full" />
-        ))}
+        <Skeleton className="h-32 w-full rounded-xl" />
+        <div className="grid grid-cols-2 gap-4">
+          <Skeleton className="h-96" />
+          <Skeleton className="h-96" />
+        </div>
       </div>
     );
   }
@@ -339,9 +348,19 @@ export default function NetProfitDetails() {
     );
   }
 
+  const forUsTotal = data?.forUsTotal || 0;
+  const onUsTotal  = data?.onUsTotal  || 0;
+  const netPos     = data?.netPosition || 0;
+  const isPositive = netPos >= 0;
+
+  // Ratio bar: what fraction of total is assets
+  const grandTotal = forUsTotal + onUsTotal;
+  const assetPct   = grandTotal > 0 ? (forUsTotal / grandTotal) * 100 : 50;
+
   return (
-    <div className="p-4 md:p-6 space-y-4 w-full">
-      {/* Header */}
+    <div className="p-4 md:p-6 space-y-5 w-full">
+
+      {/* ── Header ── */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
           <Link href="/settings">
@@ -364,7 +383,6 @@ export default function NetProfitDetails() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Date range filter */}
           <div className="flex items-center gap-2 flex-wrap">
             <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
             <div className="flex items-center gap-1.5">
@@ -467,97 +485,142 @@ export default function NetProfitDetails() {
         </div>
       </div>
 
-      {/* Formula bar */}
-      <Card data-testid="card-formula">
-        <CardContent className="pt-5">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2 bg-green-50 dark:bg-green-950/40 px-4 py-2.5 rounded-md">
-              <span className="text-sm font-medium text-green-700 dark:text-green-300">What We Have</span>
-              <span className="font-bold font-mono text-green-600">{formatAmount(data?.forUsTotal || 0)}</span>
+      {/* ── Summary hero ── */}
+      <Card data-testid="card-formula" className="overflow-hidden">
+        <CardContent className="p-0">
+          {/* Three stat blocks */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
+            {/* What We Have */}
+            <div className="p-5 flex items-center gap-4">
+              <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 shrink-0">
+                <Wallet className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-0.5">
+                  What We Have
+                </p>
+                <p className="text-2xl font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400 truncate">
+                  {formatAmount(forUsTotal)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {data?.forUs.accounts?.length || 0} asset accounts
+                </p>
+              </div>
             </div>
-            <Minus className="h-4 w-4 text-muted-foreground shrink-0" />
-            <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950/40 px-4 py-2.5 rounded-md">
-              <span className="text-sm font-medium text-red-700 dark:text-red-300">What We Owe</span>
-              <span className="font-bold font-mono text-red-600">{formatAmount(data?.onUsTotal || 0)}</span>
+
+            {/* What We Owe */}
+            <div className="p-5 flex items-center gap-4">
+              <div className="p-2.5 rounded-xl bg-rose-100 dark:bg-rose-900/50 shrink-0">
+                <Scale className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-0.5">
+                  What We Owe
+                </p>
+                <p className="text-2xl font-bold font-mono tabular-nums text-rose-600 dark:text-rose-400 truncate">
+                  {formatAmount(onUsTotal)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {data?.onUs.accounts?.length || 0} liability accounts
+                </p>
+              </div>
             </div>
-            <Equal className="h-4 w-4 text-muted-foreground shrink-0" />
-            <div className={`flex items-center gap-2 px-4 py-2.5 rounded-md ${(data?.netPosition || 0) >= 0 ? "bg-green-100 dark:bg-green-900/40" : "bg-red-100 dark:bg-red-900/40"}`}>
-              <span className={`text-sm font-medium ${(data?.netPosition || 0) >= 0 ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}`}>
-                Net Position
-              </span>
-              <span className={`font-bold font-mono ${(data?.netPosition || 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {formatAmount(data?.netPosition || 0)}
-              </span>
+
+            {/* Net Position */}
+            <div className={`p-5 flex items-center gap-4 ${isPositive ? "bg-emerald-50/40 dark:bg-emerald-950/20" : "bg-rose-50/40 dark:bg-rose-950/20"}`}>
+              <div className={`p-2.5 rounded-xl shrink-0 ${isPositive ? "bg-emerald-100 dark:bg-emerald-900/50" : "bg-rose-100 dark:bg-rose-900/50"}`}>
+                {isPositive
+                  ? <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  : <Minus className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+                }
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-0.5">
+                  Net Position
+                </p>
+                <p className={`text-2xl font-bold font-mono tabular-nums truncate ${isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+                  {formatAmount(netPos)}
+                </p>
+                <Badge
+                  variant={isPositive ? "default" : "destructive"}
+                  className="mt-1 text-xs"
+                >
+                  {data?.netPositionLabel || "Net Position"}
+                </Badge>
+              </div>
             </div>
-            <Badge variant={(data?.netPosition || 0) >= 0 ? "default" : "destructive"} className="ml-auto sm:ml-2">
-              {data?.netPositionLabel || "Net Position"}
-            </Badge>
+          </div>
+
+          {/* Ratio bar */}
+          <div className="px-5 pb-4 pt-1">
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+              <span>Assets {assetPct.toFixed(0)}%</span>
+              <span>Liabilities {(100 - assetPct).toFixed(0)}%</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-rose-200 dark:bg-rose-900/60 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-emerald-500 dark:bg-emerald-500 transition-all duration-500"
+                style={{ width: `${Math.min(100, Math.max(0, assetPct))}%` }}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Assets + Liabilities side by side, full width */}
+      {/* ── Assets + Liabilities side by side ── */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-        <CollapsibleSection
+        <SidePanel
           id="assets"
           title="What We Have"
           subtitle={`${data?.forUs.accounts?.length || 0} asset accounts`}
-          accentColor="text-green-600"
-          icon={<Plus className="h-5 w-5" />}
-          total={data?.forUsTotal || 0}
-          totalLabel="Total Assets"
-          totalColor="text-green-600"
+          side="asset"
+          total={forUsTotal}
           accounts={data?.forUs.accounts || []}
-          amountColor={() => "text-green-600"}
-          amountPrefix={() => ""}
           formatAmount={formatAmount}
         />
-        <CollapsibleSection
+        <SidePanel
           id="liabilities"
           title="What We Owe"
           subtitle={`${data?.onUs.accounts?.length || 0} liability accounts`}
-          accentColor="text-red-600"
-          icon={<Minus className="h-5 w-5" />}
-          total={data?.onUsTotal || 0}
-          totalLabel="Total Liabilities"
-          totalColor="text-red-600"
+          side="liability"
+          total={onUsTotal}
           accounts={data?.onUs.accounts || []}
-          amountColor={() => "text-red-600"}
-          amountPrefix={() => ""}
           formatAmount={formatAmount}
         />
       </div>
 
-      {/* SP Partner: Realized POS Profit section */}
+      {/* SP Partner: Realized POS Profit */}
       {(data?.spPosProfit ?? 0) !== 0 && (
-        <Card data-testid="card-sp-pos-profit">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2">
-                <span className="text-blue-600">
-                  <TrendingUp className="h-5 w-5" />
-                </span>
+        <Card data-testid="card-sp-pos-profit" className="overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-500/10 to-transparent dark:from-blue-500/15 px-5 py-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">
+                  <TrendingUp className="h-4 w-4" />
+                </div>
                 <div>
-                  <CardTitle className="text-lg text-blue-600">Realized Profit (POS Sales)</CardTitle>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <div className="font-semibold text-base text-blue-600 dark:text-blue-400">
+                    Realized Profit (POS Sales)
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
                     Supplier partner POS profit — calculated from actual sale &amp; cost per item
-                  </p>
+                  </div>
                 </div>
               </div>
-              <span className={`text-2xl font-bold font-mono ${(data?.spPosProfit ?? 0) >= 0 ? "text-blue-600" : "text-destructive"}`}>
+              <span className={`text-2xl font-bold font-mono tabular-nums ${(data?.spPosProfit ?? 0) >= 0 ? "text-blue-600 dark:text-blue-400" : "text-destructive"}`}>
                 {formatAmount(data?.spPosProfit ?? 0)}
               </span>
             </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="border border-border rounded-md overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-2.5 text-sm">
-                <span className="font-medium text-foreground">Supplier Partner POS Profit</span>
-                <span className="font-mono tabular-nums text-blue-600">
+          </div>
+          <CardContent className="pt-3 pb-4">
+            <div className="rounded-md overflow-hidden border border-border/60">
+              <div className="flex items-center justify-between px-3 py-2.5 text-sm">
+                <span className="text-foreground">Supplier Partner POS Profit</span>
+                <span className="font-mono tabular-nums font-medium text-blue-600 dark:text-blue-400">
                   {formatAmount(data?.spPosProfit ?? 0)}
                 </span>
               </div>
-              <div className="px-4 py-2 bg-muted/40 text-xs text-muted-foreground">
+              <div className="px-3 py-2 bg-muted/40 text-xs text-muted-foreground border-t border-border/50">
                 Formula: Sum of (sale price − cost price) across all POS sale lines
                 {toDate ? ` up to ${toDate}` : " (all time)"}
               </div>
