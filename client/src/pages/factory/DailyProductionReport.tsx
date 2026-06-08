@@ -880,7 +880,7 @@ export default function DailyProductionReport() {
 
   const { data: attendanceData } = useQuery<{
     dates: { date: string; isWeekend: boolean }[];
-    workers: { id: number; employeeCode: string; baseSalary: string; salaryType: string; transportAllowance: string; attendance: Record<string, string>; paidSalary: string }[];
+    workers: { id: number; employeeCode: string; fullName: string; baseSalary: string; salaryType: string; transportAllowance: string; attendance: Record<string, string>; paidSalary: string }[];
   }>({
     queryKey: ["/api/factory/workers/attendance-report", from, to],
     queryFn: async () => {
@@ -929,7 +929,7 @@ export default function DailyProductionReport() {
       const attendanceSalary = fullExpected - transport;
       totalExpected += fullExpected;
       totalPaid     += parseFloat(w.paidSalary || "0");
-      perWorker.push({ code: w.employeeCode || String(w.id), attendanceSalary, transport, baseSalary: parseFloat(w.baseSalary || "0") });
+      perWorker.push({ code: w.employeeCode || String(w.id), name: w.fullName || w.employeeCode || String(w.id), attendanceSalary, transport, baseSalary: parseFloat(w.baseSalary || "0") });
     }
     return { totalExpected, totalPaid, totalRemaining: totalExpected - totalPaid, perWorker };
   }, [attendanceData]);
@@ -1232,7 +1232,7 @@ export default function DailyProductionReport() {
                       {salaryKpi && salaryKpi.perWorker.length > 0 ? (
                         <>
                           <div className="grid grid-cols-4 gap-1 text-xs font-medium text-muted-foreground mb-1.5 px-0.5">
-                            <span>Code</span>
+                            <span>Worker</span>
                             <span className="text-right">Salary</span>
                             <span className="text-right">Transport</span>
                             <span className="text-right">Daily</span>
@@ -1241,7 +1241,7 @@ export default function DailyProductionReport() {
                             const daily = ms && ms.daysInMonth > 0 ? (w.baseSalary + w.transport) / ms.daysInMonth : 0;
                             return (
                               <div key={w.code} className="grid grid-cols-4 gap-1 text-xs py-0.5">
-                                <span className="truncate text-foreground/90 font-mono">{w.code}</span>
+                                <span className="truncate text-foreground/90">{w.name}</span>
                                 <span className="text-right tabular-nums text-foreground">{fmtSalary(w.attendanceSalary)}</span>
                                 <span className="text-right tabular-nums text-muted-foreground">{fmtSalary(w.transport)}</span>
                                 <span className="text-right tabular-nums text-sky-600 dark:text-sky-400">{fmtSalary(daily)}</span>
