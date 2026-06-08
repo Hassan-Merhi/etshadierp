@@ -180,6 +180,19 @@ export function registerStatsRoutes(app: Express) {
       const onUsAccounts = classified.onUsAccounts;
       const categoryTotals = classified.categoryTotals;
 
+      // Exclude ledger-based "Accrued Rent Payable" — the computed rentPayable
+      // (expected − paid up to asOf) is always more accurate than the accrual-
+      // scheduler-dependent ledger account. Strip it here before any totals are used.
+      for (let i = onUsAccounts.length - 1; i >= 0; i--) {
+        const a = onUsAccounts[i] as any;
+        const nameLower = (a.name || "").toLowerCase();
+        const code = (a.code || "").toUpperCase();
+        if (nameLower.includes("accrued rent") || code === "ACCR-RENT-PAY" || code === "ACCRUED_RENT_PAYABLE") {
+          onUsTotal = round2(onUsTotal - a.value);
+          onUsAccounts.splice(i, 1);
+        }
+      }
+
       // CFA revaluation: Cash accounts hold physical CFA units whose USD worth changes with the rate.
       // Expenses, loans, receivables are locked at their historical CFA values — do NOT revalue them.
       // Only revalue if this company's base currency IS CFA (not a USD company that happens to have

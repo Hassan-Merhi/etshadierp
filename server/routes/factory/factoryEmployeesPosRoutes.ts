@@ -3103,7 +3103,13 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           nameLower.includes("payroll payable") ||
           code === "PAYROLL_PAYABLE" ||
           code === "PAY_PAYABLE";
-        return !isPayrollPayable;
+        // Exclude ledger-based rent payable — the computed rentPayable (expected − paid
+        // up to asOf) is always more accurate than the accrual-scheduler-dependent ledger account.
+        const isAccruedRentPayable =
+          nameLower.includes("accrued rent") ||
+          code === "ACCR-RENT-PAY" ||
+          code === "ACCRUED_RENT_PAYABLE";
+        return !isPayrollPayable && !isAccruedRentPayable;
       });
       const ledgerForUsTotal = round2(ledgerForUs.reduce((s: number, a: any) => s + a.value, 0));
       let ledgerOnUsTotal = round2(ledgerOnUs.reduce((s: number, a: any) => s + a.value, 0));
