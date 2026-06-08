@@ -1352,8 +1352,8 @@ export default function FactoryDaybook() {
     let result = entries;
     // Always hide worker edit audit entries
     result = result.filter((e) => e.txType !== "WORKER_EDITED");
-    // Non-admins only see their own entries
-    if (!isAdminOrOwner && currentUser?.id) {
+    // Non-admins only see their own entries (View Only users are observers — they see everything)
+    if (!isAdminOrOwner && currentUser?.role !== "View Only" && currentUser?.id) {
       result = result.filter((e) => e.createdBy === currentUser.id);
     }
     if (statusFilter === "exclude") result = result.filter((e) => !e.optional);
