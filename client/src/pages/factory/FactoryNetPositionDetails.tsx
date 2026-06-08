@@ -18,11 +18,13 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   RefreshCw,
   Eye,
   EyeOff,
   RotateCcw,
   ExternalLink,
+  CalendarDays,
 } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
@@ -222,6 +224,19 @@ function CollapsibleSection({
   );
 }
 
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+function shiftDate(date: string, days: number): string {
+  const d = new Date(date + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+function formatDateLabel(date: string): string {
+  const d = new Date(date + "T12:00:00Z");
+  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
+}
+
 const STORAGE_KEY = "netpos_details_custom_view_hidden";
 
 interface PayrollEmployee {
@@ -231,7 +246,7 @@ interface PayrollEmployee {
   balance: number;
 }
 
-function CustomNetPositionView({ data, formatAmount }: { data: FactoryNetPositionData; formatAmount: (n: number) => string }) {
+function CustomNetPositionView({ data, formatAmount, asOf }: { data: FactoryNetPositionData; formatAmount: (n: number) => string; asOf: string }) {
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -243,9 +258,9 @@ function CustomNetPositionView({ data, formatAmount }: { data: FactoryNetPositio
 
   // Fetch per-employee payroll breakdown
   const { data: payrollData } = useQuery<{ employees: PayrollEmployee[] }>({
-    queryKey: ["/api/factory/net-position/payroll-breakdown"],
+    queryKey: ["/api/factory/net-position/payroll-breakdown", asOf],
     queryFn: async () => {
-      const res = await fetch("/api/factory/net-position/payroll-breakdown", { credentials: "include" });
+      const res = await fetch(`/api/factory/net-position/payroll-breakdown?asOf=${asOf}`, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
@@ -461,15 +476,17 @@ function CustomNetPositionView({ data, formatAmount }: { data: FactoryNetPositio
 
 export default function FactoryNetPositionDetails() {
   const { formatAmount } = useCurrencyContext();
+  const [asOf, setAsOf] = useState<string>(todayStr);
+  const isToday = asOf === todayStr();
 
   const { data, isLoading, error, refetch, isFetching } = useQuery<FactoryNetPositionData>({
-    queryKey: ["/api/factory/net-position"],
+    queryKey: ["/api/factory/net-position", asOf],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/factory/net-position");
+      const res = await fetch(`/api/factory/net-position?asOf=${asOf}`, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    staleTime: 60_000,
+    staleTime: isToday ? 60_000 : Infinity,
   });
 
   if (isLoading) {
@@ -503,20 +520,70 @@ export default function FactoryNetPositionDetails() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 w-full">
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <PageHeader title="Factory Net Position" subtitle="Current factory financial standing — what we have vs what we owe" />
+          <PageHeader
+            title="Factory Net Position"
+            subtitle={isToday ? "Current factory financial standing — what we have vs what we owe" : `Historical snapshot — as of ${formatDateLabel(asOf)}`}
+          />
         </div>
-        <Button
-          onClick={() => refetch()}
-          variant="outline"
-          size="default"
-          disabled={isFetching}
-          data-testid="button-refresh"
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Date navigation */}
+          <div className="flex items-center gap-1 border rounded-md px-1 py-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setAsOf(shiftDate(asOf, -1))}
+              data-testid="button-date-prev"
+              title="Previous day"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-1.5 px-1">
+              <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                type="date"
+                value={asOf}
+                max={todayStr()}
+                onChange={(e) => e.target.value && setAsOf(e.target.value)}
+                className="text-sm bg-transparent border-none outline-none cursor-pointer w-[120px]"
+                data-testid="input-as-of-date"
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setAsOf(shiftDate(asOf, 1))}
+              disabled={isToday}
+              data-testid="button-date-next"
+              title="Next day"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          {!isToday && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAsOf(todayStr())}
+              data-testid="button-date-today"
+            >
+              Today
+            </Button>
+          )}
+          {isToday && (
+            <Button
+              variant="outline"
+              size="default"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              data-testid="button-refresh"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card data-testid="card-formula">
@@ -577,7 +644,7 @@ export default function FactoryNetPositionDetails() {
       </div>
 
       {data && (
-        <CustomNetPositionView data={data} formatAmount={formatAmount} />
+        <CustomNetPositionView data={data} formatAmount={formatAmount} asOf={asOf} />
       )}
     </div>
   );
