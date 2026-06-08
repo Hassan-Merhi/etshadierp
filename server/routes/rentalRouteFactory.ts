@@ -491,11 +491,13 @@ async function postRentAccrualForCompany(
   // balance (Cr AP accrual − Dr AP payment = remaining owed). This also
   // repairs rows whose original combined voucher was accidentally deleted but
   // whose payment entries are still in place.
+  // Exclude prepaid rows — pass 2 handles those exclusively to avoid double-counting
   const allUnaccrued = await db.select()
     .from(propertyMonthlyLedger)
     .where(and(
       inArray(propertyMonthlyLedger.contractId, contractIds),
       isNull(propertyMonthlyLedger.accrualVoucherId),
+      eq(propertyMonthlyLedger.usedPrepaidAccount, false),
       sql`${propertyMonthlyLedger.expectedAmount}::numeric > 0`,
     ));
 
@@ -683,9 +685,11 @@ async function postRentAccrualForCompany(
 
   // ── Pass 2: Tenant prepaid rent recognition ──────────────────────────────
   // For rows where usedPrepaidAccount=true, accrualVoucherId IS NULL, and isDue:
-  //   Dr Rent Expense / Cr Prepaid Rent
-  // These rows have paidAmount = expectedAmount so the main pass skips them
-  // (amount = expected - paid = 0). This separate pass handles them.
+  //   Dr Rent Expense (expectedAmount)
+  //     Cr Prepaid Rent          (paidAmount  — reverses the asset)
+  //     Cr Accrued Rent Payable  (unpaidPortion, if any — normal liability for remainder)
+  // Using paidAmount (not expectedAmount) for the Prepaid Rent credit ensures we
+  // never over-credit the asset for partial advance payments.
   if (contractIds.length > 0) {
     try {
       const prepaidUnaccrued = await db.select()
@@ -698,11 +702,18 @@ async function postRentAccrualForCompany(
       const duePrepaid = prepaidUnaccrued.filter(r => isDue(r));
       if (duePrepaid.length > 0) {
         await db.transaction(async (tx) => {
-          const totalAmt = duePrepaid.reduce((s, r) => s + Number(r.expectedAmount), 0);
-          const expenseId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
-          const prepaidId = await findOrCreateLedgerAccount(tx, companyId, "Prepaid Rent", "Asset", "PREP-RENT");
+          const expenseId    = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
+          const prepaidId    = await findOrCreateLedgerAccount(tx, companyId, "Prepaid Rent", "Asset", "PREP-RENT");
+          const liabilityId  = await findOrCreateLedgerAccount(tx, companyId, "Accrued Rent Payable", "Liability", "ACCR-RENT-PAY");
+
           const months = [...new Set(duePrepaid.map(r => `${String(r.month).padStart(2,"0")}/${r.year}`))].sort();
           const periodLabel = months.length === 1 ? months[0] : `${months[0]}–${months[months.length-1]}`;
+
+          // Total expense to recognize = full expected rent (prepaid portion + any outstanding)
+          const totalExpected = duePrepaid.reduce((s, r) => s + Number(r.expectedAmount), 0);
+          const totalPaid     = duePrepaid.reduce((s, r) => s + Math.min(Number(r.paidAmount), Number(r.expectedAmount)), 0);
+          const totalUnpaid   = Math.max(0, totalExpected - totalPaid);
+
           const vDesc = `Prepaid rent recognized - ${companyId} - ${periodLabel}`;
           const [v] = await tx.insert(vouchers).values({
             companyId,
@@ -710,21 +721,33 @@ async function postRentAccrualForCompany(
             voucherType: "Journal",
             voucherDate: new Date().toISOString().slice(0,10) as any,
             description: vDesc,
-            totalAmount: String(totalAmt),
+            totalAmount: String(totalExpected),
             currency: batchCurrency,
             sourceModule: moduleParam as any,
           }).returning();
-          const debitEntries = duePrepaid.map(r => ({
-            voucherId: v.id,
-            ledgerAccountId: expenseId,
-            debitAmount: String(Number(r.expectedAmount)),
-            creditAmount: "0",
-            narration: `Prepaid rent recognized - ${unitNameById.get(r.unitId) ?? `unit${r.unitId}`} - ${String(r.month).padStart(2,"0")}/${r.year}`,
-          }));
-          await tx.insert(voucherEntries).values([
-            ...debitEntries,
-            { voucherId: v.id, ledgerAccountId: prepaidId, debitAmount: "0", creditAmount: String(totalAmt), narration: vDesc },
-          ]);
+
+          // One debit line per row (Rent Expense = full expected)
+          const entries: any[] = duePrepaid.map(r => {
+            const rowLabel = `${unitNameById.get(r.unitId) ?? `unit${r.unitId}`} - ${String(r.month).padStart(2,"0")}/${r.year}`;
+            return {
+              voucherId: v.id,
+              ledgerAccountId: expenseId,
+              debitAmount: String(Number(r.expectedAmount)),
+              creditAmount: "0",
+              narration: `Prepaid rent recognized - ${rowLabel}`,
+            };
+          });
+
+          // Credit Prepaid Rent for the portion already paid in advance
+          if (totalPaid > 0.005) {
+            entries.push({ voucherId: v.id, ledgerAccountId: prepaidId, debitAmount: "0", creditAmount: totalPaid.toFixed(2), narration: vDesc });
+          }
+          // Credit Accrued Rent Payable for the remainder (partial-prepay case)
+          if (totalUnpaid > 0.005) {
+            entries.push({ voucherId: v.id, ledgerAccountId: liabilityId, debitAmount: "0", creditAmount: totalUnpaid.toFixed(2), narration: vDesc });
+          }
+
+          await tx.insert(voucherEntries).values(entries);
           await tx.update(propertyMonthlyLedger)
             .set({ accrualVoucherId: v.id })
             .where(inArray(propertyMonthlyLedger.id, duePrepaid.map(r => r.id)));
@@ -784,7 +807,12 @@ async function postRentAccrualForCompany(
         }
         const lBatchCurrency = [...lCurrCount.entries()].sort((a, b) => b[1] - a[1])[0][0];
         await db.transaction(async (tx) => {
-          const totalAmt = dueDeferred.reduce((s, r) => s + Number(r.expectedAmount), 0);
+          // Recognize only the collected (deferred) portion — paidAmount, not expectedAmount.
+          // Uncollected rent has no deferred account entry, so no recognition needed for it.
+          const totalDeferred = dueDeferred.reduce(
+            (s, r) => s + Math.min(Number(r.paidAmount), Number(r.expectedAmount)), 0
+          );
+          if (totalDeferred < 0.005) return; // nothing to recognize
           const incomeId = await findOrCreateLedgerAccount(tx, companyId, incomeAccountName, "Income", "RENT-INC", "Indirect Income");
           const deferredId = await findOrCreateLedgerAccount(tx, companyId, "Deferred Rent Revenue", "Liability", "DEF-RENT-REV");
           const months = [...new Set(dueDeferred.map(r => `${String(r.month).padStart(2,"0")}/${r.year}`))].sort();
@@ -796,20 +824,27 @@ async function postRentAccrualForCompany(
             voucherType: "Journal",
             voucherDate: new Date().toISOString().slice(0,10) as any,
             description: vDesc,
-            totalAmount: String(totalAmt),
+            totalAmount: String(totalDeferred),
             currency: lBatchCurrency,
             sourceModule: moduleParam as any,
           }).returning();
-          const debitEntries = dueDeferred.map(r => ({
-            voucherId: v.id,
-            ledgerAccountId: deferredId,
-            debitAmount: String(Number(r.expectedAmount)),
-            creditAmount: "0",
-            narration: `Deferred rent recognized - ${landlordUnitNames.get(r.unitId) ?? `unit${r.unitId}`} - ${String(r.month).padStart(2,"0")}/${r.year}`,
-          }));
+          // One debit line per row for only the deferred (collected) portion
+          const debitEntries = dueDeferred
+            .map(r => ({
+              amount: Math.min(Number(r.paidAmount), Number(r.expectedAmount)),
+              label: `${landlordUnitNames.get(r.unitId) ?? `unit${r.unitId}`} - ${String(r.month).padStart(2,"0")}/${r.year}`,
+            }))
+            .filter(e => e.amount > 0.005)
+            .map(e => ({
+              voucherId: v.id,
+              ledgerAccountId: deferredId,
+              debitAmount: e.amount.toFixed(2),
+              creditAmount: "0",
+              narration: `Deferred rent recognized - ${e.label}`,
+            }));
           await tx.insert(voucherEntries).values([
             ...debitEntries,
-            { voucherId: v.id, ledgerAccountId: incomeId, debitAmount: "0", creditAmount: String(totalAmt), narration: vDesc },
+            { voucherId: v.id, ledgerAccountId: incomeId, debitAmount: "0", creditAmount: totalDeferred.toFixed(2), narration: vDesc },
           ]);
           await tx.update(propertyMonthlyLedger)
             .set({ accrualVoucherId: v.id })
