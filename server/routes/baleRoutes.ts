@@ -2417,8 +2417,8 @@ export function registerBaleRoutes(app: Express) {
       const png = await bwipjs.toBuffer({
         bcid: "code128",
         text: code,
-        scale: 8,
-        height: 30,
+        scale: 14,
+        height: 40,
         includetext: false,
         textxalign: "center",
         barcolor: "000000",

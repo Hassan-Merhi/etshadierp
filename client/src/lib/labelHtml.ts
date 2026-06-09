@@ -267,8 +267,9 @@ ${detailBlockCss}
       * { color: #000 !important; }
       .info-key, .info-val, .barcode-number, .barcode-subtext { -webkit-text-stroke: 0.3px #000; }
       .a4-name-right-text, .a4-bottom-name-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
-      img:not(.header-banner-img):not(.a4-banner-img) { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+      img:not(.header-banner-img):not(.a4-banner-img):not(.barcode-img) { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
       .header-banner-img, .a4-banner-img { filter: none; }
+      .barcode-img { filter: none; image-rendering: pixelated; }
     }
   </style></head><body><div class="print-note">A4 Bale Labels. Set printer to BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
@@ -331,8 +332,9 @@ export function generateA5LabelsHtml(labels: LabelData[]) {
       * { color: #000 !important; }
       .info-key, .info-val, .barcode-number, .barcode-subtext { -webkit-text-stroke: 0.3px #000; }
       .a5-name-right-text, .a5-bottom-name-text { -webkit-text-stroke: 0.7px #000; text-shadow: 0 0 0.5px #000; }
-      img:not(.header-banner-img):not(.a4-banner-img) { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+      img:not(.header-banner-img):not(.a4-banner-img):not(.barcode-img) { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
       .header-banner-img, .a4-banner-img { filter: none; }
+      .barcode-img { filter: none; image-rendering: pixelated; }
     }
   </style></head><body><div class="print-note">A5 Bale Labels (preprinted paper). Select A5 paper, Portrait, 100% scale. Set BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
@@ -389,7 +391,7 @@ export function generateStickerLabelsHtml(labels: LabelData[]) {
       * { color: #000 !important; }
       .info-label, .info-value, .ref-barcode-number, .ref-bale-name { -webkit-text-stroke: 0.3px #000; }
       img { filter: contrast(3) brightness(0.9); image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
-      .sticker-logo { filter: none; }
+      .sticker-logo, .ref-barcode-img { filter: none; image-rendering: pixelated; }
     }
   </style></head><body><div class="print-note">Sticker Labels. Set printer to BEST quality, max darkness. Disable "Headers and Footers".</div>${labelsHtml}</body></html>`;
 }
