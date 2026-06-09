@@ -1,6 +1,6 @@
 import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { sqlArray } from "../lib/sqlArray";
@@ -4517,6 +4517,51 @@ export function registerAdminRoutes(app: Express) {
     } catch (error: any) {
       console.error("[BaleOrphanFix] Error:", error);
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Emergency: force-apply missing voucher column migrations ─────────────
+  // Runs ALTER TABLE with no lock timeout so it waits as long as needed.
+  // Safe to call multiple times — all statements use IF NOT EXISTS.
+  app.post("/api/admin/apply-missing-migrations", requireAuth, requireRole("Admin", "Owner", "Developer"), async (_req, res) => {
+    const client = await pool.connect();
+    const results: { sql: string; status: string; error?: string }[] = [];
+    const statements = [
+      `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS effective_date date`,
+      `ALTER TABLE factory_daybook_entries ADD COLUMN IF NOT EXISTS effective_date date`,
+      `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS shift_id integer`,
+      `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS location_name text`,
+      `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS exchange_rate numeric(20,6)`,
+      `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS source_module text DEFAULT 'ERP'`,
+      `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS is_credit_sale boolean DEFAULT false`,
+      `CREATE TABLE IF NOT EXISTS stock_item_code_aliases (
+        id serial PRIMARY KEY,
+        company_id integer NOT NULL,
+        stock_item_id integer NOT NULL,
+        alias_code varchar(50) NOT NULL,
+        description text,
+        created_at timestamp NOT NULL DEFAULT now()
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS stock_item_code_aliases_company_alias_unique ON stock_item_code_aliases (company_id, alias_code)`,
+    ];
+    try {
+      // No lock_timeout — wait as long as needed to acquire the DDL lock
+      await client.query(`SET lock_timeout = '0'`);
+      await client.query(`SET statement_timeout = '300s'`);
+      for (const stmt of statements) {
+        const label = stmt.trim().substring(0, 80);
+        try {
+          await client.query(stmt);
+          results.push({ sql: label, status: "ok" });
+        } catch (err: any) {
+          results.push({ sql: label, status: "error", error: err.message?.split("\n")[0] });
+        }
+      }
+      res.json({ success: true, results });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message, results });
+    } finally {
+      client.release();
     }
   });
 

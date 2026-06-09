@@ -187,6 +187,20 @@ export default function StockItems() {
   const { data: stockGrades = [] } = useQuery<StockGrade[]>({ queryKey: ["/api/stock-grades"] });
   const { data: stockCategories = [] } = useQuery<StockCategory[]>({ queryKey: ["/api/stock-categories"] });
   const { data: locations = [] } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
+  const { data: allAliasesRaw = [] } = useQuery<{ stockItemId: number; aliasCode: string }[]>({
+    queryKey: ["/api/stock-items/all-code-aliases"],
+    queryFn: async () => {
+      const res = await fetch("/api/stock-items/all-code-aliases", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 60 * 1000,
+  });
+  const aliasMap = new Map<number, string[]>();
+  for (const a of allAliasesRaw) {
+    if (!aliasMap.has(a.stockItemId)) aliasMap.set(a.stockItemId, []);
+    aliasMap.get(a.stockItemId)!.push(a.aliasCode);
+  }
 
   // Derived stats
   const activeCount = displayItems.filter(i => i.active).length;
@@ -648,6 +662,7 @@ export default function StockItems() {
                   <th className="text-left px-3 font-medium">Group</th>
                   {stockGrades.length > 0 && <th className="text-left px-3 font-medium">Grade</th>}
                   {stockCategories.length > 0 && <th className="text-left px-3 font-medium">Category</th>}
+                  <th className="text-left px-3 font-medium">Aliases</th>
                   <th className="text-left px-3 font-medium">Status</th>
                   <th className="w-20 px-3" />
                 </tr>
@@ -698,6 +713,17 @@ export default function StockItems() {
                             : <span className="text-xs text-muted-foreground">—</span>}
                         </td>
                       )}
+                      <td className="px-3 py-3 max-w-[180px]" data-testid={`aliases-${item.id}`}>
+                        {(aliasMap.get(item.id) ?? []).length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {(aliasMap.get(item.id) ?? []).map(code => (
+                              <Badge key={code} variant="outline" className="text-xs font-mono font-normal">{code}</Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
                       <td className="px-3 py-3" data-testid={`status-${item.id}`}>
                         <Badge variant={item.active ? "default" : "secondary"} className="text-xs">
                           {item.active ? "Active" : "Inactive"}
@@ -722,7 +748,7 @@ export default function StockItems() {
               {totalItems > 0 && (
                 <tfoot>
                   <tr className="border-t bg-muted/40">
-                    <td colSpan={4 + (stockGrades.length > 0 ? 1 : 0) + (stockCategories.length > 0 ? 1 : 0)} className="px-3 py-2">
+                    <td colSpan={5 + (stockGrades.length > 0 ? 1 : 0) + (stockCategories.length > 0 ? 1 : 0)} className="px-3 py-2">
                       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
                         <span>
                           Showing {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, totalItems)} of {totalItems.toLocaleString()} items
@@ -782,6 +808,9 @@ export default function StockItems() {
                             {getCategoryName(item.categoryId)}
                           </Badge>
                         )}
+                        {(aliasMap.get(item.id) ?? []).map(code => (
+                          <Badge key={code} variant="outline" className="text-xs font-mono font-normal" data-testid={`alias-mobile-${item.id}`}>{code}</Badge>
+                        ))}
                       </div>
                       {!hideStockRates && (
                         <div className="text-xs text-muted-foreground mt-1">{formatAmount(item.sellingPrice)}</div>
