@@ -227,6 +227,13 @@ async function buildAgentsForCompany(cid: number) {
     );
 
   // ── 4. Ledger accounts for this company ──
+  // Also include any account explicitly referenced by the mappings for this company,
+  // because an agent may be mapped to an account that lives under a different company ID
+  // (e.g. a shared/parent-company agent account).
+  const mappedAccountIds = allMappings
+    .map((m) => m.ledgerAccountId)
+    .filter((id): id is number => id !== null);
+
   const allLedgerAccts = await db
     .select({
       id: ledgerAccounts.id,
@@ -236,7 +243,15 @@ async function buildAgentsForCompany(cid: number) {
     })
     .from(ledgerAccounts)
     .where(
-      and(eq(ledgerAccounts.companyId, cid), isNull(ledgerAccounts.deletedAt))
+      and(
+        or(
+          eq(ledgerAccounts.companyId, cid),
+          mappedAccountIds.length > 0
+            ? inArray(ledgerAccounts.id, mappedAccountIds)
+            : sql`false`
+        ),
+        isNull(ledgerAccounts.deletedAt)
+      )
     );
 
   // ── 5. Agent → ledger account resolution ──
