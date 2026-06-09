@@ -396,27 +396,41 @@ export default function StockItems() {
 
   const exportToExcel = async () => {
     try {
-      const [allRes, pricesRes, costDubaiRes] = await Promise.all([
+      const [allRes, pricesRes, costDubaiRes, aliasesRes] = await Promise.all([
         fetch("/api/stock-items", { credentials: "include" }),
         fetch("/api/stock-item-location-prices/all", { credentials: "include" }),
         fetch("/api/stock-items/cost-dubai", { credentials: "include" }),
+        fetch("/api/stock-items/all-code-aliases", { credentials: "include" }),
       ]);
       const allItems: StockItem[] = allRes.ok ? await allRes.json() : [];
       const locationPrices: { stockItemId: number; locationId: number; locationName: string; sellingPrice: string }[] = pricesRes.ok ? await pricesRes.json() : [];
       const costDubaiData: { stockItemId: number; costDubai: string }[] = costDubaiRes.ok ? await costDubaiRes.json() : [];
+      const aliasData: { stockItemId: number; aliasCode: string }[] = aliasesRes.ok ? await aliasesRes.json() : [];
+
       const costDubaiMap = new Map<number, string>();
       for (const cd of costDubaiData) costDubaiMap.set(cd.stockItemId, cd.costDubai);
+
       const priceMap = new Map<number, Map<string, string>>();
       for (const lp of locationPrices) {
         if (!priceMap.has(lp.stockItemId)) priceMap.set(lp.stockItemId, new Map());
         priceMap.get(lp.stockItemId)!.set(lp.locationName, lp.sellingPrice);
       }
+
+      const aliasMap = new Map<number, string[]>();
+      for (const a of aliasData) {
+        if (!aliasMap.has(a.stockItemId)) aliasMap.set(a.stockItemId, []);
+        aliasMap.get(a.stockItemId)!.push(a.aliasCode);
+      }
+
       const sortedLocations = locations.map(l => l.name).sort();
       const data = allItems.map(item => {
         const costDubai = costDubaiMap.get(item.id);
         const defaultPrice = item.sellingPrice || "0";
+        const itemAliases = aliasMap.get(item.id) ?? [];
         const row: Record<string, string> = {
-          Code: item.code, Name: item.name, Barcode: item.barcode || "", UOM: item.uom,
+          Code: item.code, Name: item.name, Barcode: item.barcode || "",
+          "Alias Codes": itemAliases.join(", "),
+          UOM: item.uom,
           "Stock Group": getStockGroupName(item.stockGroupId) ?? "— No Group —",
           "Grade": getGradeName(item.gradeId) || "",
           "Category": getCategoryName(item.categoryId) || "",
