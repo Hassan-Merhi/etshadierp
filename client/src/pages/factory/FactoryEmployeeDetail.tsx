@@ -113,6 +113,7 @@ export default function FactoryEmployeeDetail() {
   const [depositAmount, setDepositAmount] = useState("");
   const [depositDate, setDepositDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [depositNotes, setDepositNotes] = useState("");
+  const [depositEffectiveDate, setDepositEffectiveDate] = useState("");
 
   // Withdrawal form
   const [withdrawOpen, setWithdrawOpen] = useState(false);
@@ -124,6 +125,7 @@ export default function FactoryEmployeeDetail() {
   // Payroll (bulk) state
   const [payrollDate, setPayrollDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [payrollNotes, setPayrollNotes] = useState("");
+  const [payrollEffectiveDate, setPayrollEffectiveDate] = useState("");
 
   // All employees for payroll tab
   const [selectedEmployees, setSelectedEmployees] = useState<Set<number>>(new Set());
@@ -204,7 +206,7 @@ export default function FactoryEmployeeDetail() {
   const depositMutation = useMutation({
     mutationFn: async () => {
       const res = await factoryApiRequest("POST", `/api/factory/employees/${employeeId}/deposit`, {
-        amount: depositAmount, date: depositDate, notes: depositNotes,
+        amount: depositAmount, date: depositDate, notes: depositNotes, effectiveDate: depositEffectiveDate || null,
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
       return res.json();
@@ -215,7 +217,7 @@ export default function FactoryEmployeeDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
       toast({ title: "Deposit recorded" });
       setDepositOpen(false);
-      setDepositAmount(""); setDepositNotes("");
+      setDepositAmount(""); setDepositNotes(""); setDepositEffectiveDate("");
     },
     onError: (e: any) => { if (e?._handledGlobally) return; toast({ variant: "destructive", title: e.message }); },
   });
@@ -247,7 +249,7 @@ export default function FactoryEmployeeDetail() {
       })).filter((d) => parseFloat(d.amount) > 0);
 
       const res = await factoryApiRequest("POST", "/api/factory/employees/bulk-payroll", {
-        deposits, date: payrollDate, notes: payrollNotes,
+        deposits, date: payrollDate, notes: payrollNotes, effectiveDate: payrollEffectiveDate || null,
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
       return res.json();
@@ -532,8 +534,12 @@ export default function FactoryEmployeeDetail() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Date *</Label>
+              <Label>Entry Date *</Label>
               <Input type="date" value={depositDate} onChange={(e) => setDepositDate(e.target.value)} data-testid="input-deposit-date" />
+            </div>
+            <div className="space-y-1">
+              <Label>Effective Date <span className="text-muted-foreground">(optional — period it belongs to)</span></Label>
+              <Input type="date" value={depositEffectiveDate} onChange={(e) => setDepositEffectiveDate(e.target.value)} data-testid="input-deposit-effective-date" />
             </div>
             <div className="space-y-1">
               <Label>Notes</Label>

@@ -63,6 +63,7 @@ export default function FactoryEmployeePayrollTab() {
   const { toast } = useToast();
   const [payrollOpen, setPayrollOpen] = useState(false);
   const [payDate, setPayDate] = useState(today());
+  const [payEffectiveDate, setPayEffectiveDate] = useState("");
   const [startDate, setStartDate] = useState(currentMonthStart());
   const [endDate, setEndDate] = useState(currentMonthEnd());
   const [payNotes, setPayNotes] = useState("");
@@ -138,7 +139,7 @@ export default function FactoryEmployeePayrollTab() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ deposits, date: payDate, notes: payNotes || null }),
+        body: JSON.stringify({ deposits, date: payDate, notes: payNotes || null, effectiveDate: payEffectiveDate || null }),
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
       return res.json();
@@ -149,6 +150,7 @@ export default function FactoryEmployeePayrollTab() {
       setAmounts({});
       setDeductions({});
       setPayNotes("");
+      setPayEffectiveDate("");
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employee-advances"] });
     },
@@ -275,9 +277,15 @@ export default function FactoryEmployeePayrollTab() {
                 {previewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               </Button>
             </div>
-            <div>
-              <Label>Notes</Label>
-              <Input placeholder="e.g. March 2026..." value={payNotes} onChange={(e) => setPayNotes(e.target.value)} data-testid="input-payroll-notes" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Effective Date <span className="text-muted-foreground">(optional)</span></Label>
+                <Input type="date" value={payEffectiveDate} onChange={(e) => setPayEffectiveDate(e.target.value)} data-testid="input-payroll-effective-date" />
+              </div>
+              <div>
+                <Label>Notes</Label>
+                <Input placeholder="e.g. March 2026..." value={payNotes} onChange={(e) => setPayNotes(e.target.value)} data-testid="input-payroll-notes" />
+              </div>
             </div>
 
             {/* Column headers */}
