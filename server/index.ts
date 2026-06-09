@@ -4144,12 +4144,11 @@ END $$`,
 
     try {
       await migrationClient.connect();
-      // Short lock_timeout prevents DDL migrations from blocking user queries on the
-      // running instance. If a lock cannot be acquired within 3 s the statement throws
-      // and is silently skipped by the catch below — it will succeed on the next deploy
-      // once the old instance is gone. statement_timeout caps runaway migration queries.
-      await migrationClient.query(`SET lock_timeout = '3s'`);
-      await migrationClient.query(`SET statement_timeout = '60s'`);
+      // 30 s lock_timeout: generous enough for a busy production DB to release
+      // in-flight queries before the DDL lock is granted, but still bounded so a
+      // truly stuck table doesn't hang the server indefinitely.
+      await migrationClient.query(`SET lock_timeout = '30s'`);
+      await migrationClient.query(`SET statement_timeout = '120s'`);
       // Convert any "ALTER TABLE t ADD COLUMN IF NOT EXISTS col ..."  to a DO
       // block that first checks information_schema.columns.  If the column
       // already exists the DO block is a no-op and never requests an ACCESS
@@ -4183,6 +4182,9 @@ END $mig$`;
             ["57P01", "08006", "08003", "08001", "08004"].includes(errCode) ||
             /terminating connection|connection.*reset|could not connect|connection closed|socket.*hang/i.test(errMsg);
 
+          // PG lock_timeout code is 55P03
+          const isLockTimeout = errCode === "55P03" || /lock timeout|canceling statement due to lock timeout/i.test(errMsg);
+
           if (isConnDrop) {
             // Reconnect and retry once — if retry also fails, record as a failure
             console.error(`[Migration] Connection dropped — reconnecting... (${errMsg.split("\n")[0]})`);
@@ -4193,8 +4195,8 @@ END $mig$`;
                 ssl: requiresSSL ? { rejectUnauthorized: false } : false,
               });
               await migrationClient.connect();
-              await migrationClient.query(`SET lock_timeout = '3s'`);
-              await migrationClient.query(`SET statement_timeout = '60s'`);
+              await migrationClient.query(`SET lock_timeout = '30s'`);
+              await migrationClient.query(`SET statement_timeout = '120s'`);
               await migrationClient.query(safeMigration(migration));
               console.log(`[Migration] Reconnected and retried successfully`);
             } catch (retryErr: any) {
@@ -4204,8 +4206,22 @@ END $mig$`;
                 error: retryMsg.split("\n")[0],
               });
             }
+          } else if (isLockTimeout) {
+            // Lock timeout — wait 5 s for in-flight queries to drain, then retry once
+            console.warn(`[Migration] Lock timeout — waiting 5s before retry... (${migration.trim().substring(0, 80)})`);
+            await new Promise(r => setTimeout(r, 5000));
+            try {
+              await migrationClient.query(safeMigration(migration));
+              console.log(`[Migration] Lock-timeout retry succeeded`);
+            } catch (retryErr: any) {
+              const retryMsg: string = retryErr.message ?? String(retryErr);
+              failedMigrations.push({
+                sql: migration.trim().substring(0, 120),
+                error: `lock-timeout retry failed: ${retryMsg.split("\n")[0]}`,
+              });
+            }
           } else {
-            // All other errors (lock timeout, syntax error, constraint, etc.) are
+            // All other errors (syntax error, constraint, etc.) are
             // recorded as failures so the ops team has full visibility at ERROR level.
             failedMigrations.push({
               sql: migration.trim().substring(0, 120),
