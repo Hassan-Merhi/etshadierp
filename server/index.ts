@@ -4015,6 +4015,23 @@ END $$`,
     `ALTER TABLE factory_daybook_entries ADD COLUMN IF NOT EXISTS effective_date date`,
     // ── POS shift linkage on vouchers ──
     `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS shift_id integer`,
+    // ── Voucher columns that were in schema but never had ADD COLUMN migrations ──
+    `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS location_name text`,
+    `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS exchange_rate numeric(20,6)`,
+    `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS source_module text DEFAULT 'ERP'`,
+    `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS is_credit_sale boolean DEFAULT false`,
+    // ── stock_item_code_aliases table (schema-only, never migrated) ──
+    `CREATE TABLE IF NOT EXISTS stock_item_code_aliases (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      stock_item_id integer NOT NULL,
+      alias_code varchar(50) NOT NULL,
+      description text,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS stock_item_code_aliases_company_alias_unique ON stock_item_code_aliases (company_id, alias_code)`,
+    `DO $$ BEGIN ALTER TABLE stock_item_code_aliases ADD CONSTRAINT stock_item_code_aliases_company_id_fkey2 FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+    `DO $$ BEGIN ALTER TABLE stock_item_code_aliases ADD CONSTRAINT stock_item_code_aliases_stock_item_id_fkey2 FOREIGN KEY (stock_item_id) REFERENCES stock_items(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
