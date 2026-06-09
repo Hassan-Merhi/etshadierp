@@ -118,6 +118,54 @@ interface RenamePreviewItem {
 }
 
 
+function RecalculateBaleCostsCard() {
+  const { toast } = useToast();
+  const [result, setResult] = useState<{ balesUpdated: number } | null>(null);
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const res = await factoryApiRequest("POST", "/api/factory/raw-stock/recalculate-bale-costs");
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      setResult(data);
+      toast({ title: "Done", description: data.message });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Wrench className="h-5 w-5 text-muted-foreground" />
+          Recalculate Old Bale Costs
+        </CardTitle>
+        <CardDescription>
+          Updates the cost/kg and total cost on all existing bales to match their mix batch's current blended rate.
+          Run this once to fix bales that were pressed before post-offload charges were added to their container.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {result && (
+          <p className="text-sm text-muted-foreground">
+            Last run: updated {result.balesUpdated} bale(s).
+          </p>
+        )}
+        <Button
+          onClick={() => mutation.mutate()}
+          disabled={mutation.isPending}
+          data-testid="button-recalculate-bale-costs"
+        >
+          {mutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wrench className="h-4 w-4 mr-2" />}
+          Recalculate Bale Costs
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 function MigrateVoucherDescriptionsCard() {
   const { toast } = useToast();
   const [result, setResult] = useState<{ chargesFixed: number; narrationFixed: number } | null>(null);
@@ -1425,6 +1473,7 @@ export default function FactorySettings() {
       </Card>
 
       {/* ── Data Maintenance ─────────────────────────────────── */}
+      <RecalculateBaleCostsCard />
       <MigrateVoucherDescriptionsCard />
     </div>
   );

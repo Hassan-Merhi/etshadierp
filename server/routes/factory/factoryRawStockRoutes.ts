@@ -2971,6 +2971,53 @@ export function registerFactoryRawStockRoutes(app: Express) {
     }
   });
 
+  // ── Recalculate bale costs from current mix batch cost/kg (one-time historical fix) ──
+  app.post("/api/factory/raw-stock/recalculate-bale-costs", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const allBatches = await db
+        .select({ id: factoryMixBatches.id, costPerKg: factoryMixBatches.costPerKg })
+        .from(factoryMixBatches)
+        .where(and(eq(factoryMixBatches.companyId, companyId), sql`${factoryMixBatches.status} != 'DELETED'`));
+
+      let balesUpdated = 0;
+      const now = new Date();
+
+      for (const batch of allBatches) {
+        const batchCost = parseFloat(batch.costPerKg || "0");
+        if (batchCost <= 0) continue;
+
+        const bales = await db
+          .select({ id: factoryBales.id, weightKg: factoryBales.weightKg })
+          .from(factoryBales)
+          .where(and(
+            eq(factoryBales.mixBatchId, batch.id),
+            eq(factoryBales.companyId, companyId),
+            sql`${factoryBales.status} NOT IN ('DELETED','REMOVED')`
+          ));
+
+        for (const bale of bales) {
+          const baleWt = parseFloat(bale.weightKg as string) || 0;
+          await db.update(factoryBales)
+            .set({
+              costPerKg: String(batchCost.toFixed(4)),
+              totalCost: String((baleWt * batchCost).toFixed(2)),
+              updatedAt: now,
+            })
+            .where(eq(factoryBales.id, bale.id));
+          balesUpdated++;
+        }
+      }
+
+      res.json({ balesUpdated, message: `Updated cost/kg on ${balesUpdated} bale(s) across ${allBatches.length} batch(es).` });
+    } catch (error: any) {
+      console.error("Error recalculating bale costs:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ───────────────────────────────────────────────
   // 6. Factory Mix Batches
   // ───────────────────────────────────────────────
