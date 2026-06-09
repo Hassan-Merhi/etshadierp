@@ -164,12 +164,13 @@ export function registerAccountRoutes(app: Express) {
       const balEndDate = req.query.endDate as string | undefined;
 
       // Get all voucher entries for this company's vouchers (excluding optional and deleted)
+      // Use COALESCE(effectiveDate, voucherDate) so period filtering respects effective date
       const voucherDateConditions = [
         eq(vouchers.companyId, companyId),
         eq(vouchers.optional, false),
         isNull(vouchers.deletedAt),
-        ...(balStartDate ? [gte(vouchers.voucherDate, balStartDate)] : []),
-        ...(balEndDate ? [lte(vouchers.voucherDate, balEndDate)] : []),
+        ...(balStartDate ? [sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) >= ${balStartDate}`] : []),
+        ...(balEndDate ? [sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${balEndDate}`] : []),
       ];
 
       const companyVouchers = await db
@@ -532,6 +533,7 @@ export function registerAccountRoutes(app: Express) {
           voucherNumber: vouchers.voucherNumber,
           voucherType: vouchers.voucherType,
           voucherDate: vouchers.voucherDate,
+          effectiveDate: vouchers.effectiveDate,
           description: vouchers.description,
           totalAmount: vouchers.totalAmount,
           currency: vouchers.currency,
@@ -545,7 +547,7 @@ export function registerAccountRoutes(app: Express) {
             ...keywordConditions,
           )
         )
-        .orderBy(desc(vouchers.voucherDate))
+        .orderBy(desc(sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate})`))
         .limit(100);
 
       res.json(results);

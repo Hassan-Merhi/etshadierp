@@ -131,6 +131,7 @@ interface Transaction {
   voucherNumber: string;
   voucherType: string;
   voucherDate: string;
+  effectiveDate?: string | null;
   voucherDescription: string;
   currency?: string;
 }
@@ -140,6 +141,7 @@ interface GroupedVoucher {
   voucherNumber: string;
   voucherType: string;
   voucherDate: string;
+  effectiveDate?: string | null;
   voucherDescription: string;
   narration: string;
   totalDebit: number;
@@ -852,6 +854,7 @@ export default function Accounts() {
           voucherNumber: txn.voucherNumber,
           voucherType: txn.voucherType,
           voucherDate: txn.voucherDate,
+          effectiveDate: txn.effectiveDate || null,
           voucherDescription: txn.voucherDescription,
           narration: txn.narration || "",
           totalDebit: debit,
@@ -861,10 +864,11 @@ export default function Accounts() {
       }
     });
 
-    // Sort by date, then by voucher number
+    // Sort by effective date (falling back to voucher date), then by voucher number
     return Array.from(voucherMap.values()).sort((a, b) => {
-      const dateCompare =
-        new Date(a.voucherDate).getTime() - new Date(b.voucherDate).getTime();
+      const dateA = a.effectiveDate || a.voucherDate;
+      const dateB = b.effectiveDate || b.voucherDate;
+      const dateCompare = new Date(dateA).getTime() - new Date(dateB).getTime();
       if (dateCompare !== 0) return dateCompare;
       return a.voucherNumber.localeCompare(b.voucherNumber);
     });
@@ -2630,11 +2634,16 @@ export default function Accounts() {
                                     />
                                   </TableCell>
                                   <TableCell className="font-mono text-sm py-2 sticky left-0 bg-background z-10">
-                                    {voucher.voucherDate
-                                      ? formatDisplayDate(
-                                          new Date(voucher.voucherDate),
-                                        )
-                                      : "-"}
+                                    {voucher.effectiveDate && voucher.effectiveDate !== voucher.voucherDate ? (
+                                      <div>
+                                        <div>{formatDisplayDate(new Date(voucher.effectiveDate))}</div>
+                                        <div className="text-[10px] text-muted-foreground">
+                                          entry: {formatDisplayDate(new Date(voucher.voucherDate))}
+                                        </div>
+                                      </div>
+                                    ) : voucher.voucherDate ? (
+                                      formatDisplayDate(new Date(voucher.voucherDate))
+                                    ) : "-"}
                                   </TableCell>
                                   <TableCell className="py-2">
                                     <Badge
@@ -2784,7 +2793,12 @@ export default function Accounts() {
                                 </div>
                                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                                   <span className="font-mono">
-                                    {voucher.voucherDate ? formatDisplayDate(new Date(voucher.voucherDate)) : "-"}
+                                    {voucher.effectiveDate && voucher.effectiveDate !== voucher.voucherDate ? (
+                                      <>
+                                        {formatDisplayDate(new Date(voucher.effectiveDate))}
+                                        <span className="ml-1 text-[10px]">(entry: {formatDisplayDate(new Date(voucher.voucherDate))})</span>
+                                      </>
+                                    ) : voucher.voucherDate ? formatDisplayDate(new Date(voucher.voucherDate)) : "-"}
                                   </span>
                                 </div>
                                 {!hideBalances && <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t">
@@ -2989,7 +3003,12 @@ export default function Accounts() {
                                 {deletedVouchers.map((v: any) => (
                                   <TableRow key={v.id} className="opacity-70">
                                     <TableCell className="py-2 font-mono text-sm">
-                                      {v.voucherDate ? formatDisplayDate(new Date(v.voucherDate)) : "-"}
+                                      {v.effectiveDate && v.effectiveDate !== v.voucherDate ? (
+                                        <div>
+                                          <div>{formatDisplayDate(new Date(v.effectiveDate))}</div>
+                                          <div className="text-[10px] text-muted-foreground">entry: {formatDisplayDate(new Date(v.voucherDate))}</div>
+                                        </div>
+                                      ) : v.voucherDate ? formatDisplayDate(new Date(v.voucherDate)) : "-"}
                                     </TableCell>
                                     <TableCell className="py-2 text-sm">{v.voucherNumber || "-"}</TableCell>
                                     <TableCell className="py-2">
@@ -3571,7 +3590,14 @@ export default function Accounts() {
                           onClick={handleOpen}
                           data-testid={`row-voucher-${v.id}`}
                         >
-                          <TableCell className="py-2.5 text-muted-foreground whitespace-nowrap">{v.voucherDate}</TableCell>
+                          <TableCell className="py-2.5 text-muted-foreground whitespace-nowrap">
+                            {v.effectiveDate && v.effectiveDate !== v.voucherDate ? (
+                              <div>
+                                <div>{v.effectiveDate}</div>
+                                <div className="text-[10px]">entry: {v.voucherDate}</div>
+                              </div>
+                            ) : v.voucherDate}
+                          </TableCell>
                           <TableCell className="py-2.5">
                             <Badge variant="secondary" className={`text-xs ${typeBadgeClass[v.voucherType] || ""}`}>
                               {v.voucherType}

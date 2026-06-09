@@ -263,7 +263,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid employee ID" });
 
-      const { amount, date, notes } = req.body;
+      const { amount, date, notes, effectiveDate } = req.body;
       const depositAmount = parseFloat(amount);
       if (isNaN(depositAmount) || depositAmount <= 0) {
         return res.status(400).json({ message: "Amount must be a positive number" });
@@ -297,6 +297,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           voucherNumber,
           voucherType: "Journal",
           voucherDate: date,
+          effectiveDate: (effectiveDate as string) || null,
           description: notes || `Salary deposit for ${emp.firstName} ${emp.lastName}`,
           totalAmount: depositAmount.toFixed(2),
         }).returning();
@@ -421,7 +422,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { deposits, date, notes } = req.body;
+      const { deposits, date, notes, effectiveDate } = req.body;
       if (!deposits || !Array.isArray(deposits) || deposits.length === 0) {
         return res.status(400).json({ message: "No deposits provided" });
       }
@@ -479,6 +480,7 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
           voucherNumber,
           voucherType: "Journal",
           voucherDate: date,
+          effectiveDate: (effectiveDate as string) || null,
           description: notes || `Bulk payroll - ${validDeposits.length} employees`,
           totalAmount: Math.abs(totalNet).toFixed(2),
         }).returning();
