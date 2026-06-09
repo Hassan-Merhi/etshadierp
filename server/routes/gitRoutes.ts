@@ -318,7 +318,8 @@ async function buildAgentsForCompany(cid: number) {
         and(
           eq(voucherEntries.ledgerAccountId, accountId),
           eq(vouchers.companyId, cid),
-          eq(vouchers.optional, false)
+          eq(vouchers.optional, false),
+          isNull(vouchers.deletedAt)
         )
       );
 
