@@ -840,6 +840,9 @@ function AuthenticatedApp() {
                     </kbd>
                   </Button>
                   )}
+                  <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout-header">
+                    <LogOut className="h-4 w-4" />
+                  </Button>
                 </div>
               </header>
               <OfflineBanner />

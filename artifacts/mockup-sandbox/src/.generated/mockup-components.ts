@@ -2,12 +2,12 @@
 type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 export const modules: ModuleMap = {
   "./components/mockups/SidebarCredit.tsx": () => import("../components/mockups/SidebarCredit.tsx"),
-  "./components/mockups/chatbot-variants/CleanOpen.tsx": () => import("../components/mockups/chatbot-variants/CleanOpen.tsx"),
-  "./components/mockups/chatbot-variants/SidePanel.tsx": () => import("../components/mockups/chatbot-variants/SidePanel.tsx"),
-  "./components/mockups/chatbot-variants/SleekDark.tsx": () => import("../components/mockups/chatbot-variants/SleekDark.tsx"),
   "./components/mockups/whatsapp-images/StockRevision.tsx": () => import("../components/mockups/whatsapp-images/StockRevision.tsx"),
   "./components/mockups/whatsapp-images/StockTransfer.tsx": () => import("../components/mockups/whatsapp-images/StockTransfer.tsx"),
   "./components/mockups/payment-receipt/Clean.tsx": () => import("../components/mockups/payment-receipt/Clean.tsx"),
   "./components/mockups/payment-receipt/Modern.tsx": () => import("../components/mockups/payment-receipt/Modern.tsx"),
-  "./components/mockups/payment-receipt/Structured.tsx": () => import("../components/mockups/payment-receipt/Structured.tsx")
+  "./components/mockups/payment-receipt/Structured.tsx": () => import("../components/mockups/payment-receipt/Structured.tsx"),
+  "./components/mockups/chatbot-variants/CleanOpen.tsx": () => import("../components/mockups/chatbot-variants/CleanOpen.tsx"),
+  "./components/mockups/chatbot-variants/SidePanel.tsx": () => import("../components/mockups/chatbot-variants/SidePanel.tsx"),
+  "./components/mockups/chatbot-variants/SleekDark.tsx": () => import("../components/mockups/chatbot-variants/SleekDark.tsx")
 };
