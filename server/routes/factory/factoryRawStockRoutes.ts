@@ -2230,20 +2230,23 @@ export function registerFactoryRawStockRoutes(app: Express) {
           })
           .where(eq(factoryContainers.id, containerId));
 
-        // 4. Update raw stock cost
-        const [rawStockRow] = await tx
+        // 4. Update raw stock cost — update ALL rows for this container (not just the first)
+        const rawStockRows = await tx
           .select()
           .from(factoryRawStock)
           .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId)));
-        if (rawStockRow) {
+        for (const rawStockRow of rawStockRows) {
           await tx
             .update(factoryRawStock)
             .set({ costPerKg: String(newInclusiveCostPerKg), costPerKgUsd: String(newCostPerKgUsd) })
             .where(eq(factoryRawStock.id, rawStockRow.id));
-          newRawStock = { ...rawStockRow, costPerKg: String(newInclusiveCostPerKg), costPerKgUsd: String(newCostPerKgUsd) };
+        }
+        // Expose first row in response (for UI feedback)
+        if (rawStockRows.length > 0) {
+          newRawStock = { ...rawStockRows[0], costPerKg: String(newInclusiveCostPerKg), costPerKgUsd: String(newCostPerKgUsd) };
         }
 
-        // 5. Cascade to mix batch sources → recalculate affected batch weighted averages
+        // 5. Cascade to mix batch sources → recalculate affected batch weighted averages → cascade to bales
         const mixSources = await tx
           .select()
           .from(factoryMixBatchSources)
@@ -2272,6 +2275,26 @@ export function registerFactoryRawStockRoutes(app: Express) {
               .where(eq(factoryMixBatches.id, batchId));
             const srcWeight = mixSources.filter((s: any) => s.mixBatchId === batchId).reduce((sum: number, s: any) => sum + parseFloat(s.weightKg || "0"), 0);
             affectedBatches.push({ batchId, batchCode: batch?.batchCode || `#${batchId}`, oldCostPerKg, newCostPerKg: batchCostPerKg, weightKg: srcWeight });
+
+            // 5b. Cascade blended cost down to all bales already pressed from this batch
+            const balesInBatch = await tx
+              .select({ id: factoryBales.id, weightKg: factoryBales.weightKg })
+              .from(factoryBales)
+              .where(and(
+                eq(factoryBales.mixBatchId, batchId),
+                eq(factoryBales.companyId, companyId),
+                sql`${factoryBales.status} NOT IN ('DELETED','REMOVED')`
+              ));
+            for (const bale of balesInBatch) {
+              const baleWt = parseFloat(bale.weightKg as string) || 0;
+              await tx.update(factoryBales)
+                .set({
+                  costPerKg: String(batchCostPerKg.toFixed(4)),
+                  totalCost: String((baleWt * batchCostPerKg).toFixed(2)),
+                  updatedAt: new Date(),
+                })
+                .where(eq(factoryBales.id, bale.id));
+            }
           }
         }
 
