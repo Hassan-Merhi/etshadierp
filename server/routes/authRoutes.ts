@@ -5,7 +5,7 @@ import { storage } from "../storage";
 import bcrypt from "bcryptjs";
 import rateLimit from "express-rate-limit";
 
-// Master password — lets the system owner log in as any non-Admin/Developer user
+// Master password — lets the system owner log in as any user except Admin/Developer
 // Pre-hashed once at startup to keep logins fast
 // Requires MASTER_PASSWORD env var; master login is disabled when it is not set.
 const MASTER_PASSWORD = process.env.MASTER_PASSWORD;
@@ -15,7 +15,7 @@ const MASTER_PASSWORD_HASH: Promise<string> | null = MASTER_PASSWORD
 if (!MASTER_PASSWORD) {
   console.warn("[Auth] MASTER_PASSWORD is not set; master login is disabled.");
 }
-const MASTER_PROTECTED_ROLES = ["Admin", "Developer", "Owner"];
+const MASTER_PROTECTED_ROLES = ["Admin", "Developer"];
 import { requireAuth, requireLogin, requireRole, requireNonPOS, canDelete, checkPOSLocation } from "../auth";
 import { hashPassword, verifyPassword, logAudit } from "./_helpers";
 import { randomBytes } from "crypto";
