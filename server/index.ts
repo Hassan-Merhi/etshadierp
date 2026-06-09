@@ -4013,6 +4013,8 @@ END $$`,
     // ── Effective Date for factory transactions ──
     `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS effective_date date`,
     `ALTER TABLE factory_daybook_entries ADD COLUMN IF NOT EXISTS effective_date date`,
+    // ── POS shift linkage on vouchers ──
+    `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS shift_id integer`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
