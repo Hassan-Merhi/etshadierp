@@ -14,6 +14,7 @@ import {
   companies,
   userCompanyRoles,
   suppliers,
+  bankAccounts,
 } from "../../shared/schema";
 import { and, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 
@@ -304,20 +305,17 @@ async function buildAgentsForCompany(cid: number) {
     const acct = allLedgerAccts.find((a) => a.id === accountId);
     if (!acct) return 0;
 
-    let balance = parseFloat(acct.openingBalance || "0");
-    if (acct.openingBalanceSide === "Cr") balance = -balance;
+    const rawOB = parseFloat(acct.openingBalance || "0");
+    let balance = acct.openingBalanceSide === "Cr" ? -rawOB : rawOB;
 
+    // Ledger voucher entries — no company filter, matches Accounts page behaviour
     const entries = await db
-      .select({
-        debitAmount: voucherEntries.debitAmount,
-        creditAmount: voucherEntries.creditAmount,
-      })
+      .select({ debitAmount: voucherEntries.debitAmount, creditAmount: voucherEntries.creditAmount })
       .from(voucherEntries)
       .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
       .where(
         and(
           eq(voucherEntries.ledgerAccountId, accountId),
-          eq(vouchers.companyId, cid),
           eq(vouchers.optional, false),
           isNull(vouchers.deletedAt)
         )
@@ -325,6 +323,34 @@ async function buildAgentsForCompany(cid: number) {
 
     for (const e of entries) {
       balance += parseFloat(e.debitAmount || "0") - parseFloat(e.creditAmount || "0");
+    }
+
+    // Linked bank accounts — entries stored under bankAccountId, not ledgerAccountId.
+    // The Accounts page balance folds these in, so we must too.
+    const linkedBanks = await db
+      .select({ id: bankAccounts.id, openingBalance: bankAccounts.openingBalance, openingBalanceSide: bankAccounts.openingBalanceSide })
+      .from(bankAccounts)
+      .where(eq(bankAccounts.linkedLedgerId, accountId));
+
+    for (const bank of linkedBanks) {
+      const bOB = parseFloat(bank.openingBalance || "0");
+      balance += bank.openingBalanceSide === "Cr" ? -bOB : bOB;
+
+      const bankEntries = await db
+        .select({ debitAmount: voucherEntries.debitAmount, creditAmount: voucherEntries.creditAmount })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(voucherEntries.bankAccountId, bank.id),
+            eq(vouchers.optional, false),
+            isNull(vouchers.deletedAt)
+          )
+        );
+
+      for (const e of bankEntries) {
+        balance += parseFloat(e.debitAmount || "0") - parseFloat(e.creditAmount || "0");
+      }
     }
 
     return balance;
