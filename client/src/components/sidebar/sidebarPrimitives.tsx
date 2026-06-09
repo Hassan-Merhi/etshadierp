@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { ChevronDown, GripVertical } from "lucide-react";
+import { ChevronDown, GripVertical, LogOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 
@@ -404,6 +405,14 @@ interface ModuleFooterProps {
 export function ModuleFooter({ user, avatarClassName, accent }: ModuleFooterProps) {
   const initials = user?.username ? user.username.substring(0, 2).toUpperCase() : "AD";
   const { isOnline } = useConnectivity();
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    } catch {}
+    window.location.href = "/login";
+  };
+
   return (
     <SidebarFooter
       className="px-4 py-3 border-t border-sidebar-border relative overflow-hidden"
@@ -447,6 +456,16 @@ export function ModuleFooter({ user, avatarClassName, accent }: ModuleFooterProp
             {user?.role || "Role"}
           </span>
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleLogout}
+          title="Log out"
+          data-testid="button-sidebar-logout"
+          className="shrink-0 text-muted-foreground"
+        >
+          <LogOut className="h-4 w-4" />
+        </Button>
       </div>
     </SidebarFooter>
   );
