@@ -906,6 +906,12 @@ export function registerContainerRoutes(app: Express) {
         ? Number((po as any).freightParentAccountId) : null;
       const poHasParentFreight = poFreightPaidBy === 'parent' && poFreightAmt > 0 && !!poFreightParentAcctId;
 
+      // Fetch container number up-front — used in both the same-company and interco paths.
+      // Must be declared before isSameCompanySync block to avoid Temporal Dead Zone crash.
+      const poContainerRow = po.containerId
+        ? (await db.select({ containerNumber: containers.containerNumber }).from(containers).where(eq(containers.id, po.containerId)).limit(1))[0]
+        : undefined;
+
       // Same-company / no interco: update the freight DR entry in the PO's local voucher.
       if (isSameCompanySync) {
         if (!poHasParentFreight || !po.voucherId) {
@@ -945,10 +951,6 @@ export function registerContainerRoutes(app: Express) {
         });
         return res.json({ message: `Freight posted to account — PO voucher updated (${poFreightAmt.toFixed(2)})`, found: true, updated: true, amount: poGrossTotal.toFixed(2), poNumber: po.poNumber, updatedVouchers: 1 });
       }
-
-      const poContainerRow = po.containerId
-        ? (await db.select({ containerNumber: containers.containerNumber }).from(containers).where(eq(containers.id, po.containerId)).limit(1))[0]
-        : undefined;
 
       const result = await syncIntercoParentVoucher(
         db, po.poNumber, poGrossTotal, poContainerRow?.containerNumber,
