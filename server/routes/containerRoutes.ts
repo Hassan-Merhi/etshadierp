@@ -205,7 +205,7 @@ async function syncIntercoParentVoucher(
                   .where(eq(voucherEntries.id, fe.id));
               } else if (parseFloat(fe.creditAmount || "0") > 0) {
                 await dbOrTx.update(voucherEntries)
-                  .set({ creditAmount: freightAmtStr, ledgerAccountId: freightOpts.freightParentAccountId })
+                  .set({ creditAmount: freightAmtStr, ledgerAccountId: freightOpts.freightParentAccountId, narration: `Freight - ${nums.join(", ")}${containerNumber ? ` (${containerNumber})` : ""}` })
                   .where(eq(voucherEntries.id, fe.id));
               }
             }
@@ -228,7 +228,7 @@ async function syncIntercoParentVoucher(
                 voucherId: newFV.id, companyId: parentCompanyId,
                 ledgerAccountId: freightOpts.freightParentAccountId,
                 debitAmount: "0", creditAmount: freightAmtStr,
-                narration: `Freight - ${nums.join(", ")}`,
+                narration: `Freight - ${nums.join(", ")}${containerNumber ? ` (${containerNumber})` : ""}`,
               },
             ];
             if (drAccountId) {
@@ -714,13 +714,13 @@ export function registerContainerRoutes(app: Express) {
                   voucherId: po.voucherId, companyId: po.companyId,
                   ledgerAccountId: purchasesAcctId,
                   debitAmount: poIntercoTotal.toFixed(2), creditAmount: "0",
-                  narration: `PO ${po.poNumber}`,
+                  narration: `${po.poNumber}`,
                 },
                 {
                   voucherId: po.voucherId, companyId: po.companyId,
                   ledgerAccountId: purchasesAcctId,
                   debitAmount: poFreight.toFixed(2), creditAmount: "0",
-                  narration: `Freight - PO ${po.poNumber}`,
+                  narration: `Freight - ${po.poNumber}${poContainerRow?.containerNumber ? ` (${poContainerRow.containerNumber})` : ""}`,
                 },
               ]);
             }
@@ -763,13 +763,13 @@ export function registerContainerRoutes(app: Express) {
                   voucherId: po.voucherId, companyId: po.companyId,
                   ledgerAccountId: purchasesAcctId,
                   debitAmount: poFreight.toFixed(2), creditAmount: "0",
-                  narration: `Freight - PO ${po.poNumber}`,
+                  narration: `Freight - ${po.poNumber}${poContainerRow?.containerNumber ? ` (${poContainerRow.containerNumber})` : ""}`,
                 },
                 {
                   voucherId: po.voucherId, companyId: po.companyId,
                   ledgerAccountId: freightAccountId,
                   debitAmount: "0", creditAmount: poFreight.toFixed(2),
-                  narration: `Freight - PO ${po.poNumber}`,
+                  narration: `Freight - ${po.poNumber}${poContainerRow?.containerNumber ? ` (${poContainerRow.containerNumber})` : ""}`,
                 },
               ]);
             }
@@ -1267,13 +1267,13 @@ export function registerContainerRoutes(app: Express) {
                           voucherId: po.voucherId, companyId: po.companyId,
                           ledgerAccountId: purchasesAcctId,
                           debitAmount: intercoTotal.toFixed(2), creditAmount: "0",
-                          narration: `PO ${po.poNumber}`,
+                          narration: `${po.poNumber}`,
                         },
                         {
                           voucherId: po.voucherId, companyId: po.companyId,
                           ledgerAccountId: purchasesAcctId,
                           debitAmount: poFreight.toFixed(2), creditAmount: "0",
-                          narration: `Freight - PO ${po.poNumber}`,
+                          narration: `Freight - ${po.poNumber}${cNum && cNum !== String(po.id) ? ` (${cNum})` : ""}`,
                         },
                       ]);
                     }
@@ -1312,13 +1312,13 @@ export function registerContainerRoutes(app: Express) {
                           voucherId: po.voucherId, companyId: po.companyId,
                           ledgerAccountId: purchasesAcctId,
                           debitAmount: poFreight.toFixed(2), creditAmount: "0",
-                          narration: `Freight - PO ${po.poNumber}`,
+                          narration: `Freight - ${po.poNumber}${cNum && cNum !== String(po.id) ? ` (${cNum})` : ""}`,
                         },
                         {
                           voucherId: po.voucherId, companyId: po.companyId,
                           ledgerAccountId: freightAccountId,
                           debitAmount: "0", creditAmount: poFreight.toFixed(2),
-                          narration: `Freight - PO ${po.poNumber}`,
+                          narration: `Freight - ${po.poNumber}${cNum && cNum !== String(po.id) ? ` (${cNum})` : ""}`,
                         },
                       ]);
                     }
@@ -3633,14 +3633,15 @@ export function registerContainerRoutes(app: Express) {
                 let freightCrEntryId: number | null = null;
                 let mainCrEntryId: number | null = null;
                 const toDeleteIds: number[] = [];
+                const freightCrCandidatesPatch: number[] = [];
 
                 for (const entry of existingEntries) {
                   const acctId = (entry as any).ledgerAccountId as number | null;
                   const isDebit  = parseFloat(entry.debitAmount  || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
                   const isCredit = parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount  || "0") === 0;
 
-                  if (isCredit && acctId === newFreightParentAccountId && freightCrEntryId === null) {
-                    freightCrEntryId = entry.id; // existing freight CR — keep & update
+                  if (isCredit && acctId === newFreightParentAccountId) {
+                    freightCrCandidatesPatch.push(entry.id);
                   } else if (isDebit && purchasesEntryId === null) {
                     purchasesEntryId = entry.id; // first DR = purchases
                   } else if (isCredit && mainCrEntryId === null) {
@@ -3649,6 +3650,8 @@ export function registerContainerRoutes(app: Express) {
                     toDeleteIds.push(entry.id); // extras — delete
                   }
                 }
+                freightCrEntryId = freightCrCandidatesPatch[0] ?? null;
+                toDeleteIds.push(...freightCrCandidatesPatch.slice(1));
 
                 if (toDeleteIds.length > 0) {
                   await tx.delete(voucherEntries).where(inArray(voucherEntries.id, toDeleteIds));
@@ -3736,13 +3739,13 @@ export function registerContainerRoutes(app: Express) {
                       voucherId: existingPO.voucherId, companyId: existingPO.companyId,
                       ledgerAccountId: purchasesAcctId,
                       debitAmount: supplierTotal.toFixed(2), creditAmount: "0",
-                      narration: `PO ${existingPO.poNumber}`,
+                      narration: `${existingPO.poNumber}`,
                     },
                     {
                       voucherId: existingPO.voucherId, companyId: existingPO.companyId,
                       ledgerAccountId: purchasesAcctId,
                       debitAmount: newFreight.toFixed(2), creditAmount: "0",
-                      narration: `Freight - PO ${existingPO.poNumber}`,
+                      narration: _freightNarration,
                     },
                   ]);
                 }
@@ -3787,13 +3790,13 @@ export function registerContainerRoutes(app: Express) {
                     voucherId: existingPO.voucherId, companyId: existingPO.companyId,
                     ledgerAccountId: purchasesAcctId,
                     debitAmount: newFreight.toFixed(2), creditAmount: "0",
-                    narration: `Freight - PO ${existingPO.poNumber}`,
+                    narration: _freightNarration,
                   },
                   {
                     voucherId: existingPO.voucherId, companyId: existingPO.companyId,
                     ledgerAccountId: newFreightOwnAccountId,
                     debitAmount: "0", creditAmount: newFreight.toFixed(2),
-                    narration: `Freight - PO ${existingPO.poNumber}`,
+                    narration: _freightNarration,
                   },
                 ]);
               }
