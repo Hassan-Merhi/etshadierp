@@ -297,7 +297,7 @@ async function syncIntercoParentVoucher(
           if ((entry as any).ledgerAccountId === freightOpts.freightParentAccountId) {
             freightEntryFound = true;
             await dbOrTx.update(voucherEntries)
-              .set({ creditAmount: freightAmtStr })
+              .set({ creditAmount: freightAmtStr, narration: `Freight - ${nums.join(", ")}${containerNumber ? ` (${containerNumber})` : ""}` })
               .where(eq(voucherEntries.id, entry.id));
           } else {
             // Supplier CR → intercoTotal (goods share only)
@@ -314,7 +314,7 @@ async function syncIntercoParentVoucher(
           ledgerAccountId: freightOpts.freightParentAccountId,
           debitAmount: "0",
           creditAmount: freightAmtStr,
-          narration: `Freight - ${nums.join(", ")}`,
+          narration: `Freight - ${nums.join(", ")}${containerNumber ? ` (${containerNumber})` : ""}`,
         });
       }
     } else {
