@@ -2231,7 +2231,42 @@ export default function FactoryDaybook() {
                             </div>
 
                             {/* Expanded entry sub-rows */}
-                            {isExpanded && expandedEntries.map((entry) => {
+                            {isExpanded && row.txType === "BALE_STOCK_ENTRY" && (() => {
+                              const firstEntry = expandedEntries[0] as DisplayEntry | undefined;
+                              return (
+                                <div
+                                  className={cn("grid w-full bg-muted/20 border-t items-center", colsClass)}
+                                >
+                                  <div className="pl-14 pr-2 py-2 min-w-0">
+                                    <span className="text-sm text-foreground">{row.count} bale{row.count !== 1 ? "s" : ""}</span>
+                                  </div>
+                                  <div />
+                                  {showAmounts ? (
+                                    <div className="flex items-center justify-end gap-1 pr-2 py-2">
+                                      <span className="text-sm font-mono font-medium">
+                                        {currencySymbol(row.currencyCode)}{formatNumber(row.totalAmountCurrency)}
+                                      </span>
+                                      {firstEntry && (
+                                        <Button size="icon" variant="ghost" title="View details"
+                                          onClick={(e) => { e.stopPropagation(); setViewEntry((firstEntry._source ?? firstEntry) as DaybookEntry); }}
+                                          data-testid="button-view-bale-summary"
+                                        ><Eye className="h-3 w-3" /></Button>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center justify-end gap-1 pr-2 py-2">
+                                      {firstEntry && (
+                                        <Button size="icon" variant="ghost" title="View details"
+                                          onClick={(e) => { e.stopPropagation(); setViewEntry((firstEntry._source ?? firstEntry) as DaybookEntry); }}
+                                          data-testid="button-view-bale-summary"
+                                        ><Eye className="h-3 w-3" /></Button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                            {isExpanded && row.txType !== "BALE_STOCK_ENTRY" && expandedEntries.map((entry) => {
                               const de = entry as DisplayEntry;
                               const isBaleTransfer = entry.txType === "BALE_TRANSFER";
                               const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
