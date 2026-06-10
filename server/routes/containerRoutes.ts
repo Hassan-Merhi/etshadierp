@@ -262,6 +262,7 @@ async function syncIntercoParentVoucher(
     // Check whether an update is needed (idempotent)
     const totalMismatch = Math.abs(oldAmount - grossTotal) > 0.001;
     let freightEntryMissing = false;
+    let freightNarrationMismatch = false;
     if (freightOpts && freightOpts.freightAmount > 0) {
       const fe = parentEntries.find(
         (e: any) => e.ledgerAccountId === freightOpts.freightParentAccountId &&
@@ -269,8 +270,11 @@ async function syncIntercoParentVoucher(
       );
       freightEntryMissing = !fe ||
         Math.abs(parseFloat(fe.creditAmount || "0") - freightOpts.freightAmount) > 0.001;
+      if (fe && containerNumber) {
+        freightNarrationMismatch = !(fe.narration || "").includes(containerNumber);
+      }
     }
-    if (!totalMismatch && !freightEntryMissing) {
+    if (!totalMismatch && !freightEntryMissing && !freightNarrationMismatch) {
       return { found: true, updated: false, voucherId: parentVoucher.id, amount: amountStr, oldAmount: oldAmountStr };
     }
 
