@@ -956,14 +956,61 @@ export function registerContainerRoutes(app: Express) {
         db, po.poNumber, poGrossTotal, poContainerRow?.containerNumber,
         poHasParentFreight ? { freightAmount: poFreightAmt, freightParentAccountId: poFreightParentAcctId!, subsidiaryCompanyId: po.companyId } : undefined,
       );
+
+      if (result.found) {
+        return res.json({
+          message: `Parent JV synced — voucher #${result.voucherId} updated to ${result.amount}`,
+          ...result,
+          poNumber: po.poNumber,
+          intercoTotal: result.amount,
+          updatedVouchers: result.updated ? 1 : 0,
+        });
+      }
+
+      // No INTERCO-PARENT voucher found. If this PO has parent freight configured
+      // with a local voucher, apply the freight split directly to the local purchase
+      // voucher: CR Supplier = items-only (grossTotal − freight), CR FreightAccount = freight.
+      if (poHasParentFreight && po.voucherId) {
+        const existingEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, po.voucherId!));
+        let purchasesEntryId: number | null = null;
+        let freightCrEntryId: number | null = null;
+        let mainCrEntryId: number | null = null;
+        const toDeleteIds: number[] = [];
+        for (const entry of existingEntries) {
+          const acctId = (entry as any).ledgerAccountId as number | null;
+          const isDebit  = parseFloat(entry.debitAmount  || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
+          const isCredit = parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount  || "0") === 0;
+          if (isCredit && acctId === poFreightParentAcctId && freightCrEntryId === null) {
+            freightCrEntryId = entry.id;
+          } else if (isDebit && purchasesEntryId === null) {
+            purchasesEntryId = entry.id;
+          } else if (isCredit && mainCrEntryId === null) {
+            mainCrEntryId = entry.id;
+          } else {
+            toDeleteIds.push(entry.id);
+          }
+        }
+        const _freightNarration = `Freight - ${po.poNumber}${poContainerRow?.containerNumber ? ` (${poContainerRow.containerNumber})` : ''}`;
+        await db.transaction(async (tx) => {
+          if (toDeleteIds.length > 0) await tx.delete(voucherEntries).where(inArray(voucherEntries.id, toDeleteIds));
+          if (purchasesEntryId !== null) await tx.update(voucherEntries).set({ debitAmount: poGrossTotal.toFixed(2), creditAmount: "0" }).where(eq(voucherEntries.id, purchasesEntryId));
+          if (mainCrEntryId !== null) await tx.update(voucherEntries).set({ creditAmount: poSupplierTotal.toFixed(2), debitAmount: "0" }).where(eq(voucherEntries.id, mainCrEntryId));
+          if (freightCrEntryId !== null) {
+            await tx.update(voucherEntries).set({ creditAmount: poFreightAmt.toFixed(2), debitAmount: "0", ledgerAccountId: poFreightParentAcctId!, narration: _freightNarration }).where(eq(voucherEntries.id, freightCrEntryId));
+          } else {
+            await tx.insert(voucherEntries).values({ voucherId: po.voucherId!, companyId: po.companyId, ledgerAccountId: poFreightParentAcctId!, debitAmount: "0", creditAmount: poFreightAmt.toFixed(2), narration: _freightNarration });
+          }
+          await tx.update(vouchers).set({ totalAmount: poGrossTotal.toFixed(2) }).where(eq(vouchers.id, po.voucherId!));
+        });
+        return res.json({ message: `Freight split applied — supplier credited ${poSupplierTotal.toFixed(2)}, freight account credited ${poFreightAmt.toFixed(2)}`, found: true, updated: true, amount: poGrossTotal.toFixed(2), poNumber: po.poNumber, updatedVouchers: 1 });
+      }
+
       res.json({
-        message: result.found
-          ? `Parent JV synced — voucher #${result.voucherId} updated to ${result.amount}`
-          : `No INTERCO-PARENT voucher found for PO ${po.poNumber}`,
+        message: `No INTERCO-PARENT voucher found for PO ${po.poNumber}`,
         ...result,
         poNumber: po.poNumber,
         intercoTotal: result.amount,
-        updatedVouchers: result.updated ? 1 : 0,
+        updatedVouchers: 0,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

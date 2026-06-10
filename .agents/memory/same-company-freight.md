@@ -1,19 +1,25 @@
 ---
 name: Same-company parent freight posting
-description: When freightPaidBy='parent' and the PO company IS the parent company (or no interco config), freight must be embedded in the local PO voucher, not skipped.
+description: When freightPaidBy='parent' and the PO company IS the parent company OR no INTERCO-PARENT voucher exists, freight must be embedded in the local PO voucher, not skipped.
 ---
 
 ## Rule
-When `freightPaidBy='parent'` and `freightParentAccountId` is set, always check `isSameCompanyOrNoInterco = !parentCompanyId || po.companyId === parentCompanyId`.
+When `freightPaidBy='parent'` and `freightParentAccountId` is set, the sync-parent-voucher endpoint has three paths:
 
-- **Same-company**: embed freight directly in the PO voucher as DR freightParentAccountId. Structure: DR Purchases (supplierTotal) + DR freightParentAccountId (freight) + CR Supplier (grossTotal).
-- **Interco (subsidiary)**: keep the existing structure — DR Purchases×2 + CR parentCreditAccountId. freightParentAccountId is NEVER in the child's voucher.
+1. **Same-company** (`isSameCompanySync = !parentCompanyId || po.companyId === parentCompanyId`):
+   Apply local split immediately — DR Purchases (grossTotal), CR Supplier (grossTotal−freight), CR FreightAccount (freight).
 
-**Why:** The original code only called `syncIntercoParentVoucher` and restructured the voucher for the interco case. When `po.companyId === parentCompanyId`, the interco sync was guarded out entirely, leaving the freight account with no posting at all.
+2. **Subsidiary with INTERCO-PARENT voucher** (`!isSameCompanySync`, syncIntercoParentVoucher returns found:true):
+   Sync the INTERCO-PARENT voucher in the parent company. The subsidiary's own local voucher was created correctly by the container import flow.
 
-**How to apply:** Three call sites were fixed:
-1. `charges PATCH` — `_isSameCompanyOrNoInterco` computed before the transaction, used in the voucher entry rebuild.
-2. `sync-parent-voucher` endpoint — same-company now updates the local PO voucher instead of returning early.
-3. `sync-all-vouchers` endpoint — `isSameCompanyPo` checked in both detection and repair branches.
+3. **Fallback — no INTERCO-PARENT exists** (`!isSameCompanySync`, syncIntercoParentVoucher returns found:false, but `poHasParentFreight && po.voucherId`):
+   Apply the same local split as path #1 directly to the PO's purchase voucher. This handles companies like "Business OS" that are NOT the configured parentCompanyId but still have `freightPaidBy='parent'` POs with no interco relationship.
 
-The "Fix All PO & Parent JV Sync" button (Containers page, Developer only) runs sync-all and will bulk-fix all affected POs.
+**Why:** Business OS POs have freightPaidBy='parent' + freightParentAccountId but Business OS is not the configured parentCompanyId. The old code fell through to syncIntercoParentVoucher, found nothing, and returned an error — leaving the voucher with the full amount credited to the supplier.
+
+**How to apply:** Three call sites for the split logic:
+1. `sync-parent-voucher` endpoint — paths 1 and 3 above (path 3 is the new fallback).
+2. `sync-all-vouchers` endpoint — `isSameCompanyPo` branch handles same-company bulk repair.
+3. `charges PATCH` — `_isSameCompanyOrNoInterco` computed before the transaction.
+
+The fix is idempotent — re-running sync on an already-split voucher produces the same result.
