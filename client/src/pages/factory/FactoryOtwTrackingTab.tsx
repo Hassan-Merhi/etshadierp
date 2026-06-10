@@ -20,7 +20,7 @@ import {
   Radio, RefreshCw, Loader2, CheckCircle, XCircle, AlertTriangle,
   Minus, AlertCircle, Settings2, MapPin, Activity, Search, X, Package,
   Pencil, ArrowUp, ArrowDown, ChevronsUpDown, Ship, Truck, CheckCircle2,
-  DollarSign, Clock, Filter, ChevronDown,
+  DollarSign, Clock, Filter, ChevronDown, Scale,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -421,6 +421,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   const [settingsContainer, setSettingsContainer] = useState<ContainerWithSupplier | null>(null);
   const [supplierFilter, setSupplierFilter]       = useState<string>("all");
   const [freightFilter, setFreightFilter]         = useState<string>("all");
+  const [weightFilter, setWeightFilter]           = useState<string>("all");
   const [docsFilter, setDocsFilter]               = useState<string>("all");
   const [delayedFilter, setDelayedFilter]         = useState<string>("all");
   const [sortOrder, setSortOrder]                 = useState<string>("DEFAULT");
@@ -446,6 +447,8 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     if (supplierFilter !== "all" && String(c.supplierId ?? "none") !== supplierFilter) return false;
     if (freightFilter === "has_freight" && !(num(c.freight) > 0)) return false;
     if (freightFilter === "no_freight"  && num(c.freight) > 0)    return false;
+    if (weightFilter === "has_weight" && !(num(c.totalKg) > 0)) return false;
+    if (weightFilter === "no_weight"  && num(c.totalKg) > 0)    return false;
     if (docsFilter === "received"     && !docs[String(c.id)])  return false;
     if (docsFilter === "not_received" && !!docs[String(c.id)]) return false;
     if (delayedFilter === "delayed"  && calcDelayDays(c) === 0) return false;
@@ -507,10 +510,11 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   }, {});
 
   const docsReceived = filtered.filter((c) => docs[String(c.id)]).length;
+  const totalWeight = filtered.reduce((sum, c) => sum + num(c.totalKg), 0);
   const timelineContainer = otwContainers.find((c) => c.id === timelineId) ?? null;
   const trackingEnabledCount = otwContainers.filter((c) => (c as any).trackingEnabled !== false).length;
 
-  const hasActiveFilters = search || supplierFilter !== "all" || freightFilter !== "all" || docsFilter !== "all" || delayedFilter !== "all" || sortOrder !== "DEFAULT";
+  const hasActiveFilters = search || supplierFilter !== "all" || freightFilter !== "all" || weightFilter !== "all" || docsFilter !== "all" || delayedFilter !== "all" || sortOrder !== "DEFAULT";
 
   function saveNote(id: number, val: string) {
     setNotes((prev) => { const next = { ...prev, [String(id)]: val }; saveMap(NOTES_KEY, next); return next; });
@@ -519,7 +523,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     setDocs((prev) => { const next = { ...prev, [String(id)]: checked }; saveMap(DOCS_KEY, next); return next; });
   }
   function clearFilters() {
-    setSearch(""); setSupplierFilter("all"); setFreightFilter("all"); setDocsFilter("all"); setDelayedFilter("all"); setSortOrder("DEFAULT");
+    setSearch(""); setSupplierFilter("all"); setFreightFilter("all"); setWeightFilter("all"); setDocsFilter("all"); setDelayedFilter("all"); setSortOrder("DEFAULT");
   }
 
   const trackNowMutation = useMutation({
@@ -618,6 +622,14 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
         {inTransit > 0 && <SummaryCard label="In Transit" value={inTransit} icon={<Truck className="h-4 w-4 text-indigo-600" />} accent="bg-indigo-100 dark:bg-indigo-900/30" />}
         {arrived > 0 && <SummaryCard label="Arrived" value={arrived} icon={<CheckCircle2 className="h-4 w-4 text-green-600" />} accent="bg-green-100 dark:bg-green-900/30" />}
         {delayed > 0 && <SummaryCard label="Delayed" value={delayed} icon={<Clock className="h-4 w-4 text-red-600" />} accent="bg-red-100 dark:bg-red-900/30" />}
+        {totalWeight > 0 && (
+          <SummaryCard
+            label="Total Weight (KG)"
+            value={Math.round(totalWeight).toLocaleString()}
+            icon={<Scale className="h-4 w-4 text-violet-600" />}
+            accent="bg-violet-100 dark:bg-violet-900/30"
+          />
+        )}
         {Object.entries(costByCurrency).map(([ccy, { symbol, amount }]) => (
           <SummaryCard
             key={ccy}
@@ -701,6 +713,19 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                 <SelectItem value="all">All freight</SelectItem>
                 <SelectItem value="has_freight">Has freight</SelectItem>
                 <SelectItem value="no_freight">No freight</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1 min-w-[130px] flex-1">
+            <p className="text-xs text-muted-foreground">Weight</p>
+            <Select value={weightFilter} onValueChange={setWeightFilter}>
+              <SelectTrigger className="h-8 text-xs" data-testid="select-weight-filter">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All weights</SelectItem>
+                <SelectItem value="has_weight">Has weight</SelectItem>
+                <SelectItem value="no_weight">No weight</SelectItem>
               </SelectContent>
             </Select>
           </div>
