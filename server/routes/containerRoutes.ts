@@ -923,12 +923,13 @@ export function registerContainerRoutes(app: Express) {
         let freightCrEntryId: number | null = null;
         let mainCrEntryId: number | null = null;
         const toDeleteIds: number[] = [];
+        const freightCrCandidates: number[] = [];
         for (const entry of existingEntries) {
           const acctId = (entry as any).ledgerAccountId as number | null;
           const isDebit  = parseFloat(entry.debitAmount  || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
           const isCredit = parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount  || "0") === 0;
-          if (isCredit && acctId === poFreightParentAcctId && freightCrEntryId === null) {
-            freightCrEntryId = entry.id;
+          if (isCredit && acctId === poFreightParentAcctId) {
+            freightCrCandidates.push(entry.id);
           } else if (isDebit && purchasesEntryId === null) {
             purchasesEntryId = entry.id;
           } else if (isCredit && mainCrEntryId === null) {
@@ -937,6 +938,8 @@ export function registerContainerRoutes(app: Express) {
             toDeleteIds.push(entry.id);
           }
         }
+        freightCrEntryId = freightCrCandidates[0] ?? null;
+        toDeleteIds.push(...freightCrCandidates.slice(1));
         await db.transaction(async (tx) => {
           if (toDeleteIds.length > 0) await tx.delete(voucherEntries).where(inArray(voucherEntries.id, toDeleteIds));
           if (purchasesEntryId !== null) await tx.update(voucherEntries).set({ debitAmount: poGrossTotal.toFixed(2), creditAmount: "0" }).where(eq(voucherEntries.id, purchasesEntryId));
@@ -976,12 +979,13 @@ export function registerContainerRoutes(app: Express) {
         let freightCrEntryId: number | null = null;
         let mainCrEntryId: number | null = null;
         const toDeleteIds: number[] = [];
+        const freightCrCandidates2: number[] = [];
         for (const entry of existingEntries) {
           const acctId = (entry as any).ledgerAccountId as number | null;
           const isDebit  = parseFloat(entry.debitAmount  || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
           const isCredit = parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount  || "0") === 0;
-          if (isCredit && acctId === poFreightParentAcctId && freightCrEntryId === null) {
-            freightCrEntryId = entry.id;
+          if (isCredit && acctId === poFreightParentAcctId) {
+            freightCrCandidates2.push(entry.id);
           } else if (isDebit && purchasesEntryId === null) {
             purchasesEntryId = entry.id;
           } else if (isCredit && mainCrEntryId === null) {
@@ -990,6 +994,8 @@ export function registerContainerRoutes(app: Express) {
             toDeleteIds.push(entry.id);
           }
         }
+        freightCrEntryId = freightCrCandidates2[0] ?? null;
+        toDeleteIds.push(...freightCrCandidates2.slice(1));
         const _freightNarration = `Freight - ${po.poNumber}${poContainerRow?.containerNumber ? ` (${poContainerRow.containerNumber})` : ''}`;
         await db.transaction(async (tx) => {
           if (toDeleteIds.length > 0) await tx.delete(voucherEntries).where(inArray(voucherEntries.id, toDeleteIds));
@@ -1184,12 +1190,13 @@ export function registerContainerRoutes(app: Express) {
                       let freightCrEntryId: number | null = null;
                       let mainCrEntryId: number | null = null;
                       const toDeleteIds: number[] = [];
+                      const freightCrCandidates3: number[] = [];
                       for (const entry of entries) {
                         const acctId = (entry as any).ledgerAccountId as number | null;
                         const isDebit  = parseFloat(entry.debitAmount  || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
                         const isCredit = parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount  || "0") === 0;
-                        if (isCredit && acctId === poFreightParentAccountId && freightCrEntryId === null) {
-                          freightCrEntryId = entry.id;
+                        if (isCredit && acctId === poFreightParentAccountId) {
+                          freightCrCandidates3.push(entry.id);
                         } else if (isDebit && purchasesEntryId === null) {
                           purchasesEntryId = entry.id;
                         } else if (isCredit && mainCrEntryId === null) {
@@ -1198,6 +1205,8 @@ export function registerContainerRoutes(app: Express) {
                           toDeleteIds.push(entry.id);
                         }
                       }
+                      freightCrEntryId = freightCrCandidates3[0] ?? null;
+                      toDeleteIds.push(...freightCrCandidates3.slice(1));
                       if (toDeleteIds.length > 0) await db.delete(voucherEntries).where(inArray(voucherEntries.id, toDeleteIds));
                       if (purchasesEntryId !== null) await db.update(voucherEntries).set({ debitAmount: grossTotal.toFixed(2), creditAmount: "0" }).where(eq(voucherEntries.id, purchasesEntryId));
                       if (mainCrEntryId !== null) await db.update(voucherEntries).set({ creditAmount: intercoTotal.toFixed(2), debitAmount: "0" }).where(eq(voucherEntries.id, mainCrEntryId));
