@@ -233,7 +233,8 @@ export default function PurchaseOrderEdit() {
 
   const syncParentJvMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", `/api/purchase-orders/${poId}/sync-parent-voucher`, {});
+      const res = await apiRequest("POST", `/api/purchase-orders/${poId}/sync-parent-voucher`, {});
+      return res.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/purchase-orders/${poId}`] });
