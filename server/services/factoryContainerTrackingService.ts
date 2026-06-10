@@ -393,8 +393,16 @@ async function trackViaParcelsApp(
 }> {
   initProgress(containerId);
 
+  // ── CMA prefix — defined early so the HTTP scraper block can skip CMA ───────
+  const CMA_PREFIXES = /^(CMAU|CMDU|APZU|CGMU|APMU|APHU|CXDU|CAAU|CAJU|CAIU)/i;
+
   // ── HTTP scraper ──────────────────────────────────────────────────────────
-  if (isHttpScraperAvailable()) {
+  // CMA containers bypass this step — DataDome blocks page scraping for CMA CGM.
+  // The dedicated CMA chain below (official DCSA API → public endpoint → 17track)
+  // is the correct path for all CMA prefixes.
+  if (detectedCarrier === "CMA") {
+    ep(containerId, "HTTP scraper", "skip", "CMA uses dedicated provider chain");
+  } else if (isHttpScraperAvailable()) {
     ep(containerId, "HTTP scraper", "running");
     const scraped = await httpScrapeTracking(containerNumber);
 
@@ -422,7 +430,8 @@ async function trackViaParcelsApp(
   }
 
   // ── Maersk provider chain ─────────────────────────────────────────────────
-  const MAERSK_PREFIXES = /^(MAEU|MSKU|MRKU|MRSU|HASU|HJSC|HJCU|SUDU|SAFM|CAJU)/i;
+  // Note: CAJU is a CMA CGM prefix — excluded from this regex intentionally.
+  const MAERSK_PREFIXES = /^(MAEU|MSKU|MRKU|MRSU|HASU|HJSC|HJCU|SUDU|SAFM)/i;
   if (MAERSK_PREFIXES.test(containerNumber)) {
     // Maersk direct scraper (Puppeteer intercept)
     if (isMaerskDirectScraperAvailable()) {
@@ -489,12 +498,13 @@ async function trackViaParcelsApp(
   }
 
   // ── CMA CGM provider chain ─────────────────────────────────────────────────
-  const CMA_PREFIXES = /^(CMAU|CMDU|APZU|CGMU|APMU|APHU|CXDU|CAAU|CAJU|CAIU)/i;
+  // CMA_PREFIXES already defined above (before the HTTP scraper block).
   if (CMA_PREFIXES.test(containerNumber)) {
     console.log(`[FactoryTracking] ${containerNumber}: CMA detected — trying carrier-specific providers...`);
 
     // Step 1: CMA CGM Official DCSA API (needs API key)
     if (cmaCgmApiProvider.isConfigured()) {
+      ep(containerId, "CMA CGM API", "running");
       const apiResult = await cmaCgmApiProvider.track(containerNumber);
       await saveTrackingCheck(containerId, "cma_cgm_api",
         apiResult.success ? "success" : apiResult.noData ? "no_data" : "error",
@@ -511,14 +521,19 @@ async function trackViaParcelsApp(
         };
         if (finalEta) updateSet.arrivalDate = finalEta;
         await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+        ep(containerId, "CMA CGM API", "success", apiResult.latestStatus ?? "got data");
         console.log(`[FactoryTracking] ${containerNumber} → cma_cgm_api: status=${apiResult.latestStatus ?? "?"}`);
         return { success: true, lastStatus: apiResult.latestStatus, lastLocation: apiResult.latestLocation, lastDescription: apiResult.latestDescription, lastCheckedAt: now, error: null };
       }
+      ep(containerId, "CMA CGM API", apiResult.noData ? "skip" : "fail", apiResult.error ?? "no data");
       console.log(`[FactoryTracking] ${containerNumber}: CMA official API returned no data — trying public...`);
+    } else {
+      ep(containerId, "CMA CGM API", "skip", "CMA_CGM_API_KEY not configured");
     }
 
     // Step 2: CMA CGM public endpoint (no key, sometimes blocked by DataDome)
     if (cmaPublicProvider.isEnabled()) {
+      ep(containerId, "CMA public HTTP", "running");
       const cmaResult = await cmaPublicProvider.track(containerNumber);
       await saveTrackingCheck(containerId, "cma_public",
         cmaResult.success ? "success" : cmaResult.blocked ? "blocked" : "error",
@@ -535,10 +550,14 @@ async function trackViaParcelsApp(
         };
         if (finalEta) updateSet.arrivalDate = finalEta;
         await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+        ep(containerId, "CMA public HTTP", "success", cmaResult.latestStatus ?? "got data");
         console.log(`[FactoryTracking] ${containerNumber} → cma_public: status=${cmaResult.latestStatus ?? "?"}`);
         return { success: true, lastStatus: cmaResult.latestStatus, lastLocation: cmaResult.latestLocation, lastDescription: cmaResult.latestDescription, lastCheckedAt: now, error: null };
       }
+      ep(containerId, "CMA public HTTP", cmaResult.blocked ? "blocked" : "fail", cmaResult.error ?? "no data");
       console.log(`[FactoryTracking] ${containerNumber}: CMA public failed — trying 17track...`);
+    } else {
+      ep(containerId, "CMA public HTTP", "skip", "not enabled");
     }
 
     // Step 3: 17track with CMA carrier code (skip generic 17track block below)
@@ -579,7 +598,8 @@ async function trackViaParcelsApp(
   // if the box is on a CMA vessel we get full tracking — a 404/no_data comes
   // back quickly for non-CMA cargo so the overhead is negligible.
   // Maersk and CMA-prefix containers are already handled above.
-  const MAERSK_PREFIXES_FC = /^(MAEU|MSKU|MRKU|MRSU|HASU|HJSC|HJCU|SUDU|SAFM|CAJU)/i;
+  // Note: CAJU is a CMA CGM prefix — excluded from Maersk regex intentionally.
+  const MAERSK_PREFIXES_FC = /^(MAEU|MSKU|MRKU|MRSU|HASU|HJSC|HJCU|SUDU|SAFM)/i;
   if (!CMA_PREFIXES.test(containerNumber) && !MAERSK_PREFIXES_FC.test(containerNumber) && cmaCgmApiProvider.isConfigured()) {
     ep(containerId, "CMA CGM API", "running", "checking if container is on a CMA ship");
     console.log(`[FactoryTracking] ${containerNumber}: trying CMA CGM API (leasing/unknown carrier)...`);
