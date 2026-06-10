@@ -65,12 +65,14 @@ function fmtAmt(symbol: string, amount: number): string {
   if (amount === 0) return "—";
   return `${symbol} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function fmtDate(d: string | null | undefined): string {
   if (!d) return "—";
   const plain = d.slice(0, 10);
   const [y, m, day] = plain.split("-");
   if (!y || !m || !day) return "—";
-  return `${day}/${m}/${y.slice(2)}`;
+  const monthName = MONTH_NAMES[parseInt(m, 10) - 1] ?? m;
+  return `${day} ${monthName} ${y.slice(2)}`;
 }
 function containerCost(c: ContainerWithSupplier): { symbol: string; amount: number } {
   const ccy = c.currencyCode || "USD";
@@ -82,7 +84,11 @@ function containerCost(c: ContainerWithSupplier): { symbol: string; amount: numb
 }
 function calcDelayDays(c: ContainerWithSupplier): number {
   if (!c.arrivalDate) return 0;
-  const eta = new Date(c.arrivalDate); eta.setHours(0, 0, 0, 0);
+  const plain = c.arrivalDate.slice(0, 10);
+  const parts = plain.split("-").map(Number);
+  if (parts.length < 3 || parts.some(isNaN)) return 0;
+  const [y, m, day] = parts;
+  const eta = new Date(y, m - 1, day);
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const diff = Math.floor((today.getTime() - eta.getTime()) / 86400000);
   return diff > 0 ? diff : 0;
