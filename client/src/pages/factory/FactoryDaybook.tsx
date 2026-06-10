@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/PageHeader";
 import {
   BookOpen, Eye, EyeOff, ExternalLink, List, AlignJustify, Package,
   Trash2, ChevronDown, ChevronRight, X, FileDown, Plus,
-  LayoutList, Layers, Pencil, AlertTriangle,
+  Pencil, AlertTriangle,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -270,9 +270,6 @@ interface FactoryDaybookUIState {
   searchQuery: string;
   minAmount: string;
   maxAmount: string;
-  hiddenRowIds: string[];
-  showHidden: boolean;
-  viewMode: "detailed" | "condensed";
   sortOrder: "asc" | "desc";
   scrollY: number;
 }
@@ -307,6 +304,13 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
   const isPayrollPayment = entry.txType === "PAYROLL_PAYMENT" && !!entry.referenceId;
   const isMixBatchCreated = (entry.txType === "MIX_BATCH_CREATED" || entry.txType === "MIX_BATCH_TOPUP") && !!entry.referenceId;
   const isLoadingCreated = entry.txType === "LOADING_CREATED" && !!entry.referenceId;
+  const isOffloadRawStock = entry.txType === "OFFLOAD_RAW_STOCK";
+  const isCommission = entry.txType === "COMMISSION";
+  const isWasteDisposal = entry.txType === "WASTE_DISPOSAL";
+  const isOtherCharge = entry.txType === "OTHER_CHARGE";
+
+  const entryMeta = (() => { try { return JSON.parse(entry.metaJson || "{}"); } catch { return {}; } })();
+  const metaContainerId: number | undefined = entryMeta.containerId;
 
   const { data: viewEntries = [] } = useQuery<any[]>({
     queryKey: [`/api/vouchers/${entry.referenceId}/view-entries`],
@@ -341,6 +345,16 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
   const { data: loadingOrder } = useQuery<any>({
     queryKey: [`/api/factory/customer-orders/${entry.referenceId}`],
     enabled: isLoadingCreated,
+  });
+
+  const { data: metaContainerDetail } = useQuery<any>({
+    queryKey: [`/api/factory/containers/${metaContainerId}`],
+    enabled: (isOffloadRawStock || isCommission) && !!metaContainerId,
+  });
+
+  const { data: otherChargeContainerDetail } = useQuery<any>({
+    queryKey: [`/api/factory/containers/${entry.referenceId}`],
+    enabled: isOtherCharge && !!entry.referenceId,
   });
 
   // Balance fetching for Payment / Receipt / Journal vouchers
@@ -615,11 +629,22 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                     )}
                     <p className="text-xs text-muted-foreground mt-0.5">Container: {c.containerNumber}</p>
                     {c.origin && <p className="text-xs text-muted-foreground">Origin: {c.origin}</p>}
+                    {totalKg > 0 && parseFloat(c.actualReceivedKg || "0") < totalKg && (
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <span className="text-xs text-muted-foreground">Total KG imported:</span>
+                        <span className="font-mono text-sm font-semibold">{formatNumber(totalKg)} kg</span>
+                        {parseFloat(c.actualReceivedKg || "0") === 0 ? (
+                          <Badge variant="outline" className="text-xs bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40">Pending</Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">({formatNumber(parseFloat(c.actualReceivedKg))} kg received)</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <Button
                     size="sm"
                     variant="default"
-                    onClick={() => { onClose(); onNavigate(`/factory/containers`); }}
+                    onClick={() => { onClose(); onNavigate(`/factory/containers?edit=${entry.referenceId}`); }}
                     data-testid="button-open-container"
                   >
                     Open
@@ -1144,6 +1169,52 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                 </div>
               )}
 
+              {/* When no proforma lines exist, show scanned bales grouped by product */}
+              {lines.length === 0 && balesList.length > 0 && (
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
+                    Scanned Bales by Item ({balesList.length} total)
+                  </p>
+                  <div className="rounded-md border overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-muted/40 border-b">
+                          <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Item</th>
+                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Bales</th>
+                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Weight (kg)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(
+                          balesList.reduce((acc: Record<string, { count: number; weight: number }>, b: any) => {
+                            const key = b.productName || b.baleName || b.articleCode || "Unknown";
+                            if (!acc[key]) acc[key] = { count: 0, weight: 0 };
+                            acc[key].count += 1;
+                            acc[key].weight += parseFloat(b.weight || b.weightKg || "0");
+                            return acc;
+                          }, {})
+                        ).sort(([a], [b]) => a.localeCompare(b)).map(([name, stats]) => (
+                          <tr key={name} className="border-b last:border-0">
+                            <td className="px-3 py-2 font-medium">{name}</td>
+                            <td className="px-3 py-2 text-right font-mono">{stats.count}</td>
+                            <td className="px-3 py-2 text-right font-mono text-muted-foreground">{formatNumber(stats.weight)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-muted/50 border-t font-semibold">
+                          <td className="px-3 py-2 text-xs">Total</td>
+                          <td className="px-3 py-2 text-right font-mono">{balesList.length}</td>
+                          <td className="px-3 py-2 text-right font-mono text-muted-foreground">
+                            {formatNumber(balesList.reduce((sum: number, b: any) => sum + parseFloat(b.weight || b.weightKg || "0"), 0))}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {/* Financial summary */}
               {(grandTotal > 0 || freightAmount > 0) && (
                 <div className="rounded-md border overflow-x-auto">
@@ -1173,6 +1244,208 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
               )}
             </>
           )}
+        </div>
+      </>
+    );
+  }
+
+  // ── BALE_STOCK_ENTRY enriched view ────────────────────────────────────────
+  if (isBaleStockEntry && bales.length > 0) {
+    const totalAmt = amt;
+    const amtPerBale = bales.length > 0 ? totalAmt / bales.length : 0;
+    const groups = bales.reduce((acc: Record<string, { count: number; totalAmount: number }>, b: any) => {
+      const key = b.productName || b.ref || "Unknown";
+      if (!acc[key]) acc[key] = { count: 0, totalAmount: 0 };
+      acc[key].count += 1;
+      acc[key].totalAmount += amtPerBale;
+      return acc;
+    }, {});
+    const sortedGroups = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+    return (
+      <>
+        <DialogHeader>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <DialogTitle>Bale Stock Entry</DialogTitle>
+            <Badge variant={badgeVariant} className={badgeClass}>Bale Stock Entry</Badge>
+          </div>
+          <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="rounded-md border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted/40 border-b">
+                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Item</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Qty</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedGroups.map(([name, stats]) => (
+                  <tr key={name} className="border-b last:border-0">
+                    <td className="px-3 py-2 font-medium">{name}</td>
+                    <td className="px-3 py-2 text-right font-mono">{stats.count}</td>
+                    <td className="px-3 py-2 text-right font-mono">{sym}{formatNumber(stats.totalAmount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-muted/50 border-t font-semibold">
+                  <td className="px-3 py-2 text-xs">Total</td>
+                  <td className="px-3 py-2 text-right font-mono">{bales.length}</td>
+                  <td className="px-3 py-2 text-right font-mono">{sym}{formatNumber(totalAmt)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          {entry.description && (
+            <p className="text-sm text-muted-foreground">{entry.description}</p>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  // ── OFFLOAD_RAW_STOCK enriched view ────────────────────────────────────────
+  if (isOffloadRawStock) {
+    const c = metaContainerDetail;
+    return (
+      <>
+        <DialogHeader>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <DialogTitle>Offload Raw Stock</DialogTitle>
+            <Badge variant={badgeVariant} className={badgeClass}>Offload Raw Stock</Badge>
+          </div>
+          <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="rounded-md border p-4 space-y-2">
+            {!c && metaContainerId ? (
+              <p className="text-sm text-muted-foreground">Loading container details…</p>
+            ) : c ? (
+              <div className="flex items-start justify-between gap-2 flex-wrap">
+                <div>
+                  <p className="font-semibold text-base">{c.supplierName || "Unknown Supplier"}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Container: <span className="font-mono">{c.containerNumber}</span></p>
+                  {c.origin && <p className="text-xs text-muted-foreground">Origin: {c.origin}</p>}
+                </div>
+                <Button size="sm" variant="default"
+                  onClick={() => { onClose(); onNavigate(`/factory/containers?edit=${metaContainerId}`); }}
+                  data-testid="button-open-container"
+                >Open Container</Button>
+              </div>
+            ) : null}
+          </div>
+          <div className="rounded-md border px-4 py-3 space-y-1">
+            <p className="text-xs text-muted-foreground">Amount</p>
+            <p className="text-lg font-bold font-mono">{sym}{formatNumber(amt)}</p>
+            {entry.currencyCode !== "USD" && parseFloat(entry.fxRateToUsd || "1") !== 1 && (
+              <p className="text-xs font-mono text-muted-foreground">${formatNumber(parseFloat(entry.amountUsd || "0"))} USD</p>
+            )}
+            {entry.description && <p className="text-sm text-muted-foreground mt-1">{entry.description}</p>}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ── COMMISSION enriched view ───────────────────────────────────────────────
+  if (isCommission) {
+    const c = metaContainerDetail;
+    return (
+      <>
+        <DialogHeader>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <DialogTitle>Commission</DialogTitle>
+            <Badge variant={badgeVariant} className={badgeClass}>Commission</Badge>
+          </div>
+          <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="rounded-md border p-4 space-y-2">
+            {!c && metaContainerId ? (
+              <p className="text-sm text-muted-foreground">Loading container details…</p>
+            ) : c ? (
+              <div className="flex items-start justify-between gap-2 flex-wrap">
+                <div>
+                  <p className="font-semibold text-base">{c.containerNumber}</p>
+                  {c.supplierName && <p className="text-xs text-muted-foreground">Supplier: {c.supplierName}</p>}
+                </div>
+                <Button size="sm" variant="default"
+                  onClick={() => { onClose(); onNavigate(`/factory/containers?edit=${metaContainerId}`); }}
+                  data-testid="button-open-container"
+                >Open Container</Button>
+              </div>
+            ) : null}
+          </div>
+          <div className="rounded-md border px-4 py-3 space-y-1">
+            <p className="text-xs text-muted-foreground">Commission Amount</p>
+            <p className="text-lg font-bold font-mono">{sym}{formatNumber(amt)}</p>
+            {entry.description && <p className="text-sm text-muted-foreground mt-1">{entry.description}</p>}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ── WASTE_DISPOSAL enriched view ───────────────────────────────────────────
+  if (isWasteDisposal) {
+    return (
+      <>
+        <DialogHeader>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <DialogTitle>Waste Disposal</DialogTitle>
+            <Badge variant={badgeVariant} className={badgeClass}>Waste Disposal</Badge>
+          </div>
+          <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          {entry.description && (
+            <div className="rounded-md border p-4">
+              <p className="text-sm font-medium">{entry.description}</p>
+            </div>
+          )}
+          <div className="rounded-md border px-4 py-3">
+            <p className="text-xs text-muted-foreground">Written Off Value</p>
+            <p className="text-lg font-bold font-mono">{sym}{formatNumber(amt)}</p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ── OTHER_CHARGE enriched view ─────────────────────────────────────────────
+  if (isOtherCharge) {
+    const c = otherChargeContainerDetail;
+    return (
+      <>
+        <DialogHeader>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <DialogTitle>Other Charge</DialogTitle>
+            <Badge variant={badgeVariant} className={badgeClass}>Other Charge</Badge>
+          </div>
+          <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          {c && (
+            <div className="rounded-md border p-4">
+              <div className="flex items-start justify-between gap-2 flex-wrap">
+                <div>
+                  <p className="font-semibold text-base">{c.supplierName || c.containerNumber}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Container: <span className="font-mono">{c.containerNumber}</span></p>
+                </div>
+                <Button size="sm" variant="default"
+                  onClick={() => { onClose(); onNavigate(`/factory/containers?edit=${entry.referenceId}`); }}
+                  data-testid="button-open-container"
+                >Open Container</Button>
+              </div>
+            </div>
+          )}
+          <div className="rounded-md border px-4 py-3 space-y-1">
+            <p className="text-xs text-muted-foreground">Amount</p>
+            <p className="text-lg font-bold font-mono">{sym}{formatNumber(amt)}</p>
+            {entry.description && <p className="text-sm text-muted-foreground mt-1">{entry.description}</p>}
+          </div>
         </div>
       </>
     );
@@ -1265,10 +1538,7 @@ export default function FactoryDaybook() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // ── View/UX state ─────────────────────────────────────────────────────────
-  const [isDetailed, setIsDetailed] = useState(false); // always defaults to condensed
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
-  const [hiddenRowIds, setHiddenRowIds] = useState<Set<string>>(new Set());
-  const [showHidden, setShowHidden] = useState(false);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const scrollYRef = useRef(0);
 
@@ -1286,7 +1556,6 @@ export default function FactoryDaybook() {
   const [voidEntry, setVoidEntry] = useState<DaybookEntry | null>(null);
   const [deleteEntry, setDeleteEntry] = useState<DaybookEntry | null>(null);
   const [isExportingDetailed, setIsExportingDetailed] = useState(false);
-  const [expandedInlineVoucherId, setExpandedInlineVoucherId] = useState<number | null>(null);
   const [urlEntryHandled, setUrlEntryHandled] = useState(false);
 
   // ── Derive API date params from periodFilter ──────────────────────────────
@@ -1348,12 +1617,6 @@ export default function FactoryDaybook() {
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hiddenErpCosts: string[] = myErpPages?.hiddenErpCostFields ?? [];
   const showAmounts = !hiddenErpCosts.includes("daybook_amounts");
-
-  const { data: expandedInlineEntries = [], isLoading: expandedInlineLoading } = useQuery<any[]>({
-    queryKey: ["/api/vouchers", expandedInlineVoucherId, "view-entries"],
-    queryFn: () => fetch(`/api/vouchers/${expandedInlineVoucherId}/view-entries`, { credentials: "include" }).then((r) => r.json()),
-    enabled: !!expandedInlineVoucherId,
-  });
 
   // ── URL deep link: ?entryId= or ?voucherId= on mount ─────────────────────
   useEffect(() => {
@@ -1418,71 +1681,6 @@ export default function FactoryDaybook() {
     return result;
   }, [entries, statusFilter, searchQuery, minAmount, maxAmount, sortOrder]);
 
-  // Visible entries in detailed view (hide/unhide logic)
-  const visibleEntries = useMemo(() => {
-    if (showHidden) return filteredEntries;
-    return filteredEntries.filter((e) => !hiddenRowIds.has(String(e.id)));
-  }, [filteredEntries, hiddenRowIds, showHidden]);
-
-  // Each multi-bale BALE_STOCK_ENTRY is expanded into one row per bale
-  const displayVisibleEntries = useMemo(() => expandBaleEntries(visibleEntries), [visibleEntries]);
-
-  // ── Keyboard navigation: arrows, Ctrl+H / Ctrl+U (detailed view only) ────
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (hasAnyOpenDialog()) return;
-      const tag = (document.activeElement?.tagName || "").toLowerCase();
-      const isEditable = document.activeElement?.getAttribute("contenteditable");
-      if (["input", "textarea", "select"].includes(tag) || isEditable) return;
-
-      if ((e.key === "ArrowDown" || e.key === "ArrowUp") && isDetailed) {
-        e.preventDefault();
-        if (visibleEntries.length === 0) return;
-        const currentIndex = selectedRowId
-          ? visibleEntries.findIndex((en) => String(en.id) === selectedRowId)
-          : -1;
-        if (e.key === "ArrowDown") {
-          const next = currentIndex < visibleEntries.length - 1 ? currentIndex + 1 : 0;
-          setSelectedRowId(String(visibleEntries[next].id));
-        } else {
-          const prev = currentIndex > 0 ? currentIndex - 1 : visibleEntries.length - 1;
-          setSelectedRowId(String(visibleEntries[prev].id));
-        }
-        return;
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.key === "h" && isDetailed) {
-        e.preventDefault();
-        if (selectedRowId && !hiddenRowIds.has(selectedRowId)) {
-          const toHide = selectedRowId;
-          const nextVisible = visibleEntries.filter((en) => String(en.id) !== toHide);
-          const idx = visibleEntries.findIndex((en) => String(en.id) === toHide);
-          const nextSel = nextVisible[idx] ?? nextVisible[idx - 1] ?? null;
-          setHiddenRowIds((prev) => { const next = new Set(prev); next.add(toHide); return next; });
-          setSelectedRowId(nextSel ? String(nextSel.id) : null);
-        }
-        return;
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.key === "u" && isDetailed) {
-        e.preventDefault();
-        if (selectedRowId && hiddenRowIds.has(selectedRowId)) {
-          const rid = selectedRowId;
-          setHiddenRowIds((prev) => { const next = new Set(prev); next.delete(rid); return next; });
-        } else {
-          const arr = Array.from(hiddenRowIds);
-          if (arr.length > 0) {
-            const last = arr[arr.length - 1];
-            setHiddenRowIds((prev) => { const next = new Set(prev); next.delete(last); return next; });
-          }
-        }
-        return;
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [selectedRowId, visibleEntries, hiddenRowIds, isDetailed]);
-
   // ── Condensed grouped rows ────────────────────────────────────────────────
   const condensedRows = useMemo(() => {
     const grouped: Record<string, {
@@ -1511,6 +1709,9 @@ export default function FactoryDaybook() {
   const getEntriesForCondensedRow = (rowKey: string): DisplayEntry[] => {
     const [date, txType, currencyCode] = rowKey.split("|");
     const raw = filteredEntries.filter((e) => e.txDate === date && e.txType === txType && e.currencyCode === currencyCode);
+    if (txType === "BALE_STOCK_ENTRY") {
+      return raw.map(e => ({ ...e, _vKey: String(e.id), _source: e } as DisplayEntry));
+    }
     return expandBaleEntries(raw);
   };
 
@@ -1545,9 +1746,6 @@ export default function FactoryDaybook() {
     setSearchQuery(saved.searchQuery || "");
     setMinAmount(saved.minAmount || "");
     setMaxAmount(saved.maxAmount || "");
-    setHiddenRowIds(new Set(saved.hiddenRowIds || []));
-    setShowHidden(saved.showHidden || false);
-    if (saved.viewMode) setIsDetailed(saved.viewMode === "detailed");
     const scrollY = saved.scrollY || 0;
     requestAnimationFrame(() => {
       window.scrollTo({ top: scrollY, behavior: "instant" as ScrollBehavior });
@@ -1566,12 +1764,9 @@ export default function FactoryDaybook() {
       minAmount,
       maxAmount,
       sortOrder,
-      hiddenRowIds: Array.from(hiddenRowIds),
-      showHidden,
-      viewMode: isDetailed ? "detailed" : "condensed",
       scrollY: scrollYRef.current,
     });
-  }, [periodFilter, txTypeFilter, currencyFilter, statusFilter, searchQuery, minAmount, maxAmount, sortOrder, hiddenRowIds, showHidden, isDetailed]);
+  }, [periodFilter, txTypeFilter, currencyFilter, statusFilter, searchQuery, minAmount, maxAmount, sortOrder]);
 
   // ── Session persistence: track scroll ────────────────────────────────────
   useEffect(() => {
@@ -1835,59 +2030,6 @@ export default function FactoryDaybook() {
     });
   };
 
-  // ── Render helpers ────────────────────────────────────────────────────────
-  const renderEntryActions = (entry: DaybookEntry, size: "icon" | "sm" = "icon") => {
-    const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
-    const canEditEntry = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId && entry.txType !== "BALE_STOCK_ENTRY";
-    const rid = String(entry.id);
-    const isHidden = hiddenRowIds.has(rid);
-    const canHardDelete = (currentUser?.role === "Admin" || currentUser?.role === "Developer") && !isVoucherBacked && entry.id > 0;
-    return (
-      <div className="flex gap-1">
-        <Button size={size} variant="ghost" title="View details"
-          onClick={(e) => { e.stopPropagation(); setViewEntry((entry as DisplayEntry)._source ?? entry); }}
-          data-testid={`button-view-${entry.id}`}
-        ><Eye className="h-3 w-3" /></Button>
-        {canEditEntry && (
-          <Button size={size} variant="ghost" title="Edit source"
-            onClick={(e) => { e.stopPropagation(); editSourceRecord(entry); }}
-            data-testid={`button-edit-source-${entry.id}`}
-          ><ExternalLink className="h-3 w-3" /></Button>
-        )}
-        {isCostEditable(entry) && (
-          <Button size={size} variant="ghost" title="Edit cost (cascades to raw stock & mix batches)"
-            onClick={(e) => { e.stopPropagation(); setCostEditEntry(entry); setCostEditAmount(entry.amountCurrency); setCostEditReason(""); }}
-            data-testid={`button-cost-edit-${entry.id}`}
-          ><Pencil className="h-3 w-3 text-amber-500" /></Button>
-        )}
-        <Button size={size} variant="ghost"
-          title={isHidden ? "Unhide row" : "Hide row"}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (isHidden) {
-              setHiddenRowIds((prev) => { const next = new Set(prev); next.delete(rid); return next; });
-            } else {
-              setHiddenRowIds((prev) => { const next = new Set(prev); next.add(rid); return next; });
-              if (selectedRowId === rid) setSelectedRowId(null);
-            }
-          }}
-          data-testid={isHidden ? `button-unhide-${entry.id}` : `button-hide-${entry.id}`}
-        >{isHidden ? <Eye className="h-3 w-3 text-muted-foreground" /> : <EyeOff className="h-3 w-3 text-muted-foreground" />}</Button>
-        {isAdminOrOwner && isVoucherBacked && ["PAYMENT", "RECEIPT", "JOURNAL"].includes(entry.txType) && (
-          <Button size={size} variant="ghost" title="Void voucher"
-            onClick={(e) => { e.stopPropagation(); setVoidEntry(entry); }}
-            data-testid={`button-void-voucher-${entry.id}`}
-          ><Trash2 className="h-3 w-3" /></Button>
-        )}
-        {canHardDelete && (
-          <Button size={size} variant="ghost" title="Permanently delete entry"
-            onClick={(e) => { e.stopPropagation(); setDeleteEntry(entry); }}
-            data-testid={`button-delete-${entry.id}`}
-          ><Trash2 className="h-3 w-3 text-destructive" /></Button>
-        )}
-      </div>
-    );
-  };
 
   // ── JSX ───────────────────────────────────────────────────────────────────
   return (
@@ -1988,67 +2130,10 @@ export default function FactoryDaybook() {
               Transactions
               {filteredEntries.length > 0 && (
                 <span className="text-sm font-normal text-muted-foreground">
-                  ({isDetailed
-                    ? `${visibleEntries.length}${hiddenRowIds.size > 0 && !showHidden ? ` of ${filteredEntries.length}` : ""} ${visibleEntries.length === 1 ? "entry" : "entries"}`
-                    : `${condensedRows.length} group${condensedRows.length === 1 ? "" : "s"}`})
+                  ({`${condensedRows.length} group${condensedRows.length === 1 ? "" : "s"}`})
                 </span>
               )}
             </CardTitle>
-            <div className="flex items-center gap-2 flex-wrap">
-              {isDetailed && (
-                <>
-                  <Button
-                    variant={showHidden ? "secondary" : "outline"}
-                    size="sm"
-                    onClick={() => setShowHidden((v) => !v)}
-                    className="gap-1"
-                    data-testid="button-toggle-show-hidden"
-                    disabled={hiddenRowIds.size === 0}
-                    title={hiddenRowIds.size === 0 ? "No hidden rows" : showHidden ? "Hide hidden rows" : `Show ${hiddenRowIds.size} hidden row${hiddenRowIds.size !== 1 ? "s" : ""}`}
-                  >
-                    {showHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                    {showHidden ? "Showing hidden" : "Show hidden"}
-                    {hiddenRowIds.size > 0 && <Badge className="ml-1">{hiddenRowIds.size}</Badge>}
-                  </Button>
-                  {hiddenRowIds.size > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => { setHiddenRowIds(new Set()); setShowHidden(false); }}
-                      className="gap-1 text-muted-foreground"
-                      data-testid="button-clear-hidden-rows"
-                      title="Clear all hidden rows"
-                    >
-                      <X className="w-4 h-4" />
-                      Clear
-                    </Button>
-                  )}
-                </>
-              )}
-              <div className="flex items-center border rounded-md overflow-hidden">
-                <Button
-                  variant="ghost" size="sm"
-                  onClick={() => setIsDetailed(true)}
-                  data-testid="button-view-detailed"
-                  className={cn("rounded-none h-8 px-3 gap-1", isDetailed && "bg-muted")}
-                  title="Detailed view"
-                >
-                  <LayoutList className="w-4 h-4" />
-                  <span className="hidden sm:inline text-xs">Detailed</span>
-                </Button>
-                <div className="w-px bg-border h-6" />
-                <Button
-                  variant="ghost" size="sm"
-                  onClick={() => setIsDetailed(false)}
-                  data-testid="button-view-condensed"
-                  className={cn("rounded-none h-8 px-3 gap-1", !isDetailed && "bg-muted")}
-                  title="Condensed view"
-                >
-                  <Layers className="w-4 h-4" />
-                  <span className="hidden sm:inline text-xs">Condensed</span>
-                </Button>
-              </div>
-            </div>
           </div>
           <CardDescription>All factory transactions in one view</CardDescription>
         </CardHeader>
@@ -2074,7 +2159,7 @@ export default function FactoryDaybook() {
                 </>
               )}
             </div>
-          ) : !isDetailed ? (
+          ) : (
             /* ── CONDENSED VIEW — matches ERP Daybook: Date/Type | Count | Total ── */
             <div className="w-full">
               {/* Header */}
@@ -2151,6 +2236,13 @@ export default function FactoryDaybook() {
                               const isBaleTransfer = entry.txType === "BALE_TRANSFER";
                               const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
                               const canEdit = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId && entry.txType !== "BALE_STOCK_ENTRY";
+                              const inlineMeta = (() => { try { return JSON.parse(entry.metaJson || "{}"); } catch { return {}; } })();
+                              let pencilTarget: string | null = null;
+                              if (entry.txType === "CONTAINER_IMPORT" && entry.referenceId) pencilTarget = `/factory/containers?edit=${entry.referenceId}`;
+                              else if (entry.txType === "OFFLOAD_RAW_STOCK" && inlineMeta.containerId) pencilTarget = `/factory/containers?edit=${inlineMeta.containerId}`;
+                              else if (entry.txType === "COMMISSION" && inlineMeta.containerId) pencilTarget = `/factory/containers?edit=${inlineMeta.containerId}`;
+                              else if (entry.txType === "OTHER_CHARGE" && entry.referenceId) pencilTarget = `/factory/containers?edit=${entry.referenceId}`;
+                              const showPencil = pencilTarget && isAdminOrOwner;
                               return (
                                 <div
                                   key={de._vKey ?? entry.id}
@@ -2182,9 +2274,15 @@ export default function FactoryDaybook() {
                                         {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency))}
                                       </span>
                                       <Button size="icon" variant="ghost" title="View details"
-                                        onClick={(e) => { e.stopPropagation(); setViewEntry(entry); }}
+                                        onClick={(e) => { e.stopPropagation(); setViewEntry((de._source ?? entry) as DaybookEntry); }}
                                         data-testid={`button-view-${entry.id}`}
                                       ><Eye className="h-3 w-3" /></Button>
+                                      {showPencil && (
+                                        <Button size="icon" variant="ghost" title="Go to container"
+                                          onClick={(e) => { e.stopPropagation(); navigate(pencilTarget!); }}
+                                          data-testid={`button-pencil-${entry.id}`}
+                                        ><Pencil className="h-3 w-3 text-amber-500" /></Button>
+                                      )}
                                       {canEdit && (
                                         <Button size="icon" variant="ghost" title="Edit"
                                           onClick={(e) => { e.stopPropagation(); editSourceRecord(entry); }}
@@ -2201,9 +2299,15 @@ export default function FactoryDaybook() {
                                   ) : (
                                     <div className="flex items-center justify-end gap-1 pr-2 py-2">
                                       <Button size="icon" variant="ghost" title="View details"
-                                        onClick={(e) => { e.stopPropagation(); setViewEntry((entry as DisplayEntry)._source ?? entry); }}
+                                        onClick={(e) => { e.stopPropagation(); setViewEntry((de._source ?? entry) as DaybookEntry); }}
                                         data-testid={`button-view-${entry.id}`}
                                       ><Eye className="h-3 w-3" /></Button>
+                                      {showPencil && (
+                                        <Button size="icon" variant="ghost" title="Go to container"
+                                          onClick={(e) => { e.stopPropagation(); navigate(pencilTarget!); }}
+                                          data-testid={`button-pencil-${entry.id}`}
+                                        ><Pencil className="h-3 w-3 text-amber-500" /></Button>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -2217,237 +2321,6 @@ export default function FactoryDaybook() {
                 });
               })()}
             </div>
-          ) : (
-            /* ── DETAILED VIEW ── */
-            <>
-              {/* Mobile card layout */}
-              <div className="md:hidden space-y-3 p-3">
-                {displayVisibleEntries.map((entry) => {
-                  const de = entry as DisplayEntry;
-                  const rid = String(entry.id);
-                  const isHidden = hiddenRowIds.has(rid);
-                  const { variant: bv, className: bc } = getFactoryTxTypeBadge(entry.txType);
-                  return (
-                    <div
-                      key={de._vKey ?? entry.id}
-                      data-row-id={rid}
-                      className={cn(
-                        "border rounded-md p-3 space-y-2 transition-colors",
-                        selectedRowId === rid && "bg-accent/30 border-accent",
-                        isHidden && showHidden && "opacity-50",
-                        entry.optional && "opacity-70",
-                      )}
-                      onClick={() => setSelectedRowId(rid)}
-                      data-testid={`card-entry-${entry.id}`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant={bv} className={bc} data-testid={`badge-type-${entry.id}`}>
-                            {formatTxType(entry.txType)}
-                          </Badge>
-                          {entry.optional && (
-                            <Badge variant="outline" className="text-xs" data-testid={`badge-optional-${entry.id}`}>Optional</Badge>
-                          )}
-                          {isHidden && (
-                            <Badge variant="outline" className="text-xs text-muted-foreground">Hidden</Badge>
-                          )}
-                        </div>
-                        {showAmounts && (
-                          <span className="font-mono font-medium text-sm whitespace-nowrap">
-                            {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency || "0"))}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {formatDisplayDate(entry.txDate + "T00:00:00")}
-                      </div>
-                      <p className="text-sm truncate">{formatDaybookDescription(entry)}</p>
-                      <div className="flex items-center gap-1 pt-1 border-t">
-                        {renderEntryActions(entry)}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Desktop table */}
-              <div className="hidden md:block w-full overflow-x-auto">
-                <Table className="w-full table-fixed" wrapperClassName="overflow-visible">
-                  <colgroup>
-                    <col className="w-[12%]" />
-                    <col className="w-[18%]" />
-                    <col className="w-[43%]" />
-                    {showAmounts && <col className="w-[12%]" />}
-                    <col className="w-[15%]" />
-                  </colgroup>
-                  <TableHeader className="sticky top-0 z-30 bg-background">
-                    <TableRow>
-                      <TableHead className="w-[12%] whitespace-nowrap">Date</TableHead>
-                      <TableHead className="w-[18%]">Type</TableHead>
-                      <TableHead className="w-[43%]">Description</TableHead>
-                      {showAmounts && <TableHead className="w-[12%] text-right whitespace-nowrap">Amount</TableHead>}
-                      <TableHead className="w-[15%] text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(() => {
-                      let prevDate = "";
-                      return displayVisibleEntries.map((entry) => {
-                      const de = entry as DisplayEntry;
-                      const rid = String(entry.id);
-                      const isHidden = hiddenRowIds.has(rid);
-                      const isBaleTransfer = entry.txType === "BALE_TRANSFER";
-                      const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
-                      const isInlineExpanded = isVoucherBacked && expandedInlineVoucherId === entry.referenceId;
-                      const { variant: bv, className: bc } = getFactoryTxTypeBadge(entry.txType);
-                      const showDateSep = entry.txDate !== prevDate;
-                      if (showDateSep) prevDate = entry.txDate;
-                      const colSpan = 3 + (showAmounts ? 1 : 0) + 1;
-                      const dayEntries = showDateSep
-                        ? displayVisibleEntries.filter((e) => e.txDate === entry.txDate)
-                        : [];
-                      const dayTotal = showAmounts && showDateSep
-                        ? dayEntries.reduce((s, e) => s + parseFloat(e.amountUsd || e.amountCurrency || "0"), 0)
-                        : 0;
-                      return (
-                        <>
-                          {showDateSep && (
-                            <TableRow key={`date-sep-${entry.txDate}`} className="bg-muted/40 pointer-events-none">
-                              <TableCell colSpan={colSpan} className="py-1.5 px-4">
-                                <div className="flex items-center justify-between">
-                                  <span className="font-semibold text-sm">{formatDisplayDate(entry.txDate + "T00:00:00")}</span>
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-xs text-muted-foreground">{dayEntries.length} {dayEntries.length === 1 ? "entry" : "entries"}</span>
-                                    {showAmounts && (
-                                      <span className="font-mono text-sm font-medium">${formatNumber(dayTotal)}</span>
-                                    )}
-                                  </div>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        <TableRow
-                          key={de._vKey ?? entry.id}
-                          data-testid={`row-daybook-${entry.id}`}
-                          data-row-id={rid}
-                          className={cn(
-                            (isBaleTransfer || isVoucherBacked) ? "cursor-pointer hover-elevate" : "",
-                            entry.optional && "opacity-60",
-                            selectedRowId === rid && "bg-accent/20",
-                            isHidden && showHidden && "opacity-40",
-                            isInlineExpanded && "bg-accent/10",
-                          )}
-                          onClick={(e) => {
-                            if ((e.target as HTMLElement).closest("button")) return;
-                            setSelectedRowId(rid);
-                            if (isBaleTransfer) {
-                              handleEntryClick(entry, e);
-                            } else if (isVoucherBacked) {
-                              if (isInlineExpanded) {
-                                setExpandedInlineVoucherId(null);
-                              } else {
-                                setExpandedInlineVoucherId(entry.referenceId);
-                              }
-                            }
-                          }}
-                        >
-                          {/* DATE cell */}
-                          <TableCell className="w-[12%] whitespace-nowrap py-2 font-medium">
-                            <div className="flex flex-col">
-                              <span>{formatDisplayDate(entry.txDate + "T00:00:00")}</span>
-                              {entry.effectiveDate && entry.effectiveDate !== entry.txDate && (
-                                <span className="text-xs text-blue-600 dark:text-blue-400" title="Effective date for accounts/ledger">
-                                  eff. {formatDisplayDate(entry.effectiveDate + "T00:00:00")}
-                                </span>
-                              )}
-                              <span className="text-xs text-muted-foreground">{formatDisplayTime(entry.createdAt)}</span>
-                            </div>
-                          </TableCell>
-                          {/* TYPE cell */}
-                          <TableCell className="w-[18%] py-2">
-                            <div className="flex items-center gap-1 flex-wrap">
-                              <Badge variant={bv} className={cn(bc, "whitespace-nowrap")} data-testid={`badge-type-${entry.id}`}>
-                                {formatTxType(entry.txType)}
-                              </Badge>
-                              {isVoucherBacked && (
-                                <span className="text-muted-foreground" title={isInlineExpanded ? "Collapse entries" : "Expand ledger entries"}>
-                                  {isInlineExpanded
-                                    ? <ChevronDown className="h-3 w-3 inline" />
-                                    : <ChevronRight className="h-3 w-3 inline" />}
-                                </span>
-                              )}
-                              {entry.optional && (
-                                <Badge variant="outline" className="text-muted-foreground text-xs" data-testid={`badge-optional-${entry.id}`}>
-                                  Optional
-                                </Badge>
-                              )}
-                              {isHidden && (
-                                <Badge variant="outline" className="text-xs text-muted-foreground">Hidden</Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          {/* DESCRIPTION cell */}
-                          <TableCell className="w-[43%] py-2 truncate" title={formatDaybookDescription(entry)}>
-                            {formatDaybookDescription(entry)}
-                          </TableCell>
-                          {/* AMOUNT cell */}
-                          {showAmounts && (
-                            <TableCell className="w-[12%] py-2 text-right">
-                              <div className="font-mono font-medium">{currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency || "0"))}</div>
-                              {entry.currencyCode !== "USD" && parseFloat(entry.amountUsd || "0") > 0 && (
-                                <div className="text-xs text-muted-foreground font-mono">${formatNumber(parseFloat(entry.amountUsd))}</div>
-                              )}
-                            </TableCell>
-                          )}
-                          {/* ACTIONS cell */}
-                          <TableCell className="w-[15%] py-2">
-                            <div className="flex justify-end">
-                              {renderEntryActions(entry)}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                        {isInlineExpanded && (
-                          <TableRow key={`inline-expand-${entry.id}`} className="bg-muted/10">
-                            <TableCell colSpan={colSpan} className="p-0">
-                              <div className="px-8 py-3 border-t border-dashed border-muted">
-                                {expandedInlineLoading ? (
-                                  <div className="space-y-1.5">
-                                    {[1,2,3].map((i) => <Skeleton key={i} className="h-4 w-full" />)}
-                                  </div>
-                                ) : expandedInlineEntries.filter((e: any) => !e.isStockItem).length === 0 ? (
-                                  <p className="text-sm text-muted-foreground">No ledger entries found.</p>
-                                ) : (
-                                  <div className="space-y-0.5">
-                                    {expandedInlineEntries.filter((e: any) => !e.isStockItem).map((e: any, idx: number) => (
-                                      <div key={e.id ?? idx} className="flex items-center justify-between text-sm py-0.5 gap-4">
-                                        <span className="text-muted-foreground truncate max-w-sm">
-                                          {e.accountName || "—"}
-                                          {e.narration && <span className="ml-2 text-xs italic opacity-70">{e.narration}</span>}
-                                        </span>
-                                        <div className="flex items-center gap-6 font-mono text-xs shrink-0">
-                                          {parseFloat(e.debitAmount || "0") > 0 && (
-                                            <span className="text-foreground">Dr {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(e.debitAmount))}</span>
-                                          )}
-                                          {parseFloat(e.creditAmount || "0") > 0 && (
-                                            <span className="text-muted-foreground">Cr {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(e.creditAmount))}</span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                        </>
-                      );
-                    });
-                    })()}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
           )}
         </CardContent>
       </Card>
