@@ -781,6 +781,17 @@ export default function FactoryProformas() {
                             Add Item
                           </Button>
                         )}
+                        {canEdit && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => navigate(`/factory/stock-allocation-v5?proformaId=${proforma.id}&openEdit=true`)}
+                            data-testid={`button-edit-in-allocation-${proforma.id}`}
+                          >
+                            <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                            Edit in Stock Allocation
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
