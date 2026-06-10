@@ -467,6 +467,25 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
     }
   }
 
+  // Actual-arrival fallback: once a container has discharged/arrived at
+  // destination there will be no future ETA field anywhere in the response.
+  // Rather than falling back to a stale old DB date, find the most recent
+  // discharge or arrival event and use its date as the actual arrival date.
+  // states[] is ordered newest-first, so the first match is the latest event.
+  const arrivalPattern = /discharg|import discharg|arrived|arrival at destination|port arrival|delivered/i;
+  const states = shipment.states ?? [];
+  for (const state of states) {
+    if (!state.date) continue;
+    const textToCheck = `${state.status ?? ""} ${state.description ?? ""}`;
+    if (arrivalPattern.test(textToCheck)) {
+      const d = tryDate(state.date);
+      if (d) {
+        console.log(`[ParcelsApp] deriveEDD: actual arrival event "${state.status}" → arrivalDate=${d}`);
+        return d;
+      }
+    }
+  }
+
   // No ETA found — return null so the caller preserves whatever is in the DB.
   return null;
 }
