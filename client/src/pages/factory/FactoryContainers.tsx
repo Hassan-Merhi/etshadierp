@@ -539,12 +539,12 @@ function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrackingNow
     },
   });
 
+  const totalWeightKg = containers.reduce((sum, c) => sum + (parseFloat((c as any).totalKg) || 0), 0);
+
   if (isLoading) {
     return (
       <div className="space-y-3">
-        <div className="grid grid-cols-3 gap-3">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 rounded-lg" />)}
-        </div>
+        <Skeleton className="h-20 rounded-lg" />
         <Skeleton className="h-48 rounded-lg" />
       </div>
     );
@@ -564,24 +564,12 @@ function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrackingNow
   return (
     <div className="space-y-4">
       {/* ── Summary cards ── */}
-      <div className="grid grid-cols-3 gap-3">
+      <div>
         <Card>
           <CardContent className="py-4 px-5">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1">OTW Containers</p>
-            <p className="text-2xl font-bold tabular-nums">{containers.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-4 px-5">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1">Checked Today</p>
-            <p className="text-2xl font-bold tabular-nums text-green-600 dark:text-green-400">{checkedToday}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-4 px-5">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1">With Errors</p>
-            <p className={`text-2xl font-bold tabular-nums ${withErrors > 0 ? "text-destructive" : "text-muted-foreground"}`}>
-              {withErrors}
+            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1">Total Weight (KG)</p>
+            <p className="text-2xl font-bold tabular-nums">
+              {totalWeightKg > 0 ? totalWeightKg.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—"}
             </p>
           </CardContent>
         </Card>
@@ -1453,7 +1441,11 @@ export default function FactoryContainers() {
     selectedSupplier.parentId !== parseInt(formData.commissionSupplierId);
 
   const filteredContainers = containers?.filter((c) => {
-    if (statusFilter !== "all" && c.status !== statusFilter) return false;
+    if (statusFilter === "HAS_WEIGHT") {
+      if (!(parseFloat((c as any).totalKg) > 0)) return false;
+    } else if (statusFilter === "NO_WEIGHT") {
+      if (parseFloat((c as any).totalKg) > 0) return false;
+    } else if (statusFilter !== "all" && c.status !== statusFilter) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       const matchesNumber = c.containerNumber?.toLowerCase().includes(q);
@@ -1731,6 +1723,8 @@ export default function FactoryContainers() {
                   <SelectItem value="IN_TRANSIT">In Transit</SelectItem>
                   <SelectItem value="AVAILABLE">Available</SelectItem>
                   <SelectItem value="OFFLOADED">Offloaded</SelectItem>
+                  <SelectItem value="HAS_WEIGHT">Has Weight</SelectItem>
+                  <SelectItem value="NO_WEIGHT">No Weight</SelectItem>
                 </SelectContent>
               </Select>
             </div>
