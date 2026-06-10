@@ -615,17 +615,9 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       {/* ── Summary Cards (ERP-style) ── */}
       <div className="flex flex-wrap gap-2">
         <SummaryCard label="Active" value={otwContainers.length} icon={<Package className="h-4 w-4 text-primary" />} accent="bg-primary/10" />
-        {pending > 0 && <SummaryCard label="Pending" value={pending} icon={<Ship className="h-4 w-4 text-blue-600" />} accent="bg-blue-100 dark:bg-blue-900/30" />}
         {inTransit > 0 && <SummaryCard label="In Transit" value={inTransit} icon={<Truck className="h-4 w-4 text-indigo-600" />} accent="bg-indigo-100 dark:bg-indigo-900/30" />}
         {arrived > 0 && <SummaryCard label="Arrived" value={arrived} icon={<CheckCircle2 className="h-4 w-4 text-green-600" />} accent="bg-green-100 dark:bg-green-900/30" />}
         {delayed > 0 && <SummaryCard label="Delayed" value={delayed} icon={<Clock className="h-4 w-4 text-red-600" />} accent="bg-red-100 dark:bg-red-900/30" />}
-        {withErrors > 0 && <SummaryCard label="With Errors" value={withErrors} icon={<AlertTriangle className="h-4 w-4 text-amber-600" />} accent="bg-amber-100 dark:bg-amber-900/30" />}
-        <SummaryCard
-          label="Checked Today"
-          value={checkedToday}
-          icon={<CheckCircle className="h-4 w-4 text-green-600" />}
-          accent="bg-green-100 dark:bg-green-900/30"
-        />
         {Object.entries(costByCurrency).map(([ccy, { symbol, amount }]) => (
           <SummaryCard
             key={ccy}
