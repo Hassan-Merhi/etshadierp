@@ -306,6 +306,13 @@ export default function SupplierProfitCheck() {
     setManualAvgPrices(initAvg);
   }, [overridesData]);
 
+  // Auto-select first location group when groups load and none is selected
+  useEffect(() => {
+    if (sellPriceSource === "location_group" && locationGroups.length > 0 && !selectedLocationId) {
+      setSelectedLocationId(String(locationGroups[0].id));
+    }
+  }, [locationGroups, sellPriceSource]);
+
   const saveOverrideMutation = useMutation({
     mutationFn: async (payload: { supplierId: number; stockItemId: number; poPrice?: number; avgPrice?: number }) => {
       const res = await apiRequest("PUT", "/api/supplier-profit-check/po-overrides", payload);
@@ -627,7 +634,14 @@ export default function SupplierProfitCheck() {
                 <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                   <MapPin className="w-3 h-3" /> Sell Price Source
                 </label>
-                <Select value={sellPriceSource} onValueChange={(v) => { setSellPriceSource(v as "avg" | "location_group"); setSelectedLocationId(""); }}>
+                <Select value={sellPriceSource} onValueChange={(v) => {
+                  setSellPriceSource(v as "avg" | "location_group");
+                  if (v === "location_group" && locationGroups.length > 0) {
+                    setSelectedLocationId(String(locationGroups[0].id));
+                  } else {
+                    setSelectedLocationId("");
+                  }
+                }}>
                   <SelectTrigger data-testid="select-sell-price-source"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="avg">Average Sell Price</SelectItem>
