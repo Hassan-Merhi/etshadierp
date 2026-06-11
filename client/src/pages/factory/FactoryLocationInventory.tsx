@@ -6,7 +6,6 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,7 +16,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { PageHeader } from "@/components/PageHeader";
 import {
   MapPin, Layers, Package, Search, Printer, ArrowUpDown,
   FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check, Trash2, Pencil, Tag, Zap, Eye,
@@ -131,18 +129,18 @@ interface StatCardProps {
 }
 function StatCard({ icon, label, value, sub, accent }: StatCardProps) {
   return (
-    <Card className="flex-1 min-w-[140px]">
-      <CardContent className="pt-4 pb-3 px-4">
-        <div className="flex items-start justify-between mb-2">
-          <div className={`p-1.5 rounded-md ${accent ?? "bg-muted"}`}>
+    <div className="rounded-xl border overflow-hidden flex-1 min-w-[140px]">
+      <div className="px-4 py-4">
+        <div className="mb-3">
+          <div className={`inline-flex p-1.5 rounded-md ${accent ?? "bg-muted"}`}>
             {icon}
           </div>
         </div>
         <div className="text-2xl font-bold font-mono leading-tight">{value}</div>
         <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
         {sub && <div className="text-xs text-muted-foreground/70 mt-0.5">{sub}</div>}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -1125,19 +1123,21 @@ export default function FactoryLocationInventory() {
         </div>
 
         {/* Search + list */}
-        <Card>
-          <CardContent className="pt-4 pb-4 px-4">
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="rounded-xl border overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
+            <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input
                 placeholder="Search locations..."
                 value={locationSearch}
                 onChange={(e) => setLocationSearch(e.target.value)}
-                className="pl-9"
+                className="pl-8 h-8 bg-transparent border-0 focus-visible:ring-0 text-sm"
                 data-testid="input-search-locations"
               />
             </div>
-
+          </div>
+          <div className="p-4">
             {locationsLoading ? (
               <div className="space-y-2">
                 <Skeleton className="h-14 w-full" />
@@ -1158,16 +1158,18 @@ export default function FactoryLocationInventory() {
                 {filteredLocations.map((location) => (
                   <div
                     key={location.id}
-                    className="relative flex flex-col items-center justify-center text-center px-4 py-5 rounded-md border bg-background cursor-pointer hover-elevate gap-2"
+                    className="relative flex flex-col items-center justify-center text-center px-4 py-6 rounded-xl border bg-muted/10 cursor-pointer hover-elevate gap-2"
                     onClick={() => handleLocationClick(location)}
                     data-testid={`row-location-${location.id}`}
                   >
-                    <MapPin className="h-5 w-5 text-muted-foreground" />
-                    <span className="font-medium text-sm leading-snug">{location.name}</span>
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <MapPin className="h-5 w-5 text-primary" />
+                    </div>
+                    <span className="font-semibold text-sm leading-snug">{location.name}</span>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="absolute top-1.5 right-1.5 h-7 w-7 opacity-50"
+                      className="absolute top-1.5 right-1.5 h-7 w-7 opacity-40"
                       onClick={(e) => openRenameDialog(location, e)}
                       data-testid={`button-rename-location-${location.id}`}
                       title="Rename location"
@@ -1184,8 +1186,8 @@ export default function FactoryLocationInventory() {
                 {filteredLocations.length} of {locations.length} location{locations.length !== 1 ? "s" : ""}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         <Dialog open={renameDialogOpen} onOpenChange={(open) => { if (!open) setRenameDialogOpen(false); }}>
           <DialogContent>
@@ -1268,14 +1270,6 @@ export default function FactoryLocationInventory() {
           </td>
         )}
         <td className="px-3">
-          <Badge
-            variant="outline"
-            className={`text-xs font-medium no-default-active-elevate whitespace-nowrap ${catColor(prod.category)}`}
-          >
-            {prod.category || "Uncategorized"}
-          </Badge>
-        </td>
-        <td className="px-3">
           <div className="flex items-center gap-1.5 flex-wrap">
             <button
               onClick={() => !proformaMode && navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation.id}`)}
@@ -1287,6 +1281,14 @@ export default function FactoryLocationInventory() {
             {prod.isInactive && <Badge variant="outline" className="text-xs text-muted-foreground no-default-active-elevate">Inactive</Badge>}
           </div>
           {prod.articleCode && <div className="text-xs text-muted-foreground font-mono mt-0.5">{prod.articleCode}</div>}
+        </td>
+        <td className="px-3">
+          <Badge
+            variant="outline"
+            className={`text-xs font-medium no-default-active-elevate whitespace-nowrap ${catColor(prod.category)}`}
+          >
+            {prod.category || "Uncategorized"}
+          </Badge>
         </td>
         <td className="text-right px-3 font-mono whitespace-nowrap">
           <span>{prod.baleCount - (prod.loadingCount ?? 0)}</span>
@@ -1337,7 +1339,7 @@ export default function FactoryLocationInventory() {
     const isSelected = selections.has(prod.productId);
     const selection = selections.get(prod.productId);
     return (
-      <Card key={prod.productId} className={`p-3 ${proformaMode && isSelected ? "ring-2 ring-primary" : ""}`} data-testid={`card-product${testIdSuffix}-${prod.productId}`}>
+      <div key={prod.productId} className={`rounded-xl border p-3 ${proformaMode && isSelected ? "ring-2 ring-primary border-primary" : ""}`} data-testid={`card-product${testIdSuffix}-${prod.productId}`}>
         <div className="flex items-center gap-2 mb-2">
           {proformaMode && (
             <Checkbox checked={isSelected} onCheckedChange={() => toggleSelection(prod)} data-testid={`checkbox-mobile${testIdSuffix}-${prod.productId}`} />
@@ -1384,7 +1386,7 @@ export default function FactoryLocationInventory() {
             <Input type="number" value={selection.pricePerBale} onChange={(e) => updateSelectionPrice(prod.productId, e.target.value)} className="w-24 text-right" step="0.01" data-testid={`input-price-mobile${testIdSuffix}-${prod.productId}`} />
           </div>
         )}
-      </Card>
+      </div>
     );
   };
 
@@ -1574,9 +1576,9 @@ export default function FactoryLocationInventory() {
       )}
 
       {/* Main card — toolbar + table */}
-      <Card className="p-4 w-full" ref={printRef}>
-        {/* Toolbar */}
-        <div className="flex flex-col gap-2 mb-4">
+      <div className="rounded-xl border overflow-hidden w-full" ref={printRef}>
+        {/* Toolbar strip */}
+        <div className="flex flex-col gap-2 px-4 py-3 border-b bg-muted/20">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -1647,7 +1649,7 @@ export default function FactoryLocationInventory() {
 
         {/* Loading skeleton */}
         {(inventoryLoading || (proformaMode && availableLoading)) && (
-          <div className="space-y-2">
+          <div className="p-4 space-y-2">
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-full" />
@@ -1656,7 +1658,7 @@ export default function FactoryLocationInventory() {
 
         {/* Mobile cards */}
         {!inventoryLoading && !(proformaMode && availableLoading) && (
-          <div className="md:hidden space-y-3">
+          <div className="md:hidden p-4 space-y-3">
             {regularProducts.length === 0 && specialProducts.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground" data-testid="text-no-products">
                 No products found{productSearch || categoryFilter.length > 0 ? " matching your filters" : " at this location"}
@@ -1665,7 +1667,7 @@ export default function FactoryLocationInventory() {
               <>
                 {regularProducts.map((prod) => renderMobileCard(prod))}
                 {regularProducts.length > 0 && (
-                  <Card className="p-3 bg-muted/50" data-testid="text-product-totals">
+                  <div className="rounded-xl border p-3 bg-muted/30" data-testid="text-product-totals">
                     <div className="flex items-center justify-between gap-2 font-bold text-sm">
                       <span>Total ({regularProducts.length} products, {totalBales.toLocaleString()} bales)</span>
                       <span className="font-mono">{fmt(totalKg)} KG</span>
@@ -1676,19 +1678,19 @@ export default function FactoryLocationInventory() {
                         <span>{formatAmount(totalProdValue)} prod</span>
                       </div>
                     )}
-                  </Card>
+                  </div>
                 )}
                 {specialProducts.length > 0 && (
                   <>
                     <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide pt-2">Wipers &amp; Garbage</p>
                     {specialProducts.map((prod) => renderMobileCard(prod, "-sp"))}
-                    <Card className="p-3 bg-muted/50" data-testid="text-special-product-totals">
+                    <div className="rounded-xl border p-3 bg-muted/30" data-testid="text-special-product-totals">
                       <div className="flex items-center justify-between gap-2 font-bold text-sm">
                         <span>Total ({specialProducts.length} products, {spTotalBales.toLocaleString()} bales)</span>
                         <span className="font-mono">{fmt(spTotalKg)} KG</span>
                       </div>
                       {!hideSellingPrice && <div className="text-right text-sm font-mono font-bold">{formatAmount(spTotalSellValue)} sell</div>}
-                    </Card>
+                    </div>
                   </>
                 )}
               </>
@@ -1703,8 +1705,8 @@ export default function FactoryLocationInventory() {
               <table className="table-fixed text-sm" style={{ minWidth: "820px", width: "100%" }}>
                 <colgroup>
                   {proformaMode && <col style={{ width: "36px" }} />}
-                  <col style={{ width: "110px" }} />
                   <col style={{ minWidth: "200px" }} />
+                  <col style={{ width: "110px" }} />
                   <col style={{ width: "70px" }} />
                   {proformaMode && <col style={{ width: "80px" }} />}
                   {proformaMode && <col style={{ width: "110px" }} />}
@@ -1716,21 +1718,21 @@ export default function FactoryLocationInventory() {
                   <col style={{ width: "100px" }} />
                   {!proformaMode && <col style={{ width: "100px" }} />}
                 </colgroup>
-                <thead className="bg-muted/50 sticky top-0 z-30">
-                  <tr className="h-12">
+                <thead className="bg-muted border-b-2 border-border/60 sticky top-0 z-30">
+                  <tr className="h-10">
                     {proformaMode && <th className="px-2"></th>}
-                    <th className="text-left px-3 font-medium">Category</th>
-                    <th className="text-left px-3 font-medium whitespace-nowrap">Product</th>
-                    <th className="text-right px-3 font-medium whitespace-nowrap">{proformaMode ? "Available" : "Bales"}</th>
-                    {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
-                    {proformaMode && <th className="text-right px-3 font-medium">Price/Bale</th>}
-                    <th className="text-right px-3 font-medium">Avg KG/Bale</th>
-                    {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Price</th>}
-                    {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Value</th>}
-                    {!hideSellingPrice && <th className="text-right px-3 font-medium">Cost Price</th>}
-                    {!hideSellingPrice && <th className="text-right px-3 font-medium">Cost Value</th>}
-                    <th className="text-right px-3 font-medium">Total KG</th>
-                    {!proformaMode && <th className="text-center px-3 font-medium">Actions</th>}
+                    <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Product</th>
+                    <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category</th>
+                    <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{proformaMode ? "Available" : "Bales"}</th>
+                    {proformaMode && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Qty</th>}
+                    {proformaMode && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Price/Bale</th>}
+                    <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Avg KG/Bale</th>
+                    {!hideSellingPrice && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Sell Price</th>}
+                    {!hideSellingPrice && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Sell Value</th>}
+                    {!hideSellingPrice && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Cost Price</th>}
+                    {!hideSellingPrice && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Cost Value</th>}
+                    <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Total KG</th>
+                    {!proformaMode && <th className="text-center px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -1772,8 +1774,8 @@ export default function FactoryLocationInventory() {
                   <table className="table-fixed text-sm" style={{ minWidth: "820px", width: "100%" }}>
                     <colgroup>
                       {proformaMode && <col style={{ width: "36px" }} />}
-                      <col style={{ width: "110px" }} />
                       <col style={{ minWidth: "200px" }} />
+                      <col style={{ width: "110px" }} />
                       <col style={{ width: "70px" }} />
                       {proformaMode && <col style={{ width: "80px" }} />}
                       {proformaMode && <col style={{ width: "110px" }} />}
@@ -1785,21 +1787,21 @@ export default function FactoryLocationInventory() {
                       <col style={{ width: "100px" }} />
                       {!proformaMode && <col style={{ width: "100px" }} />}
                     </colgroup>
-                    <thead className="bg-muted/50 sticky top-0 z-30">
-                      <tr className="h-12">
+                    <thead className="bg-muted border-b-2 border-border/60 sticky top-0 z-30">
+                      <tr className="h-10">
                         {proformaMode && <th className="px-2"></th>}
-                        <th className="text-left px-3 font-medium">Category</th>
-                        <th className="text-left px-3 font-medium whitespace-nowrap">Product</th>
-                        <th className="text-right px-3 font-medium whitespace-nowrap">{proformaMode ? "Available" : "Bales"}</th>
-                        {proformaMode && <th className="text-right px-3 font-medium">Qty</th>}
-                        {proformaMode && <th className="text-right px-3 font-medium">Price/Bale</th>}
-                        <th className="text-right px-3 font-medium">Avg KG/Bale</th>
-                        {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Price</th>}
-                        {!hideSellingPrice && <th className="text-right px-3 font-medium">Sell Value</th>}
-                        {!hideSellingPrice && <th className="text-right px-3 font-medium">Cost Price</th>}
-                        {!hideSellingPrice && <th className="text-right px-3 font-medium">Cost Value</th>}
-                        <th className="text-right px-3 font-medium">Total KG</th>
-                        {!proformaMode && <th className="text-center px-3 font-medium">Actions</th>}
+                        <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Product</th>
+                        <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category</th>
+                        <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{proformaMode ? "Available" : "Bales"}</th>
+                        {proformaMode && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Qty</th>}
+                        {proformaMode && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Price/Bale</th>}
+                        <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Avg KG/Bale</th>
+                        {!hideSellingPrice && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Sell Price</th>}
+                        {!hideSellingPrice && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Sell Value</th>}
+                        {!hideSellingPrice && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Cost Price</th>}
+                        {!hideSellingPrice && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Cost Value</th>}
+                        <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Total KG</th>
+                        {!proformaMode && <th className="text-center px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -1827,11 +1829,11 @@ export default function FactoryLocationInventory() {
         )}
 
         {!inventoryLoading && filteredProducts.length > 0 && (
-          <div className="mt-4 text-sm text-muted-foreground">
+          <div className="px-4 py-3 border-t text-xs text-muted-foreground">
             Showing {filteredProducts.length} of {activeInventoryData.length} products
           </div>
         )}
-      </Card>
+      </div>
 
       {/* Proforma sticky footer */}
       {proformaMode && selections.size > 0 && (
