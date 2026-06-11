@@ -94,6 +94,24 @@ function parseBalesMeta(entry: DaybookEntry): BaleMeta[] {
 // shows all bales, not just the per-bale virtual row).
 type DisplayEntry = DaybookEntry & { _vKey: string; _source: DaybookEntry };
 
+// Merge multiple BALE_STOCK_ENTRY records (e.g. several batches in one day)
+// into a single synthetic entry so the detail popup shows ALL bales together.
+function mergeBaleEntries(entries: DaybookEntry[]): DaybookEntry {
+  if (entries.length === 1) return entries[0];
+  const allBales = entries.flatMap(e => parseBalesMeta(e));
+  const totalCurrency = entries.reduce((s, e) => s + parseFloat(e.amountCurrency || "0"), 0);
+  const totalUsd = entries.reduce((s, e) => s + parseFloat(e.amountUsd || "0"), 0);
+  const base = entries[0];
+  const productNames = [...new Set(allBales.map((b: any) => b.productName || b.ref || "Unknown"))];
+  return {
+    ...base,
+    amountCurrency: totalCurrency.toFixed(2),
+    amountUsd: totalUsd.toFixed(2),
+    metaJson: JSON.stringify({ bales: allBales }),
+    description: `${allBales.length} bales - ${productNames.join(" | ")}`,
+  };
+}
+
 // Expand multi-bale BALE_STOCK_ENTRY rows into one virtual row per bale so
 // each bale gets its own named row (like single-bale entries already do).
 // The cost is divided equally across bales.
@@ -2232,7 +2250,10 @@ export default function FactoryDaybook() {
 
                             {/* Expanded entry sub-rows */}
                             {isExpanded && row.txType === "BALE_STOCK_ENTRY" && (() => {
-                              const firstEntry = expandedEntries[0] as DisplayEntry | undefined;
+                              const hasEntries = expandedEntries.length > 0;
+                              const mergedEntry = hasEntries
+                                ? mergeBaleEntries(expandedEntries.map(e => (e as DisplayEntry)._source ?? e as DaybookEntry))
+                                : undefined;
                               return (
                                 <div
                                   className={cn("grid w-full bg-muted/20 border-t items-center", colsClass)}
@@ -2246,18 +2267,18 @@ export default function FactoryDaybook() {
                                       <span className="text-sm font-mono font-medium">
                                         {currencySymbol(row.currencyCode)}{formatNumber(row.totalAmountCurrency)}
                                       </span>
-                                      {firstEntry && (
+                                      {mergedEntry && (
                                         <Button size="icon" variant="ghost" title="View details"
-                                          onClick={(e) => { e.stopPropagation(); setViewEntry((firstEntry._source ?? firstEntry) as DaybookEntry); }}
+                                          onClick={(e) => { e.stopPropagation(); setViewEntry(mergedEntry); }}
                                           data-testid="button-view-bale-summary"
                                         ><Eye className="h-3 w-3" /></Button>
                                       )}
                                     </div>
                                   ) : (
                                     <div className="flex items-center justify-end gap-1 pr-2 py-2">
-                                      {firstEntry && (
+                                      {mergedEntry && (
                                         <Button size="icon" variant="ghost" title="View details"
-                                          onClick={(e) => { e.stopPropagation(); setViewEntry((firstEntry._source ?? firstEntry) as DaybookEntry); }}
+                                          onClick={(e) => { e.stopPropagation(); setViewEntry(mergedEntry); }}
                                           data-testid="button-view-bale-summary"
                                         ><Eye className="h-3 w-3" /></Button>
                                       )}
