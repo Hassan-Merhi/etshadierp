@@ -1279,6 +1279,23 @@ export function registerImportRoutes(app: Express) {
         createdVoucher = voucher;
       });
 
+      // Send invoice PDF to the location's WhatsApp group (best-effort)
+      if (createdVoucher && location.whatsappGroupChatId) {
+        try {
+          const senderName = (req as any).user?.username || "Import";
+          const waVis = await getErpExportVisibility(req);
+          const hideProfitCols = waVis.hideSelling || waVis.hideCost || waVis.hideSalesProfitCost;
+          const pdfBuffer = await generateInvoicePdf(createdVoucher.id, req.session.currentCompanyId!, senderName, { hideProfitCols });
+          const safeDate = (createdVoucher.voucherDate ?? saleDate).replace(/[^0-9-]/g, "");
+          const safeLoc  = (location.name ?? "").replace(/[^\w\s.()\-]/g, "_").trim();
+          const fileName = `Invoice ${safeLoc} ${safeDate}.pdf`;
+          await sendWhatsAppFileByUploadPos(location.whatsappGroupChatId, pdfBuffer, fileName, "");
+          console.log(`[POSImport] WhatsApp invoice sent: ${fileName} → ${location.whatsappGroupChatId}`);
+        } catch (waErr: any) {
+          console.error("[POSImport] WhatsApp send failed (import still succeeded):", waErr.message);
+        }
+      }
+
       res.json({
         success: true,
         voucher: createdVoucher,
