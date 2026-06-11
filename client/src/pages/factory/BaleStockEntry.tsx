@@ -970,61 +970,6 @@ import DailyScan from "./DailyScan";
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2">
-                  <Upload className="h-4 w-4 text-muted-foreground" />
-                  <CardTitle className="text-sm">Label Logo</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Select value={selectedCustomerId} onValueChange={(v) => { setSelectedCustomerId(v); setSelectedLogoId(null); }}>
-                  <SelectTrigger className="text-sm" data-testid="select-label-customer">
-                    <SelectValue placeholder="No customer (HMD logo)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No customer (HMD logo)</SelectItem>
-                    {allCustomers.filter((c: any) => c.active).map((c: any) => (
-                      <SelectItem key={c.id} value={String(c.id)}>{c.legalName}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedCustomerId && selectedCustomerId !== "none" && (
-                  customerLogosForPrint.length === 0 ? (
-                    <p className="text-xs text-muted-foreground py-1">No logos uploaded for this customer.</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {customerLogosForPrint.map((logo: any) => (
-                        <button
-                          key={logo.id}
-                          type="button"
-                          onClick={() => {
-                            const next = selectedLogoId === logo.id ? null : logo.id;
-                            setSelectedLogoId(next);
-                            if (next) prefetchLogoEager(next);
-                          }}
-                          className={`flex flex-col items-center gap-1 p-2 rounded-md border text-xs ${selectedLogoId === logo.id ? "border-primary bg-primary/10" : "border-border hover-elevate"}`}
-                          data-testid={`button-select-logo-${logo.id}`}
-                        >
-                          <img src={`/api/factory/customer-logos/${logo.id}/image`} alt={logo.name} className="h-8 w-14 object-contain" />
-                          <span className="truncate max-w-[72px]">{logo.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )
-                )}
-                {selectedLogoId && (
-                  <button
-                    className="text-xs text-muted-foreground underline hover:text-foreground"
-                    onClick={() => setSelectedLogoId(null)}
-                    data-testid="button-clear-logo"
-                  >
-                    Clear logo
-                  </button>
-                )}
-              </CardContent>
-            </Card>
-
             <Button
               className="w-full gap-2"
               disabled={cart.length === 0 || !selectedLocationId || stockEntryMutation.isPending}
