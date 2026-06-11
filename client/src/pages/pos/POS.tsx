@@ -483,8 +483,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }
   }, [posUser, posSelectedLocation]);
 
-  // Auto-set cash account for POS users from their selected location's per-location mapping
+  // Auto-set cash account for POS users from their selected location's per-location mapping.
+  // Skip in edit mode — the existing sale's original cash account is loaded from voucher entries
+  // and must not be overridden by the location's default.
   useEffect(() => {
+    if (editVoucherId) return;
     const locCashId = (posSelectedLocation as any)?.cashAccountId;
     if (posUser && locCashId) {
       setPaymentAccountType("cash");
