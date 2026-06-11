@@ -1505,57 +1505,84 @@ export default function ProductionRawStock() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <PageHeader title="Raw Production" subtitle="Raw stock inventory and daily mix batch management" />
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center h-9 w-9 rounded-xl bg-gradient-to-br from-amber-500/30 to-amber-600/10 border border-amber-500/25 shrink-0">
+            <FlaskConical className="h-4.5 w-4.5 text-amber-500" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold leading-tight">Raw Production</h1>
+            <p className="text-xs text-muted-foreground leading-tight">Raw stock inventory and daily mix batch management</p>
+          </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button onClick={() => setOffloadDialogOpen(true)} data-testid="button-offload-container">
-            <ArrowDown className="h-4 w-4 mr-2" />
-            Offload Container
-          </Button>
+        <Button
+          onClick={() => setOffloadDialogOpen(true)}
+          data-testid="button-offload-container"
+          className="bg-emerald-600 hover:bg-emerald-600 text-white gap-2"
+        >
+          <ArrowDown className="h-4 w-4" />
+          Offload Container
+        </Button>
+      </div>
+
+      <div className="rounded-xl border bg-card">
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x">
+          {/* Total Received */}
+          <div className="flex items-start gap-3 px-5 py-4">
+            <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-slate-500/10 border border-slate-500/20 shrink-0 mt-0.5">
+              <ArrowDownCircle className="h-4.5 w-4.5 text-slate-500" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Total Received</p>
+              <p className="text-2xl font-bold font-mono tabular-nums leading-tight" data-testid="text-total-received">
+                {fmtKg(totalReceived)} <span className="text-sm font-medium text-muted-foreground">kg</span>
+              </p>
+              <p className="text-xs text-muted-foreground font-mono mt-0.5" data-testid="text-total-received-value">
+                ${formatNumber(totalReceivedValue)}
+              </p>
+            </div>
+          </div>
+          {/* Total Used */}
+          <div className="flex items-start gap-3 px-5 py-4">
+            <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-amber-500/10 border border-amber-500/20 shrink-0 mt-0.5">
+              <ArrowUpCircle className="h-4.5 w-4.5 text-amber-500" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Total Used</p>
+              <p className="text-2xl font-bold font-mono tabular-nums leading-tight" data-testid="text-total-used">
+                {fmtKg(totalUsed)} <span className="text-sm font-medium text-muted-foreground">kg</span>
+              </p>
+              <p className="text-xs text-muted-foreground font-mono mt-0.5" data-testid="text-total-used-value">
+                ${formatNumber(totalUsedValue)}
+              </p>
+            </div>
+          </div>
+          {/* Free Available */}
+          <div className="flex items-start gap-3 px-5 py-4">
+            <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 shrink-0 mt-0.5">
+              <Package className="h-4.5 w-4.5 text-emerald-500" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Free Available</p>
+              <p className="text-2xl font-bold font-mono tabular-nums leading-tight text-emerald-600 dark:text-emerald-400" data-testid="text-total-free">
+                {fmtKg(totalFree)} <span className="text-sm font-medium text-emerald-600/70 dark:text-emerald-400/70">kg</span>
+              </p>
+              <p className="text-xs text-muted-foreground font-mono mt-0.5" data-testid="text-total-value">
+                Stock Value: <span className="text-foreground font-semibold">${formatNumber(totalValue)}</span>
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">Total Received</p>
-            <p className="text-xl font-bold font-mono" data-testid="text-total-received">
-              {fmtKg(totalReceived)} kg
-            </p>
-            <p className="text-sm text-muted-foreground font-mono mt-0.5" data-testid="text-total-received-value">
-              ${formatNumber(totalReceivedValue)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">Total Used</p>
-            <p className="text-xl font-bold font-mono" data-testid="text-total-used">
-              {fmtKg(totalUsed)} kg
-            </p>
-            <p className="text-sm text-muted-foreground font-mono mt-0.5" data-testid="text-total-used-value">
-              ${formatNumber(totalUsedValue)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">Free Available</p>
-            <p className="text-xl font-bold font-mono text-green-600 dark:text-green-400" data-testid="text-total-free">
-              {fmtKg(totalFree)} kg
-            </p>
-            <p className="text-sm font-mono mt-0.5 text-muted-foreground" data-testid="text-total-value">
-              Stock Value: <span className="text-foreground font-semibold">${formatNumber(totalValue)}</span>
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-          <CardTitle>Raw Stock by Supplier</CardTitle>
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/20 flex-wrap">
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-amber-500/15 border border-amber-500/20 shrink-0">
+              <FlaskConical className="h-3.5 w-3.5 text-amber-500" />
+            </div>
+            <span className="text-sm font-semibold">Raw Stock by Supplier</span>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <Button
               variant="outline"
@@ -1598,8 +1625,8 @@ export default function ProductionRawStock() {
               New Manual Material
             </Button>
           </div>
-        </CardHeader>
-        <CardContent>
+        </div>
+        <div>
           {isLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-12 w-full" />
@@ -1609,15 +1636,15 @@ export default function ProductionRawStock() {
           ) : rawStock && rawStock.length > 0 ? (
             <div className="overflow-x-auto">
             <Table>
-              <TableHeader className="sticky top-0 z-30 bg-background">
+              <TableHeader className="sticky top-0 z-30 bg-muted border-b-2 border-border/60">
                 <TableRow>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead className="text-right">Received (kg)</TableHead>
-                  <TableHead className="text-right">Free (kg)</TableHead>
-                  <TableHead className="text-right">Avg Cost/kg ($)</TableHead>
-                  <TableHead className="text-right">Value Remaining ($)</TableHead>
-                  <TableHead>Last Offloaded</TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground tracking-wide">Supplier</TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground tracking-wide">Source</TableHead>
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground tracking-wide">Received (kg)</TableHead>
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground tracking-wide">Free (kg)</TableHead>
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground tracking-wide">Avg Cost/kg ($)</TableHead>
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground tracking-wide">Value Remaining ($)</TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground tracking-wide">Last Offloaded</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
@@ -1673,22 +1700,22 @@ export default function ProductionRawStock() {
                     const headerRow = hasCategories ? (
                       <TableRow
                         key={`group-${groupKey}`}
-                        className="bg-muted/40 hover:bg-muted/60 cursor-pointer select-none"
+                        className="bg-muted/60 hover:bg-muted/80 cursor-pointer select-none"
                         onClick={toggleGroup}
                         data-testid={`row-category-${groupKey}`}
                       >
-                        <TableCell colSpan={2} className="py-2 font-semibold text-sm">
+                        <TableCell colSpan={2} className="py-2.5">
                           <div className="flex items-center gap-2">
                             {isCollapsed
-                              ? <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                              : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                              ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                              : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                             }
                             {isUncategorized
-                              ? <Folder className="h-4 w-4 text-muted-foreground" />
-                              : <FolderOpen className="h-4 w-4 text-primary/70" />
+                              ? <Folder className="h-3.5 w-3.5 text-muted-foreground" />
+                              : <FolderOpen className="h-3.5 w-3.5 text-primary/70" />
                             }
-                            <span>{groupLabel}</span>
-                            <span className="text-xs font-normal text-muted-foreground">
+                            <span className="text-xs font-bold uppercase tracking-wide">{groupLabel}</span>
+                            <span className="text-xs text-muted-foreground font-normal">
                               ({groupRows.length} supplier{groupRows.length !== 1 ? "s" : ""})
                             </span>
                           </div>
@@ -1830,7 +1857,8 @@ export default function ProductionRawStock() {
                         <div className="flex items-center gap-1 flex-wrap">
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="ghost"
+                          className="text-xs h-7 px-2"
                           data-testid={`button-adjust-stock-${row.supplierId || idx}`}
                           onClick={() => {
                             setAdjIsNewMaterial(false);
@@ -1851,7 +1879,8 @@ export default function ProductionRawStock() {
                         {row.supplierId && (
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant="ghost"
+                            className="text-xs h-7 px-2 text-destructive hover:text-destructive"
                             data-testid={`button-deduct-received-${row.supplierId}`}
                             onClick={() => {
                               setDeductingRow({
@@ -1874,7 +1903,8 @@ export default function ProductionRawStock() {
                         {row.supplierId && parseFloat(row.freeKg || "0") > 0.001 && (
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant="ghost"
+                            className="text-xs h-7 px-2 text-emerald-600 dark:text-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-400"
                             data-testid={`button-add-to-batch-${row.supplierId}`}
                             onClick={() => {
                               setAddToBatchSource({
@@ -1917,8 +1947,8 @@ export default function ProductionRawStock() {
               </Button>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* ── Manual Stock Adjustments History ── */}
       <AdjustmentsHistoryCard onDeleteRequest={setConfirmDeleteAdjId} />
