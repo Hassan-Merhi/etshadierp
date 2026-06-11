@@ -684,7 +684,6 @@ export default function BarcodeLookup() {
                       </div>
                     )}
                   </div>
-                </div>
                 <div className="px-4 py-4 space-y-4">
                   {/* Row 1: Key fields */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
