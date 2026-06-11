@@ -88,12 +88,8 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     items: [
       { title: "Stock Entry",     url: "/factory/stock-entry",     icon: ScanLine },
       { title: "Raw Materials",   url: "/factory/raw-materials",   icon: Package  },
-      { title: "Raw Stock",       url: "/factory/raw-stock",       icon: Boxes,   developerOnly: true },
       { title: "Waste Dispatch",  url: "/factory/waste-dispatch",  icon: Trash2   },
       { title: "Bale Explorer",   url: "/factory/bales-hub",       icon: History  },
-      { title: "Import",          url: "/factory/import",          icon: Upload,  developerOnly: true },
-      { title: "Bale Products",   url: "/factory/bale-products",   icon: Tag,     developerOnly: true },
-      { title: "Bale Relabeling", url: "/factory/bale-relabeling", icon: Repeat,  developerOnly: true },
     ],
   },
   {
