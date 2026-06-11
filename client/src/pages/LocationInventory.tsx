@@ -640,8 +640,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     setAllStockSearchTerm("");
     setAllStockGroupFilter("");
     setAllStockLocationFilter("");
-    setAllStockCategoryFilter("");
-    setItemCategoryFilter("");
+    setAllStockCategoryFilter([]);
+    setItemCategoryFilter([]);
   };
 
   // Handle back to groups
@@ -650,7 +650,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     setViewAllItems(false);
     setSelectedRowIndex(0);
     setItemSearchTerm("");
-    setItemCategoryFilter("");
+    setItemCategoryFilter([]);
   };
 
   const escapeBackHandler = selectedGroup
@@ -3438,10 +3438,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   const searchLower = itemSearchTerm.toLowerCase();
                   const sortedInventory = [...inventory]
                     .filter((item) => {
-                      if (itemCategoryFilter) {
-                        const catId = itemCategoryFilter === "none" ? null : parseInt(itemCategoryFilter, 10);
-                        const matches = catId === null ? item.categoryId == null : item.categoryId === catId;
-                        if (!matches) return false;
+                      if (itemCategoryFilter.length > 0) {
+                        const itemCatId = item.categoryId == null ? "none" : String(item.categoryId);
+                        if (!itemCategoryFilter.includes(itemCatId)) return false;
                       }
                       if (!searchLower) return true;
                       return (
