@@ -25,7 +25,7 @@ import {
   TrendingUp, TrendingDown, Minus, AlertTriangle, Search, Download,
   FileText, CheckCircle, Package, Loader2, BarChart2, Save,
   Hash, ShoppingCart, Columns, RotateCcw, Truck, Filter, ChevronDown,
-  CircleDollarSign, MapPin, Container,
+  CircleDollarSign, MapPin, Container, Plus,
 } from "lucide-react";
 
 // ─── Column definitions ───────────────────────────────────────────────────────
@@ -202,6 +202,14 @@ export default function SupplierProfitCheck() {
   const [proformaRef, setProformaRef] = useState<string>("");
   const [proformaNotes, setProformaNotes] = useState<string>("");
 
+  // Add item dialog
+  const [showAddItemDialog, setShowAddItemDialog] = useState(false);
+  const [newItemCode, setNewItemCode] = useState("");
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemGroupId, setNewItemGroupId] = useState("");
+  const [newItemDubaiPrice, setNewItemDubaiPrice] = useState("");
+  const [newItemAvgSell, setNewItemAvgSell] = useState("");
+
   // Autosave
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [qtyVersion, setQtyVersion] = useState(0);
@@ -323,6 +331,27 @@ export default function SupplierProfitCheck() {
       const res = await apiRequest("PUT", "/api/supplier-profit-check/po-overrides", payload);
       return res.json();
     },
+  });
+
+  const addItemMutation = useMutation({
+    mutationFn: async (payload: {
+      code: string; name: string; supplierId: number;
+      stockGroupId?: number; dubaiPrice?: number; avgSellPrice?: number;
+    }) => {
+      const res = await apiRequest("POST", "/api/supplier-profit-check/add-stock-item", payload);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? "Failed to add item");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/supplier-profit-check/analyze"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/supplier-profit-check/po-overrides", supplierId] });
+      setShowAddItemDialog(false);
+      setNewItemCode(""); setNewItemName(""); setNewItemGroupId("");
+      setNewItemDubaiPrice(""); setNewItemAvgSell("");
+      toast({ title: "Item added", description: "The item is now included in the analysis." });
+    },
+    onError: (err: any) => toast({ title: "Failed to add item", description: err.message, variant: "destructive" }),
   });
 
   const handleManualPoChange = useCallback((stockItemId: number, value: string) => {
@@ -603,6 +632,18 @@ export default function SupplierProfitCheck() {
               </span>
             )}
 
+            {supplierId && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddItemDialog(true)}
+                className="shrink-0"
+                data-testid="button-add-item"
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
+                Add Item
+              </Button>
+            )}
             {loaded && !savedProforma && !(sourceType === "proforma" && proformaId) && (
               <Button
                 onClick={() => {
@@ -1251,6 +1292,135 @@ export default function SupplierProfitCheck() {
           </div>
         )}
       </div>
+
+      {/* ── Add Item Dialog ── */}
+      <Dialog open={showAddItemDialog} onOpenChange={(open) => {
+        setShowAddItemDialog(open);
+        if (!open) {
+          setNewItemCode(""); setNewItemName(""); setNewItemGroupId("");
+          setNewItemDubaiPrice(""); setNewItemAvgSell("");
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5" /> Add Item to Stock
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Create a new stock item that will immediately appear in this supplier's analysis.
+            </p>
+
+            {/* Code + Name */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Code <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  placeholder="e.g. ITEM-001"
+                  value={newItemCode}
+                  onChange={(e) => setNewItemCode(e.target.value.toUpperCase())}
+                  className="font-mono"
+                  data-testid="input-new-item-code"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Name <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  placeholder="Item name"
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  data-testid="input-new-item-name"
+                />
+              </div>
+            </div>
+
+            {/* Stock Group */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Stock Group</label>
+              <Select value={newItemGroupId} onValueChange={setNewItemGroupId}>
+                <SelectTrigger data-testid="select-new-item-group">
+                  <SelectValue placeholder="No group (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No group</SelectItem>
+                  {(stockGroups as any[]).map((g: any) => (
+                    <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Price hints */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  <span className="text-amber-500">Dubai Price</span>
+                  <span className="font-normal">(optional)</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
+                  <Input
+                    type="number" min="0" step="0.01" placeholder="0.00"
+                    value={newItemDubaiPrice}
+                    onChange={(e) => setNewItemDubaiPrice(e.target.value)}
+                    className="pl-6 font-mono"
+                    data-testid="input-new-item-dubai-price"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  Avg Sell Price
+                  <span className="font-normal">(optional)</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
+                  <Input
+                    type="number" min="0" step="0.01" placeholder="0.00"
+                    value={newItemAvgSell}
+                    onChange={(e) => setNewItemAvgSell(e.target.value)}
+                    className="pl-6 font-mono"
+                    data-testid="input-new-item-avg-sell"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowAddItemDialog(false)} disabled={addItemMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!newItemCode.trim() || !newItemName.trim()) {
+                  toast({ title: "Code and name are required", variant: "destructive" });
+                  return;
+                }
+                addItemMutation.mutate({
+                  code: newItemCode.trim(),
+                  name: newItemName.trim(),
+                  supplierId: Number(supplierId),
+                  stockGroupId: newItemGroupId && newItemGroupId !== "none" ? Number(newItemGroupId) : undefined,
+                  dubaiPrice: newItemDubaiPrice ? Number(newItemDubaiPrice) : undefined,
+                  avgSellPrice: newItemAvgSell ? Number(newItemAvgSell) : undefined,
+                });
+              }}
+              disabled={addItemMutation.isPending || !newItemCode.trim() || !newItemName.trim()}
+              data-testid="button-confirm-add-item"
+            >
+              {addItemMutation.isPending
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Adding…</>
+                : <><Plus className="w-4 h-4 mr-2" />Add Item</>
+              }
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Confirm Proforma Modal ── */}
       <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
