@@ -377,29 +377,54 @@ export function registerFiscalTransferRoutes(app: Express) {
           .where(and(...conditions))
           .orderBy(sql`${vouchers.voucherDate} DESC, ${vouchers.createdAt} DESC`);
 
-        // Batch-fetch all sales items for all vouchers in one query
+        // Batch-fetch all sales items and cash account names in parallel
         const voucherIds = salesVouchers.map(v => v.id);
-        const allSalesItems = voucherIds.length > 0
-          ? await db
-              .select({
-                id: salesItems.id,
-                voucherId: salesItems.voucherId,
-                stockItemId: salesItems.stockItemId,
-                stockItemName: stockItems.name,
-                quantity: salesItems.quantity,
-                sellingPrice: salesItems.sellingPrice,
-                totalSales: salesItems.totalSales,
-              })
-              .from(salesItems)
-              .leftJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
-              .where(inArray(salesItems.voucherId, voucherIds))
-          : [];
+        const [allSalesItems, cashEntries] = await Promise.all([
+          voucherIds.length > 0
+            ? db
+                .select({
+                  id: salesItems.id,
+                  voucherId: salesItems.voucherId,
+                  stockItemId: salesItems.stockItemId,
+                  stockItemName: stockItems.name,
+                  quantity: salesItems.quantity,
+                  sellingPrice: salesItems.sellingPrice,
+                  totalSales: salesItems.totalSales,
+                })
+                .from(salesItems)
+                .leftJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
+                .where(inArray(salesItems.voucherId, voucherIds))
+            : Promise.resolve([]),
+          // Find the Cash-type debit entry for each voucher (that's the cash account used)
+          voucherIds.length > 0
+            ? db
+                .select({
+                  voucherId: voucherEntries.voucherId,
+                  cashAccountName: ledgerAccounts.name,
+                })
+                .from(voucherEntries)
+                .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
+                .where(and(
+                  inArray(voucherEntries.voucherId, voucherIds),
+                  eq(ledgerAccounts.accountType, "Cash"),
+                  sql`${voucherEntries.debitAmount}::numeric > 0`,
+                ))
+            : Promise.resolve([]),
+        ]);
 
         const itemsByVoucher = new Map<number, typeof allSalesItems>();
         for (const item of allSalesItems) {
           const arr = itemsByVoucher.get(item.voucherId!) || [];
           arr.push(item);
           itemsByVoucher.set(item.voucherId!, arr);
+        }
+
+        // Use first Cash debit entry per voucher (there's only one in normal POS sales)
+        const cashAccountByVoucher = new Map<number, string>();
+        for (const entry of cashEntries) {
+          if (entry.voucherId && !cashAccountByVoucher.has(entry.voucherId)) {
+            cashAccountByVoucher.set(entry.voucherId, entry.cashAccountName);
+          }
         }
 
         const transactions = salesVouchers.map((voucher) => {
@@ -414,6 +439,7 @@ export function registerFiscalTransferRoutes(app: Express) {
               createdAt: voucher.createdAt,
               description: voucher.description,
               customerName: voucher.customerName ?? null,
+              cashAccountName: cashAccountByVoucher.get(voucher.id) ?? null,
               totalAmount: totalAmt,
               totalQuantity: totalQty,
               itemCount: items.length,

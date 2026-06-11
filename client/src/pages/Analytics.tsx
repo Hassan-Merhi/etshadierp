@@ -73,6 +73,7 @@ interface POSTransaction {
   createdAt: string;
   description: string | null;
   customerName: string | null;
+  cashAccountName: string | null;
   totalAmount: number;
   totalQuantity: number;
   itemCount: number;
@@ -1834,6 +1835,7 @@ export default function Analytics() {
                         <TableRow>
                           <TableHead>Date</TableHead>
                           {selectedLocationForDetails === -1 && <TableHead>Customer</TableHead>}
+                          <TableHead>Cash Account</TableHead>
                           <TableHead className="text-right">Items</TableHead>
                           <TableHead className="text-right">Quantity</TableHead>
                           <TableHead className="text-right">Amount</TableHead>
@@ -1866,6 +1868,9 @@ export default function Analytics() {
                                 {transaction.customerName || "—"}
                               </TableCell>
                             )}
+                            <TableCell className="text-muted-foreground text-sm">
+                              {transaction.cashAccountName || "—"}
+                            </TableCell>
                             <TableCell className="text-right">
                               {transaction.itemCount}
                             </TableCell>
@@ -1905,6 +1910,9 @@ export default function Analytics() {
                             </div>
                             {selectedLocationForDetails === -1 && transaction.customerName && (
                               <div className="text-sm text-muted-foreground">{transaction.customerName}</div>
+                            )}
+                            {transaction.cashAccountName && (
+                              <div className="text-sm text-muted-foreground">{transaction.cashAccountName}</div>
                             )}
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-muted-foreground">Items: {transaction.itemCount} | Qty: {transaction.totalQuantity}</span>
