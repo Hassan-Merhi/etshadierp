@@ -25,7 +25,7 @@ import {
   TrendingUp, TrendingDown, Minus, AlertTriangle, Search, Download,
   FileText, CheckCircle, Package, Loader2, BarChart2, Save,
   Hash, ShoppingCart, Columns, RotateCcw, Truck, Filter, ChevronDown,
-  CircleDollarSign,
+  CircleDollarSign, MapPin, Container,
 } from "lucide-react";
 
 // ─── Column definitions ───────────────────────────────────────────────────────
@@ -81,6 +81,7 @@ interface AnalysisRow {
   currentStock: number;
   salesQty: number;
   avgSellingPrice: number | null;
+  groupSellingPrice: number | null;
   poPrice: number | null;
   poPriceSource: string;
   inventoryAvgCost: number;
@@ -91,6 +92,21 @@ interface AnalysisRow {
   status: string;
   proformaQty: number | null;
   proformaBarcode: string | null;
+}
+
+interface OtwContainer {
+  id: number;
+  container_number: string;
+  eta: string | null;
+  status: string;
+  items_total: string | null;
+  item_name: string | null;
+  loaded_items_count: string;
+}
+
+interface LocationGroup {
+  id: number;
+  name: string;
 }
 
 interface ComputedRow extends AnalysisRow {
@@ -157,8 +173,11 @@ export default function SupplierProfitCheck() {
 
   const [supplierId, setSupplierId] = useState<string>("");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>({ fromDate: "", toDate: "", preset: "all_time" });
-  const [sourceType, setSourceType] = useState<"all" | "proforma">("all");
+  const [sourceType, setSourceType] = useState<"all" | "proforma" | "otw_containers">("all");
   const [proformaId, setProformaId] = useState<string>("");
+  const [otwContainerIds, setOtwContainerIds] = useState<number[]>([]);
+  const [sellPriceSource, setSellPriceSource] = useState<"avg" | "location_group">("avg");
+  const [selectedLocationId, setSelectedLocationId] = useState<string>("");
   const [manualPoPrices, setManualPoPrices] = useState<Record<number, string>>({});
   const [manualAvgPrices, setManualAvgPrices] = useState<Record<number, string>>({});
   const debounceTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
@@ -225,9 +244,31 @@ export default function SupplierProfitCheck() {
     },
   });
 
-  const queryEnabled = !!supplierId && (sourceType !== "proforma" || !!proformaId);
+  const { data: locationGroups = [] } = useQuery<LocationGroup[]>({
+    queryKey: ["/api/supplier-profit-check/location-groups", companyId],
+    enabled: !!companyId,
+    queryFn: async () => {
+      const res = await fetch("/api/supplier-profit-check/location-groups", { credentials: "include" });
+      return res.ok ? res.json() : [];
+    },
+  });
+
+  const { data: otwContainers = [], isLoading: isLoadingOtw } = useQuery<OtwContainer[]>({
+    queryKey: ["/api/supplier-profit-check/otw-containers", supplierId],
+    enabled: !!supplierId && sourceType === "otw_containers",
+    queryFn: async () => {
+      const res = await fetch(`/api/supplier-profit-check/otw-containers?supplierId=${supplierId}`, { credentials: "include" });
+      return res.ok ? res.json() : [];
+    },
+  });
+
+  const queryEnabled = !!supplierId && (
+    sourceType === "all" ||
+    (sourceType === "proforma" && !!proformaId) ||
+    (sourceType === "otw_containers" && otwContainerIds.length > 0)
+  );
   const { data: rows = [], isLoading } = useQuery<AnalysisRow[]>({
-    queryKey: ["/api/supplier-profit-check/analyze", supplierId, periodFilter.fromDate, periodFilter.toDate, sourceType, proformaId],
+    queryKey: ["/api/supplier-profit-check/analyze", supplierId, periodFilter.fromDate, periodFilter.toDate, sourceType, proformaId, otwContainerIds, sellPriceSource, selectedLocationId],
     enabled: queryEnabled,
     queryFn: async () => {
       const res = await apiRequest("POST", "/api/supplier-profit-check/analyze", {
@@ -236,6 +277,9 @@ export default function SupplierProfitCheck() {
         toDate: periodFilter.toDate,
         sourceType,
         proformaId: proformaId ? Number(proformaId) : undefined,
+        containerIds: sourceType === "otw_containers" ? otwContainerIds : undefined,
+        sellPriceSource,
+        locationId: sellPriceSource === "location_group" && selectedLocationId ? Number(selectedLocationId) : undefined,
       });
       return res.json();
     },
@@ -327,7 +371,13 @@ export default function SupplierProfitCheck() {
       const manualPoNum = parseFloat(manualPoPrices[row.stockItemId] ?? "");
       const poP = (!isNaN(manualPoNum) && manualPoNum > 0) ? manualPoNum : row.poPrice;
       const manualAvgNum = parseFloat(manualAvgPrices[row.stockItemId] ?? "");
-      const sell = (!isNaN(manualAvgNum) && manualAvgNum > 0) ? manualAvgNum : row.avgSellingPrice;
+      // Use group price when source is location_group; otherwise use avg/manual
+      let sell: number | null;
+      if (sellPriceSource === "location_group") {
+        sell = row.groupSellingPrice ?? null;
+      } else {
+        sell = (!isNaN(manualAvgNum) && manualAvgNum > 0) ? manualAvgNum : row.avgSellingPrice;
+      }
       const landingCost = poP != null ? poP + extraCostPerBale : null;
       const costProfit = sell != null && landingCost != null ? sell - landingCost : null;
       const costProfitPct = costProfit != null && sell != null && sell > 0 ? (costProfit / sell) * 100 : null;
@@ -339,7 +389,7 @@ export default function SupplierProfitCheck() {
       const hassanProfit = row.configPrice - row.inventoryAvgCost;
       return { ...row, landingCost, costProfit, costProfitPct, computedStatus, hassanProfit };
     });
-  }, [rows, extraCostPerBale, manualPoPrices, manualAvgPrices]);
+  }, [rows, extraCostPerBale, manualPoPrices, manualAvgPrices, sellPriceSource]);
 
   // ─── Multi-status filter ──────────────────────────────────────────────────
   const toggleStatus = useCallback((val: string) => {
@@ -376,20 +426,28 @@ export default function SupplierProfitCheck() {
     const totalQty = withQty.reduce((s, r) => s + (Number(qtyMap[r.stockItemId]) || 0), 0);
     const totalLandingCost = withQty.reduce((s, r) =>
       r.landingCost != null ? s + (Number(qtyMap[r.stockItemId]) || 0) * r.landingCost : s, 0);
-    const totalEstSales = withQty.reduce((s, r) =>
-      r.avgSellingPrice != null ? s + (Number(qtyMap[r.stockItemId]) || 0) * r.avgSellingPrice : s, 0);
+    // Use the active sell price source for totals
+    const effectiveSellPrice = (r: ComputedRow) =>
+      sellPriceSource === "location_group" ? r.groupSellingPrice : r.avgSellingPrice;
+    const totalEstSales = withQty.reduce((s, r) => {
+      const sp = effectiveSellPrice(r);
+      return sp != null ? s + (Number(qtyMap[r.stockItemId]) || 0) * sp : s;
+    }, 0);
     const totalCostProfit = withQty.reduce((s, r) =>
       r.costProfit != null ? s + (Number(qtyMap[r.stockItemId]) || 0) * r.costProfit : s, 0);
     const costProfitPct = totalEstSales > 0 ? (totalCostProfit / totalEstSales) * 100 : null;
     const losingCount = computedRows.filter((r) => r.computedStatus === "losing").length;
     const noDataCount = computedRows.filter((r) => r.computedStatus === "no_sales_data").length;
     const missingPoCount = computedRows.filter((r) => r.poPriceSource === "missing").length;
+    const noGroupPriceCount = sellPriceSource === "location_group"
+      ? computedRows.filter((r) => r.groupSellingPrice == null).length
+      : 0;
     return {
       totalItems: computedRows.length, selectedCount: withQty.length, totalQty,
       totalLandingCost, totalEstSales, totalCostProfit, costProfitPct,
-      losingCount, noDataCount, missingPoCount,
+      losingCount, noDataCount, missingPoCount, noGroupPriceCount,
     };
-  }, [computedRows, qtyMap]);
+  }, [computedRows, qtyMap, sellPriceSource]);
 
   const itemsWithQty = useMemo(
     () => computedRows.filter((r) => Number(qtyMap[r.stockItemId]) > 0),
@@ -514,11 +572,12 @@ export default function SupplierProfitCheck() {
           </div>
 
           {/* Controls row */}
-          <div className="px-5 py-4">
+          <div className="px-5 py-4 space-y-4">
+            {/* Row 1: Supplier, Date, Item Source, Sell Price Source */}
             <div className="flex flex-wrap gap-4 items-end">
               <div className="space-y-1.5 min-w-[180px] flex-1">
                 <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Supplier</label>
-                <Select value={supplierId} onValueChange={setSupplierId}>
+                <Select value={supplierId} onValueChange={(v) => { setSupplierId(v); setOtwContainerIds([]); }}>
                   <SelectTrigger data-testid="select-supplier">
                     <SelectValue placeholder="Select supplier…" />
                   </SelectTrigger>
@@ -539,11 +598,12 @@ export default function SupplierProfitCheck() {
 
               <div className="space-y-1.5 min-w-[160px] shrink-0">
                 <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Item Source</label>
-                <Select value={sourceType} onValueChange={(v) => { setSourceType(v as "all" | "proforma"); setProformaId(""); }}>
+                <Select value={sourceType} onValueChange={(v) => { setSourceType(v as "all" | "proforma" | "otw_containers"); setProformaId(""); setOtwContainerIds([]); }}>
                   <SelectTrigger data-testid="select-source-type"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Supplier Items</SelectItem>
                     <SelectItem value="proforma">Existing Proforma</SelectItem>
+                    <SelectItem value="otw_containers">Containers OTW</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -561,7 +621,105 @@ export default function SupplierProfitCheck() {
                   </Select>
                 </div>
               )}
+
+              {/* Sell Price Source */}
+              <div className="space-y-1.5 min-w-[180px] shrink-0">
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                  <MapPin className="w-3 h-3" /> Sell Price Source
+                </label>
+                <Select value={sellPriceSource} onValueChange={(v) => { setSellPriceSource(v as "avg" | "location_group"); setSelectedLocationId(""); }}>
+                  <SelectTrigger data-testid="select-sell-price-source"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="avg">Average Sell Price</SelectItem>
+                    <SelectItem value="location_group">Location Group Price</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {sellPriceSource === "location_group" && (
+                <div className="space-y-1.5 min-w-[180px] shrink-0">
+                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Location Group</label>
+                  {locationGroups.length === 0 ? (
+                    <div className="h-9 flex items-center px-3 rounded-md border text-xs text-muted-foreground">
+                      No groups configured
+                    </div>
+                  ) : (
+                    <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+                      <SelectTrigger data-testid="select-location-group"><SelectValue placeholder="Select group…" /></SelectTrigger>
+                      <SelectContent>
+                        {locationGroups.map((lg) => (
+                          <SelectItem key={lg.id} value={String(lg.id)}>{lg.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              )}
             </div>
+
+            {/* Row 2: OTW Containers picker (only when sourceType === 'otw_containers') */}
+            {sourceType === "otw_containers" && (
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Container className="w-3.5 h-3.5 text-blue-500" />
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">OTW Containers</span>
+                  {otwContainerIds.length > 0 && (
+                    <Badge className="bg-blue-500 text-white text-[10px] px-1.5 py-0 h-4">{otwContainerIds.length} selected</Badge>
+                  )}
+                  {otwContainerIds.length > 0 && (
+                    <Button variant="ghost" size="sm" className="h-6 text-xs px-2 ml-auto" onClick={() => setOtwContainerIds([])}>
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                {!supplierId ? (
+                  <p className="text-xs text-muted-foreground italic">Select a supplier first to see OTW containers.</p>
+                ) : isLoadingOtw ? (
+                  <div className="flex items-center gap-2 py-2">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Loading containers…</span>
+                  </div>
+                ) : otwContainers.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">No OTW containers found for this supplier.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {otwContainers.map((c) => {
+                      const selected = otwContainerIds.includes(c.id);
+                      const itemCount = Number(c.loaded_items_count) || 0;
+                      return (
+                        <label
+                          key={c.id}
+                          className={`flex items-center gap-2 rounded-md border px-3 py-2 cursor-pointer text-xs hover-elevate transition-colors ${selected ? "border-blue-500/60 bg-blue-500/10" : "bg-background"}`}
+                          data-testid={`container-checkbox-${c.id}`}
+                        >
+                          <Checkbox
+                            checked={selected}
+                            onCheckedChange={(chk) => {
+                              setOtwContainerIds((prev) =>
+                                chk ? [...prev, c.id] : prev.filter((id) => id !== c.id)
+                              );
+                            }}
+                          />
+                          <div>
+                            <div className="font-mono font-semibold">{c.container_number}</div>
+                            <div className="text-muted-foreground text-[10px]">
+                              {itemCount > 0 ? `${itemCount} items` : "No items loaded"}
+                              {c.eta ? ` · ETA ${c.eta}` : ""}
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+                {otwContainerIds.length === 0 && otwContainers.length > 0 && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    <AlertTriangle className="w-3 h-3 inline mr-1" />
+                    Select at least one container to load items.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -668,7 +826,13 @@ export default function SupplierProfitCheck() {
                     <span className="text-xs"><span className="font-bold text-orange-500">{summary.missingPoCount}</span> <span className="text-muted-foreground">no PO price</span></span>
                   </div>
                 )}
-                {summary.losingCount === 0 && summary.noDataCount === 0 && summary.missingPoCount === 0 && (
+                {summary.noGroupPriceCount > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                    <span className="text-xs"><span className="font-bold text-amber-500">{summary.noGroupPriceCount}</span> <span className="text-muted-foreground">no group price</span></span>
+                  </div>
+                )}
+                {summary.losingCount === 0 && summary.noDataCount === 0 && summary.missingPoCount === 0 && summary.noGroupPriceCount === 0 && (
                   <div className="flex items-center gap-1.5">
                     <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
                     <span className="text-xs text-emerald-500 font-medium">All good</span>
@@ -800,7 +964,7 @@ export default function SupplierProfitCheck() {
                   {colVisibility.code           && <TableHead className="min-w-[90px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Code</TableHead>}
                   {colVisibility.name           && <TableHead className="min-w-[200px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Name</TableHead>}
                   {colVisibility.salesQty       && <TableHead className="text-right min-w-[80px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Sales Qty</TableHead>}
-                  {colVisibility.avgSell        && <TableHead className="text-right min-w-[100px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Avg Sell</TableHead>}
+                  {colVisibility.avgSell        && <TableHead className="text-right min-w-[100px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{sellPriceSource === "location_group" ? "Group Sell" : "Avg Sell"}</TableHead>}
                   {colVisibility.dubaiPrice     && (
                     <TableHead className="text-right min-w-[110px] text-[11px] font-bold uppercase tracking-wide">
                       <span className="text-amber-500">Dubai Price</span>
@@ -845,8 +1009,10 @@ export default function SupplierProfitCheck() {
                   filteredRows.map((row, idx) => {
                     const isLosing = row.computedStatus === "losing";
                     const isNoData = row.computedStatus === "no_sales_data";
+                    const isNoGroupPrice = sellPriceSource === "location_group" && row.groupSellingPrice == null;
                     const rowClass = [
                       isLosing  ? "border-l-2 border-l-red-500 bg-red-500/5"
+                      : isNoGroupPrice ? "border-l-2 border-l-amber-400 bg-amber-500/5"
                       : isNoData ? "bg-amber-500/3"
                       : idx % 2 === 1 ? "bg-muted/20"
                       : "",
@@ -868,23 +1034,33 @@ export default function SupplierProfitCheck() {
                         )}
                         {colVisibility.avgSell && (
                           <TableCell className="text-right text-sm font-medium py-2.5">
-                            <div className="flex flex-col items-end gap-0.5">
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                placeholder={row.avgSellingPrice != null ? fmt(row.avgSellingPrice) : "—"}
-                                value={manualAvgPrices[row.stockItemId] ?? ""}
-                                onChange={(e) => handleManualAvgChange(row.stockItemId, e.target.value)}
-                                onKeyDown={(e) => handleArrowNav(e, "data-avg-input")}
-                                className="h-7 w-20 text-right text-xs px-1.5 font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                data-testid={`input-manual-avg-price-${row.stockItemId}`}
-                                data-avg-input="true"
-                              />
-                              {manualAvgPrices[row.stockItemId] && row.avgSellingPrice != null && (
-                                <span className="text-[10px] text-muted-foreground leading-tight">auto ${fmt(row.avgSellingPrice)}</span>
-                              )}
-                            </div>
+                            {sellPriceSource === "location_group" ? (
+                              <div className="text-right">
+                                {row.groupSellingPrice != null ? (
+                                  <span className="font-mono text-sm">${fmt(row.groupSellingPrice)}</span>
+                                ) : (
+                                  <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">No Price</span>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-end gap-0.5">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  placeholder={row.avgSellingPrice != null ? fmt(row.avgSellingPrice) : "—"}
+                                  value={manualAvgPrices[row.stockItemId] ?? ""}
+                                  onChange={(e) => handleManualAvgChange(row.stockItemId, e.target.value)}
+                                  onKeyDown={(e) => handleArrowNav(e, "data-avg-input")}
+                                  className="h-7 w-20 text-right text-xs px-1.5 font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  data-testid={`input-manual-avg-price-${row.stockItemId}`}
+                                  data-avg-input="true"
+                                />
+                                {manualAvgPrices[row.stockItemId] && row.avgSellingPrice != null && (
+                                  <span className="text-[10px] text-muted-foreground leading-tight">auto ${fmt(row.avgSellingPrice)}</span>
+                                )}
+                              </div>
+                            )}
                           </TableCell>
                         )}
                         {colVisibility.dubaiPrice && (

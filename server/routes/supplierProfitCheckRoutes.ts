@@ -4,16 +4,64 @@ import ExcelJS from "exceljs";
 
 export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any) {
 
+  // ── GET location groups (master locations with configured price groups) ──
+  app.get("/api/supplier-profit-check/location-groups", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const result = await pool.query(`
+        SELECT DISTINCT l.id, l.name
+        FROM location_price_groups lpg
+        JOIN locations l ON l.id = lpg.master_location_id
+        WHERE lpg.company_id = $1
+        ORDER BY l.name
+      `, [companyId]);
+
+      res.json(result.rows);
+    } catch (err: any) {
+      console.error("[supplier-profit-check/location-groups]", err.message);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── GET OTW containers for a supplier ──
+  app.get("/api/supplier-profit-check/otw-containers", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const supplierId = req.query.supplierId;
+      if (!supplierId) return res.status(400).json({ message: "supplierId required" });
+
+      const result = await pool.query(`
+        SELECT c.id, c.container_number, c.eta, c.status, c.items_total,
+          c.import_date, c.item_name,
+          (SELECT COUNT(*) FROM supplier_container_loaded_items scli WHERE scli.container_id = c.id) AS loaded_items_count
+        FROM containers c
+        WHERE c.company_id = $1
+          AND c.supplier_id = $2
+          AND c.status = 'OTW'
+        ORDER BY c.created_at DESC
+      `, [companyId, supplierId]);
+
+      res.json(result.rows);
+    } catch (err: any) {
+      console.error("[supplier-profit-check/otw-containers]", err.message);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.post("/api/supplier-profit-check/analyze", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { supplierId, fromDate, toDate, sourceType, proformaId } = req.body;
+      const { supplierId, fromDate, toDate, sourceType, proformaId, containerIds, sellPriceSource, locationId } = req.body;
       if (!supplierId) return res.status(400).json({ message: "supplierId required" });
       const allTime = !fromDate || !toDate;
 
-      // 1. Get stock items (all for company OR from proforma lines)
+      // 1. Get stock items (all for company OR from proforma lines OR from OTW containers)
       let itemsResult;
       if (sourceType === "proforma" && proformaId) {
         itemsResult = await pool.query(`
@@ -32,6 +80,22 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
             AND si.deleted_at IS NULL
           ORDER BY si.code
         `, [proformaId, companyId]);
+      } else if (sourceType === "otw_containers" && Array.isArray(containerIds) && containerIds.length > 0) {
+        itemsResult = await pool.query(`
+          SELECT DISTINCT ON (si.id)
+            si.id, si.code, si.name, si.stock_group_id,
+            sg.name as stock_group_name,
+            scli.qty as proforma_qty,
+            scli.price_per_bale as proforma_price,
+            si.code as proforma_barcode
+          FROM supplier_container_loaded_items scli
+          JOIN stock_items si ON lower(si.code) = lower(scli.barcode)
+          LEFT JOIN stock_groups sg ON sg.id = si.stock_group_id
+          WHERE scli.container_id = ANY($1::int[])
+            AND si.company_id = $2
+            AND si.deleted_at IS NULL
+          ORDER BY si.id, si.code
+        `, [containerIds, companyId]);
       } else {
         // Look up the supplier's linked stock group (if any)
         const supplierRow = await pool.query(
@@ -186,6 +250,22 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         avgCostFallbackMap.set(Number(row.stock_item_id), Number(row.rate));
       }
 
+      // 4c. Location group price (when sellPriceSource === 'location_group')
+      const groupPriceMap = new Map<number, number>();
+      if (sellPriceSource === "location_group" && locationId) {
+        const groupPriceResult = await pool.query(`
+          SELECT stock_item_id, selling_price::numeric AS selling_price
+          FROM stock_item_location_prices
+          WHERE location_id = $1
+            AND stock_item_id = ANY($2::int[])
+        `, [locationId, stockItemIds]);
+        for (const row of groupPriceResult.rows) {
+          if (row.selling_price != null && Number(row.selling_price) > 0) {
+            groupPriceMap.set(Number(row.stock_item_id), Number(row.selling_price));
+          }
+        }
+      }
+
       // Build response
       const rows = items.map((item: any) => {
         const id = Number(item.id);
@@ -229,6 +309,9 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
           else status = "break_even";
         }
 
+        // Group sell price (only populated when sellPriceSource === 'location_group')
+        const groupSellingPrice = groupPriceMap.has(id) ? groupPriceMap.get(id)! : null;
+
         return {
           stockItemId: id,
           code: item.code,
@@ -238,6 +321,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
           currentStock,
           salesQty,
           avgSellingPrice,
+          groupSellingPrice,
           // Dubai / PO Price — selected supplier first, fall back to any PO for this company
           poPrice: nCostMap.has(id)
             ? nCostMap.get(id)!
