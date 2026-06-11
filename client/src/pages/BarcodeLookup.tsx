@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Search, Package, Clock, User, Scale, Hash, Layers, Container, Truck, FlaskConical, Box, CheckCircle2, AlertCircle, XCircle, ArchiveX, Ship, FileText, User2, Trash2, Pencil, ArchiveRestore, Undo2, AlertTriangle, History, ArrowLeftRight } from "lucide-react";
+import { Search, Package, Clock, User, Hash, Layers, Container, Truck, FlaskConical, CheckCircle2, AlertCircle, XCircle, ArchiveX, Ship, FileText, User2, Trash2, Pencil, ArchiveRestore, Undo2, AlertTriangle, History, ArrowLeftRight, ScanLine, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -406,6 +405,16 @@ export default function BarcodeLookup() {
     },
   });
 
+  // Auto-detect mode from input value
+  useEffect(() => {
+    const v = searchValue.trim().toUpperCase();
+    if (v.startsWith("REF")) {
+      setSearchMode("reference");
+    } else if (v.length > 0) {
+      setSearchMode("article");
+    }
+  }, [searchValue]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get("ref");
@@ -449,41 +458,54 @@ export default function BarcodeLookup() {
 
   return (
     <div className="space-y-4 p-4">
-      <div className="flex flex-col gap-2">
-        <div className="flex gap-1">
-          <Button
-            size="sm"
-            variant={searchMode === "reference" ? "default" : "outline"}
-            onClick={() => { setSearchMode("reference"); setSearchValue(""); setReferenceResult(null); setArticleResult(null); }}
-            data-testid="button-mode-reference"
-          >
-            Reference No.
-          </Button>
-          <Button
-            size="sm"
-            variant={searchMode === "article" ? "default" : "outline"}
-            onClick={() => { setSearchMode("article"); setSearchValue(""); setReferenceResult(null); setArticleResult(null); }}
-            data-testid="button-mode-article"
-          >
-            Article Code
-          </Button>
+
+      {/* ── Header + Search ── */}
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center gap-3 px-4 py-3 border-b bg-muted/20">
+          <div className="flex items-center justify-center h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500/30 to-blue-600/10 border border-blue-500/25 shrink-0">
+            <ScanLine className="h-4.5 w-4.5 text-blue-500" />
+          </div>
+          <div>
+            <h1 className="text-base font-bold leading-tight">Bale Lookup</h1>
+            <p className="text-xs text-muted-foreground leading-tight">Search by reference number or article code</p>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Input
-            placeholder={searchMode === "article" ? "Enter article code (e.g. ART-001)" : "Enter reference number (e.g. REF0000001)"}
-            value={searchValue}
-            onChange={(e) => setSearchValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            data-testid="input-lookup-search"
-          />
-          <Button
-            onClick={handleSearch}
-            disabled={isLoading || !searchValue.trim()}
-            data-testid="button-lookup-search"
-          >
-            <Search className="h-4 w-4 mr-2" />
-            {isLoading ? "Searching..." : "Search"}
-          </Button>
+        <div className="p-4">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Scan or type a reference (REF…) or article code…"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="pl-9 pr-24"
+                autoFocus
+                data-testid="input-lookup-search"
+              />
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-xs font-medium text-muted-foreground hover-elevate"
+                onClick={() => setSearchMode(searchMode === "reference" ? "article" : "reference")}
+                data-testid="button-toggle-search-mode"
+                title="Click to switch between Ref # and Article Code mode"
+              >
+                {searchMode === "reference" ? "Ref #" : "Article"}
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            </div>
+            <Button
+              onClick={handleSearch}
+              disabled={isLoading || !searchValue.trim()}
+              data-testid="button-lookup-search"
+            >
+              <Search className="h-4 w-4 mr-1.5" />
+              {isLoading ? "Searching…" : "Search"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Mode auto-detects: inputs starting with <span className="font-mono font-medium">REF</span> search by reference number, everything else by article code. Click the badge to override.
+          </p>
         </div>
       </div>
 
@@ -498,99 +520,88 @@ export default function BarcodeLookup() {
       {articleResult && (
         <div className="space-y-4">
           {articleResult.product ? (
-            <Card>
-              <CardHeader className="pb-3">
-                {/* Bale name — shown first, prominently */}
-                <CardTitle className="text-xl flex items-center gap-2 flex-wrap">
-                  <Package className="h-5 w-5 shrink-0" />
-                  {(articleResult.product as any).name}
-                  <Badge variant={(articleResult.product as any).active ? "default" : "secondary"}>
+            <div className="rounded-xl border overflow-hidden">
+              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/20 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="font-bold text-base">{(articleResult.product as any).name}</span>
+                  <Badge variant={(articleResult.product as any).active ? "default" : "secondary"} className="text-xs">
                     {(articleResult.product as any).active ? "Active" : "Inactive"}
                   </Badge>
-                </CardTitle>
-                <div className="flex gap-6 flex-wrap text-sm pt-1">
+                </div>
+                <div className="flex items-center gap-4 text-sm">
                   <div>
-                    <p className="text-muted-foreground">Article Code</p>
-                    <p className="font-mono font-medium">{(articleResult.product as any).articleCode || (articleResult.product as any).code}</p>
+                    <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1.5">Article Code</span>
+                    <span className="font-mono font-semibold">{(articleResult.product as any).articleCode || (articleResult.product as any).code}</span>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Total References</p>
-                    <p className="font-medium">{articleResult.labelPrints.length.toLocaleString()}</p>
+                    <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1.5">References</span>
+                    <span className="font-semibold font-mono">{articleResult.labelPrints.length.toLocaleString()}</span>
                   </div>
                 </div>
-              </CardHeader>
+              </div>
 
-              {/* Bale references — directly under the name, no separate card */}
               {articleResult.labelPrints.length > 0 ? (
-                <CardContent className="p-0">
-                  <div className="border-t">
-                    <div className="px-6 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-muted/30">
-                      Bale References
-                    </div>
-                    <Table>
-                      <TableHeader className="sticky top-0 z-30 bg-background">
-                        <TableRow>
-                          <TableHead>Reference No.</TableHead>
-                          <TableHead>Approx. Weight (KG)</TableHead>
-                          <TableHead>Printed At</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Scanned</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {articleResult.labelPrints.map((lp) => {
-                          const baleStatus = (lp as any).baleStatus as string | null;
-                          const isDeleted = baleStatus === "DELETED" || baleStatus === "REMOVED";
-                          return (
-                          <TableRow
-                            key={lp.id}
-                            className="cursor-pointer hover-elevate"
-                            data-testid={`row-label-${lp.id}`}
-                            onClick={() => {
-                              setSearchMode("reference");
-                              setSearchValue(lp.referenceNumber);
-                              referenceLookup.mutate(lp.referenceNumber);
-                            }}
-                          >
-                            <TableCell className={`font-mono font-medium ${isDeleted ? "text-muted-foreground line-through" : ""}`}>{lp.referenceNumber}</TableCell>
-                            <TableCell>{smartNum(lp.approxWeightKg)}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {lp.printedAt ? new Date(lp.printedAt).toLocaleDateString() : "—"}
-                            </TableCell>
-                            <TableCell>
-                              {baleStatus ? (
-                                <BaleStatusBadge status={baleStatus} />
-                              ) : (
-                                <span className="text-muted-foreground text-xs">—</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {lp.scannedAt ? (
-                                <Badge variant="default" className="gap-1">
-                                  <CheckCircle2 className="h-3 w-3" /> Scanned
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline">Not Scanned</Badge>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );})}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
+                <Table>
+                  <TableHeader className="sticky top-0 z-30 bg-muted border-b-2 border-border/60">
+                    <TableRow>
+                      <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Reference No.</TableHead>
+                      <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Approx. Weight (KG)</TableHead>
+                      <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Printed At</TableHead>
+                      <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</TableHead>
+                      <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Scanned</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {articleResult.labelPrints.map((lp) => {
+                      const baleStatus = (lp as any).baleStatus as string | null;
+                      const isDeleted = baleStatus === "DELETED" || baleStatus === "REMOVED";
+                      return (
+                      <TableRow
+                        key={lp.id}
+                        className="cursor-pointer hover-elevate"
+                        data-testid={`row-label-${lp.id}`}
+                        onClick={() => {
+                          setSearchMode("reference");
+                          setSearchValue(lp.referenceNumber);
+                          referenceLookup.mutate(lp.referenceNumber);
+                        }}
+                      >
+                        <TableCell className={`font-mono font-medium ${isDeleted ? "text-muted-foreground line-through" : ""}`}>{lp.referenceNumber}</TableCell>
+                        <TableCell className="font-mono">{smartNum(lp.approxWeightKg)}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {lp.printedAt ? new Date(lp.printedAt).toLocaleDateString() : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {baleStatus ? (
+                            <BaleStatusBadge status={baleStatus} />
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {lp.scannedAt ? (
+                            <Badge variant="default" className="gap-1">
+                              <CheckCircle2 className="h-3 w-3" /> Scanned
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">Not Scanned</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                      );})}
+                    </TableBody>
+                  </Table>
               ) : (
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">No bale references found for this article code.</p>
-                </CardContent>
+                <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  No bale references found for this article code.
+                </div>
               )}
-            </Card>
+            </div>
           ) : (
-            <Card>
-              <CardContent className="py-4">
-                <p className="text-sm text-muted-foreground">No product found for article code "<span className="font-mono">{searchValue}</span>"</p>
-              </CardContent>
-            </Card>
+            <div className="rounded-xl border p-6 text-center text-sm text-muted-foreground">
+              No product found for article code "<span className="font-mono">{searchValue}</span>"
+            </div>
           )}
         </div>
       )}
@@ -600,27 +611,26 @@ export default function BarcodeLookup() {
         <div className="space-y-4">
           {referenceResult.labelPrint ? (
             <>
-              {/* Merged: Bale Reference Details (Label Print + Bale Details) */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-2 flex-wrap">
-                    <CardTitle className="flex items-center gap-2 flex-wrap">
-                      <Hash className="h-5 w-5" />
-                      Bale Reference Details
-                      {referenceResult.baleInfo && <BaleStatusBadge status={referenceResult.baleInfo.status} />}
-                    </CardTitle>
-                    {isAdmin && (
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {(referenceResult.baleInfo?.status === "DELETED" || referenceResult.baleInfo?.status === "REMOVED") && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={restoreDeletedMutation.isPending}
-                            onClick={() => referenceResult.baleInfo && restoreDeletedMutation.mutate(referenceResult.baleInfo.id)}
-                            data-testid="button-restore-deleted"
-                          >
-                            <ArchiveRestore className="h-3.5 w-3.5 mr-1" />
-                            {restoreDeletedMutation.isPending ? "Restoring…" : "Restore to Stock"}
+              {/* ── Bale Reference Details ── */}
+              <div className="rounded-xl border overflow-hidden">
+                <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/20 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Hash className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="font-bold">Bale Reference Details</span>
+                    {referenceResult.baleInfo && <BaleStatusBadge status={referenceResult.baleInfo.status} />}
+                  </div>
+                  {isAdmin && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {(referenceResult.baleInfo?.status === "DELETED" || referenceResult.baleInfo?.status === "REMOVED") && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={restoreDeletedMutation.isPending}
+                          onClick={() => referenceResult.baleInfo && restoreDeletedMutation.mutate(referenceResult.baleInfo.id)}
+                          data-testid="button-restore-deleted"
+                        >
+                          <ArchiveRestore className="h-3.5 w-3.5 mr-1" />
+                          {restoreDeletedMutation.isPending ? "Restoring…" : "Restore to Stock"}
                           </Button>
                         )}
                         {(referenceResult.baleInfo?.status === "RESERVED_FOR_ORDER" || referenceResult.baleInfo?.status === "RESERVED" || referenceResult.baleInfo?.status === "SOLD") && (
@@ -674,17 +684,17 @@ export default function BarcodeLookup() {
                       </div>
                     )}
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {/* Row 1: Ref + Article Code (with Printed At) + Product Name (with Printed By) + Worker */}
+                </div>
+                <div className="px-4 py-4 space-y-4">
+                  {/* Row 1: Key fields */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
-                      <p className="text-sm text-muted-foreground">Reference Number</p>
-                      <p className="font-mono text-lg font-semibold" data-testid="text-reference-number">{referenceResult.labelPrint.referenceNumber}</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Reference Number</p>
+                      <p className="font-mono text-lg font-bold" data-testid="text-reference-number">{referenceResult.labelPrint.referenceNumber}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Article Code</p>
-                      <p className="font-medium" data-testid="text-ref-article-code">{referenceResult.labelPrint.articleCode || "—"}</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Article Code</p>
+                      <p className="font-mono font-semibold" data-testid="text-ref-article-code">{referenceResult.labelPrint.articleCode || "—"}</p>
                       <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1" data-testid="text-ref-printed-at">
                         <Clock className="h-3 w-3" />
                         {formatDateOnly(referenceResult.labelPrint.printedAt as any) ?? "N/A"}
@@ -692,7 +702,7 @@ export default function BarcodeLookup() {
                     </div>
                     {referenceResult.baleInfo?.productName && (
                       <div>
-                        <p className="text-sm text-muted-foreground">Product Name</p>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Product Name</p>
                         <p className="font-semibold" data-testid="text-bale-product-name">{referenceResult.baleInfo.productName}</p>
                         <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1" data-testid="text-ref-printed-by">
                           <User className="h-3 w-3" />
@@ -702,7 +712,7 @@ export default function BarcodeLookup() {
                     )}
                     {referenceResult.baleInfo?.workerName && (
                       <div>
-                        <p className="text-sm text-muted-foreground">Worker Name</p>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Worker</p>
                         <p className="font-semibold flex items-center gap-1" data-testid="text-bale-worker-name">
                           <User className="h-3.5 w-3.5 text-muted-foreground" />
                           {referenceResult.baleInfo.workerName}
@@ -711,21 +721,26 @@ export default function BarcodeLookup() {
                     )}
                   </div>
 
-                  {/* Row 2: Weight + Grade + Mark as Scanned */}
+                  {/* Row 2: Weight + Grade + Scan button */}
                   <div className="flex items-center gap-6 flex-wrap">
                     {referenceResult.baleInfo && (
                       <div>
-                        <p className="text-sm text-muted-foreground">Actual Weight</p>
-                        <p className="font-medium">{smartNum(referenceResult.baleInfo.weightKg)} KG</p>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Actual Weight</p>
+                        <p className="font-bold font-mono text-base">{smartNum(referenceResult.baleInfo.weightKg)} KG</p>
                       </div>
                     )}
                     {referenceResult.baleInfo?.grade && (
                       <div>
-                        <p className="text-sm text-muted-foreground">Grade</p>
-                        <p className="font-medium">{referenceResult.baleInfo.grade}</p>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Grade</p>
+                        <p className="font-semibold">{referenceResult.baleInfo.grade}</p>
                       </div>
                     )}
-                    {!referenceResult.labelPrint.scannedAt && (
+                    {referenceResult.labelPrint.scannedAt ? (
+                      <div className="ml-auto flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        Scanned {formatDateOnly(referenceResult.labelPrint.scannedAt as any)}
+                      </div>
+                    ) : (
                       <div className="ml-auto">
                         <Button
                           size="sm"
@@ -742,12 +757,11 @@ export default function BarcodeLookup() {
 
                   {/* Row 3: Audit dates */}
                   {referenceResult.baleInfo && (
-                    <div className="border-t pt-3 flex items-start gap-6 flex-wrap">
+                    <div className="flex items-start gap-6 flex-wrap pt-3 border-t">
                       {(referenceResult.baleInfo.finalizedAt || referenceResult.baleInfo.stockEntryDate) && (
                         <div>
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <History className="h-3 w-3" />
-                            Date Produced
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 mb-0.5">
+                            <History className="h-3 w-3" /> Date Produced
                           </p>
                           <p className="text-sm font-medium">
                             {referenceResult.baleInfo.finalizedAt
@@ -758,18 +772,16 @@ export default function BarcodeLookup() {
                       )}
                       {referenceResult.baleInfo.createdAt && (
                         <div>
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            Record Created
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 mb-0.5">
+                            <Clock className="h-3 w-3" /> Record Created
                           </p>
                           <p className="text-sm font-medium">{formatDate(referenceResult.baleInfo.createdAt)}</p>
                         </div>
                       )}
                       {referenceResult.baleInfo.updatedAt && referenceResult.baleInfo.updatedAt !== referenceResult.baleInfo.createdAt && (
                         <div>
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Pencil className="h-3 w-3" />
-                            Last Modified
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 mb-0.5">
+                            <Pencil className="h-3 w-3" /> Last Modified
                           </p>
                           <p className="text-sm font-medium">{formatDate(referenceResult.baleInfo.updatedAt)}</p>
                         </div>
@@ -778,9 +790,8 @@ export default function BarcodeLookup() {
                         const deleteEntry = referenceResult.auditHistory?.find((e: any) => e.action === "delete");
                         return (
                           <div>
-                            <p className="text-xs text-muted-foreground flex items-center gap-1 text-destructive">
-                              <Trash2 className="h-3 w-3" />
-                              Deleted
+                            <p className="text-xs text-destructive flex items-center gap-1 mb-0.5">
+                              <Trash2 className="h-3 w-3" /> Deleted
                             </p>
                             <p className="text-sm font-medium text-destructive">
                               {referenceResult.baleInfo.deletedAt
@@ -795,57 +806,53 @@ export default function BarcodeLookup() {
                       })()}
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
-              {/* Audit History */}
+              {/* ── Change Log ── */}
               {referenceResult.auditHistory && referenceResult.auditHistory.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 flex-wrap">
-                      <History className="h-5 w-5" />
-                      Change Log
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {referenceResult.auditHistory.map((entry) => {
-                        const changedFields = entry.changes ? Object.keys(entry.changes) : [];
-                        const actionLabel =
-                          entry.action === "create" ? "Created" :
-                          entry.action === "delete" ? "Deleted" :
-                          entry.action === "restore" ? "Restored" : "Updated";
-                        return (
-                          <div key={entry.id} className="flex items-start gap-3 py-2 border-b last:border-b-0">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <Badge
-                                  variant={entry.action === "delete" ? "destructive" : entry.action === "create" ? "default" : "secondary"}
-                                  className="text-xs"
-                                >
-                                  {actionLabel}
-                                </Badge>
-                                <span className="text-sm font-medium flex items-center gap-1">
-                                  <User className="h-3 w-3 text-muted-foreground" />
-                                  {entry.username}
-                                </span>
-                                <span className="text-xs text-muted-foreground">{formatDate(entry.createdAt)}</span>
-                              </div>
-                              {changedFields.length > 0 && (
-                                <p className="text-xs text-muted-foreground mt-1 truncate">
-                                  Changed: {changedFields.join(", ")}
-                                </p>
-                              )}
+                <div className="rounded-xl border overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
+                    <History className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-semibold text-sm">Change Log</span>
+                  </div>
+                  <div className="px-4 divide-y">
+                    {referenceResult.auditHistory.map((entry) => {
+                      const changedFields = entry.changes ? Object.keys(entry.changes) : [];
+                      const actionLabel =
+                        entry.action === "create" ? "Created" :
+                        entry.action === "delete" ? "Deleted" :
+                        entry.action === "restore" ? "Restored" : "Updated";
+                      return (
+                        <div key={entry.id} className="flex items-start gap-3 py-2.5">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge
+                                variant={entry.action === "delete" ? "destructive" : entry.action === "create" ? "default" : "secondary"}
+                                className="text-xs"
+                              >
+                                {actionLabel}
+                              </Badge>
+                              <span className="text-sm font-medium flex items-center gap-1">
+                                <User className="h-3 w-3 text-muted-foreground" />
+                                {entry.username}
+                              </span>
+                              <span className="text-xs text-muted-foreground">{formatDate(entry.createdAt)}</span>
                             </div>
+                            {changedFields.length > 0 && (
+                              <p className="text-xs text-muted-foreground mt-1 truncate">
+                                Changed: {changedFields.join(", ")}
+                              </p>
+                            )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
 
-              {/* Loaded onto outbound container / customer order */}
+              {/* ── Loaded onto Outbound Container ── */}
               {referenceResult.loadedOnOrder && (() => {
                 const o = referenceResult.loadedOnOrder!;
                 const statusColors: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
@@ -857,194 +864,153 @@ export default function BarcodeLookup() {
                   CANCELLED: "destructive",
                 };
                 return (
-                  <Card data-testid="card-loaded-on-order">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 flex-wrap">
-                        <Ship className="h-5 w-5" />
-                        Loaded onto Outbound Container
-                        <Badge variant={statusColors[o.status] ?? "outline"}>{o.status.replace("_", " ")}</Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
+                  <div className="rounded-xl border overflow-hidden" data-testid="card-loaded-on-order">
+                    <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20 flex-wrap">
+                      <Ship className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="font-semibold text-sm">Loaded onto Outbound Container</span>
+                      <Badge variant={statusColors[o.status] ?? "outline"} className="text-xs">{o.status.replace("_", " ")}</Badge>
+                    </div>
+                    <div className="px-4 py-4">
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         {o.containerNumber && (
                           <div className="col-span-2 md:col-span-1">
-                            <p className="text-sm text-muted-foreground flex items-center gap-1"><Truck className="h-3.5 w-3.5" /> Container No.</p>
-                            <p className="font-mono font-semibold text-base" data-testid="text-loaded-container">{o.containerNumber}</p>
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5 flex items-center gap-1"><Truck className="h-3 w-3" /> Container No.</p>
+                            <p className="font-mono font-bold text-base" data-testid="text-loaded-container">{o.containerNumber}</p>
                           </div>
                         )}
                         {o.customerName && (
                           <InfoRow label="Customer" value={<span className="flex items-center gap-1"><User2 className="h-3.5 w-3.5 text-muted-foreground" />{o.customerName}</span>} />
                         )}
                         {o.invoiceNumber && (
-                          <InfoRow label="Invoice No." value={<span className="flex items-center gap-1"><FileText className="h-3.5 w-3.5 text-muted-foreground" /><span className="font-mono">{o.invoiceNumber}</span></span>} />
+                          <InfoRow label="Invoice No." value={<span className="flex items-center gap-1"><FileText className="h-3.5 w-3.5 text-muted-foreground" /><span className="font-mono font-semibold">{o.invoiceNumber}</span></span>} />
                         )}
                         <InfoRow label="Order Date" value={formatDateOnly(o.orderDate)} />
-                        {o.shippingCompany && (
-                          <InfoRow label="Shipping Company" value={o.shippingCompany} />
-                        )}
+                        {o.shippingCompany && <InfoRow label="Shipping Company" value={o.shippingCompany} />}
                         <InfoRow label="Total Bales in Order" value={o.totalQtyBales.toLocaleString()} />
                         <InfoRow label="This Bale — Weight" value={`${smartNum(o.baleWeight)} KG`} />
-                        {o.loadingStartedAt && (
-                          <InfoRow label="Loading Started" value={formatDate(o.loadingStartedAt)} />
-                        )}
-                        {o.loadingFinalizedAt && (
-                          <InfoRow label="Loading Finalized" value={formatDate(o.loadingFinalizedAt)} />
-                        )}
-                        {o.scannedBy && (
-                          <InfoRow label="Scanned by" value={<span className="flex items-center gap-1"><User2 className="h-3.5 w-3.5 text-muted-foreground" />{o.scannedBy}</span>} />
-                        )}
+                        {o.loadingStartedAt && <InfoRow label="Loading Started" value={formatDate(o.loadingStartedAt)} />}
+                        {o.loadingFinalizedAt && <InfoRow label="Loading Finalized" value={formatDate(o.loadingFinalizedAt)} />}
+                        {o.scannedBy && <InfoRow label="Scanned by" value={<span className="flex items-center gap-1"><User2 className="h-3.5 w-3.5 text-muted-foreground" />{o.scannedBy}</span>} />}
                         {o.containerNotes && (
                           <div className="col-span-2 md:col-span-3">
                             <InfoRow label="Notes" value={o.containerNotes} />
                           </div>
                         )}
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 );
               })()}
 
-              {/* Source Containers */}
+              {/* ── Source Containers ── */}
               {referenceResult.containers_used && referenceResult.containers_used.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 flex-wrap">
-                      <Container className="h-5 w-5" />
-                      Source Container{referenceResult.containers_used.length > 1 ? "s" : ""}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {referenceResult.containers_used.map((c, i) => (
-                        <div key={c.id} className={`rounded-md border p-3 ${i > 0 ? "mt-3" : ""}`} data-testid={`card-container-${c.id}`}>
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                            <div className="col-span-2 md:col-span-1">
-                              <p className="text-sm text-muted-foreground flex items-center gap-1"><Truck className="h-3.5 w-3.5" /> Container No.</p>
-                              <p className="font-mono font-semibold text-base" data-testid={`text-container-number-${c.id}`}>{c.containerNumber}</p>
-                            </div>
-                            {c.supplierName && (
-                              <InfoRow label="Supplier" value={c.supplierName} />
-                            )}
-                            {c.origin && (
-                              <InfoRow label="Origin" value={c.origin} />
-                            )}
-                            {c.arrivalDate && (
-                              <InfoRow label="Arrival Date" value={formatDateOnly(c.arrivalDate)} />
-                            )}
-                            <div>
-                              <p className="text-sm text-muted-foreground">Status</p>
-                              <Badge variant="outline">{c.status}</Badge>
-                            </div>
-                            {c.weightKgUsed && (
-                              <InfoRow label="KG Used from This Container" value={`${smartNum(c.weightKgUsed)} KG`} />
-                            )}
-                            {isAdmin && c.ratePerKg && (
-                              <InfoRow label="Rate / KG" value={`${c.currencyCode} ${smartNum(c.ratePerKg)}`} />
-                            )}
+                <div className="rounded-xl border overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
+                    <Container className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-semibold text-sm">Source Container{referenceResult.containers_used.length > 1 ? "s" : ""}</span>
+                  </div>
+                  <div className="px-4 py-4 space-y-3">
+                    {referenceResult.containers_used.map((c) => (
+                      <div key={c.id} className="rounded-lg border p-3" data-testid={`card-container-${c.id}`}>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          <div className="col-span-2 md:col-span-1">
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5 flex items-center gap-1"><Truck className="h-3 w-3" /> Container No.</p>
+                            <p className="font-mono font-bold text-base" data-testid={`text-container-number-${c.id}`}>{c.containerNumber}</p>
                           </div>
+                          {c.supplierName && <InfoRow label="Supplier" value={c.supplierName} />}
+                          {c.origin && <InfoRow label="Origin" value={c.origin} />}
+                          {c.arrivalDate && <InfoRow label="Arrival Date" value={formatDateOnly(c.arrivalDate)} />}
+                          <div>
+                            <p className="text-sm text-muted-foreground">Status</p>
+                            <Badge variant="outline" className="text-xs">{c.status}</Badge>
+                          </div>
+                          {c.weightKgUsed && <InfoRow label="KG Used" value={`${smartNum(c.weightKgUsed)} KG`} />}
+                          {isAdmin && c.ratePerKg && <InfoRow label="Rate / KG" value={`${c.currencyCode} ${smartNum(c.ratePerKg)}`} />}
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
 
-              {/* Mix Batch */}
+              {/* ── Mix Batch ── */}
               {referenceResult.mixBatch && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 flex-wrap">
-                      <FlaskConical className="h-5 w-5" />
-                      Mix Batch
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                <div className="rounded-xl border overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
+                    <FlaskConical className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-semibold text-sm">Mix Batch</span>
+                  </div>
+                  <div className="px-4 py-4">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                      <InfoRow label="Batch Code" value={<span className="font-mono">{referenceResult.mixBatch.batchCode}</span>} />
-                      {referenceResult.mixBatch.batchNumber && (
-                        <InfoRow label="Batch Number" value={referenceResult.mixBatch.batchNumber} />
-                      )}
-                      {referenceResult.mixBatch.name && (
-                        <InfoRow label="Name" value={referenceResult.mixBatch.name} />
-                      )}
-                      {referenceResult.mixBatch.batchDate && (
-                        <InfoRow label="Batch Date" value={formatDateOnly(referenceResult.mixBatch.batchDate)} />
-                      )}
+                      <InfoRow label="Batch Code" value={<span className="font-mono font-semibold">{referenceResult.mixBatch.batchCode}</span>} />
+                      {referenceResult.mixBatch.batchNumber && <InfoRow label="Batch Number" value={referenceResult.mixBatch.batchNumber} />}
+                      {referenceResult.mixBatch.name && <InfoRow label="Name" value={referenceResult.mixBatch.name} />}
+                      {referenceResult.mixBatch.batchDate && <InfoRow label="Batch Date" value={formatDateOnly(referenceResult.mixBatch.batchDate)} />}
                       <InfoRow label="Total Weight" value={`${smartNum(referenceResult.mixBatch.totalWeightKg)} KG`} />
                       {isAdmin && <InfoRow label="Cost / KG" value={smartNum(referenceResult.mixBatch.costPerKg)} />}
                       <div>
                         <p className="text-sm text-muted-foreground">Status</p>
-                        <Badge variant="outline">{referenceResult.mixBatch.status}</Badge>
+                        <Badge variant="outline" className="text-xs">{referenceResult.mixBatch.status}</Badge>
                       </div>
-                      {referenceResult.mixBatch.operatorUser && (
-                        <InfoRow label="Operator" value={referenceResult.mixBatch.operatorUser} />
-                      )}
+                      {referenceResult.mixBatch.operatorUser && <InfoRow label="Operator" value={referenceResult.mixBatch.operatorUser} />}
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               )}
 
-              {/* Pressing Batch */}
+              {/* ── Pressing Batch ── */}
               {referenceResult.pressingBatch && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 flex-wrap">
-                      <Layers className="h-5 w-5" />
-                      Pressing Batch
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                <div className="rounded-xl border overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
+                    <Layers className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-semibold text-sm">Pressing Batch</span>
+                  </div>
+                  <div className="px-4 py-4">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                      <InfoRow label="Batch ID" value={<span className="font-mono">#{referenceResult.pressingBatch.id}</span>} />
+                      <InfoRow label="Batch ID" value={<span className="font-mono font-semibold">#{referenceResult.pressingBatch.id}</span>} />
                       <div>
                         <p className="text-sm text-muted-foreground">Status</p>
-                        <Badge variant="outline">{referenceResult.pressingBatch.status}</Badge>
+                        <Badge variant="outline" className="text-xs">{referenceResult.pressingBatch.status}</Badge>
                       </div>
                       <InfoRow label="Expected Bale Count" value={referenceResult.pressingBatch.expectedCount} />
-                      {referenceResult.pressingBatch.finalizedAt && (
-                        <InfoRow label="Finalized At" value={formatDate(referenceResult.pressingBatch.finalizedAt)} />
-                      )}
+                      {referenceResult.pressingBatch.finalizedAt && <InfoRow label="Finalized At" value={formatDate(referenceResult.pressingBatch.finalizedAt)} />}
                       {referenceResult.pressingBatch.notes && (
                         <div className="col-span-2 md:col-span-3">
                           <InfoRow label="Notes" value={referenceResult.pressingBatch.notes} />
                         </div>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               )}
 
-              {/* Linked Product */}
+              {/* ── Linked Product ── */}
               {referenceResult.product && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 flex-wrap">
-                      <Package className="h-5 w-5" />
-                      Linked Product
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-4">
-                      <InfoRow label="Article Code" value={(referenceResult.product as any).articleCode || (referenceResult.product as any).code} />
+                <div className="rounded-xl border overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
+                    <Package className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-semibold text-sm">Linked Product</span>
+                  </div>
+                  <div className="px-4 py-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <InfoRow label="Article Code" value={<span className="font-mono font-semibold">{(referenceResult.product as any).articleCode || (referenceResult.product as any).code}</span>} />
                       <InfoRow label="Product Name" value={(referenceResult.product as any).name} />
                       <div>
                         <p className="text-sm text-muted-foreground">Status</p>
-                        <Badge variant={(referenceResult.product as any).active ? "default" : "secondary"}>
+                        <Badge variant={(referenceResult.product as any).active ? "default" : "secondary"} className="text-xs">
                           {(referenceResult.product as any).active ? "Active" : "Inactive"}
                         </Badge>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               )}
             </>
           ) : (
-            <Card>
-              <CardContent className="py-6">
-                <p className="text-center text-muted-foreground">No record found for reference "{searchValue}"</p>
-              </CardContent>
-            </Card>
+            <div className="rounded-xl border p-8 text-center text-muted-foreground">
+              <Hash className="h-10 w-10 mx-auto mb-3 opacity-25" />
+              <p className="text-sm">No record found for reference "<span className="font-mono">{searchValue}</span>"</p>
+            </div>
           )}
         </div>
       )}
