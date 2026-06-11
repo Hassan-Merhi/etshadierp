@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { useBackToParent } from "@/hooks/use-back-to-parent";
@@ -60,6 +60,9 @@ export default function SupplierProformas() {
   const [editingLineId, setEditingLineId] = useState<number | null>(null);
   const [editLineData, setEditLineData] = useState({ barcode: "", itemName: "", qty: "0", weightPerBale: "0", pricePerBale: "0" });
   const [importTarget, setImportTarget] = useState<number | null>(null);
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   const { data: proformas, isLoading } = useQuery<Proforma[]>({
     queryKey: ["/api/suppliers", supplierId, "proformas"],
@@ -143,6 +146,36 @@ export default function SupplierProformas() {
     },
     onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Error", description: e.message, variant: "destructive" }); },
   });
+
+  const renameMutation = useMutation({
+    mutationFn: async ({ id, reference }: { id: number; reference: string }) => {
+      const res = await apiRequest("PATCH", `/api/suppliers/${supplierId}/proformas/${id}`, { reference });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers", supplierId, "proformas"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers", supplierId, "proformas", renamingId] });
+      setRenamingId(null);
+      toast({ title: "Proforma renamed" });
+    },
+    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Error", description: e.message, variant: "destructive" }); },
+  });
+
+  const startRename = (e: React.MouseEvent, p: Proforma) => {
+    e.stopPropagation();
+    setRenamingId(p.id);
+    setRenameValue(p.reference);
+  };
+
+  const commitRename = (id: number) => {
+    const trimmed = renameValue.trim();
+    if (!trimmed) { setRenamingId(null); return; }
+    renameMutation.mutate({ id, reference: trimmed });
+  };
+
+  useEffect(() => {
+    if (renamingId !== null) renameInputRef.current?.focus();
+  }, [renamingId]);
 
   const starMutation = useMutation({
     mutationFn: async (proformaId: number) => {
@@ -272,15 +305,44 @@ export default function SupplierProformas() {
                   onClick={() => setSelectedProformaId(p.id)}
                   data-testid={`row-proforma-${p.id}`}
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      {p.isStarred && (
-                        <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-400" />
-                      )}
-                      <span className="text-sm font-medium truncate">{p.reference}</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground">{format(new Date(p.createdAt), "MMM d, yyyy")}</div>
+                  <div className="min-w-0 flex-1" onClick={(e) => renamingId === p.id && e.stopPropagation()}>
+                    {renamingId === p.id ? (
+                      <Input
+                        ref={renameInputRef}
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onBlur={() => commitRename(p.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") { e.preventDefault(); commitRename(p.id); }
+                          if (e.key === "Escape") { e.stopPropagation(); setRenamingId(null); }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-7 text-sm px-2 py-0"
+                        data-testid={`input-rename-proforma-${p.id}`}
+                      />
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-1.5">
+                          {p.isStarred && (
+                            <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-400" />
+                          )}
+                          <span className="text-sm font-medium truncate">{p.reference}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">{format(new Date(p.createdAt), "MMM d, yyyy")}</div>
+                      </>
+                    )}
                   </div>
+                  {renamingId !== p.id && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => startRename(e, p)}
+                      data-testid={`button-rename-proforma-${p.id}`}
+                      title="Rename"
+                    >
+                      <Pencil className="h-3 w-3 text-muted-foreground" />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
