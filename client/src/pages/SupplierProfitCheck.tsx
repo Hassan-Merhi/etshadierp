@@ -202,6 +202,11 @@ export default function SupplierProfitCheck() {
   const [proformaRef, setProformaRef] = useState<string>("");
   const [proformaNotes, setProformaNotes] = useState<string>("");
 
+  // Autosave
+  const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [qtyVersion, setQtyVersion] = useState(0);
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // ─── Queries ─────────────────────────────────────────────────────────────
   const { data: suppliers = [] } = useQuery<any[]>({
     queryKey: ["/api/suppliers", companyId],
@@ -358,7 +363,40 @@ export default function SupplierProfitCheck() {
     }
     setQtyMap(initialQty);
     setSavedProforma(null);
+    setAutosaveStatus("idle");
+    // Don't bump qtyVersion here — initialization should not trigger autosave
   }, [rows]);
+
+  // ─── Autosave effect ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (qtyVersion === 0) return; // skip initial render / initialization
+    const targetId = sourceType === "proforma" && proformaId
+      ? Number(proformaId)
+      : savedProforma?.id ?? null;
+    if (!targetId) return; // no proforma to save to yet
+
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    setAutosaveStatus("saving");
+
+    autosaveTimerRef.current = setTimeout(async () => {
+      try {
+        const items = computedRows
+          .filter((r) => Number(qtyMap[r.stockItemId]) > 0)
+          .map((r) => ({
+            barcode: r.code, code: r.code, name: r.name, itemName: r.name,
+            qty: Number(qtyMap[r.stockItemId]) || 0,
+            supplierPrice: r.poPrice ?? r.nCost, weight: 0,
+          }));
+        const res = await apiRequest("PUT", `/api/supplier-profit-check/proforma/${targetId}/update-items`, { items });
+        if (!res.ok) throw new Error("Save failed");
+        setAutosaveStatus("saved");
+        setTimeout(() => setAutosaveStatus("idle"), 2500);
+      } catch {
+        setAutosaveStatus("error");
+        setTimeout(() => setAutosaveStatus("idle"), 3000);
+      }
+    }, 1200);
+  }, [qtyVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loaded = queryEnabled && !isLoading && rows.length >= 0;
 
@@ -552,7 +590,20 @@ export default function SupplierProfitCheck() {
                 <p className="text-[11px] text-muted-foreground">Analyze item profitability before ordering</p>
               </div>
             </div>
-            {loaded && !savedProforma && (
+            {/* Autosave indicator */}
+            {autosaveStatus !== "idle" && (
+              <span className={`flex items-center gap-1.5 text-xs shrink-0 ${
+                autosaveStatus === "saving" ? "text-muted-foreground" :
+                autosaveStatus === "saved"  ? "text-emerald-500" :
+                "text-destructive"
+              }`}>
+                {autosaveStatus === "saving" && <Loader2 className="w-3 h-3 animate-spin" />}
+                {autosaveStatus === "saved"  && <CheckCircle className="w-3 h-3" />}
+                {autosaveStatus === "saving" ? "Saving…" : autosaveStatus === "saved" ? "Saved" : "Save failed"}
+              </span>
+            )}
+
+            {loaded && !savedProforma && !(sourceType === "proforma" && proformaId) && (
               <Button
                 onClick={() => {
                   if (itemsWithQty.length === 0) { toast({ title: "Enter qty for at least one item", variant: "destructive" }); return; }
@@ -1133,7 +1184,10 @@ export default function SupplierProfitCheck() {
                             <Input
                               type="number" min="0" step="1" placeholder="0"
                               value={qtyMap[row.stockItemId] ?? ""}
-                              onChange={(e) => setQtyMap((prev) => ({ ...prev, [row.stockItemId]: e.target.value }))}
+                              onChange={(e) => {
+                                setQtyMap((prev) => ({ ...prev, [row.stockItemId]: e.target.value }));
+                                setQtyVersion((v) => v + 1);
+                              }}
                               onKeyDown={(e) => {
                                 if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                                   e.preventDefault();

@@ -400,6 +400,54 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
     }
   });
 
+  // PUT /api/supplier-profit-check/proforma/:id/update-items — autosave: replace lines in place
+  app.put("/api/supplier-profit-check/proforma/:id/update-items", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const proformaId = parseInt(req.params.id);
+      if (isNaN(proformaId)) return res.status(400).json({ message: "Invalid proforma ID" });
+
+      const check = await pool.query(
+        `SELECT id FROM supplier_proformas WHERE id = $1 AND company_id = $2`,
+        [proformaId, companyId]
+      );
+      if (!check.rows.length) return res.status(404).json({ message: "Proforma not found" });
+
+      const { items } = req.body;
+      if (!Array.isArray(items)) return res.status(400).json({ message: "items array required" });
+
+      await pool.query(`DELETE FROM supplier_proforma_lines WHERE proforma_id = $1`, [proformaId]);
+
+      if (items.length > 0) {
+        const lineValues: any[] = [];
+        const linePlaceholders: string[] = [];
+        let pIdx = 1;
+        for (const item of items) {
+          lineValues.push(
+            proformaId,
+            item.barcode || item.code || "",
+            item.itemName || item.name || "",
+            Math.round(Number(item.qty) || 0),
+            String(item.weight || "0"),
+            String(Number(item.supplierPrice || 0).toFixed(2))
+          );
+          linePlaceholders.push(`($${pIdx},$${pIdx+1},$${pIdx+2},$${pIdx+3},$${pIdx+4},$${pIdx+5})`);
+          pIdx += 6;
+        }
+        await pool.query(
+          `INSERT INTO supplier_proforma_lines (proforma_id, barcode, item_name, qty, weight_per_bale, price_per_bale) VALUES ${linePlaceholders.join(",")}`,
+          lineValues
+        );
+      }
+
+      await pool.query(`UPDATE supplier_proformas SET updated_at = now() WHERE id = $1`, [proformaId]);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/supplier-profit-check/proforma/:proformaId/export-supplier", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId;
