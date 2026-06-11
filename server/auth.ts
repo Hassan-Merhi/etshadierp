@@ -280,6 +280,10 @@ export function blockViewOnlyWrites(req: Request, res: Response, next: NextFunct
   const method = req.method.toUpperCase();
   if (method === "GET" || method === "HEAD" || method === "OPTIONS") return next();
   if (!req.path.startsWith("/api")) return next();
+  // Auth routes (login, logout, switch-company, confirm-password) must always
+  // be reachable — even for View Only sessions — so View Only users can log in,
+  // log out, and switch companies.
+  if (req.path.startsWith("/api/auth/")) return next();
 
   // Read role from session (available before requireAuth populates req.user)
   const role = (req.session as any)?.currentRole;
