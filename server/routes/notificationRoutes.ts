@@ -1,0 +1,166 @@
+import type { Express } from "express";
+import { db } from "../db";
+import { requireAuth } from "../auth";
+import { notifications, notificationRules, users } from "@shared/schema";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import { NOTIFICATION_EVENT_TYPES } from "../lib/notificationService";
+
+export function registerNotificationRoutes(app: Express) {
+
+  // GET /api/notifications — current user's notifications
+  app.get("/api/notifications", requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) return res.status(401).json({ message: "Not authenticated" });
+
+      const unreadOnly = req.query.unread === "true";
+      const typeFilter = req.query.type as string | undefined;
+      const limit = Math.min(parseInt(req.query.limit as string || "60"), 100);
+
+      const conditions: any[] = [eq(notifications.recipientUserId, userId)];
+      if (unreadOnly) conditions.push(eq(notifications.isRead, false));
+      if (typeFilter && typeFilter !== "all") {
+        if (typeFilter === "loading") {
+          conditions.push(sql`${notifications.eventType} IN ('LOADING_STARTED','LOADING_FINALIZED')`);
+        } else if (typeFilter === "invoice") {
+          conditions.push(sql`${notifications.eventType} IN ('INVOICE_PENDING','INVOICE_FINALIZED')`);
+        } else if (typeFilter === "intercompany") {
+          conditions.push(eq(notifications.eventType, "INTERCOMPANY_REQUEST"));
+        }
+      }
+
+      const rows = await db
+        .select()
+        .from(notifications)
+        .where(and(...conditions))
+        .orderBy(desc(notifications.createdAt))
+        .limit(limit);
+
+      // Enrich with triggeredBy username
+      const triggerUserIds = [...new Set(rows.map(r => r.triggeredByUserId).filter(Boolean))] as string[];
+      const triggerUsers = triggerUserIds.length > 0
+        ? await db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, triggerUserIds))
+        : [];
+      const userMap = Object.fromEntries(triggerUsers.map(u => [u.id, u.username]));
+
+      const enriched = rows.map(n => ({
+        ...n,
+        triggeredByUsername: n.triggeredByUserId ? (userMap[n.triggeredByUserId] ?? null) : null,
+      }));
+
+      res.json(enriched);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // GET /api/notifications/unread-count
+  app.get("/api/notifications/unread-count", requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) return res.json({ count: 0 });
+      const [row] = await db
+        .select({ count: sql<number>`COUNT(*)::int` })
+        .from(notifications)
+        .where(and(eq(notifications.recipientUserId, userId), eq(notifications.isRead, false)));
+      res.json({ count: row?.count ?? 0 });
+    } catch {
+      res.json({ count: 0 });
+    }
+  });
+
+  // POST /api/notifications/:id/read
+  app.post("/api/notifications/:id/read", requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.session?.userId;
+      const id = parseInt(req.params.id);
+      if (!userId || isNaN(id)) return res.status(400).json({ message: "Invalid request" });
+      await db
+        .update(notifications)
+        .set({ isRead: true, readAt: new Date() })
+        .where(and(eq(notifications.id, id), eq(notifications.recipientUserId, userId)));
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // POST /api/notifications/read-all
+  app.post("/api/notifications/read-all", requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) return res.status(401).json({ message: "Not authenticated" });
+      await db
+        .update(notifications)
+        .set({ isRead: true, readAt: new Date() })
+        .where(and(eq(notifications.recipientUserId, userId), eq(notifications.isRead, false)));
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // GET /api/notification-rules — admin/dev only
+  app.get("/api/notification-rules", requireAuth, async (req: any, res: any) => {
+    try {
+      const role = req.session?.currentRole;
+      if (role !== "Developer" && role !== "Admin" && role !== "Owner") {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      const rules = await db.select().from(notificationRules).orderBy(notificationRules.eventType);
+      res.json(rules);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // PUT /api/notification-rules — admin/dev only; replaces all rules for given eventType
+  app.put("/api/notification-rules", requireAuth, async (req: any, res: any) => {
+    try {
+      const role = req.session?.currentRole;
+      if (role !== "Developer" && role !== "Admin" && role !== "Owner") {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      const { eventType, recipientUserIds } = req.body;
+      if (!eventType || !Array.isArray(recipientUserIds)) {
+        return res.status(400).json({ message: "eventType and recipientUserIds[] are required" });
+      }
+      if (!Object.values(NOTIFICATION_EVENT_TYPES).includes(eventType)) {
+        return res.status(400).json({ message: "Invalid eventType" });
+      }
+
+      // Replace rules for this event type
+      await db.delete(notificationRules).where(eq(notificationRules.eventType, eventType));
+      if (recipientUserIds.length > 0) {
+        await db.insert(notificationRules).values(
+          recipientUserIds.map((uid: string) => ({
+            eventType,
+            recipientUserId: uid,
+            isEnabled: true,
+          })),
+        );
+      }
+      const updated = await db.select().from(notificationRules).where(eq(notificationRules.eventType, eventType));
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // GET /api/notification-users — users list for recipient picker (admin/dev only)
+  app.get("/api/notification-users", requireAuth, async (req: any, res: any) => {
+    try {
+      const role = req.session?.currentRole;
+      if (role !== "Developer" && role !== "Admin" && role !== "Owner") {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      const allUsers = await db
+        .select({ id: users.id, username: users.username })
+        .from(users)
+        .orderBy(users.username);
+      res.json(allUsers);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+}

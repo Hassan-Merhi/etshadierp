@@ -64,7 +64,7 @@
   import { useAppMode } from "@/contexts/AppModeContext";
   import { getApiRequest } from "@/lib/factoryApi";
   import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, Zap, Eraser, ArrowLeft, Info, Search, Activity } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, Bell, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, Zap, Eraser, ArrowLeft, Info, Search, Activity } from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -1582,6 +1582,26 @@ import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
                           <div>
                             <h3 className="font-semibold mb-1" data-testid="link-chatbot-settings">AI Chatbot Settings</h3>
                             <p className="text-sm text-muted-foreground">Manage AI assistant access permissions and review conversation history.</p>
+                          </div>
+                          <div className="flex items-center gap-1 text-sm font-medium text-primary">
+                            Manage <ChevronRight className="h-4 w-4" />
+                          </div>
+                        </div>
+                      </Card>
+                    </Link>
+
+                    <Link href={`${pfx}/notification-settings`}>
+                      <Card className="p-6 hover-elevate cursor-pointer h-full">
+                        <div className="flex flex-col gap-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="p-2.5 bg-primary/10 rounded-md">
+                              <Bell className="h-5 w-5 text-primary" />
+                            </div>
+                            <Badge variant="secondary" className="text-xs">Alerts</Badge>
+                          </div>
+                          <div>
+                            <h3 className="font-semibold mb-1" data-testid="link-notification-settings">Notification Settings</h3>
+                            <p className="text-sm text-muted-foreground">Configure which users receive alerts for loading, invoice, and intercompany events.</p>
                           </div>
                           <div className="flex items-center gap-1 text-sm font-medium text-primary">
                             Manage <ChevronRight className="h-4 w-4" />

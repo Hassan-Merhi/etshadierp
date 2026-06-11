@@ -6,7 +6,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { CurrencyToggle } from "@/components/CurrencyToggle";
 import { CompanySelector } from "@/components/CompanySelector";
 import { PendingSyncIndicator } from "@/components/PendingSyncIndicator";
-import { IntercompanyBell } from "@/components/IntercompanyBell";
+import { NotificationsCenter } from "@/components/NotificationsCenter";
 
 interface AppTopBarProps {
   accentColor: string;
@@ -83,7 +83,7 @@ export function AppTopBar({
         )}
 
         <PendingSyncIndicator />
-        <IntercompanyBell />
+        <NotificationsCenter />
 
         {/* Divider */}
         <div className="hidden sm:block h-5 w-px bg-border/60 mx-1" />

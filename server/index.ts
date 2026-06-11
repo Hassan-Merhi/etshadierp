@@ -4032,6 +4032,32 @@ END $$`,
     `CREATE UNIQUE INDEX IF NOT EXISTS stock_item_code_aliases_company_alias_unique ON stock_item_code_aliases (company_id, alias_code)`,
     `DO $$ BEGIN ALTER TABLE stock_item_code_aliases ADD CONSTRAINT stock_item_code_aliases_company_id_fkey2 FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
     `DO $$ BEGIN ALTER TABLE stock_item_code_aliases ADD CONSTRAINT stock_item_code_aliases_stock_item_id_fkey2 FOREIGN KEY (stock_item_id) REFERENCES stock_items(id) ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+    // ── Notifications Center ──────────────────────────────────────────────────
+    `CREATE TABLE IF NOT EXISTS notifications (
+      id serial PRIMARY KEY,
+      recipient_user_id varchar NOT NULL,
+      event_type text NOT NULL,
+      title text NOT NULL,
+      message text NOT NULL,
+      entity_type text,
+      entity_id integer,
+      triggered_by_user_id varchar,
+      company_id integer,
+      is_read boolean NOT NULL DEFAULT false,
+      read_at timestamp,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS notifications_recipient_idx ON notifications (recipient_user_id, is_read, created_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS notifications_entity_idx ON notifications (entity_type, entity_id)`,
+    `CREATE TABLE IF NOT EXISTS notification_rules (
+      id serial PRIMARY KEY,
+      event_type text NOT NULL,
+      recipient_user_id varchar NOT NULL,
+      is_enabled boolean NOT NULL DEFAULT true,
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS notification_rules_event_user_uniq ON notification_rules (event_type, recipient_user_id)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

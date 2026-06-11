@@ -1,5 +1,6 @@
 import { trackOneContainerById } from "../../services/containerTrackingService";
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { dispatchNotification } from "../../lib/notificationService";
 import { getClientDate } from "../../lib/dateUtils";
 import { getExportPriceVisibility } from "../../helpers/exportVisibility";
 import { sendWhatsAppFileToChatIdPos } from "../../services/whatsappService";
@@ -2511,6 +2512,16 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         amountUsd: parseFloat(result.grandTotal || "0"),
       });
 
+      dispatchNotification({
+        eventType: "INVOICE_FINALIZED",
+        title: "Invoice Finalized",
+        message: `Invoice ${result.invoiceNumber} finalized for ${result.customerName || "customer"}`,
+        entityType: "customer_order",
+        entityId: result.id,
+        triggeredByUserId: (req.session as any)?.userId ?? null,
+        companyId: result.companyId ?? companyId,
+      }).catch(() => {});
+
       res.json(result);
     } catch (error: any) {
       console.error("Error finalizing order:", error);
@@ -3565,6 +3576,16 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         description: `Loading started for customer: ${loadingCustomer?.legalName || customerId}`,
       });
 
+      dispatchNotification({
+        eventType: "LOADING_STARTED",
+        title: "Loading Started",
+        message: `New loading started for ${loadingCustomer?.legalName || "customer"}`,
+        entityType: "customer_order",
+        entityId: order.id,
+        triggeredByUserId: (req.session as any)?.userId ?? null,
+        companyId,
+      }).catch(() => {});
+
       res.json(order);
     } catch (error: any) {
       console.error("Error creating loading order:", error);
@@ -3618,6 +3639,26 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         amountCurrency: lsTotalValue,
         amountUsd: lsTotalValue,
       });
+
+      const lsMsg = `${bales.length} bale${bales.length !== 1 ? "s" : ""} submitted for ${lsCustomer?.legalName || "customer"}`;
+      dispatchNotification({
+        eventType: "LOADING_FINALIZED",
+        title: "Loading Finalized",
+        message: lsMsg,
+        entityType: "customer_order",
+        entityId: orderId,
+        triggeredByUserId: (req.session as any)?.userId ?? null,
+        companyId,
+      }).catch(() => {});
+      dispatchNotification({
+        eventType: "INVOICE_PENDING",
+        title: "Invoice Pending Verification",
+        message: lsMsg,
+        entityType: "customer_order",
+        entityId: orderId,
+        triggeredByUserId: (req.session as any)?.userId ?? null,
+        companyId,
+      }).catch(() => {});
 
       res.json(updated);
     } catch (error: any) {

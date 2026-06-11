@@ -35,6 +35,7 @@ import {
   Ship,
   HardHat,
   Sparkles,
+  Bell,
 } from "lucide-react";
 import { useErpVisibleSections } from "@/components/AppSidebar";
 import { useFactoryVisibleSections } from "@/components/FactorySidebar";
@@ -173,6 +174,7 @@ const PROPERTIES_ADMIN_EXTRAS: PageEntry[] = [
 const adminPages: PageEntry[] = [
   { label: "Settings", description: "App configuration and system tools", path: "/settings", icon: Settings },
   { label: "Chatbot Settings", description: "AI assistant configuration", path: "/chatbot-settings", icon: Bot },
+  { label: "Notification Settings", description: "Configure notification recipients per event type", path: "/notification-settings", icon: Bell },
   { label: "Deleted Items", description: "View and restore deleted records", path: "/deleted-items", icon: Trash2 },
   { label: "Orphaned Records", description: "Records with missing references", path: "/orphaned-records", icon: LinkIcon },
   { label: "Inventory Repair", description: "Fix inventory discrepancies", path: "/inventory-repair", icon: Wrench },

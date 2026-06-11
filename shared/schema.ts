@@ -6095,3 +6095,30 @@ export const supplierProfitPoOverrides = pgTable("supplier_profit_po_overrides",
 }, (t) => ({
   uniq: uniqueIndex("supplier_profit_po_overrides_uniq").on(t.supplierId, t.stockItemId),
 }));
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  recipientUserId: varchar("recipient_user_id").notNull(),
+  eventType: text("event_type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  entityType: text("entity_type"),
+  entityId: integer("entity_id"),
+  triggeredByUserId: varchar("triggered_by_user_id"),
+  companyId: integer("company_id"),
+  isRead: boolean("is_read").notNull().default(false),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+export type Notification = typeof notifications.$inferSelect;
+
+export const notificationRules = pgTable("notification_rules", {
+  id: serial("id").primaryKey(),
+  eventType: text("event_type").notNull(),
+  recipientUserId: varchar("recipient_user_id").notNull(),
+  isEnabled: boolean("is_enabled").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+export type NotificationRule = typeof notificationRules.$inferSelect;
