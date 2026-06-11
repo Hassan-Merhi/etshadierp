@@ -167,7 +167,12 @@ export function registerNotificationRoutes(app: Express) {
       const allUsers = await db
         .select({ id: users.id, username: users.username })
         .from(users)
-        .where(eq(users.active, true))
+        .where(
+          and(
+            eq(users.active, true),
+            sql`${users.id} NOT IN (SELECT DISTINCT user_id FROM user_company_roles WHERE role = 'Developer')`
+          )
+        )
         .orderBy(users.username);
       res.json(allUsers);
     } catch (err: any) {
