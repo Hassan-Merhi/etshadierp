@@ -299,8 +299,8 @@ export default function SupplierProfitCheck() {
     const initPo: Record<number, string> = {};
     const initAvg: Record<number, string> = {};
     for (const o of (overridesData ?? [])) {
-      if (o.poPrice != null) initPo[o.stockItemId] = String(o.poPrice);
-      if (o.avgPrice != null) initAvg[o.stockItemId] = String(o.avgPrice);
+      if (o.poPrice != null) initPo[o.stockItemId] = String(parseFloat(String(o.poPrice)));
+      if (o.avgPrice != null) initAvg[o.stockItemId] = String(parseFloat(String(o.avgPrice)));
     }
     setManualPoPrices(initPo);
     setManualAvgPrices(initAvg);
