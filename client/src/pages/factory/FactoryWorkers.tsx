@@ -7,7 +7,6 @@ import {
 } from "lucide-react";
 import { ExcelJS, writeFile } from "@/lib/excelHelper";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -655,13 +654,13 @@ export default function FactoryWorkers() {
           {/* Table */}
           <div className="border rounded-xl overflow-auto max-h-[calc(100vh-220px)]">
             <Table wrapperClassName="overflow-visible">
-              <TableHeader className="sticky top-0 z-30 bg-background">
-                <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="text-xs h-9 font-semibold">Worker</TableHead>
-                  <TableHead className="text-xs h-9 font-semibold">Position</TableHead>
-                  <TableHead className="text-xs h-9 font-semibold text-right">Salary</TableHead>
-                  <TableHead className="text-xs h-9 font-semibold">Status</TableHead>
-                  <TableHead className="text-xs h-9 font-semibold w-[80px]"></TableHead>
+              <TableHeader className="sticky top-0 z-30">
+                <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Worker</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Position</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Salary</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Status</TableHead>
+                  <TableHead className="w-[80px] py-2"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -806,49 +805,47 @@ export default function FactoryWorkers() {
                   const catWorkers = (workers ?? []).filter((w) => ids.includes(w.id));
                   const activeMembers = catWorkers.filter((w) => w.active);
                   return (
-                    <Card key={cat.id} data-testid={`card-category-${cat.id}`}>
-                      <CardContent className="p-4 space-y-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="font-semibold text-sm" data-testid={`text-cat-name-${cat.id}`}>{cat.name}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {activeMembers.length} active worker{activeMembers.length !== 1 ? "s" : ""}
-                              {ids.length > activeMembers.length && (
-                                <span className="ml-1">({ids.length - activeMembers.length} inactive)</span>
-                              )}
-                            </p>
-                          </div>
-                          <div className="flex gap-1 flex-shrink-0">
-                            <Button size="icon" variant="ghost" onClick={() => openEditCategory(cat)} data-testid={`button-edit-cat-${cat.id}`}>
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => deleteCatMutation.mutate(cat.id)}
-                              disabled={deleteCatMutation.isPending}
-                              data-testid={`button-delete-cat-${cat.id}`}
-                            >
-                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                            </Button>
-                          </div>
-                        </div>
-                        {activeMembers.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {activeMembers.slice(0, 6).map((w) => (
-                              <Badge key={w.id} variant="secondary" className="text-xs font-normal no-default-active-elevate">
-                                {w.fullName}
-                              </Badge>
-                            ))}
-                            {activeMembers.length > 6 && (
-                              <Badge variant="outline" className="text-xs font-normal no-default-active-elevate">
-                                +{activeMembers.length - 6} more
-                              </Badge>
+                    <div key={cat.id} className="rounded-xl border p-4 space-y-3" data-testid={`card-category-${cat.id}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-sm" data-testid={`text-cat-name-${cat.id}`}>{cat.name}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {activeMembers.length} active worker{activeMembers.length !== 1 ? "s" : ""}
+                            {ids.length > activeMembers.length && (
+                              <span className="ml-1">({ids.length - activeMembers.length} inactive)</span>
                             )}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
+                          </p>
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <Button size="icon" variant="ghost" onClick={() => openEditCategory(cat)} data-testid={`button-edit-cat-${cat.id}`}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => deleteCatMutation.mutate(cat.id)}
+                            disabled={deleteCatMutation.isPending}
+                            data-testid={`button-delete-cat-${cat.id}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                      {activeMembers.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {activeMembers.slice(0, 6).map((w) => (
+                            <Badge key={w.id} variant="secondary" className="text-xs font-normal no-default-active-elevate">
+                              {w.fullName}
+                            </Badge>
+                          ))}
+                          {activeMembers.length > 6 && (
+                            <Badge variant="outline" className="text-xs font-normal no-default-active-elevate">
+                              +{activeMembers.length - 6} more
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>

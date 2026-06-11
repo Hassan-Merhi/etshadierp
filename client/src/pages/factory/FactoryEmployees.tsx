@@ -288,13 +288,13 @@ export default function FactoryEmployees() {
       {/* Table */}
       <div className="border rounded-xl overflow-x-auto">
         <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/40 hover:bg-muted/40">
-              <TableHead className="text-xs h-9 font-semibold">Employee</TableHead>
-              <TableHead className="text-xs h-9 font-semibold text-right">Monthly Salary</TableHead>
-              <TableHead className="text-xs h-9 font-semibold text-right">Balance</TableHead>
-              <TableHead className="text-xs h-9 font-semibold">Status</TableHead>
-              <TableHead className="text-xs h-9 font-semibold w-[80px]"></TableHead>
+          <TableHeader className="sticky top-0 z-30">
+            <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
+              <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Employee</TableHead>
+              <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Monthly Salary</TableHead>
+              <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Balance</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Status</TableHead>
+              <TableHead className="w-[80px] py-2"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
