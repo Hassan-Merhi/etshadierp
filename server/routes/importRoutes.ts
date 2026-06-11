@@ -40,6 +40,9 @@ import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
+import { generateInvoicePdf } from "../helpers/generateInvoicePdf";
+import { sendWhatsAppFileByUploadPos } from "../services/whatsappService";
+import { getErpExportVisibility } from "../helpers/exportVisibility";
 
 
 export function registerImportRoutes(app: Express) {
@@ -1700,6 +1703,24 @@ export function registerImportRoutes(app: Express) {
           description: `Credit Sale Import - ${items.length} items`,
         });
       });
+
+      // Send invoice PDF to the location's WhatsApp group (best-effort — never blocks the response)
+      if (createdVoucher && location.whatsappGroupChatId) {
+        try {
+          const senderName = (req as any).user?.username || "Import";
+          const waVis = await getErpExportVisibility(req);
+          const hideProfitCols = waVis.hideSelling || waVis.hideCost || waVis.hideSalesProfitCost;
+          const pdfBuffer = await generateInvoicePdf(createdVoucher.id, req.session.currentCompanyId!, senderName, { hideProfitCols });
+          const safeDate = (createdVoucher.voucherDate ?? saleDate).replace(/[^0-9-]/g, "");
+          const safeLoc  = (location.name ?? "").replace(/[^\w\s.()\-]/g, "_").trim();
+          const safeCust = (customer.legalName ?? "").replace(/[^\w\s.()\-]/g, "_").trim();
+          const fileName = `${safeCust} Invoice ${safeLoc} ${safeDate}.pdf`;
+          await sendWhatsAppFileByUploadPos(location.whatsappGroupChatId, pdfBuffer, fileName, "");
+          console.log(`[CreditImport] WhatsApp invoice sent: ${fileName} → ${location.whatsappGroupChatId}`);
+        } catch (waErr: any) {
+          console.error("[CreditImport] WhatsApp send failed (import still succeeded):", waErr.message);
+        }
+      }
 
       res.json({
         success: true,
