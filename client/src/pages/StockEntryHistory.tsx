@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "@/lib/excelHelper";
-import { ChevronDown, ChevronRight, Download, Search, RotateCcw, List, AlignJustify, FileDown, MoreVertical, CalendarRange, MessageCircle, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Search, RotateCcw, List, AlignJustify, FileDown, MoreVertical, CalendarRange, MessageCircle, Loader2, History, Users, Package, MapPin, Tag, Layers } from "lucide-react";
 import ProductionPlannerDialog from "./factory/ProductionPlannerDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -677,17 +677,26 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   }
 
   return (
-    <div className="p-4 space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-base font-semibold">Stock Entry History</h2>
+    <div className="p-4 space-y-3">
+      {/* ── Toolbar ── */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center h-8 w-8 rounded-xl bg-gradient-to-br from-sky-500/30 to-sky-600/10 border border-sky-500/25 shrink-0">
+            <History className="h-4 w-4 text-sky-500" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold leading-tight">Stock Entry History</h2>
+            <p className="text-xs text-muted-foreground leading-tight">Browse and filter recorded bale entries</p>
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <ProductionPlannerDialog />
           {/* View toggle */}
-          <div className="flex rounded-md border overflow-hidden">
+          <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
             <Button
               variant={viewMode === "condensed" ? "default" : "ghost"}
               size="sm"
-              className="rounded-none border-0"
+              className="h-7 px-2.5 text-xs rounded-md"
               onClick={() => setViewMode("condensed")}
               data-testid="button-view-condensed"
             >
@@ -696,7 +705,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
             <Button
               variant={viewMode === "detailed" ? "default" : "ghost"}
               size="sm"
-              className="rounded-none border-0 border-l"
+              className="h-7 px-2.5 text-xs rounded-md"
               onClick={() => setViewMode("detailed")}
               data-testid="button-view-detailed"
             >
@@ -705,8 +714,8 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" data-testid="button-actions-menu">
-                <MoreVertical className="w-3 h-3 mr-1" /> Actions
+              <Button variant="outline" size="icon" data-testid="button-actions-menu">
+                <MoreVertical className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -743,74 +752,88 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Category</Label>
-          <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setWorkerIdFilter("all"); }}>
-            <SelectTrigger data-testid="select-category"><SelectValue placeholder="All categories" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((c: any) => (
-                <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Worker</Label>
-          <Select value={workerIdFilter} onValueChange={setWorkerIdFilter}>
-            <SelectTrigger data-testid="select-worker"><SelectValue placeholder="All workers" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Workers</SelectItem>
-              {filteredWorkers.map((w: any) => (
-                <SelectItem key={w.id} value={String(w.id)}>{w.fullName}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Product</Label>
-          <Select value={productIdFilter} onValueChange={setProductIdFilter}>
-            <SelectTrigger data-testid="select-product"><SelectValue placeholder="All products" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Products</SelectItem>
-              {products.map((p: any) => (
-                <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Location</Label>
-          <Select value={locationIdFilter} onValueChange={setLocationIdFilter}>
-            <SelectTrigger data-testid="select-location"><SelectValue placeholder="All locations" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
-              {locations.map((l: any) => (
-                <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Status</Label>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger data-testid="select-status"><SelectValue placeholder="All statuses" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-            </SelectContent>
-          </Select>
+      {/* ── Filters panel ── */}
+      <div className="rounded-xl border bg-muted/30 p-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+          <div className="space-y-1">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
+              <Layers className="h-3 w-3" />Category
+            </div>
+            <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setWorkerIdFilter("all"); }}>
+              <SelectTrigger className="h-8 text-xs" data-testid="select-category"><SelectValue placeholder="All categories" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((c: any) => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
+              <Users className="h-3 w-3" />Worker
+            </div>
+            <Select value={workerIdFilter} onValueChange={setWorkerIdFilter}>
+              <SelectTrigger className="h-8 text-xs" data-testid="select-worker"><SelectValue placeholder="All workers" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Workers</SelectItem>
+                {filteredWorkers.map((w: any) => (
+                  <SelectItem key={w.id} value={String(w.id)}>{w.fullName}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
+              <Package className="h-3 w-3" />Product
+            </div>
+            <Select value={productIdFilter} onValueChange={setProductIdFilter}>
+              <SelectTrigger className="h-8 text-xs" data-testid="select-product"><SelectValue placeholder="All products" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Products</SelectItem>
+                {products.map((p: any) => (
+                  <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
+              <MapPin className="h-3 w-3" />Location
+            </div>
+            <Select value={locationIdFilter} onValueChange={setLocationIdFilter}>
+              <SelectTrigger className="h-8 text-xs" data-testid="select-location"><SelectValue placeholder="All locations" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Locations</SelectItem>
+                {locations.map((l: any) => (
+                  <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
+              <Tag className="h-3 w-3" />Status
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-8 text-xs" data-testid="select-status"><SelectValue placeholder="All statuses" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* ── Date + Search band ── */}
+      <div className="flex items-center gap-2 px-3 py-2 rounded-xl border bg-muted/30 flex-wrap">
         <Button
-          variant={useDateFilter ? "default" : "outline"}
+          variant={useDateFilter ? "default" : "ghost"}
           size="sm"
           onClick={() => setUseDateFilter(v => !v)}
           data-testid="button-toggle-date-filter"
-          className="toggle-elevate shrink-0"
+          className="toggle-elevate shrink-0 h-7 px-2.5 text-xs"
         >
           <CalendarRange className="w-3.5 h-3.5 mr-1.5" />
           Date
@@ -822,7 +845,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
               value={fromDate}
               onChange={e => setFromDate(e.target.value)}
               data-testid="input-from-date"
-              className="w-36 shrink-0"
+              className="w-34 h-7 text-xs shrink-0"
             />
             <span className="text-muted-foreground text-xs shrink-0">to</span>
             <Input
@@ -830,50 +853,61 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
               value={toDate}
               onChange={e => setToDate(e.target.value)}
               data-testid="input-to-date"
-              className="w-36 shrink-0"
+              className="w-34 h-7 text-xs shrink-0"
             />
           </>
         )}
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative flex-1 min-w-[180px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
-            className="pl-8"
-            placeholder="Search by reference number..."
+            className="pl-8 h-7 text-xs"
+            placeholder="Search by reference number…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             data-testid="input-search"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           <Checkbox
             id="include-unassigned"
             checked={includeUnassigned}
             onCheckedChange={v => setIncludeUnassigned(!!v)}
             data-testid="checkbox-include-unassigned"
           />
-          <Label htmlFor="include-unassigned" className="text-sm cursor-pointer">Include Unassigned</Label>
+          <Label htmlFor="include-unassigned" className="text-xs cursor-pointer whitespace-nowrap">Include Unassigned</Label>
         </div>
       </div>
 
-      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-        <span>{filteredGroups.length} group{filteredGroups.length !== 1 ? "s" : ""}</span>
-        <span>{totalBales} bales</span>
-        <span>{totalWeight.toFixed(2)} kg total</span>
+      {/* ── Summary pill-cards ── */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-slate-500/10 border-slate-500/20">
+          <span className="text-xs font-semibold text-slate-500">Groups</span>
+          <span className="text-sm font-bold tabular-nums text-slate-600 dark:text-slate-300">{filteredGroups.length}</span>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-emerald-500/10 border-emerald-500/20">
+          <span className="text-xs font-semibold text-emerald-500">Bales</span>
+          <span className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{totalBales}</span>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-sky-500/10 border-sky-500/20">
+          <span className="text-xs font-semibold text-sky-500">Weight</span>
+          <span className="text-sm font-bold tabular-nums text-sky-600 dark:text-sky-400">{totalWeight.toFixed(2)}</span>
+          <span className="text-xs text-sky-600/70 dark:text-sky-400/70">kg</span>
+        </div>
       </div>
 
       {/* ── CONDENSED VIEW: grouped by worker ── */}
       {viewMode === "condensed" && (
-        <div className="rounded-md border overflow-hidden">
+        <div className="rounded-xl border overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-30 bg-muted/50">
+            <thead className="sticky top-0 z-30 bg-muted border-b-2 border-border/60">
               <tr className="text-left">
-                <th className="px-3 py-2 w-6"></th>
-                <th className="px-3 py-2 text-right">No. Workers</th>
-                <th className="px-3 py-2">Worker</th>
-                <th className="px-3 py-2 text-right">Target</th>
-                <th className="px-3 py-2 text-right">Shortage</th>
-                <th className="px-3 py-2 text-right">Bales</th>
-                <th className="px-3 py-2 text-right">Total kg</th>
+                <th className="px-3 py-2.5 w-6"></th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">No. Workers</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Worker</th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">Target</th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">Shortage</th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">Bales</th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">Total kg</th>
               </tr>
             </thead>
             <tbody>
@@ -1000,7 +1034,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                                               <td className="py-1 pr-4 font-mono">{b.referenceNumber}</td>
                                               <td className="py-1 pr-4 text-right">{parseFloat(b.weightKg || "0").toFixed(2)}</td>
                                               <td className="py-1 pr-4">
-                                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_COLORS[b.status] || "bg-muted text-muted-foreground"}`}>
+                                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-muted text-muted-foreground"}`}>
                                                   {b.status}
                                                 </span>
                                               </td>
@@ -1028,19 +1062,19 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
 
       {/* ── DETAILED VIEW: flat per-bale list ── */}
       {viewMode === "detailed" && (
-        <div className="rounded-md border overflow-hidden">
+        <div className="rounded-xl border overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-30 bg-muted/50">
+            <thead className="sticky top-0 z-30 bg-muted border-b-2 border-border/60">
               <tr className="text-left">
-                <th className="px-3 py-2">Reference</th>
-                <th className="px-3 py-2">Date</th>
-                <th className="px-3 py-2">Location</th>
-                <th className="px-3 py-2">Worker</th>
-                <th className="px-3 py-2">Product</th>
-                <th className="px-3 py-2">Article</th>
-                <th className="px-3 py-2 text-right">Weight (kg)</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Finalized At</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Reference</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Date</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Location</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Worker</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Product</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Article</th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">Weight (kg)</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Status</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Finalized At</th>
               </tr>
             </thead>
             <tbody>
@@ -1066,7 +1100,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                   <td className="px-3 py-1.5 text-muted-foreground text-xs">{b.articleCode || "—"}</td>
                   <td className="px-3 py-1.5 text-right">{parseFloat(b.weightKg || "0").toFixed(2)}</td>
                   <td className="px-3 py-1.5">
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_COLORS[b.status] || "bg-muted text-muted-foreground"}`}>
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-muted text-muted-foreground"}`}>
                       {b.status}
                     </span>
                   </td>
