@@ -1,6 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -258,6 +257,9 @@ export default function FactoryCustomers() {
                         >
                           {customer.legalName}
                         </button>
+                        {customer.phone && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{customer.phone}</p>
+                        )}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {customer.balance !== undefined ? (
@@ -332,7 +334,6 @@ export default function FactoryCustomers() {
                   <TableHeader className="sticky top-0 z-30">
                     <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
                       <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Name</TableHead>
-                      <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Code</TableHead>
                       <TableHead className="w-[80px] py-2"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -340,7 +341,6 @@ export default function FactoryCustomers() {
                     {deletedCustomers.map((customer) => (
                       <TableRow key={customer.id} data-testid={`row-deleted-customer-${customer.id}`}>
                         <TableCell className="font-medium text-muted-foreground">{customer.legalName}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground font-mono">{customer.code}</TableCell>
                         <TableCell>
                           <Button
                             variant="outline"
@@ -477,7 +477,7 @@ export default function FactoryCustomers() {
               Edit Customer
             </DialogTitle>
             <DialogDescription>
-              {editingCustomer ? `Editing ${editingCustomer.code}` : ""}
+              {editingCustomer ? `Editing ${editingCustomer.legalName}` : ""}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

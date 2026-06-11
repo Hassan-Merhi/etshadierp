@@ -2,7 +2,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -322,9 +321,11 @@ export default function FactoryCustomerStatement() {
               {customer.active ? "Active" : "Inactive"}
             </Badge>
           </div>
-          <p className="text-muted-foreground text-sm mt-1" data-testid="text-customer-code">
-            {customer.code}{customer.phone ? ` · ${customer.phone}` : ""}
-          </p>
+          {customer.phone && (
+            <p className="text-muted-foreground text-sm mt-1" data-testid="text-customer-phone">
+              {customer.phone}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <Button
@@ -366,32 +367,26 @@ export default function FactoryCustomerStatement() {
 
       {/* Balance cards */}
       <div className={`grid grid-cols-1 gap-4 mb-6 ${hasOpeningBalance ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground mb-1">Current Balance</p>
-            <p className="text-2xl font-bold font-mono" data-testid="text-current-balance">
-              {fmtMoney(currentBalance)}
-            </p>
-            <Badge variant="outline" className="mt-1 text-xs" data-testid="badge-balance-side">{currentBalanceSide}</Badge>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border p-4">
+          <p className="text-xs text-muted-foreground mb-1">Current Balance</p>
+          <p className="text-2xl font-bold font-mono" data-testid="text-current-balance">
+            {fmtMoney(currentBalance)}
+          </p>
+          <Badge variant="outline" className="mt-1 text-xs" data-testid="badge-balance-side">{currentBalanceSide}</Badge>
+        </div>
         {hasOpeningBalance && (
-          <Card>
-            <CardContent className="pt-4">
-              <p className="text-xs text-muted-foreground mb-1">Opening Balance</p>
-              <p className="text-xl font-semibold font-mono" data-testid="text-opening-balance">
-                {fmtMoney(Number(openingBalance || 0))}
-              </p>
-              <Badge variant="outline" className="mt-1 text-xs">{openingBalanceSide}</Badge>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border p-4">
+            <p className="text-xs text-muted-foreground mb-1">Opening Balance</p>
+            <p className="text-xl font-semibold font-mono" data-testid="text-opening-balance">
+              {fmtMoney(Number(openingBalance || 0))}
+            </p>
+            <Badge variant="outline" className="mt-1 text-xs">{openingBalanceSide}</Badge>
+          </div>
         )}
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground mb-1">Total Invoices</p>
-            <p className="text-2xl font-bold" data-testid="text-total-invoices">{statement.invoices.length}</p>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border p-4">
+          <p className="text-xs text-muted-foreground mb-1">Total Invoices</p>
+          <p className="text-2xl font-bold" data-testid="text-total-invoices">{statement.invoices.length}</p>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -460,48 +455,42 @@ export default function FactoryCustomerStatement() {
 
           {/* Totals bar */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <Card>
-              <CardContent className="py-3 px-4">
-                <p className="text-xs text-muted-foreground mb-0.5">Total Bales</p>
-                <p className="text-lg font-bold font-mono" data-testid="text-total-bales">
-                  {fmtNum(totals.totalBales)}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="py-3 px-4">
-                <p className="text-xs text-muted-foreground mb-0.5">Total Invoiced</p>
-                <p className="text-lg font-bold font-mono" data-testid="text-total-debit">
-                  {fmtMoney(totals.totalAmountDebit)}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="py-3 px-4">
-                <p className="text-xs text-muted-foreground mb-0.5">Total Paid</p>
-                <p className="text-lg font-bold font-mono" data-testid="text-total-credit">
-                  {fmtMoney(totals.totalAmountCredit)}
-                </p>
-              </CardContent>
-            </Card>
+            <div className="rounded-xl border p-3">
+              <p className="text-xs text-muted-foreground mb-0.5">Total Bales</p>
+              <p className="text-lg font-bold font-mono" data-testid="text-total-bales">
+                {fmtNum(totals.totalBales)}
+              </p>
+            </div>
+            <div className="rounded-xl border p-3">
+              <p className="text-xs text-muted-foreground mb-0.5">Total Invoiced</p>
+              <p className="text-lg font-bold font-mono" data-testid="text-total-debit">
+                {fmtMoney(totals.totalAmountDebit)}
+              </p>
+            </div>
+            <div className="rounded-xl border p-3">
+              <p className="text-xs text-muted-foreground mb-0.5">Total Paid</p>
+              <p className="text-lg font-bold font-mono" data-testid="text-total-credit">
+                {fmtMoney(totals.totalAmountCredit)}
+              </p>
+            </div>
           </div>
 
           {/* Statement table */}
-          <Card className="table-responsive">
+          <div className="rounded-xl border overflow-hidden table-responsive">
             <Table>
-              <TableHeader className="sticky top-0 z-30 bg-background">
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Container</TableHead>
-                  <TableHead>Destination</TableHead>
-                  <TableHead className="text-right">Bales</TableHead>
-                  <TableHead className="text-right">Kg</TableHead>
-                  <TableHead className="text-right">Debit</TableHead>
-                  <TableHead className="text-right">Credit</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
-                  <TableHead>Side</TableHead>
-                  <TableHead className="min-w-[160px]">Note</TableHead>
+              <TableHeader className="sticky top-0 z-30">
+                <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Date</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Type</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Container</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Destination</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Bales</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Kg</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Debit</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Credit</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Balance</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Side</TableHead>
+                  <TableHead className="min-w-[160px] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Note</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -572,30 +561,28 @@ export default function FactoryCustomerStatement() {
                 )}
               </TableBody>
             </Table>
-          </Card>
+          </div>
 
           {/* Statement Note */}
-          <Card className="mt-4">
-            <CardContent className="p-4 space-y-2">
-              <p className="text-sm font-semibold">Statement Note</p>
-              <p className="text-xs text-muted-foreground">This note appears on exported PDF and Excel statements.</p>
-              <Textarea
-                value={draftNote ?? ""}
-                onChange={(e) => setDraftNote(e.target.value)}
-                placeholder="Add a note for this customer's statement..."
-                rows={3}
-                data-testid="textarea-statement-note"
-              />
-              <Button
-                size="sm"
-                onClick={() => saveNoteMutation.mutate(draftNote ?? "")}
-                disabled={saveNoteMutation.isPending}
-                data-testid="button-save-statement-note"
-              >
-                {saveNoteMutation.isPending ? "Saving…" : "Save Note"}
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border p-4 mt-4 space-y-2">
+            <p className="text-sm font-semibold">Statement Note</p>
+            <p className="text-xs text-muted-foreground">This note appears on exported PDF and Excel statements.</p>
+            <Textarea
+              value={draftNote ?? ""}
+              onChange={(e) => setDraftNote(e.target.value)}
+              placeholder="Add a note for this customer's statement..."
+              rows={3}
+              data-testid="textarea-statement-note"
+            />
+            <Button
+              size="sm"
+              onClick={() => saveNoteMutation.mutate(draftNote ?? "")}
+              disabled={saveNoteMutation.isPending}
+              data-testid="button-save-statement-note"
+            >
+              {saveNoteMutation.isPending ? "Saving…" : "Save Note"}
+            </Button>
+          </div>
         </TabsContent>
 
         {/* ─── Price List Tab ─── */}
@@ -640,15 +627,15 @@ export default function FactoryCustomerStatement() {
             </div>
           </div>
 
-          <Card>
+          <div className="rounded-xl border overflow-hidden">
             <Table>
-              <TableHeader className="sticky top-0 z-30 bg-background">
-                <TableRow>
-                  <TableHead>Article Code</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-right">Price per Bale ($)</TableHead>
-                  <TableHead className="text-right">Last Updated</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+              <TableHeader className="sticky top-0 z-30">
+                <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Article Code</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Name</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Price per Bale ($)</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Last Updated</TableHead>
+                  <TableHead className="w-[50px] py-2"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -746,7 +733,7 @@ export default function FactoryCustomerStatement() {
                 </TableRow>
               </TableBody>
             </Table>
-          </Card>
+          </div>
 
           <p className="text-xs text-muted-foreground mt-3">
             Excel format: columns named <span className="font-mono">article_code</span> and <span className="font-mono">price</span> (or <span className="font-mono">price_per_bale</span>).
