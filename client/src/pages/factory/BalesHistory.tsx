@@ -1010,7 +1010,6 @@ export default function BalesHistory() {
               </Table>
             </div>
           )}
-        </div>
       </div>
 
       {/* ── Remove from Stock Dialog ── */}
