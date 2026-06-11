@@ -38,11 +38,16 @@ export async function dispatchNotification(opts: DispatchOptions): Promise<void>
 
     const recipientIds = [...new Set(rules.map(r => r.recipientUserId))];
 
-    // Verify users exist and are active
+    // Only deliver to users that exist AND have active=true
     const activeUsers = await db
       .select({ id: users.id })
       .from(users)
-      .where(inArray(users.id, recipientIds));
+      .where(
+        and(
+          inArray(users.id, recipientIds),
+          eq(users.active, true),
+        ),
+      );
 
     const activeSet = new Set(activeUsers.map(u => u.id));
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);

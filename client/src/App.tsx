@@ -512,7 +512,7 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/orphaned-records" component={OrphanedRecords} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/deleted-items" component={DeletedItems} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/chatbot-settings" component={ChatbotSettings} />}
-      {(user?.role === "Admin" || user?.role === "Developer" || user?.role === "Owner") && <Route path="/notification-settings" component={NotificationSettings} />}
+      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/notification-settings" component={NotificationSettings} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/account-groups" component={AccountGroups} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/test-data-import" component={TestDataImport} />}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/import-cycle-diagnostics" component={ImportCycleDiagnostics} />}

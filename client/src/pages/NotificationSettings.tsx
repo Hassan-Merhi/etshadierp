@@ -158,7 +158,7 @@ export default function NotificationSettings() {
         </p>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1">
           <Shield className="h-3.5 w-3.5" />
-          Visible to Admin, Owner, and Developer roles only.
+          Visible to Admin and Developer roles only.
         </div>
       </div>
 

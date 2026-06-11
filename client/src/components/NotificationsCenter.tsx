@@ -45,6 +45,7 @@ interface NotificationItem {
   triggeredByUserId: string | null;
   triggeredByUsername: string | null;
   companyId: number | null;
+  companyName: string | null;
   isRead: boolean;
   readAt: string | null;
   createdAt: string;
@@ -170,6 +171,7 @@ export function NotificationsCenter() {
       return r.ok ? r.json() : [];
     },
     enabled: open && activeTab !== "intercompany",
+    refetchInterval: 30_000,
   });
 
   // ── IC requests ───────────────────────────────────────────────────────────────
@@ -180,6 +182,7 @@ export function NotificationsCenter() {
       return r.ok ? r.json() : [];
     },
     enabled: open && activeTab === "intercompany",
+    refetchInterval: 30_000,
   });
 
   // Dest accounts for IC approve dialog
@@ -430,9 +433,8 @@ export function NotificationsCenter() {
                       <div
                         key={item.id}
                         data-testid={`notif-item-${item.id}`}
-                        onClick={() => handleNotifClick(item)}
                         className={cn(
-                          "px-4 py-3 space-y-1.5 cursor-pointer transition-colors hover-elevate",
+                          "px-4 py-3 space-y-1.5",
                           !item.isRead && "bg-primary/5 border-l-2 border-l-primary",
                         )}
                       >
@@ -443,37 +445,50 @@ export function NotificationsCenter() {
                             )}
                             <span className="text-sm font-medium leading-snug truncate">{item.title}</span>
                           </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            {meta && (
-                              <Badge
-                                variant="outline"
-                                className={cn("text-[9px] px-1 h-4 font-medium", meta.className)}
-                              >
-                                {meta.label}
-                              </Badge>
-                            )}
-                            {navPath && (
-                              <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                            )}
-                          </div>
+                          {meta && (
+                            <Badge
+                              variant="outline"
+                              className={cn("text-[9px] px-1 h-4 font-medium shrink-0", meta.className)}
+                            >
+                              {meta.label}
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-xs text-muted-foreground leading-snug line-clamp-2">
                           {item.message}
                         </p>
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="text-[10px] text-muted-foreground">
+                        {/* Company info */}
+                        {item.companyName && (
+                          <p className="text-[10px] text-muted-foreground font-medium">{item.companyName}</p>
+                        )}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-muted-foreground leading-tight">
                             {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
                             {item.triggeredByUsername && ` · by ${item.triggeredByUsername}`}
                           </span>
-                          {!item.isRead && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); markReadMutation.mutate(item.id); }}
-                              className="text-[10px] text-muted-foreground underline hover:text-foreground"
-                              data-testid={`button-mark-read-${item.id}`}
-                            >
-                              Mark read
-                            </button>
-                          )}
+                          <div className="flex items-center gap-1 shrink-0">
+                            {!item.isRead && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); markReadMutation.mutate(item.id); }}
+                                className="text-[10px] text-muted-foreground underline hover:text-foreground"
+                                data-testid={`button-mark-read-${item.id}`}
+                              >
+                                Mark read
+                              </button>
+                            )}
+                            {navPath && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 text-[10px] px-2 gap-0.5"
+                                onClick={(e) => { e.stopPropagation(); handleNotifClick(item); }}
+                                data-testid={`button-go-to-record-${item.id}`}
+                              >
+                                Go to record
+                                <ArrowRight className="h-2.5 w-2.5" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );

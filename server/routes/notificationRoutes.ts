@@ -1,13 +1,15 @@
 import type { Express } from "express";
 import { db } from "../db";
 import { requireAuth } from "../auth";
-import { notifications, notificationRules, users } from "@shared/schema";
+import { notifications, notificationRules, users, companies } from "@shared/schema";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { NOTIFICATION_EVENT_TYPES } from "../lib/notificationService";
 
+const ALLOWED_ROLES = ["Developer", "Admin"];
+
 export function registerNotificationRoutes(app: Express) {
 
-  // GET /api/notifications — current user's notifications
+  // GET /api/notifications — current user's notifications, enriched with company + triggered-by username
   app.get("/api/notifications", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.session?.userId;
@@ -43,9 +45,17 @@ export function registerNotificationRoutes(app: Express) {
         : [];
       const userMap = Object.fromEntries(triggerUsers.map(u => [u.id, u.username]));
 
+      // Enrich with company name
+      const companyIds = [...new Set(rows.map(r => r.companyId).filter((id): id is number => id !== null))];
+      const companyRows = companyIds.length > 0
+        ? await db.select({ id: companies.id, name: companies.name }).from(companies).where(inArray(companies.id, companyIds))
+        : [];
+      const companyMap = Object.fromEntries(companyRows.map(c => [c.id, c.name]));
+
       const enriched = rows.map(n => ({
         ...n,
         triggeredByUsername: n.triggeredByUserId ? (userMap[n.triggeredByUserId] ?? null) : null,
+        companyName: n.companyId ? (companyMap[n.companyId] ?? null) : null,
       }));
 
       res.json(enriched);
@@ -104,7 +114,7 @@ export function registerNotificationRoutes(app: Express) {
   app.get("/api/notification-rules", requireAuth, async (req: any, res: any) => {
     try {
       const role = req.session?.currentRole;
-      if (role !== "Developer" && role !== "Admin" && role !== "Owner") {
+      if (!ALLOWED_ROLES.includes(role)) {
         return res.status(403).json({ message: "Forbidden" });
       }
       const rules = await db.select().from(notificationRules).orderBy(notificationRules.eventType);
@@ -118,7 +128,7 @@ export function registerNotificationRoutes(app: Express) {
   app.put("/api/notification-rules", requireAuth, async (req: any, res: any) => {
     try {
       const role = req.session?.currentRole;
-      if (role !== "Developer" && role !== "Admin" && role !== "Owner") {
+      if (!ALLOWED_ROLES.includes(role)) {
         return res.status(403).json({ message: "Forbidden" });
       }
       const { eventType, recipientUserIds } = req.body;
@@ -151,12 +161,13 @@ export function registerNotificationRoutes(app: Express) {
   app.get("/api/notification-users", requireAuth, async (req: any, res: any) => {
     try {
       const role = req.session?.currentRole;
-      if (role !== "Developer" && role !== "Admin" && role !== "Owner") {
+      if (!ALLOWED_ROLES.includes(role)) {
         return res.status(403).json({ message: "Forbidden" });
       }
       const allUsers = await db
         .select({ id: users.id, username: users.username })
         .from(users)
+        .where(eq(users.active, true))
         .orderBy(users.username);
       res.json(allUsers);
     } catch (err: any) {
