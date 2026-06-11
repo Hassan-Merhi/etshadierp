@@ -485,7 +485,7 @@ export default function BarcodeLookup() {
               />
               <button
                 type="button"
-                className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-xs font-medium text-muted-foreground hover-elevate"
+                className="absolute right-2 top-0 bottom-0 my-auto h-7 flex items-center gap-1 px-2 rounded-md bg-muted text-xs font-medium text-muted-foreground hover-elevate"
                 onClick={() => setSearchMode(searchMode === "reference" ? "article" : "reference")}
                 data-testid="button-toggle-search-mode"
                 title="Click to switch between Ref # and Article Code mode"
