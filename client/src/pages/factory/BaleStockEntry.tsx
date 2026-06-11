@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/PageHeader";
   import {
     Plus, Minus, Trash2, Printer, ScanLine, AlertCircle, Package, CheckCircle,
     XCircle, ShieldAlert, Lock, Upload, FileSpreadsheet, CalendarDays, List, LayoutList, Download, Palette, Square, Loader2, MessageCircle, ImagePlus,
-    Pencil, Layers, Tag,
+    Pencil, Layers, Tag, MapPin, Weight, Factory,
   } from "lucide-react";
   import { Button } from "@/components/ui/button";
   import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -659,11 +659,13 @@ import DailyScan from "./DailyScan";
             onDiscard={discardCartDraft}
           />
         )}
-        <div className="max-w-sm">
-          <p className="text-sm text-muted-foreground mb-1.5">Warehouse Location</p>
+        {/* Location bar */}
+        <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg border bg-muted/30">
+          <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Location</span>
           <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
-            <SelectTrigger data-testid="select-stock-entry-location">
-              <SelectValue placeholder="Select Location..." />
+            <SelectTrigger className="flex-1 border-0 bg-transparent shadow-none h-7 text-sm font-medium focus:ring-0 p-0 pl-1" data-testid="select-stock-entry-location">
+              <SelectValue placeholder="Select location…" />
             </SelectTrigger>
             <SelectContent>
               {activeLocations?.map((loc) => (
@@ -677,14 +679,14 @@ import DailyScan from "./DailyScan";
 
         <div className="flex gap-6">
           <div className="flex-1 min-w-0 space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <ScanLine className="h-5 w-5 text-muted-foreground" />
-                  <CardTitle className="text-lg">Scan / Add Product</CardTitle>
+            <div className="rounded-xl border bg-card overflow-hidden">
+              <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/20">
+                <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-emerald-500/15 border border-emerald-500/20 shrink-0">
+                  <ScanLine className="h-3.5 w-3.5 text-emerald-500" />
                 </div>
-              </CardHeader>
-              <CardContent>
+                <span className="text-sm font-semibold">Scan / Add Product</span>
+              </div>
+              <div className="p-4">
                 <div className="space-y-2 relative">
                   <Input
                     ref={scanRef}
@@ -799,32 +801,40 @@ import DailyScan from "./DailyScan";
                     </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <CardTitle className="text-lg">Cart ({totalQty} bales)</CardTitle>
-                  {workerCategoryGroups.length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Filter workers by:</span>
-                      <Select value={workerCategoryFilter} onValueChange={setWorkerCategoryFilter}>
-                        <SelectTrigger className="h-8 w-44 text-xs" data-testid="select-worker-category-filter">
-                          <SelectValue placeholder="All workers" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Workers</SelectItem>
-                          {workerCategoryGroups.map((c: any) => (
-                            <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+            <div className="rounded-xl border bg-card overflow-hidden">
+              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/20 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-primary/10 border border-primary/20 shrink-0">
+                    <Package className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <span className="text-sm font-semibold">Cart</span>
+                  {totalQty > 0 && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-primary/15 text-primary border border-primary/20">
+                      {totalQty} bales
+                    </span>
                   )}
                 </div>
-              </CardHeader>
-              <CardContent>
+                {workerCategoryGroups.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Filter workers by:</span>
+                    <Select value={workerCategoryFilter} onValueChange={setWorkerCategoryFilter}>
+                      <SelectTrigger className="h-8 w-44 text-xs" data-testid="select-worker-category-filter">
+                        <SelectValue placeholder="All workers" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Workers</SelectItem>
+                        {workerCategoryGroups.map((c: any) => (
+                          <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              <div>
                 {cart.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -918,35 +928,46 @@ import DailyScan from "./DailyScan";
                     </TableBody>
                   </Table>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
 
-          <div className="w-72 space-y-4 sticky top-4 self-start overflow-y-auto max-h-[calc(100vh-8rem)]">
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-muted-foreground" />
-                  <CardTitle className="text-lg">Entry Summary</CardTitle>
+          <div className="w-72 space-y-3 sticky top-4 self-start overflow-y-auto max-h-[calc(100vh-8rem)]">
+            {/* Summary card */}
+            <div className="rounded-xl border bg-card overflow-hidden">
+              <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/20">
+                <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-emerald-500/15 border border-emerald-500/20 shrink-0">
+                  <Package className="h-3.5 w-3.5 text-emerald-500" />
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <div className="text-sm text-muted-foreground">Total Bales</div>
-                  <div className="text-2xl font-bold" data-testid="text-total-bales">{totalQty}</div>
+                <span className="text-sm font-semibold">Entry Summary</span>
+              </div>
+              <div className="p-4 space-y-4">
+                {/* Big stats row */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border bg-muted/30 px-3 py-2.5">
+                    <div className="text-xs text-muted-foreground mb-0.5">Total Bales</div>
+                    <div className="text-2xl font-bold tabular-nums leading-tight" data-testid="text-total-bales">{totalQty}</div>
+                  </div>
+                  <div className="rounded-lg border bg-muted/30 px-3 py-2.5">
+                    <div className="text-xs text-muted-foreground mb-0.5">Weight</div>
+                    <div className="text-lg font-bold tabular-nums leading-tight" data-testid="text-total-weight">{formatNumber(totalKg)}<span className="text-xs font-medium ml-0.5 text-muted-foreground">kg</span></div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-sm text-muted-foreground">Total Weight</div>
-                  <div className="text-2xl font-bold" data-testid="text-total-weight">{formatNumber(totalKg)} kg</div>
-                </div>
+
+                {/* Location */}
                 {selectedLocationName && (
-                  <div>
-                    <div className="text-sm text-muted-foreground">Location</div>
-                    <div className="text-sm font-medium">{selectedLocationName.name}</div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="font-medium truncate">{selectedLocationName.name}</span>
                   </div>
                 )}
+
+                {/* Divider */}
+                <div className="border-t" />
+
+                {/* Entry date */}
                 <div>
-                  <div className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
+                  <div className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
                     <CalendarDays className="h-3.5 w-3.5" />
                     Entry Date
                   </div>
@@ -954,7 +975,7 @@ import DailyScan from "./DailyScan";
                     type="date"
                     value={entryDate}
                     onChange={(e) => setEntryDate(e.target.value || new Date().toLocaleDateString('en-CA'))}
-                    className="w-full text-sm"
+                    className="w-full text-sm h-8"
                     data-testid="input-entry-date"
                   />
                   {entryDate !== new Date().toLocaleDateString('en-CA') && (
@@ -967,17 +988,19 @@ import DailyScan from "./DailyScan";
                     </button>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             <Button
-              className="w-full gap-2"
+              className="w-full gap-2 bg-emerald-600 hover:bg-emerald-600 text-white h-11 text-sm font-semibold rounded-xl"
               disabled={cart.length === 0 || !selectedLocationId || stockEntryMutation.isPending}
               onClick={handleConfirmClick}
               data-testid="button-confirm-stock-entry"
             >
-              <CheckCircle className="h-4 w-4" />
-              {stockEntryMutation.isPending ? "Processing..." : "Confirm & Print Labels"}
+              {stockEntryMutation.isPending
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> Processing…</>
+                : <><CheckCircle className="h-4 w-4" /> Confirm & Print Labels{totalQty > 0 && ` (${totalQty})`}</>
+              }
             </Button>
           </div>
         </div>
@@ -2237,46 +2260,41 @@ import DailyScan from "./DailyScan";
     const isToday = date === todayStr;
 
     return (
-      <div className="flex items-center gap-2 px-3 py-2 rounded-md border bg-muted/30 flex-wrap">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-            {isToday ? "Today's Production" : "Production"}
-          </span>
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Label */}
+        <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground whitespace-nowrap">
+          {isToday ? "Today" : "Production"}
+        </span>
+
+        {/* Production */}
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-emerald-500/10 border-emerald-500/20">
+          <Factory className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+          <span className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400" data-testid="text-entry-today-qty">{totalQty}</span>
+          <span className="text-xs text-emerald-600/70 dark:text-emerald-400/70">bales</span>
+          <span className="w-px h-3 bg-emerald-500/30" />
+          <span className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400" data-testid="text-entry-today-kg">{formatDailyNum(totalKg)}</span>
+          <span className="text-xs text-emerald-600/70 dark:text-emerald-400/70">kg</span>
         </div>
 
-        <div className="w-px h-4 bg-border hidden sm:block" />
-
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm font-bold tabular-nums" data-testid="text-entry-today-qty">{totalQty}</span>
-          <span className="text-xs text-muted-foreground">qty</span>
-          <span className="text-sm font-bold tabular-nums" data-testid="text-entry-today-kg">{formatDailyNum(totalKg)}</span>
-          <span className="text-xs text-muted-foreground">kg</span>
+        {/* Garbage */}
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-orange-500/10 border-orange-500/20">
+          <span className="text-xs font-semibold text-orange-500">Garbage</span>
+          <span className="text-sm font-bold tabular-nums text-orange-600 dark:text-orange-400" data-testid="text-entry-garbage-qty">{garbageQty}</span>
+          <span className="text-xs text-orange-600/70 dark:text-orange-400/70">bales</span>
+          <span className="w-px h-3 bg-orange-500/30" />
+          <span className="text-sm font-bold tabular-nums text-orange-600 dark:text-orange-400" data-testid="text-entry-garbage-kg">{formatDailyNum(garbageKg)}</span>
+          <span className="text-xs text-orange-600/70 dark:text-orange-400/70">kg</span>
         </div>
 
-        <div className="w-px h-4 bg-border hidden sm:block" />
-
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/25 text-orange-700 dark:text-orange-400">
-            Garbage
-          </span>
-          <span className="text-sm font-semibold tabular-nums" data-testid="text-entry-garbage-qty">{garbageQty}</span>
-          <span className="text-xs text-muted-foreground">qty</span>
-          <span className="text-sm font-semibold tabular-nums" data-testid="text-entry-garbage-kg">{formatDailyNum(garbageKg)}</span>
-          <span className="text-xs text-muted-foreground">kg</span>
+        {/* Wipers */}
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-blue-500/10 border-blue-500/20">
+          <span className="text-xs font-semibold text-blue-500">Wipers</span>
+          <span className="text-sm font-bold tabular-nums text-blue-600 dark:text-blue-400" data-testid="text-entry-wipers-qty">{wipersQty}</span>
+          <span className="text-xs text-blue-600/70 dark:text-blue-400/70">bales</span>
+          <span className="w-px h-3 bg-blue-500/30" />
+          <span className="text-sm font-bold tabular-nums text-blue-600 dark:text-blue-400" data-testid="text-entry-wipers-kg">{formatDailyNum(wipersKg)}</span>
+          <span className="text-xs text-blue-600/70 dark:text-blue-400/70">kg</span>
         </div>
-
-        <div className="w-px h-4 bg-border hidden sm:block" />
-
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/25 text-blue-700 dark:text-blue-400">
-            Wipers
-          </span>
-          <span className="text-sm font-semibold tabular-nums" data-testid="text-entry-wipers-qty">{wipersQty}</span>
-          <span className="text-xs text-muted-foreground">qty</span>
-          <span className="text-sm font-semibold tabular-nums" data-testid="text-entry-wipers-kg">{formatDailyNum(wipersKg)}</span>
-          <span className="text-xs text-muted-foreground">kg</span>
-        </div>
-
       </div>
     );
   }
@@ -2390,11 +2408,22 @@ import DailyScan from "./DailyScan";
 
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <PageHeader title="Bale Stock Entry" />
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500/30 to-emerald-600/10 border border-emerald-500/25 shrink-0">
+              <ScanLine className="h-4.5 w-4.5 text-emerald-500" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold leading-tight">Bale Stock Entry</h1>
+              <p className="text-xs text-muted-foreground leading-tight">Scan and record bale production</p>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             <LabelPrintSettings />
-            <Badge variant="secondary" data-testid="badge-stock-entry">STOCK ENTRY</Badge>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold tracking-widest bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25" data-testid="badge-stock-entry">
+              <Factory className="h-3 w-3" />
+              STOCK ENTRY
+            </span>
           </div>
         </div>
 
