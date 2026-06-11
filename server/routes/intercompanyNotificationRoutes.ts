@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { db } from "../db";
 import { requireAuth, requireRole } from "../auth";
+import { dispatchNotification } from "../lib/notificationService";
 import {
   intercompanyAccountLinks,
   intercompanyLinkRecipients,
@@ -52,7 +53,7 @@ export async function triggerIntercompanyNotifications(
 
     for (const link of links) {
       // Insert one pending request per matching link
-      await db.insert(intercompanyPaymentRequests).values({
+      const [inserted] = await db.insert(intercompanyPaymentRequests).values({
         linkId: link.id,
         fromCompanyId: companyId,
         fromVoucherId: voucherId,
@@ -61,7 +62,17 @@ export async function triggerIntercompanyNotifications(
         amount,
         description: description || null,
         status: "pending",
-      });
+      }).returning({ id: intercompanyPaymentRequests.id });
+
+      // Dispatch INTERCOMPANY_REQUEST notification via the unified notification system
+      dispatchNotification({
+        eventType: "INTERCOMPANY_REQUEST",
+        title: "Intercompany Payment Request",
+        message: `Payment request from voucher ${voucherNumber} — ${description || ""}`.trim().replace(/—\s*$/, ""),
+        entityType: "intercompany_payment_request",
+        entityId: inserted?.id,
+        companyId,
+      }).catch(() => {});
     }
   } catch (err: any) {
     console.error("[IntercompanyNotif] trigger failed (non-fatal):", err?.message);
