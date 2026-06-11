@@ -843,11 +843,21 @@ export class DbStorage implements IStorage {
             and(
               eq(schema.ledgerAccounts.companyId, account.companyId),
               eq(schema.ledgerAccounts.name, account.name),
-              isNull(schema.ledgerAccounts.deletedAt),
             ),
           )
           .limit(1);
-        if (byName) return byName;
+        if (byName) {
+          // If the conflicting row is soft-deleted, reactivate it so it's usable
+          if (byName.deletedAt !== null) {
+            const [reactivated] = await db
+              .update(schema.ledgerAccounts)
+              .set({ deletedAt: null, active: true })
+              .where(eq(schema.ledgerAccounts.id, byName.id))
+              .returning();
+            return reactivated;
+          }
+          return byName;
+        }
       }
       throw insertErr;
     }

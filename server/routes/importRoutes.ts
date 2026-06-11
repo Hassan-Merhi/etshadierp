@@ -1287,10 +1287,14 @@ export function registerImportRoutes(app: Express) {
           const hideProfitCols = waVis.hideSelling || waVis.hideCost || waVis.hideSalesProfitCost;
           const pdfBuffer = await generateInvoicePdf(createdVoucher.id, req.session.currentCompanyId!, senderName, { hideProfitCols });
           const safeDate = (createdVoucher.voucherDate ?? saleDate).replace(/[^0-9-]/g, "");
-          const safeLoc  = (location.name ?? "").replace(/[^\w\s.()\-]/g, "_").trim();
-          const fileName = `Invoice ${safeLoc} ${safeDate}.pdf`;
-          await sendWhatsAppFileByUploadPos(location.whatsappGroupChatId, pdfBuffer, fileName, "");
-          console.log(`[POSImport] WhatsApp invoice sent: ${fileName} → ${location.whatsappGroupChatId}`);
+          const rawName  = `${location.name ?? ""} Invoice ${safeDate}`;
+          const fileName = rawName.replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, " ").trim() + ".pdf";
+          const result = await sendWhatsAppFileByUploadPos(location.whatsappGroupChatId, pdfBuffer, fileName, "");
+          if (!result.success) {
+            console.error(`[POSImport] WhatsApp send failed (import still succeeded): ${result.error}`);
+          } else {
+            console.log(`[POSImport] WhatsApp invoice sent: ${fileName} → ${location.whatsappGroupChatId}`);
+          }
         } catch (waErr: any) {
           console.error("[POSImport] WhatsApp send failed (import still succeeded):", waErr.message);
         }
@@ -1571,7 +1575,8 @@ export function registerImportRoutes(app: Express) {
           openingBalanceSide: "Dr",
           active: true,
         });
-        customer = await storage.updateCustomer(customer.id, { ledgerAccountId: customerLedgerAccount.id });
+        const updatedCustomer = await storage.updateCustomer(customer.id, { ledgerAccountId: customerLedgerAccount.id });
+        if (updatedCustomer) customer = updatedCustomer;
         customerLedgerAccountId = customerLedgerAccount.id;
       }
 
@@ -1729,11 +1734,14 @@ export function registerImportRoutes(app: Express) {
           const hideProfitCols = waVis.hideSelling || waVis.hideCost || waVis.hideSalesProfitCost;
           const pdfBuffer = await generateInvoicePdf(createdVoucher.id, req.session.currentCompanyId!, senderName, { hideProfitCols });
           const safeDate = (createdVoucher.voucherDate ?? saleDate).replace(/[^0-9-]/g, "");
-          const safeLoc  = (location.name ?? "").replace(/[^\w\s.()\-]/g, "_").trim();
-          const safeCust = (customer.legalName ?? "").replace(/[^\w\s.()\-]/g, "_").trim();
-          const fileName = `${safeCust} Invoice ${safeLoc} ${safeDate}.pdf`;
-          await sendWhatsAppFileByUploadPos(location.whatsappGroupChatId, pdfBuffer, fileName, "");
-          console.log(`[CreditImport] WhatsApp invoice sent: ${fileName} → ${location.whatsappGroupChatId}`);
+          const rawName  = `${customer.legalName ?? ""} Invoice ${location.name ?? ""} ${safeDate}`;
+          const fileName = rawName.replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, " ").trim() + ".pdf";
+          const result = await sendWhatsAppFileByUploadPos(location.whatsappGroupChatId, pdfBuffer, fileName, "");
+          if (!result.success) {
+            console.error(`[CreditImport] WhatsApp send failed (import still succeeded): ${result.error}`);
+          } else {
+            console.log(`[CreditImport] WhatsApp invoice sent: ${fileName} → ${location.whatsappGroupChatId}`);
+          }
         } catch (waErr: any) {
           console.error("[CreditImport] WhatsApp send failed (import still succeeded):", waErr.message);
         }
