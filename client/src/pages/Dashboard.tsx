@@ -274,6 +274,7 @@ export default function Dashboard() {
       queryKey: ["/api/dashboard-cash-accounts", selectedCompany?.id],
       enabled: !!selectedCompany,
       staleTime: 30 * 1000,
+      refetchInterval: 5 * 60 * 1000,
     },
   );
 

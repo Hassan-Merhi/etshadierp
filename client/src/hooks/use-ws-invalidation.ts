@@ -17,6 +17,9 @@ export function useWsInvalidation() {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unmountedRef = useRef(false);
+  // Track whether we had a successful connection before, so we know a reconnect
+  // may have missed broadcasts that fired while the socket was down.
+  const hadSuccessfulConnectionRef = useRef(false);
 
   useEffect(() => {
     unmountedRef.current = false;
@@ -54,6 +57,15 @@ export function useWsInvalidation() {
       }
       const ws = new WebSocket(_wsTarget);
       wsRef.current = ws;
+
+      ws.onopen = () => {
+        // If this is a reconnect (not the initial connect), we may have missed
+        // invalidation broadcasts while the socket was down — flush stale data now.
+        if (hadSuccessfulConnectionRef.current && !unmountedRef.current) {
+          handleInvalidate();
+        }
+        hadSuccessfulConnectionRef.current = true;
+      };
 
       ws.onmessage = (event) => {
         try {
