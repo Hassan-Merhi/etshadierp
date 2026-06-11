@@ -118,7 +118,6 @@ export function registerFactoryStockRoutes(app: Express) {
 
         const now = new Date();
         const finalizedAtTs = effectiveEntryDate ?? now;
-        const bales: any[] = [];
         let baleIndex = 0;
         let totalWeight = 0;
 
@@ -152,6 +151,10 @@ export function registerFactoryStockRoutes(app: Express) {
           for (const w of wkRows) workerNameMap.set(w.id, w.fullName);
         }
 
+        // ── Build all bale rows in memory, track per-item product for later ──
+        const baleValues: any[] = [];
+        const baleProductRefs: any[] = [];
+
         for (const item of items) {
           const qty = parseInt(item.quantity || item.qty || "1");
           const weight = parseFloat(item.weightPerBale || "25");
@@ -159,42 +162,41 @@ export function registerFactoryStockRoutes(app: Express) {
           if (!product) throw new Error(`Product ID ${item.productId} not found`);
           const categoryName: string | null = product.categoryId ? (categoryMap.get(product.categoryId)?.name || null) : null;
           const resolvedWorkerName: string | null = item.finalizedBy ? (workerNameMap.get(Number(item.finalizedBy)) ?? null) : null;
+          const isGarbage = product.articleCode?.startsWith("HMD16");
+          const productionCostPerKg = parseFloat(product.productionPrice || "0");
+          const effectiveCostPerKg = isGarbage ? 0 : productionCostPerKg;
+          const baleTotalCost = weight * effectiveCostPerKg;
 
           for (let i = 0; i < qty; i++) {
             const refNum = `REF${String(nextNumber + baleIndex).padStart(6, '0')}`;
-            const isGarbage = product.articleCode?.startsWith("HMD16");
-            const productionCostPerKg = parseFloat(product.productionPrice || "0");
-            const effectiveCostPerKg = isGarbage ? 0 : productionCostPerKg;
-            const baleTotalCost = weight * effectiveCostPerKg;
-
-            const [bale] = await tx
-              .insert(factoryBales)
-              .values({
-                companyId,
-                mixBatchId: mixBatchId || null,
-                productId: item.productId,
-                erpLocationId,
-                baleCode: product.code,
-                referenceNumber: refNum,
-                articleCode: product.articleCode,
-                productName: product.name,
-                category: categoryName,
-                weightKg: String(weight),
-                costPerKg: String(effectiveCostPerKg),
-                totalCost: String(baleTotalCost),
-                status: "IN_STOCK",
-                finalizedAt: finalizedAtTs,
-                finalizedBy: item.finalizedBy ?? null,
-                workerName: resolvedWorkerName,
-                stockEntryDate: effectiveDateStr,
-              })
-              .returning();
-
-            bales.push({ ...bale, _product: product });
+            baleValues.push({
+              companyId,
+              mixBatchId: mixBatchId || null,
+              productId: item.productId,
+              erpLocationId,
+              baleCode: product.code,
+              referenceNumber: refNum,
+              articleCode: product.articleCode,
+              productName: product.name,
+              category: categoryName,
+              weightKg: String(weight),
+              costPerKg: String(effectiveCostPerKg),
+              totalCost: String(baleTotalCost),
+              status: "IN_STOCK",
+              finalizedAt: finalizedAtTs,
+              finalizedBy: item.finalizedBy ?? null,
+              workerName: resolvedWorkerName,
+              stockEntryDate: effectiveDateStr,
+            });
+            baleProductRefs.push(product);
             totalWeight += weight;
             baleIndex++;
           }
         }
+
+        // ── Single bulk INSERT for all bales ──
+        const insertedBales = await tx.insert(factoryBales).values(baleValues).returning();
+        const bales: any[] = insertedBales.map((b: any, idx: number) => ({ ...b, _product: baleProductRefs[idx] }));
 
         if (mixBatch) {
           const mixRemaining = parseFloat(mixBatch.totalWeightKg) - parseFloat(mixBatch.usedKg || "0");
@@ -210,6 +212,8 @@ export function registerFactoryStockRoutes(app: Express) {
 
         const stockGroupCache = new Map<string, number>();
         const stockItemCache = new Map<string, number>();
+        // Accumulate inventory adjustments per stockItemId instead of per bale
+        const inventoryAdjMap = new Map<number, { qty: number; totalCost: number }>();
 
         for (const bale of bales) {
           const factoryProduct = productMap.get(bale.productId as number);
@@ -237,7 +241,6 @@ export function registerFactoryStockRoutes(app: Express) {
                 if (existingGroup) {
                   stockGroupId = existingGroup.id;
                 } else {
-                  // Use the category's own ID for a collision-free code
                   const groupCode = catId ? `FCAT-${catId}` : "F-" + catName.replace(/[^A-Z0-9]/gi, "").substring(0, 10).toUpperCase();
                   const [created] = await tx
                     .insert(stockGroups)
@@ -289,9 +292,17 @@ export function registerFactoryStockRoutes(app: Express) {
             stockItemCache.set(itemCode, erpStockItemId!);
           }
 
+          // Accumulate instead of calling adjustInventory per bale
           const baleWeight = parseFloat(bale.weightKg);
           const baleRate = baleWeight * parseFloat(bale.costPerKg || "0");
-          await adjustInventory(tx, erpLocationId, erpStockItemId!, 1, companyId, baleRate);
+          const prev = inventoryAdjMap.get(erpStockItemId!) ?? { qty: 0, totalCost: 0 };
+          inventoryAdjMap.set(erpStockItemId!, { qty: prev.qty + 1, totalCost: prev.totalCost + baleRate });
+        }
+
+        // ── One adjustInventory call per unique stock item ──
+        for (const [stockItemId, { qty, totalCost }] of inventoryAdjMap) {
+          const avgRatePerBale = qty > 0 ? totalCost / qty : 0;
+          await adjustInventory(tx, erpLocationId, stockItemId, qty, companyId, avgRatePerBale);
         }
 
         return { bales, totalWeight };
