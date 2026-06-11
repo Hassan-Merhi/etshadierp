@@ -137,6 +137,60 @@ function ContainerStatusBadge({ status }: { status: string }) {
   return <Badge variant="secondary" className="text-xs">{label}</Badge>;
 }
 
+// ── Inline ETA cell ──────────────────────────────────────────────────────────
+function EtaCell({ containerId, arrivalDate, overdue, onSave }: {
+  containerId: number;
+  arrivalDate: string | null | undefined;
+  overdue: boolean;
+  onSave: (id: number, val: string | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  function startEdit(e: React.MouseEvent) {
+    e.stopPropagation();
+    const plain = arrivalDate ? arrivalDate.slice(0, 10) : "";
+    setDraft(plain);
+    setEditing(true);
+  }
+  function commit() {
+    onSave(containerId, draft || null);
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <Input
+        autoFocus
+        type="date"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") setEditing(false);
+        }}
+        className="h-7 text-xs w-[120px]"
+        data-testid={`input-eta-${containerId}`}
+      />
+    );
+  }
+  return (
+    <span
+      className={cn(
+        "text-xs cursor-pointer rounded px-1 py-0.5 hover-elevate block font-medium",
+        overdue ? "text-red-600 dark:text-red-400" : (arrivalDate ? "text-foreground" : "text-muted-foreground italic"),
+      )}
+      onClick={startEdit}
+      data-testid={`text-eta-${containerId}`}
+      title="Click to edit ETA"
+    >
+      {arrivalDate ? fmtDate(arrivalDate) : "Set ETA…"}
+    </span>
+  );
+}
+
 // ── Inline notes cell ────────────────────────────────────────────────────────
 function NotesCell({ containerId, notes, onSave }: {
   containerId: number;
@@ -522,6 +576,24 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   function toggleDoc(id: number, checked: boolean) {
     setDocs((prev) => { const next = { ...prev, [String(id)]: checked }; saveMap(DOCS_KEY, next); return next; });
   }
+
+  const etaMutation = useMutation({
+    mutationFn: async ({ id, arrivalDate }: { id: number; arrivalDate: string | null }) => {
+      const res = await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, { arrivalDate: arrivalDate || null });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Failed to update ETA"); }
+      return res.json();
+    },
+    onSuccess: () => {
+      tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to update ETA", description: err?.message, variant: "destructive" });
+    },
+  });
+
+  function saveEta(id: number, val: string | null) {
+    etaMutation.mutate({ id, arrivalDate: val });
+  }
   function clearFilters() {
     setSearch(""); setSupplierFilter("all"); setFreightFilter("all"); setWeightFilter("all"); setDocsFilter("all"); setDelayedFilter("all"); setSortOrder("DEFAULT");
   }
@@ -881,8 +953,8 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                   </TableCell>
 
                   {/* ETA */}
-                  <TableCell className={cn("font-medium", overdue && "text-red-600 dark:text-red-400")}>
-                    {fmtDate(c.arrivalDate)}
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <EtaCell containerId={c.id} arrivalDate={c.arrivalDate} overdue={overdue} onSave={saveEta} />
                   </TableCell>
 
                   {/* Cost */}
