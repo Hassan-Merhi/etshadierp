@@ -185,9 +185,11 @@ export function BusinessAlertsPage({ currentUser }: Props) {
 
   const alertsQuery = useQuery<BusinessAlert[]>({
     queryKey: ["/api/business-alerts", statusFilter],
-    queryFn: () =>
-      fetch(`/api/business-alerts?status=${statusFilter}`, { credentials: "include" })
-        .then((r) => r.json()),
+    queryFn: async () => {
+      const r = await fetch(`/api/business-alerts?status=${statusFilter}`, { credentials: "include" });
+      if (!r.ok) throw new Error("Failed to load alerts");
+      return r.json();
+    },
   });
 
   const summaryQuery = useQuery<Record<string, number>>({
@@ -240,7 +242,7 @@ export function BusinessAlertsPage({ currentUser }: Props) {
       toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const alerts = alertsQuery.data ?? [];
+  const alerts = Array.isArray(alertsQuery.data) ? alertsQuery.data : [];
   const summary = summaryQuery.data ?? {};
 
   return (
