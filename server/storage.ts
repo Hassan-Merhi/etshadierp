@@ -762,43 +762,95 @@ export class DbStorage implements IStorage {
   }
 
   /**
-   * Atomic get-or-create for ledger accounts using PostgreSQL upsert.
+   * Safe get-or-create for ledger accounts.
    *
-   * Uses INSERT … ON CONFLICT (company_id, code) DO UPDATE so the operation
-   * is a single round-trip and is immune to:
-   *   - Unique-constraint crashes when the account already exists (active or
-   *     soft-deleted).
-   *   - Race conditions between two simultaneous first-time creates.
+   * Strategy:
+   *  1. SELECT by (companyId, code) — handles active AND soft-deleted rows.
+   *  2. Plain INSERT (no ON CONFLICT clause) — works on any DB regardless of
+   *     which unique constraints exist.
+   *  3. If the INSERT fails with ANY unique-constraint violation (code 23505),
+   *     fall back to SELECTing by code, then by name — so a pre-existing account
+   *     with the same name but a different code is returned instead of crashing.
    *
-   * On conflict we only touch deleted_at / active so we never overwrite an
-   * existing account's name, type, opening balance, etc.
+   * This is intentionally constraint-agnostic so it survives production DBs that
+   * have extra unique indexes (e.g. uq_ledger_accounts_company_name_active).
    */
   async getOrCreateLedgerAccount(account: InsertLedgerAccount): Promise<LedgerAccount> {
     const code = account.code || `LA-${Date.now()}`;
 
-    const [row] = await db
-      .insert(schema.ledgerAccounts)
-      .values({
-        companyId:           account.companyId,
-        code,
-        name:                account.name,
-        accountType:         account.accountType,
-        subType:             account.subType ?? null,
-        parentId:            account.parentId ?? null,
-        openingBalance:      account.openingBalance ?? "0",
-        openingBalanceSide:  account.openingBalanceSide ?? "Dr",
-        active:              account.active ?? true,
-      })
-      .onConflictDoUpdate({
-        target: [schema.ledgerAccounts.companyId, schema.ledgerAccounts.code],
-        set: {
-          deletedAt: null,
-          active:    true,
-        },
-      })
-      .returning();
+    // 1. Look for an existing row by code (active or soft-deleted)
+    const [existingByCode] = await db
+      .select()
+      .from(schema.ledgerAccounts)
+      .where(
+        and(
+          eq(schema.ledgerAccounts.companyId, account.companyId),
+          eq(schema.ledgerAccounts.code, code),
+        ),
+      )
+      .limit(1);
 
-    return row;
+    if (existingByCode) {
+      if (existingByCode.deletedAt !== null) {
+        const [reactivated] = await db
+          .update(schema.ledgerAccounts)
+          .set({ deletedAt: null, active: true })
+          .where(eq(schema.ledgerAccounts.id, existingByCode.id))
+          .returning();
+        return reactivated;
+      }
+      return existingByCode;
+    }
+
+    // 2. Try a plain INSERT — no ON CONFLICT clause
+    try {
+      const [created] = await db
+        .insert(schema.ledgerAccounts)
+        .values({
+          companyId:          account.companyId,
+          code,
+          name:               account.name,
+          accountType:        account.accountType,
+          subType:            account.subType ?? null,
+          parentId:           account.parentId ?? null,
+          openingBalance:     account.openingBalance ?? "0",
+          openingBalanceSide: account.openingBalanceSide ?? "Dr",
+          active:             account.active ?? true,
+        })
+        .returning();
+      return created;
+    } catch (insertErr: any) {
+      // 3. Any unique-constraint violation → find whoever already holds that slot
+      if (insertErr.code === "23505") {
+        // Try by code first (race condition — another request beat us)
+        const [byCode] = await db
+          .select()
+          .from(schema.ledgerAccounts)
+          .where(
+            and(
+              eq(schema.ledgerAccounts.companyId, account.companyId),
+              eq(schema.ledgerAccounts.code, code),
+            ),
+          )
+          .limit(1);
+        if (byCode) return byCode;
+
+        // Try by name (production may have a unique-name constraint)
+        const [byName] = await db
+          .select()
+          .from(schema.ledgerAccounts)
+          .where(
+            and(
+              eq(schema.ledgerAccounts.companyId, account.companyId),
+              eq(schema.ledgerAccounts.name, account.name),
+              isNull(schema.ledgerAccounts.deletedAt),
+            ),
+          )
+          .limit(1);
+        if (byName) return byName;
+      }
+      throw insertErr;
+    }
   }
 
   async deleteLedgerAccount(id: number): Promise<void> {
