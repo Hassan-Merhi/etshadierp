@@ -762,47 +762,43 @@ export class DbStorage implements IStorage {
   }
 
   /**
-   * Safe get-or-create for ledger accounts.
-   * 1. Returns the active account if it exists.
-   * 2. If a soft-deleted row exists with the same (companyId, code), reactivates
-   *    it instead of inserting — avoids unique-constraint crashes.
-   * 3. Creates a brand-new row only when neither case applies.
+   * Atomic get-or-create for ledger accounts using PostgreSQL upsert.
+   *
+   * Uses INSERT … ON CONFLICT (company_id, code) DO UPDATE so the operation
+   * is a single round-trip and is immune to:
+   *   - Unique-constraint crashes when the account already exists (active or
+   *     soft-deleted).
+   *   - Race conditions between two simultaneous first-time creates.
+   *
+   * On conflict we only touch deleted_at / active so we never overwrite an
+   * existing account's name, type, opening balance, etc.
    */
   async getOrCreateLedgerAccount(account: InsertLedgerAccount): Promise<LedgerAccount> {
     const code = account.code || `LA-${Date.now()}`;
 
-    // 1. Active account?
-    const [active] = await db.select().from(schema.ledgerAccounts).where(
-      and(
-        eq(schema.ledgerAccounts.code, code),
-        eq(schema.ledgerAccounts.companyId, account.companyId),
-        isNull(schema.ledgerAccounts.deletedAt),
-      )
-    ).limit(1);
-    if (active) return active;
+    const [row] = await db
+      .insert(schema.ledgerAccounts)
+      .values({
+        companyId:           account.companyId,
+        code,
+        name:                account.name,
+        accountType:         account.accountType,
+        subType:             account.subType ?? null,
+        parentId:            account.parentId ?? null,
+        openingBalance:      account.openingBalance ?? "0",
+        openingBalanceSide:  account.openingBalanceSide ?? "Dr",
+        active:              account.active ?? true,
+      })
+      .onConflictDoUpdate({
+        target: [schema.ledgerAccounts.companyId, schema.ledgerAccounts.code],
+        set: {
+          deletedAt: null,
+          active:    true,
+        },
+      })
+      .returning();
 
-    // 2. Soft-deleted account with same code?
-    const [deleted] = await db.select().from(schema.ledgerAccounts).where(
-      and(
-        eq(schema.ledgerAccounts.code, code),
-        eq(schema.ledgerAccounts.companyId, account.companyId),
-        isNotNull(schema.ledgerAccounts.deletedAt),
-      )
-    ).limit(1);
-    if (deleted) {
-      const [reactivated] = await db.update(schema.ledgerAccounts)
-        .set({ deletedAt: null, active: true })
-        .where(eq(schema.ledgerAccounts.id, deleted.id))
-        .returning();
-      return reactivated;
-    }
-
-    // 3. Create fresh.
-    const [created] = await db.insert(schema.ledgerAccounts).values({
-      ...account,
-      code,
-    }).returning();
-    return created;
+    return row;
   }
 
   async deleteLedgerAccount(id: number): Promise<void> {
