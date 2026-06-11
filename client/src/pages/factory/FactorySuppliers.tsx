@@ -1001,22 +1001,18 @@ export default function FactorySuppliers() {
         {/* ── Broker KPIs ───────────────────────────────────────────── */}
         {parentSup && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            <Card>
-              <CardContent className="p-4">
+            <div className="rounded-xl border p-4">
                 <div className="text-xs text-muted-foreground">Total Containers</div>
                 <div className="text-2xl font-bold mt-1" data-testid="text-parent-total-containers">
                   {parentSup.totalContainers}
                 </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
+            </div>
+            <div className="rounded-xl border p-4">
                 <div className="text-xs text-muted-foreground">Linked Suppliers</div>
                 <div className="text-2xl font-bold mt-1">
                   {children.length}
                 </div>
-              </CardContent>
-            </Card>
+            </div>
             {/* OTW card — only shown when there are pending containers */}
             {parentSup.pendingContainers > 0 && (() => {
               const byCC = parentSup.otwByCurrency || {};
@@ -1031,8 +1027,7 @@ export default function FactorySuppliers() {
                 { label: "Other", count: otherCount },
               ].filter(p => p.count > 0);
               return (
-                <Card key="otw" data-testid="card-otw-containers">
-                  <CardContent className="p-4">
+                <div key="otw" className="rounded-xl border p-4" data-testid="card-otw-containers">
                     <div className="text-xs text-muted-foreground flex items-center gap-1">
                       <Clock className="h-3 w-3" />
                       OTW Containers
@@ -1053,20 +1048,16 @@ export default function FactorySuppliers() {
                         ))}
                       </div>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
               );
             })()}
             {brokerOverviewLoading ? (
-              <Card>
-                <CardContent className="p-4">
+              <div className="rounded-xl border p-4">
                   <div className="text-xs text-muted-foreground">Pool Balance</div>
                   <div className="text-2xl font-bold mt-1 text-muted-foreground animate-pulse">—</div>
-                </CardContent>
-              </Card>
+              </div>
             ) : brokerOwnBalances.map((b) => (
-              <Card key={b.currencyCode}>
-                <CardContent className="p-4">
+              <div key={b.currencyCode} className="rounded-xl border p-4">
                   <div className="text-xs text-muted-foreground">
                     {b.isBrokerPool ? "Pool Balance" : "Net Balance"} ({b.currencyCode})
                   </div>
@@ -1081,21 +1072,18 @@ export default function FactorySuppliers() {
                       ? (b.balance > 0 ? "Received" : b.balance < 0 ? "Owed" : "Settled")
                       : (b.balance > 0 ? "Payable to suppliers" : b.balance < 0 ? "Overpaid" : "Settled")}
                   </div>
-                </CardContent>
-              </Card>
+              </div>
             ))}
           </div>
         )}
 
         {/* Linked Suppliers list */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Link2 className="h-4 w-4" />
-              Linked Suppliers
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
+        <div className="rounded-xl border overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
+            <Link2 className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-semibold">Linked Suppliers</span>
+          </div>
+          <div>
             {children.length === 0 ? (
               <div className="text-center py-10 text-muted-foreground">
                 <Users className="h-10 w-10 mx-auto mb-2 opacity-40" />
@@ -1167,8 +1155,8 @@ export default function FactorySuppliers() {
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1233,13 +1221,11 @@ export default function FactorySuppliers() {
             <Skeleton className="h-64 w-full" />
           </div>
         ) : statementError ? (
-          <Card>
-            <CardContent className="p-8 text-center text-muted-foreground">
+          <div className="rounded-xl border p-8 text-center text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
               <p className="text-lg font-medium">Could not load statement</p>
               <p className="text-sm mt-1">Please go back and try again</p>
-            </CardContent>
-          </Card>
+          </div>
         ) : statementData ? (
           <>
             {(() => {
@@ -1303,8 +1289,7 @@ export default function FactorySuppliers() {
                 const isSettled = Math.abs(bal) <= 0.005;
                 const ccPrefix = cc !== "USD" ? `${cc} ` : "$";
                 return (
-                  <Card key={`${testId}-${cc}`}>
-                    <CardContent className="p-4">
+                  <div key={`${testId}-${cc}`} className="rounded-xl border p-4">
                       <div className="text-xs text-muted-foreground font-medium">{cc} {label}</div>
                       <div
                         className={`text-xl font-bold mt-1 tabular-nums ${isSettled ? "text-muted-foreground" : isOverpaid ? "text-green-600 dark:text-green-400" : ""}`}
@@ -1323,8 +1308,7 @@ export default function FactorySuppliers() {
                           incl. {ccPrefix}{formatNum(String(freight.toFixed(2)))} freight
                         </div>
                       )}
-                    </CardContent>
-                  </Card>
+                  </div>
                 );
               };
 
@@ -1334,8 +1318,7 @@ export default function FactorySuppliers() {
                   {/* Non-broker: simple KPI grid */}
                   {!isBrokerStatement && (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                      <Card>
-                        <CardContent className="p-4">
+                      <div className="rounded-xl border p-4">
                           <div className="text-xs text-muted-foreground">Active Containers</div>
                           <div className="text-xl font-bold mt-1" data-testid="text-statement-total-containers">
                             {activeContainerCount}
@@ -1343,25 +1326,20 @@ export default function FactorySuppliers() {
                               <span className="text-sm font-normal text-muted-foreground ml-1">/ {statementData.summary.totalContainers} total</span>
                             )}
                           </div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="p-4">
+                      </div>
+                      <div className="rounded-xl border p-4">
                           <div className="text-xs text-muted-foreground">Active Weight</div>
                           <div className="text-xl font-bold mt-1" data-testid="text-statement-total-kg">
                             {formatKg(String(activeKg.toFixed(3)))}
                           </div>
-                        </CardContent>
-                      </Card>
+                      </div>
                       {Object.entries(ownMap).filter(([, v]) => Math.abs(v.own) > 0.005).length === 0 ? (
-                        <Card>
-                          <CardContent className="p-4">
+                        <div className="rounded-xl border p-4">
                             <div className="text-xs text-muted-foreground">Net Balance</div>
                             <div className="text-xl font-bold mt-1 text-muted-foreground" data-testid="text-statement-total-owed">
                               $— <span className="text-sm font-normal">Settled</span>
                             </div>
-                          </CardContent>
-                        </Card>
+                        </div>
                       ) : (
                         Object.entries(ownMap).filter(([, v]) => Math.abs(v.own) > 0.005).map(([cc, v]) =>
                           renderBalCard(cc, v.own, "Net Balance", "text-statement-balance", v.totalFreight)
@@ -1376,14 +1354,15 @@ export default function FactorySuppliers() {
             })()}
 
             {statementData.supplier && !isBrokerStatement && (
-              <Card>
-                <CardHeader className="pb-2 cursor-pointer hover-elevate rounded-t-md" onClick={() => toggleStmtSection("supplierDetails")}>
-                  <CardTitle className="text-base flex items-center justify-between gap-2">
-                    <span>Supplier Details</span>
-                    <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("supplierDetails") ? "" : "rotate-180"}`} />
-                  </CardTitle>
-                </CardHeader>
-                {!collapsedStmtSections.has("supplierDetails") && <CardContent>
+              <div className="rounded-xl border overflow-hidden">
+                <div
+                  className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-muted/20 cursor-pointer hover-elevate"
+                  onClick={() => toggleStmtSection("supplierDetails")}
+                >
+                  <span className="text-sm font-semibold">Supplier Details</span>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("supplierDetails") ? "" : "rotate-180"}`} />
+                </div>
+                {!collapsedStmtSections.has("supplierDetails") && <div className="p-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                     {statementData.supplier.contactPerson && (
                       <div className="flex items-center gap-2">
@@ -1416,20 +1395,19 @@ export default function FactorySuppliers() {
                       </div>
                     )}
                   </div>
-                </CardContent>}
-              </Card>
+                </div>}
+              </div>
             )}
 
             {statementData.currencyGroups && (statementData.currencyGroups.length > 1 || (statementData.currencyGroups.length === 1 && statementData.currencyGroups[0].currencyCode !== "USD")) && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center justify-between gap-2 flex-wrap">
+              <div className="rounded-xl border overflow-hidden">
+                <div className="flex items-center justify-between gap-2 flex-wrap px-4 py-3 border-b bg-muted/20">
                     <span
                       className="flex items-center gap-2 cursor-pointer hover-elevate rounded px-1 py-0.5 flex-1"
                       onClick={() => toggleStmtSection("currencyPools")}
                     >
                       <Globe className="h-4 w-4" />
-                      Currency Pools
+                      <span className="text-sm font-semibold">Currency Pools</span>
                       <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("currencyPools") ? "" : "rotate-180"}`} />
                     </span>
                     {statementData.currencyGroups.some(g => g.currencyCode !== "USD" && (parseFloat(g.netPayable) > 0 || parseFloat(g.totalCommission) > 0)) && (
@@ -1451,19 +1429,18 @@ export default function FactorySuppliers() {
                         {statementData.supplier.parentId ? "Settle FX to Broker" : "Settle FX to EUR"}
                       </Button>
                     )}
-                  </CardTitle>
-                </CardHeader>
-                {!collapsedStmtSections.has("currencyPools") && <CardContent className="p-0">
+                </div>
+                {!collapsedStmtSections.has("currencyPools") && <div>
                   <div className="table-responsive">
                     <Table>
-                      <TableHeader className="sticky top-0 z-30 bg-background">
-                        <TableRow>
-                          <TableHead>Currency</TableHead>
-                          <TableHead className="text-right">Containers</TableHead>
-                          <TableHead className="text-right">Total Weight</TableHead>
-                          <TableHead className="text-right">Gross Value</TableHead>
-                          <TableHead className="text-right">Commission</TableHead>
-                          <TableHead className="text-right">Net Payable</TableHead>
+                      <TableHeader className="sticky top-0 z-30">
+                        <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
+                          <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Currency</TableHead>
+                          <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Containers</TableHead>
+                          <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Total Weight</TableHead>
+                          <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Gross Value</TableHead>
+                          <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Commission</TableHead>
+                          <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Net Payable</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1592,21 +1569,20 @@ export default function FactorySuppliers() {
                       </TableBody>
                     </Table>
                   </div>
-                </CardContent>}
-              </Card>
+                </div>}
+              </div>
             )}
 
             {/* ── Broker Activity Ledger (consolidated) ── */}
             {isBrokerStatement && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center justify-between gap-2 flex-wrap">
+              <div className="rounded-xl border overflow-hidden">
+                <div className="flex items-center justify-between gap-2 flex-wrap px-4 py-3 border-b bg-muted/20">
                     <span
                       className="flex items-center gap-2 cursor-pointer hover-elevate rounded px-1 py-0.5 flex-1"
                       onClick={() => toggleStmtSection("brokerActivityLedger")}
                     >
                       <BookOpen className="h-4 w-4" />
-                      Broker Activity Ledger
+                      <span className="text-sm font-semibold">Broker Activity Ledger</span>
                       <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("brokerActivityLedger") ? "" : "rotate-180"}`} />
                     </span>
                     <div className="flex items-center gap-3 flex-wrap">
@@ -1631,15 +1607,14 @@ export default function FactorySuppliers() {
                         Export Excel
                       </Button>
                     </div>
-                  </CardTitle>
-                  {!collapsedStmtSections.has("brokerActivityLedger") && (
-                    <p className="text-xs text-muted-foreground">
-                      All transactions affecting the broker's own balance — containers, settlements, FX transfers received, and commissions.
-                      Grouped by currency. Does not include linked supplier activity.
-                    </p>
-                  )}
-                </CardHeader>
-                {!collapsedStmtSections.has("brokerActivityLedger") && <CardContent className="space-y-6 pt-0">
+                </div>
+                {!collapsedStmtSections.has("brokerActivityLedger") && (
+                  <p className="text-xs text-muted-foreground px-4 pt-3 pb-0">
+                    All transactions affecting the broker's own balance — containers, settlements, FX transfers received, and commissions.
+                    Grouped by currency. Does not include linked supplier activity.
+                  </p>
+                )}
+                {!collapsedStmtSections.has("brokerActivityLedger") && <div className="space-y-6 p-4 pt-2">
                   {brokerStatementLoading ? (
                     <div className="space-y-2">
                       {[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
@@ -1815,25 +1790,23 @@ export default function FactorySuppliers() {
                   ) : (
                     <p className="text-sm text-muted-foreground text-center py-4">No data found for this broker.</p>
                   )}
-                </CardContent>}
-              </Card>
+                </div>}
+              </div>
             )}
 
             {/* Unified Activity Ledger — Phase 4: merges Containers, Payments, FX Settlements, Commissions */}
-            {!isBrokerStatement && <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center justify-between gap-2">
-                  <span
-                    className="flex items-center gap-2 cursor-pointer hover-elevate rounded px-1 py-0.5 flex-1"
-                    onClick={() => toggleStmtSection("activityLedger")}
-                  >
+            {!isBrokerStatement && <div className="rounded-xl border overflow-hidden">
+              <div
+                className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-muted/20 cursor-pointer hover-elevate"
+                onClick={() => toggleStmtSection("activityLedger")}
+              >
+                <span className="flex items-center gap-2 flex-1">
                     <Package className="h-4 w-4" />
-                    Activity Ledger
+                    <span className="text-sm font-semibold">Activity Ledger</span>
                     <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("activityLedger") ? "" : "rotate-180"}`} />
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              {!collapsedStmtSections.has("activityLedger") && <CardContent>
+                </span>
+              </div>
+              {!collapsedStmtSections.has("activityLedger") && <div className="p-4">
                 {(() => {
                   type RowType = "purchase" | "payment" | "fx" | "commission" | "other_charge" | "freight";
                   const srcLabel: Record<string, string> = { supplier: "Balance", commission: "Commission", both: "Both" };
@@ -2170,14 +2143,14 @@ export default function FactorySuppliers() {
 
                       <div className="table-responsive">
                       <Table>
-                        <TableHeader className="sticky top-0 z-30 bg-background">
-                          <TableRow>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead>Reference</TableHead>
-                            <TableHead className="text-right">Amount</TableHead>
-                            <TableHead className="text-right">Balance</TableHead>
-                            <TableHead className="w-8" />
+                        <TableHeader className="sticky top-0 z-30">
+                          <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
+                            <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Date</TableHead>
+                            <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Type</TableHead>
+                            <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Reference</TableHead>
+                            <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Amount</TableHead>
+                            <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Balance</TableHead>
+                            <TableHead className="w-8 py-2" />
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -2256,8 +2229,8 @@ export default function FactorySuppliers() {
                     </div>
                   );
                 })()}
-              </CardContent>}
-            </Card>}
+              </div>}
+            </div>}
 
           </>
         ) : null}
@@ -2536,32 +2509,25 @@ export default function FactorySuppliers() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card>
-          <CardContent className="p-4">
+        <div className="rounded-xl border p-4">
             <div className="text-xs text-muted-foreground">Brokers</div>
             <div className="text-2xl font-bold mt-1" data-testid="text-broker-count">
               {brokerCount}
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
+        </div>
+        <div className="rounded-xl border p-4">
             <div className="text-xs text-muted-foreground">Standalone Suppliers</div>
             <div className="text-2xl font-bold mt-1" data-testid="text-total-suppliers">
               {standaloneCount}
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
+        </div>
+        <div className="rounded-xl border p-4">
             <div className="text-xs text-muted-foreground">Total Containers</div>
             <div className="text-2xl font-bold mt-1" data-testid="text-total-containers">
               {totalContainers}
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
+        </div>
+        <div className="rounded-xl border p-4">
             <div className="flex items-center justify-between gap-1 flex-wrap">
               <div className="text-xs text-muted-foreground">Total USD</div>
               {listIncludeOtw && (
@@ -2582,12 +2548,10 @@ export default function FactorySuppliers() {
                 </span>
               </div>
             </div>
-          </CardContent>
-        </Card>
+        </div>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
+      <div className="rounded-xl border overflow-hidden">
           {displayedTopLevel.length > 0 ? (
             <div className="divide-y">
               {displayedTopLevel.map((s) => {
@@ -2884,8 +2848,7 @@ export default function FactorySuppliers() {
               <p className="text-sm mt-1">Add your first factory supplier to get started</p>
             </div>
           )}
-        </CardContent>
-      </Card>
+      </div>
 
       {/* Payment Dialog */}
       <Dialog open={!!paymentDialogSupplier} onOpenChange={(open) => { if (!open) setPaymentDialogSupplier(null); }}>

@@ -229,16 +229,15 @@ export default function FactoryCustomers() {
         />
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="table-responsive">
+      <div className="rounded-xl border overflow-hidden">
+        <div className="table-responsive">
             <Table>
-              <TableHeader className="sticky top-0 z-30 bg-background">
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-[90px]"></TableHead>
+              <TableHeader className="sticky top-0 z-30">
+                <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Name</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Balance</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Status</TableHead>
+                  <TableHead className="w-[90px] py-2"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -314,31 +313,27 @@ export default function FactoryCustomers() {
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+      </div>
 
       {showDeleted && (
-        <Card className="mt-6">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <History className="h-4 w-4 text-muted-foreground" />
-              Deleted Customers
-              {deletedCustomers.length > 0 && (
-                <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate">{deletedCustomers.length}</Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
+        <div className="rounded-xl border overflow-hidden mt-6">
+          <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
+            <History className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-semibold">Deleted Customers</span>
+            {deletedCustomers.length > 0 && (
+              <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-xs">{deletedCustomers.length}</Badge>
+            )}
+          </div>
             {deletedCustomers.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8 px-4">No deleted customers found</p>
             ) : (
               <div className="table-responsive">
                 <Table>
-                  <TableHeader className="sticky top-0 z-30 bg-background">
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Code</TableHead>
-                      <TableHead className="w-[80px]"></TableHead>
+                  <TableHeader className="sticky top-0 z-30">
+                    <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Name</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Code</TableHead>
+                      <TableHead className="w-[80px] py-2"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -364,8 +359,7 @@ export default function FactoryCustomers() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+        </div>
       )}
 
       <Dialog open={isCreateOpen} onOpenChange={(open) => { if (!open) { setIsCreateOpen(false); resetForm(); } }}>
