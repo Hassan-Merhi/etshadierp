@@ -679,8 +679,8 @@ import DailyScan from "./DailyScan";
 
         <div className="flex gap-6">
           <div className="flex-1 min-w-0 space-y-4">
-            <div className="rounded-xl border bg-card overflow-hidden">
-              <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/20">
+            <div className="rounded-xl border bg-card">
+              <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/20 rounded-t-xl">
                 <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-emerald-500/15 border border-emerald-500/20 shrink-0">
                   <ScanLine className="h-3.5 w-3.5 text-emerald-500" />
                 </div>
