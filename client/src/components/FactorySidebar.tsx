@@ -106,6 +106,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     label: "Inventory",
     color: NAV_COLOR.inventory,
     items: [
+      { title: "Location Inventory", url: "/factory/location-inventory", icon: MapPin    },
       { title: "Containers",         url: "/factory/containers-hub",     icon: Container },
     ],
   },
