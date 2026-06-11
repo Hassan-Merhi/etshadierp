@@ -5,7 +5,6 @@ import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid,
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
 import {
@@ -881,85 +880,93 @@ export default function BaleProducts() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <PageHeader title="Bale Products" subtitle="Manage product types for bale production" />
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.csv"
-            className="hidden"
-            onChange={handleFileSelect}
-            data-testid="input-import-file"
-          />
-          {isAdmin && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" data-testid="button-actions-menu">
-                  Actions
-                  <ChevronDown className="h-3 w-3 ml-2" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                <DropdownMenuLabel className="text-xs text-muted-foreground">Categories</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => setShowCategories(!showCategories)} data-testid="menu-manage-categories">
-                  <Tags className="h-4 w-4 mr-2" />
-                  {showCategories ? "Hide Categories" : "Manage Categories"}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-xs text-muted-foreground">Make Your Order</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => handleExportExcel("selling")} data-testid="menu-export-selling-price">
-                  <FileSpreadsheet className="h-4 w-4 mr-2" />
-                  Selling Price
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExportExcel("production")} data-testid="menu-export-production-price">
-                  <FileSpreadsheet className="h-4 w-4 mr-2" />
-                  Production Price
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportNoPrices} data-testid="menu-export-no-prices">
-                  <FileSpreadsheet className="h-4 w-4 mr-2" />
-                  No Prices
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-xs text-muted-foreground">Import / Template</DropdownMenuLabel>
-                <DropdownMenuItem onClick={handleDownloadTemplate} data-testid="menu-download-template">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Template
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => fileInputRef.current?.click()} data-testid="menu-import-excel">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Import Excel
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          <Button
-            onClick={() => {
-              if (isAdmin) {
-                setCreateDialogOpen(true);
-              } else {
-                setAdminAuthOpen(true);
-              }
-            }}
-            data-testid="button-create-product"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Create Product
-          </Button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.csv"
+        className="hidden"
+        onChange={handleFileSelect}
+        data-testid="input-import-file"
+      />
+
+      {/* ── Page header ── */}
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center justify-between gap-3 px-5 py-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <Package className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-base font-semibold leading-tight">Bale Products</h1>
+              <p className="text-xs text-muted-foreground">Manage product types for bale production</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {isAdmin && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" data-testid="button-actions-menu">
+                    Actions
+                    <ChevronDown className="h-3 w-3 ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">Categories</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => setShowCategories(!showCategories)} data-testid="menu-manage-categories">
+                    <Tags className="h-4 w-4 mr-2" />
+                    {showCategories ? "Hide Categories" : "Manage Categories"}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">Make Your Order</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => handleExportExcel("selling")} data-testid="menu-export-selling-price">
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Selling Price
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportExcel("production")} data-testid="menu-export-production-price">
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Production Price
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportNoPrices} data-testid="menu-export-no-prices">
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    No Prices
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">Import / Template</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={handleDownloadTemplate} data-testid="menu-download-template">
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Template
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => fileInputRef.current?.click()} data-testid="menu-import-excel">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Import Excel
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            <Button
+              onClick={() => {
+                if (isAdmin) {
+                  setCreateDialogOpen(true);
+                } else {
+                  setAdminAuthOpen(true);
+                }
+              }}
+              data-testid="button-create-product"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Product
+            </Button>
+          </div>
         </div>
       </div>
 
       {showCategories && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Tags className="h-5 w-5" />
-              Product Categories
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="rounded-xl border overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
+            <Tags className="h-4 w-4 text-muted-foreground" />
+            <span className="font-semibold text-sm">Product Categories</span>
+          </div>
+          <div className="px-4 py-4 space-y-4">
             <div className="flex gap-2">
               <Input
                 value={newCategoryName}
@@ -1108,166 +1115,165 @@ export default function BaleProducts() {
             ) : (
               <p className="text-sm text-muted-foreground">No categories yet. Create one above.</p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-3 flex-wrap">
-              <CardTitle>Product List</CardTitle>
-              {selectedIds.size > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">{selectedIds.size} selected</span>
-                  {selectedActiveIds.length > 0 && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => bulkToggleActiveMutation.mutate({ ids: selectedActiveIds, active: false })}
-                      disabled={bulkToggleActiveMutation.isPending}
-                      data-testid="button-bulk-hide"
-                    >
-                      <EyeOff className="h-4 w-4 mr-1" />
-                      Hide {selectedActiveIds.length > 0 ? `(${selectedActiveIds.length})` : ""}
-                    </Button>
-                  )}
-                  {selectedHiddenIds.length > 0 && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => bulkToggleActiveMutation.mutate({ ids: selectedHiddenIds, active: true })}
-                      disabled={bulkToggleActiveMutation.isPending}
-                      data-testid="button-bulk-unhide"
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      Unhide {selectedHiddenIds.length > 0 ? `(${selectedHiddenIds.length})` : ""}
-                    </Button>
-                  )}
-                  <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())} data-testid="button-clear-selection">
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => { setSearchQuery(e.target.value); setSelectedIds(new Set()); }}
-                  placeholder="Search by name or code..."
-                  className="pl-8 w-56"
-                  data-testid="input-search-products"
-                />
-                {searchQuery && (
-                  <button
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    onClick={() => { setSearchQuery(""); setSelectedIds(new Set()); }}
-                    data-testid="button-clear-search"
+      {/* ── Product List ── */}
+      <div className="rounded-xl border overflow-hidden">
+        {/* Toolbar */}
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-muted/20 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-sm">Product List</span>
+            {selectedIds.size > 0 && (
+              <>
+                <span className="text-xs text-muted-foreground border-l pl-2">{selectedIds.size} selected</span>
+                {selectedActiveIds.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => bulkToggleActiveMutation.mutate({ ids: selectedActiveIds, active: false })}
+                    disabled={bulkToggleActiveMutation.isPending}
+                    data-testid="button-bulk-hide"
                   >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+                    <EyeOff className="h-3.5 w-3.5 mr-1" />
+                    Hide ({selectedActiveIds.length})
+                  </Button>
                 )}
-              </div>
-              {categories && categories.length > 0 && (
-                <Select
-                  value={filterCategoryId === null ? "all" : String(filterCategoryId)}
-                  onValueChange={(val) => { setFilterCategoryId(val === "all" ? null : Number(val)); setSelectedIds(new Set()); }}
-                >
-                  <SelectTrigger className="w-44" data-testid="select-filter-category">
-                    <SelectValue placeholder="All categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All categories</SelectItem>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              {distinctWeights.length > 0 && (
-                <Select
-                  value={filterWeight === null ? "all" : filterWeight}
-                  onValueChange={(val) => { setFilterWeight(val === "all" ? null : val); setSelectedIds(new Set()); }}
-                >
-                  <SelectTrigger className="w-36" data-testid="select-filter-weight">
-                    <SelectValue placeholder="All weights" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All weights</SelectItem>
-                    {distinctWeights.map((w) => (
-                      <SelectItem key={w} value={w}>{w} kg</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              {/* Filters dropdown */}
-              {(() => {
-                const activeFilterCount = (showZeroPrice && !hideSellingPriceBP ? 1 : 0) + (showNoColor && noColorCount > 0 ? 1 : 0) + (showHidden && hiddenProducts && hiddenProducts.length > 0 ? 1 : 0);
-                const hasAnyFilter = (!hideSellingPriceBP) || (noColorCount > 0) || (hiddenProducts && hiddenProducts.length > 0);
-                if (!hasAnyFilter) return null;
-                return (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button size="sm" variant={activeFilterCount > 0 ? "default" : "outline"} data-testid="button-filters-dropdown">
-                        <AlertCircle className="h-4 w-4 mr-1.5" />
-                        Filters
-                        {activeFilterCount > 0 && (
-                          <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs no-default-active-elevate">{activeFilterCount}</Badge>
-                        )}
-                        <ChevronDown className="h-3 w-3 ml-1" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-52">
-                      <DropdownMenuLabel className="text-xs text-muted-foreground">Show in list</DropdownMenuLabel>
-                      {!hideSellingPriceBP && (
-                        <DropdownMenuItem
-                          onClick={() => { setShowZeroPrice(v => !v); setSelectedIds(new Set()); }}
-                          data-testid="menu-filter-unpriced"
-                          className="flex items-center justify-between"
-                        >
-                          <span className="flex items-center gap-2">
-                            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                            Unpriced products
-                          </span>
-                          {showZeroPrice && <span className="text-xs text-primary font-medium">On</span>}
-                        </DropdownMenuItem>
-                      )}
-                      {noColorCount > 0 && (
-                        <DropdownMenuItem
-                          onClick={() => { setShowNoColor(v => !v); setSelectedIds(new Set()); }}
-                          data-testid="menu-filter-no-color"
-                          className="flex items-center justify-between"
-                        >
-                          <span className="flex items-center gap-2">
-                            <Palette className="h-4 w-4 text-muted-foreground" />
-                            No color ({noColorCount})
-                          </span>
-                          {showNoColor && <span className="text-xs text-primary font-medium">On</span>}
-                        </DropdownMenuItem>
-                      )}
-                      {hiddenProducts && hiddenProducts.length > 0 && (
-                        <DropdownMenuItem
-                          onClick={() => { setShowHidden(!showHidden); setSelectedIds(new Set()); }}
-                          data-testid="menu-filter-hidden"
-                          className="flex items-center justify-between"
-                        >
-                          <span className="flex items-center gap-2">
-                            <EyeOff className="h-4 w-4 text-muted-foreground" />
-                            Hidden products ({hiddenProducts.length})
-                          </span>
-                          {showHidden && <span className="text-xs text-primary font-medium">On</span>}
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                );
-              })()}
-            </div>
+                {selectedHiddenIds.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => bulkToggleActiveMutation.mutate({ ids: selectedHiddenIds, active: true })}
+                    disabled={bulkToggleActiveMutation.isPending}
+                    data-testid="button-bulk-unhide"
+                  >
+                    <Eye className="h-3.5 w-3.5 mr-1" />
+                    Unhide ({selectedHiddenIds.length})
+                  </Button>
+                )}
+                <Button size="icon" variant="ghost" onClick={() => setSelectedIds(new Set())} data-testid="button-clear-selection">
+                  <X className="h-4 w-4" />
+                </Button>
+              </>
+            )}
           </div>
-        </CardHeader>
-        <CardContent>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setSelectedIds(new Set()); }}
+                placeholder="Search by name or code..."
+                className="pl-8 w-52 h-8 text-sm"
+                data-testid="input-search-products"
+              />
+              {searchQuery && (
+                <button
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => { setSearchQuery(""); setSelectedIds(new Set()); }}
+                  data-testid="button-clear-search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            {categories && categories.length > 0 && (
+              <Select
+                value={filterCategoryId === null ? "all" : String(filterCategoryId)}
+                onValueChange={(val) => { setFilterCategoryId(val === "all" ? null : Number(val)); setSelectedIds(new Set()); }}
+              >
+                <SelectTrigger className="w-40 h-8 text-sm" data-testid="select-filter-category">
+                  <SelectValue placeholder="All categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All categories</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {distinctWeights.length > 0 && (
+              <Select
+                value={filterWeight === null ? "all" : filterWeight}
+                onValueChange={(val) => { setFilterWeight(val === "all" ? null : val); setSelectedIds(new Set()); }}
+              >
+                <SelectTrigger className="w-32 h-8 text-sm" data-testid="select-filter-weight">
+                  <SelectValue placeholder="All weights" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All weights</SelectItem>
+                  {distinctWeights.map((w) => (
+                    <SelectItem key={w} value={w}>{w} kg</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {(() => {
+              const activeFilterCount = (showZeroPrice && !hideSellingPriceBP ? 1 : 0) + (showNoColor && noColorCount > 0 ? 1 : 0) + (showHidden && hiddenProducts && hiddenProducts.length > 0 ? 1 : 0);
+              const hasAnyFilter = (!hideSellingPriceBP) || (noColorCount > 0) || (hiddenProducts && hiddenProducts.length > 0);
+              if (!hasAnyFilter) return null;
+              return (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant={activeFilterCount > 0 ? "default" : "outline"} className="h-8" data-testid="button-filters-dropdown">
+                      <AlertCircle className="h-3.5 w-3.5 mr-1.5" />
+                      Filters
+                      {activeFilterCount > 0 && (
+                        <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs no-default-active-elevate">{activeFilterCount}</Badge>
+                      )}
+                      <ChevronDown className="h-3 w-3 ml-1" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuLabel className="text-xs text-muted-foreground">Show in list</DropdownMenuLabel>
+                    {!hideSellingPriceBP && (
+                      <DropdownMenuItem
+                        onClick={() => { setShowZeroPrice(v => !v); setSelectedIds(new Set()); }}
+                        data-testid="menu-filter-unpriced"
+                        className="flex items-center justify-between"
+                      >
+                        <span className="flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                          Unpriced products
+                        </span>
+                        {showZeroPrice && <span className="text-xs text-primary font-medium">On</span>}
+                      </DropdownMenuItem>
+                    )}
+                    {noColorCount > 0 && (
+                      <DropdownMenuItem
+                        onClick={() => { setShowNoColor(v => !v); setSelectedIds(new Set()); }}
+                        data-testid="menu-filter-no-color"
+                        className="flex items-center justify-between"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Palette className="h-4 w-4 text-muted-foreground" />
+                          No color ({noColorCount})
+                        </span>
+                        {showNoColor && <span className="text-xs text-primary font-medium">On</span>}
+                      </DropdownMenuItem>
+                    )}
+                    {hiddenProducts && hiddenProducts.length > 0 && (
+                      <DropdownMenuItem
+                        onClick={() => { setShowHidden(!showHidden); setSelectedIds(new Set()); }}
+                        data-testid="menu-filter-hidden"
+                        className="flex items-center justify-between"
+                      >
+                        <span className="flex items-center gap-2">
+                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          Hidden products ({hiddenProducts.length})
+                        </span>
+                        {showHidden && <span className="text-xs text-primary font-medium">On</span>}
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              );
+            })()}
+          </div>
+        </div>
+        <div>
           {isLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-12 w-full" />
@@ -1277,18 +1283,18 @@ export default function BaleProducts() {
           ) : condensedView ? (
             groupedProducts.length > 0 ? (
               <Table wrapperClassName="max-h-[calc(100vh-320px)] overflow-auto">
-                <TableHeader className="sticky top-0 z-30 bg-background">
-                  <TableRow>
+                <TableHeader className="sticky top-0 z-30">
+                  <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
                     <TableHead className="w-8"></TableHead>
                     <TableHead className="w-8"></TableHead>
-                    <TableHead>Article Code</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead className="text-right">Wt/Bale (kg)</TableHead>
-                    {!hideAvgRate && <TableHead className="text-right">Prod. Price</TableHead>}
-                    {!hideSellingPriceBP && <TableHead className="text-right">Sell Price</TableHead>}
-                    <TableHead className="text-right">Count</TableHead>
-                    <TableHead className="w-[60px]">Actions</TableHead>
+                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Article Code</TableHead>
+                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</TableHead>
+                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category</TableHead>
+                    <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Wt/Bale (kg)</TableHead>
+                    {!hideAvgRate && <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Prod. Price</TableHead>}
+                    {!hideSellingPriceBP && <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sell Price</TableHead>}
+                    <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Count</TableHead>
+                    <TableHead className="w-[60px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1405,8 +1411,8 @@ export default function BaleProducts() {
             )
           ) : activeProducts && activeProducts.length > 0 ? (
             <Table wrapperClassName="max-h-[calc(100vh-320px)] overflow-auto">
-              <TableHeader className="sticky top-0 z-30 bg-background">
-                <TableRow>
+              <TableHeader className="sticky top-0 z-30">
+                <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
                   <TableHead className="w-8">
                     <Checkbox
                       checked={activeProducts.length > 0 && activeProducts.every((p) => selectedIds.has(p.id))}
@@ -1414,14 +1420,14 @@ export default function BaleProducts() {
                       data-testid="checkbox-select-all"
                     />
                   </TableHead>
-                  <TableHead>Article Code</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Weight/Bale (kg)</TableHead>
-                  {!hideAvgRate && <TableHead className="text-right">Prod. Price</TableHead>}
-                  {!hideSellingPriceBP && <TableHead className="text-right">Sell Price</TableHead>}
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-[60px]">Actions</TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Article Code</TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category</TableHead>
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Wt/Bale (kg)</TableHead>
+                  {!hideAvgRate && <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Prod. Price</TableHead>}
+                  {!hideSellingPriceBP && <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sell Price</TableHead>}
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</TableHead>
+                  <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1502,14 +1508,14 @@ export default function BaleProducts() {
           )}
 
           {showHidden && hiddenProducts && hiddenProducts.length > 0 && (
-            <div className="mt-6 border-t pt-4">
-              <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                <EyeOff className="h-4 w-4" />
-                Hidden Products ({hiddenProducts.length})
-              </h3>
+            <div className="border-t">
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/10">
+                <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Hidden Products ({hiddenProducts.length})</span>
+              </div>
               <Table wrapperClassName="max-h-[400px] overflow-auto">
-                <TableHeader className="sticky top-0 z-30 bg-background">
-                  <TableRow>
+                <TableHeader className="sticky top-0 z-30">
+                  <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
                     <TableHead className="w-8">
                       <Checkbox
                         checked={hiddenProducts.length > 0 && hiddenProducts.every((p) => selectedIds.has(p.id))}
@@ -1517,9 +1523,9 @@ export default function BaleProducts() {
                         data-testid="checkbox-select-all-hidden"
                       />
                     </TableHead>
-                    <TableHead>Article Code</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Category</TableHead>
+                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Article Code</TableHead>
+                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</TableHead>
+                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category</TableHead>
                     <TableHead className="w-[100px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1556,8 +1562,8 @@ export default function BaleProducts() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <CreateBaleProductDialog
         open={createDialogOpen}
