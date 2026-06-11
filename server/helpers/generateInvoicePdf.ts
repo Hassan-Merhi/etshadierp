@@ -387,9 +387,13 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     rowIndex++;
   }
 
-  // ── TOTAL row — emerald green ─────────────────────────────────────────────────
+  // ── TOTAL + TOTAL PAID + footer — keep together on the same page ─────────────
+  // Minimum combined height: TOTAL (18) + gap (8) + TOTAL PAID (32) + gap (8) +
+  // footer rule + text (~26) = 92 pt.  If that doesn't fit, start a fresh page
+  // so the summary is never split across pages leaving a near-blank last page.
   const totH = 18;
-  if (y + totH > PAGE_H - MARGIN_Y) {
+  const SUMMARY_MIN_H = totH + 8 + 32 + 8 + 26; // 92
+  if (y + SUMMARY_MIN_H > PAGE_H - MARGIN_Y) {
     doc.addPage({ size: "A4" });
     y = MARGIN_Y;
   }
@@ -411,10 +415,7 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   y += totH + 8;
 
   // ── TOTAL PAID block ──────────────────────────────────────────────────────────
-  if (y + 36 > PAGE_H - MARGIN_Y) {
-    doc.addPage({ size: "A4" });
-    y = MARGIN_Y;
-  }
+  // (overflow already handled by the combined check above — no extra addPage here)
 
   const paidH  = 32;
   const paidStr = fmtUSD(totalAmt);

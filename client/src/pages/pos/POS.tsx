@@ -2860,8 +2860,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             </AlertDialogDescription>
           </AlertDialogHeader>
           
-          {/* Invoice print template — off-screen so html2canvas can capture it */}
-          <div style={{ position: 'fixed', top: '-99999px', left: '-99999px', width: '680px', pointerEvents: 'none', zIndex: -1 }}>
+          {/* Invoice print template — off-screen so react-to-print can capture it.
+               Use left-only offset (top:0) so the browser print renderer never
+               inserts blank pages above the content. */}
+          <div style={{ position: 'fixed', top: 0, left: '-99999px', width: '680px', pointerEvents: 'none', zIndex: -1 }}>
             <div ref={printCallbackRef} style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '8pt', padding: '8px', backgroundColor: 'white', color: 'black', width: '100%', fontWeight: 'normal', fontVariantNumeric: 'tabular-nums' }}>
               <style dangerouslySetInnerHTML={{ __html: `
                 @media print {
@@ -3057,7 +3059,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       </AlertDialog>
 
       {/* Stock print template — off-screen, inline styles for html2canvas + react-to-print */}
-      <div style={{ position: 'fixed', top: '-99999px', left: '-99999px', width: '794px', pointerEvents: 'none', zIndex: -1 }}>
+      <div style={{ position: 'fixed', top: 0, left: '-99999px', width: '794px', pointerEvents: 'none', zIndex: -1 }}>
         <div ref={stockPrintRef} style={{ fontFamily: 'Arial, Helvetica, sans-serif', backgroundColor: 'white', color: 'black', padding: '12mm 14mm', boxSizing: 'border-box', width: '794px' }}>
           {/* Header — matches LocationInventory print template */}
           <div style={{ textAlign: 'center', marginBottom: '10px' }}>
