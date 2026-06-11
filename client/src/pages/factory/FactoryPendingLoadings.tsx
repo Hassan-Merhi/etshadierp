@@ -2,13 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { Clock, Package, Play, Trash2, Download, Link, X, Undo2, Pencil, Save, ChevronDown, ChevronRight, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { PageHeader } from "@/components/PageHeader";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -238,10 +236,7 @@ export default function FactoryPendingLoadings() {
   };
 
   return (
-    <div className="flex flex-col h-full p-4 lg:p-6">
-      <div className="mb-6">
-        <PageHeader title="Pending Loadings" subtitle="In-progress container loads saved for later" />
-      </div>
+    <div className="flex flex-col h-full p-5 gap-4">
 
       {/* Undo banners */}
       {undoItems.length > 0 && (
@@ -325,7 +320,8 @@ export default function FactoryPendingLoadings() {
             const groups = Array.from(seen.values());
 
             const renderLoadCard = (load: PendingLoad) => (
-              <Card key={load.id} className="p-4" data-testid={`card-load-${load.id}`}>
+              <div key={load.id} className="rounded-xl border overflow-hidden" data-testid={`card-load-${load.id}`}>
+              <div className="p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-col gap-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -405,7 +401,8 @@ export default function FactoryPendingLoadings() {
                     </Button>
                   </div>
                 </div>
-              </Card>
+              </div>
+              </div>
             );
 
             return groups.map(group => {
@@ -415,13 +412,13 @@ export default function FactoryPendingLoadings() {
               const totalWeightKg = group.loads.reduce((s, l) => s + parseFloat(l.totalWeightKg || "0"), 0);
               return (
                 <div key={`group-${group.customerId}`} className="space-y-2">
-                  {/* Group header card */}
-                  <Card
-                    className="p-4 cursor-pointer hover-elevate"
+                  {/* Group header */}
+                  <div
+                    className="rounded-xl border overflow-hidden cursor-pointer hover-elevate"
                     onClick={() => toggleCustomer(group.customerId)}
                     data-testid={`card-group-${group.customerId}`}
                   >
-                    <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center justify-between gap-3 px-4 py-3 bg-muted/20">
                       <div className="flex items-center gap-3 min-w-0">
                         {isExpanded
                           ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -445,8 +442,8 @@ export default function FactoryPendingLoadings() {
                           {isExpanded ? "Click to collapse" : "Click to expand"}
                         </span>
                       </div>
-                    </div>
-                  </Card>
+                  </div>
+                  </div>
                   {/* Expanded individual cards */}
                   {isExpanded && (
                     <div className="space-y-2 pl-4 border-l-2 border-muted ml-2">

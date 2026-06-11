@@ -10,7 +10,6 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { Badge } from "@/components/ui/badge";
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import * as XLSX from "@/lib/excelHelper";
-import { PageHeader } from "@/components/PageHeader";
 import {
   Select,
   SelectContent,
@@ -841,8 +840,14 @@ export default function FactoryContainerLoadingScan() {
         </div>
       )}
       <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
-        <div>
-          <PageHeader title="Container Loading" subtitle="Floor loader bale scanning" />
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <ScanLine className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-base font-semibold leading-tight">Container Loading</h1>
+            <p className="text-xs text-muted-foreground">Floor loader bale scanning</p>
+          </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {isResuming && orderId && (
@@ -866,10 +871,11 @@ export default function FactoryContainerLoadingScan() {
       <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
         {/* Left: scanned bales */}
         <div className="lg:w-[60%] flex flex-col min-h-0">
-          <Card className={`flex-1 flex flex-col min-h-0 p-4 transition-colors duration-300 ${scanFlash === "success" ? "ring-4 ring-green-500 bg-green-50 dark:bg-green-950" : scanFlash === "error" ? "ring-2 ring-red-500" : ""}`}>
-            <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+          <div className={`flex-1 flex flex-col min-h-0 rounded-xl border overflow-hidden transition-colors duration-300 ${scanFlash === "success" ? "ring-4 ring-green-500" : scanFlash === "error" ? "ring-2 ring-red-500" : ""}`}>
+            {/* Scanned bales header strip */}
+            <div className={`flex items-center justify-between gap-2 px-4 py-3 border-b flex-wrap transition-colors duration-300 ${scanFlash === "success" ? "bg-green-50 dark:bg-green-950" : scanFlash === "error" ? "bg-red-50 dark:bg-red-950/30" : "bg-muted/20"}`}>
               <h2
-                className="font-semibold text-lg"
+                className="font-semibold text-sm"
                 data-testid="text-bales-header"
               >
                 Scanned Bales
@@ -892,6 +898,7 @@ export default function FactoryContainerLoadingScan() {
                 </Button>
               </div>
             </div>
+            <div className="flex flex-col flex-1 min-h-0 p-4">
 
             {orderId && (
               <div className="mb-3">
@@ -1040,11 +1047,13 @@ export default function FactoryContainerLoadingScan() {
                 </div>
               )}
             </div>
-          </Card>
+            </div>
+          </div>
 
           {/* Removal log — only shown when there are removals */}
           {orderId && baleRemovals.length > 0 && (
-            <Card className="p-4">
+            <div className="rounded-xl border overflow-hidden mt-4">
+            <div className="p-4">
               <button
                 className="w-full flex items-center justify-between gap-2 text-sm font-medium"
                 onClick={() => setShowRemovalLog((v) => !v)}
@@ -1086,14 +1095,19 @@ export default function FactoryContainerLoadingScan() {
                   </TableBody>
                 </Table>
               )}
-            </Card>
+            </div>
+            </div>
           )}
         </div>
 
         {/* Right: controls + proforma panel */}
         <div className="lg:w-[40%] flex flex-col gap-4">
           {/* Setup card — hidden once order started and proforma is showing */}
-          <Card className="p-4 space-y-4">
+          <div className="rounded-xl border overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
+            <span className="text-sm font-semibold">Setup</span>
+          </div>
+          <div className="p-4 space-y-4">
             <div>
               <label className="text-sm font-medium mb-1 block">Customer</label>
               <Select
@@ -1237,39 +1251,40 @@ export default function FactoryContainerLoadingScan() {
                   : "Start Loading"}
               </Button>
             )}
-          </Card>
+          </div>
+          </div>
 
           {/* Proforma progress panel — shown when order is active and a proforma is linked */}
           {orderId && linkedProforma ? (
-            <Card
-              className="p-4 flex flex-col gap-3"
+            <div
+              className="rounded-xl border overflow-hidden flex flex-col"
               data-testid="card-proforma-progress"
             >
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div>
-                  <h3 className="font-semibold text-sm">
-                    {linkedProforma.name}
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {fulfilledCount} / {totalLines} lines fulfilled
-                  </p>
-                </div>
-                <Badge
-                  variant={
-                    fulfilledCount === totalLines && totalLines > 0
-                      ? "default"
-                      : "secondary"
-                  }
-                  className={
-                    fulfilledCount === totalLines && totalLines > 0
-                      ? "bg-green-600 text-white no-default-hover-elevate no-default-active-elevate"
-                      : ""
-                  }
-                  data-testid="badge-proforma-progress"
-                >
-                  {fulfilledCount}/{totalLines}
-                </Badge>
+            <div className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-muted/20 flex-wrap">
+              <div>
+                <h3 className="font-semibold text-sm">
+                  {linkedProforma.name}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {fulfilledCount} / {totalLines} lines fulfilled
+                </p>
               </div>
+              <Badge
+                variant={
+                  fulfilledCount === totalLines && totalLines > 0
+                    ? "default"
+                    : "secondary"
+                }
+                className={
+                  fulfilledCount === totalLines && totalLines > 0
+                    ? "bg-green-600 text-white no-default-hover-elevate no-default-active-elevate"
+                    : ""
+                }
+                data-testid="badge-proforma-progress"
+              >
+                {fulfilledCount}/{totalLines}
+              </Badge>
+            </div>
 
               <div className="overflow-y-auto max-h-[340px]">
                 <Table>
@@ -1427,10 +1442,13 @@ export default function FactoryContainerLoadingScan() {
                   {bales.length} bales scanned · {totalWeight.toFixed(1)} kg
                 </span>
               </div>
-            </Card>
+            </div>
           ) : orderId ? (
-            <Card className="p-4 space-y-2">
-              <h3 className="font-semibold text-sm">Order Summary</h3>
+            <div className="rounded-xl border overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
+                <span className="text-sm font-semibold">Order Summary</span>
+              </div>
+              <div className="p-4 space-y-2">
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span>Total Bales</span>
                 <span className="font-mono" data-testid="text-total-bales">
@@ -1449,7 +1467,8 @@ export default function FactoryContainerLoadingScan() {
                   {Object.keys(groupedBalesMap).length}
                 </span>
               </div>
-            </Card>
+              </div>
+            </div>
           ) : null}
 
           {/* Save & Exit + Validate & Finalize */}

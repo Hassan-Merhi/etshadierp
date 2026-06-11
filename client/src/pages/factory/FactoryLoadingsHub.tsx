@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import FactoryContainerLoadingScan from "./FactoryContainerLoadingScan";
 import FactoryPendingLoadings from "./FactoryPendingLoadings";
+import { Truck } from "lucide-react";
+
+type LoadingsTab = "loadings" | "pending";
 
 export default function FactoryLoadingsHub() {
   const hash = typeof window !== "undefined" ? window.location.hash.replace("#", "") : "";
@@ -17,32 +20,67 @@ export default function FactoryLoadingsHub() {
 
   const showPending = settings?.loadingsTabPendingEnabled !== false && !hiddenTabs.includes("hide_tab_loadings_pending");
 
-  const defaultTab = hash === "pending" && showPending ? "pending" : "loadings";
+  const [activeTab, setActiveTab] = useState<LoadingsTab>(
+    hash === "pending" && showPending ? "pending" : "loadings"
+  );
 
-  function handleTabChange(value: string) {
+  function handleTabChange(value: LoadingsTab) {
+    setActiveTab(value);
     window.history.replaceState(null, "", `#${value}`);
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <Tabs defaultValue={defaultTab} onValueChange={handleTabChange} className="flex flex-col h-full">
-        <div className="border-b px-4 pt-3 flex-shrink-0">
-          <TabsList>
-            <TabsTrigger value="loadings" data-testid="tab-container-loadings">Container Loadings</TabsTrigger>
-            {showPending && (
-              <TabsTrigger value="pending" data-testid="tab-pending-loadings">Pending Loadings</TabsTrigger>
-            )}
-          </TabsList>
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="border-b bg-background shrink-0">
+        {/* Header row */}
+        <div className="flex items-center gap-3 px-5 pt-4 pb-3">
+          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <Truck className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-base font-semibold leading-tight">Loadings</h1>
+            <p className="text-xs text-muted-foreground">Container loading and pending sessions</p>
+          </div>
         </div>
-        <TabsContent value="loadings" className="flex-1 overflow-auto mt-0">
-          <FactoryContainerLoadingScan />
-        </TabsContent>
-        {showPending && (
-          <TabsContent value="pending" className="flex-1 overflow-auto mt-0">
-            <FactoryPendingLoadings />
-          </TabsContent>
-        )}
-      </Tabs>
+        {/* Tab row */}
+        <div className="flex gap-0 px-4" role="tablist">
+          <button
+            role="tab"
+            aria-selected={activeTab === "loadings"}
+            data-testid="tab-container-loadings"
+            onClick={() => handleTabChange("loadings")}
+            className={[
+              "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+              activeTab === "loadings"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            ].join(" ")}
+          >
+            Container Loadings
+          </button>
+          {showPending && (
+            <button
+              role="tab"
+              aria-selected={activeTab === "pending"}
+              data-testid="tab-pending-loadings"
+              onClick={() => handleTabChange("pending")}
+              className={[
+                "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+                activeTab === "pending"
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+              ].join(" ")}
+            >
+              Pending Loadings
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto min-h-0">
+        {activeTab === "loadings" && <FactoryContainerLoadingScan />}
+        {activeTab === "pending" && showPending && <FactoryPendingLoadings />}
+      </div>
     </div>
   );
 }
