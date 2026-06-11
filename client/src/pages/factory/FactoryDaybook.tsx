@@ -1316,9 +1316,6 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
               </tfoot>
             </table>
           </div>
-          {entry.description && (
-            <p className="text-sm text-muted-foreground">{entry.description}</p>
-          )}
         </div>
       </>
     );
