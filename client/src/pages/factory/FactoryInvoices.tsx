@@ -1,6 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
@@ -229,9 +228,17 @@ export default function FactoryInvoices() {
   })();
 
   return (
-    <div className="flex flex-col h-full p-6">
-      <div className="flex flex-col gap-2 mb-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col h-full p-5 gap-4">
+
+      {isError && (
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive" data-testid="error-invoices-load">
+          Failed to load data. Please check your connection or try refreshing the page.
+        </div>
+      )}
+
+      <div className="rounded-xl border overflow-hidden flex flex-col">
+        {/* Toolbar strip */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b bg-muted/20">
           <div className="flex flex-wrap items-center gap-1.5" data-testid="filter-tabs">
             {statusFilters.map((f) => (
               <Button
@@ -256,7 +263,7 @@ export default function FactoryInvoices() {
             </Button>
           </div>
 
-          <div className="w-56">
+          <div className="w-52">
             <Select value={customerFilter} onValueChange={setCustomerFilter}>
               <SelectTrigger data-testid="select-customer-filter">
                 <SelectValue placeholder="All customers" />
@@ -272,47 +279,43 @@ export default function FactoryInvoices() {
             </Select>
           </div>
         </div>
-      </div>
 
-      {isError && (
-        <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive" data-testid="error-invoices-load">
-          Failed to load data. Please check your connection or try refreshing the page.
-        </div>
-      )}
+        {/* Summary bar */}
+        {!isLoading && filteredOrders.length > 0 && (
+          <div className="px-4 pt-3 pb-0">
+            <InvoiceSummaryBar
+              orders={filteredOrders}
+              hideTotalsUsd={hideTotalsUsd}
+              getRemainingBales={getRemainingBales}
+              getEstimatedKg={getEstimatedKg}
+              getEstimatedPrice={getEstimatedPrice}
+            />
+          </div>
+        )}
 
-      {!isLoading && filteredOrders.length > 0 && (
-        <InvoiceSummaryBar
-          orders={filteredOrders}
-          hideTotalsUsd={hideTotalsUsd}
-          getRemainingBales={getRemainingBales}
-          getEstimatedKg={getEstimatedKg}
-          getEstimatedPrice={getEstimatedPrice}
-        />
-      )}
-
-      {isLoading ? (
-        <div className="space-y-3">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-14 w-full" />
-          ))}
-        </div>
-      ) : (
-        <Card className="table-responsive">
+        {isLoading ? (
+          <div className="space-y-3 p-4">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full" />
+            ))}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
           <Table>
-            <TableHeader className="sticky top-0 z-30 bg-background">
-              <TableRow>
-                <TableHead>Customer</TableHead>
-                <TableHead>Loading #</TableHead>
-                {!hideProformaCol && <TableHead>Proforma</TableHead>}
-                <TableHead>Container</TableHead>
-                <TableHead>Destination</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Bales</TableHead>
-                <TableHead className="text-right">Weight</TableHead>
-                <TableHead className="text-right">Remaining</TableHead>
-                {!hideTotalsUsd && <TableHead className="text-right">Total</TableHead>}
-                <TableHead className="w-[120px]">Actions</TableHead>
+            <TableHeader>
+              <TableRow className="bg-muted hover:bg-muted border-b-2 border-border/60">
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Customer</TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Loading #</TableHead>
+                {!hideProformaCol && <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Proforma</TableHead>}
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Container</TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Destination</TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Date</TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</TableHead>
+                <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Bales</TableHead>
+                <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Weight</TableHead>
+                <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Remaining</TableHead>
+                {!hideTotalsUsd && <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total</TableHead>}
+                <TableHead className="w-[120px] text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -535,8 +538,9 @@ export default function FactoryInvoices() {
               )}
             </TableBody>
           </Table>
-        </Card>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
