@@ -83,6 +83,7 @@ export interface IStorage {
   getLedgerAccountByCode(code: string, companyId: number): Promise<LedgerAccount | undefined>;
   getLedgerAccountByName(name: string, companyId: number): Promise<LedgerAccount | undefined>;
   createLedgerAccount(account: InsertLedgerAccount): Promise<LedgerAccount>;
+  getOrCreateLedgerAccount(account: InsertLedgerAccount): Promise<LedgerAccount>;
   updateLedgerAccount(account: schema.UpdateLedgerAccount): Promise<LedgerAccount>;
   deleteLedgerAccount(id: number): Promise<void>;
 
@@ -756,6 +757,50 @@ export class DbStorage implements IStorage {
     const [created] = await db.insert(schema.ledgerAccounts).values({
       ...account,
       code: account.code || `LA-${Date.now()}`,
+    }).returning();
+    return created;
+  }
+
+  /**
+   * Safe get-or-create for ledger accounts.
+   * 1. Returns the active account if it exists.
+   * 2. If a soft-deleted row exists with the same (companyId, code), reactivates
+   *    it instead of inserting — avoids unique-constraint crashes.
+   * 3. Creates a brand-new row only when neither case applies.
+   */
+  async getOrCreateLedgerAccount(account: InsertLedgerAccount): Promise<LedgerAccount> {
+    const code = account.code || `LA-${Date.now()}`;
+
+    // 1. Active account?
+    const [active] = await db.select().from(schema.ledgerAccounts).where(
+      and(
+        eq(schema.ledgerAccounts.code, code),
+        eq(schema.ledgerAccounts.companyId, account.companyId),
+        isNull(schema.ledgerAccounts.deletedAt),
+      )
+    ).limit(1);
+    if (active) return active;
+
+    // 2. Soft-deleted account with same code?
+    const [deleted] = await db.select().from(schema.ledgerAccounts).where(
+      and(
+        eq(schema.ledgerAccounts.code, code),
+        eq(schema.ledgerAccounts.companyId, account.companyId),
+        isNotNull(schema.ledgerAccounts.deletedAt),
+      )
+    ).limit(1);
+    if (deleted) {
+      const [reactivated] = await db.update(schema.ledgerAccounts)
+        .set({ deletedAt: null, active: true })
+        .where(eq(schema.ledgerAccounts.id, deleted.id))
+        .returning();
+      return reactivated;
+    }
+
+    // 3. Create fresh.
+    const [created] = await db.insert(schema.ledgerAccounts).values({
+      ...account,
+      code,
     }).returning();
     return created;
   }

@@ -1125,35 +1125,29 @@ export function registerImportRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid cash account" });
       }
 
-      // Get or create "Sales Revenue" ledger account
-      let salesRevenueAccount = await storage.getLedgerAccountByCode("SALES_REV", req.session.currentCompanyId!);
-      if (!salesRevenueAccount) {
-        salesRevenueAccount = await storage.createLedgerAccount({
-          companyId: req.session.currentCompanyId!,
-          code: "SALES_REV",
-          name: "Sales Revenue",
-          accountType: "Income",
-          subType: "Direct Income",
-          openingBalance: "0",
-          openingBalanceSide: "Cr",
-          active: true,
-        });
-      }
+      // Get or create "Sales Revenue" ledger account (safe: handles soft-deleted rows)
+      const salesRevenueAccount = await storage.getOrCreateLedgerAccount({
+        companyId: req.session.currentCompanyId!,
+        code: "SALES_REV",
+        name: "Sales Revenue",
+        accountType: "Income",
+        subType: "Direct Income",
+        openingBalance: "0",
+        openingBalanceSide: "Cr",
+        active: true,
+      });
 
-      // Get or create "Cost of Goods Sold" ledger account
-      let cogsAccount = await storage.getLedgerAccountByCode("COGS", req.session.currentCompanyId!);
-      if (!cogsAccount) {
-        cogsAccount = await storage.createLedgerAccount({
-          companyId: req.session.currentCompanyId!,
-          code: "COGS",
-          name: "Cost of Goods Sold",
-          accountType: "Expense",
-          subType: "Direct Expense",
-          openingBalance: "0",
-          openingBalanceSide: "Dr",
-          active: true,
-        });
-      }
+      // Get or create "Cost of Goods Sold" ledger account (safe: handles soft-deleted rows)
+      const cogsAccount = await storage.getOrCreateLedgerAccount({
+        companyId: req.session.currentCompanyId!,
+        code: "COGS",
+        name: "Cost of Goods Sold",
+        accountType: "Expense",
+        subType: "Direct Expense",
+        openingBalance: "0",
+        openingBalanceSide: "Dr",
+        active: true,
+      });
 
       let totalSales = 0;
       let createdVoucher: any = null;
@@ -1530,39 +1524,33 @@ export function registerImportRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid customer" });
       }
 
-      let salesRevenueAccount = await storage.getLedgerAccountByCode("SALES_REV", req.session.currentCompanyId!);
-      if (!salesRevenueAccount) {
-        salesRevenueAccount = await storage.createLedgerAccount({
-          companyId: req.session.currentCompanyId!,
-          code: "SALES_REV",
-          name: "Sales Revenue",
-          accountType: "Income",
-          subType: "Direct Income",
-          openingBalance: "0",
-          openingBalanceSide: "Cr",
-          active: true,
-        });
-      }
+      // Get or create "Sales Revenue" ledger account (safe: handles soft-deleted rows)
+      const salesRevenueAccount = await storage.getOrCreateLedgerAccount({
+        companyId: req.session.currentCompanyId!,
+        code: "SALES_REV",
+        name: "Sales Revenue",
+        accountType: "Income",
+        subType: "Direct Income",
+        openingBalance: "0",
+        openingBalanceSide: "Cr",
+        active: true,
+      });
 
       // Get or create the customer's linked ledger account for receivables
       let customerLedgerAccountId = customer.ledgerAccountId;
       if (!customerLedgerAccountId) {
-        // Create a ledger account for this customer
         const customerLedgerCode = `CUST_${customer.code}`;
-        let customerLedgerAccount = await storage.getLedgerAccountByCode(customerLedgerCode, req.session.currentCompanyId!);
-        if (!customerLedgerAccount) {
-          customerLedgerAccount = await storage.createLedgerAccount({
-            companyId: req.session.currentCompanyId!,
-            code: customerLedgerCode,
-            name: `${customer.legalName} - Receivable`,
-            accountType: "Asset",
-            subType: "Sundry Debtors",
-            openingBalance: "0",
-            openingBalanceSide: "Dr",
-            active: true,
-          });
-        }
-        // Update customer with the linked ledger account
+        // Safe: reactivates a soft-deleted row instead of crashing on unique constraint
+        const customerLedgerAccount = await storage.getOrCreateLedgerAccount({
+          companyId: req.session.currentCompanyId!,
+          code: customerLedgerCode,
+          name: `${customer.legalName} - Receivable`,
+          accountType: "Asset",
+          subType: "Sundry Debtors",
+          openingBalance: "0",
+          openingBalanceSide: "Dr",
+          active: true,
+        });
         customer = await storage.updateCustomer(customer.id, { ledgerAccountId: customerLedgerAccount.id });
         customerLedgerAccountId = customerLedgerAccount.id;
       }
