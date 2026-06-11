@@ -734,7 +734,6 @@ function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrackingNow
             </Table>
           </div>
         </div>
-      </div>
 
       {/* ── Event timeline sheet ── */}
       <EventTimelineSheet
