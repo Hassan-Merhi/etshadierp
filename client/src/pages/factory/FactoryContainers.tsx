@@ -137,21 +137,21 @@ function OtwNotes() {
   useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
 
   return (
-    <Card>
-      <CardContent className="pt-3 pb-3">
-        <div className="flex items-center gap-2 mb-2">
-          <StickyNote className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Notes</span>
-        </div>
+    <div className="rounded-xl border overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-muted/20">
+        <StickyNote className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Notes</span>
+      </div>
+      <div className="px-4 py-3">
         <Textarea
           value={value}
           onChange={handleChange}
           placeholder="Write anything here…"
-          className="min-h-[80px] resize-y text-sm border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+          className="min-h-[72px] resize-y text-sm border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
           data-testid="textarea-otw-notes"
         />
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -552,35 +552,36 @@ function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrackingNow
 
   if (containers.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-16 text-center">
+      <div className="rounded-xl border overflow-hidden">
+        <div className="py-16 text-center">
           <Radio className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-40" />
           <p className="text-muted-foreground">No containers currently on the way.</p>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {/* ── Summary cards ── */}
-      <div>
-        <Card>
-          <CardContent className="py-4 px-5">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1">Total Weight (KG)</p>
-            <p className="text-2xl font-bold tabular-nums">
-              {totalWeightKg > 0 ? totalWeightKg.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—"}
+      {/* ── Summary card ── */}
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <Boxes className="h-4 w-4 text-muted-foreground" />
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold leading-none mb-0.5">Total Weight</p>
+            <p className="text-xl font-bold tabular-nums leading-none">
+              {totalWeightKg > 0 ? `${totalWeightKg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg` : "—"}
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* ── Main table ── */}
-      <Card>
-        <CardHeader className="flex flex-col gap-2 pb-3">
-          <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
-            <CardTitle className="text-base">OTW Container Tracking</CardTitle>
-            <span className="text-sm text-muted-foreground">
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex flex-col gap-2 px-4 py-3 border-b bg-muted/20">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="text-sm font-semibold">OTW Container Tracking</span>
+            <span className="text-xs text-muted-foreground">
               {filteredPanelContainers.length} of {containers.length} container{containers.length !== 1 ? "s" : ""}
             </span>
           </div>
@@ -601,22 +602,21 @@ function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrackingNow
               );
             })}
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="pl-4">Container</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Tracking Status</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>ETA</TableHead>
-                  <TableHead>Last Checked</TableHead>
-                  <TableHead className="pr-4 text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
+        </div>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
+                <TableHead className="pl-4 text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">Container</TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">Supplier</TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">Status</TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">Tracking Status</TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">Location</TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">ETA</TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">Last Checked</TableHead>
+                <TableHead className="pr-4 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
               <TableBody>
                 {filteredPanelContainers.map((c) => {
                   const fc = c as any;
@@ -733,8 +733,8 @@ function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrackingNow
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* ── Event timeline sheet ── */}
       <EventTimelineSheet
@@ -1540,15 +1540,15 @@ export default function FactoryContainers() {
           <OtwNotes />
 
           {otwContainers.length === 0 ? (
-            <Card>
-              <CardContent className="py-16 text-center">
+            <div className="rounded-xl border overflow-hidden">
+              <div className="py-16 text-center">
                 <Ship className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-40" />
                 <p className="text-muted-foreground">No containers currently on the way.</p>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ) : (
             <>
-              <Card>
+              <div className="rounded-xl border overflow-hidden">
                 {otwSupplierGroups.map((group, idx) => {
                   const key = String(group.supplierId ?? "none");
                   const isOpen = openOtwGroups.has(key);
@@ -1557,22 +1557,20 @@ export default function FactoryContainers() {
                     <Collapsible key={key} open={isOpen} onOpenChange={() => toggleOtwGroup(key)}>
                       <CollapsibleTrigger asChild>
                         <div
-                          className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover-elevate transition-colors
-                            ${!isLast ? "border-b" : ""}
-                            ${isOpen ? "bg-muted/30" : ""}`}
+                          className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer hover-elevate transition-colors ${!isLast || isOpen ? "border-b" : ""} ${isOpen ? "bg-muted/30" : ""}`}
                           data-testid={`row-otw-supplier-${key}`}
                         >
                           <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span className="font-semibold text-base flex-1 min-w-0 truncate">
+                          <span className="font-semibold text-sm flex-1 min-w-0 truncate">
                             {group.supplierName}
                           </span>
-                          <Badge variant="secondary" className="shrink-0">
+                          <Badge variant="secondary" className="shrink-0 text-xs">
                             {group.containers.length} ctr{group.containers.length !== 1 ? "s" : ""}
                           </Badge>
-                          <span className="font-mono text-sm text-muted-foreground shrink-0 hidden sm:block w-32 text-right">
+                          <span className="font-mono text-xs text-muted-foreground shrink-0 hidden sm:block w-28 text-right">
                             {fmtOtwKg(group.totalKg)} kg
                           </span>
-                          <div className="shrink-0 min-w-[100px] text-right">
+                          <div className="shrink-0 min-w-[110px] text-right">
                             <OtwCurrencyInline amounts={group.totalsByCurrency} />
                           </div>
                           <ChevronDown
@@ -1581,15 +1579,15 @@ export default function FactoryContainers() {
                         </div>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
-                        <div className={`border-t bg-muted/10 ${!isLast ? "border-b" : ""}`}>
+                        <div className={`bg-muted/5 ${!isLast ? "border-b" : ""}`}>
                           <Table>
                             <TableHeader>
-                              <TableRow>
-                                <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Container</TableHead>
-                                <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Origin</TableHead>
-                                <TableHead className="text-right text-xs uppercase tracking-wide font-medium text-muted-foreground">KG</TableHead>
-                                <TableHead className="text-right text-xs uppercase tracking-wide font-medium text-muted-foreground">Value</TableHead>
-                                <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Status</TableHead>
+                              <TableRow className="bg-muted/40 border-b border-border/60 hover:bg-muted/40">
+                                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2 pl-4">Container</TableHead>
+                                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Origin</TableHead>
+                                <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">KG</TableHead>
+                                <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Value</TableHead>
+                                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Status</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1643,10 +1641,10 @@ export default function FactoryContainers() {
                     </Collapsible>
                   );
                 })}
-              </Card>
+              </div>
 
               <div
-                className="sticky bottom-0 z-50 rounded-md border bg-background shadow-md"
+                className="sticky bottom-0 z-50 rounded-xl border bg-card shadow-md"
                 data-testid="div-otw-grand-total"
               >
                 <div className="flex flex-wrap items-center gap-6 p-4">
@@ -1693,44 +1691,42 @@ export default function FactoryContainers() {
         </div>
       ) : (
 
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Container className="h-5 w-5 text-muted-foreground" />
-              <CardTitle className="text-lg">
-                Containers ({filteredContainers?.length || 0}{filteredContainers?.length !== containers?.length ? ` of ${containers?.length}` : ""})
-              </CardTitle>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="relative w-56">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search containers..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                  data-testid="input-search-containers"
-                />
-              </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40" data-testid="select-filter-status">
-                  <SelectValue placeholder="All Statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="PENDING">Pending</SelectItem>
-                  <SelectItem value="IN_TRANSIT">In Transit</SelectItem>
-                  <SelectItem value="AVAILABLE">Available</SelectItem>
-                  <SelectItem value="OFFLOADED">Offloaded</SelectItem>
-                  <SelectItem value="HAS_WEIGHT">Has Weight</SelectItem>
-                  <SelectItem value="NO_WEIGHT">No Weight</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      <div className="rounded-xl border overflow-hidden">
+        <div className="flex items-center justify-between gap-3 flex-wrap px-4 py-3 border-b bg-muted/20">
+          <div className="flex items-center gap-2">
+            <Container className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-semibold">
+              Containers ({filteredContainers?.length || 0}{filteredContainers?.length !== containers?.length ? ` of ${containers?.length}` : ""})
+            </span>
           </div>
-        </CardHeader>
-        <CardContent>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative w-52">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search containers..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-containers"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40" data-testid="select-filter-status">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="IN_TRANSIT">In Transit</SelectItem>
+                <SelectItem value="AVAILABLE">Available</SelectItem>
+                <SelectItem value="OFFLOADED">Offloaded</SelectItem>
+                <SelectItem value="HAS_WEIGHT">Has Weight</SelectItem>
+                <SelectItem value="NO_WEIGHT">No Weight</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div>
           {filteredContainers && filteredContainers.length > 0 ? (() => {
             // Group containers by supplier name
             const groups: { supplierKey: string; supplierName: string; containers: typeof filteredContainers }[] = [];
@@ -1811,9 +1807,9 @@ export default function FactoryContainers() {
             };
             return (
               <Table wrapperClassName="overflow-visible">
-                <TableHeader className="sticky top-0 z-30 bg-background">
-                  <TableRow>
-                    <TableHead className="w-10">
+                <TableHeader className="sticky top-0 z-30">
+                  <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
+                    <TableHead className="w-10 py-2">
                       <Checkbox
                         checked={filteredContainers.length > 0 && filteredContainers.every(c => selectedIds.has(c.id))}
                         onCheckedChange={(checked) => {
@@ -1823,12 +1819,12 @@ export default function FactoryContainers() {
                         data-testid="checkbox-select-all"
                       />
                     </TableHead>
-                    <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Container #</TableHead>
-                    <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Commission</TableHead>
-                    <TableHead className="text-right text-xs uppercase tracking-wide font-medium text-muted-foreground">Weight (kg)</TableHead>
-                    <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Total Value</TableHead>
-                    <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Status</TableHead>
-                    <TableHead className="w-24 text-xs uppercase tracking-wide font-medium text-muted-foreground">Actions</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Container #</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Commission</TableHead>
+                    <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Weight (kg)</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Total Value</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Status</TableHead>
+                    <TableHead className="w-24 text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1854,33 +1850,34 @@ export default function FactoryContainers() {
                       // Supplier header row
                       <TableRow
                         key={`supplier-${supplierKey}`}
-                        className="bg-muted/30 hover-elevate cursor-pointer"
+                        className="bg-muted/40 hover-elevate cursor-pointer border-b border-border/50"
                         onClick={() => toggleSupplier(supplierKey)}
                         data-testid={`row-supplier-group-${supplierKey}`}
                       >
-                        <TableCell className="w-10">
+                        <TableCell className="w-10 py-2.5">
                           {isExpanded
                             ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
                             : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                         </TableCell>
-                        <TableCell colSpan={2}>
+                        <TableCell colSpan={2} className="py-2.5">
                           <div className="flex items-center gap-2">
-                            <span className="text-base font-bold">{supplierName}</span>
-                            <Badge variant="outline">{count} container{count !== 1 ? "s" : ""}</Badge>
+                            <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <span className="text-sm font-semibold">{supplierName}</span>
+                            <Badge variant="secondary" className="text-xs">{count} container{count !== 1 ? "s" : ""}</Badge>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-mono font-semibold">
+                        <TableCell className="text-right font-mono font-semibold text-sm py-2.5">
                           {(() => {
                             const totalKg = groupContainers.reduce((s, c) => s + parseFloat(c.totalKg || "0"), 0);
                             return totalKg > 0 ? formatNumber(totalKg) : <span className="text-muted-foreground">—</span>;
                           })()}
                         </TableCell>
-                        <TableCell className="font-mono font-semibold">
+                        <TableCell className="font-mono font-semibold text-sm py-2.5">
                           {Array.from(groupTotals.entries()).map(([cc, amt]) => (
                             <div key={cc}>{cc} {formatNumber(amt)}</div>
                           ))}
                         </TableCell>
-                        <TableCell colSpan={2} />
+                        <TableCell colSpan={2} className="py-2.5" />
                       </TableRow>,
                       // Container rows (only when expanded)
                       ...(isExpanded ? groupContainers.map((c) => {
@@ -2002,8 +1999,8 @@ export default function FactoryContainers() {
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       )}
 
