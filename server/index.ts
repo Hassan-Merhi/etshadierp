@@ -2648,6 +2648,8 @@ let migrationsDone = false;
       // All idempotent: ADD COLUMN IF NOT EXISTS is safe to run repeatedly.
       `ALTER TABLE locations ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
       `ALTER TABLE ledger_accounts ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+      `ALTER TABLE ledger_accounts ADD COLUMN IF NOT EXISTS is_hidden boolean NOT NULL DEFAULT false`,
+      `ALTER TABLE ledger_accounts ADD COLUMN IF NOT EXISTS created_at timestamp NOT NULL DEFAULT now()`,
       `ALTER TABLE employees ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
       `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
       `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS stock_group_id integer REFERENCES stock_groups(id) ON DELETE SET NULL`,
