@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useCompany } from "@/contexts/CompanyContext";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -77,13 +78,12 @@ interface LedgerAccount {
   companyId: number;
 }
 
-type TabId = "all" | "unread" | "loading" | "invoice" | "intercompany";
+type TabId = "all" | "loading" | "invoice" | "intercompany";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "unread", label: "Unread" },
   { id: "loading", label: "Loading" },
   { id: "invoice", label: "Invoice" },
   { id: "intercompany", label: "Intercompany" },
@@ -120,6 +120,8 @@ export function NotificationsCenter() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { selectedCompany } = useCompany();
+  const companyId = selectedCompany?.id;
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("all");
 
@@ -129,9 +131,9 @@ export function NotificationsCenter() {
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [dismissNote, setDismissNote] = useState("");
 
-  // ── Unread count ─────────────────────────────────────────────────────────────
+  // ── Unread count (scoped to current company) ──────────────────────────────────
   const { data: unreadData } = useQuery<{ count: number }>({
-    queryKey: ["/api/notifications/unread-count"],
+    queryKey: ["/api/notifications/unread-count", companyId],
     queryFn: async () => {
       const r = await fetch("/api/notifications/unread-count", { credentials: "include" });
       return r.ok ? r.json() : { count: 0 };
@@ -152,21 +154,15 @@ export function NotificationsCenter() {
 
   const totalBadge = (unreadData?.count ?? 0) + (icCountData?.count ?? 0);
 
-  // ── Notifications list ────────────────────────────────────────────────────────
-  const typeParam = activeTab === "all" ? undefined
-    : activeTab === "unread" ? undefined
-    : activeTab === "intercompany" ? undefined
-    : activeTab;
+  // ── Notifications list — always unread only, scoped to current company ────────
+  const typeParam = (activeTab === "all" || activeTab === "intercompany") ? undefined : activeTab;
 
-  const unreadParam = activeTab === "unread" ? "true" : undefined;
-
-  const qKey = ["/api/notifications", activeTab];
+  const qKey = ["/api/notifications", activeTab, companyId];
   const { data: notifList = [], isLoading: notifLoading } = useQuery<NotificationItem[]>({
     queryKey: qKey,
     queryFn: async () => {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ unread: "true" });
       if (typeParam) params.set("type", typeParam);
-      if (unreadParam) params.set("unread", unreadParam);
       const r = await fetch(`/api/notifications?${params}`, { credentials: "include" });
       return r.ok ? r.json() : [];
     },
@@ -256,7 +252,8 @@ export function NotificationsCenter() {
 
   // ── Render ────────────────────────────────────────────────────────────────────
   const showNotifEmpty = !notifLoading && notifList.length === 0 && activeTab !== "intercompany";
-  const unreadInView = notifList.filter(n => !n.isRead).length;
+  // All items in notifList are unread (we always fetch unread=true)
+  const unreadInView = notifList.length;
 
   return (
     <>
@@ -343,7 +340,7 @@ export function NotificationsCenter() {
                     {icCountData!.count}
                   </span>
                 )}
-                {tab.id === "unread" && (unreadData?.count ?? 0) > 0 && (
+                {tab.id === "all" && (unreadData?.count ?? 0) > 0 && (
                   <span className="ml-1 inline-flex h-3.5 min-w-3.5 px-0.5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold">
                     {unreadData!.count}
                   </span>

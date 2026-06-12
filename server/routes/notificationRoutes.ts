@@ -9,10 +9,11 @@ const ALLOWED_ROLES = ["Developer", "Admin"];
 
 export function registerNotificationRoutes(app: Express) {
 
-  // GET /api/notifications — current user's notifications, enriched with company + triggered-by username
+  // GET /api/notifications — current user's notifications for the active company, enriched with triggered-by username
   app.get("/api/notifications", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.session?.userId;
+      const companyId = req.session?.currentCompanyId;
       if (!userId) return res.status(401).json({ message: "Not authenticated" });
 
       const unreadOnly = req.query.unread === "true";
@@ -20,6 +21,8 @@ export function registerNotificationRoutes(app: Express) {
       const limit = Math.min(parseInt(req.query.limit as string || "60"), 100);
 
       const conditions: any[] = [eq(notifications.recipientUserId, userId)];
+      // Scope to the currently-selected company
+      if (companyId) conditions.push(eq(notifications.companyId, companyId));
       if (unreadOnly) conditions.push(eq(notifications.isRead, false));
       if (typeFilter && typeFilter !== "all") {
         if (typeFilter === "loading") {
@@ -68,11 +71,14 @@ export function registerNotificationRoutes(app: Express) {
   app.get("/api/notifications/unread-count", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.session?.userId;
+      const companyId = req.session?.currentCompanyId;
       if (!userId) return res.json({ count: 0 });
+      const conds: any[] = [eq(notifications.recipientUserId, userId), eq(notifications.isRead, false)];
+      if (companyId) conds.push(eq(notifications.companyId, companyId));
       const [row] = await db
         .select({ count: sql<number>`COUNT(*)::int` })
         .from(notifications)
-        .where(and(eq(notifications.recipientUserId, userId), eq(notifications.isRead, false)));
+        .where(and(...conds));
       res.json({ count: row?.count ?? 0 });
     } catch {
       res.json({ count: 0 });
@@ -99,11 +105,14 @@ export function registerNotificationRoutes(app: Express) {
   app.post("/api/notifications/read-all", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.session?.userId;
+      const companyId = req.session?.currentCompanyId;
       if (!userId) return res.status(401).json({ message: "Not authenticated" });
+      const conds: any[] = [eq(notifications.recipientUserId, userId), eq(notifications.isRead, false)];
+      if (companyId) conds.push(eq(notifications.companyId, companyId));
       await db
         .update(notifications)
         .set({ isRead: true, readAt: new Date() })
-        .where(and(eq(notifications.recipientUserId, userId), eq(notifications.isRead, false)));
+        .where(and(...conds));
       res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
