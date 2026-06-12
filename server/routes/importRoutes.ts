@@ -1280,57 +1280,55 @@ export function registerImportRoutes(app: Express) {
         createdVoucher = voucher;
       });
 
-      // Send invoice + stock report to the location's WhatsApp group (best-effort)
-      if (createdVoucher && location.whatsappGroupChatId) {
-        // 1. Invoice PDF
-        try {
-          const senderName = (req as any).user?.username || "Import";
-          const waVis = await getErpExportVisibility(req);
-          const hideProfitCols = waVis.hideSelling || waVis.hideCost || waVis.hideSalesProfitCost;
-          const pdfBuffer = await generateInvoicePdf(createdVoucher.id, req.session.currentCompanyId!, senderName, { hideProfitCols });
-          const safeDate = (createdVoucher.voucherDate ?? saleDate).replace(/[^0-9-]/g, "");
-          const rawName  = `${location.name ?? ""} Invoice ${safeDate}`;
-          const fileName = rawName.replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, " ").trim() + ".pdf";
-          const invResult = await sendWhatsAppFileByUploadPos(location.whatsappGroupChatId, pdfBuffer, fileName, "");
-          if (!invResult.success) {
-            console.error(`[POSImport] Invoice send failed: ${invResult.error}`);
-          } else {
-            console.log(`[POSImport] Invoice sent: ${fileName} → ${location.whatsappGroupChatId}`);
-          }
-        } catch (waErr: any) {
-          console.error("[POSImport] Invoice send failed (import still succeeded):", waErr.message);
-        }
-
-        // 2. Stock report PDF
-        try {
-          const [co] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, req.session.currentCompanyId!)).limit(1);
-          const companyName = co?.name || "Company";
-          const { buffer: stockBuf, pageCount, rowCount } = await generateStockPdf(req.session.currentCompanyId!, companyName, locationId, location.name);
-          const maxAllowedPages = Math.ceil(rowCount / 20) + 5;
-          if (pageCount > maxAllowedPages) {
-            console.error(`[POSImport] Stock PDF safety guard: ${pageCount} pages for ${rowCount} rows — not sent`);
-          } else {
-            const dateStr   = getClientDate(req);
-            const stampStr  = new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-            const stockName = `${location.name} STK ${companyName} ${dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
-            const stockRes  = await sendWhatsAppFileToChatIdPos(location.whatsappGroupChatId, stockBuf, `${stockName}.pdf`, `Stock Report — ${location.name}\n${stampStr}`);
-            if (!stockRes.success) {
-              console.error(`[POSImport] Stock send failed: ${stockRes.error}`);
-            } else {
-              console.log(`[POSImport] Stock report sent: ${stockName}.pdf → ${location.whatsappGroupChatId}`);
-            }
-          }
-        } catch (stockErr: any) {
-          console.error("[POSImport] Stock send failed (import still succeeded):", stockErr.message);
-        }
-      }
-
       res.json({
         success: true,
         voucher: createdVoucher,
         itemsCount: items.length,
         totalSales: totalSales.toFixed(2),
       });
+
+      // Background: send invoice + stock report after response is already sent
+      if (createdVoucher && location.whatsappGroupChatId) {
+        const _companyId  = req.session.currentCompanyId!;
+        const _chatId     = location.whatsappGroupChatId;
+        const _locName    = location.name;
+        const _locId      = locationId;
+        const _saleDate   = saleDate;
+        const _voucherDate = createdVoucher.voucherDate;
+        const _voucherId  = createdVoucher.id;
+        const _senderName = (req as any).user?.username || "Import";
+        const _dateStr    = getClientDate(req);
+        setImmediate(async () => {
+          // 1. Invoice PDF
+          try {
+            const waVis = await getErpExportVisibility(req);
+            const hideProfitCols = waVis.hideSelling || waVis.hideCost || waVis.hideSalesProfitCost;
+            const pdfBuffer = await generateInvoicePdf(_voucherId, _companyId, _senderName, { hideProfitCols });
+            const safeDate  = (_voucherDate ?? _saleDate).replace(/[^0-9-]/g, "");
+            const fileName  = `${_locName} Invoice ${safeDate}`.replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, " ").trim() + ".pdf";
+            const invResult = await sendWhatsAppFileByUploadPos(_chatId, pdfBuffer, fileName, "");
+            if (!invResult.success) console.error(`[POSImport-bg] Invoice send failed: ${invResult.error}`);
+            else console.log(`[POSImport-bg] Invoice sent: ${fileName} → ${_chatId}`);
+          } catch (e: any) { console.error("[POSImport-bg] Invoice send error:", e.message); }
+
+          // 2. Stock report PDF
+          try {
+            const [co] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, _companyId)).limit(1);
+            const companyName = co?.name || "Company";
+            const { buffer: stockBuf, pageCount, rowCount } = await generateStockPdf(_companyId, companyName, _locId, _locName);
+            const maxAllowedPages = Math.ceil(rowCount / 20) + 5;
+            if (pageCount > maxAllowedPages) {
+              console.error(`[POSImport-bg] Stock PDF safety guard: ${pageCount} pages for ${rowCount} rows — not sent`);
+            } else {
+              const stampStr  = new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+              const stockName = `${_locName} STK ${companyName} ${_dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
+              const stockRes  = await sendWhatsAppFileToChatIdPos(_chatId, stockBuf, `${stockName}.pdf`, `Stock Report — ${_locName}\n${stampStr}`);
+              if (!stockRes.success) console.error(`[POSImport-bg] Stock send failed: ${stockRes.error}`);
+              else console.log(`[POSImport-bg] Stock report sent: ${stockName}.pdf → ${_chatId}`);
+            }
+          } catch (e: any) { console.error("[POSImport-bg] Stock send error:", e.message); }
+        });
+      }
     } catch (error: any) {
       console.error("POS Import error:", error);
       res.status(500).json({ message: error.message });
@@ -1751,51 +1749,6 @@ export function registerImportRoutes(app: Express) {
         });
       });
 
-      // Send invoice + stock report to the location's WhatsApp group (best-effort — never blocks the response)
-      if (createdVoucher && location.whatsappGroupChatId) {
-        // 1. Invoice PDF
-        try {
-          const senderName = (req as any).user?.username || "Import";
-          const waVis = await getErpExportVisibility(req);
-          const hideProfitCols = waVis.hideSelling || waVis.hideCost || waVis.hideSalesProfitCost;
-          const pdfBuffer = await generateInvoicePdf(createdVoucher.id, req.session.currentCompanyId!, senderName, { hideProfitCols });
-          const safeDate = (createdVoucher.voucherDate ?? saleDate).replace(/[^0-9-]/g, "");
-          const rawName  = `${customer.legalName ?? ""} Invoice ${location.name ?? ""} ${safeDate}`;
-          const fileName = rawName.replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, " ").trim() + ".pdf";
-          const invResult = await sendWhatsAppFileByUploadPos(location.whatsappGroupChatId, pdfBuffer, fileName, "");
-          if (!invResult.success) {
-            console.error(`[CreditImport] Invoice send failed: ${invResult.error}`);
-          } else {
-            console.log(`[CreditImport] Invoice sent: ${fileName} → ${location.whatsappGroupChatId}`);
-          }
-        } catch (waErr: any) {
-          console.error("[CreditImport] Invoice send failed (import still succeeded):", waErr.message);
-        }
-
-        // 2. Stock report PDF
-        try {
-          const [co] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, req.session.currentCompanyId!)).limit(1);
-          const companyName = co?.name || "Company";
-          const { buffer: stockBuf, pageCount, rowCount } = await generateStockPdf(req.session.currentCompanyId!, companyName, locationId, location.name);
-          const maxAllowedPages = Math.ceil(rowCount / 20) + 5;
-          if (pageCount > maxAllowedPages) {
-            console.error(`[CreditImport] Stock PDF safety guard: ${pageCount} pages for ${rowCount} rows — not sent`);
-          } else {
-            const dateStr   = getClientDate(req);
-            const stampStr  = new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-            const stockName = `${location.name} STK ${companyName} ${dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
-            const stockRes  = await sendWhatsAppFileToChatIdPos(location.whatsappGroupChatId, stockBuf, `${stockName}.pdf`, `Stock Report — ${location.name}\n${stampStr}`);
-            if (!stockRes.success) {
-              console.error(`[CreditImport] Stock send failed: ${stockRes.error}`);
-            } else {
-              console.log(`[CreditImport] Stock report sent: ${stockName}.pdf → ${location.whatsappGroupChatId}`);
-            }
-          }
-        } catch (stockErr: any) {
-          console.error("[CreditImport] Stock send failed (import still succeeded):", stockErr.message);
-        }
-      }
-
       res.json({
         success: true,
         voucher: createdVoucher,
@@ -1803,6 +1756,50 @@ export function registerImportRoutes(app: Express) {
         totalSales: totalSales.toFixed(2),
         customerName: customer.legalName,
       });
+
+      // Background: send invoice + stock report after response is already sent
+      if (createdVoucher && location.whatsappGroupChatId) {
+        const _companyId   = req.session.currentCompanyId!;
+        const _chatId      = location.whatsappGroupChatId;
+        const _locName     = location.name;
+        const _locId       = locationId;
+        const _saleDate    = saleDate;
+        const _voucherDate = createdVoucher.voucherDate;
+        const _voucherId   = createdVoucher.id;
+        const _custName    = customer.legalName ?? "";
+        const _senderName  = (req as any).user?.username || "Import";
+        const _dateStr     = getClientDate(req);
+        setImmediate(async () => {
+          // 1. Invoice PDF
+          try {
+            const waVis = await getErpExportVisibility(req);
+            const hideProfitCols = waVis.hideSelling || waVis.hideCost || waVis.hideSalesProfitCost;
+            const pdfBuffer = await generateInvoicePdf(_voucherId, _companyId, _senderName, { hideProfitCols });
+            const safeDate  = (_voucherDate ?? _saleDate).replace(/[^0-9-]/g, "");
+            const fileName  = `${_custName} Invoice ${_locName} ${safeDate}`.replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, " ").trim() + ".pdf";
+            const invResult = await sendWhatsAppFileByUploadPos(_chatId, pdfBuffer, fileName, "");
+            if (!invResult.success) console.error(`[CreditImport-bg] Invoice send failed: ${invResult.error}`);
+            else console.log(`[CreditImport-bg] Invoice sent: ${fileName} → ${_chatId}`);
+          } catch (e: any) { console.error("[CreditImport-bg] Invoice send error:", e.message); }
+
+          // 2. Stock report PDF
+          try {
+            const [co] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, _companyId)).limit(1);
+            const companyName = co?.name || "Company";
+            const { buffer: stockBuf, pageCount, rowCount } = await generateStockPdf(_companyId, companyName, _locId, _locName);
+            const maxAllowedPages = Math.ceil(rowCount / 20) + 5;
+            if (pageCount > maxAllowedPages) {
+              console.error(`[CreditImport-bg] Stock PDF safety guard: ${pageCount} pages for ${rowCount} rows — not sent`);
+            } else {
+              const stampStr  = new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+              const stockName = `${_locName} STK ${companyName} ${_dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
+              const stockRes  = await sendWhatsAppFileToChatIdPos(_chatId, stockBuf, `${stockName}.pdf`, `Stock Report — ${_locName}\n${stampStr}`);
+              if (!stockRes.success) console.error(`[CreditImport-bg] Stock send failed: ${stockRes.error}`);
+              else console.log(`[CreditImport-bg] Stock report sent: ${stockName}.pdf → ${_chatId}`);
+            }
+          } catch (e: any) { console.error("[CreditImport-bg] Stock send error:", e.message); }
+        });
+      }
     } catch (error: any) {
       console.error("Credit Sales Import error:", error);
       res.status(500).json({ message: error.message });

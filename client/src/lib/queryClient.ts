@@ -203,7 +203,7 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
   _isRetry = false,
-  timeoutMs = 30000,
+  timeoutMs = 300000,
 ): Promise<Response> {
   const controller = new AbortController();
   let intentionalAbort = false;
@@ -284,14 +284,14 @@ export const getQueryFn: <T>(options: {
     // The queryKey is expected to be a single URL string as the first element
     const url = queryKey[0] as string;
 
-    // Apply a 30-second hard timeout so queries never hang indefinitely.
+    // Apply a 5-minute hard timeout so queries never hang indefinitely.
     // We race the caller's own signal (query cancellation) against our timeout.
     const controller = new AbortController();
     let timedOut = false;
     const timeoutId = setTimeout(() => {
       timedOut = true;
       controller.abort();
-    }, 30000);
+    }, 300000);
 
     // Forward query-level cancellation (e.g. component unmount) into our controller
     querySignal?.addEventListener("abort", () => controller.abort(), { once: true });
