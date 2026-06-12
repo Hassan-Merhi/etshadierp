@@ -48,6 +48,10 @@ import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositio
 import path from "path";
 import fs from "fs";
 
+const _npsCache = new Map<string, { data: any; expiresAt: number }>();
+function _npsCached(key: string) { const c = _npsCache.get(key); return (c && Date.now() < c.expiresAt) ? c.data : null; }
+function _npsSetCache(key: string, data: any) { _npsCache.set(key, { data, expiresAt: Date.now() + 30_000 }); if (_npsCache.size > 500) { const now = Date.now(); for (const [k, v] of _npsCache) if (now >= v.expiresAt) _npsCache.delete(k); } }
+
 export function registerReportsRoutes(app: Express) {
   app.get("/api/reports/net-profit-statement", requireAuth, requireNonPOS, async (req, res) => {
     try {
@@ -63,25 +67,20 @@ export function registerReportsRoutes(app: Express) {
       const startDate = req.query.startDate ? new Date(req.query.startDate as string) : null;
       const endDate = req.query.endDate ? new Date(req.query.endDate as string) : null;
 
-      // Check if this is a factory company (uses factory_raw_stock for purchases/stock)
-      const [companyRecord] = await db
-        .select({ companyType: companies.companyType })
-        .from(companies)
-        .where(eq(companies.id, companyId))
-        .execute();
+      // Phase 1: metadata + accounts + stock items (all independent, run in parallel)
+      const [companyRecord, companyAccounts, allStockItems] = await Promise.all([
+        db.select({ companyType: companies.companyType }).from(companies).where(eq(companies.id, companyId)).execute().then((r) => r[0] ?? null),
+        storage.getAllLedgerAccounts(companyId, true),
+        storage.getAllStockItems(companyId),
+      ]);
       const isFactoryCompany = companyRecord?.companyType === "factory";
 
-      // Get all ledger accounts for this company
-      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
-
       // Build voucher filter conditions
-      const voucherConditions = [
+      const voucherConditions: any[] = [
         eq(vouchers.companyId, companyId),
         isNull(vouchers.deletedAt),
-        eq(vouchers.optional, false)
+        eq(vouchers.optional, false),
       ];
-      
-      // Add date filters if provided
       if (startDate) {
         voucherConditions.push(gte(vouchers.voucherDate, startDate.toISOString().split('T')[0]));
       }
@@ -89,23 +88,42 @@ export function registerReportsRoutes(app: Express) {
         voucherConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split('T')[0]));
       }
 
-      // Get all non-optional vouchers for this company within date range
-      const companyVouchers = await db
-        .select({ id: vouchers.id })
-        .from(vouchers)
-        .where(and(...voucherConditions))
-        .execute();
-      
-      const companyVoucherIds = companyVouchers.map((v) => v.id);
+      // allTime conditions: same but without startDate filter
+      const allTimeVoucherConditions: any[] = [
+        eq(vouchers.companyId, companyId),
+        isNull(vouchers.deletedAt),
+        eq(vouchers.optional, false),
+      ];
+      if (endDate) {
+        allTimeVoucherConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split('T')[0]));
+      }
 
-      // Get all voucher entries
-      const companyEntries = companyVoucherIds.length > 0
-        ? await db
-            .select()
-            .from(voucherEntries)
-            .where(inArray(voucherEntries.voucherId, companyVoucherIds))
-            .execute()
-        : [];
+      // Phase 2: period entries + all-time entries via JOINs (eliminates 2 intermediate ID round-trips)
+      const [periodEntries, allTimeEntries] = await Promise.all([
+        db.select({
+          ledgerAccountId: voucherEntries.ledgerAccountId,
+          debitAmount: voucherEntries.debitAmount,
+          creditAmount: voucherEntries.creditAmount,
+          voucherId: voucherEntries.voucherId,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(and(...voucherConditions))
+        .execute(),
+        db.select({
+          ledgerAccountId: voucherEntries.ledgerAccountId,
+          debitAmount: voucherEntries.debitAmount,
+          creditAmount: voucherEntries.creditAmount,
+          supplierId: voucherEntries.supplierId,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(and(...allTimeVoucherConditions))
+        .execute(),
+      ]);
+
+      const companyEntries = periodEntries;
+      const companyVoucherIds = [...new Set(periodEntries.map((e) => e.voucherId).filter((id): id is number => id != null))];
 
       // Calculate balances for each account (credit - debit for normal P&L view)
       // accountBalances = period-filtered (used for P&L: purchases, sales, expenses, incomes)
@@ -124,27 +142,6 @@ export function registerReportsRoutes(app: Express) {
 
       // allTimeAccountBalances = ALL vouchers up to endDate (used for Net Position balance sheet)
       // This ensures Net Position reflects the true running balance of assets/liabilities
-      const allTimeVoucherConditions = [
-        eq(vouchers.companyId, companyId),
-        isNull(vouchers.deletedAt),
-        eq(vouchers.optional, false),
-      ];
-      if (endDate) {
-        allTimeVoucherConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split('T')[0]));
-      }
-      const allTimeVouchers = await db
-        .select({ id: vouchers.id })
-        .from(vouchers)
-        .where(and(...allTimeVoucherConditions))
-        .execute();
-      const allTimeVoucherIds = allTimeVouchers.map((v) => v.id);
-      const allTimeEntries = allTimeVoucherIds.length > 0
-        ? await db
-            .select()
-            .from(voucherEntries)
-            .where(inArray(voucherEntries.voucherId, allTimeVoucherIds))
-            .execute()
-        : [];
       const allTimeAccountBalances = new Map<number, { debit: number; credit: number }>();
       for (const entry of allTimeEntries) {
         if (entry.ledgerAccountId) {
@@ -160,7 +157,6 @@ export function registerReportsRoutes(app: Express) {
 
       // 1. Opening Stock - FROZEN value from stock items' opening values only
       // This value does not change with POS sales - it represents the initial inventory setup
-      const allStockItems = await storage.getAllStockItems(companyId);
       let openingStockValue = 0;
       for (const item of allStockItems) {
         openingStockValue += parseFloat(item.openingValue || "0");
@@ -1325,31 +1321,31 @@ export function registerReportsRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
+      const cacheKey = `purchase-accounts:${companyId}`;
+      const cached = _npsCached(cacheKey);
+      if (cached) return res.json(cached);
+
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
       const purchaseAccounts = companyAccounts.filter(
         (acc) => acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-")
       );
 
-      // Get voucher entries for these accounts
-      const companyVouchers = await db
-        .select({ id: vouchers.id })
-        .from(vouchers)
-        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
-        .execute();
-      
-      const companyVoucherIds = companyVouchers.map((v) => v.id);
       const accountIds = purchaseAccounts.map((a) => a.id);
-
-      const entries = companyVoucherIds.length > 0 && accountIds.length > 0
+      const entries = accountIds.length > 0
         ? await db
-            .select()
+            .select({
+              ledgerAccountId: voucherEntries.ledgerAccountId,
+              debitAmount: voucherEntries.debitAmount,
+              creditAmount: voucherEntries.creditAmount,
+            })
             .from(voucherEntries)
-            .where(
-              and(
-                inArray(voucherEntries.voucherId, companyVoucherIds),
-                inArray(voucherEntries.ledgerAccountId, accountIds)
-              )
-            )
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+            .where(and(
+              eq(vouchers.companyId, companyId),
+              eq(vouchers.optional, false),
+              isNull(vouchers.deletedAt),
+              inArray(voucherEntries.ledgerAccountId, accountIds),
+            ))
             .execute()
         : [];
 
@@ -1359,28 +1355,19 @@ export function registerReportsRoutes(app: Express) {
           const debit = parseFloat(entry.debitAmount || "0");
           const credit = parseFloat(entry.creditAmount || "0");
           const current = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
-          accountBalances.set(entry.ledgerAccountId, {
-            debit: current.debit + debit,
-            credit: current.credit + credit,
-          });
+          accountBalances.set(entry.ledgerAccountId, { debit: current.debit + debit, credit: current.credit + credit });
         }
       }
 
       const accounts = purchaseAccounts.map((acc) => {
         const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
-        return {
-          id: acc.id,
-          code: acc.code,
-          name: acc.name,
-          debit: balance.debit,
-          credit: balance.credit,
-          balance: balance.debit - balance.credit,
-        };
+        return { id: acc.id, code: acc.code, name: acc.name, debit: balance.debit, credit: balance.credit, balance: balance.debit - balance.credit };
       }).filter((a) => a.debit > 0 || a.credit > 0);
 
       const total = accounts.reduce((sum, a) => sum + a.balance, 0);
-
-      res.json({ accounts, total });
+      const result = { accounts, total };
+      _npsSetCache(cacheKey, result);
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1394,30 +1381,31 @@ export function registerReportsRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
+      const cacheKey = `direct-incomes:${companyId}`;
+      const cached = _npsCached(cacheKey);
+      if (cached) return res.json(cached);
+
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
       const directIncomeAccounts = companyAccounts.filter(
         (acc) => acc.accountType === "Income" && acc.subType === "Direct Income"
       );
 
-      const companyVouchers = await db
-        .select({ id: vouchers.id })
-        .from(vouchers)
-        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
-        .execute();
-      
-      const companyVoucherIds = companyVouchers.map((v) => v.id);
       const accountIds = directIncomeAccounts.map((a) => a.id);
-
-      const entries = companyVoucherIds.length > 0 && accountIds.length > 0
+      const entries = accountIds.length > 0
         ? await db
-            .select()
+            .select({
+              ledgerAccountId: voucherEntries.ledgerAccountId,
+              debitAmount: voucherEntries.debitAmount,
+              creditAmount: voucherEntries.creditAmount,
+            })
             .from(voucherEntries)
-            .where(
-              and(
-                inArray(voucherEntries.voucherId, companyVoucherIds),
-                inArray(voucherEntries.ledgerAccountId, accountIds)
-              )
-            )
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+            .where(and(
+              eq(vouchers.companyId, companyId),
+              eq(vouchers.optional, false),
+              isNull(vouchers.deletedAt),
+              inArray(voucherEntries.ledgerAccountId, accountIds),
+            ))
             .execute()
         : [];
 
@@ -1427,28 +1415,19 @@ export function registerReportsRoutes(app: Express) {
           const debit = parseFloat(entry.debitAmount || "0");
           const credit = parseFloat(entry.creditAmount || "0");
           const current = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
-          accountBalances.set(entry.ledgerAccountId, {
-            debit: current.debit + debit,
-            credit: current.credit + credit,
-          });
+          accountBalances.set(entry.ledgerAccountId, { debit: current.debit + debit, credit: current.credit + credit });
         }
       }
 
       const accounts = directIncomeAccounts.map((acc) => {
         const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
-        return {
-          id: acc.id,
-          code: acc.code,
-          name: acc.name,
-          debit: balance.debit,
-          credit: balance.credit,
-          balance: balance.credit - balance.debit, // Income is credit
-        };
+        return { id: acc.id, code: acc.code, name: acc.name, debit: balance.debit, credit: balance.credit, balance: balance.credit - balance.debit };
       }).filter((a) => a.debit > 0 || a.credit > 0);
 
       const total = accounts.reduce((sum, a) => sum + a.balance, 0);
-
-      res.json({ accounts, total });
+      const result = { accounts, total };
+      _npsSetCache(cacheKey, result);
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1462,52 +1441,47 @@ export function registerReportsRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
-      
+      const cacheKey = `direct-expenses:${companyId}`;
+      const cached = _npsCached(cacheKey);
+      if (cached) return res.json(cached);
+
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
+
       // Direct Expenses - include accounts that are Direct Expenses in any form:
       // - accountType === "Direct Expense"
       // - accountType === "Expense" AND subType === "Direct Expense"
       // - IMPORT_CHARGES parent and its children (import costs that reduce profit)
-      const importChargesParent = companyAccounts.find(
-        (acc) => acc.code === "IMPORT_CHARGES"
-      );
+      const importChargesParent = companyAccounts.find((acc) => acc.code === "IMPORT_CHARGES");
       const importChargesAccountIds = new Set<number>();
       if (importChargesParent) {
         importChargesAccountIds.add(importChargesParent.id);
-        companyAccounts.forEach(acc => {
-          if (acc.parentId === importChargesParent.id) {
-            importChargesAccountIds.add(acc.id);
-          }
-        });
+        companyAccounts.forEach(acc => { if (acc.parentId === importChargesParent.id) importChargesAccountIds.add(acc.id); });
       }
-      
+
       const directExpenseAccounts = companyAccounts.filter(
         (acc) => acc.code !== "PURCHASES" && !acc.code?.startsWith("PURCHASES") && (
-                   acc.accountType === "Direct Expense" || 
+                   acc.accountType === "Direct Expense" ||
                    (acc.accountType === "Expense" && acc.subType === "Direct Expense") ||
                    importChargesAccountIds.has(acc.id)
                  )
       );
 
-      const companyVouchers = await db
-        .select({ id: vouchers.id })
-        .from(vouchers)
-        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
-        .execute();
-      
-      const companyVoucherIds = companyVouchers.map((v) => v.id);
       const accountIds = directExpenseAccounts.map((a) => a.id);
-
-      const entries = companyVoucherIds.length > 0 && accountIds.length > 0
+      const entries = accountIds.length > 0
         ? await db
-            .select()
+            .select({
+              ledgerAccountId: voucherEntries.ledgerAccountId,
+              debitAmount: voucherEntries.debitAmount,
+              creditAmount: voucherEntries.creditAmount,
+            })
             .from(voucherEntries)
-            .where(
-              and(
-                inArray(voucherEntries.voucherId, companyVoucherIds),
-                inArray(voucherEntries.ledgerAccountId, accountIds)
-              )
-            )
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+            .where(and(
+              eq(vouchers.companyId, companyId),
+              eq(vouchers.optional, false),
+              isNull(vouchers.deletedAt),
+              inArray(voucherEntries.ledgerAccountId, accountIds),
+            ))
             .execute()
         : [];
 
@@ -1517,28 +1491,19 @@ export function registerReportsRoutes(app: Express) {
           const debit = parseFloat(entry.debitAmount || "0");
           const credit = parseFloat(entry.creditAmount || "0");
           const current = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
-          accountBalances.set(entry.ledgerAccountId, {
-            debit: current.debit + debit,
-            credit: current.credit + credit,
-          });
+          accountBalances.set(entry.ledgerAccountId, { debit: current.debit + debit, credit: current.credit + credit });
         }
       }
 
       const accounts = directExpenseAccounts.map((acc) => {
         const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
-        return {
-          id: acc.id,
-          code: acc.code,
-          name: acc.name,
-          debit: balance.debit,
-          credit: balance.credit,
-          balance: balance.debit - balance.credit, // Expense is debit
-        };
+        return { id: acc.id, code: acc.code, name: acc.name, debit: balance.debit, credit: balance.credit, balance: balance.debit - balance.credit };
       }).filter((a) => a.debit > 0 || a.credit > 0);
 
       const total = accounts.reduce((sum, a) => sum + a.balance, 0);
-
-      res.json({ accounts, total });
+      const result = { accounts, total };
+      _npsSetCache(cacheKey, result);
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1552,7 +1517,11 @@ export function registerReportsRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
+      const cacheKey = `indirect-expenses:${companyId}`;
+      const cached = _npsCached(cacheKey);
+      if (cached) return res.json(cached);
+
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
       const indirectExpenseAccounts = companyAccounts.filter(
         (acc) => acc.accountType === "Indirect Expense" &&
                  acc.code !== "PRODUCTION_ADJUSTMENT" &&
@@ -1561,25 +1530,22 @@ export function registerReportsRoutes(app: Express) {
                  !acc.code?.startsWith("PURCHASES")
       );
 
-      const companyVouchers = await db
-        .select({ id: vouchers.id })
-        .from(vouchers)
-        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
-        .execute();
-      
-      const companyVoucherIds = companyVouchers.map((v) => v.id);
       const accountIds = indirectExpenseAccounts.map((a) => a.id);
-
-      const entries = companyVoucherIds.length > 0 && accountIds.length > 0
+      const entries = accountIds.length > 0
         ? await db
-            .select()
+            .select({
+              ledgerAccountId: voucherEntries.ledgerAccountId,
+              debitAmount: voucherEntries.debitAmount,
+              creditAmount: voucherEntries.creditAmount,
+            })
             .from(voucherEntries)
-            .where(
-              and(
-                inArray(voucherEntries.voucherId, companyVoucherIds),
-                inArray(voucherEntries.ledgerAccountId, accountIds)
-              )
-            )
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+            .where(and(
+              eq(vouchers.companyId, companyId),
+              eq(vouchers.optional, false),
+              isNull(vouchers.deletedAt),
+              inArray(voucherEntries.ledgerAccountId, accountIds),
+            ))
             .execute()
         : [];
 
@@ -1589,28 +1555,19 @@ export function registerReportsRoutes(app: Express) {
           const debit = parseFloat(entry.debitAmount || "0");
           const credit = parseFloat(entry.creditAmount || "0");
           const current = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
-          accountBalances.set(entry.ledgerAccountId, {
-            debit: current.debit + debit,
-            credit: current.credit + credit,
-          });
+          accountBalances.set(entry.ledgerAccountId, { debit: current.debit + debit, credit: current.credit + credit });
         }
       }
 
       const accounts = indirectExpenseAccounts.map((acc) => {
         const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
-        return {
-          id: acc.id,
-          code: acc.code,
-          name: acc.name,
-          debit: balance.debit,
-          credit: balance.credit,
-          balance: balance.debit - balance.credit, // Expense is debit
-        };
+        return { id: acc.id, code: acc.code, name: acc.name, debit: balance.debit, credit: balance.credit, balance: balance.debit - balance.credit };
       }).filter((a) => a.debit > 0 || a.credit > 0);
 
       const total = accounts.reduce((sum, a) => sum + a.balance, 0);
-
-      res.json({ accounts, total });
+      const result = { accounts, total };
+      _npsSetCache(cacheKey, result);
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

@@ -595,7 +595,6 @@ export function registerAccountRoutes(app: Express) {
         fContainers,
         fPayments,
         companyVouchers,
-        companyCustomers,
       ] = await Promise.all([
         storage.getAllLedgerAccounts(companyId),
         storage.getAllBankAccounts(companyId),
@@ -616,7 +615,6 @@ export function registerAccountRoutes(app: Express) {
           .from(vouchers)
           .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
           .execute(),
-        storage.getAllCustomers(companyId),
       ]);
 
       const companyVoucherIds = companyVouchers.map((v) => v.id);
