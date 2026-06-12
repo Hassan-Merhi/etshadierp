@@ -2,6 +2,23 @@ import { createContext, useContext, useState, useEffect, useRef, ReactNode } fro
 import { useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
+const PREFETCH_KEYS = [
+  "/api/suppliers",
+  "/api/customers",
+  "/api/stock-items",
+  "/api/ledger-accounts",
+  "/api/bank-accounts",
+  "/api/locations",
+  "/api/employees",
+  "/api/fixed-assets",
+];
+
+function prefetchReferenceData(companyId: number) {
+  for (const key of PREFETCH_KEYS) {
+    queryClient.prefetchQuery({ queryKey: [key, companyId] });
+  }
+}
+
 interface Company {
   id: number;
   code: string;
@@ -72,6 +89,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     } else {
       invalidateCompanyQueries();
     }
+    prefetchReferenceData(company.id);
   };
 
   useEffect(() => {
@@ -87,6 +105,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       }
 
       setSelectedCompany(companyToSelect);
+      prefetchReferenceData(companyToSelect.id);
 
       if (companyToSelect && lastSyncedCompanyId.current !== companyToSelect.id) {
         switchCompanyOnServer(companyToSelect.id).then((ok) => {
