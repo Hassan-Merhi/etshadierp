@@ -801,14 +801,13 @@ function WorkerDeductionsView() {
     queryKey: ["/api/factory/worker-deductions"],
   });
 
-  const { data: allEmployees } = useQuery<Employee[]>({
-    queryKey: ["/api/employees"],
-  });
-
-  const workers = useMemo(
-    () => (allEmployees || []).filter((e) => e.employeeType === "Worker"),
-    [allEmployees],
-  );
+  const workers = useMemo(() => {
+    const seen = new Map<number, string>();
+    (deductions || []).forEach((d) => {
+      if (!seen.has(d.workerId)) seen.set(d.workerId, d.workerName || String(d.workerId));
+    });
+    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
+  }, [deductions]);
 
   const filtered = useMemo(() => {
     if (!deductions) return [];
@@ -891,7 +890,7 @@ function WorkerDeductionsView() {
             <SelectItem value="all">All Workers</SelectItem>
             {workers.map((w) => (
               <SelectItem key={w.id} value={String(w.id)}>
-                {`${w.firstName} ${w.lastName}`.trim()}
+                {w.name}
               </SelectItem>
             ))}
           </SelectContent>
