@@ -66,6 +66,15 @@ export default defineConfig({
           ) {
             return "routing-vendor";
           }
+          if (
+            id.includes("node_modules/xlsx/") ||
+            id.includes("node_modules/xlsx-js-style/")
+          ) {
+            return "xlsx-vendor";
+          }
+          if (id.includes("node_modules/exceljs/")) {
+            return "exceljs-vendor";
+          }
         },
       },
     },

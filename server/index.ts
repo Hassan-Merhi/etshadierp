@@ -3548,6 +3548,12 @@ let migrationsDone = false;
     `CREATE INDEX IF NOT EXISTS voucher_entries_supplier_idx ON voucher_entries(supplier_id)`,
     `CREATE INDEX IF NOT EXISTS voucher_entries_employee_idx ON voucher_entries(employee_id)`,
     `CREATE INDEX IF NOT EXISTS voucher_entries_bank_account_idx ON voucher_entries(bank_account_id)`,
+    `CREATE INDEX IF NOT EXISTS voucher_entries_factory_supplier_idx ON voucher_entries(factory_supplier_id)`,
+
+    // suppliers: no indexes at all — every getAllSuppliers() call is a full table scan.
+    // A partial index on deleted_at covers the common WHERE deleted_at IS NULL filter.
+    `CREATE INDEX IF NOT EXISTS suppliers_deleted_at_idx ON suppliers(deleted_at)`,
+    `CREATE INDEX IF NOT EXISTS suppliers_active_idx ON suppliers(active)`,
 
     // audit_log: no indexes exist at all; any lookup (by company, user, or date) is a seq scan.
     `CREATE INDEX IF NOT EXISTS audit_log_company_idx ON audit_log(company_id)`,
