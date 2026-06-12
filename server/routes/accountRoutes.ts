@@ -561,6 +561,11 @@ export function registerAccountRoutes(app: Express) {
     }
   });
 
+  // 30-second TTL cache for voucher-sidebar results (keyed by companyId).
+  // The sidebar shows aggregate balances; stale data for 30 s is acceptable because
+  // TanStack Query on the client invalidates this query after every voucher mutation.
+  const _vsBCache = new Map<number, { data: any; expiresAt: number }>();
+
   app.get("/api/accounts/voucher-sidebar", requireAuth, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
@@ -569,35 +574,50 @@ export function registerAccountRoutes(app: Express) {
 
       const companyId = req.session.currentCompanyId;
 
-      // Determine company type — ERP suppliers must not appear in factory company vouchers
+      // Check TTL cache
+      const _vsCached = _vsBCache.get(companyId);
+      if (_vsCached && Date.now() < _vsCached.expiresAt) {
+        return res.json(_vsCached.data);
+      }
+
+      // Phase 1: determine company type (other fetches are conditional on this)
       const currentCompany = await storage.getCompanyById(companyId);
       const isFactoryCompany = currentCompany?.companyType === "factory";
 
-      // Fetch all account types
-      const ledgers = await storage.getAllLedgerAccounts(companyId);
-      const banks = await storage.getAllBankAccounts(companyId);
-      const assets = await storage.getAllFixedAssets(companyId);
-      const employees = await storage.getAllEmployees(companyId);
-      const suppliers = isFactoryCompany ? [] : await storage.getAllSuppliers();
-      const employeesData = await storage.getAllEmployees(companyId);
-      const fSuppliers = isFactoryCompany
-        ? await db.select().from(factorySuppliers).where(eq(factorySuppliers.companyId, companyId)).orderBy(factorySuppliers.name)
-        : [];
-
-      // For factory companies: fetch containers and payments to compute accurate supplier balances
-      const fContainers = isFactoryCompany
-        ? await db.select().from(factoryContainers).where(eq(factoryContainers.companyId, companyId))
-        : [];
-      const fPayments = isFactoryCompany
-        ? await db.select().from(factorySupplierPayments).where(eq(factorySupplierPayments.companyId, companyId))
-        : [];
-
-      // Get all voucher entries for this company's vouchers (excluding optional and deleted)
-      const companyVouchers = await db
-        .select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber, currency: vouchers.currency, exchangeRate: vouchers.exchangeRate })
-        .from(vouchers)
-        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
-        .execute();
+      // Phase 2: all independent fetches in parallel
+      const [
+        ledgers,
+        banks,
+        assets,
+        employees,
+        suppliers,
+        fSuppliers,
+        fContainers,
+        fPayments,
+        companyVouchers,
+        companyCustomers,
+      ] = await Promise.all([
+        storage.getAllLedgerAccounts(companyId),
+        storage.getAllBankAccounts(companyId),
+        storage.getAllFixedAssets(companyId),
+        storage.getAllEmployees(companyId),
+        isFactoryCompany ? Promise.resolve([] as any[]) : storage.getAllSuppliers(),
+        isFactoryCompany
+          ? db.select().from(factorySuppliers).where(eq(factorySuppliers.companyId, companyId)).orderBy(factorySuppliers.name)
+          : Promise.resolve([] as any[]),
+        isFactoryCompany
+          ? db.select().from(factoryContainers).where(eq(factoryContainers.companyId, companyId))
+          : Promise.resolve([] as any[]),
+        isFactoryCompany
+          ? db.select().from(factorySupplierPayments).where(eq(factorySupplierPayments.companyId, companyId))
+          : Promise.resolve([] as any[]),
+        db
+          .select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber, currency: vouchers.currency, exchangeRate: vouchers.exchangeRate })
+          .from(vouchers)
+          .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
+          .execute(),
+        storage.getAllCustomers(companyId),
+      ]);
 
       const companyVoucherIds = companyVouchers.map((v) => v.id);
       // FACTORY-PAY-* voucher IDs — excluded when computing factory supplier voucher-paid amounts
@@ -721,11 +741,6 @@ export function registerAccountRoutes(app: Express) {
         // Add net change (debits increase, credits decrease)
         return balance + debits - credits;
       };
-
-      // Fetch company customers — needed for the customer entries below.
-      // Customer mirror ledger accounts are intentionally NOT excluded from the ledger list
-      // because they serve as a distinct "cash" account separate from the POS balance account.
-      const companyCustomers = await storage.getAllCustomers(companyId);
 
       // Build simplified account array for sidebar
       const accounts = [
@@ -881,6 +896,11 @@ export function registerAccountRoutes(app: Express) {
       ];
 
       // Customers are excluded from the voucher account selector — only ledger/bank/supplier accounts appear
+      _vsBCache.set(companyId, { data: accounts, expiresAt: Date.now() + 30_000 });
+      if (_vsBCache.size > 100) {
+        const now = Date.now();
+        for (const [k, v] of _vsBCache) { if (now >= v.expiresAt) _vsBCache.delete(k); }
+      }
       res.json(accounts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

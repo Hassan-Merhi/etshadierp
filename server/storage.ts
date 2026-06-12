@@ -6999,16 +6999,25 @@ export class DbStorage implements IStorage {
     }
   }
 
+  // 5-minute in-memory cache for the parent company ID setting.
+  // This value is set once during initial setup and almost never changes, so a
+  // long TTL is safe. The cache is invalidated whenever setParentCompanyId is called.
+  private _parentCompanyIdCache: { value: number | null; expiresAt: number } | null = null;
+  private readonly _PARENT_ID_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
   async getParentCompanyId(): Promise<number | null> {
-    const setting = await this.getSystemSetting("parentCompanyId");
-    if (setting?.value) {
-      const id = parseInt(setting.value, 10);
-      return isNaN(id) ? null : id;
+    const now = Date.now();
+    if (this._parentCompanyIdCache && now < this._parentCompanyIdCache.expiresAt) {
+      return this._parentCompanyIdCache.value;
     }
-    return null;
+    const setting = await this.getSystemSetting("parentCompanyId");
+    const value = setting?.value ? (parseInt(setting.value, 10) || null) : null;
+    this._parentCompanyIdCache = { value, expiresAt: now + this._PARENT_ID_TTL_MS };
+    return value;
   }
 
   async setParentCompanyId(companyId: number | null): Promise<void> {
+    this._parentCompanyIdCache = null; // invalidate cache
     await this.setSystemSetting("parentCompanyId", companyId?.toString() ?? null);
   }
 

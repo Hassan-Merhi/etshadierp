@@ -2609,6 +2609,8 @@ let migrationsDone = false;
       `CREATE INDEX IF NOT EXISTS customer_order_bales_order_idx ON customer_order_bales(order_id)`,
       `CREATE INDEX IF NOT EXISTS customer_order_bales_bale_idx ON customer_order_bales(bale_id)`,
       `CREATE INDEX IF NOT EXISTS voucher_entries_ledger_voucher_idx ON voucher_entries(ledger_account_id, voucher_id)`,
+      `CREATE INDEX IF NOT EXISTS voucher_entries_voucher_id_idx ON voucher_entries(voucher_id)`,
+      `CREATE INDEX IF NOT EXISTS voucher_entries_customer_id_idx ON voucher_entries(customer_id)`,
       `CREATE INDEX IF NOT EXISTS vouchers_company_date_idx ON vouchers(company_id, voucher_date)`,
       `CREATE INDEX IF NOT EXISTS inventory_location_idx ON inventory(location_id)`,
 

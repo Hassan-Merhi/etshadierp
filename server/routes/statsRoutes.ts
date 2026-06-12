@@ -2604,31 +2604,29 @@ export function registerStatsRoutes(app: Express) {
         .filter((acc) => acc.accountType === "Liability")
         .map((acc) => acc.id);
 
-      // Get vouchers with date filter
-      const conditions = [eq(vouchers.companyId, companyId)];
+      const _ratiosCacheKey = `ratios:${companyId}:${startDate ?? ""}:${endDate ?? ""}`;
+      const _ratiosCached = _getCached(_ratiosCacheKey);
+      if (_ratiosCached) return res.json(_ratiosCached);
+
+      // Single-query JOIN replaces the old two-step voucher-ID fetch + inArray pattern
+      const entryConditions: any[] = [eq(vouchers.companyId, companyId)];
       if (startDate) {
-        conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
+        entryConditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
       }
       if (endDate) {
-        conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
+        entryConditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
       }
 
-      const companyVouchers = await db
-        .select({ id: vouchers.id })
-        .from(vouchers)
-        .where(and(...conditions))
+      const companyEntries = await db
+        .select({
+          debitAmount: voucherEntries.debitAmount,
+          creditAmount: voucherEntries.creditAmount,
+          ledgerAccountId: voucherEntries.ledgerAccountId,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(and(...entryConditions, isNotNull(voucherEntries.ledgerAccountId)))
         .execute();
-
-      const companyVoucherIds = companyVouchers.map((v) => v.id);
-
-      const companyEntries =
-        companyVoucherIds.length > 0
-          ? await db
-              .select()
-              .from(voucherEntries)
-              .where(inArray(voucherEntries.voucherId, companyVoucherIds))
-              .execute()
-          : [];
 
       // Calculate totals
       let totalIncome = 0;
@@ -2698,7 +2696,7 @@ export function registerStatsRoutes(app: Express) {
           ? totalLiabilities / (totalAssets - totalLiabilities)
           : 0;
 
-      res.json({
+      const _ratiosResult = {
         ratios: {
           grossProfitMargin,
           netProfitMargin,
@@ -2720,7 +2718,9 @@ export function registerStatsRoutes(app: Express) {
           startDate: startDate || null,
           endDate: endDate || null,
         },
-      });
+      };
+      _setCached(_ratiosCacheKey, _ratiosResult);
+      res.json(_ratiosResult);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
