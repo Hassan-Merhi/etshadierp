@@ -2568,6 +2568,7 @@ export default function Payroll() {
               : null;
 
           const filteredWorkers = workerStaff.filter(w => {
+            if (w.active === false) return false;
             if (workerIdsInSelectedGroup !== null && !workerIdsInSelectedGroup.includes(w.id)) return false;
             const q = workerProfileSearch.toLowerCase();
             if (!q) return true;
