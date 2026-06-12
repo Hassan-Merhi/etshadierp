@@ -82,7 +82,6 @@ export const ERP_NAV_SECTIONS: NavSection[] = [
     items: [
       { title: "Inventory",         url: "/inventory",              icon: Layers      },
       { title: "Stock",             url: "/stock",                  icon: Package     },
-      { title: "Stock Query",       url: "/factory/stock-query",    icon: Search      },
       { title: "Optional Vouchers", url: "/optional-vouchers",      icon: FileText    },
       { title: "Profit Check",      url: "/supplier-profit-check",  icon: Calculator  },
     ],
