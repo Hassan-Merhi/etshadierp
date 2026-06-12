@@ -196,6 +196,10 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
 
   const isMali = d.companyName.toLowerCase().includes("mali");
 
+  // Auto-hide profit columns when no item has a configured price set
+  const hasConfiguredPrice = d.items.some(item => item.configuredPrice > 0);
+  const hideProfitCols = d.hideProfitCols || !hasConfiguredPrice;
+
   // ── Column geometry ──────────────────────────────────────────────────────────
   let COL_DESC_W: number, COL_QTY_W: number, COL_RATE_W: number, COL_AMT_W: number;
   let COL_CFG_W: number, COL_PLB_W: number, COL_TPL_W: number;
@@ -203,7 +207,7 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   let X_CFG: number, X_PLB: number, X_TPL: number;
   let innerDividers: number[];
 
-  if (d.hideProfitCols) {
+  if (hideProfitCols) {
     COL_DESC_W = Math.round(USABLE_W * 0.42);
     COL_QTY_W  = Math.round(USABLE_W * 0.08);
     COL_RATE_W = Math.round(USABLE_W * 0.18);
@@ -305,7 +309,7 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     cellText(doc, "QTY",         X_QTY,  COL_QTY_W,  atY, THR_H, "center");
     cellText(doc, "RATE",        X_RATE, COL_RATE_W,  atY, THR_H, "center");
     cellText(doc, "AMT",         X_AMT,  COL_AMT_W,   atY, THR_H, "center");
-    if (!d.hideProfitCols) {
+    if (!hideProfitCols) {
       cellText(doc, "CONFIG",    X_CFG,  COL_CFG_W,   atY, THR_H, "center");
       cellText(doc, "P/L BALE",  X_PLB,  COL_PLB_W,   atY, THR_H, "center");
       cellText(doc, "TOTAL P/L", X_TPL,  COL_TPL_W,   atY, THR_H, "center");
@@ -373,7 +377,7 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     doc.font("Helvetica-Bold").fontSize(7.5).fillColor(CLR_BODY);
     doc.text(fmtUSD(amtUSD),         X_AMT  + 1, cy, { width: COL_AMT_W  - 2, align: "center", lineBreak: false });
 
-    if (!d.hideProfitCols) {
+    if (!hideProfitCols) {
       doc.font("Helvetica").fontSize(7.5).fillColor(CLR_BODY);
       doc.text(fmtUSD(item.configuredPrice), X_CFG + 1, cy, { width: COL_CFG_W - 2, align: "center", lineBreak: false });
       doc.font("Helvetica-Bold").fontSize(7.5);
@@ -405,7 +409,7 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   cellText(doc, "TOTAL",          X_DESC, COL_DESC_W, y, totH, "left");
   cellText(doc, fmtQty(totalQty), X_QTY,  COL_QTY_W,  y, totH, "center");
   cellText(doc, fmtUSD(totalAmt), X_AMT,  COL_AMT_W,  y, totH, "center");
-  if (!d.hideProfitCols) {
+  if (!hideProfitCols) {
     // White for profit, bright red for loss — clearly readable on green background.
     // Always show sign (+/−) so direction is unambiguous.
     const plSign = totalPL > 0 ? "+" : totalPL < 0 ? "−" : "";
