@@ -34,9 +34,23 @@ export function registerLedgerRoutes(app: Express) {
       if (!effectiveCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      let accounts = await storage.getAllLedgerAccounts(effectiveCompanyId, includeHidden === "true");
+      let accounts;
       if (accountType && typeof accountType === "string" && accountType.trim()) {
-        accounts = accounts.filter(a => a.accountType === accountType.trim());
+        // Push accountType filter to SQL — avoids fetching all accounts then
+        // discarding most of them in JS (e.g. 8 Cash accounts out of 400 total).
+        const conditions: any[] = [
+          eq(ledgerAccounts.companyId, effectiveCompanyId),
+          isNull(ledgerAccounts.deletedAt),
+          eq(ledgerAccounts.accountType, accountType.trim()),
+        ];
+        if (includeHidden !== "true") conditions.push(eq(ledgerAccounts.isHidden, false));
+        accounts = await db
+          .select()
+          .from(ledgerAccounts)
+          .where(and(...conditions))
+          .orderBy(asc(ledgerAccounts.code));
+      } else {
+        accounts = await storage.getAllLedgerAccounts(effectiveCompanyId, includeHidden === "true");
       }
       if (search && typeof search === "string" && search.trim()) {
         const q = search.trim().toLowerCase();

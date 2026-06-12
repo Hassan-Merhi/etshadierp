@@ -4088,6 +4088,11 @@ END $$`,
   });
 
   const server = await registerRoutes(app);
+  // Keep connections alive longer than Render's 60-second proxy idle timeout.
+  // Without this, Express closes sockets at 5 s (Node default), causing the
+  // proxy to send a request on a dead connection → socket hang-up retries.
+  server.keepAliveTimeout = 65_000;
+  server.headersTimeout   = 66_000;
   setupWS(server);
   if (process.env.ENABLE_SCHEDULERS !== 'false') {
     startScheduler();

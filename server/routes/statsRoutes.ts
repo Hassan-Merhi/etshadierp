@@ -41,6 +41,28 @@ import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeW
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
 import { classifyNetPositionAccounts, getAccountNetBalance, round2 } from "../netPositionHelper";
 
+// ---------------------------------------------------------------------------
+// Lightweight in-process TTL cache for expensive computed stat endpoints.
+// Keyed by endpoint + companyId + date params. 30-second TTL means a company
+// with multiple users hitting the dashboard simultaneously gets one DB round-
+// trip instead of N.  Mutations don't invalidate the cache — the 30-second
+// staleness is acceptable for these summary/aggregate endpoints.
+// ---------------------------------------------------------------------------
+const _statCache = new Map<string, { data: any; expiresAt: number }>();
+function _getCached(key: string): any | null {
+  const e = _statCache.get(key);
+  if (!e) return null;
+  if (Date.now() > e.expiresAt) { _statCache.delete(key); return null; }
+  return e.data;
+}
+function _setCached(key: string, data: any, ttlMs = 30_000): void {
+  _statCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+  // Prune stale entries to prevent unbounded growth (> 500 entries is unusual)
+  if (_statCache.size > 500) {
+    const now = Date.now();
+    for (const [k, v] of _statCache) { if (v.expiresAt < now) _statCache.delete(k); }
+  }
+}
 
 export function registerStatsRoutes(app: Express) {
   app.get("/api/stats/net-profit", requireAuth, requireNonPOS, async (req, res) => {
@@ -59,13 +81,12 @@ export function registerStatsRoutes(app: Express) {
       const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
       // Fetch company to know its base currency (CFA vs USD)
-      const companyRecord = await storage.getCompanyById(companyId);
-      const companyBaseCurrency = companyRecord?.baseCurrency || "USD";
+      // Check the 30-second TTL cache before touching the DB
+      const _cacheKey = `net-profit:${companyId}:${toDate || ''}`;
+      const _cached = _getCached(_cacheKey);
+      if (_cached) return res.json(_cached);
 
-      // Get all ledger accounts for this company
-      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
-
-      // Cumulative voucher filter: include ALL transactions up to toDate (balance-sheet approach)
+      // Build voucher conditions synchronously — no DB call needed
       const voucherConditions: any[] = [
         eq(vouchers.companyId, companyId),
         eq(vouchers.optional, false),
@@ -74,19 +95,28 @@ export function registerStatsRoutes(app: Express) {
       if (toDate) {
         voucherConditions.push(lte(vouchers.voucherDate, toDate));
       }
-      // Single JOIN query — avoids the large IN-clause on voucher IDs
-      const companyEntries = await db
-        .select({
+
+      // Fire all four independent DB queries in parallel instead of serially.
+      // getCompanyById, getAllLedgerAccounts, the big JOIN, and getParentCompanyId
+      // share no dependencies — running them concurrently cuts wall-clock time to
+      // max(individual latencies) rather than their sum.
+      const [companyRecord, companyAccounts, companyEntries, parentCompanyId] = await Promise.all([
+        storage.getCompanyById(companyId),
+        storage.getAllLedgerAccounts(companyId, true),
+        db.select({
           ledgerAccountId: voucherEntries.ledgerAccountId,
           supplierId:      voucherEntries.supplierId,
           employeeId:      voucherEntries.employeeId,
           debitAmount:     voucherEntries.debitAmount,
           creditAmount:    voucherEntries.creditAmount,
         })
-        .from(voucherEntries)
-        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-        .where(and(...voucherConditions))
-        .execute();
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(and(...voucherConditions))
+          .execute(),
+        storage.getParentCompanyId(),
+      ]);
+      const companyBaseCurrency = companyRecord?.baseCurrency || "USD";
 
       // Calculate balances for each ledger account (debit/credit totals)
       const accountBalances = new Map<number, { debit: number; credit: number }>();
@@ -138,7 +168,7 @@ export function registerStatsRoutes(app: Express) {
       // the asset vs liability classification formula used by both ERP and Factory.
 
       // Parent company determines whether ERP supplier ledger accounts are included
-      const parentCompanyId = await storage.getParentCompanyId();
+      // (parentCompanyId already fetched in the parallel Promise.all above)
       const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
 
       // Build excluded-from-expenses set (needed for the P&L expense pass below)
@@ -684,7 +714,7 @@ export function registerStatsRoutes(app: Express) {
         netPosition,
       };
 
-      res.json({
+      const _result = {
         totalIncome: incomeTotal,
         totalExpenses: expensesTotal,
         netProfit,
@@ -718,7 +748,9 @@ export function registerStatsRoutes(app: Express) {
         onUsTotal,
         incomeTotal,
         expensesTotal,
-      });
+      };
+      _setCached(_cacheKey, _result);
+      res.json(_result);
     } catch (error: any) {
       console.error("[/api/stats/net-profit] Unhandled error:", error);
       res.status(500).json({ message: error.message });

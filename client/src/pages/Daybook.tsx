@@ -182,6 +182,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [hiddenRowIds, setHiddenRowIds] = useState<Set<string>>(new Set());
   const [showHidden, setShowHidden] = useState(false);
+  const DAYBOOK_PAGE_SIZE = 200;
+  const [daybookRowLimit, setDaybookRowLimit] = useState(DAYBOOK_PAGE_SIZE);
   const scrollYRef = useRef(0);
   const [viewMode, setViewMode] = useState<"detailed" | "condensed">(() => {
     const saved = loadDaybookState();
@@ -783,6 +785,19 @@ export default function Daybook({ user }: { user?: any } = {}) {
     if (showHidden) return allRows;
     return allRows.filter((row) => !hiddenRowIds.has(rowId(row)));
   }, [allRows, hiddenRowIds, showHidden, rowId]);
+
+  // Reset the display limit whenever the filtered list changes (filter/date change)
+  // but NOT when the user clicks "Load more" (that only changes daybookRowLimit).
+  useEffect(() => {
+    setDaybookRowLimit(DAYBOOK_PAGE_SIZE);
+  }, [visibleRows]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Slice to the current page limit — only visible rows are rendered as DOM nodes,
+  // preventing the browser from laying out hundreds of rows at once.
+  const displayedRows = useMemo(
+    () => visibleRows.slice(0, daybookRowLimit),
+    [visibleRows, daybookRowLimit],
+  );
 
   // Check if user can edit a voucher based on role and date
   const canEdit = (voucher: Voucher): boolean => {
@@ -1740,7 +1755,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
             <>
             {/* Mobile Card View */}
             <div className="md:hidden space-y-3">
-              {visibleRows.map((row) => {
+              {displayedRows.map((row) => {
                 if (row._type === "offload") {
                   const o = row.data;
                   const rid = `offload-${o.id}`;
@@ -1918,7 +1933,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 (() => {
                   type GroupEntry = { rows: DaybookRow[]; total: number };
                   const byDate = new Map<string, Map<string, GroupEntry>>();
-                  for (const row of visibleRows) {
+                  for (const row of displayedRows) {
                     const date = row._type === "voucher" ? row.data.voucherDate : row.data.offloadedAt.slice(0, 10);
                     const type = row._type === "voucher" ? row.data.voucherType : "Offload";
                     const amt = row._type === "voucher"
@@ -2075,10 +2090,10 @@ export default function Daybook({ user }: { user?: any } = {}) {
                     {(() => {
                       const tableRows: JSX.Element[] = [];
                       let lastDate = "";
-                      for (const row of visibleRows) {
+                      for (const row of displayedRows) {
                         const rowDate = row._type === "voucher" ? row.data.voucherDate : row.data.offloadedAt.slice(0, 10);
                         if (rowDate !== lastDate) {
-                          const dayRows = visibleRows.filter((r) => {
+                          const dayRows = displayedRows.filter((r) => {
                             const d = r._type === "voucher" ? r.data.voucherDate : r.data.offloadedAt.slice(0, 10);
                             return d === rowDate;
                           });
@@ -2336,6 +2351,20 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 </Table>
               )}
             </div>
+            {displayedRows.length < visibleRows.length && (
+              <div className="flex justify-center pt-3 pb-1">
+                <Button
+                  variant="outline"
+                  onClick={() => setDaybookRowLimit(prev => prev + DAYBOOK_PAGE_SIZE)}
+                  data-testid="button-daybook-load-more"
+                >
+                  Show {Math.min(DAYBOOK_PAGE_SIZE, visibleRows.length - displayedRows.length)} more
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    ({displayedRows.length} of {visibleRows.length})
+                  </span>
+                </Button>
+              </div>
+            )}
             </>
           )}
         </CardContent>
