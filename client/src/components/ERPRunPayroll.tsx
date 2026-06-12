@@ -89,7 +89,13 @@ interface PreviewItem {
   groupName: string;
   baseSalary: number;
   deduction: number;
+  pendingDeductions: number;
   netPay: number;
+}
+interface WorkerDeductionRow {
+  workerId: number;
+  amount: string;
+  applied: boolean;
 }
 interface PayrollRun {
   id: number;
@@ -177,6 +183,16 @@ export default function ERPRunPayroll() {
     },
   });
 
+  const { data: workerDeductionsRaw = [] } = useQuery<WorkerDeductionRow[]>({
+    queryKey: ["/api/factory/worker-deductions", companyId],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/worker-deductions", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!companyId,
+  });
+
   const { data: payrollRuns = [], isLoading: runsLoading } = useQuery<PayrollRun[]>({
     queryKey: ["/api/payroll/runs", companyId],
     queryFn: async () => {
@@ -205,6 +221,16 @@ export default function ERPRunPayroll() {
     }
     return map;
   }, [salaryAdvances]);
+
+  const pendingDeductionsByEmployee = useMemo(() => {
+    const map: Record<number, number> = {};
+    for (const d of workerDeductionsRaw) {
+      if (!d.applied) {
+        map[d.workerId] = (map[d.workerId] || 0) + parseFloat(d.amount || "0");
+      }
+    }
+    return map;
+  }, [workerDeductionsRaw]);
 
   const workerMemberships = useMemo(() => {
     const map: Record<number, number[]> = {};
@@ -250,13 +276,15 @@ export default function ERPRunPayroll() {
         const w = workerById[id];
         const salary = parseFloat(w.monthlySalary || "0");
         const deduction = Math.min(advanceBalanceByEmployee[id] || 0, salary);
+        const pendingDeductions = pendingDeductionsByEmployee[id] || 0;
         items.push({
           employeeId: id,
           employeeName: `${w.firstName} ${w.lastName}`.trim(),
           groupName: label,
           baseSalary: salary,
           deduction,
-          netPay: Math.max(0, salary - deduction),
+          pendingDeductions,
+          netPay: Math.max(0, salary - deduction - pendingDeductions),
         });
       }
     }
@@ -271,7 +299,7 @@ export default function ERPRunPayroll() {
     setPreviewItems((prev) => prev.map((it, i) => {
       if (i !== idx) return it;
       const ded = Math.max(0, parseFloat(val) || 0);
-      return { ...it, deduction: ded, netPay: Math.max(0, it.baseSalary - ded) };
+      return { ...it, deduction: ded, netPay: Math.max(0, it.baseSalary - ded - it.pendingDeductions) };
     }));
   }
 
@@ -781,6 +809,7 @@ export default function ERPRunPayroll() {
                       <TableHead className="text-muted-foreground text-xs font-medium">Group</TableHead>
                       <TableHead className="text-right">Base Salary</TableHead>
                       <TableHead className="text-right w-40">Advance Deduction</TableHead>
+                      <TableHead className="text-right">Deductions</TableHead>
                       <TableHead className="text-right">Net Pay</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -818,6 +847,15 @@ export default function ERPRunPayroll() {
                                 );
                               })()}
                             </div>
+                          </TableCell>
+                          <TableCell className="text-right text-sm">
+                            {it.pendingDeductions > 0 ? (
+                              <span className="text-orange-600 dark:text-orange-400 font-mono">
+                                -{formatAmount(it.pendingDeductions)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right font-semibold text-sm" data-testid={`text-net-${it.employeeId}`}>
                             {formatAmount(it.netPay)}
