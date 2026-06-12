@@ -67,6 +67,11 @@ export function registerReportsRoutes(app: Express) {
       const startDate = req.query.startDate ? new Date(req.query.startDate as string) : null;
       const endDate = req.query.endDate ? new Date(req.query.endDate as string) : null;
 
+      // 30-second TTL cache (keyed by companyId + date range)
+      const npsCacheKey = `net-profit:${companyId}:${req.query.startDate || ''}:${req.query.endDate || ''}`;
+      const npsCachedResult = _npsCached(npsCacheKey);
+      if (npsCachedResult) return res.json(npsCachedResult);
+
       // Phase 1: metadata + accounts + stock items (all independent, run in parallel)
       const [companyRecord, companyAccounts, allStockItems] = await Promise.all([
         db.select({ companyType: companies.companyType }).from(companies).where(eq(companies.id, companyId)).execute().then((r) => r[0] ?? null),
@@ -660,7 +665,7 @@ export function registerReportsRoutes(app: Express) {
       // Right pane total for P&L display (trading credit side + indirect incomes for balancing)
       const rightPaneTotal = rightTradingTotal + indirectIncomesTotal;
 
-      res.json({
+      const npsResult = {
         dateRange: {
           startDate: startDate ? startDate.toISOString().split('T')[0] : null,
           endDate: endDate ? endDate.toISOString().split('T')[0] : null,
@@ -724,7 +729,9 @@ export function registerReportsRoutes(app: Express) {
           },
           total: rightPaneTotal,
         },
-      });
+      };
+      _npsSetCache(npsCacheKey, npsResult);
+      res.json(npsResult);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
