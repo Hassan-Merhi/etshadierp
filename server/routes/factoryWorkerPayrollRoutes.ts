@@ -1232,6 +1232,34 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
 
   // ─── Worker Deductions CRUD ───────────────────────────────────────────────
 
+  // GET /api/factory/worker-deductions - All deductions for company (joined with worker name)
+  app.get("/api/factory/worker-deductions", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const rows = await db
+        .select({
+          id: factoryWorkerDeductions.id,
+          companyId: factoryWorkerDeductions.companyId,
+          workerId: factoryWorkerDeductions.workerId,
+          workerName: factoryWorkers.fullName,
+          amount: factoryWorkerDeductions.amount,
+          reason: factoryWorkerDeductions.reason,
+          deductionDate: factoryWorkerDeductions.deductionDate,
+          applied: factoryWorkerDeductions.applied,
+          payrollId: factoryWorkerDeductions.payrollId,
+          createdAt: factoryWorkerDeductions.createdAt,
+        })
+        .from(factoryWorkerDeductions)
+        .leftJoin(factoryWorkers, eq(factoryWorkerDeductions.workerId, factoryWorkers.id))
+        .where(eq(factoryWorkerDeductions.companyId, companyId))
+        .orderBy(desc(factoryWorkerDeductions.createdAt));
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // GET /api/factory/workers/:id/deductions
   app.get("/api/factory/workers/:id/deductions", requireAuth, async (req: any, res: any) => {
     try {

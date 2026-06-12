@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import { Plus, Trash2, Banknote, RotateCcw, Users, Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Trash2, Banknote, RotateCcw, Users, Loader2, ChevronDown, ChevronRight, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -87,12 +87,19 @@ export default function ERPAdvancesTab() {
           <RotateCcw className="h-4 w-4 mr-2" />
           Repayments
         </TabsTrigger>
+        <TabsTrigger value="worker-deductions" data-testid="subtab-erp-worker-deductions">
+          <Scissors className="h-4 w-4 mr-2" />
+          Worker Deductions
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="advances" className="mt-0">
         <AdvancesView />
       </TabsContent>
       <TabsContent value="repayments" className="mt-0">
         <RepaymentsView />
+      </TabsContent>
+      <TabsContent value="worker-deductions" className="mt-0">
+        <WorkerDeductionsView />
       </TabsContent>
     </Tabs>
   );
@@ -768,6 +775,181 @@ function AdvancesView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+interface WorkerDeductionRow {
+  id: number;
+  workerId: number;
+  workerName: string | null;
+  amount: string;
+  reason: string | null;
+  deductionDate: string;
+  applied: boolean;
+  payrollId: number | null;
+  createdAt: string;
+}
+
+function WorkerDeductionsView() {
+  const { formatDisplayDate } = useDateFormat();
+  const { formatAmount } = useCurrencyContext();
+  const [filterWorker, setFilterWorker] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+
+  const { data: deductions, isLoading } = useQuery<WorkerDeductionRow[]>({
+    queryKey: ["/api/factory/worker-deductions"],
+  });
+
+  const { data: allEmployees } = useQuery<Employee[]>({
+    queryKey: ["/api/employees"],
+  });
+
+  const workers = useMemo(
+    () => (allEmployees || []).filter((e) => e.employeeType === "Worker"),
+    [allEmployees],
+  );
+
+  const filtered = useMemo(() => {
+    if (!deductions) return [];
+    return deductions.filter((d) => {
+      if (filterWorker !== "all" && String(d.workerId) !== filterWorker) return false;
+      if (filterStatus === "pending" && d.applied) return false;
+      if (filterStatus === "applied" && !d.applied) return false;
+      return true;
+    });
+  }, [deductions, filterWorker, filterStatus]);
+
+  const stats = useMemo(() => {
+    const all = deductions || [];
+    const pending = all.filter((d) => !d.applied);
+    const totalAmount = all.reduce((s, d) => s + parseFloat(d.amount || "0"), 0);
+    const pendingAmount = pending.reduce((s, d) => s + parseFloat(d.amount || "0"), 0);
+    return { total: all.length, pending: pending.length, totalAmount, pendingAmount };
+  }, [deductions]);
+
+  const fmtDate = (val: string | null | undefined) => {
+    if (!val) return "—";
+    try { return formatDisplayDate(val); } catch { return "—"; }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-md" />)}
+        </div>
+        <Skeleton className="h-64 rounded-md" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="p-2 rounded-md bg-orange-100 dark:bg-orange-900/30">
+              <Scissors className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Total Deductions</p>
+              <p className="text-lg font-bold">{formatAmount(stats.totalAmount)}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="p-2 rounded-md bg-yellow-100 dark:bg-yellow-900/30">
+              <Scissors className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Pending (not yet applied)</p>
+              <p className="text-lg font-bold">{formatAmount(stats.pendingAmount)}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="p-2 rounded-md bg-muted">
+              <Users className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Pending Entries</p>
+              <p className="text-lg font-bold">{stats.pending} of {stats.total}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex items-center gap-3 flex-wrap">
+        <Select value={filterWorker} onValueChange={setFilterWorker}>
+          <SelectTrigger className="w-48" data-testid="select-worker-deduction-worker">
+            <SelectValue placeholder="All Workers" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Workers</SelectItem>
+            {workers.map((w) => (
+              <SelectItem key={w.id} value={String(w.id)}>
+                {`${w.firstName} ${w.lastName}`.trim()}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="w-40" data-testid="select-worker-deduction-status">
+            <SelectValue placeholder="All Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="applied">Applied</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Worker</TableHead>
+                <TableHead>Deduction Date</TableHead>
+                <TableHead>Reason</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Recorded</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    No deductions found
+                  </TableCell>
+                </TableRow>
+              ) : filtered.map((d) => (
+                <TableRow key={d.id} data-testid={`row-worker-deduction-${d.id}`}>
+                  <TableCell className="font-medium">{d.workerName || "—"}</TableCell>
+                  <TableCell>{fmtDate(d.deductionDate)}</TableCell>
+                  <TableCell className="text-muted-foreground">{d.reason || "—"}</TableCell>
+                  <TableCell className="text-right font-mono">
+                    {formatAmount(parseFloat(d.amount || "0"))}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={d.applied ? "secondary" : "outline"}>
+                      {d.applied ? "Applied" : "Pending"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {fmtDate(d.createdAt)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }

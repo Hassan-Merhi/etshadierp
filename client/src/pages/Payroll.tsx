@@ -1746,7 +1746,7 @@ export default function Payroll() {
                 { key: "employees", label: "Employees", icon: Users as LucideIcon },
                 { key: "worker-profiles", label: "Worker Profiles", icon: User as LucideIcon },
                 { key: "run-payroll", label: "Run Payroll", icon: PlayCircle as LucideIcon },
-                { key: "advances", label: "Advances", icon: Banknote as LucideIcon },
+                { key: "advances", label: "Advances + Deductions", icon: Banknote as LucideIcon },
               ],
             },
           ].map((group) => (
