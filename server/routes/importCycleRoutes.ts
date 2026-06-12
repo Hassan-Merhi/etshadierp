@@ -38,6 +38,24 @@ import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeW
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
 
+// ---------------------------------------------------------------------------
+// Lightweight in-process TTL cache — same 30s pattern as statsRoutes.ts.
+// Keyed by companyId. Multiple dashboard users share one DB round-trip.
+// ---------------------------------------------------------------------------
+const _icCache = new Map<string, { data: any; expiresAt: number }>();
+function _getCached(key: string): any | null {
+  const e = _icCache.get(key);
+  if (!e) return null;
+  if (Date.now() > e.expiresAt) { _icCache.delete(key); return null; }
+  return e.data;
+}
+function _setCached(key: string, data: any, ttlMs = 30_000): void {
+  _icCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+  if (_icCache.size > 200) {
+    const now = Date.now();
+    for (const [k, v] of _icCache) { if (v.expiresAt < now) _icCache.delete(k); }
+  }
+}
 
 export function registerImportCycleRoutes(app: Express) {
   app.get("/api/stats/import-cycle-balance", requireAuth, async (req, res) => {
@@ -46,6 +64,10 @@ export function registerImportCycleRoutes(app: Express) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
+
+      const _cacheKey = `import-cycle-balance:${companyId}`;
+      const _cached = _getCached(_cacheKey);
+      if (_cached) return res.json(_cached);
 
       // ── Single-pass voucher entry scan (same approach as /api/stats/net-profit)
       // Builds accountBalances + supplierBalancesMap in one query so all component
@@ -580,7 +602,7 @@ export function registerImportCycleRoutes(app: Express) {
             : null,
       };
 
-      res.json({
+      const _result = {
         netImportCycleBalance: roundedBalance,
         components: {
           supplierBalance,
@@ -611,7 +633,9 @@ export function registerImportCycleRoutes(app: Express) {
           openingStockValue,
         },
         precisionTrace,
-      });
+      };
+      _setCached(_cacheKey, _result);
+      res.json(_result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

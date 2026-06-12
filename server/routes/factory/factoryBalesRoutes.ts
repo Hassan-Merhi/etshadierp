@@ -3,6 +3,24 @@ import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
+
+// ---------------------------------------------------------------------------
+// Lightweight in-process TTL cache for expensive dashboard KPI endpoint
+// ---------------------------------------------------------------------------
+const _kpiCache = new Map<string, { data: any; expiresAt: number }>();
+function _getKpiCached(key: string): any | null {
+  const e = _kpiCache.get(key);
+  if (!e) return null;
+  if (Date.now() > e.expiresAt) { _kpiCache.delete(key); return null; }
+  return e.data;
+}
+function _setKpiCached(key: string, data: any, ttlMs = 30_000): void {
+  _kpiCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+  if (_kpiCache.size > 200) {
+    const now = Date.now();
+    for (const [k, v] of _kpiCache) { if (v.expiresAt < now) _kpiCache.delete(k); }
+  }
+}
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
 import {
@@ -2152,35 +2170,27 @@ export function registerFactoryBalesRoutes(app: Express) {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
-      const rawStockTotals = await db
-        .select({
+      const _kpiKey = `factory-kpis:${companyId}:${todayStart.toDateString()}`;
+      const _kpiHit = _getKpiCached(_kpiKey);
+      if (_kpiHit) return res.json(_kpiHit);
+
+      // Fire all three independent DB queries in parallel
+      const [rawStockTotals, todayMixBatches, todayBales] = await Promise.all([
+        db.select({
           totalReceived: sql<string>`COALESCE(SUM(${factoryRawStock.receivedKg}), 0)`,
           totalUsed: sql<string>`COALESCE(SUM(${factoryRawStock.usedKg}), 0)`,
         })
-        .from(factoryRawStock)
-        .where(eq(factoryRawStock.companyId, companyId));
+          .from(factoryRawStock)
+          .where(eq(factoryRawStock.companyId, companyId)),
 
-      const totalReceived = parseFloat(rawStockTotals[0]?.totalReceived || "0");
-      const totalUsed = parseFloat(rawStockTotals[0]?.totalUsed || "0");
-      const closingStockKg = totalReceived - totalUsed;
-
-      const todayMixBatches = await db
-        .select({ totalWeightKg: factoryMixBatches.totalWeightKg })
-        .from(factoryMixBatches)
-        .where(
-          and(
+        db.select({ totalWeightKg: factoryMixBatches.totalWeightKg })
+          .from(factoryMixBatches)
+          .where(and(
             eq(factoryMixBatches.companyId, companyId),
-            sql`${factoryMixBatches.createdAt} >= ${todayStart}`
-          )
-        );
+            sql`${factoryMixBatches.createdAt} >= ${todayStart}`,
+          )),
 
-      const kgsUsedToday = todayMixBatches.reduce(
-        (sum, mb) => sum + (parseFloat(mb.totalWeightKg as string) || 0), 0
-      );
-      const openingStockKg = closingStockKg + kgsUsedToday;
-
-      const todayBales = await db
-        .select({
+        db.select({
           id: factoryBales.id,
           baleCode: factoryBales.baleCode,
           productName: factoryBales.productName,
@@ -2189,13 +2199,21 @@ export function registerFactoryBalesRoutes(app: Express) {
           pressedAt: factoryBales.pressedAt,
           status: factoryBales.status,
         })
-        .from(factoryBales)
-        .where(
-          and(
+          .from(factoryBales)
+          .where(and(
             eq(factoryBales.companyId, companyId),
-            sql`${factoryBales.pressedAt} >= ${todayStart}`
-          )
-        );
+            sql`${factoryBales.pressedAt} >= ${todayStart}`,
+          )),
+      ]);
+
+      const totalReceived = parseFloat(rawStockTotals[0]?.totalReceived || "0");
+      const totalUsed = parseFloat(rawStockTotals[0]?.totalUsed || "0");
+      const closingStockKg = totalReceived - totalUsed;
+
+      const kgsUsedToday = todayMixBatches.reduce(
+        (sum, mb) => sum + (parseFloat(mb.totalWeightKg as string) || 0), 0
+      );
+      const openingStockKg = closingStockKg + kgsUsedToday;
 
       const balesPressedToday = todayBales.length;
       const totalBaleWeightToday = todayBales.reduce(
@@ -2213,7 +2231,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         .map(([name, data]) => ({ name, count: data.count, totalKg: parseFloat(data.totalKg.toFixed(3)) }))
         .sort((a, b) => b.count - a.count);
 
-      res.json({
+      const _kpiResult = {
         openingStockKg: openingStockKg.toFixed(3),
         closingStockKg: closingStockKg.toFixed(3),
         balesPressedToday,
@@ -2221,7 +2239,9 @@ export function registerFactoryBalesRoutes(app: Express) {
         totalBaleWeightToday: totalBaleWeightToday.toFixed(3),
         categories,
         balesDetail: todayBales.map((b: any) => ({ ...b, quantity: 1 })),
-      });
+      };
+      _setKpiCached(_kpiKey, _kpiResult);
+      res.json(_kpiResult);
     } catch (error: any) {
       console.error("Error fetching factory dashboard KPIs:", error);
       res.status(500).json({ message: error.message });

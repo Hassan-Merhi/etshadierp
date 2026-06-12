@@ -52,20 +52,25 @@ export function registerAccountRoutes(app: Express) {
 
       const companyId = req.session.currentCompanyId;
 
-      const currentCompany = await storage.getCompanyById(companyId);
+      // Fire all independent lookups in parallel instead of serially.
+      // getAllSuppliers is always fetched; for factory companies the result is
+      // discarded — the wasted query is small compared to the serial latency saved.
+      const [currentCompany, ledgers, banks, assets, employees, allSuppliers, companyCustomers] = await Promise.all([
+        storage.getCompanyById(companyId),
+        storage.getAllLedgerAccounts(companyId),
+        storage.getAllBankAccounts(companyId),
+        storage.getAllFixedAssets(companyId),
+        storage.getAllEmployees(companyId),
+        storage.getAllSuppliers(),
+        storage.getAllCustomers(companyId),
+      ]);
       const isFactoryCompany = currentCompany?.companyType === "factory";
-
-      const ledgers = await storage.getAllLedgerAccounts(companyId);
-      const banks = await storage.getAllBankAccounts(companyId);
-      const assets = await storage.getAllFixedAssets(companyId);
-      const employees = await storage.getAllEmployees(companyId);
-      const suppliers = isFactoryCompany ? [] : await storage.getAllSuppliers();
+      const suppliers = isFactoryCompany ? [] : allSuppliers;
 
       // Build a map of ledgerAccountId → customer opening balance.
       // For customer-linked ledger accounts, the customer record is the
       // authoritative source of opening balance — the ledger account's own
       // openingBalance may have drifted (e.g. edited directly in Accounts page).
-      const companyCustomers = await storage.getAllCustomers(companyId);
       const customerObMap = new Map<number, { openingBalance: string; openingBalanceSide: string | null }>();
       for (const cust of companyCustomers) {
         if (cust.ledgerAccountId) {

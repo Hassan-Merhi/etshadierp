@@ -75,6 +75,19 @@ export default defineConfig({
           if (id.includes("node_modules/exceljs/")) {
             return "exceljs-vendor";
           }
+          if (
+            id.includes("node_modules/recharts/") ||
+            id.includes("node_modules/d3-") ||
+            id.includes("node_modules/victory-vendor/")
+          ) {
+            return "recharts-vendor";
+          }
+          if (id.includes("node_modules/jspdf/") || id.includes("node_modules/jspdf-autotable/")) {
+            return "jspdf-vendor";
+          }
+          if (id.includes("node_modules/html2canvas/")) {
+            return "html2canvas-vendor";
+          }
         },
       },
     },

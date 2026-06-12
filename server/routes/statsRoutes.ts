@@ -1451,51 +1451,49 @@ export function registerStatsRoutes(app: Express) {
         !excludedFromExpenses.has(acc.id)
       );
 
-      // Get all non-optional vouchers for this company
-      const companyVouchers = await db
-        .select({ id: vouchers.id })
-        .from(vouchers)
-        .where(
-          and(
-            eq(vouchers.companyId, companyId),
-            eq(vouchers.optional, false),
-            isNull(vouchers.deletedAt)
-          )
-        )
-        .execute();
-
-      const companyVoucherIds = companyVouchers.map(v => v.id);
-
-      // Get all entries for company vouchers
-      const entries = companyVoucherIds.length > 0
-        ? await db
-            .select()
-            .from(voucherEntries)
-            .where(inArray(voucherEntries.voucherId, companyVoucherIds))
-            .execute()
-        : [];
-
-      // Create a map of account ID to account type
+      const expenseAccountIds = new Set(expenseAccounts.map(a => a.id));
       const accountTypeMap = new Map<number, string>();
       for (const acc of expenseAccounts) {
         accountTypeMap.set(acc.id, acc.accountType);
       }
 
+      const _ebCacheKey = `expense-breakdown:${companyId}`;
+      const _ebCached = _getCached(_ebCacheKey);
+      if (_ebCached) return res.json(_ebCached);
+
+      if (expenseAccountIds.size === 0) {
+        _setCached(_ebCacheKey, []);
+        return res.json([]);
+      }
+
+      // Single JOIN — replaces the two-query IN-clause anti-pattern.
+      // Directly filters entries to expense accounts for this company.
+      const expenseEntries = await db
+        .select({
+          ledgerAccountId: voucherEntries.ledgerAccountId,
+          debitAmount:     voucherEntries.debitAmount,
+          creditAmount:    voucherEntries.creditAmount,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(and(
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.optional, false),
+          isNull(vouchers.deletedAt),
+          inArray(voucherEntries.ledgerAccountId as any, [...expenseAccountIds]),
+        ))
+        .execute();
+
       // Sum balances by expense type
       const expenseByType = new Map<string, number>();
-      
-      for (const entry of entries) {
+
+      for (const entry of expenseEntries) {
         if (!entry.ledgerAccountId) continue;
-        
         const accountType = accountTypeMap.get(entry.ledgerAccountId);
         if (!accountType) continue;
-
-        // Expense accounts: debits increase expense, credits decrease it
         const amount = parseFloat(entry.debitAmount || "0") - parseFloat(entry.creditAmount || "0");
         if (amount <= 0) continue;
-
-        const current = expenseByType.get(accountType) || 0;
-        expenseByType.set(accountType, current + amount);
+        expenseByType.set(accountType, (expenseByType.get(accountType) || 0) + amount);
       }
 
       // Convert to array format for chart
@@ -1507,6 +1505,7 @@ export function registerStatsRoutes(app: Express) {
         }))
         .sort((a, b) => b.value - a.value);
 
+      _setCached(_ebCacheKey, result);
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
