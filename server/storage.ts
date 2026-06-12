@@ -820,45 +820,66 @@ export class DbStorage implements IStorage {
         .returning();
       return created;
     } catch (insertErr: any) {
-      // 3. Any unique-constraint violation → find whoever already holds that slot
-      if (insertErr.code === "23505") {
-        // Try by code first (race condition — another request beat us)
-        const [byCode] = await db
-          .select()
-          .from(schema.ledgerAccounts)
-          .where(
-            and(
-              eq(schema.ledgerAccounts.companyId, account.companyId),
-              eq(schema.ledgerAccounts.code, code),
-            ),
-          )
-          .limit(1);
-        if (byCode) return byCode;
+      // 3. INSERT failed for any reason — try to find a row that already satisfies
+      //    the slot (race condition, unique constraint variant, NOT-NULL mismatch, etc.)
+      //    before giving up and re-throwing.
 
-        // Try by name (production may have a unique-name constraint)
-        const [byName] = await db
-          .select()
-          .from(schema.ledgerAccounts)
-          .where(
-            and(
-              eq(schema.ledgerAccounts.companyId, account.companyId),
-              eq(schema.ledgerAccounts.name, account.name),
-            ),
-          )
-          .limit(1);
-        if (byName) {
-          // If the conflicting row is soft-deleted, reactivate it so it's usable
-          if (byName.deletedAt !== null) {
-            const [reactivated] = await db
-              .update(schema.ledgerAccounts)
-              .set({ deletedAt: null, active: true })
-              .where(eq(schema.ledgerAccounts.id, byName.id))
-              .returning();
-            return reactivated;
-          }
-          return byName;
+      // Try by code first (covers the common race-condition path)
+      const [byCode] = await db
+        .select()
+        .from(schema.ledgerAccounts)
+        .where(
+          and(
+            eq(schema.ledgerAccounts.companyId, account.companyId),
+            eq(schema.ledgerAccounts.code, code),
+          ),
+        )
+        .limit(1);
+      if (byCode) {
+        if (byCode.deletedAt !== null) {
+          const [reactivated] = await db
+            .update(schema.ledgerAccounts)
+            .set({ deletedAt: null, active: true })
+            .where(eq(schema.ledgerAccounts.id, byCode.id))
+            .returning();
+          return reactivated;
         }
+        return byCode;
       }
+
+      // Try by name (production may have a unique-name constraint)
+      const [byName] = await db
+        .select()
+        .from(schema.ledgerAccounts)
+        .where(
+          and(
+            eq(schema.ledgerAccounts.companyId, account.companyId),
+            eq(schema.ledgerAccounts.name, account.name),
+          ),
+        )
+        .limit(1);
+      if (byName) {
+        // If the conflicting row is soft-deleted, reactivate it so it's usable
+        if (byName.deletedAt !== null) {
+          const [reactivated] = await db
+            .update(schema.ledgerAccounts)
+            .set({ deletedAt: null, active: true })
+            .where(eq(schema.ledgerAccounts.id, byName.id))
+            .returning();
+          return reactivated;
+        }
+        return byName;
+      }
+
+      // Nothing found — surface the original INSERT error
+      console.error(
+        "[getOrCreateLedgerAccount] INSERT failed (code=%s) and no existing row found for companyId=%s code=%s name=%s. Original error: %s",
+        insertErr.code,
+        account.companyId,
+        code,
+        account.name,
+        insertErr.message,
+      );
       throw insertErr;
     }
   }
