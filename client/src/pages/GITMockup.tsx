@@ -1821,16 +1821,29 @@ function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupC
               ))
             )}
 
-            {/* Open balance footer row */}
-            {hasBalance && (
-              <tr className="bg-yellow-400 text-yellow-950 font-bold">
-                <td colSpan={9} className="py-1.5 px-2 text-xs uppercase tracking-wide">
-                  Open Balance (= Account Balance)
-                </td>
-                <td className="py-1.5 px-2 text-right text-sm">${fmt(openBalance ?? openSum, 0)}</td>
-                <td />
-              </tr>
-            )}
+            {/* Open balance footer row — green for Dr, red for Cr */}
+            {hasBalance && (() => {
+              const isDebit  = (ledgerBalance ?? 0) > 0;
+              const isCredit = (ledgerBalance ?? 0) < 0;
+              const rowCls = isDebit
+                ? "bg-green-500 text-white font-bold"
+                : isCredit
+                  ? "bg-red-500 text-white font-bold"
+                  : "bg-yellow-400 text-yellow-950 font-bold";
+              const balLabel = isDebit ? "Dr" : isCredit ? "Cr" : "";
+              return (
+                <tr className={rowCls}>
+                  <td colSpan={9} className="py-1.5 px-2 text-xs uppercase tracking-wide">
+                    Open Balance (= Account Balance)
+                  </td>
+                  <td className="py-1.5 px-2 text-right text-sm">
+                    ${fmt(openBalance ?? openSum, 0)}
+                    {balLabel && <span className="ml-1 text-xs opacity-80">({balLabel})</span>}
+                  </td>
+                  <td />
+                </tr>
+              );
+            })()}
           </tbody>
         </table>
       </div>
