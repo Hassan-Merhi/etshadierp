@@ -602,21 +602,19 @@ export function registerPosRoutes(app: Express) {
       }
 
       // Get or create SALES revenue account (outside transaction for simplicity)
-      const allAccounts = await storage.getAllLedgerAccounts(
-        req.session.currentCompanyId!,
-      );
-      let salesAccount = allAccounts.find((a: any) => a.code === "SALES");
+      // Use getOrCreateLedgerAccount so soft-deleted duplicates don't cause a
+      // unique-constraint crash — it handles the 23505 error and falls back to
+      // fetching the existing (possibly soft-deleted) row.
+      let salesAccount = await storage.getOrCreateLedgerAccount({
+        companyId: req.session.currentCompanyId!,
+        code: "SALES",
+        name: "Sales Revenue",
+        accountType: "Income",
+        openingBalance: "0",
+        active: true,
+      });
 
-      if (!salesAccount) {
-        salesAccount = await storage.createLedgerAccount({
-          companyId: req.session.currentCompanyId!,
-          code: "SALES",
-          name: "Sales Revenue",
-          accountType: "Income",
-          openingBalance: "0",
-          active: true,
-        });
-      } else if (salesAccount.accountType !== "Income") {
+      if (salesAccount.accountType !== "Income") {
         // Validate that Sales account is of type Income for proper import cycle balance
         console.warn(`[POS Sale] WARNING: SALES account has type "${salesAccount.accountType}" instead of "Income". This will cause import cycle imbalance!`);
         return res.status(400).json({
@@ -2014,24 +2012,22 @@ export function registerPosRoutes(app: Express) {
       const customer = await storage.createCustomer({ ...parsed, code } as any);
 
       const customerAccountCode = `CUST-${customer.code}`;
-      let customerAccount = await storage.getLedgerAccountByCode(customerAccountCode, req.session.currentCompanyId!);
+      // Use getOrCreateLedgerAccount to survive soft-deleted duplicates that
+      // would cause a unique-constraint crash with a plain INSERT.
+      const customerAccount = await storage.getOrCreateLedgerAccount({
+        companyId: req.session.currentCompanyId,
+        code: customerAccountCode,
+        name: `${customer.legalName} - Customer Account`,
+        accountType: "Asset",
+        subType: "Accounts Receivable",
+        openingBalance: parsed.openingBalance || "0",
+        openingBalanceSide: parsed.openingBalanceSide || "Dr",
+        active: true,
+      });
 
-      if (!customerAccount) {
-        customerAccount = await storage.createLedgerAccount({
-          companyId: req.session.currentCompanyId,
-          code: customerAccountCode,
-          name: `${customer.legalName} - Customer Account`,
-          accountType: "Asset",
-          subType: "Accounts Receivable",
-          openingBalance: parsed.openingBalance || "0",
-          openingBalanceSide: parsed.openingBalanceSide || "Dr",
-          active: true,
-        });
-
-        await storage.updateCustomer(customer.id, {
-          ledgerAccountId: customerAccount.id,
-        });
-      }
+      await storage.updateCustomer(customer.id, {
+        ledgerAccountId: customerAccount.id,
+      });
 
       res.status(201).json(customer);
     } catch (error: any) {
