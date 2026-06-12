@@ -351,86 +351,73 @@ export function registerReportsRoutes(app: Express) {
 
       let erpSalesTotal = 0;
       const erpSalesAccountsDetails: { id: number; code: string; name: string; debit: number; credit: number; balance: number }[] = [];
-      if (missedIncomeAccounts.length > 0 && companyVoucherIds.length > 0) {
-        // Get the set of voucherIds that already have salesItems (POS sales) — exclude these
-        const posVouchersData = await db
-          .select({ voucherId: salesItems.voucherId })
-          .from(salesItems)
-          .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
-          .where(and(...salesConditions))
+      const missedAccountIds = missedIncomeAccounts.map((a) => a.id);
+      if (missedAccountIds.length > 0) {
+        // Single JOIN query: ERP (non-POS) voucher entries for missed income accounts.
+        // "Non-POS" = vouchers that have NO sales_items rows (NOT EXISTS subquery).
+        // Replaces the previous two-step: (1) fetch posVoucherIds, (2) inArray(nonPosVoucherIds).
+        const erpSalesEntries = await db
+          .select({
+            ledgerAccountId: voucherEntries.ledgerAccountId,
+            debitAmount: voucherEntries.debitAmount,
+            creditAmount: voucherEntries.creditAmount,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(and(
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.optional, false),
+            isNull(vouchers.deletedAt),
+            inArray(voucherEntries.ledgerAccountId, missedAccountIds),
+            sql`NOT EXISTS (SELECT 1 FROM sales_items si WHERE si.voucher_id = voucher_entries.voucher_id)`,
+          ))
           .execute();
-        const posVoucherIdSet = new Set(posVouchersData.map((r) => r.voucherId));
 
-        const nonPosVoucherIds = companyVoucherIds.filter((id) => !posVoucherIdSet.has(id));
-        if (nonPosVoucherIds.length > 0) {
-          const missedAccountIds = missedIncomeAccounts.map((a) => a.id);
-          const erpSalesEntries = await db
-            .select()
-            .from(voucherEntries)
-            .where(
-              and(
-                inArray(voucherEntries.voucherId, nonPosVoucherIds),
-                inArray(voucherEntries.ledgerAccountId, missedAccountIds)
-              )
-            )
-            .execute();
-
-          const erpSalesByAccount = new Map<number, { debit: number; credit: number }>();
-          for (const e of erpSalesEntries) {
-            const d = parseFloat(e.debitAmount || "0");
-            const c = parseFloat(e.creditAmount || "0");
-            const cur = erpSalesByAccount.get(e.ledgerAccountId!) || { debit: 0, credit: 0 };
-            erpSalesByAccount.set(e.ledgerAccountId!, { debit: cur.debit + d, credit: cur.credit + c });
-          }
-          for (const acc of missedIncomeAccounts) {
-            const bal = erpSalesByAccount.get(acc.id) || { debit: 0, credit: 0 };
-            const netBalance = bal.credit - bal.debit;
-            if (Math.abs(netBalance) > 0.001) {
-              erpSalesTotal += netBalance;
-              erpSalesAccountsDetails.push({
-                id: acc.id,
-                code: acc.code || "",
-                name: acc.name,
-                debit: bal.debit,
-                credit: bal.credit,
-                balance: netBalance,
-              });
-            }
+        const erpSalesByAccount = new Map<number, { debit: number; credit: number }>();
+        for (const e of erpSalesEntries) {
+          if (!e.ledgerAccountId) continue;
+          const d = parseFloat(e.debitAmount || "0");
+          const c = parseFloat(e.creditAmount || "0");
+          const cur = erpSalesByAccount.get(e.ledgerAccountId) || { debit: 0, credit: 0 };
+          erpSalesByAccount.set(e.ledgerAccountId, { debit: cur.debit + d, credit: cur.credit + c });
+        }
+        for (const acc of missedIncomeAccounts) {
+          const bal = erpSalesByAccount.get(acc.id) || { debit: 0, credit: 0 };
+          const netBalance = bal.credit - bal.debit;
+          if (Math.abs(netBalance) > 0.001) {
+            erpSalesTotal += netBalance;
+            erpSalesAccountsDetails.push({
+              id: acc.id,
+              code: acc.code || "",
+              name: acc.name,
+              debit: bal.debit,
+              credit: bal.credit,
+              balance: netBalance,
+            });
           }
         }
       }
 
       const salesAccountsTotal = posSalesTotal + erpSalesTotal;
 
-      // 6. Closing Stock - Current inventory value (quantity × weighted average cost) across all active locations
-      const activeLocationsData = await db
-        .select({ id: locations.id })
-        .from(locations)
-        .where(
-          and(
-            eq(locations.companyId, companyId),
-            eq(locations.active, true),
-            isNull(locations.deletedAt)
-          )
-        )
-        .execute();
-      const activeLocationIds = activeLocationsData.map((l) => l.id);
-
+      // 6. Closing Stock — single JOIN replaces two-step (fetch active locationIds, then inArray)
       let closingStockValue = 0;
-      if (activeLocationIds.length > 0) {
+      {
         const inventoryData = await db
           .select({
             quantity: inventory.quantity,
             averageRate: inventory.averageRate,
           })
           .from(inventory)
-          .where(inArray(inventory.locationId, activeLocationIds))
+          .innerJoin(locations, eq(inventory.locationId, locations.id))
+          .where(and(
+            eq(locations.companyId, companyId),
+            eq(locations.active, true),
+            isNull(locations.deletedAt),
+          ))
           .execute();
-
         for (const inv of inventoryData) {
-          const qty = parseFloat(inv.quantity || "0");
-          const rate = parseFloat(inv.averageRate || "0");
-          closingStockValue += qty * rate;
+          closingStockValue += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
         }
       }
 
@@ -931,27 +918,28 @@ export function registerReportsRoutes(app: Express) {
         .from(stockItems)
         .where(inArray(stockItems.id, sourceStockItemIds));
 
-      // Map source stock item codes to target stock items
+      // Map source stock item codes to target stock items — single batch query (was N queries)
+      const sourceCodes = sourceStockItems.map((i) => i.code).filter(Boolean) as string[];
+      const targetItemsInBatch = sourceCodes.length > 0
+        ? await db
+            .select({ id: stockItems.id, code: stockItems.code })
+            .from(stockItems)
+            .where(and(
+              eq(stockItems.companyId, targetCompanyId),
+              inArray(stockItems.code, sourceCodes),
+            ))
+            .execute()
+        : [];
+      const targetItemsByCode = new Map(targetItemsInBatch.map((i) => [i.code, i.id]));
+
       const stockItemMapping = new Map<number, number>();
       for (const sourceItem of sourceStockItems) {
-        // Find matching stock item in target by code
-        const targetItem = await db
-          .select()
-          .from(stockItems)
-          .where(
-            and(
-              eq(stockItems.companyId, targetCompanyId),
-              eq(stockItems.code, sourceItem.code)
-            )
-          )
-          .limit(1);
-
-        if (targetItem.length > 0) {
-          stockItemMapping.set(sourceItem.id, targetItem[0].id);
+        const targetId = targetItemsByCode.get(sourceItem.code);
+        if (targetId !== undefined) {
+          stockItemMapping.set(sourceItem.id, targetId);
         } else {
-          // Stock item doesn't exist in target - return error with the missing item name
-          return res.status(400).json({ 
-            message: `Stock item "${sourceItem.name}" (code: ${sourceItem.code}) doesn't exist in target company. Please create matching stock items first.`
+          return res.status(400).json({
+            message: `Stock item "${sourceItem.name}" (code: ${sourceItem.code}) doesn't exist in target company. Please create matching stock items first.`,
           });
         }
       }

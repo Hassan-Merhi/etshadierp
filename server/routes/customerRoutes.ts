@@ -60,58 +60,83 @@ export function registerCustomerRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const customers = await storage.getAllCustomers(req.session.currentCompanyId);
+      const companyId = req.session.currentCompanyId;
+      const customers = await storage.getAllCustomers(companyId);
+      if (customers.length === 0) return res.json([]);
 
-      const customersWithBalances = await Promise.all(
-        customers.map(async (customer) => {
-          // If customer has a linked ledger account, calculate balance from voucher entries
-          if (customer.ledgerAccountId) {
-            const entries = await storage.getVoucherEntriesByLedger(customer.ledgerAccountId);
-            const openingBalance = parseFloat(customer.openingBalance || "0");
-            const openingSide = customer.openingBalanceSide || "Dr";
+      // Batch: fetch ALL entries for all customer ledger accounts + all customer IDs in 2 queries
+      // (replaces N individual queries — one per customer — in the old Promise.all approach)
+      const ledgerAccountIds = customers.filter(c => c.ledgerAccountId).map(c => c.ledgerAccountId as number);
+      const customerOnlyIds  = customers.filter(c => !c.ledgerAccountId).map(c => c.id);
 
-            // For customers (Asset account - Accounts Receivable):
-            // Debit = increases amount they owe us
-            // Credit = decreases amount they owe us
-            const balance = entries.reduce((sum, entry) => {
-              const debit = parseFloat(entry.debitAmount || "0");
-              const credit = parseFloat(entry.creditAmount || "0");
+      const [ledgerEntries, customerEntries] = await Promise.all([
+        ledgerAccountIds.length > 0
+          ? db.select({
+              ledgerAccountId: voucherEntries.ledgerAccountId,
+              debitAmount: voucherEntries.debitAmount,
+              creditAmount: voucherEntries.creditAmount,
+            })
+            .from(voucherEntries)
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+            .where(and(
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt),
+              isNotNull(voucherEntries.ledgerAccountId),
+              inArray(voucherEntries.ledgerAccountId, ledgerAccountIds),
+            ))
+            .execute()
+          : Promise.resolve([] as { ledgerAccountId: number | null; debitAmount: string | null; creditAmount: string | null }[]),
+        customerOnlyIds.length > 0
+          ? db.select({
+              customerId: (voucherEntries as any).customerId,
+              debitAmount: voucherEntries.debitAmount,
+              creditAmount: voucherEntries.creditAmount,
+            })
+            .from(voucherEntries)
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+            .where(and(
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt),
+              isNotNull((voucherEntries as any).customerId),
+              inArray((voucherEntries as any).customerId, customerOnlyIds),
+            ))
+            .execute()
+          : Promise.resolve([] as { customerId: number | null; debitAmount: string | null; creditAmount: string | null }[]),
+      ]);
 
-              if (debit > 0 && credit === 0) {
-                return sum + debit; // Increase receivable
-              } else if (credit > 0 && debit === 0) {
-                return sum - credit; // Decrease receivable
-              }
-              return sum;
-            }, openingSide === "Dr" ? openingBalance : -openingBalance);
+      // Build net-transaction maps (only pure debit or pure credit entries, matching original logic)
+      const ledgerTxnMap = new Map<number, number>();
+      for (const e of ledgerEntries) {
+        if (!e.ledgerAccountId) continue;
+        const d = parseFloat(e.debitAmount || "0"), c = parseFloat(e.creditAmount || "0");
+        const cur = ledgerTxnMap.get(e.ledgerAccountId) ?? 0;
+        if (d > 0 && c === 0) ledgerTxnMap.set(e.ledgerAccountId, cur + d);
+        else if (c > 0 && d === 0) ledgerTxnMap.set(e.ledgerAccountId, cur - c);
+      }
+      const customerTxnMap = new Map<number, number>();
+      for (const e of customerEntries) {
+        const cid = (e as any).customerId;
+        if (!cid) continue;
+        const d = parseFloat(e.debitAmount || "0"), c = parseFloat(e.creditAmount || "0");
+        const cur = customerTxnMap.get(cid) ?? 0;
+        if (d > 0 && c === 0) customerTxnMap.set(cid, cur + d);
+        else if (c > 0 && d === 0) customerTxnMap.set(cid, cur - c);
+      }
 
-            return {
-              ...customer,
-              balance: Math.abs(balance),
-              balanceSide: balance >= 0 ? "Dr" : "Cr",
-            };
-          }
-
-          // No ledger account — use customer_id on voucher_entries (post-migration path)
-          const customerEntries = await storage.getVoucherEntriesByCustomer(customer.id);
-          const openingBalance = parseFloat(customer.openingBalance || "0");
-          const openingSide = customer.openingBalanceSide || "Dr";
-
-          const balance = customerEntries.reduce((sum, entry) => {
-            const debit = parseFloat(entry.debitAmount || "0");
-            const credit = parseFloat(entry.creditAmount || "0");
-            if (debit > 0 && credit === 0) return sum + debit;
-            if (credit > 0 && debit === 0) return sum - credit;
-            return sum;
-          }, openingSide === "Dr" ? openingBalance : -openingBalance);
-
-          return {
-            ...customer,
-            balance: Math.abs(balance),
-            balanceSide: balance >= 0 ? "Dr" : "Cr",
-          };
-        })
-      );
+      const customersWithBalances = customers.map((customer) => {
+        const openingBalance = parseFloat(customer.openingBalance || "0");
+        const openingSide = customer.openingBalanceSide || "Dr";
+        const openingNet = openingSide === "Dr" ? openingBalance : -openingBalance;
+        const txnNet = customer.ledgerAccountId
+          ? (ledgerTxnMap.get(customer.ledgerAccountId) ?? 0)
+          : (customerTxnMap.get(customer.id) ?? 0);
+        const balance = openingNet + txnNet;
+        return {
+          ...customer,
+          balance: Math.abs(balance),
+          balanceSide: balance >= 0 ? "Dr" : "Cr",
+        };
+      });
 
       res.json(customersWithBalances);
     } catch (error: any) {
@@ -201,28 +226,23 @@ export function registerCustomerRoutes(app: Express) {
 
       const parsed = insertCustomerSchema.parse(dataWithCompany);
 
-      // Auto-generate customer code
+      // Auto-generate customer code using MAX() — avoids loading all customers into memory
       let code = "CUST001";
       let suffix = 1;
-      const allCustomers = await storage.getAllCustomers(
-        req.session.currentCompanyId,
-      );
-
-      // Find the highest existing customer number
-      const existingCodes = allCustomers
-        .map((c) => c.code)
-        .filter((c) => c.startsWith("CUST"))
-        .map((c) => parseInt(c.replace("CUST", "")))
-        .filter((n) => !isNaN(n));
-
-      if (existingCodes.length > 0) {
-        const maxNumber = Math.max(...existingCodes);
-        suffix = maxNumber + 1;
-      }
-
+      const [maxRow] = await db
+        .select({
+          maxSuffix: sql<string>`MAX(CAST(NULLIF(REGEXP_REPLACE(code, '[^0-9]', '', 'g'), '') AS integer))`,
+        })
+        .from(customers)
+        .where(and(
+          eq(customers.companyId, req.session.currentCompanyId!),
+          sql`code LIKE 'CUST%'`,
+        ))
+        .execute();
+      if (maxRow?.maxSuffix) suffix = parseInt(maxRow.maxSuffix) + 1;
       code = `CUST${suffix.toString().padStart(3, "0")}`;
 
-      // Ensure uniqueness
+      // Ensure uniqueness (handles gaps/collisions)
       while (
         await storage.getCustomerByCode(code, req.session.currentCompanyId)
       ) {
@@ -481,37 +501,22 @@ export function registerCustomerRoutes(app: Express) {
 
         const parsed = insertContainerSaleSchema.parse(dataWithCompany);
 
-        // Verify customer exists and belongs to current company
-        const customer = await storage.getCustomerById(parsed.customerId);
-        if (!customer) {
-          return res.status(404).json({ message: "Customer not found" });
-        }
+        // Verify customer, container, and sale status in parallel
+        const [customer, container, existingSale] = await Promise.all([
+          storage.getCustomerById(parsed.customerId),
+          storage.getContainerById(parsed.containerId),
+          storage.getContainerSaleByContainerId(parsed.containerId, req.session.currentCompanyId),
+        ]);
+        if (!customer) return res.status(404).json({ message: "Customer not found" });
         if (customer.companyId !== req.session.currentCompanyId) {
-          return res
-            .status(403)
-            .json({ message: "Customer belongs to a different company" });
+          return res.status(403).json({ message: "Customer belongs to a different company" });
         }
-
-        // Verify container exists and belongs to current company
-        const container = await storage.getContainerById(parsed.containerId);
-        if (!container) {
-          return res.status(404).json({ message: "Container not found" });
-        }
+        if (!container) return res.status(404).json({ message: "Container not found" });
         if (container.companyId !== req.session.currentCompanyId) {
-          return res
-            .status(403)
-            .json({ message: "Container belongs to a different company" });
+          return res.status(403).json({ message: "Container belongs to a different company" });
         }
-
-        // Check if container is already sold
-        const existingSale = await storage.getContainerSaleByContainerId(
-          parsed.containerId,
-          req.session.currentCompanyId
-        );
         if (existingSale) {
-          return res
-            .status(400)
-            .json({ message: "Container has already been sold" });
+          return res.status(400).json({ message: "Container has already been sold" });
         }
 
         // Get customer's ledger account
@@ -651,49 +656,26 @@ export function registerCustomerRoutes(app: Express) {
 
         const parsed = insertInterCompanyTransferSchema.parse(req.body);
 
-        // Verify both companies exist
-        const fromCompany = await storage.getCompanyById(parsed.fromCompanyId);
-        if (!fromCompany) {
-          return res.status(404).json({ message: "From company not found" });
-        }
+        // Verify both companies, accounts, and inter-company ledgers in parallel
+        const [fromCompany, toCompany, fromAccount, toAccount, fromCompanyAccounts, toCompanyAccounts] = await Promise.all([
+          storage.getCompanyById(parsed.fromCompanyId),
+          storage.getCompanyById(parsed.toCompanyId),
+          storage.getLedgerAccountById(parsed.fromLedgerAccountId),
+          storage.getLedgerAccountById(parsed.toLedgerAccountId),
+          storage.getAllLedgerAccounts(parsed.fromCompanyId),
+          storage.getAllLedgerAccounts(parsed.toCompanyId),
+        ]);
 
-        const toCompany = await storage.getCompanyById(parsed.toCompanyId);
-        if (!toCompany) {
-          return res.status(404).json({ message: "To company not found" });
-        }
-
-        // Verify user has access to both companies (optional, depending on requirements)
-        // For now, we'll allow the transfer if the user is in the current company
-
-        // Verify ledger accounts exist
-        const fromAccount = await storage.getLedgerAccountById(
-          parsed.fromLedgerAccountId,
-        );
+        if (!fromCompany) return res.status(404).json({ message: "From company not found" });
+        if (!toCompany)   return res.status(404).json({ message: "To company not found" });
         if (!fromAccount || fromAccount.companyId !== parsed.fromCompanyId) {
-          return res
-            .status(404)
-            .json({
-              message:
-                "From ledger account not found or doesn't belong to from company",
-            });
+          return res.status(404).json({ message: "From ledger account not found or doesn't belong to from company" });
         }
-
-        const toAccount = await storage.getLedgerAccountById(
-          parsed.toLedgerAccountId,
-        );
         if (!toAccount || toAccount.companyId !== parsed.toCompanyId) {
-          return res
-            .status(404)
-            .json({
-              message:
-                "To ledger account not found or doesn't belong to to company",
-            });
+          return res.status(404).json({ message: "To ledger account not found or doesn't belong to to company" });
         }
 
         // Get or create inter-company accounts for both companies
-        const fromCompanyAccounts = await storage.getAllLedgerAccounts(
-          parsed.fromCompanyId,
-        );
         let fromInterCompanyAccount = fromCompanyAccounts.find(
           (a: any) => a.code === `IC-TO-${toCompany.code}`,
         );
@@ -709,9 +691,6 @@ export function registerCustomerRoutes(app: Express) {
           });
         }
 
-        const toCompanyAccounts = await storage.getAllLedgerAccounts(
-          parsed.toCompanyId,
-        );
         let toInterCompanyAccount = toCompanyAccounts.find(
           (a: any) => a.code === `IC-FROM-${fromCompany.code}`,
         );
@@ -851,10 +830,18 @@ export function registerCustomerRoutes(app: Express) {
         )
         .orderBy(desc(interCompanyTransfers.createdAt));
 
-      // Enrich with company names
-      const allCompanies = await storage.getAllCompanies();
+      // Enrich with company names and accounts (filter to only relevant account IDs)
+      const transferAccountIds = Array.from(new Set([
+        ...transfers.map((t: any) => t.fromLedgerAccountId),
+        ...transfers.map((t: any) => t.toLedgerAccountId),
+      ].filter(Boolean))) as number[];
+      const [allCompanies, allAccounts] = await Promise.all([
+        storage.getAllCompanies(),
+        transferAccountIds.length > 0
+          ? db.select().from(ledgerAccounts).where(inArray(ledgerAccounts.id, transferAccountIds))
+          : Promise.resolve([] as any[]),
+      ]);
       const companyMap = new Map(allCompanies.map((c: any) => [c.id, c]));
-      const allAccounts = await db.select().from(ledgerAccounts);
       const accountMap = new Map(allAccounts.map((a: any) => [a.id, a]));
 
       const enriched = transfers.map((t: any) => ({

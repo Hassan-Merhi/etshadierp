@@ -49,15 +49,22 @@ export function registerLedgerRoutes(app: Express) {
           .from(ledgerAccounts)
           .where(and(...conditions))
           .orderBy(asc(ledgerAccounts.code));
+      } else if (search && typeof search === "string" && search.trim()) {
+        // Push search to DB (ILIKE) instead of fetching all accounts and filtering in JS
+        const q = `%${search.trim()}%`;
+        const searchConds: any[] = [
+          eq(ledgerAccounts.companyId, effectiveCompanyId),
+          isNull(ledgerAccounts.deletedAt),
+          or(ilike(ledgerAccounts.name, q), ilike(ledgerAccounts.code, q)),
+        ];
+        if (includeHidden !== "true") searchConds.push(eq(ledgerAccounts.isHidden, false));
+        accounts = await db
+          .select()
+          .from(ledgerAccounts)
+          .where(and(...searchConds))
+          .orderBy(asc(ledgerAccounts.code));
       } else {
         accounts = await storage.getAllLedgerAccounts(effectiveCompanyId, includeHidden === "true");
-      }
-      if (search && typeof search === "string" && search.trim()) {
-        const q = search.trim().toLowerCase();
-        accounts = accounts.filter(a =>
-          a.name.toLowerCase().includes(q) ||
-          (a.code && a.code.toLowerCase().includes(q))
-        );
       }
       res.json(accounts);
     } catch (error: any) {
@@ -85,6 +92,8 @@ export function registerLedgerRoutes(app: Express) {
         if (accountIds.length === 0) return res.json([]);
 
         // Accounts that have any voucher entries — scoped to this company only
+        // The innerJoin on vouchers with companyId already scopes to this company's accounts;
+        // the inArray is redundant since all accounts belong to this company.
         const usedInEntries = await db
           .selectDistinct({ accountId: voucherEntries.ledgerAccountId })
           .from(voucherEntries)
@@ -92,7 +101,6 @@ export function registerLedgerRoutes(app: Express) {
           .where(and(
             isNotNull(voucherEntries.ledgerAccountId),
             eq(vouchers.companyId, companyId),
-            inArray(voucherEntries.ledgerAccountId, accountIds),
           ));
         const usedIds = new Set(usedInEntries.map((r: any) => r.accountId));
 
@@ -672,61 +680,39 @@ export function registerLedgerRoutes(app: Express) {
         for (const company of allCompanies) {
           const companyId = company.id;
 
-          // Helper function to calculate account balance by account type
+          // Single-query aggregate replaces N+1 (fetch accounts → per-account entry fetch)
           const getAccountTypeBalance = async (accountType: string, isLiability: boolean = false) => {
-            const accounts = await db
-              .select()
-              .from(ledgerAccounts)
-              .where(
-                and(
-                  eq(ledgerAccounts.companyId, companyId),
-                  eq(ledgerAccounts.accountType, accountType),
-                  isNull(ledgerAccounts.deletedAt)
+            const rows = await db.execute(sql`
+              SELECT
+                la.opening_balance,
+                la.opening_balance_side,
+                COALESCE(SUM(CAST(ve.debit_amount  AS numeric)), 0) AS total_debit,
+                COALESCE(SUM(CAST(ve.credit_amount AS numeric)), 0) AS total_credit
+              FROM ledger_accounts la
+              LEFT JOIN voucher_entries ve
+                ON  ve.ledger_account_id = la.id
+                AND ve.voucher_id IN (
+                  SELECT id FROM vouchers
+                   WHERE company_id  = ${companyId}
+                     AND optional    = false
+                     AND deleted_at IS NULL
                 )
-              );
+              WHERE la.company_id   = ${companyId}
+                AND la.account_type = ${accountType}
+                AND la.deleted_at  IS NULL
+              GROUP BY la.id, la.opening_balance, la.opening_balance_side
+            `);
 
             let totalBalance = 0;
-            for (const account of accounts) {
-              const entries = await db
-                .select({
-                  creditAmount: voucherEntries.creditAmount,
-                  debitAmount: voucherEntries.debitAmount,
-                })
-                .from(voucherEntries)
-                .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-                .where(
-                  and(
-                    eq(voucherEntries.ledgerAccountId, account.id),
-                    eq(vouchers.companyId, companyId),
-                    isNull(vouchers.deletedAt),
-                    eq(vouchers.optional, false)
-                  )
-                );
-
-              // Fix: Properly sign opening balance based on openingBalanceSide
-              const openingBalanceRaw = parseFloat(account.openingBalance || "0");
-              const openingSide = account.openingBalanceSide || "Dr";
-              let signedOpening: number;
-              if (isLiability) {
-                // Liability/Income accounts: Cr opening = positive, Dr opening = negative
-                signedOpening = openingSide === "Cr" ? openingBalanceRaw : -openingBalanceRaw;
-              } else {
-                // Asset/Expense accounts: Dr opening = positive, Cr opening = negative
-                signedOpening = openingSide === "Dr" ? openingBalanceRaw : -openingBalanceRaw;
-              }
-              
-              const balance = entries.reduce((sum, entry) => {
-                const credit = parseFloat(entry.creditAmount || "0");
-                const debit = parseFloat(entry.debitAmount || "0");
-                
-                if (isLiability) {
-                  return sum + credit - debit;
-                } else {
-                  return sum + debit - credit;
-                }
-              }, signedOpening);
-              
-              totalBalance += balance;
+            for (const row of rows.rows as any[]) {
+              const openingBalanceRaw = parseFloat(row.opening_balance || "0");
+              const openingSide = (row.opening_balance_side as string) || "Dr";
+              const signedOpening = isLiability
+                ? (openingSide === "Cr" ? openingBalanceRaw : -openingBalanceRaw)
+                : (openingSide === "Dr" ? openingBalanceRaw : -openingBalanceRaw);
+              const debit  = parseFloat(row.total_debit  || "0");
+              const credit = parseFloat(row.total_credit || "0");
+              totalBalance += signedOpening + (isLiability ? credit - debit : debit - credit);
             }
             return totalBalance;
           };
@@ -848,72 +834,71 @@ export function registerLedgerRoutes(app: Express) {
             return sum + parseFloat(container.grandTotal || "0");
           }, 0);
 
-          // 3-5. Agent and Loan balances
-          const dutyAgentBalance = await getAccountTypeBalance("Duty Agent", true);
-          const transporterAgentBalance = await getAccountTypeBalance("Transporter Agent", true);
-          const loansBalance = await getAccountTypeBalance("Loans", true);
+          // 3-10: All independent — run in parallel
+          const [
+            dutyAgentBalance,
+            transporterAgentBalance,
+            loansBalance,
+            cashBalance,
+            ledgerBankBalance,
+            standaloneBankAccountEntries,
+            standaloneBankAccountsForBalance,
+            directExpenseBalance,
+            indirectExpenseBalance,
+            incomeBalance,
+          ] = await Promise.all([
+            getAccountTypeBalance("Duty Agent", true),
+            getAccountTypeBalance("Transporter Agent", true),
+            getAccountTypeBalance("Loans", true),
+            getAccountTypeBalance("Cash", false),
+            getAccountTypeBalance("Bank", false),
+            db
+              .select({
+                bankAccountId: voucherEntries.bankAccountId,
+                creditAmount: voucherEntries.creditAmount,
+                debitAmount: voucherEntries.debitAmount,
+              })
+              .from(voucherEntries)
+              .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+              .innerJoin(bankAccounts, eq(voucherEntries.bankAccountId, bankAccounts.id))
+              .where(
+                and(
+                  isNotNull(voucherEntries.bankAccountId),
+                  isNull(voucherEntries.ledgerAccountId),
+                  isNull(bankAccounts.linkedLedgerId),
+                  eq(bankAccounts.companyId, companyId),
+                  isNull(bankAccounts.deletedAt),
+                  eq(vouchers.companyId, companyId),
+                  isNull(vouchers.deletedAt),
+                  eq(vouchers.optional, false)
+                )
+              ),
+            db
+              .select()
+              .from(bankAccounts)
+              .where(
+                and(
+                  eq(bankAccounts.companyId, companyId),
+                  isNull(bankAccounts.deletedAt),
+                  isNull(bankAccounts.linkedLedgerId)
+                )
+              ),
+            getImportChargesBalance(),
+            getAccountTypeBalance("Indirect Expense", false),
+            getAccountTypeBalance("Income", true),
+          ]);
 
-          // 6-7. Cash and Bank balances
-          const cashBalance = await getAccountTypeBalance("Cash", false);
-          
-          // Bank balance from ledger accounts (type "Bank") - includes linked bank accounts
-          const ledgerBankBalance = await getAccountTypeBalance("Bank", false);
-          
-          // Bank balance from standalone bankAccounts (no linkedLedgerId)
-          const standaloneBankAccountEntries = await db
-            .select({
-              bankAccountId: voucherEntries.bankAccountId,
-              creditAmount: voucherEntries.creditAmount,
-              debitAmount: voucherEntries.debitAmount,
-            })
-            .from(voucherEntries)
-            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-            .innerJoin(bankAccounts, eq(voucherEntries.bankAccountId, bankAccounts.id))
-            .where(
-              and(
-                isNotNull(voucherEntries.bankAccountId),
-                isNull(voucherEntries.ledgerAccountId), // Only entries without ledger posting
-                isNull(bankAccounts.linkedLedgerId), // Only standalone bank accounts
-                eq(bankAccounts.companyId, companyId),
-                isNull(bankAccounts.deletedAt),
-                eq(vouchers.companyId, companyId),
-                isNull(vouchers.deletedAt),
-                eq(vouchers.optional, false)
-              )
-            );
-          
-          const standaloneBankAccountsForBalance = await db
-            .select()
-            .from(bankAccounts)
-            .where(
-              and(
-                eq(bankAccounts.companyId, companyId),
-                isNull(bankAccounts.deletedAt),
-                isNull(bankAccounts.linkedLedgerId) // Only standalone
-              )
-            );
-          
           const standaloneBankOpeningBalance = standaloneBankAccountsForBalance.reduce((sum, account) => {
             const openingBalanceRaw = parseFloat(account.openingBalance || "0");
             const openingSide = account.openingBalanceSide || "Dr";
             return sum + (openingSide === "Dr" ? openingBalanceRaw : -openingBalanceRaw);
           }, 0);
-          
           const standaloneBankVoucherBalance = standaloneBankAccountEntries.reduce((sum, entry) => {
             const credit = parseFloat(entry.creditAmount || "0");
             const debit = parseFloat(entry.debitAmount || "0");
             return sum + debit - credit;
           }, 0);
-          
           const bankBalance = ledgerBankBalance + standaloneBankOpeningBalance + standaloneBankVoucherBalance;
-
-          // 8-9. Expense balances
-          // Use getImportChargesBalance() instead of generic Direct Expense to match import-cycle-balance calculation
-          const directExpenseBalance = await getImportChargesBalance();
-          const indirectExpenseBalance = await getAccountTypeBalance("Indirect Expense", false);
-
-          // 10. Income balance
-          const incomeBalance = await getAccountTypeBalance("Income", true);
 
           // 11. Stock on Floor
           // Calculate from quantity * averageRate to ensure accuracy (totalValue can get out of sync)

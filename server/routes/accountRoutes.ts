@@ -602,7 +602,7 @@ export function registerAccountRoutes(app: Express) {
       const currentCompany = await storage.getCompanyById(companyId);
       const isFactoryCompany = currentCompany?.companyType === "factory";
 
-      // Phase 2: all independent fetches in parallel
+      // Phase 2: all independent fetches in parallel (allEntries runs concurrently with others)
       const [
         ledgers,
         banks,
@@ -613,6 +613,7 @@ export function registerAccountRoutes(app: Express) {
         fContainers,
         fPayments,
         companyVouchers,
+        allEntries,
       ] = await Promise.all([
         storage.getAllLedgerAccounts(companyId),
         storage.getAllBankAccounts(companyId),
@@ -633,6 +634,10 @@ export function registerAccountRoutes(app: Express) {
           .from(vouchers)
           .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
           .execute(),
+        // Fetch all entries using a SQL subquery instead of first fetching IDs then inArray
+        db.select().from(voucherEntries).where(
+          sql`${voucherEntries.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${companyId} AND optional = false AND deleted_at IS NULL)`
+        ).execute(),
       ]);
 
       const companyVoucherIds = companyVouchers.map((v) => v.id);
@@ -646,15 +651,7 @@ export function registerAccountRoutes(app: Express) {
         (companyVouchers as any[]).map((v) => [v.id, { currency: v.currency || "USD", exchangeRate: v.exchangeRate || "1" }])
       );
 
-      // Get all voucher entries for this company
-      const allEntries =
-        companyVoucherIds.length > 0
-          ? await db
-              .select()
-              .from(voucherEntries)
-              .where(inArray(voucherEntries.voucherId, companyVoucherIds))
-              .execute()
-          : [];
+      // allEntries already fetched in parallel above (see Promise.all)
 
       // Group entries by account type and calculate balances
       const ledgerBalances = new Map<number, { debits: number; credits: number }>();

@@ -432,7 +432,11 @@ export function registerStatsRoutes(app: Express) {
 
       // Add Suppliers (only for parent company or if no parent set)
       if (shouldIncludeSuppliers) {
-        const allSuppliers = await db.select().from(suppliers).where(isNull(suppliers.deletedAt)).execute();
+        // Only fetch suppliers that appear in this company's entries (avoids full-table scan)
+        const supplierIdsWithBalance = [...supplierBalances.keys()];
+        const allSuppliers = supplierIdsWithBalance.length > 0
+          ? await db.select().from(suppliers).where(and(isNull(suppliers.deletedAt), inArray(suppliers.id, supplierIdsWithBalance))).execute()
+          : [];
         let supplierLiabilities = 0;
         let supplierAssets = 0;
         
@@ -881,7 +885,11 @@ export function registerStatsRoutes(app: Express) {
 
       // ── 5. Supplier balances ──────────────────────────────────────────────
       if (shouldIncludeSuppliers) {
-        const allSuppliers = await db.select().from(suppliers).where(isNull(suppliers.deletedAt)).execute();
+        // Only fetch suppliers that appear in this company's entries (avoids full-table scan)
+        const supplierIdsWithBalance = [...supplierBalances.keys()];
+        const allSuppliers = supplierIdsWithBalance.length > 0
+          ? await db.select().from(suppliers).where(and(isNull(suppliers.deletedAt), inArray(suppliers.id, supplierIdsWithBalance))).execute()
+          : [];
         let supplierLiabilities = 0;
         let supplierAssets = 0;
         for (const sup of allSuppliers as any[]) {
@@ -1252,26 +1260,28 @@ export function registerStatsRoutes(app: Express) {
       });
       const expenseAccountIds = expenseAccounts.map((acc) => acc.id);
 
-      // Get all voucher entries for this company (excluding optional)
-      const companyVouchers = await db
-        .select({ id: vouchers.id, voucherDate: vouchers.voucherDate })
-        .from(vouchers)
+      // Single JOIN query: fetch entries with their voucher dates — replaces two-step
+      // (previously: fetch companyVouchers → extract IDs → inArray(voucherEntries))
+      const companyEntriesRaw = await db
+        .select({
+          ledgerAccountId: voucherEntries.ledgerAccountId,
+          debitAmount: voucherEntries.debitAmount,
+          creditAmount: voucherEntries.creditAmount,
+          voucherDate: vouchers.voucherDate,
+          voucherId: voucherEntries.voucherId,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
         .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
         .execute();
 
-      const companyVoucherIds = companyVouchers.map((v) => v.id);
+      // Keep voucherDateMap for compatibility with code below that uses it
       const voucherDateMap = new Map(
-        companyVouchers.map((v) => [v.id, v.voucherDate]),
+        companyEntriesRaw.map((e) => [e.voucherId, e.voucherDate]),
       );
 
-      const companyEntries =
-        companyVoucherIds.length > 0
-          ? await db
-              .select()
-              .from(voucherEntries)
-              .where(inArray(voucherEntries.voucherId, companyVoucherIds))
-              .execute()
-          : [];
+      // companyEntriesRaw already fetched above via JOIN
+      const companyEntries = companyEntriesRaw;
 
       // Group data by month (last 6 months)
       const monthlyData = new Map<string, { sales: number; profit: number }>();
@@ -1935,37 +1945,33 @@ export function registerStatsRoutes(app: Express) {
         const incomeAccountIds = incomeAccounts.map((acc) => acc.id);
         const expenseAccountIds = expenseAccounts.map((acc) => acc.id);
 
-        // Get voucher IDs for this company with date filter
-        let companyVouchersQuery = db
-          .select({ id: vouchers.id, voucherDate: vouchers.voucherDate })
-          .from(vouchers)
-          .where(eq(vouchers.companyId, companyId));
-
-        const conditions = [eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)];
+        const plConditions: any[] = [eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)];
         if (startDate) {
-          conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
+          plConditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
         }
         if (endDate) {
-          conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
+          plConditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
         }
 
-        const companyVouchers = await db
-          .select({ id: vouchers.id })
-          .from(vouchers)
-          .where(and(...conditions))
-          .execute();
-
-        const companyVoucherIds = companyVouchers.map((v) => v.id);
-
-        // Get voucher entries
-        const companyEntries =
-          companyVoucherIds.length > 0
-            ? await db
-                .select()
-                .from(voucherEntries)
-                .where(inArray(voucherEntries.voucherId, companyVoucherIds))
-                .execute()
-            : [];
+        // Single JOIN query — replaces two-step (fetch voucher IDs → inArray entries)
+        // Only fetch entries for income/expense accounts to avoid reading the whole table
+        const allAccountIds = [...incomeAccountIds, ...expenseAccountIds];
+        const companyEntries = allAccountIds.length > 0
+          ? await db
+              .select({
+                ledgerAccountId: voucherEntries.ledgerAccountId,
+                debitAmount: voucherEntries.debitAmount,
+                creditAmount: voucherEntries.creditAmount,
+              })
+              .from(voucherEntries)
+              .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+              .where(and(
+                ...plConditions,
+                isNotNull(voucherEntries.ledgerAccountId),
+                inArray(voucherEntries.ledgerAccountId, allAccountIds),
+              ))
+              .execute()
+          : [];
 
         // Calculate balances for each account
         const accountBalances = new Map<number, number>();
@@ -2043,36 +2049,33 @@ export function registerStatsRoutes(app: Express) {
 
         const { asOfDate } = req.query;
 
-        // Get all accounts
-        const ledgers = await storage.getAllLedgerAccounts(companyId);
-        const banks = await storage.getAllBankAccounts(companyId);
-        const assets = await storage.getAllFixedAssets(companyId);
-      const employees = await storage.getAllEmployees(companyId);
-        const suppliers = await storage.getAllSuppliers();
-
-        // Get vouchers up to asOfDate
+        // Build conditions for voucher date filter
         const conditions = [eq(vouchers.companyId, companyId)];
         if (asOfDate) {
           conditions.push(lte(vouchers.voucherDate, asOfDate));
         }
 
-        const companyVouchers = await db
-          .select({ id: vouchers.id })
-          .from(vouchers)
-          .where(and(...conditions))
-          .execute();
-
-        const companyVoucherIds = companyVouchers.map((v) => v.id);
-
-        const allEntries =
-          companyVoucherIds.length > 0
-            ? await db
-                .select()
-                .from(voucherEntries)
-                .where(inArray(voucherEntries.voucherId, companyVoucherIds))
-                .execute()
-            : [];
-
+        // Parallel fetch: all accounts + all entries (JOIN replaces two-step inArray)
+        const [ledgers, banks, assets, employees, suppliers, allEntries] = await Promise.all([
+          storage.getAllLedgerAccounts(companyId),
+          storage.getAllBankAccounts(companyId),
+          storage.getAllFixedAssets(companyId),
+          storage.getAllEmployees(companyId),
+          storage.getAllSuppliers(),
+          db.select({
+            voucherId: voucherEntries.voucherId,
+            ledgerAccountId: voucherEntries.ledgerAccountId,
+            bankAccountId: voucherEntries.bankAccountId,
+            fixedAssetId: voucherEntries.fixedAssetId,
+            supplierId: voucherEntries.supplierId,
+            employeeId: voucherEntries.employeeId,
+            debitAmount: voucherEntries.debitAmount,
+            creditAmount: voucherEntries.creditAmount,
+          }).from(voucherEntries)
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+            .where(and(...conditions))
+            .execute(),
+        ]);
         // Calculate balances
         const ledgerBalances = new Map<
           number,
@@ -2407,12 +2410,18 @@ export function registerStatsRoutes(app: Express) {
         .where(and(...inventoryConditions))
         .execute();
 
+      // Pre-group inventory by stockItemId — avoids O(n²) .filter() inside .map()
+      const inventoryByItem = new Map<number, typeof inventoryRecords>();
+      for (const inv of inventoryRecords) {
+        const list = inventoryByItem.get(inv.stockItemId) || [];
+        list.push(inv);
+        inventoryByItem.set(inv.stockItemId, list);
+      }
+
       // Build movement report - calculate value dynamically as qty * rate
       const movementData = stockItemsToReport
         .map((item) => {
-          const itemInventory = inventoryRecords.filter(
-            (inv) => inv.stockItemId === item.id,
-          );
+          const itemInventory = inventoryByItem.get(item.id) || [];
           const totalQuantity = itemInventory.reduce(
             (sum, inv) => sum + parseFloat(inv.quantity),
             0,
