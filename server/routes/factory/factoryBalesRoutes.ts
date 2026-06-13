@@ -1766,6 +1766,9 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
+      const userRole = (req.session as any).currentRole as string || (req.session as any).factoryRole as string || "";
+      const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(userRole);
+
       const { startDate, endDate, workerId, productId, locationId, status, search, includeUnassigned } = req.query as Record<string, string>;
 
       const today = getClientDate(req);
@@ -1778,6 +1781,8 @@ export function registerFactoryBalesRoutes(app: Express) {
       const statusFilter = status ? sql`AND fb.status = ${status}` : sql``;
       const searchFilter = search ? sql`AND LOWER(fb.reference_number) LIKE ${'%' + search.toLowerCase() + '%'}` : sql``;
       const unassignedFilter = includeUnassigned === 'false' ? sql`AND fb.finalized_by IS NOT NULL` : sql``;
+      // Privileged users can see deleted bales when searching by ref code
+      const deletedFilter = (isPrivileged && search) ? sql`` : sql`AND fb.deleted_at IS NULL`;
 
       const rows = await db.execute(sql`
         SELECT
@@ -1811,7 +1816,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         LEFT JOIN factory_bale_products fbp ON fb.product_id = fbp.id AND fbp.company_id = ${companyId}
         LEFT JOIN locations l ON fb.erp_location_id = l.id AND l.company_id = ${companyId}
         WHERE fb.company_id = ${companyId}
-          AND fb.deleted_at IS NULL
+          ${deletedFilter}
           AND fb.stock_entry_date IS NOT NULL
           AND fb.stock_entry_date >= ${effectiveStart}
           AND fb.stock_entry_date <= ${effectiveEnd}
@@ -1838,6 +1843,9 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
+      const userRole = (req.session as any).currentRole as string || (req.session as any).factoryRole as string || "";
+      const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(userRole);
+
       const { startDate, endDate, workerId, productId, locationId, status, search, includeUnassigned } = req.query as Record<string, string>;
 
       const today = getClientDate(req);
@@ -1850,6 +1858,7 @@ export function registerFactoryBalesRoutes(app: Express) {
       const statusFilter = status ? sql`AND fb.status = ${status}` : sql``;
       const searchFilter = search ? sql`AND LOWER(fb.reference_number) LIKE ${'%' + search.toLowerCase() + '%'}` : sql``;
       const unassignedFilter = includeUnassigned === 'false' ? sql`AND fb.finalized_by IS NOT NULL` : sql``;
+      const deletedFilter = (isPrivileged && search) ? sql`` : sql`AND fb.deleted_at IS NULL`;
 
       const rows = await db.execute(sql`
         SELECT
@@ -1883,7 +1892,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         LEFT JOIN factory_bale_products fbp ON fb.product_id = fbp.id AND fbp.company_id = ${companyId}
         LEFT JOIN locations l ON fb.erp_location_id = l.id AND l.company_id = ${companyId}
         WHERE fb.company_id = ${companyId}
-          AND fb.deleted_at IS NULL
+          ${deletedFilter}
           AND fb.stock_entry_date IS NOT NULL
           AND fb.stock_entry_date >= ${effectiveStart}
           AND fb.stock_entry_date <= ${effectiveEnd}

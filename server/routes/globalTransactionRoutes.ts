@@ -49,6 +49,7 @@ export function registerGlobalTransactionRoutes(
       const userId = (req.session as any).userId as string;
       const userRole = (req.session as any).currentRole as string;
       const isAdmin = userRole === "Admin" || userRole === "Developer";
+      const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(userRole);
 
       const {
         startDate,
@@ -141,9 +142,10 @@ export function registerGlobalTransactionRoutes(
       }
 
       // 3. Build WHERE conditions
+      // Privileged users (Admin/Owner/Manager/Developer) can see deleted vouchers when searching
       const conditions: any[] = [
         inArray(vouchers.companyId, targetCompanyIds),
-        isNull(vouchers.deletedAt),
+        ...(isPrivileged ? [] : [isNull(vouchers.deletedAt)]),
       ];
 
       if (startDate) conditions.push(gte(vouchers.voucherDate, startDate));
@@ -201,6 +203,7 @@ export function registerGlobalTransactionRoutes(
           currency:      vouchers.currency,
           optional:      vouchers.optional,
           description:   vouchers.description,
+          deletedAt:     vouchers.deletedAt,
           narration: sql<string>`(
             SELECT ve.narration FROM voucher_entries ve
             WHERE ve.voucher_id = ${vouchers.id}
@@ -280,10 +283,14 @@ export function registerGlobalTransactionRoutes(
 
       if (allowedCompanyIds.length === 0) return res.json([]);
 
+      const isPrivilegedTypes = ["Admin", "Owner", "Manager", "Developer"].includes(userRole);
       const types = await db
         .selectDistinct({ voucherType: vouchers.voucherType })
         .from(vouchers)
-        .where(and(inArray(vouchers.companyId, allowedCompanyIds), isNull(vouchers.deletedAt)))
+        .where(and(
+          inArray(vouchers.companyId, allowedCompanyIds),
+          ...(isPrivilegedTypes ? [] : [isNull(vouchers.deletedAt)]),
+        ))
         .orderBy(vouchers.voucherType);
 
       return res.json(types.map((t) => t.voucherType));

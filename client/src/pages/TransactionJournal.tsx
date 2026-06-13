@@ -48,6 +48,7 @@ interface JournalVoucher {
   optional: boolean;
   description: string | null;
   narration: string | null;
+  deletedAt: string | null;
 }
 
 interface SummaryRow {
@@ -741,6 +742,9 @@ export default function TransactionJournal() {
                               {v.optional && (
                                 <Badge variant="outline" className="text-xs">Optional</Badge>
                               )}
+                              {v.deletedAt && (
+                                <Badge variant="destructive" className="text-xs">Deleted</Badge>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell className="text-sm max-w-xs text-muted-foreground">
@@ -824,6 +828,7 @@ export default function TransactionJournal() {
                           <div className="flex items-center gap-1.5 flex-wrap mb-1">
                             <VoucherTypeBadge type={v.voucherType} />
                             {v.optional && <Badge variant="outline" className="text-xs">Optional</Badge>}
+                            {v.deletedAt && <Badge variant="destructive" className="text-xs">Deleted</Badge>}
                             <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded ${companyColor(v.companyId)}`}>
                               {v.companyName}
                             </span>
