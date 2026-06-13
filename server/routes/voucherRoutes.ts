@@ -1599,6 +1599,51 @@ export function registerVoucherRoutes(app: Express) {
         // that matches a charge on one of their orders, update that charge automatically
         await syncJournalToOrderCharge(req.session.currentCompanyId!, result.entries, result.voucher.id).catch(() => {});
 
+        // ── Intercompany counterpart sync ─────────────────────────────────────
+        // If this voucher is one side of an intercompany transfer pair, scale the
+        // counterpart voucher's totalAmount and entries to match the new amount.
+        try {
+          const [ict] = await db
+            .select()
+            .from(interCompanyTransfers)
+            .where(or(
+              eq(interCompanyTransfers.fromVoucherId, voucherId),
+              eq(interCompanyTransfers.toVoucherId, voucherId),
+            ))
+            .limit(1);
+          if (ict) {
+            const otherVoucherId = ict.fromVoucherId === voucherId
+              ? ict.toVoucherId
+              : ict.fromVoucherId;
+            if (otherVoucherId) {
+              const newTotal = parseFloat(result.voucher.totalAmount || "0");
+              const [otherVoucher] = await db.select().from(vouchers).where(eq(vouchers.id, otherVoucherId));
+              if (otherVoucher) {
+                const oldTotal = parseFloat(otherVoucher.totalAmount || "0");
+                const ratio = oldTotal > 0 ? newTotal / oldTotal : 1;
+                const otherEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, otherVoucherId));
+                for (const e of otherEntries) {
+                  await db.update(voucherEntries).set({
+                    debitAmount:  (parseFloat(e.debitAmount  || "0") * ratio).toFixed(2),
+                    creditAmount: (parseFloat(e.creditAmount || "0") * ratio).toFixed(2),
+                  }).where(eq(voucherEntries.id, e.id));
+                }
+                await db.update(vouchers)
+                  .set({ totalAmount: newTotal.toFixed(2) })
+                  .where(eq(vouchers.id, otherVoucherId));
+                await db.update(fde)
+                  .set({ amountCurrency: newTotal.toFixed(2), amountUsd: newTotal.toFixed(2) })
+                  .where(and(
+                    eq(fde.referenceTable, "vouchers"),
+                    eq(fde.referenceId, otherVoucherId),
+                  ));
+              }
+            }
+          }
+        } catch (ictErr: any) {
+          console.error("[ICT sync] Counterpart update failed (non-fatal):", ictErr?.message);
+        }
+
         // WhatsApp rule check — prompt the frontend instead of auto-sending
         let waJournalPatch: { prompt: boolean; accountId?: number; voucherDate?: string; month?: string } = { prompt: false };
         try {
@@ -3874,6 +3919,51 @@ export function registerVoucherRoutes(app: Express) {
         recordIdentifier: updatedVoucher.voucherNumber,
         changes: buildVoucherChangesForUpdate(existingVoucher, updatedVoucher, _oldEntriesSnap, _newEntriesSnap),
       });
+
+      // ── Intercompany counterpart sync ────────────────────────────────────
+      // If this voucher is one side of an intercompany transfer pair, scale the
+      // counterpart voucher's totalAmount and entries to match the new amount.
+      try {
+        const [ict] = await db
+          .select()
+          .from(interCompanyTransfers)
+          .where(or(
+            eq(interCompanyTransfers.fromVoucherId, id),
+            eq(interCompanyTransfers.toVoucherId, id),
+          ))
+          .limit(1);
+        if (ict) {
+          const otherVoucherId = ict.fromVoucherId === id
+            ? ict.toVoucherId
+            : ict.fromVoucherId;
+          if (otherVoucherId) {
+            const newTotal = parseFloat(updatedVoucher.totalAmount || "0");
+            const [otherVoucher] = await db.select().from(vouchers).where(eq(vouchers.id, otherVoucherId));
+            if (otherVoucher) {
+              const oldTotal = parseFloat(otherVoucher.totalAmount || "0");
+              const ratio = oldTotal > 0 ? newTotal / oldTotal : 1;
+              const otherEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, otherVoucherId));
+              for (const e of otherEntries) {
+                await db.update(voucherEntries).set({
+                  debitAmount:  (parseFloat(e.debitAmount  || "0") * ratio).toFixed(2),
+                  creditAmount: (parseFloat(e.creditAmount || "0") * ratio).toFixed(2),
+                }).where(eq(voucherEntries.id, e.id));
+              }
+              await db.update(vouchers)
+                .set({ totalAmount: newTotal.toFixed(2) })
+                .where(eq(vouchers.id, otherVoucherId));
+              await db.update(fde)
+                .set({ amountCurrency: newTotal.toFixed(2), amountUsd: newTotal.toFixed(2) })
+                .where(and(
+                  eq(fde.referenceTable, "vouchers"),
+                  eq(fde.referenceId, otherVoucherId),
+                ));
+            }
+          }
+        }
+      } catch (ictErr: any) {
+        console.error("[ICT sync] Counterpart update failed (non-fatal):", ictErr?.message);
+      }
 
       // ── CHARGE voucher sync ──────────────────────────────────────────────
       // If this voucher was auto-created during invoice finalization (number
