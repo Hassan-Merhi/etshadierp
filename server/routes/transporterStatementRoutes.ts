@@ -4,7 +4,7 @@ import { requireAuth, requireNonPOS } from "../auth";
 import {
   ledgerAccounts, vouchers, voucherEntries, containers,
 } from "@shared/schema";
-import { eq, and, desc, asc, isNull, sql } from "drizzle-orm";
+import { eq, and, asc, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { parseId } from "../lib/parseId";
 
@@ -28,7 +28,6 @@ function extractContainerNumber(text: string | null | undefined): string | null 
 export function registerTransporterStatementRoutes(app: Express) {
 
   // GET /api/transporter-statement/transporters
-  // Returns all Loans-type ledger accounts for the current company.
   app.get("/api/transporter-statement/transporters", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -132,8 +131,95 @@ export function registerTransporterStatementRoutes(app: Express) {
     }
   });
 
+  // POST /api/transporter-statement/:accountId/reallocate
+  // FIFO allocation: clears existing allocations for account and re-runs
+  app.post("/api/transporter-statement/:accountId/reallocate", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const accountId = parseId(req.params.accountId);
+      if (accountId === null) return res.status(400).json({ message: "Invalid account ID" });
+
+      // Verify account belongs to this company
+      const accRows = await db.execute(
+        sql`SELECT id FROM ledger_accounts WHERE id = ${accountId} AND company_id = ${companyId} LIMIT 1`
+      );
+      if (!accRows.rows?.length) return res.status(404).json({ message: "Account not found" });
+
+      // Fetch all entries for this account ordered by date
+      const entryRows = await db.execute(sql`
+        SELECT
+          ve.id,
+          ve.debit_amount,
+          ve.credit_amount,
+          v.voucher_date
+        FROM voucher_entries ve
+        JOIN vouchers v ON v.id = ve.voucher_id
+        WHERE ve.ledger_account_id = ${accountId}
+          AND v.company_id = ${companyId}
+          AND (v.deleted_at IS NULL)
+          AND (v.optional IS DISTINCT FROM true)
+        ORDER BY v.voucher_date ASC, ve.id ASC
+      `);
+
+      const entries = entryRows.rows as Array<{
+        id: number;
+        debit_amount: string;
+        credit_amount: string;
+        voucher_date: string;
+      }>;
+
+      // Separate credits (charges) and debits (payments)
+      const creditEntries = entries
+        .filter((e) => parseFloat(e.credit_amount || "0") > 0)
+        .map((e) => ({ id: e.id, total: parseFloat(e.credit_amount), remaining: parseFloat(e.credit_amount) }));
+
+      const debitEntries = entries
+        .filter((e) => parseFloat(e.debit_amount || "0") > 0)
+        .map((e) => ({ id: e.id, total: parseFloat(e.debit_amount), remaining: parseFloat(e.debit_amount) }));
+
+      // Clear existing allocations for this account
+      await db.execute(
+        sql`DELETE FROM transporter_payment_allocations WHERE company_id = ${companyId}
+            AND (credit_entry_id = ANY(${sql.raw(`ARRAY[${creditEntries.map((c) => c.id).join(",") || "NULL"}]::integer[]`)})
+              OR debit_entry_id = ANY(${sql.raw(`ARRAY[${debitEntries.map((d) => d.id).join(",") || "NULL"}]::integer[]`)}))`
+      );
+
+      // FIFO: iterate debits in date order, distribute against oldest unpaid credits
+      const newAllocations: Array<{ debitId: number; creditId: number; amount: number }> = [];
+
+      for (const debit of debitEntries) {
+        let debitRemaining = debit.remaining;
+        for (const credit of creditEntries) {
+          if (debitRemaining <= 0) break;
+          if (credit.remaining <= 0) continue;
+
+          const alloc = Math.min(debitRemaining, credit.remaining);
+          newAllocations.push({ debitId: debit.id, creditId: credit.id, amount: alloc });
+          debitRemaining -= alloc;
+          credit.remaining -= alloc;
+        }
+      }
+
+      // Insert new allocations in bulk
+      if (newAllocations.length > 0) {
+        for (const a of newAllocations) {
+          await db.execute(
+            sql`INSERT INTO transporter_payment_allocations
+                  (company_id, debit_entry_id, credit_entry_id, allocated_amount)
+                VALUES (${companyId}, ${a.debitId}, ${a.creditId}, ${a.amount})`
+          );
+        }
+      }
+
+      res.json({ ok: true, allocationsCreated: newAllocations.length });
+    } catch (err: any) {
+      console.error("[TransporterStatement/reallocate]", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // GET /api/transporter-statement/:accountId/statement
-  // Returns ledger entries with running balance + container info + due dates.
   app.get("/api/transporter-statement/:accountId/statement", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -199,11 +285,21 @@ export function registerTransporterStatementRoutes(app: Express) {
         });
       }
 
+      // Fetch paid amounts per credit entry from allocations table
+      const allocRows = await db.execute(sql`
+        SELECT credit_entry_id, SUM(allocated_amount) AS paid_amount
+        FROM transporter_payment_allocations
+        WHERE company_id = ${companyId}
+        GROUP BY credit_entry_id
+      `);
+      const paidMap = new Map<number, number>();
+      for (const a of (allocRows.rows as any[])) {
+        paidMap.set(Number(a.credit_entry_id), parseFloat(a.paid_amount || "0"));
+      }
+
       // Opening balance
       const ob = parseFloat(account.openingBalance || "0");
       const obSide = account.openingBalanceSide;
-      // For Loans accounts: Cr = liability (positive balance = owed)
-      // Running balance convention: positive = credit balance (liability/owed to transporter)
       let runningBalance = obSide === "Dr" ? -ob : ob;
 
       const allRows = rawEntries.rows as any[];
@@ -212,10 +308,8 @@ export function registerTransporterStatementRoutes(app: Express) {
       const statementRows = allRows.map((row: any) => {
         const debit  = parseFloat(row.debit_amount  || "0");
         const credit = parseFloat(row.credit_amount || "0");
-        // DR reduces liability (payment made), CR increases liability (charge posted)
         runningBalance = runningBalance + credit - debit;
 
-        // Try to find container number from description or narration
         const containerNum =
           extractContainerNumber(row.voucher_description) ||
           extractContainerNumber(row.narration);
@@ -230,12 +324,26 @@ export function registerTransporterStatementRoutes(app: Express) {
           }
         }
 
-        // Calculate date to be paid
         let dateToBePaid: string | null = null;
         if (row.manual_due_date) {
           dateToBePaid = row.manual_due_date;
         } else if (offloadDate && paymentTermsDays > 0) {
           dateToBePaid = addDays(offloadDate, paymentTermsDays);
+        }
+
+        // Determine payment status for credit rows
+        let status: "unpaid" | "partial" | "paid" | null = null;
+        let paidAmount: string | null = null;
+        if (credit > 0) {
+          const paid = paidMap.get(row.id) ?? 0;
+          paidAmount = paid.toFixed(2);
+          if (paid <= 0) {
+            status = "unpaid";
+          } else if (paid >= credit - 0.005) {
+            status = "paid";
+          } else {
+            status = "partial";
+          }
         }
 
         return {
@@ -254,6 +362,8 @@ export function registerTransporterStatementRoutes(app: Express) {
           dateToBePaid,
           hasManualDueDate: !!row.manual_due_date,
           containerNumber: containerNum,
+          status,
+          paidAmount,
         };
       });
 

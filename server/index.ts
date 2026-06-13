@@ -4086,6 +4086,18 @@ END $$`,
       updated_at timestamp NOT NULL DEFAULT now(),
       CONSTRAINT transporter_entry_due_dates_entry_uniq UNIQUE (voucher_entry_id)
     )`,
+    `CREATE TABLE IF NOT EXISTS transporter_payment_allocations (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      debit_entry_id integer NOT NULL,
+      credit_entry_id integer NOT NULL,
+      allocated_amount numeric(15,2) NOT NULL DEFAULT 0,
+      created_at timestamptz DEFAULT now(),
+      updated_at timestamptz DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS transporter_alloc_company_idx ON transporter_payment_allocations (company_id)`,
+    `CREATE INDEX IF NOT EXISTS transporter_alloc_credit_idx ON transporter_payment_allocations (credit_entry_id)`,
+    `CREATE INDEX IF NOT EXISTS transporter_alloc_debit_idx ON transporter_payment_allocations (debit_entry_id)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
