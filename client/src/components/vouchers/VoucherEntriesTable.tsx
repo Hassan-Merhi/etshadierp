@@ -215,14 +215,20 @@ export function VoucherEntriesTable({
           if (newInput) { newInput.focus(); newInput.select(); }
         });
       }
-    } else if (e.key === "ArrowUp" && index > 0) {
+    } else if (e.key === "ArrowUp") {
+      // Always prevent default on ArrowUp/Down for number inputs — without this
+      // the browser increments/decrements the value (especially visible on Mac/Safari).
       e.preventDefault();
-      const prevInput = document.querySelector(`[data-testid="input-amount-${index - 1}"]`) as HTMLInputElement;
-      if (prevInput) { prevInput.focus(); prevInput.select(); }
-    } else if (e.key === "ArrowDown" && index < entries.length - 1) {
+      if (index > 0) {
+        const prevInput = document.querySelector(`[data-testid="input-amount-${index - 1}"]`) as HTMLInputElement;
+        if (prevInput) { prevInput.focus(); prevInput.select(); }
+      }
+    } else if (e.key === "ArrowDown") {
       e.preventDefault();
-      const nextInput = document.querySelector(`[data-testid="input-amount-${index + 1}"]`) as HTMLInputElement;
-      if (nextInput) { nextInput.focus(); nextInput.select(); }
+      if (index < entries.length - 1) {
+        const nextInput = document.querySelector(`[data-testid="input-amount-${index + 1}"]`) as HTMLInputElement;
+        if (nextInput) { nextInput.focus(); nextInput.select(); }
+      }
     }
   };
 

@@ -886,7 +886,7 @@ export default function POSDaybook() {
                       </PopoverContent>
                     </Popover>
                   </div>
-                  <p className="text-xs text-muted-foreground mb-2">Hover or use ↑↓ to select · Alt+S to view item</p>
+                  <p className="text-xs text-muted-foreground mb-2">Hover or use ↑↓ to select · {typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform) ? "⌥S" : "Alt+S"} to view item</p>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1040,7 +1040,7 @@ export default function POSDaybook() {
                           <div className="w-px h-5 bg-border mx-0.5" />
                         </>
                       )}
-                      <p className="text-xs text-muted-foreground">↑↓ · Alt+S</p>
+                      <p className="text-xs text-muted-foreground">↑↓ · {typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform) ? "⌥S" : "Alt+S"}</p>
                     </div>
                   </div>
                   {(() => {

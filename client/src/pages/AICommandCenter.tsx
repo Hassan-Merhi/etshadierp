@@ -341,7 +341,7 @@ export default function AICommandCenter() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <Textarea
-                  placeholder="Describe what you want the AI to do…&#10;e.g. Find all items with low stock and prepare a list&#10;e.g. Check if supplier ACME has unpaid balances&#10;&#10;Ctrl+Enter to submit"
+                  placeholder={`Describe what you want the AI to do…\ne.g. Find all items with low stock and prepare a list\ne.g. Check if supplier ACME has unpaid balances\n\n${typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform) ? "⌘+Return" : "Ctrl+Enter"} to submit`}
                   value={instruction}
                   onChange={e => setInstruction(e.target.value)}
                   onKeyDown={handleKeyDown}

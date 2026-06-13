@@ -6,7 +6,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
+
+const isMac = typeof navigator !== "undefined" &&
+  /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+
+const MOD_KEY = isMac ? "⌘" : "Ctrl";
+const ALT_KEY = isMac ? "⌥" : "Alt";
 
 interface ShortcutGroup {
   label: string;
@@ -17,9 +22,9 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     label: "Navigation",
     shortcuts: [
-      { keys: ["Alt", "1"], description: "Go to ERP / Business OS" },
-      { keys: ["Alt", "2"], description: "Go to Factory" },
-      { keys: ["Alt", "3"], description: "Go to Properties" },
+      { keys: [ALT_KEY, "1"], description: "Go to ERP / Business OS" },
+      { keys: [ALT_KEY, "2"], description: "Go to Factory" },
+      { keys: [ALT_KEY, "3"], description: "Go to Properties" },
     ],
   },
   {
@@ -27,7 +32,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     shortcuts: [
       { keys: ["N"], description: "New item (on supported pages)" },
       { keys: ["/"], description: "Focus search bar" },
-      { keys: ["Ctrl", "K"], description: "Focus search bar" },
+      { keys: [MOD_KEY, "K"], description: "Focus search bar" },
     ],
   },
   {
@@ -154,10 +159,13 @@ export function KeyboardShortcuts() {
         return;
       }
 
+      // Alt/Option+1/2/3 navigation
+      // Use e.code ("Digit1" etc.) instead of e.key so this fires correctly on Mac,
+      // where Option+1 sets e.key to "¡" rather than "1".
       if (e.altKey && !e.ctrlKey && !e.metaKey) {
-        if (e.key === "1") { e.preventDefault(); navigate("/"); return; }
-        if (e.key === "2") { e.preventDefault(); navigate("/factory/stock-entry"); return; }
-        if (e.key === "3") { e.preventDefault(); navigate("/properties/rental/warehouses"); return; }
+        if (e.code === "Digit1") { e.preventDefault(); navigate("/"); return; }
+        if (e.code === "Digit2") { e.preventDefault(); navigate("/factory/stock-entry"); return; }
+        if (e.code === "Digit3") { e.preventDefault(); navigate("/properties/rental/warehouses"); return; }
       }
     },
     [open, navigate],

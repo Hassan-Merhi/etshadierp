@@ -65,7 +65,7 @@ export function AppTopBar({
             <Search className="h-3.5 w-3.5 shrink-0" />
             <span className="hidden lg:inline">Search</span>
             <kbd className="inline-flex h-4 items-center rounded border border-border bg-background px-1.5 text-[9px] font-mono leading-none">
-              Ctrl /
+              {typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform) ? "⌘ /" : "Ctrl /"}
             </kbd>
           </button>
         )}

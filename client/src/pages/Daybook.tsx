@@ -1381,7 +1381,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
         return;
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.key === "h") {
+      // Ctrl+H to hide a voucher row.
+      // Deliberately uses ctrlKey only (not metaKey) — on Mac, Cmd+H is the
+      // system shortcut to hide the application window and the browser
+      // intercepts it before JavaScript. Mac users use Ctrl+H here.
+      if (e.ctrlKey && !e.metaKey && e.key === "h") {
         e.preventDefault();
         if (
           selectedRowId &&
@@ -1405,7 +1409,10 @@ export default function Daybook({ user }: { user?: any } = {}) {
         return;
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.key === "u") {
+      // Ctrl+U to unhide a voucher row.
+      // Deliberately uses ctrlKey only (not metaKey) — on Mac, Cmd+U opens
+      // page source in the browser before JavaScript can intercept it.
+      if (e.ctrlKey && !e.metaKey && e.key === "u") {
         e.preventDefault();
         if (selectedRowId && hiddenRowIds.has(selectedRowId)) {
           const rid = selectedRowId;
@@ -2564,7 +2571,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         {/* Sales Items Table */}
                         {salesItems.length > 0 && (
                           <div>
-                            <p className="text-xs text-muted-foreground text-right mb-1">Hover or use ↑↓ to select · Alt+S to view item</p>
+                            <p className="text-xs text-muted-foreground text-right mb-1">Hover or use ↑↓ to select · {typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform) ? "⌥S" : "Alt+S"} to view item</p>
                             <div className="border rounded-md">
                             <Table>
                               <TableHeader className="sticky top-0 z-30 bg-background">

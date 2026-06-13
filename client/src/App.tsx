@@ -838,7 +838,7 @@ function AuthenticatedApp() {
                   >
                     <Search className="h-4 w-4" />
                     <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 text-[10px] font-mono">
-                      Ctrl /
+                      {typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform) ? "⌘ /" : "Ctrl /"}
                     </kbd>
                   </Button>
                   )}
