@@ -7,6 +7,7 @@ import {
 import { eq, and, asc, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { parseId } from "../lib/parseId";
+import { getActiveRecipients, sendWhatsAppTextToChatId } from "../services/whatsappService";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -128,6 +129,121 @@ export function registerTransporterStatementRoutes(app: Express) {
       res.json({ ok: true, dueDate });
     } catch (err: any) {
       res.status(400).json({ message: err.message });
+    }
+  });
+
+  // POST /api/transporter-statement/:accountId/send-whatsapp
+  // Sends a text summary of the outstanding balance to all active WhatsApp recipients.
+  app.post("/api/transporter-statement/:accountId/send-whatsapp", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const accountId = parseId(req.params.accountId);
+      if (accountId === null) return res.status(400).json({ message: "Invalid account ID" });
+
+      const { dateFrom, dateTo } = z.object({
+        dateFrom: z.string().optional(),
+        dateTo:   z.string().optional(),
+      }).parse(req.body);
+
+      // Verify account
+      const [account] = await db
+        .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+        .from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, companyId)))
+        .limit(1);
+      if (!account) return res.status(404).json({ message: "Account not found" });
+
+      // Fetch all entries (unbounded) for running balance
+      const rawEntries = await db.execute(sql`
+        SELECT ve.id, ve.debit_amount, ve.credit_amount, v.voucher_date
+        FROM voucher_entries ve
+        JOIN vouchers v ON v.id = ve.voucher_id
+        WHERE ve.ledger_account_id = ${accountId}
+          AND v.company_id = ${companyId}
+          AND v.deleted_at IS NULL
+          AND (v.optional IS DISTINCT FROM true)
+        ORDER BY v.voucher_date ASC, ve.id ASC
+      `);
+
+      // Fetch paid amounts from allocations
+      const allocRows = await db.execute(sql`
+        SELECT credit_entry_id, SUM(allocated_amount) AS paid_amount
+        FROM transporter_payment_allocations
+        WHERE company_id = ${companyId}
+        GROUP BY credit_entry_id
+      `);
+      const paidMap = new Map<number, number>();
+      for (const a of (allocRows.rows as any[])) {
+        paidMap.set(Number(a.credit_entry_id), parseFloat(a.paid_amount || "0"));
+      }
+
+      const allRows = rawEntries.rows as any[];
+      let totalCharged = 0;
+      let totalPaid = 0;
+      let runningBalance = 0;
+      let overdueCount = 0;
+      const now = new Date().toISOString().slice(0, 10);
+
+      for (const row of allRows) {
+        const debit  = parseFloat(row.debit_amount  || "0");
+        const credit = parseFloat(row.credit_amount || "0");
+        runningBalance += credit - debit;
+        const inRange =
+          (!dateFrom || row.voucher_date >= dateFrom) &&
+          (!dateTo   || row.voucher_date <= dateTo);
+        if (inRange) {
+          totalCharged += credit;
+          totalPaid    += debit;
+        }
+        if (credit > 0) {
+          const paid = paidMap.get(row.id) ?? 0;
+          if (paid < credit - 0.005 && row.voucher_date <= now) overdueCount++;
+        }
+      }
+
+      const fmt = (n: number) =>
+        n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      const periodLine = dateFrom && dateTo
+        ? `Period: ${dateFrom} → ${dateTo}`
+        : dateFrom ? `From: ${dateFrom}` : dateTo ? `To: ${dateTo}` : "All time";
+
+      const message = [
+        `*Transporter Statement*`,
+        `Account: ${account.name}`,
+        periodLine,
+        ``,
+        `Total Charged: ${fmt(totalCharged)}`,
+        `Total Paid:    ${fmt(totalPaid)}`,
+        `*Outstanding:  ${fmt(runningBalance)}*`,
+        overdueCount > 0 ? `⚠️ ${overdueCount} entry/entries overdue` : `All entries current`,
+        ``,
+        `Sent on ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}`,
+      ].join("\n");
+
+      const recipients = await getActiveRecipients();
+      if (!recipients.length) {
+        return res.status(400).json({ message: "No active WhatsApp recipients configured" });
+      }
+
+      let sent = 0;
+      let failed = 0;
+      const errors: string[] = [];
+      for (const r of recipients) {
+        const result = await sendWhatsAppTextToChatId(r.chatId, message);
+        if (result.success) {
+          sent++;
+        } else {
+          failed++;
+          if (result.error) errors.push(result.error);
+        }
+      }
+
+      res.json({ ok: true, sent, failed, errors });
+    } catch (err: any) {
+      console.error("[TransporterStatement/send-whatsapp]", err);
+      res.status(500).json({ message: err.message });
     }
   });
 

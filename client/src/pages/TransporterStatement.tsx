@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/popover";
 import {
   Settings2, Pencil, Check, X, TrendingDown, TrendingUp, Minus,
-  RefreshCw, Printer,
+  RefreshCw, Printer, MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -332,6 +332,24 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
     dueDateMutation.mutate({ entryId, dueDate });
   }
 
+  // Send WhatsApp summary mutation
+  const whatsappMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", `/api/transporter-statement/${selectedAccountId}/send-whatsapp`, {
+        dateFrom,
+        dateTo,
+      }),
+    onSuccess: (data: any) => {
+      toast({
+        title: "WhatsApp sent",
+        description: `Delivered to ${data?.sent ?? 0} recipient(s).`,
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "WhatsApp failed", description: err?.message, variant: "destructive" });
+    },
+  });
+
   // Reallocate mutation (FIFO)
   const reallocateMutation = useMutation({
     mutationFn: () =>
@@ -510,6 +528,15 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
                 >
                   <RefreshCw className={cn("h-4 w-4 mr-2", reallocateMutation.isPending && "animate-spin")} />
                   {reallocateMutation.isPending ? "Running…" : "Reallocate"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => whatsappMutation.mutate()}
+                  disabled={whatsappMutation.isPending}
+                  data-testid="btn-send-whatsapp"
+                >
+                  <MessageCircle className={cn("h-4 w-4 mr-2", whatsappMutation.isPending && "animate-pulse")} />
+                  {whatsappMutation.isPending ? "Sending…" : "Send WhatsApp"}
                 </Button>
                 <Button
                   variant="outline"
