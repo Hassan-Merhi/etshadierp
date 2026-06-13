@@ -4068,6 +4068,24 @@ END $$`,
       updated_at timestamp NOT NULL DEFAULT now()
     )`,
     `CREATE UNIQUE INDEX IF NOT EXISTS notification_rules_event_user_uniq ON notification_rules (event_type, recipient_user_id)`,
+    `CREATE TABLE IF NOT EXISTS transporter_payment_settings (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      ledger_account_id integer NOT NULL,
+      payment_terms_days integer NOT NULL DEFAULT 0,
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now(),
+      CONSTRAINT transporter_payment_settings_uniq UNIQUE (company_id, ledger_account_id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS transporter_entry_due_dates (
+      id serial PRIMARY KEY,
+      voucher_entry_id integer NOT NULL,
+      company_id integer NOT NULL,
+      due_date date NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now(),
+      CONSTRAINT transporter_entry_due_dates_entry_uniq UNIQUE (voucher_entry_id)
+    )`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

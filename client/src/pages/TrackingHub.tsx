@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 const GITContainers = lazy(() => import("@/pages/GITContainers"));
 const GITMockup = lazy(() => import("@/pages/GITMockup"));
+const TransporterStatement = lazy(() => import("@/pages/TransporterStatement"));
 
 function TabFallback() {
   return (
@@ -29,6 +30,9 @@ export default function TrackingHub() {
             <TabsTrigger value="git-tracking" data-testid="tab-tracking-git">
               GIT Tracking
             </TabsTrigger>
+            <TabsTrigger value="transporter-statement" data-testid="tab-tracking-transporter-statement">
+              Transporter Statement
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="containers-otw" className="flex-1 overflow-hidden m-0 p-0">
@@ -40,6 +44,12 @@ export default function TrackingHub() {
           <TabsContent value="git-tracking" className="flex-1 overflow-hidden m-0 p-0">
             <Suspense fallback={<TabFallback />}>
               <GITMockup embedded />
+            </Suspense>
+          </TabsContent>
+
+          <TabsContent value="transporter-statement" className="flex-1 overflow-hidden m-0 p-0 pt-3">
+            <Suspense fallback={<TabFallback />}>
+              <TransporterStatement embedded />
             </Suspense>
           </TabsContent>
         </Tabs>
