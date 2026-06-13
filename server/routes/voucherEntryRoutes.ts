@@ -3,6 +3,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries, snapshotVoucherEntries, buildVoucherChangesForDelete } from "./_helpers";
+import { autoReallocateLoansAccounts } from "../lib/transporterAllocation";
 import {
   inventory, stockItems, stockGroups, stockItemCodeAliases,
   stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
@@ -476,6 +477,12 @@ export function registerVoucherEntryRoutes(app: Express) {
       }
 
       const entry = await storage.createVoucherEntry(req.body);
+
+      // Fire-and-forget: auto-rerun FIFO allocation if a Loans account was touched
+      if (entry.ledgerAccountId && req.session.currentCompanyId) {
+        autoReallocateLoansAccounts(req.session.currentCompanyId, [entry.ledgerAccountId]).catch(() => {});
+      }
+
       res.json(entry);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -556,6 +563,12 @@ export function registerVoucherEntryRoutes(app: Express) {
         allowedUpdates.narration = req.body.narration;
 
       const updated = await storage.updateVoucherEntry(id, allowedUpdates);
+
+      // Fire-and-forget: auto-rerun FIFO allocation if a Loans account was touched
+      if (existingEntry.ledgerAccountId && req.session.currentCompanyId) {
+        autoReallocateLoansAccounts(req.session.currentCompanyId, [existingEntry.ledgerAccountId]).catch(() => {});
+      }
+
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

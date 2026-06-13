@@ -5,6 +5,7 @@ import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } 
 import { requireActionAccess } from "../lib/permissionMiddleware";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries, snapshotVoucherEntries, buildVoucherChangesForCreate, buildVoucherChangesForUpdate, buildItemLevelChanges } from "./_helpers";
 import { triggerIntercompanyNotifications } from "./intercompanyNotificationRoutes";
+import { autoReallocateLoansAccounts } from "../lib/transporterAllocation";
 import {
   inventory, stockItems, stockGroups, stockItemCodeAliases,
   stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
@@ -634,6 +635,12 @@ export function registerVoucherRoutes(app: Express) {
           createdVoucher.voucherType,
         ).catch(() => {});
 
+        // Fire-and-forget: auto-rerun FIFO allocation for any Loans accounts touched
+        autoReallocateLoansAccounts(
+          req.session.currentCompanyId!,
+          createdEntries.map(e => e.ledgerAccountId),
+        ).catch(() => {});
+
         res.json(result);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -950,6 +957,12 @@ export function registerVoucherRoutes(app: Express) {
           result.voucher.description,
           result.entries.map(e => e.ledgerAccountId),
           result.voucher.voucherType,
+        ).catch(() => {});
+
+        // Fire-and-forget: auto-rerun FIFO allocation for any Loans accounts touched
+        autoReallocateLoansAccounts(
+          req.session.currentCompanyId!,
+          result.entries.map(e => e.ledgerAccountId),
         ).catch(() => {});
 
         res.json({ ...result, whatsapp: waResult });
