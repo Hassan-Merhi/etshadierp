@@ -6,7 +6,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber, drCrClass } from "@/lib/formatNumber";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { Plus, Search, Building2, Pencil, Users, Wallet, TrendingUp, TrendingDown, EyeOff, Eye } from "lucide-react";
+import { Plus, Search, Building2, Pencil, Users, Wallet, TrendingUp, TrendingDown, EyeOff, Eye, Printer } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -498,6 +498,7 @@ export default function Customers() {
                         <TableHead className="text-xs h-9 font-semibold text-right">Debit</TableHead>
                         <TableHead className="text-xs h-9 font-semibold text-right">Credit</TableHead>
                         <TableHead className="text-xs h-9 font-semibold text-right">Balance</TableHead>
+                        <TableHead className="text-xs h-9 w-8"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -511,12 +512,14 @@ export default function Customers() {
                           <TableCell className="py-2 text-right font-mono font-medium">
                             {formatAmount(Math.abs(openingBalance))}
                           </TableCell>
+                          <TableCell className="py-2"></TableCell>
                         </TableRow>
                       )}
                       {sorted.map((t, i) => {
                         const dr = parseFloat(t.debitAmount || "0");
                         const cr = parseFloat(t.creditAmount || "0");
                         running = running + dr - cr;
+                        const isSale = t.voucherType === "Sales" && t.voucherId;
                         return (
                           <TableRow key={t.entryId ?? i} className="text-xs hover:bg-muted/40">
                             <TableCell className="py-2 font-mono whitespace-nowrap">
@@ -544,6 +547,20 @@ export default function Customers() {
                                 {running >= 0 ? "Dr" : "Cr"}
                               </span>
                             </TableCell>
+                            <TableCell className="py-2">
+                              {isSale ? (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6"
+                                  title="Print Invoice"
+                                  data-testid={`btn-print-invoice-${t.voucherId}`}
+                                  onClick={() => window.open(`/api/pos/invoice/${t.voucherId}/pdf`, "_blank")}
+                                >
+                                  <Printer className="h-3 w-3" />
+                                </Button>
+                              ) : null}
+                            </TableCell>
                           </TableRow>
                         );
                       })}
@@ -559,6 +576,7 @@ export default function Customers() {
                             {statementCustomer?.balanceSide || "Dr"}
                           </span>
                         </TableCell>
+                        <TableCell></TableCell>
                       </TableRow>
                     </TableFooter>
                   </Table>

@@ -298,6 +298,55 @@ export function registerPosRoutes(app: Express) {
     }
   });
 
+  // ── Direct invoice PDF download (ERP use — no location/WA required) ──────────
+  app.get("/api/pos/invoice/:voucherId/pdf", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const voucherId = parseInt(req.params.voucherId);
+      if (isNaN(voucherId)) return res.status(400).json({ message: "Invalid voucherId" });
+
+      // Verify the voucher belongs to this company
+      const [voucherRow] = await db
+        .select({ id: vouchers.id, isCreditSale: vouchers.isCreditSale, voucherDate: vouchers.voucherDate })
+        .from(vouchers)
+        .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, companyId)))
+        .limit(1);
+      if (!voucherRow) return res.status(404).json({ message: "Voucher not found" });
+
+      const erpVis = await getErpExportVisibility(req);
+      const hideProfitCols = erpVis.hideSelling || erpVis.hideCost || erpVis.hideSalesProfitCost;
+      const pdfBuffer = await generateInvoicePdf(voucherId, companyId, (req as any).user?.username, { hideProfitCols });
+
+      // Build a friendly filename
+      let customerName: string | null = null;
+      if (voucherRow.isCreditSale) {
+        const [custEntry] = await db
+          .select({ name: ledgerAccounts.name })
+          .from(voucherEntries)
+          .innerJoin(ledgerAccounts, eq(ledgerAccounts.id, voucherEntries.ledgerAccountId))
+          .where(and(
+            eq(voucherEntries.voucherId, voucherId),
+            sql`${voucherEntries.debitAmount}::numeric > 0`,
+          ))
+          .limit(1);
+        customerName = custEntry?.name || null;
+      }
+      const dateStr = voucherRow.voucherDate ? String(voucherRow.voucherDate).slice(0, 10) : getClientDate(req);
+      const rawName = customerName ? `${customerName} Invoice ${dateStr}` : `Invoice ${dateStr}`;
+      const safeName = rawName.replace(/[^\w\s.()\-]/g, "_").trim();
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${safeName}.pdf"`);
+      res.setHeader("Content-Length", pdfBuffer.length);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      console.error("[GET /api/pos/invoice/:voucherId/pdf]", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/pos/sales", requireAuth, canModifyDate("voucherDate"), async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
