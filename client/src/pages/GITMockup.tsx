@@ -28,7 +28,7 @@ import {
   Ship, Truck, Package, AlertTriangle, FileX, Clock, DollarSign,
   Search, ExternalLink, CheckCircle2, XCircle, MessageSquare,
   FileSpreadsheet, LayoutGrid, List, Info, AlertCircle, ChevronDown, ChevronUp,
-  ArrowUp, ArrowDown, RotateCcw,
+  ArrowUp, ArrowDown, RotateCcw, Pencil, Check, X as XIcon, StickyNote,
   Building2, Layers, Loader2, MessageCircle,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
@@ -1589,6 +1589,23 @@ function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupC
 
   const resetOrder = () => saveOrder(null);
 
+  // ── Overpayment note ──────────────────────────────────────────────────────
+  // A free-text label the user can set to explain what miscellaneous payments
+  // (peage, fees, etc.) make up the cleared/overpayment amount.
+  const noteKey = `agent-note-${agent.agentName}`;
+  const [note, setNote]           = useState<string>(() => localStorage.getItem(noteKey) ?? "");
+  const [editingNote, setEditingNote] = useState(false);
+  const [draftNote, setDraftNote] = useState(note);
+
+  const saveNote = () => {
+    const trimmed = draftNote.trim();
+    if (trimmed) localStorage.setItem(noteKey, trimmed);
+    else localStorage.removeItem(noteKey);
+    setNote(trimmed);
+    setEditingNote(false);
+  };
+  const cancelNote = () => { setDraftNote(note); setEditingNote(false); };
+
   const sendToWhatsApp = useCallback(async () => {
     setWaSending(true);
     try {
@@ -1702,11 +1719,19 @@ function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupC
 
       const openCols = ["CONTAINER #", "SUPPLIER", "PLATE", "OFFLOAD DATE", "BORDER DATE", "TRANSPORTER", "LOCATION", "DUTY", "CLEARED", "REMAINING", "STATUS"];
 
+      const noteHtml = note
+        ? `<div style="background:#fffbeb;border-bottom:1px solid #fde68a;padding:8px 14px;display:flex;align-items:flex-start;gap:8px;">
+             <span style="font-size:13px;color:#92400e;font-weight:700;flex-shrink:0;">Note:</span>
+             <span style="font-size:13px;color:#78350f;white-space:pre-wrap;">${esc(note)}</span>
+           </div>`
+        : "";
+
       capture.innerHTML = `
         <div style="background:#fbbf24;padding:18px 12px;text-align:center;">
           <div style="font-size:26px;font-weight:800;color:#1c1917;letter-spacing:0.06em;text-transform:uppercase;">${esc(agentName)}</div>
           <div style="font-size:11px;color:#78350f;margin-top:3px;font-weight:500;">Agent Duty Summary &nbsp;·&nbsp; ${today}</div>
         </div>
+        ${noteHtml}
         <table style="width:100%;border-collapse:collapse;table-layout:auto;">
           <thead>
             <tr>${openCols.map(h => `<th style="${thOpen()}">${h}</th>`).join("")}</tr>
@@ -1855,6 +1880,51 @@ function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupC
         );
       })}
 
+
+      {/* ── Overpayment note ── */}
+      <div className="px-3 py-2 border-b bg-amber-50/60 dark:bg-amber-950/15 flex items-start gap-2 min-h-[2rem]">
+        <StickyNote className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+        {editingNote ? (
+          <div className="flex-1 flex items-start gap-1.5">
+            <textarea
+              autoFocus
+              value={draftNote}
+              onChange={e => setDraftNote(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveNote(); } if (e.key === "Escape") cancelNote(); }}
+              placeholder="e.g. Peage $400 · Road fees $530 · etc."
+              rows={2}
+              className="flex-1 text-xs rounded border border-amber-300 dark:border-amber-700 bg-white dark:bg-amber-950/30 px-2 py-1 text-amber-900 dark:text-amber-200 resize-none focus:outline-none focus:ring-1 focus:ring-amber-400"
+              data-testid={`input-note-${agentName}`}
+            />
+            <button onClick={saveNote} title="Save note" className="mt-0.5 text-green-700 dark:text-green-400 hover:text-green-900" data-testid={`button-save-note-${agentName}`}>
+              <Check className="h-4 w-4" />
+            </button>
+            <button onClick={cancelNote} title="Cancel" className="mt-0.5 text-muted-foreground hover:text-foreground">
+              <XIcon className="h-4 w-4" />
+            </button>
+          </div>
+        ) : note ? (
+          <div className="flex-1 flex items-start justify-between gap-2">
+            <p className="text-xs text-amber-800 dark:text-amber-300 whitespace-pre-wrap leading-relaxed">{note}</p>
+            <button
+              onClick={() => { setDraftNote(note); setEditingNote(true); }}
+              title="Edit note"
+              className="shrink-0 text-amber-500 hover:text-amber-700 dark:hover:text-amber-300"
+              data-testid={`button-edit-note-${agentName}`}
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => { setDraftNote(""); setEditingNote(true); }}
+            className="text-xs text-amber-500 dark:text-amber-500 hover:text-amber-700 dark:hover:text-amber-300 italic"
+            data-testid={`button-add-note-${agentName}`}
+          >
+            + Add note (e.g. what these payments are for — peage, fees, etc.)
+          </button>
+        )}
+      </div>
 
       {/* ── Custom order toolbar ── */}
       {isCustomOrder && (
