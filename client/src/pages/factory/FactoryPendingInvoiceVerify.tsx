@@ -188,7 +188,7 @@ export default function FactoryPendingInvoiceVerify() {
     enabled: true,
   });
 
-  const { data: proformas = [] } = useQuery<{ id: number; name: string; lines: { articleCode: string; pricePerBale: string }[] }[]>({
+  const { data: proformas = [] } = useQuery<{ id: number; name: string; lines: { articleCode: string; pricePerBale: string; pricingMode?: string | null; pricePerKg?: string | null; weightPerBaleKg?: string | null }[] }[]>({
     queryKey: ["/api/factory/customer-proformas", orderDetail?.customerId],
     queryFn: async () => {
       if (!orderDetail?.customerId) return [];
@@ -1207,12 +1207,23 @@ export default function FactoryPendingInvoiceVerify() {
               return (
                 <div className="rounded-md border p-3 space-y-1 max-h-48 overflow-y-auto">
                   <p className="text-xs font-medium text-muted-foreground mb-2">Price lines in this proforma:</p>
-                  {pf.lines.map((l, i) => (
-                    <div key={i} className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{l.articleCode}</span>
-                      <span className="font-medium">${fmtNum(parseFloat(l.pricePerBale))}</span>
-                    </div>
-                  ))}
+                  {pf.lines.map((l, i) => {
+                    const isPerKg = l.pricingMode === "per_kg" && l.pricePerKg && l.weightPerBaleKg;
+                    const effectivePrice = isPerKg
+                      ? parseFloat(l.weightPerBaleKg!) * parseFloat(l.pricePerKg!)
+                      : parseFloat(l.pricePerBale) || 0;
+                    return (
+                      <div key={i} className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">{l.articleCode}</span>
+                        <div className="text-right">
+                          <span className="font-medium">${fmtNum(effectivePrice)}</span>
+                          {isPerKg && (
+                            <span className="text-xs text-muted-foreground ml-1">(${fmtNum(parseFloat(l.pricePerKg!))}/kg)</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })()}

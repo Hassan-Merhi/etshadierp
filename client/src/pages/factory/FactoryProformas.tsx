@@ -30,6 +30,17 @@ interface ProformaLine {
   quantity: number;
   pricePerBale: string;
   weightPerBaleKg?: string | null;
+  pricingMode?: string | null;
+  pricePerKg?: string | null;
+}
+
+function effectivePricePerBale(line: ProformaLine): number {
+  if (line.pricingMode === "per_kg" && line.pricePerKg && line.weightPerBaleKg) {
+    const kg = parseFloat(line.weightPerBaleKg);
+    const pkk = parseFloat(line.pricePerKg);
+    if (kg > 0 && pkk > 0) return kg * pkk;
+  }
+  return parseFloat(line.pricePerBale) || 0;
 }
 
 interface Proforma {
@@ -641,7 +652,7 @@ export default function FactoryProformas() {
               const isExpanded = expandedProformaIds.has(proforma.id);
               const totalQty = proforma.lines?.reduce((s, l) => s + l.quantity, 0) ?? 0;
               const totalWeight = proforma.lines?.reduce((s, l) => s + l.quantity * parseFloat(l.weightPerBaleKg || "0"), 0) ?? 0;
-              const totalAmount = proforma.lines?.reduce((s, l) => s + l.quantity * parseFloat(l.pricePerBale), 0) ?? 0;
+              const totalAmount = proforma.lines?.reduce((s, l) => s + l.quantity * effectivePricePerBale(l), 0) ?? 0;
               const lineCount = proforma.lines?.length ?? 0;
               const d = formatProformaDate(proforma.createdAt, proforma.updatedAt);
 
@@ -892,7 +903,10 @@ export default function FactoryProformas() {
                                     </TableCell>
                                     {!hideProformaPrice && (
                                       <TableCell className="text-right font-mono font-medium py-2.5" data-testid={`text-price-${line.id}`}>
-                                        {formatAmount(parseFloat(line.pricePerBale))}
+                                        {formatAmount(effectivePricePerBale(line))}
+                                        {line.pricingMode === "per_kg" && line.pricePerKg && (
+                                          <div className="text-[10px] text-muted-foreground font-normal">${parseFloat(line.pricePerKg).toFixed(2)}/kg</div>
+                                        )}
                                       </TableCell>
                                     )}
                                     {canEdit && (
