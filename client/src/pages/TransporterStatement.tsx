@@ -294,15 +294,22 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
     data: statement,
     isLoading: loadingStatement,
     isFetching,
+    isError: statementError,
+    error: statementErrorObj,
   } = useQuery<StatementResponse>({
     queryKey: ["/api/transporter-statement", selectedAccountId, "statement", dateFrom, dateTo],
-    queryFn: () => {
+    queryFn: async () => {
       const params = new URLSearchParams();
       if (dateFrom) params.set("dateFrom", dateFrom);
       if (dateTo) params.set("dateTo", dateTo);
-      return fetch(`/api/transporter-statement/${selectedAccountId}/statement?${params}`, {
+      const r = await fetch(`/api/transporter-statement/${selectedAccountId}/statement?${params}`, {
         credentials: "include",
-      }).then((r) => r.json());
+      });
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error(body?.message ?? `Server error ${r.status}`);
+      }
+      return r.json();
     },
     enabled: !!selectedAccountId,
   });
@@ -378,7 +385,7 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
     let totalPaid = 0;
     let overdueCount = 0;
     const now = today();
-    for (const r of statement.rows) {
+    for (const r of (statement.rows ?? [])) {
       totalDebit += parseFloat(r.debit || "0");
       totalCredit += parseFloat(r.credit || "0");
       totalPaid += parseFloat(r.paidAmount || "0");
@@ -603,6 +610,11 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
                 <Skeleton key={i} className="h-8 w-full" />
               ))}
             </div>
+          ) : statementError ? (
+            <div className="flex flex-col items-center justify-center h-48 gap-2 text-destructive print:hidden">
+              <p className="text-sm font-medium">Failed to load statement</p>
+              <p className="text-xs text-muted-foreground">{(statementErrorObj as any)?.message ?? "Unknown error"}</p>
+            </div>
           ) : (
             <Table>
               <TableHeader>
@@ -634,14 +646,14 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
                   </TableRow>
                 )}
 
-                {statement?.rows.length === 0 ? (
+                {(statement?.rows?.length ?? 0) === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center text-muted-foreground py-10 text-sm">
                       No entries for the selected period
                     </TableCell>
                   </TableRow>
                 ) : (
-                  statement?.rows.map((row) => {
+                  statement?.rows?.map((row) => {
                     const bal = parseFloat(row.runningBalance);
                     const isOverdue = row.dateToBePaid && row.dateToBePaid < today() && row.status && row.status !== "paid";
                     const isPaid = row.status === "paid";
@@ -704,7 +716,7 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
                 )}
 
                 {/* Closing balance row */}
-                {statement && statement.rows.length > 0 && (
+                {statement?.rows && statement.rows.length > 0 && (
                   <TableRow className="bg-muted/30 font-semibold text-xs summary-row">
                     <TableCell></TableCell>
                     <TableCell className="text-muted-foreground italic">Closing Balance</TableCell>
