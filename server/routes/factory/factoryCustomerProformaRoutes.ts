@@ -112,6 +112,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         pricePerBale:           l.price_per_bale          ?? "0",
         productionPricePerBale: l.production_price_per_bale ?? "0",
         priceFixed:             l.price_fixed             ?? false,
+        pricingMode:            l.pricing_mode            ?? "per_bale",
+        pricePerKg:             l.price_per_kg            ?? null,
         createdAt:              l.created_at,
       }));
       const articleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
