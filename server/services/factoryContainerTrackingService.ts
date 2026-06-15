@@ -251,7 +251,8 @@ function resolveEtaFromShipment(
 async function trackOneContainer(
   containerId: number,
   containerNumber: string,
-  _destinationCountry?: string,
+  destinationCountry: string = "Congo",
+  manualCarrierHint: string | null = null,
 ): Promise<{
   success: boolean;
   lastStatus: string | null;
@@ -323,7 +324,7 @@ async function trackOneContainer(
     lastDirectFallbackReason = result.provider + "_failed";
   }
 
-  return await trackViaParcelsApp(containerId, containerNumber, detectedCarrier, lastDirectFallbackReason, now, currentEta);
+  return await trackViaParcelsApp(containerId, containerNumber, detectedCarrier, lastDirectFallbackReason, now, currentEta, destinationCountry, manualCarrierHint);
 }
 
 // ParcelsApp-only fallback — used by CMA chain after exhausting carrier-specific providers.
@@ -334,6 +335,8 @@ async function trackViaParcelsAppFallback(
   fallbackReason: string | null,
   now: Date,
   currentEta: string | null,
+  destinationCountry: string = "Congo",
+  manualCarrierHint: string | null = null,
 ): Promise<{
   success: boolean;
   lastStatus: string | null;
@@ -348,13 +351,27 @@ async function trackViaParcelsAppFallback(
     return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: noProviderError };
   }
   ep(containerId, "ParcelsApp API", "running");
-  const hintCarrier = detectedCarrier && detectedCarrier !== "OTHER" ? detectedCarrier : undefined;
-  const result = await trackContainer(containerNumber, "United States", hintCarrier);
+  const effectiveHint = manualCarrierHint || (detectedCarrier && detectedCarrier !== "OTHER" ? detectedCarrier : null);
+  console.log(`[FactoryTracking] ${containerNumber} ParcelsApp fallback: dest=${destinationCountry} hint=${effectiveHint ?? "none"} manualHint=${manualCarrierHint ?? "none"} detected=${detectedCarrier ?? "none"}`);
+  let result = await trackContainer(containerNumber, destinationCountry, effectiveHint ?? undefined);
   await saveTrackingCheck(containerId, "parcelsapp", result.success ? "success" : result.timedOut ? "timeout" : "error", result.error ?? null, result.rawResponse);
+  if (result.timedOut && effectiveHint) {
+    console.log(`[FactoryTracking] ${containerNumber} ParcelsApp fallback timed out with hint="${effectiveHint}" — retrying without hint`);
+    ep(containerId, "ParcelsApp API (retry no hint)", "running");
+    const retryResult = await trackContainer(containerNumber, destinationCountry, undefined);
+    await saveTrackingCheck(containerId, "parcelsapp_retry_no_hint", retryResult.success ? "success" : retryResult.timedOut ? "timeout" : "error", retryResult.error ?? null, retryResult.rawResponse);
+    if (retryResult.success && retryResult.shipment) {
+      result = { ...retryResult, rawResponse: retryResult.rawResponse };
+      ep(containerId, "ParcelsApp API (retry no hint)", "success", retryResult.shipment ? "got data" : "no data");
+    } else {
+      ep(containerId, "ParcelsApp API (retry no hint)", "fail", retryResult.error ?? "no data");
+    }
+  }
   if (!result.success || !result.shipment) {
     ep(containerId, "ParcelsApp API", "fail", result.error ?? "no data");
-    await db.update(factoryContainers).set({ trackingLastCheckedAt: now, trackingError: result.error ?? "Tracking failed", trackingProvider: "parcelsapp" } as any).where(eq(factoryContainers.id, containerId));
-    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: result.error ?? "Tracking failed" };
+    const errMsg = result.timedOut ? `Carrier timed out (dest=${destinationCountry})` : (result.error ?? "Tracking failed");
+    await db.update(factoryContainers).set({ trackingLastCheckedAt: now, trackingError: errMsg, trackingProvider: "parcelsapp" } as any).where(eq(factoryContainers.id, containerId));
+    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: errMsg };
   }
   const shipment = result.shipment;
   const lastStatus = deriveLastStatus(shipment);
@@ -383,6 +400,8 @@ async function trackViaParcelsApp(
   fallbackReason: string | null,
   now: Date,
   currentEta: string | null,
+  destinationCountry: string = "Congo",
+  manualCarrierHint: string | null = null,
 ): Promise<{
   success: boolean;
   lastStatus: string | null;
@@ -589,7 +608,7 @@ async function trackViaParcelsApp(
     }
 
     // Fall through to ParcelsApp for CMA (skip generic Puppeteer / 17track blocks)
-    return await trackViaParcelsAppFallback(containerId, containerNumber, detectedCarrier, fallbackReason, now, currentEta);
+    return await trackViaParcelsAppFallback(containerId, containerNumber, detectedCarrier, fallbackReason, now, currentEta, destinationCountry, manualCarrierHint);
   }
 
   // ── CMA CGM API — leasing / unknown-carrier containers ───────────────────────
@@ -706,8 +725,9 @@ async function trackViaParcelsApp(
   }
 
   ep(containerId, "ParcelsApp API", "running");
-  const hintCarrier = detectedCarrier && detectedCarrier !== "OTHER" ? detectedCarrier : undefined;
-  const result = await trackContainer(containerNumber, "United States", hintCarrier);
+  const effectiveHintMain = manualCarrierHint || (detectedCarrier && detectedCarrier !== "OTHER" ? detectedCarrier : null);
+  console.log(`[FactoryTracking] ${containerNumber} ParcelsApp: dest=${destinationCountry} hint=${effectiveHintMain ?? "none"} manualHint=${manualCarrierHint ?? "none"} detected=${detectedCarrier ?? "none"}`);
+  let result = await trackContainer(containerNumber, destinationCountry, effectiveHintMain ?? undefined);
 
   await saveTrackingCheck(
     containerId, "parcelsapp",
@@ -715,13 +735,27 @@ async function trackViaParcelsApp(
     result.error ?? null, result.rawResponse,
   );
 
+  if (result.timedOut && effectiveHintMain) {
+    console.log(`[FactoryTracking] ${containerNumber} ParcelsApp timed out with hint="${effectiveHintMain}" — retrying without hint`);
+    ep(containerId, "ParcelsApp API (retry no hint)", "running");
+    const retryResult = await trackContainer(containerNumber, destinationCountry, undefined);
+    await saveTrackingCheck(containerId, "parcelsapp_retry_no_hint", retryResult.success ? "success" : retryResult.timedOut ? "timeout" : "error", retryResult.error ?? null, retryResult.rawResponse);
+    if (retryResult.success && retryResult.shipment) {
+      result = { ...retryResult, rawResponse: retryResult.rawResponse };
+      ep(containerId, "ParcelsApp API (retry no hint)", "success", "got data");
+    } else {
+      ep(containerId, "ParcelsApp API (retry no hint)", "fail", retryResult.error ?? "no data");
+    }
+  }
+
   if (!result.success || !result.shipment) {
     ep(containerId, "ParcelsApp API", "fail", result.error ?? "no data");
+    const errMsg = result.timedOut ? `Carrier timed out (dest=${destinationCountry})` : (result.error ?? "Tracking failed");
     await db
       .update(factoryContainers)
-      .set({ trackingLastCheckedAt: now, trackingError: result.error ?? "Tracking failed", trackingProvider: "parcelsapp" } as any)
+      .set({ trackingLastCheckedAt: now, trackingError: errMsg, trackingProvider: "parcelsapp" } as any)
       .where(eq(factoryContainers.id, containerId));
-    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: result.error ?? "Tracking failed" };
+    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: errMsg };
   }
 
   const shipment = result.shipment;
@@ -771,6 +805,8 @@ export async function trackOneFactoryContainerById(containerId: number): Promise
       containerNumber: factoryContainers.containerNumber,
       status: factoryContainers.status,
       arrivalDate: factoryContainers.arrivalDate,
+      destination: factoryContainers.destination,
+      trackingCarrierHint: factoryContainers.trackingCarrierHint,
     })
     .from(factoryContainers)
     .where(eq(factoryContainers.id, containerId))
@@ -784,8 +820,11 @@ export async function trackOneFactoryContainerById(containerId: number): Promise
 
   const oldEta = row.arrivalDate ?? null;
   const trackStartedAt = new Date();
+  const destinationCountry = row.destination || "Congo";
+  const manualCarrierHint = row.trackingCarrierHint ?? null;
+  console.log(`[FactoryTracking] trackOneFactoryContainerById: container=${row.containerNumber} dest="${destinationCountry}" manualHint=${manualCarrierHint ?? "none"}`);
 
-  const result = await trackOneContainer(row.id, row.containerNumber);
+  const result = await trackOneContainer(row.id, row.containerNumber, destinationCountry, manualCarrierHint);
   await setSchedulerMeta(row.id, null, new Date(Date.now() + 24 * 60 * 60 * 1000));
 
   const [postRow] = await db
@@ -843,6 +882,8 @@ export async function trackDueFactoryContainers(): Promise<void> {
     trackingAutoUpdate: boolean;
     trackingLastCheckedAt: Date | null;
     trackingNextCheckAt: Date | null;
+    destination: string | null;
+    trackingCarrierHint: string | null;
   }>;
 
   try {
@@ -854,6 +895,8 @@ export async function trackDueFactoryContainers(): Promise<void> {
         trackingAutoUpdate: factoryContainers.trackingAutoUpdate,
         trackingLastCheckedAt: factoryContainers.trackingLastCheckedAt,
         trackingNextCheckAt: factoryContainers.trackingNextCheckAt,
+        destination: factoryContainers.destination,
+        trackingCarrierHint: factoryContainers.trackingCarrierHint,
       })
       .from(factoryContainers)
       .where(
@@ -887,7 +930,9 @@ export async function trackDueFactoryContainers(): Promise<void> {
 
   for (const row of eligible) {
     try {
-      await trackOneContainer(row.id, row.containerNumber);
+      const destCountry = row.destination || "Congo";
+      const carrierHint = row.trackingCarrierHint ?? null;
+      await trackOneContainer(row.id, row.containerNumber, destCountry, carrierHint);
       await new Promise((resolve) => setTimeout(resolve, 2000));
     } catch (err: any) {
       console.error(`[FactoryTracking] Error tracking ${row.containerNumber}:`, err?.message);

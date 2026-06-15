@@ -935,8 +935,30 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                           {(() => {
                             const err: string = fc.trackingError ?? "";
                             const low = err.toLowerCase();
-                            return (low.includes("timeout") || low.includes("timed out")) ? "Carrier timeout" : err.slice(0, 35);
+                            if (low.includes("timeout") || low.includes("timed out")) {
+                              return fc.trackingCarrierHint
+                                ? "Timeout — try clearing carrier hint"
+                                : "Carrier timed out — set carrier hint to retry";
+                            }
+                            return err.slice(0, 45);
                           })()}
+                        </span>
+                      )}
+                      {!isTracking && !hasError && fc.trackingProvider && (
+                        <span className="text-xs text-muted-foreground font-normal">
+                          via {fc.trackingProvider}
+                        </span>
+                      )}
+                      {(fc.trackingDetectedCarrier || fc.trackingCarrierHint) && (
+                        <span className="text-xs text-muted-foreground font-normal">
+                          {fc.trackingCarrierHint
+                            ? <>hint: <span className="font-medium">{fc.trackingCarrierHint}</span></>
+                            : <>carrier: {fc.trackingDetectedCarrier}</>}
+                        </span>
+                      )}
+                      {fc.trackingLastCheckedAt && (
+                        <span className="text-xs text-muted-foreground font-normal">
+                          {new Date(fc.trackingLastCheckedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                         </span>
                       )}
                       {!isValidNum && (
