@@ -2153,13 +2153,13 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                   "border-b",
                   r.allocationStatus === "Partially Cleared" && "bg-amber-50/80 dark:bg-amber-950/20"
                 )}>
-                  <td className="py-0.5 px-2 font-mono font-semibold">{r.containerNumber}</td>
-                  <td className="py-0.5 px-2">{r.supplierCode ?? "—"}</td>
-                  <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
-                  <td className="py-0.5 px-2">{fmtD(r.offloadDate ?? null)}</td>
-                  <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
-                  <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>
-                  <td className="py-0.5 px-2">{r.location ?? "—"}</td>
+                  <td className="py-0.5 px-2 font-mono font-semibold text-center">{r.containerNumber}</td>
+                  <td className="py-0.5 px-2 text-center">{r.supplierCode ?? "—"}</td>
+                  <td className="py-0.5 px-2 font-mono text-center">{r.numberPlate ?? "—"}</td>
+                  <td className="py-0.5 px-2 text-center">{fmtD(r.offloadDate ?? null)}</td>
+                  <td className="py-0.5 px-2 text-center">{fmtD(r.borderDate)}</td>
+                  <td className="py-0.5 px-2 text-center">{r.transporter ?? "—"}</td>
+                  <td className="py-0.5 px-2 text-center">{r.location ?? "—"}</td>
                   <td className="py-0.5 px-2 text-right">${fmt(r.dutyFee, 0)}</td>
                   <td className="py-0.5 px-2 text-right text-green-600 dark:text-green-500">
                     {r.clearedAmount > 0 ? `$${fmt(r.clearedAmount, 0)}` : "—"}
@@ -2233,9 +2233,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                         ${fmt(rawBal, 0)}
                         {balLabel && <span className="ml-1 text-xs opacity-80">({balLabel})</span>}
                       </td>
-                      <td colSpan={2} className="py-1 px-2 text-right text-xs opacity-80">
-                        − ${fmt(Math.abs(netAdjustment), 0)} {netAdjustment >= 0 ? "Dr" : "Cr"} manual
-                      </td>
+                      <td colSpan={2} />
                     </tr>
                   );
                 }
@@ -2259,9 +2257,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                         ${fmt(rawBal, 0)}
                         {balLabel && <span className="ml-1 text-xs opacity-80">({balLabel})</span>}
                       </td>
-                      <td colSpan={2} className="py-1 px-2 text-right text-xs opacity-80">
-                        − ${fmt(Math.abs(netAdjustment), 0)} {netAdjustment >= 0 ? "Dr" : "Cr"} manual
-                      </td>
+                      <td colSpan={2} />
                     </tr>
                     <tr className={adjRowCls}>
                       <td colSpan={9} className="py-1.5 px-2 text-xs uppercase tracking-wide">
@@ -2295,25 +2291,9 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
               );
             })()}
 
-            {/* ── Cleared rows — collapsed by default, toggle at bottom ── */}
+            {/* ── Cleared rows — hidden by default ── */}
             {(clearedRows.length > 0 || (isReconciled && openAndPartial.length > 0)) && (
               <>
-                <tr>
-                  <td colSpan={12} className="p-0">
-                    <button
-                      onClick={() => setShowCleared(v => !v)}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-1 bg-slate-100 dark:bg-slate-800/40 hover-elevate border-t border-slate-200 dark:border-slate-700 text-[11px] text-slate-500 dark:text-slate-400"
-                      data-testid={`button-toggle-cleared-${agentName}`}
-                    >
-                      {showCleared ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                      <span>
-                        {showCleared ? "Hide" : "Show"}{" "}
-                        {clearedRows.length + (isReconciled ? openAndPartial.length : 0)} cleared container{(clearedRows.length + (isReconciled ? openAndPartial.length : 0)) !== 1 ? "s" : ""}{" "}
-                        (${fmt(clearedRows.reduce((s, r) => s + r.dutyFee, 0) + (isReconciled ? openAndPartial.reduce((s, r) => s + r.dutyFee, 0) : 0), 0)} duty)
-                      </span>
-                    </button>
-                  </td>
-                </tr>
                 {showCleared && clearedRows.map(r => (
                   <tr key={`cleared-${r.id}`} className="border-b bg-slate-50/60 dark:bg-slate-800/20 opacity-70">
                     <td className="py-0.5 px-2 font-mono text-muted-foreground">{r.containerNumber}</td>
@@ -2386,12 +2366,12 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                 <tbody>
                   {activePreviewRows.map((r) => (
                     <tr key={r.id} className="border-b bg-sky-50/30 dark:bg-sky-950/10 text-muted-foreground">
-                      <td className="py-0.5 px-2 font-mono">{r.containerNumber}</td>
-                      <td className="py-0.5 px-2">{r.supplierCode ?? r.supplierName ?? "—"}</td>
-                      <td className="py-0.5 px-2 font-mono">{r.numberPlate ?? "—"}</td>
-                      <td className="py-0.5 px-2">{fmtD(r.borderDate)}</td>
-                      <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>
-                      <td className="py-0.5 px-2">{r.location ?? "—"}</td>
+                      <td className="py-0.5 px-2 font-mono text-center">{r.containerNumber}</td>
+                      <td className="py-0.5 px-2 text-center">{r.supplierCode ?? r.supplierName ?? "—"}</td>
+                      <td className="py-0.5 px-2 font-mono text-center">{r.numberPlate ?? "—"}</td>
+                      <td className="py-0.5 px-2 text-center">{fmtD(r.borderDate)}</td>
+                      <td className="py-0.5 px-2 text-center">{r.transporter ?? "—"}</td>
+                      <td className="py-0.5 px-2 text-center">{r.location ?? "—"}</td>
                       <td className="py-0.5 px-2 text-right">${fmt(r.dutyFee, 0)}</td>
                     </tr>
                   ))}
