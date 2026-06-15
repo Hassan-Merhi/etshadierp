@@ -253,6 +253,149 @@ function fmtDate(d: string | null | undefined) {
   return `${day}/${m}/${y.slice(2)}`;
 }
 
+// ─── Inline-edit cell components ─────────────────────────────────────────────
+// Shared mutation hook — invalidates the full containers list on success
+function useInlinePatch(containerId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: Record<string, unknown>) =>
+      apiRequest("PATCH", `/api/containers/${containerId}/tracking`, patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/git/containers"] }),
+  });
+}
+
+function InlineTextCell({ id, field, value, mono, width }: {
+  id: number; field: string; value: string | null | undefined;
+  mono?: boolean; width?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value ?? "");
+  const mutation = useInlinePatch(id);
+  function save() { mutation.mutate({ [field]: val || null }); setEditing(false); }
+  if (editing) return (
+    <input
+      type="text" autoFocus value={val}
+      onChange={e => setVal(e.target.value)}
+      onBlur={save}
+      onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") { setVal(value ?? ""); setEditing(false); } }}
+      onClick={e => e.stopPropagation()}
+      style={{ width: width ?? "110px" }}
+      className="h-7 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+    />
+  );
+  return (
+    <span
+      onClick={e => { e.stopPropagation(); setVal(value ?? ""); setEditing(true); }}
+      title="Click to edit"
+      className={cn("cursor-text underline decoration-dashed underline-offset-2 decoration-muted-foreground/40", mono && "font-mono")}
+    >
+      {value || <span className="text-muted-foreground/50 text-xs">—</span>}
+    </span>
+  );
+}
+
+function InlineDateCell({ id, field, value }: {
+  id: number; field: string; value: string | null | undefined;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value ?? "");
+  const mutation = useInlinePatch(id);
+  function save() { mutation.mutate({ [field]: val || null }); setEditing(false); }
+  if (editing) return (
+    <input
+      type="date" autoFocus value={val}
+      onChange={e => setVal(e.target.value)}
+      onBlur={save}
+      onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") { setVal(value ?? ""); setEditing(false); } }}
+      onClick={e => e.stopPropagation()}
+      className="w-[128px] h-7 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+    />
+  );
+  return (
+    <span
+      onClick={e => { e.stopPropagation(); setVal(value ?? ""); setEditing(true); }}
+      title="Click to edit"
+      className="cursor-text underline decoration-dashed underline-offset-2 decoration-muted-foreground/40"
+    >
+      {value ? fmtDate(value) : <span className="text-muted-foreground/50 text-xs">—</span>}
+    </span>
+  );
+}
+
+function InlineNumberCell({ id, field, value, prefix = "$" }: {
+  id: number; field: string; value: string | null | undefined; prefix?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value ?? "");
+  const mutation = useInlinePatch(id);
+  function save() { mutation.mutate({ [field]: val || null }); setEditing(false); }
+  if (editing) return (
+    <input
+      type="number" autoFocus value={val}
+      onChange={e => setVal(e.target.value)}
+      onBlur={save}
+      onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") { setVal(value ?? ""); setEditing(false); } }}
+      onClick={e => e.stopPropagation()}
+      className="w-[80px] h-7 rounded-md border border-input bg-background px-2 text-xs text-right focus:outline-none focus:ring-1 focus:ring-ring"
+    />
+  );
+  const num = parseNum(value);
+  return (
+    <span
+      onClick={e => { e.stopPropagation(); setVal(value ?? ""); setEditing(true); }}
+      title="Click to edit"
+      className="cursor-text underline decoration-dashed underline-offset-2 decoration-muted-foreground/40"
+    >
+      {num > 0 ? `${prefix}${fmt(num)}` : <span className="text-muted-foreground/50 text-xs">—</span>}
+    </span>
+  );
+}
+
+const TRANSPORTER_OPTIONS = ["FARHAT", "CONTINENTAL", "KDOUH", "TRH"];
+
+function InlineTransporterCell({ id, value }: { id: number; value: string | null | undefined }) {
+  const [editing, setEditing] = useState(false);
+  const mutation = useInlinePatch(id);
+  function save(v: string) { mutation.mutate({ transporter: v || null }); setEditing(false); }
+  if (editing) return (
+    <select
+      autoFocus value={value ?? ""}
+      onChange={e => save(e.target.value)}
+      onBlur={() => setEditing(false)}
+      onClick={e => e.stopPropagation()}
+      className="h-7 rounded-md border border-input bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+    >
+      <option value="">—</option>
+      {TRANSPORTER_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+    </select>
+  );
+  return (
+    <span
+      onClick={e => { e.stopPropagation(); setEditing(true); }}
+      title="Click to change transporter"
+      className="cursor-pointer underline decoration-dashed underline-offset-2 decoration-muted-foreground/40"
+    >
+      {value || <span className="text-muted-foreground/50 text-xs">—</span>}
+    </span>
+  );
+}
+
+function InlineBoolCell({ id, field, value }: { id: number; field: string; value: boolean | null | undefined }) {
+  const mutation = useInlinePatch(id);
+  return (
+    <button
+      type="button"
+      onClick={e => { e.stopPropagation(); mutation.mutate({ [field]: !value }); }}
+      title="Click to toggle"
+      className="flex items-center justify-center"
+    >
+      {value
+        ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+        : <XCircle className="h-3.5 w-3.5 text-red-500" />}
+    </button>
+  );
+}
+
 // ─── Client-side priority helper (mirrors server trackingPriority.ts) ─────────
 
 type PriorityTier = "high" | "medium" | "low";
@@ -2389,7 +2532,9 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                         {c.supplierCode ?? <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell>{c.companyName}</TableCell>
-                      <TableCell>{c.shopName ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                      <TableCell>
+                        <InlineTextCell id={c.id} field="shopName" value={c.shopName} width="100px" />
+                      </TableCell>
                       <TableCell><EtaCell container={c} fmtDate={fmtDate} /></TableCell>
                       <TableCell className="text-right font-medium">
                         {c.grandTotal ? `$${fmt(parseNum(c.grandTotal))}` : "—"}
@@ -2400,14 +2545,14 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                           : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell>
-                        {c.numberPlate
-                          ? <span className="font-mono">{c.numberPlate}</span>
-                          : <span className="text-muted-foreground">—</span>}
+                        <InlineTextCell id={c.id} field="numberPlate" value={c.numberPlate} mono width="90px" />
                       </TableCell>
                       <TableCell>
-                        {c.trackingLocation ?? <span className="text-muted-foreground">—</span>}
+                        <InlineTextCell id={c.id} field="trackingLocation" value={c.trackingLocation} width="100px" />
                       </TableCell>
-                      <TableCell>{fmtDate(c.borderDate)}</TableCell>
+                      <TableCell>
+                        <InlineDateCell id={c.id} field="borderDate" value={c.borderDate} />
+                      </TableCell>
                       <TableCell className={c.isOverdue ? "text-red-600 font-medium" : ""}>
                         {fmtDate(c.maxOffloadDate)}
                       </TableCell>
@@ -2417,25 +2562,25 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                           : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell>
-                        {c.docReceived
-                          ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
-                          : <XCircle className="h-3.5 w-3.5 text-red-500" />}
-                      </TableCell>
-                      <TableCell>{fmtDate(c.docsSentDate)}</TableCell>
-                      <TableCell>
-                        {c.transporter ?? <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {c.transportFee ? `$${fmt(parseNum(c.transportFee))}` : "—"}
+                        <InlineBoolCell id={c.id} field="docReceived" value={c.docReceived} />
                       </TableCell>
                       <TableCell>
-                        {c.agent ?? <span className="text-muted-foreground">—</span>}
+                        <InlineDateCell id={c.id} field="docsSentDate" value={c.docsSentDate} />
+                      </TableCell>
+                      <TableCell>
+                        <InlineTransporterCell id={c.id} value={c.transporter} />
                       </TableCell>
                       <TableCell className="text-right">
-                        {c.dutyFee ? `$${fmt(parseNum(c.dutyFee))}` : "—"}
+                        <InlineNumberCell id={c.id} field="transportFee" value={c.transportFee} />
+                      </TableCell>
+                      <TableCell>
+                        <InlineTextCell id={c.id} field="agent" value={c.agent} width="80px" />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <InlineNumberCell id={c.id} field="dutyFee" value={c.dutyFee} />
                       </TableCell>
                       <TableCell className="max-w-28 truncate text-muted-foreground">
-                        {c.trackingDescription ?? "—"}
+                        <InlineTextCell id={c.id} field="trackingDescription" value={c.trackingDescription} width="120px" />
                       </TableCell>
                       <TableCell>
                         <Button
