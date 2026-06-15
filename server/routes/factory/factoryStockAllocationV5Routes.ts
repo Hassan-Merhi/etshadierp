@@ -520,6 +520,8 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
           quantity: parseInt(l.quantity),
           pricePerBale: String(l.pricePerBale ?? "0"),
           productionPricePerBale: String(l.productionPricePerBale ?? "0"),
+          pricingMode: l.pricingMode ?? 'per_bale',
+          pricePerKg: (l.pricingMode === 'per_kg' && l.pricePerKg != null && l.pricePerKg !== '') ? String(l.pricePerKg) : null,
         }));
         const insertedLines = await tx.insert(customerProformaLines).values(lineValues).returning();
 

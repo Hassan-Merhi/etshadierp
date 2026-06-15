@@ -698,7 +698,15 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
             ));
           proformaLine = pl || null;
           if (proformaLine) {
-            priceUsed = proformaLine.pricePerBale;
+            const pricingMode = (proformaLine as any).pricingMode ?? 'per_bale';
+            const perKgVal = (proformaLine as any).pricePerKg;
+            if (pricingMode === 'per_kg' && perKgVal) {
+              const weightKg = parseFloat(String(bale.weightKg || "0"));
+              const pkgRate = parseFloat(String(perKgVal));
+              priceUsed = (!isNaN(weightKg) && !isNaN(pkgRate)) ? (weightKg * pkgRate).toFixed(2) : "0";
+            } else {
+              priceUsed = proformaLine.pricePerBale;
+            }
             // Overload check: count existing bales of this article in the order
             if (!req.body.allowBypassOverload) {
               const [countResult] = await tx

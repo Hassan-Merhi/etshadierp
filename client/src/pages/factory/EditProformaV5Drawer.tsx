@@ -27,6 +27,8 @@ interface ExistingLine {
   quantity: number;
   pricePerBale: string;
   weightPerBaleKg: string;
+  pricingMode?: string;
+  pricePerKg?: string | null;
 }
 
 interface ProformaData {
@@ -58,6 +60,8 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
   const [isActive, setIsActive] = useState(true);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [prices, setPrices] = useState<Record<string, string>>({});
+  const [pricingModes, setPricingModes] = useState<Record<string, "per_bale" | "per_kg">>({});
+  const [kgPrices, setKgPrices] = useState<Record<string, string>>({});
   const [showZeroItems, setShowZeroItems] = useState(false);
   const [hideNonPositive, setHideNonPositive] = useState(false);
   const [showGarbageWipers, setShowGarbageWipers] = useState(false);
@@ -102,12 +106,20 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
     setIsActive(pf.isActive ?? true);
     const qtys: Record<string, string> = {};
     const prs: Record<string, string> = {};
+    const modes: Record<string, "per_bale" | "per_kg"> = {};
+    const kgs: Record<string, string> = {};
     for (const line of pf.lines) {
       qtys[line.articleCode] = String(line.quantity);
       prs[line.articleCode] = line.pricePerBale ?? "";
+      if (line.pricingMode === "per_kg") {
+        modes[line.articleCode] = "per_kg";
+        kgs[line.articleCode] = line.pricePerKg ?? "";
+      }
     }
     setQuantities(qtys);
     setPrices(prs);
+    setPricingModes(modes);
+    setKgPrices(kgs);
     setInitialized(true);
   }, [proformaQuery.data, initialized]);
 
@@ -117,6 +129,8 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
       setInitialized(false);
       setQuantities({});
       setPrices({});
+      setPricingModes({});
+      setKgPrices({});
       setProformaName("");
       setAppliedPrice(null);
       setShowZeroItems(false);
@@ -158,13 +172,26 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
         const price = prices[row.articleCode] ?? "0";
         const existing = lineMap.get(row.articleCode);
 
+        const mode = pricingModes[row.articleCode] ?? "per_bale";
+        const kgPrice = kgPrices[row.articleCode] ?? "0";
+        const effectivePrice = mode === "per_kg" ? "0" : price;
+        const existingMode = existing?.pricingMode ?? "per_bale";
+        const existingKgPrice = existing?.pricePerKg ?? null;
+
         if (existing) {
           if (validQty === 0) {
             ops.push(apiRequest("DELETE", `/api/factory/customer-proforma-lines/${existing.id}`, undefined));
-          } else if (validQty !== existing.quantity || price !== existing.pricePerBale) {
+          } else if (
+            validQty !== existing.quantity ||
+            effectivePrice !== existing.pricePerBale ||
+            mode !== existingMode ||
+            (mode === "per_kg" && kgPrice !== (existingKgPrice ?? ""))
+          ) {
             ops.push(apiRequest("PUT", `/api/factory/customer-proforma-lines/${existing.id}`, {
               quantity: validQty,
-              pricePerBale: price,
+              pricePerBale: effectivePrice,
+              pricingMode: mode,
+              pricePerKg: mode === "per_kg" ? kgPrice : null,
             }));
           }
         } else if (validQty > 0) {
@@ -173,8 +200,10 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
             articleCode: row.articleCode,
             productName: row.productName,
             quantity: validQty,
-            pricePerBale: price || "0",
+            pricePerBale: effectivePrice || "0",
             productionPricePerBale: "0",
+            pricingMode: mode,
+            pricePerKg: mode === "per_kg" ? kgPrice : null,
           }));
         }
       }
@@ -259,6 +288,13 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
   const totalValue = articleRows.reduce((s, r) => {
     const qty = parseInt(quantities[r.articleCode] || "0");
     if (isNaN(qty) || qty <= 0) return s;
+    const mode = pricingModes[r.articleCode] ?? "per_bale";
+    if (mode === "per_kg") {
+      const pkgRate = parseFloat(kgPrices[r.articleCode] || "0");
+      const p = map.get(r.articleCode);
+      const avgWt = parseFloat(p?.weightPerBaleKg || "0");
+      return s + qty * avgWt * pkgRate;
+    }
     const price = parseFloat(prices[r.articleCode] || "0");
     return s + qty * price;
   }, 0);
@@ -461,16 +497,48 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
                         </td>
 
                         <td className="px-2 py-1">
-                          <Input
-                            type="number"
-                            min={0}
-                            value={prices[row.articleCode] ?? ""}
-                            onChange={e => setPrices(prev => ({ ...prev, [row.articleCode]: e.target.value }))}
-                            onFocus={e => e.target.select()}
-                            placeholder="0.00"
-                            className="h-7 text-center text-xs tabular-nums w-full"
-                            data-testid={`input-edit-v5-price-${row.articleCode}`}
-                          />
+                          {(() => {
+                            const mode = pricingModes[row.articleCode] ?? "per_bale";
+                            return (
+                              <div className="flex items-center gap-1">
+                                <div className="flex rounded border shrink-0 overflow-hidden text-[9px] font-semibold">
+                                  <button
+                                    className={cn("px-1.5 py-0.5 transition-colors", mode === "per_bale" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+                                    onClick={() => setPricingModes(prev => ({ ...prev, [row.articleCode]: "per_bale" }))}
+                                    data-testid={`button-edit-v5-mode-bale-${row.articleCode}`}
+                                    title="Price per bale"
+                                  >/bale</button>
+                                  <button
+                                    className={cn("px-1.5 py-0.5 transition-colors", mode === "per_kg" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+                                    onClick={() => setPricingModes(prev => ({ ...prev, [row.articleCode]: "per_kg" }))}
+                                    data-testid={`button-edit-v5-mode-kg-${row.articleCode}`}
+                                    title="Price per kg"
+                                  >/kg</button>
+                                </div>
+                                {mode === "per_kg" ? (
+                                  <Input
+                                    type="number" min={0} step="0.001"
+                                    value={kgPrices[row.articleCode] ?? ""}
+                                    onChange={e => setKgPrices(prev => ({ ...prev, [row.articleCode]: e.target.value }))}
+                                    onFocus={e => e.target.select()}
+                                    placeholder="0.000"
+                                    className="h-7 text-right text-xs tabular-nums w-full"
+                                    data-testid={`input-edit-v5-kgprice-${row.articleCode}`}
+                                  />
+                                ) : (
+                                  <Input
+                                    type="number" min={0}
+                                    value={prices[row.articleCode] ?? ""}
+                                    onChange={e => setPrices(prev => ({ ...prev, [row.articleCode]: e.target.value }))}
+                                    onFocus={e => e.target.select()}
+                                    placeholder="0.00"
+                                    className="h-7 text-right text-xs tabular-nums w-full"
+                                    data-testid={`input-edit-v5-price-${row.articleCode}`}
+                                  />
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
 
                         <td className="px-1 py-1 text-center">

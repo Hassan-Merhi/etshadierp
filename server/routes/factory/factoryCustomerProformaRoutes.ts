@@ -546,6 +546,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       if (req.body.productName !== undefined) updateData.productName = req.body.productName;
       if (req.body.quantity !== undefined) updateData.quantity = parseInt(req.body.quantity);
       if (req.body.pricePerBale !== undefined) updateData.pricePerBale = req.body.pricePerBale;
+      if (req.body.pricingMode !== undefined) updateData.pricingMode = req.body.pricingMode;
+      if (req.body.pricePerKg !== undefined) updateData.pricePerKg = req.body.pricePerKg ?? null;
 
       // factory_v2: warn if quantity increase exceeds free-to-promise (non-blocking)
       let stockWarning: string | undefined;
@@ -632,6 +634,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           quantity: parseInt(l.quantity),
           pricePerBale: String(l.pricePerBale || "0"),
           productionPricePerBale: String(l.productionPricePerBale || "0"),
+          pricingMode: l.pricingMode ?? 'per_bale',
+          pricePerKg: (l.pricingMode === 'per_kg' && l.pricePerKg != null && l.pricePerKg !== '') ? String(l.pricePerKg) : null,
         }));
 
         const insertedLines = await tx.insert(customerProformaLines).values(lineValues).returning();
@@ -686,6 +690,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           productName: l.productName,
           quantity: parseInt(l.quantity),
           pricePerBale: String(l.pricePerBale || "0"),
+          pricingMode: l.pricingMode ?? 'per_bale',
+          pricePerKg: (l.pricingMode === 'per_kg' && l.pricePerKg != null && l.pricePerKg !== '') ? String(l.pricePerKg) : null,
         }));
         const insertedLines = await tx.insert(customerProformaLines).values(lineValues).returning();
         return { ...proforma, lines: insertedLines };

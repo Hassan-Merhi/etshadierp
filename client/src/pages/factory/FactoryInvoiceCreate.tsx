@@ -34,6 +34,8 @@ interface ProformaLine {
   articleCode: string;
   productName: string;
   pricePerBale: string;
+  pricingMode?: string;
+  pricePerKg?: string | null;
 }
 
 interface Proforma {
@@ -418,7 +420,17 @@ export default function FactoryInvoiceCreate() {
                         <div className="flex items-center gap-3 text-sm text-muted-foreground">
                           <span>Qty: {group.bales.length}</span>
                           <span>Wt: {group.totalWeight.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
-                          <span className="font-mono">@{group.pricePerBale.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                          {(() => {
+                            const pfl = activeProforma?.lines.find(l => l.articleCode === group.articleCode);
+                            const isPerKg = pfl?.pricingMode === "per_kg";
+                            return isPerKg ? (
+                              <span className="font-mono text-xs text-muted-foreground">
+                                @{parseFloat(pfl?.pricePerKg || "0").toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}/kg
+                              </span>
+                            ) : (
+                              <span className="font-mono">@{group.pricePerBale.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                            );
+                          })()}
                           <span className="font-mono font-semibold text-foreground">{group.totalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                         </div>
                       </div>

@@ -72,6 +72,8 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
   const [sendToLoading, setSendToLoading]   = useState(draft?.sendToLoading ?? false);
   const [containerCount, setContainerCount] = useState(draft?.containerCount ?? "1");
   const [containerNames, setContainerNames] = useState<string[]>(draft?.containerNames ?? ["Container 1"]);
+  const [pricingModes, setPricingModes]         = useState<Record<string, "per_bale" | "per_kg">>({});
+  const [kgPrices, setKgPrices]                 = useState<Record<string, string>>({});
   const [draftStatus, setDraftStatus]           = useState<"idle" | "saved">("idle");
   const [appliedPrice, setAppliedPrice]         = useState<"sell" | "prod" | null>(null);
   const [errors, setErrors]                     = useState<Record<string, string>>({});
@@ -91,6 +93,8 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
       setIsActive(true);
       setQuantities({});
       setSellingPrices({});
+      setPricingModes({});
+      setKgPrices({});
       setSendToLoading(false);
       setContainerCount("1");
       setContainerNames(["Container 1"]);
@@ -324,13 +328,18 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
     if (!validate()) return;
     const lines = articleRows
       .filter(r => { const v = quantities[r.articleCode]; return v && parseInt(v) > 0; })
-      .map(r => ({
-        articleCode: r.articleCode,
-        productName: r.productName,
-        quantity: parseInt(quantities[r.articleCode]),
-        pricePerBale: sellingPrices[r.articleCode] || "0",
-        productionPricePerBale: "0",
-      }));
+      .map(r => {
+        const mode = pricingModes[r.articleCode] ?? "per_bale";
+        return {
+          articleCode: r.articleCode,
+          productName: r.productName,
+          quantity: parseInt(quantities[r.articleCode]),
+          pricePerBale: mode === "per_kg" ? "0" : (sellingPrices[r.articleCode] || "0"),
+          productionPricePerBale: "0",
+          pricingMode: mode,
+          ...(mode === "per_kg" ? { pricePerKg: kgPrices[r.articleCode] || "0" } : {}),
+        };
+      });
 
     const n = containerNames.length;
     // Warning: check shortages using corrected formula
@@ -402,6 +411,13 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
   const totalValue = articleRows.reduce((s, r) => {
     const qty = parseInt(quantities[r.articleCode] || "0");
     if (isNaN(qty) || qty <= 0) return s;
+    const mode = pricingModes[r.articleCode] ?? "per_bale";
+    if (mode === "per_kg") {
+      const pkgRate = parseFloat(kgPrices[r.articleCode] || "0");
+      const p = map.get(r.articleCode);
+      const avgWt = parseFloat(p?.weightPerBaleKg || "0");
+      return s + qty * avgWt * pkgRate;
+    }
     const price = parseFloat(sellingPrices[r.articleCode] || "0");
     return s + qty * price;
   }, 0);
@@ -769,15 +785,48 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
                     )}
 
                     <td className="px-2 py-1">
-                      <Input
-                        type="number" min={0} step="0.01"
-                        value={sellingPrices[row.articleCode] ?? ""}
-                        onChange={e => setSellingPrices(prev => ({ ...prev, [row.articleCode]: e.target.value }))}
-                        onFocus={e => e.target.select()}
-                        placeholder="0.00"
-                        className="h-7 text-right text-xs font-mono w-24 px-2 tabular-nums"
-                        data-testid={`input-v5-price-${row.articleCode}`}
-                      />
+                      {(() => {
+                        const mode = pricingModes[row.articleCode] ?? "per_bale";
+                        return (
+                          <div className="flex items-center gap-1">
+                            <div className="flex rounded border shrink-0 overflow-hidden text-[9px] font-semibold">
+                              <button
+                                className={cn("px-1.5 py-0.5 transition-colors", mode === "per_bale" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+                                onClick={() => setPricingModes(prev => ({ ...prev, [row.articleCode]: "per_bale" }))}
+                                data-testid={`button-v5-mode-bale-${row.articleCode}`}
+                                title="Price per bale"
+                              >/bale</button>
+                              <button
+                                className={cn("px-1.5 py-0.5 transition-colors", mode === "per_kg" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+                                onClick={() => setPricingModes(prev => ({ ...prev, [row.articleCode]: "per_kg" }))}
+                                data-testid={`button-v5-mode-kg-${row.articleCode}`}
+                                title="Price per kg"
+                              >/kg</button>
+                            </div>
+                            {mode === "per_kg" ? (
+                              <Input
+                                type="number" min={0} step="0.001"
+                                value={kgPrices[row.articleCode] ?? ""}
+                                onChange={e => setKgPrices(prev => ({ ...prev, [row.articleCode]: e.target.value }))}
+                                onFocus={e => e.target.select()}
+                                placeholder="0.000"
+                                className="h-7 text-right text-xs font-mono w-20 px-2 tabular-nums"
+                                data-testid={`input-v5-kgprice-${row.articleCode}`}
+                              />
+                            ) : (
+                              <Input
+                                type="number" min={0} step="0.01"
+                                value={sellingPrices[row.articleCode] ?? ""}
+                                onChange={e => setSellingPrices(prev => ({ ...prev, [row.articleCode]: e.target.value }))}
+                                onFocus={e => e.target.select()}
+                                placeholder="0.00"
+                                className="h-7 text-right text-xs font-mono w-20 px-2 tabular-nums"
+                                data-testid={`input-v5-price-${row.articleCode}`}
+                              />
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                   </tr>
                 );

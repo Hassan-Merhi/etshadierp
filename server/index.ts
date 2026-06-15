@@ -4118,6 +4118,9 @@ END $$`,
     )`,
     `CREATE INDEX IF NOT EXISTS idx_git_agent_adjustments_lookup
       ON git_agent_adjustments (company_id, agent_name)`,
+    // Per-kg pricing support on proforma lines (June 2026)
+    `ALTER TABLE customer_proforma_lines ADD COLUMN IF NOT EXISTS pricing_mode text NOT NULL DEFAULT 'per_bale'`,
+    `ALTER TABLE customer_proforma_lines ADD COLUMN IF NOT EXISTS price_per_kg decimal(20,4)`,
     // Always-run: ensure tracking is enabled on every active (non-offloaded) container.
     // Safe to run on every boot — only touches rows that are still incorrectly false.
     // Uses LOWER() to handle any case variation in status values.

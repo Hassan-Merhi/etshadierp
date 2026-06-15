@@ -3430,6 +3430,8 @@ export const customerProformaLines = pgTable("customer_proforma_lines", {
   pricePerBale: decimal("price_per_bale", { precision: 20, scale: 2 }).notNull(),
   productionPricePerBale: decimal("production_price_per_bale", { precision: 20, scale: 2 }).notNull().default("0"),
   priceFixed: boolean("price_fixed").notNull().default(false),
+  pricingMode: text("pricing_mode").notNull().default("per_bale"),
+  pricePerKg: decimal("price_per_kg", { precision: 20, scale: 4 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   proformaIdx: index("customer_proforma_lines_proforma_idx").on(t.proformaId),
@@ -3444,6 +3446,8 @@ export const insertCustomerProformaLineSchema = createInsertSchema(customerProfo
   productName: z.string().min(1, "Product name is required"),
   quantity: z.number().int().min(1, "Quantity must be at least 1"),
   pricePerBale: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Price must be non-negative"),
+  pricingMode: z.enum(["per_bale", "per_kg"]).optional().default("per_bale"),
+  pricePerKg: z.string().optional().nullable(),
 });
 
 export type InsertCustomerProformaLine = z.infer<typeof insertCustomerProformaLineSchema>;
