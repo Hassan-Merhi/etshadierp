@@ -118,6 +118,10 @@ function AdvancesView() {
   const [deleteTarget, setDeleteTarget] = useState<AdvanceRecord | null>(null);
   const [reverseTarget, setReverseTarget] = useState<AdvanceRecord | null>(null);
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkCashAccountId, setBulkCashAccountId] = useState("");
+
   const [form, setForm] = useState({
     workerId: "",
     advanceDate: new Date().toLocaleDateString('en-CA'),
@@ -446,6 +450,28 @@ function AdvancesView() {
     },
   });
 
+  const bulkUpdateCashAccountMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/factory/advances/bulk-update-cash-account", {
+        advanceIds: Array.from(selectedIds),
+        cashAccountId: parseInt(bulkCashAccountId),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to update cash accounts");
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/advances"] });
+      toast({ title: "Cash accounts updated", description: data.message });
+      setSelectedIds(new Set());
+      setBulkCashAccountId("");
+    },
+    onError: (err: Error) => {
+      if ((err as any)?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const filtered = useMemo(() => {
     let list = Array.isArray(advances) ? advances : [];
     if (filterWorker !== "all") list = list.filter((a) => a.workerId === parseInt(filterWorker));
@@ -554,11 +580,62 @@ function AdvancesView() {
         </div>
       </div>
 
+      {/* Bulk action bar — visible when rows are selected */}
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/60 px-4 py-3">
+          <span className="text-sm font-medium">
+            {selectedIds.size} advance{selectedIds.size !== 1 ? "s" : ""} selected
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedIds(new Set())}
+            data-testid="button-clear-selection"
+          >
+            Clear
+          </Button>
+          <div className="flex items-center gap-2 ml-auto flex-wrap">
+            <Select value={bulkCashAccountId} onValueChange={setBulkCashAccountId}>
+              <SelectTrigger className="w-52" data-testid="select-bulk-cash-account">
+                <SelectValue placeholder="Select cash account…" />
+              </SelectTrigger>
+              <SelectContent>
+                {(cashAccounts || []).map((a) => (
+                  <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={() => bulkUpdateCashAccountMutation.mutate()}
+              disabled={!bulkCashAccountId || bulkUpdateCashAccountMutation.isPending}
+              data-testid="button-bulk-update-cash-account"
+            >
+              {bulkUpdateCashAccountMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Update Cash Account
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className="border rounded-xl overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
+              <TableHead className="w-10 h-9">
+                <Checkbox
+                  checked={filtered.length > 0 && filtered.every((a) => selectedIds.has(a.id))}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setSelectedIds(new Set(filtered.map((a) => a.id)));
+                    } else {
+                      setSelectedIds(new Set());
+                    }
+                  }}
+                  data-testid="checkbox-select-all"
+                  aria-label="Select all"
+                />
+              </TableHead>
               <TableHead className="text-xs h-9 font-semibold">Worker</TableHead>
               <TableHead className="text-xs h-9 font-semibold">Date</TableHead>
               <TableHead className="text-xs h-9 font-semibold text-right">Amount</TableHead>
@@ -573,6 +650,7 @@ function AdvancesView() {
             {isLoading ? (
               [...Array(5)].map((_, i) => (
                 <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
@@ -585,7 +663,7 @@ function AdvancesView() {
               ))
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8}>
+                <TableCell colSpan={9}>
                   <div className="flex flex-col items-center gap-2 py-10 text-center">
                     <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
                       <Banknote className="h-5 w-5 text-muted-foreground" />
@@ -598,7 +676,25 @@ function AdvancesView() {
                 </TableCell>
               </TableRow>
             ) : filtered.map((adv) => (
-              <TableRow key={adv.id} className="hover:bg-muted/40" data-testid={`row-advance-${adv.id}`}>
+              <TableRow
+                key={adv.id}
+                className={`hover:bg-muted/40 ${selectedIds.has(adv.id) ? "bg-muted/30" : ""}`}
+                data-testid={`row-advance-${adv.id}`}
+              >
+                <TableCell className="py-3">
+                  <Checkbox
+                    checked={selectedIds.has(adv.id)}
+                    onCheckedChange={(checked) => {
+                      setSelectedIds((prev) => {
+                        const next = new Set(prev);
+                        if (checked) next.add(adv.id); else next.delete(adv.id);
+                        return next;
+                      });
+                    }}
+                    data-testid={`checkbox-advance-${adv.id}`}
+                    aria-label={`Select advance for ${adv.workerName}`}
+                  />
+                </TableCell>
                 <TableCell className="font-medium py-3" data-testid={`text-advance-worker-${adv.id}`}>
                   {adv.workerName}
                 </TableCell>

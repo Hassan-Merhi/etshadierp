@@ -1931,6 +1931,93 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
     }
   });
 
+  // POST /api/factory/advances/bulk-update-cash-account
+  // Updates cashAccountId on selected advances AND patches the credit leg of their existing PAYMENT-ADV-* vouchers
+  app.post("/api/factory/advances/bulk-update-cash-account", requireAuth, async (req: any, res: any) => {
+    try {
+      const currentRole = (req.session as any).currentRole;
+      if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
+        return res.status(403).json({ message: "Only Admin or Owner can update advance cash accounts" });
+      }
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { advanceIds, cashAccountId: rawCashAccountId } = req.body;
+      if (!Array.isArray(advanceIds) || advanceIds.length === 0) {
+        return res.status(400).json({ message: "advanceIds must be a non-empty array" });
+      }
+      const cashAccountId = rawCashAccountId ? parseInt(rawCashAccountId) : null;
+      if (!cashAccountId) return res.status(400).json({ message: "cashAccountId is required" });
+
+      // Verify cash account belongs to this company
+      const [acct] = await db.select({ id: ledgerAccounts.id })
+        .from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
+      if (!acct) return res.status(400).json({ message: "Cash account not found for this company" });
+
+      const ids = advanceIds.map((x: any) => parseInt(x)).filter((x: number) => !isNaN(x));
+
+      const result = await db.transaction(async (tx: any) => {
+        // Update cashAccountId on each advance
+        await tx.update(factoryWorkerAdvances)
+          .set({ cashAccountId })
+          .where(and(
+            eq(factoryWorkerAdvances.companyId, companyId),
+            inArray(factoryWorkerAdvances.id, ids),
+          ));
+
+        // Find existing PAYMENT-ADV-* vouchers for these advances
+        const matchingVouchers = await tx.select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber })
+          .from(vouchers)
+          .where(and(
+            eq(vouchers.companyId, companyId),
+            sql`${vouchers.voucherNumber} LIKE 'PAYMENT-ADV-%'`,
+          ));
+
+        // Map advance id → voucher id
+        const advVoucherMap = new Map<number, number>();
+        for (const v of matchingVouchers) {
+          const match = v.voucherNumber.match(/^PAYMENT-ADV-(\d+)-/);
+          if (match) {
+            const advId = parseInt(match[1]);
+            if (ids.includes(advId)) advVoucherMap.set(advId, v.id);
+          }
+        }
+
+        let vouchersUpdated = 0;
+        for (const voucherId of advVoucherMap.values()) {
+          // Find the credit leg (the cash account entry: creditAmount > 0, debitAmount = 0 or near 0)
+          const entries = await tx.select({ id: voucherEntries.id, creditAmount: voucherEntries.creditAmount })
+            .from(voucherEntries)
+            .where(eq(voucherEntries.voucherId, voucherId));
+
+          // The credit leg is the entry with the largest creditAmount (the cash payout)
+          const creditEntry = entries
+            .filter((e: any) => parseFloat(e.creditAmount || "0") > 0)
+            .sort((a: any, b: any) => parseFloat(b.creditAmount) - parseFloat(a.creditAmount))[0];
+
+          if (creditEntry) {
+            await tx.update(voucherEntries)
+              .set({ ledgerAccountId: cashAccountId })
+              .where(eq(voucherEntries.id, creditEntry.id));
+            vouchersUpdated++;
+          }
+        }
+
+        return { updated: ids.length, vouchersUpdated };
+      });
+
+      res.json({
+        message: `Updated ${result.updated} advance(s); ${result.vouchersUpdated} accounting voucher(s) patched`,
+        updated: result.updated,
+        vouchersUpdated: result.vouchersUpdated,
+      });
+    } catch (error: any) {
+      console.error("Error bulk-updating advance cash accounts:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // GET /api/factory/workers/:id/advance-balance - Get total outstanding advance balance
   app.get("/api/factory/workers/:id/advance-balance", requireAuth, async (req: any, res: any) => {
     try {
