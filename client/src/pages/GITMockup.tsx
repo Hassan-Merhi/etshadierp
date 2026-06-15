@@ -1590,6 +1590,21 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
 
   const resetOrder = () => saveOrder(null);
 
+  // ── Prepaid in-transit designation ────────────────────────────────────────
+  // User-chosen transit container IDs to show as "Prepaid". Empty = auto-select based on adjustedBalance.
+  const transitStorageKey = `agent-prepaid-transit-${agent.agentName}`;
+  const [prepaidTransitIds, setPrepaidTransitIds] = useState<number[]>(() => {
+    try {
+      const saved = localStorage.getItem(transitStorageKey);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const savePrepaidTransit = (ids: number[]) => {
+    setPrepaidTransitIds(ids);
+    localStorage.setItem(transitStorageKey, JSON.stringify(ids));
+  };
+  const resetPrepaidTransit = () => savePrepaidTransit([]);
+
   // ── Overpayment note (DB-backed, shared across all users) ─────────────────
   const [editingNote, setEditingNote] = useState(false);
   const [draftNote, setDraftNote]     = useState("");
@@ -1962,6 +1977,63 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   // isMismatch: manual entries exist, balance is not zero, and doesn't match container remainder
   const isMismatch      = hasAdjustments && adjustedBalance !== null && !isReconciled && Math.abs(adjustedBalance - openSum) > 0.01;
 
+  // ── Enhanced FIFO: payment + manual Dr entries as combined coverage ────────
+  // Re-runs clientReallocate with (remainderForOpenPartial + netAdjustment) so that
+  // manual Dr entries hide containers that are already explained by them.
+  const enhancedRemainder = remainderForOpenPartial + Math.max(0, netAdjustment);
+  const enhancedAllocated = useMemo(() => {
+    // Use the same order as openAndPartial (respects customOrder), but with raw dutyFee data
+    const orderMap = new Map(openAndPartial.map((r, i) => [r.id, i]));
+    const sortedRaw = [...allOpenPartial].sort(
+      (a, b) => (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999)
+    );
+    return clientReallocate(sortedRaw, enhancedRemainder);
+  }, [openAndPartial, allOpenPartial, enhancedRemainder]); // eslint-disable-line react-hooks/exhaustive-deps
+  const enhancedCoveredIds = useMemo(
+    () => new Set(enhancedAllocated.filter(r => r.clearedAmount >= r.dutyFee).map(r => r.id)),
+    [enhancedAllocated]
+  );
+  // Containers fully covered by payment + manual entries → hidden from the open table
+  const visibleOpenPartial = useMemo(
+    () => openAndPartial.filter(r => !enhancedCoveredIds.has(r.id)),
+    [openAndPartial, enhancedCoveredIds]
+  );
+  const coveredCount = openAndPartial.length - visibleOpenPartial.length;
+
+  // ── Prepaid transit allocation ─────────────────────────────────────────────
+  // Budget = adjustedBalance (remaining after manual entries explain the offloaded balance).
+  const prepaidBudget = hasAdjustments && adjustedBalance !== null ? Math.max(0, adjustedBalance) : 0;
+
+  // Auto-designate: greedily fill prepaidBudget from the transit list in order
+  const autoDesignatedTransitIds = useMemo((): number[] => {
+    if (prepaidBudget <= 0 || activePreviewRows.length === 0) return [];
+    let budget = prepaidBudget;
+    const ids: number[] = [];
+    for (const row of activePreviewRows) {
+      if (budget >= row.dutyFee - 0.01) {
+        ids.push(row.id);
+        budget -= row.dutyFee;
+        if (budget <= 0.01) break;
+      }
+    }
+    return ids;
+  }, [prepaidBudget, activePreviewRows]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isUserTransitOverride  = prepaidTransitIds.length > 0;
+  const effectivePrepaidIds    = isUserTransitOverride ? prepaidTransitIds : autoDesignatedTransitIds;
+  const prepaidTransitSet      = useMemo(() => new Set(effectivePrepaidIds), [effectivePrepaidIds]); // eslint-disable-line react-hooks/exhaustive-deps
+  const prepaidTransitRows     = useMemo(() => activePreviewRows.filter(r => prepaidTransitSet.has(r.id)), [activePreviewRows, prepaidTransitSet]); // eslint-disable-line react-hooks/exhaustive-deps
+  const remainingTransitRows   = useMemo(() => activePreviewRows.filter(r => !prepaidTransitSet.has(r.id)), [activePreviewRows, prepaidTransitSet]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When no transit is designated manually, check if the visible open containers look "prepaid"
+  // (adjustedBalance ≈ their duty sum → agent already has the money for them)
+  const visibleOpenDutySum  = visibleOpenPartial.reduce((s, r) => s + r.remainingAmount, 0);
+  const openContainersPrepaid = hasAdjustments
+    && prepaidTransitRows.length === 0
+    && prepaidBudget > 0
+    && visibleOpenDutySum > 0
+    && Math.abs(visibleOpenDutySum - prepaidBudget) <= 0.01;
+
   const confidenceBadge = {
     exact:    { label: "Exact match",  cls: "bg-green-700 text-white" },
     fuzzy:    { label: "Fuzzy match",  cls: "bg-amber-600 text-white" },
@@ -2159,6 +2231,40 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       )}
 
 
+      {/* ── Covered-by-manual-entries info banner ── */}
+      {coveredCount > 0 && !isReconciled && (
+        <div className="flex items-center gap-2 px-3 py-1 bg-teal-50 dark:bg-teal-950/20 border-b border-teal-200 dark:border-teal-800 text-xs text-teal-800 dark:text-teal-300">
+          <CheckCircle2 className="h-3 w-3 shrink-0 text-teal-600" />
+          <span>
+            {coveredCount} container{coveredCount !== 1 ? "s" : ""} covered by payment + manual entries — hidden from table
+          </span>
+        </div>
+      )}
+
+      {/* ── Prepaid transit designation banner ── */}
+      {prepaidTransitRows.length > 0 && (
+        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-950/20 border-b border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300">
+          <ArrowUp className="h-3 w-3 shrink-0" />
+          <span className="font-semibold">
+            {prepaidTransitRows.length} in-transit container{prepaidTransitRows.length !== 1 ? "s" : ""} designated as Prepaid
+          </span>
+          {isUserTransitOverride
+            ? <span className="text-emerald-600 dark:text-emerald-400">— user selected</span>
+            : <span className="text-emerald-600 dark:text-emerald-400">— auto-selected from transit list</span>
+          }
+          {isUserTransitOverride && (
+            <button
+              onClick={resetPrepaidTransit}
+              className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-medium"
+              data-testid={`button-reset-prepaid-transit-${agentName}`}
+            >
+              <RotateCcw className="h-3 w-3" />
+              Reset to auto
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── Open / Partial rows (always visible) ── */}
       <div className="overflow-x-auto">
         <table className="w-full text-xs whitespace-nowrap border-collapse">
@@ -2170,24 +2276,57 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
             </tr>
           </thead>
           <tbody>
-            {/* ── Open / Partial rows first — these are the active action items ── */}
+            {/* ── Prepaid in-transit rows — shown first, above offloaded open/partial ── */}
+            {prepaidTransitRows.map((r) => (
+              <tr key={`prepaid-transit-${r.id}`} className="border-b bg-emerald-50/60 dark:bg-emerald-950/20">
+                <td className="py-0.5 px-2 font-mono font-semibold text-center text-emerald-800 dark:text-emerald-300">{r.containerNumber}</td>
+                <td className="py-0.5 px-2 text-center">{r.supplierCode ?? r.supplierName ?? "—"}</td>
+                <td className="py-0.5 px-2 font-mono text-center">{r.numberPlate ?? "—"}</td>
+                <td className="py-0.5 px-2 text-center text-muted-foreground italic text-[10px]">In Transit</td>
+                <td className="py-0.5 px-2 text-center">{fmtD(r.borderDate)}</td>
+                <td className="py-0.5 px-2 text-center">{r.transporter ?? "—"}</td>
+                <td className="py-0.5 px-2 text-center">{r.location ?? "—"}</td>
+                <td className="py-0.5 px-2 text-right">${fmt(r.dutyFee, 0)}</td>
+                <td className="py-0.5 px-2 text-center text-muted-foreground">—</td>
+                <td className="py-0.5 px-2 text-right font-semibold">${fmt(r.dutyFee, 0)}</td>
+                <td className="py-0.5 px-2 text-center">
+                  <Badge variant="outline" className="text-[10px] text-emerald-700 border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 no-default-active-elevate">Prepaid</Badge>
+                </td>
+                <td className="py-0.5 px-1 text-center">
+                  <button
+                    onClick={() => {
+                      const next = effectivePrepaidIds.filter(id => id !== r.id);
+                      savePrepaidTransit(next);
+                    }}
+                    title="Remove from prepaid"
+                    data-testid={`button-unprepaid-transit-${r.id}`}
+                    className="text-muted-foreground hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                  >
+                    <XIcon className="h-3 w-3" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+
+            {/* ── Offloaded open / partial rows ── */}
             {isReconciled ? (
               <tr>
                 <td colSpan={12} className="py-3 px-3 text-center text-green-700 dark:text-green-400 italic text-xs">
                   All containers reconciled by manual entries — no outstanding balance.
                 </td>
               </tr>
-            ) : openAndPartial.length === 0 ? (
+            ) : visibleOpenPartial.length === 0 && prepaidTransitRows.length === 0 ? (
               <tr>
                 <td colSpan={12} className="py-3 px-3 text-center text-muted-foreground italic text-xs">
                   No open containers — account balance is fully cleared.
                 </td>
               </tr>
-            ) : (
-              openAndPartial.map((r, rowIdx) => (
+            ) : visibleOpenPartial.length === 0 && prepaidTransitRows.length > 0 ? null : (
+              visibleOpenPartial.map((r, rowIdx) => (
                 <tr key={r.id} className={cn(
                   "border-b",
-                  r.allocationStatus === "Partially Cleared" && "bg-amber-50/80 dark:bg-amber-950/20"
+                  r.allocationStatus === "Partially Cleared" && "bg-amber-50/80 dark:bg-amber-950/20",
+                  openContainersPrepaid && "bg-emerald-50/40 dark:bg-emerald-950/10"
                 )}>
                   <td className="py-0.5 px-2 font-mono font-semibold text-center">{r.containerNumber}</td>
                   <td className="py-0.5 px-2 text-center">{r.supplierCode ?? "—"}</td>
@@ -2202,15 +2341,16 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                   </td>
                   <td className="py-0.5 px-2 text-right font-semibold">${fmt(r.remainingAmount, 0)}</td>
                   <td className="py-0.5 px-2 text-center">
-                    {r.allocationStatus === "Partially Cleared"
-                      ? <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-400 no-default-active-elevate">Partial</Badge>
-                      : <Badge variant="outline" className="text-[10px] no-default-active-elevate">Open</Badge>
+                    {openContainersPrepaid
+                      ? <Badge variant="outline" className="text-[10px] text-emerald-700 border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 no-default-active-elevate">Prepaid</Badge>
+                      : r.allocationStatus === "Partially Cleared"
+                        ? <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-400 no-default-active-elevate">Partial</Badge>
+                        : <Badge variant="outline" className="text-[10px] no-default-active-elevate">Open</Badge>
                     }
                   </td>
                   {/* ── Priority move buttons ── */}
                   <td className="py-0.5 px-1 text-center">
                     <div className="flex flex-col gap-px">
-                      {/* Move to top — one click sets this as #1 priority for overpayment */}
                       <button
                         disabled={rowIdx === 0}
                         onClick={() => moveToTop(r.id)}
@@ -2230,7 +2370,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                         <ArrowUp className="h-3 w-3" />
                       </button>
                       <button
-                        disabled={rowIdx === openAndPartial.length - 1}
+                        disabled={rowIdx === visibleOpenPartial.length - 1}
                         onClick={() => moveRow(r.id, "down")}
                         title="Move down one"
                         data-testid={`button-move-down-${r.id}`}
@@ -2383,8 +2523,14 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
             data-testid={`button-toggle-active-${agentName}`}
           >
             <span className="font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-400">
-              In Transit — {activePreviewRows.length} containers,{" "}
-              ${fmt(activePreviewRows.reduce((s, r) => s + r.dutyFee, 0), 0)} upcoming duty
+              In Transit —{" "}
+              {remainingTransitRows.length} container{remainingTransitRows.length !== 1 ? "s" : ""}
+              {prepaidTransitRows.length > 0 && (
+                <span className="ml-1 text-emerald-600 dark:text-emerald-400">
+                  ({prepaidTransitRows.length} prepaid)
+                </span>
+              )}
+              ,{" "}${fmt(remainingTransitRows.reduce((s, r) => s + r.dutyFee, 0), 0)} upcoming duty
             </span>
             {showActive ? <ChevronUp className="h-3.5 w-3.5 text-sky-600" /> : <ChevronDown className="h-3.5 w-3.5 text-sky-600" />}
           </button>
@@ -2394,23 +2540,52 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
               <table className="w-full text-xs whitespace-nowrap border-collapse">
                 <thead>
                   <tr className="bg-sky-100 dark:bg-sky-950/30 border-b text-sky-800 dark:text-sky-300">
-                    {["CONTAINER","SUPPLIER","PLATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY"].map(h => (
+                    {["CONTAINER","SUPPLIER","PLATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY",""].map(h => (
                       <th key={h} className="py-1 px-2 font-bold text-center">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {activePreviewRows.map((r) => (
-                    <tr key={r.id} className="border-b bg-sky-50/30 dark:bg-sky-950/10 text-muted-foreground">
-                      <td className="py-0.5 px-2 font-mono text-center">{r.containerNumber}</td>
-                      <td className="py-0.5 px-2 text-center">{r.supplierCode ?? r.supplierName ?? "—"}</td>
-                      <td className="py-0.5 px-2 font-mono text-center">{r.numberPlate ?? "—"}</td>
-                      <td className="py-0.5 px-2 text-center">{fmtD(r.borderDate)}</td>
-                      <td className="py-0.5 px-2 text-center">{r.transporter ?? "—"}</td>
-                      <td className="py-0.5 px-2 text-center">{r.location ?? "—"}</td>
-                      <td className="py-0.5 px-2 text-right">${fmt(r.dutyFee, 0)}</td>
+                  {remainingTransitRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-3 px-3 text-center text-muted-foreground italic text-xs">
+                        All in-transit containers designated as prepaid.
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    remainingTransitRows.map((r) => {
+                      const canDesignate = prepaidBudget > 0;
+                      return (
+                        <tr key={r.id} className="border-b bg-sky-50/30 dark:bg-sky-950/10 text-muted-foreground">
+                          <td className="py-0.5 px-2 font-mono text-center">{r.containerNumber}</td>
+                          <td className="py-0.5 px-2 text-center">{r.supplierCode ?? r.supplierName ?? "—"}</td>
+                          <td className="py-0.5 px-2 font-mono text-center">{r.numberPlate ?? "—"}</td>
+                          <td className="py-0.5 px-2 text-center">{fmtD(r.borderDate)}</td>
+                          <td className="py-0.5 px-2 text-center">{r.transporter ?? "—"}</td>
+                          <td className="py-0.5 px-2 text-center">{r.location ?? "—"}</td>
+                          <td className="py-0.5 px-2 text-right">${fmt(r.dutyFee, 0)}</td>
+                          <td className="py-0.5 px-1 text-center">
+                            {canDesignate && (
+                              <button
+                                onClick={() => {
+                                  // If user is overriding: add to user list.
+                                  // If still in auto mode: switch to user override with current auto ids + this one.
+                                  const baseIds = isUserTransitOverride ? prepaidTransitIds : autoDesignatedTransitIds;
+                                  const next = baseIds.includes(r.id) ? baseIds : [...baseIds, r.id];
+                                  savePrepaidTransit(next);
+                                }}
+                                title="Designate as prepaid — moves to top"
+                                data-testid={`button-designate-prepaid-${r.id}`}
+                                className="text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                              >
+                                <ArrowUp className="h-3 w-3" />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
