@@ -1060,8 +1060,8 @@ export function registerGitRoutes(app: Express) {
 
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader("Content-Disposition", 'attachment; filename="container_import_template.xlsx"');
-        await wb.xlsx.write(res);
-        res.end();
+        const buf = await wb.xlsx.writeBuffer();
+        res.send(buf);
       } catch (err: any) {
         console.error("[GIT import template]", err);
         res.status(500).json({ message: err.message });
@@ -1097,9 +1097,10 @@ export function registerGitRoutes(app: Express) {
           workbook.SheetNames.find((n) => n.toLowerCase() === "containers") ??
           workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
-        // range: 2 = start from 0-indexed row 2 of the sheet (sheet row 3),
-        // skipping row 1 (header, handled by sheet_to_json) and row 2 (instruction/hint row).
-        const rawRows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "", range: 2 });
+        // No range override — let sheet_to_json use the first row (the real header row) as
+        // column names. The hint row (row 2) and the two example rows are caught later by
+        // the knownExamples set and the "required / used to match" text check below.
+        const rawRows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
         /** Convert any value to a plain string — handles JS Date objects from Excel */
         function toStr(v: any): string {
