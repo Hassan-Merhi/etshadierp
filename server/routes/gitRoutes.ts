@@ -865,6 +865,94 @@ export function registerGitRoutes(app: Express) {
       ),
   );
 
+  // ─── ETA-only template (dev) — pre-filled with real container numbers ────
+
+  app.get(
+    "/api/git/containers/eta-template.xlsx",
+    requireAuth,
+    requireRole("Admin", "Owner", "Developer"),
+    async (req: any, res: any) => {
+      try {
+        // Fetch all active containers (non-inactive statuses)
+        const rows = await db
+          .select({
+            containerNumber: containers.containerNumber,
+            eta: containers.eta,
+            status: containers.status,
+            companyName: companies.name,
+          })
+          .from(containers)
+          .leftJoin(companies, eq(containers.companyId, companies.id))
+          .where(
+            sql`LOWER(${containers.status}) NOT IN ('offloaded','closed','completed')`
+          )
+          .orderBy(containers.containerNumber);
+
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet("ETA Update");
+
+        // ── Header row ──────────────────────────────────────────────────────
+        const headers = ["Container #", "Company", "Status", "Current ETA", "New ETA (YYYY-MM-DD)"];
+        const headerRow = ws.addRow(headers);
+        headerRow.eachCell((cell: any) => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "1F4E79" } };
+          cell.font = { bold: true, color: { argb: "FFFFFF" }, size: 11 };
+          cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+        });
+        headerRow.height = 28;
+
+        // ── Hint row ────────────────────────────────────────────────────────
+        const hintRow = ws.addRow([
+          "Used to match — do not edit",
+          "",
+          "",
+          "For reference only",
+          "Fill this column to update",
+        ]);
+        hintRow.eachCell((cell: any) => {
+          if (cell.value) {
+            cell.font = { italic: true, color: { argb: "888888" }, size: 9 };
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "F5F5F5" } };
+          }
+        });
+
+        // ── Data rows — one per active container ────────────────────────────
+        rows.forEach((r, i) => {
+          const row = ws.addRow([
+            r.containerNumber,
+            r.companyName ?? "",
+            r.status ?? "",
+            r.eta ?? "",
+            "", // New ETA — user fills this in
+          ]);
+          const bg = i % 2 === 0 ? "FFFFFF" : "F0F4FA";
+          row.eachCell((cell: any) => {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bg } };
+          });
+          // Highlight the "New ETA" cell so it's obvious what to fill
+          const etaCell = row.getCell(5);
+          etaCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
+          etaCell.font = { bold: true };
+        });
+
+        // ── Column widths ───────────────────────────────────────────────────
+        [22, 26, 22, 18, 24].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+        // ── Freeze header rows ──────────────────────────────────────────────
+        ws.views = [{ state: "frozen", ySplit: 2 }];
+
+        const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        res.setHeader("Content-Disposition", `attachment; filename="eta_update_${today}.xlsx"`);
+        const buf = await wb.xlsx.writeBuffer();
+        res.send(buf);
+      } catch (err: any) {
+        console.error("[ETA template]", err);
+        res.status(500).json({ message: err.message });
+      }
+    },
+  );
+
   // ─── Excel import template ────────────────────────────────────────────────
 
   app.get(

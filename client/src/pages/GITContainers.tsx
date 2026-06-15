@@ -1953,6 +1953,17 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                     Template
                   </a>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a
+                    href="/api/git/containers/eta-template.xlsx"
+                    download
+                    className="flex items-center gap-2 cursor-pointer"
+                    data-testid="link-download-eta-template"
+                  >
+                    <Download className="h-4 w-4 text-amber-600" />
+                    ETA Update Sheet
+                  </a>
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => fileInputRef.current?.click()}
                   disabled={importMutation.isPending}
