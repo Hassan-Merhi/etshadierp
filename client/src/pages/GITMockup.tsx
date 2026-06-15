@@ -28,6 +28,7 @@ import {
   Ship, Truck, Package, AlertTriangle, FileX, Clock, DollarSign,
   Search, ExternalLink, CheckCircle2, XCircle, MessageSquare,
   FileSpreadsheet, LayoutGrid, List, Info, AlertCircle, ChevronDown, ChevronUp,
+  ArrowUp, ArrowDown, RotateCcw,
   Building2, Layers, Loader2, MessageCircle,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
@@ -1543,11 +1544,50 @@ interface AgentDutyWaSettings {
   waEnabled:      boolean;
 }
 
+// Helper: client-side FIFO re-allocation given an ordered list of rows and the
+// amount already consumed by payments (clearedByPayments from the server).
+function clientReallocate(
+  orderedRows: ApiAllocatedRow[],
+  toConsume: number,
+): ApiAllocatedRow[] {
+  let rem = toConsume;
+  return orderedRows.map(row => {
+    if (rem >= row.dutyFee) {
+      rem -= row.dutyFee;
+      return { ...row, clearedAmount: row.dutyFee, remainingAmount: 0, allocationStatus: "Cleared" as ApiAllocStatus };
+    } else if (rem > 0) {
+      const cl = rem;
+      rem = 0;
+      return { ...row, clearedAmount: cl, remainingAmount: row.dutyFee - cl, allocationStatus: "Partially Cleared" as ApiAllocStatus };
+    } else {
+      return { ...row, clearedAmount: 0, remainingAmount: row.dutyFee, allocationStatus: "Open" as ApiAllocStatus };
+    }
+  });
+}
+
 function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupChatId?: string }) {
   const { toast } = useToast();
   const [showActive, setShowActive]   = useState(true);
   const [waSending,  setWaSending]    = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+
+  // ── Manual priority order ─────────────────────────────────────────────────
+  // Persisted in localStorage per agent. null = use server FIFO; array of IDs = custom order.
+  const storageKey = `agent-order-${agent.agentName}`;
+  const [customOrder, setCustomOrder] = useState<number[] | null>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  const saveOrder = (order: number[] | null) => {
+    if (order === null) localStorage.removeItem(storageKey);
+    else localStorage.setItem(storageKey, JSON.stringify(order));
+    setCustomOrder(order);
+  };
+
+  const resetOrder = () => saveOrder(null);
 
   const sendToWhatsApp = useCallback(async () => {
     setWaSending(true);
@@ -1722,9 +1762,49 @@ function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupC
   // Only show containers that have a truck number assigned
   const activePreviewRows = agent.activePreviewRows.filter(r => !!(r.numberPlate ?? "").trim());
 
-  const openAndPartial = [...partialRows, ...openRows];
+  // ── Custom-order reallocation ──────────────────────────────────────────────
+  // All offloaded rows from server (cleared are already consumed by payment).
+  // We allow the user to reorder partial+open rows; cleared rows stay fixed.
+  const allOpenPartial = useMemo(() => [...partialRows, ...openRows], [partialRows, openRows]);
+
+  // Amount of payment left over after paying fully-cleared containers.
+  const clearedTotal = useMemo(() => clearedRows.reduce((s, r) => s + r.dutyFee, 0), [clearedRows]);
+  const remainderForOpenPartial = Math.max(clearedByPayments - clearedTotal, 0);
+
+  // Build display order: custom order first (filtered to those that exist), then
+  // any remaining rows in their original FIFO position.
+  const openAndPartial: ApiAllocatedRow[] = useMemo(() => {
+    if (!customOrder || customOrder.length === 0) {
+      // No custom order — re-run allocation on server FIFO order to keep display consistent
+      return clientReallocate(allOpenPartial, remainderForOpenPartial);
+    }
+    const orderMap = new Map(customOrder.map((id, i) => [id, i]));
+    const sorted = [...allOpenPartial].sort((a, b) => {
+      const ai = orderMap.has(a.id) ? orderMap.get(a.id)! : customOrder.length + allOpenPartial.findIndex(r => r.id === a.id);
+      const bi = orderMap.has(b.id) ? orderMap.get(b.id)! : customOrder.length + allOpenPartial.findIndex(r => r.id === b.id);
+      return ai - bi;
+    });
+    return clientReallocate(sorted, remainderForOpenPartial);
+  }, [customOrder, allOpenPartial, remainderForOpenPartial]);
+
+  // Move a row up or down in the priority list
+  const moveRow = useCallback((containerId: number, direction: "up" | "down") => {
+    // Build current order from display rows if no custom order exists yet
+    const currentIds = openAndPartial.map(r => r.id);
+    const idx = currentIds.indexOf(containerId);
+    if (idx === -1) return;
+    const newIds = [...currentIds];
+    if (direction === "up" && idx > 0) {
+      [newIds[idx], newIds[idx - 1]] = [newIds[idx - 1], newIds[idx]];
+    } else if (direction === "down" && idx < newIds.length - 1) {
+      [newIds[idx], newIds[idx + 1]] = [newIds[idx + 1], newIds[idx]];
+    }
+    saveOrder(newIds);
+  }, [openAndPartial]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const openSum = openAndPartial.reduce((s, r) => s + r.remainingAmount, 0);
   const hasBalance = ledgerBalance !== null;
+  const isCustomOrder = !!(customOrder && customOrder.length > 0);
 
   const confidenceBadge = {
     exact:    { label: "Exact match",  cls: "bg-green-700 text-white" },
@@ -1776,12 +1856,29 @@ function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupC
       })}
 
 
+      {/* ── Custom order toolbar ── */}
+      {isCustomOrder && (
+        <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-950/20 border-b border-blue-200 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-300">
+          <ArrowUp className="h-3 w-3 shrink-0" />
+          <span className="font-semibold">Custom priority order active</span>
+          <span className="text-blue-600 dark:text-blue-400">— overpayment will be allocated top-to-bottom</span>
+          <button
+            onClick={resetOrder}
+            className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded border border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium"
+            data-testid={`button-reset-order-${agentName}`}
+          >
+            <RotateCcw className="h-3 w-3" />
+            Reset to auto (FIFO)
+          </button>
+        </div>
+      )}
+
       {/* ── Open / Partial rows (always visible) ── */}
       <div className="overflow-x-auto">
         <table className="w-full text-xs whitespace-nowrap border-collapse">
           <thead>
             <tr className="bg-yellow-200 text-yellow-900 border-b border-yellow-400">
-              {["CONTAINER #","SUPPLIER","PLATE","OFFLOAD DATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY","CLEARED","REMAINING","STATUS"].map(h => (
+              {["CONTAINER #","SUPPLIER","PLATE","OFFLOAD DATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY","CLEARED","REMAINING","STATUS",""].map(h => (
                 <th key={h} className="py-1 px-2 font-bold text-center">{h}</th>
               ))}
             </tr>
@@ -1789,12 +1886,12 @@ function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupC
           <tbody>
             {openAndPartial.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-3 px-3 text-center text-muted-foreground italic text-xs">
+                <td colSpan={12} className="py-3 px-3 text-center text-muted-foreground italic text-xs">
                   No open containers — account balance is fully cleared.
                 </td>
               </tr>
             ) : (
-              openAndPartial.map((r) => (
+              openAndPartial.map((r, rowIdx) => (
                 <tr key={r.id} className={cn(
                   "border-b",
                   r.allocationStatus === "Partially Cleared" && "bg-amber-50/80 dark:bg-amber-950/20"
@@ -1816,6 +1913,29 @@ function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupC
                       ? <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-400 no-default-active-elevate">Partial</Badge>
                       : <Badge variant="outline" className="text-[10px] no-default-active-elevate">Open</Badge>
                     }
+                  </td>
+                  {/* ── Priority move buttons ── */}
+                  <td className="py-0.5 px-1 text-center">
+                    <div className="flex flex-col gap-px">
+                      <button
+                        disabled={rowIdx === 0}
+                        onClick={() => moveRow(r.id, "up")}
+                        title="Move up (higher priority)"
+                        data-testid={`button-move-up-${r.id}`}
+                        className="disabled:opacity-20 hover:text-blue-600 dark:hover:text-blue-400 text-muted-foreground transition-colors"
+                      >
+                        <ArrowUp className="h-3 w-3" />
+                      </button>
+                      <button
+                        disabled={rowIdx === openAndPartial.length - 1}
+                        onClick={() => moveRow(r.id, "down")}
+                        title="Move down (lower priority)"
+                        data-testid={`button-move-down-${r.id}`}
+                        className="disabled:opacity-20 hover:text-blue-600 dark:hover:text-blue-400 text-muted-foreground transition-colors"
+                      >
+                        <ArrowDown className="h-3 w-3" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -1840,6 +1960,7 @@ function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupC
                     ${fmt(openBalance ?? openSum, 0)}
                     {balLabel && <span className="ml-1 text-xs opacity-80">({balLabel})</span>}
                   </td>
+                  <td />
                   <td />
                 </tr>
               );
