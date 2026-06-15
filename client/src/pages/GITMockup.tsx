@@ -1684,6 +1684,8 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       let openRowsHtml = "";
       if (openAndPartial.length === 0) {
         openRowsHtml = `<tr><td colspan="11" style="padding:16px;text-align:center;color:#6b7280;font-style:italic;font-size:11px;border:1px solid #e5e7eb;">No open containers — account fully cleared.</td></tr>`;
+      } else if (isReconciledWa) {
+        openRowsHtml = `<tr><td colspan="11" style="padding:16px;text-align:center;color:#065f46;font-style:italic;font-size:11px;border:1px solid #a7f3d0;background:#d1fae5;">All containers reconciled by manual entries — no outstanding balance.</td></tr>`;
       } else {
         openAndPartial.forEach((r, i) => {
           const isPartial = r.allocationStatus === "Partially Cleared";
@@ -1714,6 +1716,8 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       const adjIsDebit = adjustedBal >= 0;
       const waOpenSum = openAndPartial.reduce((s, r) => s + r.remainingAmount, 0);
       const waMismatch = hasAdj && Math.abs(adjustedBal - waOpenSum) > 0.01;
+      // mirrors isReconciled in the UI: manual entries bring adjusted balance to ~0
+      const isReconciledWa = hasAdj && hasBalance && Math.abs(adjustedBal) <= 0.01;
 
       const adjustmentsHtml = hasAdj ? `
         <div style="background:#f9fafb;border-bottom:1px solid #e5e7eb;padding:8px 14px;">
@@ -1739,7 +1743,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
         ${hasAdj ? `<tr style="background:#d1fae5">
           <td colspan="9" style="padding:5px 7px;font-size:10px;font-weight:600;color:#065f46;text-transform:uppercase;letter-spacing:0.04em;border:1px solid #a7f3d0;opacity:0.85;">Account Balance</td>
           <td style="padding:5px 7px;font-size:12px;font-weight:700;color:#065f46;text-align:right;border:1px solid #a7f3d0;">$${esc(fmt(displayBal, 0))}</td>
-          <td colspan="1" style="padding:5px 7px;font-size:10px;color:#065f46;text-align:right;border:1px solid #a7f3d0;">− $${esc(fmt(Math.abs(netAdj), 0))} manual</td>
+          <td colspan="1" style="padding:5px 7px;border:1px solid #a7f3d0;"></td>
         </tr>` : ""}
         <tr style="background:#fbbf24">
           <td colspan="9" style="padding:8px 7px;font-size:11px;font-weight:700;color:#1c1917;text-transform:uppercase;letter-spacing:0.05em;border:1px solid #f59e0b;">
