@@ -586,6 +586,7 @@ let migrationsDone = false;
     `CREATE INDEX IF NOT EXISTS factory_advance_repayments_advance_idx ON factory_advance_repayments (advance_id)`,
     `CREATE INDEX IF NOT EXISTS factory_advance_repayments_company_idx ON factory_advance_repayments (company_id)`,
     `ALTER TABLE factory_advance_repayments ADD COLUMN IF NOT EXISTS payroll_id INTEGER`,
+    `ALTER TABLE factory_advance_repayments ADD COLUMN IF NOT EXISTS cash_account_id INTEGER REFERENCES ledger_accounts(id)`,
     // Live spreadsheet links (shared Google Sheet / external links)
     `CREATE TABLE IF NOT EXISTS live_spreadsheets (
       id serial PRIMARY KEY,
