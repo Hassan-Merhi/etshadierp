@@ -1,8 +1,19 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import multer from "multer";
 import path from "path";
+import { randomUUID } from "crypto";
 import XLSX from "xlsx";
 import ExcelJS from "exceljs";
+
+// ── In-memory undo store for bulk Excel imports ────────────────────────────
+// Keyed by importId (UUID). Stores the "before" snapshot so the last import
+// can be rolled back. Entries expire after 2 hours to prevent unbounded growth.
+const importUndoStore = new Map<string, {
+  companyId: number;
+  createdAt: number;
+  changes: Array<{ id: number; containerNumber: string; prevData: Record<string, any> }>;
+}>();
+const UNDO_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 import { db } from "../db";
 import { requireAuth, requireRole } from "../auth";
 import {
@@ -865,7 +876,7 @@ export function registerGitRoutes(app: Express) {
       ),
   );
 
-  // ─── ETA-only template (dev) — pre-filled with real container numbers ────
+  // ─── ETA-only template — 2 columns: Container # + New ETA ───────────────
 
   app.get(
     "/api/git/containers/eta-template.xlsx",
@@ -873,18 +884,18 @@ export function registerGitRoutes(app: Express) {
     requireRole("Admin", "Owner", "Developer"),
     async (req: any, res: any) => {
       try {
-        // Fetch all active containers (non-inactive statuses)
+        // Fetch all active containers for this company
         const rows = await db
           .select({
             containerNumber: containers.containerNumber,
             eta: containers.eta,
-            status: containers.status,
-            companyName: companies.name,
           })
           .from(containers)
-          .leftJoin(companies, eq(containers.companyId, companies.id))
           .where(
-            sql`LOWER(${containers.status}) NOT IN ('offloaded','closed','completed')`
+            and(
+              eq(containers.companyId, req.session.currentCompanyId),
+              sql`LOWER(${containers.status}) NOT IN ('offloaded','closed','completed')`
+            )
           )
           .orderBy(containers.containerNumber);
 
@@ -892,51 +903,39 @@ export function registerGitRoutes(app: Express) {
         const ws = wb.addWorksheet("ETA Update");
 
         // ── Header row ──────────────────────────────────────────────────────
-        const headers = ["Container #", "Company", "Status", "Current ETA", "New ETA (YYYY-MM-DD)"];
-        const headerRow = ws.addRow(headers);
+        const headerRow = ws.addRow(["Container #", "New ETA"]);
         headerRow.eachCell((cell: any) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "1F4E79" } };
-          cell.font = { bold: true, color: { argb: "FFFFFF" }, size: 11 };
-          cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+          cell.font = { bold: true, color: { argb: "FFFFFF" }, size: 12 };
+          cell.alignment = { vertical: "middle", horizontal: "center" };
         });
-        headerRow.height = 28;
+        headerRow.height = 30;
 
         // ── Hint row ────────────────────────────────────────────────────────
         const hintRow = ws.addRow([
-          "Used to match — do not edit",
-          "",
-          "",
-          "For reference only",
-          "Fill this column to update",
+          "Do not edit — used to match",
+          "Enter any date format: 13/06/2026  or  2026-06-13  or  13-06-2026",
         ]);
-        hintRow.eachCell((cell: any) => {
-          if (cell.value) {
-            cell.font = { italic: true, color: { argb: "888888" }, size: 9 };
-            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "F5F5F5" } };
-          }
-        });
+        hintRow.getCell(1).font = { italic: true, color: { argb: "888888" }, size: 9 };
+        hintRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "F5F5F5" } };
+        hintRow.getCell(2).font = { italic: true, color: { argb: "888888" }, size: 9 };
+        hintRow.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
 
         // ── Data rows — one per active container ────────────────────────────
         rows.forEach((r, i) => {
-          const row = ws.addRow([
-            r.containerNumber,
-            r.companyName ?? "",
-            r.status ?? "",
-            r.eta ?? "",
-            "", // New ETA — user fills this in
-          ]);
+          const row = ws.addRow([r.containerNumber, ""]);
           const bg = i % 2 === 0 ? "FFFFFF" : "F0F4FA";
-          row.eachCell((cell: any) => {
-            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bg } };
-          });
-          // Highlight the "New ETA" cell so it's obvious what to fill
-          const etaCell = row.getCell(5);
-          etaCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
-          etaCell.font = { bold: true };
+          // Container # cell — grey, locked-looking
+          row.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: bg } };
+          row.getCell(1).font = { color: { argb: "333333" } };
+          // New ETA cell — yellow highlight so user knows to fill it
+          row.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
+          row.getCell(2).font = { bold: true };
         });
 
         // ── Column widths ───────────────────────────────────────────────────
-        [22, 26, 22, 18, 24].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+        ws.getColumn(1).width = 24;
+        ws.getColumn(2).width = 36;
 
         // ── Freeze header rows ──────────────────────────────────────────────
         ws.views = [{ state: "frozen", ySplit: 2 }];
@@ -1141,8 +1140,35 @@ export function registerGitRoutes(app: Express) {
           }
           const s = String(v).trim();
           if (!s || s === "0") return "";
-          // Already a valid ISO date
+          // Already a valid ISO date (YYYY-MM-DD)
           if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+          // DD/MM/YYYY or D/M/YYYY (most common non-ISO format for this region)
+          const dmySlash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+          if (dmySlash) {
+            const dd = String(dmySlash[1]).padStart(2, "0");
+            const mm = String(dmySlash[2]).padStart(2, "0");
+            const yyyy = dmySlash[3];
+            const d2 = new Date(`${yyyy}-${mm}-${dd}`);
+            if (!isNaN(d2.getTime())) return `${yyyy}-${mm}-${dd}`;
+          }
+          // DD-MM-YYYY or D-M-YYYY
+          const dmyDash = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+          if (dmyDash) {
+            const dd = String(dmyDash[1]).padStart(2, "0");
+            const mm = String(dmyDash[2]).padStart(2, "0");
+            const yyyy = dmyDash[3];
+            const d2 = new Date(`${yyyy}-${mm}-${dd}`);
+            if (!isNaN(d2.getTime())) return `${yyyy}-${mm}-${dd}`;
+          }
+          // DD.MM.YYYY
+          const dmyDot = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+          if (dmyDot) {
+            const dd = String(dmyDot[1]).padStart(2, "0");
+            const mm = String(dmyDot[2]).padStart(2, "0");
+            const yyyy = dmyDot[3];
+            const d2 = new Date(`${yyyy}-${mm}-${dd}`);
+            if (!isNaN(d2.getTime())) return `${yyyy}-${mm}-${dd}`;
+          }
           // Excel serial number (e.g. 46043 → 2026-02-07)
           const n = Number(s);
           if (!isNaN(n) && Number.isInteger(n) && n > 1000 && n < 200000) {
@@ -1175,6 +1201,10 @@ export function registerGitRoutes(app: Express) {
           plateno: "numberPlate",
           eta: "eta",
           etayyyymmdd: "eta",
+          neweta: "eta",
+          newetayyyymmdd: "eta",
+          newarrivaldate: "eta",
+          arrivaldate: "eta",
           borderdate: "borderDate",
           borderdateyyyymmdd: "borderDate",
           transporter: "transporter",
@@ -1240,6 +1270,7 @@ export function registerGitRoutes(app: Express) {
         let skipped = 0;
         let notFound = 0;
         const errors: string[] = [];
+        const undoChanges: Array<{ id: number; containerNumber: string; prevData: Record<string, any> }> = [];
 
         for (let i = 0; i < rawRows.length; i++) {
           const raw = rawRows[i];
@@ -1380,13 +1411,78 @@ export function registerGitRoutes(app: Express) {
             continue;
           }
 
+          // Capture "before" snapshot for undo (only keys we're about to overwrite)
+          const prevData: Record<string, any> = {};
+          const [current] = await db
+            .select()
+            .from(containers)
+            .where(eq(containers.id, match.id))
+            .limit(1);
+          if (current) {
+            for (const key of Object.keys(updateData)) {
+              prevData[key] = (current as any)[key] ?? null;
+            }
+          }
+
           await db.update(containers).set(updateData).where(eq(containers.id, match.id));
+          undoChanges.push({ id: match.id, containerNumber: ctrNum, prevData });
           updated++;
         }
 
-        res.json({ updated, skipped, notFound, errors });
+        // Store undo snapshot
+        const importId = randomUUID();
+        // Expire old entries (> 2h)
+        for (const [k, v] of importUndoStore) {
+          if (Date.now() - v.createdAt > UNDO_TTL_MS) importUndoStore.delete(k);
+        }
+        if (undoChanges.length > 0) {
+          importUndoStore.set(importId, {
+            companyId: req.session.currentCompanyId,
+            createdAt: Date.now(),
+            changes: undoChanges,
+          });
+        }
+
+        res.json({ updated, skipped, notFound, errors, importId: undoChanges.length > 0 ? importId : null });
       } catch (err: any) {
         console.error("[GIT import excel]", err);
+        res.status(500).json({ message: err.message });
+      }
+    },
+  );
+
+  // ─── Undo last Excel import ───────────────────────────────────────────────
+  app.post(
+    "/api/git/containers/import-excel/undo",
+    requireAuth,
+    requireRole("Admin", "Owner", "Developer"),
+    async (req: any, res: any) => {
+      try {
+        const { importId } = req.body ?? {};
+        if (!importId || typeof importId !== "string") {
+          return res.status(400).json({ message: "importId required" });
+        }
+        const snap = importUndoStore.get(importId);
+        if (!snap) {
+          return res.status(404).json({ message: "Undo data not found — it may have expired (2 hr limit) or already been used." });
+        }
+        if (snap.companyId !== req.session.currentCompanyId) {
+          return res.status(403).json({ message: "Forbidden" });
+        }
+
+        let reverted = 0;
+        for (const change of snap.changes) {
+          if (Object.keys(change.prevData).length === 0) continue;
+          await db.update(containers).set(change.prevData).where(eq(containers.id, change.id));
+          reverted++;
+        }
+
+        // Remove the undo snapshot so it can't be used twice
+        importUndoStore.delete(importId);
+
+        res.json({ reverted });
+      } catch (err: any) {
+        console.error("[GIT import undo]", err);
         res.status(500).json({ message: err.message });
       }
     },

@@ -80,6 +80,7 @@ import {
   X,
   MessageCircle,
   Send,
+  Undo2,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
@@ -1497,7 +1498,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const [showFilters, setShowFilters] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerContainer, setDrawerContainer] = useState<EnrichedContainerRow | null>(null);
-  const [importResult, setImportResult] = useState<{ updated: number; skipped: number; notFound: number; errors: string[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ updated: number; skipped: number; notFound: number; errors: string[]; importId: string | null } | null>(null);
   const [waSending, setWaSending] = useState(false);
 
   type BulkProgress = {
@@ -1545,7 +1546,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
         const err = await res.json().catch(() => ({ message: "Import failed" }));
         throw new Error(err.message || "Import failed");
       }
-      return res.json() as Promise<{ updated: number; skipped: number; notFound: number; errors: string[] }>;
+      return res.json() as Promise<{ updated: number; skipped: number; notFound: number; errors: string[]; importId: string | null }>;
     },
     onSuccess: (result) => {
       setImportResult(result);
@@ -1566,6 +1567,25 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     importMutation.mutate(file);
     e.target.value = "";
   }
+
+  const undoImportMutation = useMutation({
+    mutationFn: async (importId: string) => {
+      const res = await apiRequest("POST", "/api/git/containers/import-excel/undo", { importId });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Undo failed" }));
+        throw new Error(err.message || "Undo failed");
+      }
+      return res.json() as Promise<{ reverted: number }>;
+    },
+    onSuccess: (result) => {
+      setImportResult(null);
+      refetch();
+      toast({ title: `Undo complete — ${result.reverted} container${result.reverted !== 1 ? "s" : ""} reverted` });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Undo failed", description: err.message, variant: "destructive" });
+    },
+  });
 
   const bulkEnableMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
@@ -2109,15 +2129,31 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                   )}
                 </div>
               </div>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-6 w-6 shrink-0"
-                onClick={() => setImportResult(null)}
-                data-testid="button-dismiss-import-result"
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
+              <div className="flex items-center gap-1 shrink-0">
+                {importResult.importId && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => undoImportMutation.mutate(importResult.importId!)}
+                    disabled={undoImportMutation.isPending}
+                    data-testid="button-undo-import"
+                  >
+                    {undoImportMutation.isPending
+                      ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                      : <Undo2 className="h-3.5 w-3.5 mr-1" />}
+                    Undo
+                  </Button>
+                )}
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6"
+                  onClick={() => setImportResult(null)}
+                  data-testid="button-dismiss-import-result"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
 
             {importResult.updated === 0 && importResult.notFound > 0 && (
