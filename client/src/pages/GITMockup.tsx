@@ -28,7 +28,7 @@ import {
   Ship, Truck, Package, AlertTriangle, FileX, Clock, DollarSign,
   Search, ExternalLink, CheckCircle2, XCircle, MessageSquare,
   FileSpreadsheet, LayoutGrid, List, Info, AlertCircle, ChevronDown, ChevronUp,
-  ArrowUp, ArrowDown, RotateCcw, Pencil, Check, X as XIcon, StickyNote,
+  ArrowUp, ArrowDown, ChevronsUp, RotateCcw, Pencil, Check, X as XIcon, StickyNote,
   Building2, Layers, Loader2, MessageCircle, Trash2, Plus,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
@@ -1567,8 +1567,9 @@ function clientReallocate(
 
 function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummary; companyId: number; waGroupChatId?: string }) {
   const { toast } = useToast();
-  const [showActive, setShowActive]   = useState(true);
-  const [waSending,  setWaSending]    = useState(false);
+  const [showActive,  setShowActive]  = useState(true);
+  const [showCleared, setShowCleared] = useState(false);
+  const [waSending,   setWaSending]   = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   // ── Manual priority order ─────────────────────────────────────────────────
@@ -1910,7 +1911,6 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
 
   // Move a row up or down in the priority list
   const moveRow = useCallback((containerId: number, direction: "up" | "down") => {
-    // Build current order from display rows if no custom order exists yet
     const currentIds = openAndPartial.map(r => r.id);
     const idx = currentIds.indexOf(containerId);
     if (idx === -1) return;
@@ -1920,6 +1920,15 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
     } else if (direction === "down" && idx < newIds.length - 1) {
       [newIds[idx], newIds[idx + 1]] = [newIds[idx + 1], newIds[idx]];
     }
+    saveOrder(newIds);
+  }, [openAndPartial]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Move a row directly to the top (position 0) — one click to set as #1 priority
+  const moveToTop = useCallback((containerId: number) => {
+    const currentIds = openAndPartial.map(r => r.id);
+    const idx = currentIds.indexOf(containerId);
+    if (idx <= 0) return;
+    const newIds = [containerId, ...currentIds.filter(id => id !== containerId)];
     saveOrder(newIds);
   }, [openAndPartial]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -2163,25 +2172,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
             </tr>
           </thead>
           <tbody>
-            {/* Cleared / offloaded rows (always visible) */}
-            {clearedRows.map(r => (
-              <tr key={`cleared-${r.id}`} className="border-b bg-slate-100/60 dark:bg-slate-800/20 opacity-70">
-                <td className="py-0.5 px-2 font-mono text-muted-foreground">{r.containerNumber}</td>
-                <td className="py-0.5 px-2 text-muted-foreground">{r.supplierCode ?? "—"}</td>
-                <td className="py-0.5 px-2 font-mono text-muted-foreground">{r.numberPlate ?? "—"}</td>
-                <td className="py-0.5 px-2 text-muted-foreground">{fmtD(r.offloadDate ?? null)}</td>
-                <td className="py-0.5 px-2 text-muted-foreground">{fmtD(r.borderDate)}</td>
-                <td className="py-0.5 px-2 text-muted-foreground">{r.transporter ?? "—"}</td>
-                <td className="py-0.5 px-2 text-muted-foreground">{r.location ?? "—"}</td>
-                <td className="py-0.5 px-2 text-right text-muted-foreground">${fmt(r.dutyFee, 0)}</td>
-                <td className="py-0.5 px-2 text-right text-green-600 dark:text-green-500">${fmt(r.dutyFee, 0)}</td>
-                <td className="py-0.5 px-2 text-right text-muted-foreground">—</td>
-                <td className="py-0.5 px-2 text-center">
-                  <Badge variant="outline" className="text-[10px] text-slate-500 border-slate-300 dark:border-slate-600 no-default-active-elevate">Cleared</Badge>
-                </td>
-                <td />
-              </tr>
-            ))}
+            {/* ── Open / Partial rows first — these are the active action items ── */}
             {openAndPartial.length === 0 ? (
               <tr>
                 <td colSpan={12} className="py-3 px-3 text-center text-muted-foreground italic text-xs">
@@ -2215,10 +2206,20 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                   {/* ── Priority move buttons ── */}
                   <td className="py-0.5 px-1 text-center">
                     <div className="flex flex-col gap-px">
+                      {/* Move to top — one click sets this as #1 priority for overpayment */}
+                      <button
+                        disabled={rowIdx === 0}
+                        onClick={() => moveToTop(r.id)}
+                        title="Set as top priority (overpayment goes here first)"
+                        data-testid={`button-move-top-${r.id}`}
+                        className="disabled:opacity-20 hover:text-orange-600 dark:hover:text-orange-400 text-muted-foreground transition-colors"
+                      >
+                        <ChevronsUp className="h-3 w-3" />
+                      </button>
                       <button
                         disabled={rowIdx === 0}
                         onClick={() => moveRow(r.id, "up")}
-                        title="Move up (higher priority)"
+                        title="Move up one"
                         data-testid={`button-move-up-${r.id}`}
                         className="disabled:opacity-20 hover:text-blue-600 dark:hover:text-blue-400 text-muted-foreground transition-colors"
                       >
@@ -2227,7 +2228,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                       <button
                         disabled={rowIdx === openAndPartial.length - 1}
                         onClick={() => moveRow(r.id, "down")}
-                        title="Move down (lower priority)"
+                        title="Move down one"
                         data-testid={`button-move-down-${r.id}`}
                         className="disabled:opacity-20 hover:text-blue-600 dark:hover:text-blue-400 text-muted-foreground transition-colors"
                       >
@@ -2309,6 +2310,45 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                 </tr>
               );
             })()}
+
+            {/* ── Cleared rows — collapsed by default, toggle at bottom ── */}
+            {clearedRows.length > 0 && (
+              <>
+                <tr>
+                  <td colSpan={12} className="p-0">
+                    <button
+                      onClick={() => setShowCleared(v => !v)}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-1 bg-slate-100 dark:bg-slate-800/40 hover-elevate border-t border-slate-200 dark:border-slate-700 text-[11px] text-slate-500 dark:text-slate-400"
+                      data-testid={`button-toggle-cleared-${agentName}`}
+                    >
+                      {showCleared ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                      <span>
+                        {showCleared ? "Hide" : "Show"} {clearedRows.length} cleared container{clearedRows.length !== 1 ? "s" : ""}{" "}
+                        (${fmt(clearedRows.reduce((s, r) => s + r.dutyFee, 0), 0)} duty)
+                      </span>
+                    </button>
+                  </td>
+                </tr>
+                {showCleared && clearedRows.map(r => (
+                  <tr key={`cleared-${r.id}`} className="border-b bg-slate-50/60 dark:bg-slate-800/20 opacity-70">
+                    <td className="py-0.5 px-2 font-mono text-muted-foreground">{r.containerNumber}</td>
+                    <td className="py-0.5 px-2 text-muted-foreground">{r.supplierCode ?? "—"}</td>
+                    <td className="py-0.5 px-2 font-mono text-muted-foreground">{r.numberPlate ?? "—"}</td>
+                    <td className="py-0.5 px-2 text-muted-foreground">{fmtD(r.offloadDate ?? null)}</td>
+                    <td className="py-0.5 px-2 text-muted-foreground">{fmtD(r.borderDate)}</td>
+                    <td className="py-0.5 px-2 text-muted-foreground">{r.transporter ?? "—"}</td>
+                    <td className="py-0.5 px-2 text-muted-foreground">{r.location ?? "—"}</td>
+                    <td className="py-0.5 px-2 text-right text-muted-foreground">${fmt(r.dutyFee, 0)}</td>
+                    <td className="py-0.5 px-2 text-right text-green-600 dark:text-green-500">${fmt(r.dutyFee, 0)}</td>
+                    <td className="py-0.5 px-2 text-right text-muted-foreground">—</td>
+                    <td className="py-0.5 px-2 text-center">
+                      <Badge variant="outline" className="text-[10px] text-slate-500 border-slate-300 dark:border-slate-600 no-default-active-elevate">Cleared</Badge>
+                    </td>
+                    <td />
+                  </tr>
+                ))}
+              </>
+            )}
           </tbody>
         </table>
       </div>
