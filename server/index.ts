@@ -4106,6 +4106,10 @@ END $$`,
       updated_at timestamptz DEFAULT now(),
       UNIQUE (company_id, agent_name)
     )`,
+    // Enable tracking on all active containers — fixes the bug where new
+    // containers were saved with tracking_enabled=false because the drawer
+    // initialised trackEnabled to false before this was corrected.
+    `UPDATE containers SET tracking_enabled = true WHERE LOWER(status) NOT IN ('offloaded','closed','completed')`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

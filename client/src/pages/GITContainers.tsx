@@ -395,7 +395,7 @@ function ContainerDrawer({
   const queryClient = useQueryClient();
   const [form, setForm] = useState<DrawerForm | null>(null);
   const [lastId, setLastId] = useState<number | null>(null);
-  const [trackEnabled, setTrackEnabled] = useState(false);
+  const [trackEnabled, setTrackEnabled] = useState(true);
   const [trackAutoUpdate, setTrackAutoUpdate] = useState(true);
   const [trackCarrierHint, setTrackCarrierHint] = useState("");
   const [showEvents, setShowEvents] = useState(false);
