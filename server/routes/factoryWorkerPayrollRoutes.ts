@@ -1932,7 +1932,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
   });
 
   // POST /api/factory/advances/bulk-update-cash-account
-  // Updates cashAccountId on selected advances AND patches the credit leg of their existing PAYMENT-ADV-* vouchers
+  // Updates cashAccountId on selected advances, creates/patches PAYMENT-ADV-* vouchers, and writes daybook entries.
   app.post("/api/factory/advances/bulk-update-cash-account", requireAuth, async (req: any, res: any) => {
     try {
       const currentRole = (req.session as any).currentRole;
@@ -1950,15 +1950,49 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
       if (!cashAccountId) return res.status(400).json({ message: "cashAccountId is required" });
 
       // Verify cash account belongs to this company
-      const [acct] = await db.select({ id: ledgerAccounts.id })
+      const [acct] = await db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
         .from(ledgerAccounts)
         .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
       if (!acct) return res.status(400).json({ message: "Cash account not found for this company" });
 
       const ids = advanceIds.map((x: any) => parseInt(x)).filter((x: number) => !isNaN(x));
+      const today = getClientDate(req);
 
       const result = await db.transaction(async (tx: any) => {
-        // Update cashAccountId on each advance
+        // Load the advance records we're updating (need amount, date, workerId)
+        const advanceRows = await tx.select()
+          .from(factoryWorkerAdvances)
+          .where(and(
+            eq(factoryWorkerAdvances.companyId, companyId),
+            inArray(factoryWorkerAdvances.id, ids),
+          ));
+
+        // Load worker names for narration
+        const workerIds = [...new Set(advanceRows.map((a: any) => a.workerId))];
+        const workerRows = workerIds.length > 0
+          ? await tx.select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
+              .from(factoryWorkers)
+              .where(inArray(factoryWorkers.id, workerIds as number[]))
+          : [];
+        const workerMap = new Map<number, string>(workerRows.map((w: any) => [w.id, w.fullName]));
+
+        // Find or create the "Factory Worker Advances" asset ledger account
+        let [advancesAccount] = await tx.select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Worker Advances")));
+        if (!advancesAccount) {
+          const maxCodeResult = await tx.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+            .from(ledgerAccounts)
+            .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
+          const nextCode = String((parseInt(maxCodeResult[0]?.maxCode || "0") || 0) + 1);
+          [advancesAccount] = await tx.insert(ledgerAccounts).values({
+            companyId, code: nextCode, name: "Factory Worker Advances",
+            accountType: "Asset", active: true, isHidden: false,
+          }).returning();
+        }
+        const advancesAccountId = advancesAccount.id;
+
+        // Update cashAccountId on each advance record
         await tx.update(factoryWorkerAdvances)
           .set({ cashAccountId })
           .where(and(
@@ -1974,7 +2008,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
             sql`${vouchers.voucherNumber} LIKE 'PAYMENT-ADV-%'`,
           ));
 
-        // Map advance id → voucher id
+        // Map advance id → voucher id (for those that already have a voucher)
         const advVoucherMap = new Map<number, number>();
         for (const v of matchingVouchers) {
           const match = v.voucherNumber.match(/^PAYMENT-ADV-(\d+)-/);
@@ -1984,33 +2018,65 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
           }
         }
 
-        let vouchersUpdated = 0;
-        for (const voucherId of advVoucherMap.values()) {
-          // Find the credit leg (the cash account entry: creditAmount > 0, debitAmount = 0 or near 0)
-          const entries = await tx.select({ id: voucherEntries.id, creditAmount: voucherEntries.creditAmount })
-            .from(voucherEntries)
-            .where(eq(voucherEntries.voucherId, voucherId));
+        let vouchersPatched = 0;
+        let vouchersCreated = 0;
 
-          // The credit leg is the entry with the largest creditAmount (the cash payout)
-          const creditEntry = entries
-            .filter((e: any) => parseFloat(e.creditAmount || "0") > 0)
-            .sort((a: any, b: any) => parseFloat(b.creditAmount) - parseFloat(a.creditAmount))[0];
+        for (const adv of advanceRows) {
+          const workerName = workerMap.get(adv.workerId) ?? "Worker";
+          const amount = parseFloat(adv.amount || "0");
+          const advDate = adv.advanceDate ?? today;
+          const narration = `Advance to ${workerName}: $${amount.toFixed(2)}`;
 
-          if (creditEntry) {
-            await tx.update(voucherEntries)
-              .set({ ledgerAccountId: cashAccountId })
-              .where(eq(voucherEntries.id, creditEntry.id));
-            vouchersUpdated++;
+          if (advVoucherMap.has(adv.id)) {
+            // Patch the credit leg of the existing voucher to the new cash account
+            const voucherId = advVoucherMap.get(adv.id)!;
+            const entries = await tx.select({ id: voucherEntries.id, creditAmount: voucherEntries.creditAmount })
+              .from(voucherEntries)
+              .where(eq(voucherEntries.voucherId, voucherId));
+
+            const creditEntry = entries
+              .filter((e: any) => parseFloat(e.creditAmount || "0") > 0)
+              .sort((a: any, b: any) => parseFloat(b.creditAmount) - parseFloat(a.creditAmount))[0];
+
+            if (creditEntry) {
+              await tx.update(voucherEntries)
+                .set({ ledgerAccountId: cashAccountId })
+                .where(eq(voucherEntries.id, creditEntry.id));
+              vouchersPatched++;
+            }
+          } else {
+            // No voucher existed — create one now: DR Factory Worker Advances / CR Cash
+            const voucherNumber = `PAYMENT-ADV-${adv.id}-${Date.now()}`;
+            const [createdVoucher] = await tx.insert(vouchers).values({
+              companyId, voucherNumber, voucherType: "Payment",
+              voucherDate: advDate, description: narration,
+              totalAmount: amount.toFixed(2), currency: "USD", sourceModule: "FACTORY",
+            }).returning();
+            await tx.insert(voucherEntries).values([
+              { voucherId: createdVoucher.id, ledgerAccountId: advancesAccountId, debitAmount: amount.toFixed(2), creditAmount: "0", narration },
+              { voucherId: createdVoucher.id, ledgerAccountId: cashAccountId, debitAmount: "0", creditAmount: amount.toFixed(2), narration },
+            ]);
+            vouchersCreated++;
           }
+
+          // Daybook entry for every advance updated
+          await writeDaybookEntry(tx, {
+            companyId, txDate: today, txType: "ADVANCE_CASH_UPDATED",
+            referenceId: adv.id, referenceTable: "factory_worker_advances",
+            description: `Cash account assigned for advance to ${workerName}: $${amount.toFixed(2)} → ${acct.name}`,
+            amountCurrency: amount, amountUsd: amount,
+            createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+          });
         }
 
-        return { updated: ids.length, vouchersUpdated };
+        return { updated: advanceRows.length, vouchersPatched, vouchersCreated };
       });
 
       res.json({
-        message: `Updated ${result.updated} advance(s); ${result.vouchersUpdated} accounting voucher(s) patched`,
+        message: `Updated ${result.updated} advance(s); ${result.vouchersCreated} voucher(s) created, ${result.vouchersPatched} patched`,
         updated: result.updated,
-        vouchersUpdated: result.vouchersUpdated,
+        vouchersCreated: result.vouchersCreated,
+        vouchersPatched: result.vouchersPatched,
       });
     } catch (error: any) {
       console.error("Error bulk-updating advance cash accounts:", error);
