@@ -182,6 +182,26 @@ export function registerFactoryDaybookRoutes(app: Express) {
         livePayrolls.forEach((p: any) => validPayrollIds.add(p.id));
       }
 
+      // ── 1d. Safety-net: drop advance-backed daybook entries whose advance was deleted ─
+      // Covers ADVANCE_GIVEN entries left behind when an advance is deleted without
+      // the corresponding daybook row being cleaned up (e.g. older deletes).
+      const ADVANCE_TX_TYPES = new Set(["ADVANCE_GIVEN"]);
+      const advanceRefIds = daybookRows
+        .filter((r: any) =>
+          (r.referenceTable === "factory_worker_advances" || ADVANCE_TX_TYPES.has(r.txType)) &&
+          r.referenceId != null
+        )
+        .map((r: any) => r.referenceId as number);
+
+      const validAdvanceIds = new Set<number>();
+      if (advanceRefIds.length > 0) {
+        const liveAdvances = await db
+          .select({ id: factoryWorkerAdvances.id })
+          .from(factoryWorkerAdvances)
+          .where(inArray(factoryWorkerAdvances.id, advanceRefIds));
+        liveAdvances.forEach((a: any) => validAdvanceIds.add(a.id));
+      }
+
       const filteredDaybookRows = daybookRows
         .filter((r: any) => {
           // Drop voucher-backed entries whose voucher was deleted
@@ -195,6 +215,13 @@ export function registerFactoryDaybookRoutes(app: Express) {
             r.referenceId != null
           ) {
             return validPayrollIds.has(r.referenceId);
+          }
+          // Drop advance-backed entries whose advance was deleted
+          if (
+            (r.referenceTable === "factory_worker_advances" || ADVANCE_TX_TYPES.has(r.txType)) &&
+            r.referenceId != null
+          ) {
+            return validAdvanceIds.has(r.referenceId);
           }
           return true;
         })

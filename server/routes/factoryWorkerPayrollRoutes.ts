@@ -1680,6 +1680,18 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
         await tx.delete(factoryWorkerAdvances)
           .where(and(eq(factoryWorkerAdvances.id, id), eq(factoryWorkerAdvances.companyId, companyId)));
 
+        // Remove the original ADVANCE_GIVEN daybook row(s) so they no longer
+        // appear in the daybook after deletion (prevents duplicates when a new
+        // advance is created for the same worker afterwards).
+        await tx.delete(factoryDaybookEntries)
+          .where(
+            and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              eq(factoryDaybookEntries.referenceTable, "factory_worker_advances"),
+              eq(factoryDaybookEntries.referenceId, id),
+            )
+          );
+
         const repayNote = repayments.length > 0 ? ` (${repayments.length} repayment(s) also removed)` : "";
         const voucherNote = advanceVouchers.length > 0 ? "; voucher reversed" : "";
         await writeDaybookEntry(tx, {
