@@ -4118,6 +4118,13 @@ END $$`,
     )`,
     `CREATE INDEX IF NOT EXISTS idx_git_agent_adjustments_lookup
       ON git_agent_adjustments (company_id, agent_name)`,
+    // Always-run: ensure tracking is enabled on every active (non-offloaded) container.
+    // Safe to run on every boot — only touches rows that are still incorrectly false.
+    // Uses LOWER() to handle any case variation in status values.
+    `UPDATE containers
+       SET tracking_enabled = true
+       WHERE tracking_enabled = false
+         AND LOWER(COALESCE(status,'')) NOT IN ('offloaded','closed','completed')`,
     // One-time backfill: enable tracking on all active containers.
     // Guarded by a marker table so it only runs once — subsequent boots are no-ops.
     // This fixes the historical bug where the drawer defaulted trackEnabled to false,

@@ -1932,8 +1932,8 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
             data-testid="input-import-excel"
           />
 
-          {/* ── Actions dropdown — dev mode only ── */}
-          {isDevMode && isAllowed && (
+          {/* ── Actions dropdown — allowed roles only ── */}
+          {isAllowed && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="default" data-testid="button-actions-menu">
