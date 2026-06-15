@@ -1588,4 +1588,64 @@ export function registerGitRoutes(app: Express) {
       res.status(500).json({ message: err.message });
     }
   });
+
+  // ── Agent manual adjustment entries (per-company, per-agent) ──────────────
+  app.get("/api/git/agent-adjustments/:companyId/:agentName", requireAuth, async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.companyId, 10);
+      const agentName = req.params.agentName;
+      const result = await db.execute(
+        sql`SELECT id, description, amount, type, created_at
+            FROM git_agent_adjustments
+            WHERE company_id = ${companyId} AND agent_name = ${agentName}
+            ORDER BY created_at ASC`
+      );
+      res.json(result.rows.map((r: any) => ({
+        id: r.id,
+        description: r.description,
+        amount: parseFloat(r.amount),
+        type: r.type,
+        createdAt: r.created_at,
+      })));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/git/agent-adjustments/:companyId/:agentName", requireAuth, async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.companyId, 10);
+      const agentName = req.params.agentName;
+      const description: string = (req.body.description ?? "").trim();
+      const amount = parseFloat(req.body.amount);
+      const type: string = req.body.type;
+      if (!description) return res.status(400).json({ message: "Description is required." });
+      if (isNaN(amount) || amount <= 0) return res.status(400).json({ message: "Amount must be a positive number." });
+      if (!["debit", "credit"].includes(type)) return res.status(400).json({ message: "Type must be 'debit' or 'credit'." });
+      const result = await db.execute(
+        sql`INSERT INTO git_agent_adjustments (company_id, agent_name, description, amount, type)
+            VALUES (${companyId}, ${agentName}, ${description}, ${amount}, ${type})
+            RETURNING id, description, amount, type, created_at`
+      );
+      const r = result.rows[0] as any;
+      res.json({ id: r.id, description: r.description, amount: parseFloat(r.amount), type: r.type, createdAt: r.created_at });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/git/agent-adjustments/:companyId/:agentName/:id", requireAuth, async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.companyId, 10);
+      const agentName = req.params.agentName;
+      const id = parseInt(req.params.id, 10);
+      await db.execute(
+        sql`DELETE FROM git_agent_adjustments
+            WHERE id = ${id} AND company_id = ${companyId} AND agent_name = ${agentName}`
+      );
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
 }

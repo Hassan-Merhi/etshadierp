@@ -4107,6 +4107,17 @@ END $$`,
       updated_at timestamptz DEFAULT now(),
       UNIQUE (company_id, agent_name)
     )`,
+    `CREATE TABLE IF NOT EXISTS git_agent_adjustments (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      agent_name text NOT NULL,
+      description text NOT NULL DEFAULT '',
+      amount numeric(15,2) NOT NULL,
+      type text NOT NULL CHECK (type IN ('debit','credit')),
+      created_at timestamptz DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_git_agent_adjustments_lookup
+      ON git_agent_adjustments (company_id, agent_name)`,
     // One-time backfill: enable tracking on all active containers.
     // Guarded by a marker table so it only runs once — subsequent boots are no-ops.
     // This fixes the historical bug where the drawer defaulted trackEnabled to false,

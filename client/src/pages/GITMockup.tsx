@@ -29,7 +29,7 @@ import {
   Search, ExternalLink, CheckCircle2, XCircle, MessageSquare,
   FileSpreadsheet, LayoutGrid, List, Info, AlertCircle, ChevronDown, ChevronUp,
   ArrowUp, ArrowDown, RotateCcw, Pencil, Check, X as XIcon, StickyNote,
-  Building2, Layers, Loader2, MessageCircle,
+  Building2, Layers, Loader2, MessageCircle, Trash2, Plus,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
@@ -1593,6 +1593,12 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   const [editingNote, setEditingNote] = useState(false);
   const [draftNote, setDraftNote]     = useState("");
 
+  // ── Manual adjustment entries state ────────────────────────────────────────
+  const [showCleared, setShowCleared] = useState(false);
+  const [newDesc,     setNewDesc]     = useState("");
+  const [newAmount,   setNewAmount]   = useState("");
+  const [newType,     setNewType]     = useState<"debit" | "credit">("debit");
+
   const noteQueryKey = [`/api/git/agent-note/${companyId}/${encodeURIComponent(agent.agentName)}`];
   const { data: noteData } = useQuery<{ note: string }>({ queryKey: noteQueryKey });
   const note = noteData?.note ?? "";
@@ -1609,6 +1615,38 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
     setEditingNote(false);
   };
   const cancelNote = () => { setDraftNote(note); setEditingNote(false); };
+
+  // ── Manual adjustment entries (DB-backed, shared across all users) ─────────
+  type AdjEntry = { id: number; description: string; amount: number; type: string };
+  const adjQueryKey = [`/api/git/agent-adjustments/${companyId}/${encodeURIComponent(agent.agentName)}`];
+  const { data: adjData } = useQuery<AdjEntry[]>({ queryKey: adjQueryKey, initialData: [] });
+  const adjustments: AdjEntry[] = adjData ?? [];
+
+  const createAdjMutation = useMutation({
+    mutationFn: (body: { description: string; amount: number; type: "debit" | "credit" }) =>
+      apiRequest("POST", `/api/git/agent-adjustments/${companyId}/${encodeURIComponent(agent.agentName)}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adjQueryKey });
+      setNewDesc(""); setNewAmount(""); setNewType("debit");
+    },
+    onError: (e: any) => toast({ title: "Failed to add entry", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteAdjMutation = useMutation({
+    mutationFn: (id: number) =>
+      apiRequest("DELETE", `/api/git/agent-adjustments/${companyId}/${encodeURIComponent(agent.agentName)}/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: adjQueryKey }),
+    onError: (e: any) => toast({ title: "Failed to delete", description: e.message, variant: "destructive" }),
+  });
+
+  const saveAdj = () => {
+    const amt = parseFloat(newAmount);
+    if (!newDesc.trim() || isNaN(amt) || amt <= 0) {
+      toast({ title: "Invalid entry", description: "Please enter a description and a positive amount.", variant: "destructive" });
+      return;
+    }
+    createAdjMutation.mutate({ description: newDesc.trim(), amount: amt, type: newType });
+  };
 
   const sendToWhatsApp = useCallback(async () => {
     setWaSending(true);
@@ -1668,14 +1706,67 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
         });
       }
 
+      // ── manual adjustment entries section ─────────────────────────────────
+      const netAdj   = adjustments.reduce((s, a) => s + (a.type === "debit" ? a.amount : -a.amount), 0);
+      const hasAdj   = adjustments.length > 0;
+      const displayBal = openBalance ?? openSum;
+      const adjustedBal = displayBal - netAdj;
+      const adjIsDebit = adjustedBal >= 0;
+      const waOpenSum = openAndPartial.reduce((s, r) => s + r.remainingAmount, 0);
+      const waMismatch = hasAdj && Math.abs(adjustedBal - waOpenSum) > 0.01;
+
+      const adjustmentsHtml = hasAdj ? `
+        <div style="background:#f9fafb;border-bottom:1px solid #e5e7eb;padding:8px 14px;">
+          <div style="font-size:10.5px;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">Manual Entries</div>
+          <table style="width:100%;border-collapse:collapse;">
+            ${adjustments.map(a => `
+              <tr>
+                <td style="font-size:10.5px;padding:2px 0;color:#374151;">${esc(a.description)}</td>
+                <td style="font-size:10.5px;padding:2px 0;text-align:right;font-weight:600;color:${a.type === "debit" ? "#059669" : "#dc2626"};">
+                  ${a.type === "debit" ? "+" : "-"}$${esc(fmt(a.amount, 0))}
+                </td>
+                <td style="font-size:10.5px;padding:2px 0 2px 8px;font-weight:600;color:${a.type === "debit" ? "#059669" : "#dc2626"};">
+                  ${a.type === "debit" ? "Dr" : "Cr"}
+                </td>
+              </tr>`).join("")}
+            <tr>
+              <td colspan="3" style="border-top:1px dashed #d1d5db;padding-top:3px;"></td>
+            </tr>
+            <tr>
+              <td style="font-size:10.5px;padding:2px 0;color:#6b7280;font-weight:600;">Net adjustment</td>
+              <td style="font-size:10.5px;padding:2px 0;text-align:right;font-weight:700;color:${netAdj >= 0 ? "#059669" : "#dc2626"};">
+                ${netAdj >= 0 ? "+" : "-"}$${esc(fmt(Math.abs(netAdj), 0))}
+              </td>
+              <td style="font-size:10.5px;padding:2px 0 2px 8px;font-weight:700;color:${netAdj >= 0 ? "#059669" : "#dc2626"};">
+                ${netAdj >= 0 ? "Dr" : "Cr"}
+              </td>
+            </tr>
+          </table>
+        </div>` : "";
+
+      const mismatchBannerHtml = waMismatch ? `
+        <div style="background:#fee2e2;border-bottom:1px solid #fca5a5;padding:6px 14px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:11.5px;font-weight:700;color:#991b1b;">BALANCE MISMATCH</span>
+          <span style="font-size:10.5px;color:#7f1d1d;">
+            Adjusted $${esc(fmt(Math.abs(adjustedBal), 0))} ${adjIsDebit ? "Dr" : "Cr"}
+            &ne; Container remainder $${esc(fmt(waOpenSum, 0))}
+          </span>
+        </div>` : "";
+
       // ── open balance footer row ───────────────────────────────────────────
       const balanceRowHtml = hasBalance ? `
+        ${hasAdj ? `<tr style="background:#d1fae5">
+          <td colspan="9" style="padding:5px 7px;font-size:10px;font-weight:600;color:#065f46;text-transform:uppercase;letter-spacing:0.04em;border:1px solid #a7f3d0;opacity:0.85;">Account Balance</td>
+          <td style="padding:5px 7px;font-size:12px;font-weight:700;color:#065f46;text-align:right;border:1px solid #a7f3d0;">$${esc(fmt(displayBal, 0))}</td>
+          <td colspan="1" style="padding:5px 7px;font-size:10px;color:#065f46;text-align:right;border:1px solid #a7f3d0;">− $${esc(fmt(Math.abs(netAdj), 0))} manual</td>
+        </tr>` : ""}
         <tr style="background:#fbbf24">
           <td colspan="9" style="padding:8px 7px;font-size:11px;font-weight:700;color:#1c1917;text-transform:uppercase;letter-spacing:0.05em;border:1px solid #f59e0b;">
-            Open Balance (= Account Balance)
+            ${hasAdj ? "Adjusted Balance" : "Open Balance (= Account Balance)"}
           </td>
           <td style="padding:8px 7px;font-size:13px;font-weight:800;color:#1c1917;text-align:right;border:1px solid #f59e0b;">
-            $${esc(fmt(openBalance ?? openSum, 0))}
+            $${esc(fmt(Math.abs(hasAdj ? adjustedBal : displayBal), 0))}
+            ${hasAdj ? esc(" (" + (adjIsDebit ? "Dr" : "Cr") + ")") : ""}
           </td>
           <td style="padding:8px 7px;font-size:11px;font-weight:700;color:#1c1917;text-align:center;border:1px solid #f59e0b;"></td>
         </tr>` : "";
@@ -1736,6 +1827,8 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
           <div style="font-size:11px;color:#78350f;margin-top:3px;font-weight:500;">Agent Duty Summary &nbsp;·&nbsp; ${today}</div>
         </div>
         ${noteHtml}
+        ${adjustmentsHtml}
+        ${mismatchBannerHtml}
         <table style="width:100%;border-collapse:collapse;table-layout:auto;">
           <thead>
             <tr>${openCols.map(h => `<th style="${thOpen()}">${h}</th>`).join("")}</tr>
@@ -1779,7 +1872,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
     } finally {
       setWaSending(false);
     }
-  }, [agent, toast]);
+  }, [agent, toast, adjustments]);
 
   const {
     agentName, matchConfidence, ledgerAccountName,
@@ -1834,6 +1927,13 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   const openSum = openAndPartial.reduce((s, r) => s + r.remainingAmount, 0);
   const hasBalance = ledgerBalance !== null;
   const isCustomOrder = !!(customOrder && customOrder.length > 0);
+
+  // ── Manual entry balance recalculation ────────────────────────────────────
+  const netAdjustment   = adjustments.reduce((s, a) => s + (a.type === "debit" ? a.amount : -a.amount), 0);
+  const adjustedBalance = openBalance !== null ? openBalance - netAdjustment : null;
+  const hasAdjustments  = adjustments.length > 0;
+  const isMismatch      = hasAdjustments && adjustedBalance !== null && Math.abs(adjustedBalance - openSum) > 0.01;
+  const isReconciled    = hasAdjustments && adjustedBalance !== null && Math.abs(adjustedBalance - openSum) <= 0.01;
 
   const confidenceBadge = {
     exact:    { label: "Exact match",  cls: "bg-green-700 text-white" },
@@ -1930,6 +2030,111 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
         )}
       </div>
 
+      {/* ── Manual Adjustment Entries ── */}
+      <div className="border-b">
+        {/* Saved entries list */}
+        {adjustments.length > 0 && (
+          <div className="px-3 pt-2 space-y-1">
+            {adjustments.map(a => (
+              <div key={a.id} className="flex items-center gap-2 text-xs">
+                <span className="flex-1 text-foreground truncate">{a.description}</span>
+                <span className={cn("font-semibold tabular-nums shrink-0", a.type === "debit" ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400")}>
+                  {a.type === "debit" ? "+" : "−"}${fmt(a.amount, 0)}
+                </span>
+                <Badge variant="outline" className={cn("text-[10px] shrink-0 no-default-active-elevate", a.type === "debit" ? "text-green-700 border-green-400" : "text-red-600 border-red-400")}>
+                  {a.type === "debit" ? "Dr" : "Cr"}
+                </Badge>
+                <button
+                  onClick={() => deleteAdjMutation.mutate(a.id)}
+                  disabled={deleteAdjMutation.isPending}
+                  className="shrink-0 text-muted-foreground hover:text-red-500 transition-colors disabled:opacity-40"
+                  title="Remove entry"
+                  data-testid={`button-delete-adj-${a.id}`}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+            {/* Net adjustment total */}
+            <div className="flex items-center justify-end gap-2 py-1 border-t border-dashed border-muted mt-1 text-xs text-muted-foreground">
+              <span>Net adjustment:</span>
+              <span className={cn("font-semibold tabular-nums", netAdjustment > 0 ? "text-green-700 dark:text-green-400" : netAdjustment < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>
+                {netAdjustment >= 0 ? "+" : "−"}${fmt(Math.abs(netAdjustment), 0)}
+              </span>
+              <span className={cn("font-semibold", netAdjustment >= 0 ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400")}>
+                {netAdjustment >= 0 ? "Dr" : "Cr"}
+              </span>
+            </div>
+          </div>
+        )}
+        {/* Inline add form */}
+        <div className="px-3 py-2 flex items-center gap-1.5 flex-wrap">
+          <Plus className="h-3 w-3 shrink-0 text-muted-foreground" />
+          <input
+            value={newDesc}
+            onChange={e => setNewDesc(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && saveAdj()}
+            placeholder="Description (e.g. Peage, Road fees…)"
+            className="flex-1 min-w-[140px] text-xs rounded border border-input bg-background px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
+            data-testid={`input-adj-desc-${agentName}`}
+          />
+          <input
+            type="number"
+            min="0"
+            step="any"
+            value={newAmount}
+            onChange={e => setNewAmount(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && saveAdj()}
+            placeholder="Amount"
+            className="w-24 text-xs rounded border border-input bg-background px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring text-right"
+            data-testid={`input-adj-amount-${agentName}`}
+          />
+          {/* Dr / Cr toggle */}
+          <div className="flex rounded border border-input overflow-hidden text-[10px] font-bold shrink-0">
+            <button
+              type="button"
+              onClick={() => setNewType("debit")}
+              className={cn("px-2.5 py-1 transition-colors", newType === "debit" ? "bg-green-600 text-white" : "bg-background text-muted-foreground hover:bg-muted")}
+              data-testid={`button-adj-debit-${agentName}`}
+            >Dr</button>
+            <button
+              type="button"
+              onClick={() => setNewType("credit")}
+              className={cn("px-2.5 py-1 transition-colors", newType === "credit" ? "bg-red-600 text-white" : "bg-background text-muted-foreground hover:bg-muted")}
+              data-testid={`button-adj-credit-${agentName}`}
+            >Cr</button>
+          </div>
+          <button
+            type="button"
+            onClick={saveAdj}
+            disabled={createAdjMutation.isPending}
+            className="px-2.5 py-1 rounded bg-primary text-primary-foreground text-[10px] font-semibold disabled:opacity-50 shrink-0"
+            data-testid={`button-adj-save-${agentName}`}
+          >
+            {createAdjMutation.isPending ? "…" : "Save"}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Reconciliation status banner ── */}
+      {isMismatch && (
+        <div className="flex items-start gap-2 px-3 py-2 bg-red-50 dark:bg-red-950/20 border-b border-red-200 dark:border-red-800 text-xs text-red-800 dark:text-red-300">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-red-600 dark:text-red-400" />
+          <span>
+            <strong>Balance mismatch</strong> — adjusted balance{" "}
+            <strong>${fmt(Math.abs(adjustedBalance ?? 0), 0)} {(adjustedBalance ?? 0) >= 0 ? "Dr" : "Cr"}</strong>{" "}
+            does not match container remainder{" "}
+            <strong>${fmt(openSum, 0)}</strong>. Check your manual entries.
+          </span>
+        </div>
+      )}
+      {isReconciled && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 dark:bg-green-950/20 border-b border-green-200 dark:border-green-800 text-xs text-green-800 dark:text-green-300">
+          <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400 shrink-0" />
+          <span>Manual entries reconcile with container remainder — balance confirmed</span>
+        </div>
+      )}
+
       {/* ── Custom order toolbar ── */}
       {isCustomOrder && (
         <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-950/20 border-b border-blue-200 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-300">
@@ -1947,6 +2152,23 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
         </div>
       )}
 
+      {/* ── Cleared containers toggle ── */}
+      {clearedRows.length > 0 && (
+        <button
+          onClick={() => setShowCleared(v => !v)}
+          className="w-full flex items-center justify-center gap-2 px-3 py-1.5 border-b bg-slate-50 dark:bg-slate-900/20 text-xs hover-elevate"
+          data-testid={`button-toggle-cleared-${agentName}`}
+        >
+          <span className="font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            {showCleared ? "Hide" : "Show"} {clearedRows.length} cleared container{clearedRows.length !== 1 ? "s" : ""}
+            {" "}(${fmt(clearedRows.reduce((s, r) => s + r.dutyFee, 0), 0)} duty)
+          </span>
+          {showCleared
+            ? <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
+            : <ChevronDown className="h-3.5 w-3.5 text-slate-400" />}
+        </button>
+      )}
+
       {/* ── Open / Partial rows (always visible) ── */}
       <div className="overflow-x-auto">
         <table className="w-full text-xs whitespace-nowrap border-collapse">
@@ -1958,6 +2180,25 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
             </tr>
           </thead>
           <tbody>
+            {/* Cleared / offloaded rows (optional) */}
+            {showCleared && clearedRows.map(r => (
+              <tr key={`cleared-${r.id}`} className="border-b bg-slate-100/60 dark:bg-slate-800/20 opacity-70">
+                <td className="py-0.5 px-2 font-mono text-muted-foreground">{r.containerNumber}</td>
+                <td className="py-0.5 px-2 text-muted-foreground">{r.supplierCode ?? "—"}</td>
+                <td className="py-0.5 px-2 font-mono text-muted-foreground">{r.numberPlate ?? "—"}</td>
+                <td className="py-0.5 px-2 text-muted-foreground">{fmtD(r.offloadDate ?? null)}</td>
+                <td className="py-0.5 px-2 text-muted-foreground">{fmtD(r.borderDate)}</td>
+                <td className="py-0.5 px-2 text-muted-foreground">{r.transporter ?? "—"}</td>
+                <td className="py-0.5 px-2 text-muted-foreground">{r.location ?? "—"}</td>
+                <td className="py-0.5 px-2 text-right text-muted-foreground">${fmt(r.dutyFee, 0)}</td>
+                <td className="py-0.5 px-2 text-right text-green-600 dark:text-green-500">${fmt(r.dutyFee, 0)}</td>
+                <td className="py-0.5 px-2 text-right text-muted-foreground">—</td>
+                <td className="py-0.5 px-2 text-center">
+                  <Badge variant="outline" className="text-[10px] text-slate-500 border-slate-300 dark:border-slate-600 no-default-active-elevate">Cleared</Badge>
+                </td>
+                <td />
+              </tr>
+            ))}
             {openAndPartial.length === 0 ? (
               <tr>
                 <td colSpan={12} className="py-3 px-3 text-center text-muted-foreground italic text-xs">
@@ -2015,23 +2256,69 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
               ))
             )}
 
-            {/* Open balance footer row — green for Dr, red for Cr */}
+            {/* Open balance footer row — updated with manual adjustment entries */}
             {hasBalance && (() => {
-              const isDebit  = (ledgerBalance ?? 0) > 0;
-              const isCredit = (ledgerBalance ?? 0) < 0;
-              const rowCls = isDebit
+              const rawBal   = openBalance ?? openSum;
+              const isDebit  = rawBal > 0;
+              const isCredit = rawBal < 0;
+              const baseCls  = isDebit
                 ? "bg-green-500 text-white font-bold"
                 : isCredit
                   ? "bg-red-500 text-white font-bold"
                   : "bg-yellow-400 text-yellow-950 font-bold";
               const balLabel = isDebit ? "Dr" : isCredit ? "Cr" : "";
+
+              if (hasAdjustments && adjustedBalance !== null) {
+                const adjAbs    = Math.abs(adjustedBalance);
+                const adjLabel  = adjustedBalance >= 0 ? "Dr" : "Cr";
+                const adjRowCls = isReconciled
+                  ? "bg-green-600 text-white font-bold"
+                  : isMismatch
+                    ? "bg-red-600 text-white font-bold"
+                    : adjustedBalance > 0
+                      ? "bg-green-500 text-white font-bold"
+                      : adjustedBalance < 0
+                        ? "bg-red-500 text-white font-bold"
+                        : "bg-yellow-400 text-yellow-950 font-bold";
+                return (
+                  <>
+                    <tr className={cn(baseCls, "opacity-70")}>
+                      <td colSpan={9} className="py-1 px-2 text-xs uppercase tracking-wide">
+                        Account Balance
+                      </td>
+                      <td className="py-1 px-2 text-right text-sm">
+                        ${fmt(rawBal, 0)}
+                        {balLabel && <span className="ml-1 text-xs opacity-80">({balLabel})</span>}
+                      </td>
+                      <td colSpan={2} className="py-1 px-2 text-right text-xs opacity-80">
+                        − ${fmt(Math.abs(netAdjustment), 0)} {netAdjustment >= 0 ? "Dr" : "Cr"} manual
+                      </td>
+                    </tr>
+                    <tr className={adjRowCls}>
+                      <td colSpan={9} className="py-1.5 px-2 text-xs uppercase tracking-wide">
+                        <span className="flex items-center gap-1.5">
+                          Adjusted Balance (After Manual Entries)
+                          {isReconciled && <CheckCircle2 className="h-3.5 w-3.5 inline-block" />}
+                        </span>
+                      </td>
+                      <td className="py-1.5 px-2 text-right text-sm">
+                        ${fmt(adjAbs, 0)}
+                        <span className="ml-1 text-xs opacity-80">({adjLabel})</span>
+                      </td>
+                      <td />
+                      <td />
+                    </tr>
+                  </>
+                );
+              }
+
               return (
-                <tr className={rowCls}>
+                <tr className={baseCls}>
                   <td colSpan={9} className="py-1.5 px-2 text-xs uppercase tracking-wide">
                     Open Balance (= Account Balance)
                   </td>
                   <td className="py-1.5 px-2 text-right text-sm">
-                    ${fmt(openBalance ?? openSum, 0)}
+                    ${fmt(rawBal, 0)}
                     {balLabel && <span className="ml-1 text-xs opacity-80">({balLabel})</span>}
                   </td>
                   <td />
