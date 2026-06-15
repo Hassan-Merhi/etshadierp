@@ -1940,8 +1940,10 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   const netAdjustment   = adjustments.reduce((s, a) => s + (a.type === "debit" ? a.amount : -a.amount), 0);
   const adjustedBalance = openBalance !== null ? openBalance - netAdjustment : null;
   const hasAdjustments  = adjustments.length > 0;
-  const isMismatch      = hasAdjustments && adjustedBalance !== null && Math.abs(adjustedBalance - openSum) > 0.01;
-  const isReconciled    = hasAdjustments && adjustedBalance !== null && Math.abs(adjustedBalance - openSum) <= 0.01;
+  // isReconciled: manual entries bring the adjusted balance to 0 → everything is explained
+  const isReconciled    = hasAdjustments && adjustedBalance !== null && Math.abs(adjustedBalance) <= 0.01;
+  // isMismatch: manual entries exist, balance is not zero, and doesn't match container remainder
+  const isMismatch      = hasAdjustments && adjustedBalance !== null && !isReconciled && Math.abs(adjustedBalance - openSum) > 0.01;
 
   const confidenceBadge = {
     exact:    { label: "Exact match",  cls: "bg-green-700 text-white" },
@@ -2173,7 +2175,13 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
           </thead>
           <tbody>
             {/* ── Open / Partial rows first — these are the active action items ── */}
-            {openAndPartial.length === 0 ? (
+            {isReconciled ? (
+              <tr>
+                <td colSpan={12} className="py-3 px-3 text-center text-green-700 dark:text-green-400 italic text-xs">
+                  All containers reconciled by manual entries — no outstanding balance.
+                </td>
+              </tr>
+            ) : openAndPartial.length === 0 ? (
               <tr>
                 <td colSpan={12} className="py-3 px-3 text-center text-muted-foreground italic text-xs">
                   No open containers — account balance is fully cleared.
@@ -2253,17 +2261,34 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
               const balLabel = isDebit ? "Dr" : isCredit ? "Cr" : "";
 
               if (hasAdjustments && adjustedBalance !== null) {
+                // When adjusted balance is 0, manual entries fully explain everything —
+                // only show the account balance row (no need for the adjusted row)
+                if (isReconciled) {
+                  return (
+                    <tr className={cn(baseCls, "opacity-70")}>
+                      <td colSpan={9} className="py-1 px-2 text-xs uppercase tracking-wide">
+                        Account Balance
+                      </td>
+                      <td className="py-1 px-2 text-right text-sm">
+                        ${fmt(rawBal, 0)}
+                        {balLabel && <span className="ml-1 text-xs opacity-80">({balLabel})</span>}
+                      </td>
+                      <td colSpan={2} className="py-1 px-2 text-right text-xs opacity-80">
+                        − ${fmt(Math.abs(netAdjustment), 0)} {netAdjustment >= 0 ? "Dr" : "Cr"} manual
+                      </td>
+                    </tr>
+                  );
+                }
+
                 const adjAbs    = Math.abs(adjustedBalance);
                 const adjLabel  = adjustedBalance >= 0 ? "Dr" : "Cr";
-                const adjRowCls = isReconciled
-                  ? "bg-green-600 text-white font-bold"
-                  : isMismatch
-                    ? "bg-red-600 text-white font-bold"
-                    : adjustedBalance > 0
-                      ? "bg-green-500 text-white font-bold"
-                      : adjustedBalance < 0
-                        ? "bg-red-500 text-white font-bold"
-                        : "bg-yellow-400 text-yellow-950 font-bold";
+                const adjRowCls = isMismatch
+                  ? "bg-red-600 text-white font-bold"
+                  : adjustedBalance > 0
+                    ? "bg-green-500 text-white font-bold"
+                    : adjustedBalance < 0
+                      ? "bg-red-500 text-white font-bold"
+                      : "bg-yellow-400 text-yellow-950 font-bold";
                 return (
                   <>
                     <tr className={cn(baseCls, "opacity-70")}>
@@ -2282,7 +2307,6 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                       <td colSpan={9} className="py-1.5 px-2 text-xs uppercase tracking-wide">
                         <span className="flex items-center gap-1.5">
                           Adjusted Balance (After Manual Entries)
-                          {isReconciled && <CheckCircle2 className="h-3.5 w-3.5 inline-block" />}
                         </span>
                       </td>
                       <td className="py-1.5 px-2 text-right text-sm">
@@ -2312,7 +2336,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
             })()}
 
             {/* ── Cleared rows — collapsed by default, toggle at bottom ── */}
-            {clearedRows.length > 0 && (
+            {(clearedRows.length > 0 || (isReconciled && openAndPartial.length > 0)) && (
               <>
                 <tr>
                   <td colSpan={12} className="p-0">
@@ -2323,8 +2347,9 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                     >
                       {showCleared ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                       <span>
-                        {showCleared ? "Hide" : "Show"} {clearedRows.length} cleared container{clearedRows.length !== 1 ? "s" : ""}{" "}
-                        (${fmt(clearedRows.reduce((s, r) => s + r.dutyFee, 0), 0)} duty)
+                        {showCleared ? "Hide" : "Show"}{" "}
+                        {clearedRows.length + (isReconciled ? openAndPartial.length : 0)} cleared container{(clearedRows.length + (isReconciled ? openAndPartial.length : 0)) !== 1 ? "s" : ""}{" "}
+                        (${fmt(clearedRows.reduce((s, r) => s + r.dutyFee, 0) + (isReconciled ? openAndPartial.reduce((s, r) => s + r.dutyFee, 0) : 0), 0)} duty)
                       </span>
                     </button>
                   </td>
@@ -2343,6 +2368,26 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                     <td className="py-0.5 px-2 text-right text-muted-foreground">—</td>
                     <td className="py-0.5 px-2 text-center">
                       <Badge variant="outline" className="text-[10px] text-slate-500 border-slate-300 dark:border-slate-600 no-default-active-elevate">Cleared</Badge>
+                    </td>
+                    <td />
+                  </tr>
+                ))}
+                {showCleared && isReconciled && openAndPartial.map(r => (
+                  <tr key={`reconciled-${r.id}`} className="border-b bg-purple-50/60 dark:bg-purple-900/10 opacity-70">
+                    <td className="py-0.5 px-2 font-mono text-muted-foreground">{r.containerNumber}</td>
+                    <td className="py-0.5 px-2 text-muted-foreground">{r.supplierCode ?? "—"}</td>
+                    <td className="py-0.5 px-2 font-mono text-muted-foreground">{r.numberPlate ?? "—"}</td>
+                    <td className="py-0.5 px-2 text-muted-foreground">{fmtD(r.offloadDate ?? null)}</td>
+                    <td className="py-0.5 px-2 text-muted-foreground">{fmtD(r.borderDate)}</td>
+                    <td className="py-0.5 px-2 text-muted-foreground">{r.transporter ?? "—"}</td>
+                    <td className="py-0.5 px-2 text-muted-foreground">{r.location ?? "—"}</td>
+                    <td className="py-0.5 px-2 text-right text-muted-foreground">${fmt(r.dutyFee, 0)}</td>
+                    <td className="py-0.5 px-2 text-right text-green-600 dark:text-green-500">
+                      {r.clearedAmount > 0 ? `$${fmt(r.clearedAmount, 0)}` : "—"}
+                    </td>
+                    <td className="py-0.5 px-2 text-right text-muted-foreground">—</td>
+                    <td className="py-0.5 px-2 text-center">
+                      <Badge variant="outline" className="text-[10px] text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-700 no-default-active-elevate">Manual</Badge>
                     </td>
                     <td />
                   </tr>
