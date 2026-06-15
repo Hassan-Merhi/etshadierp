@@ -1594,7 +1594,6 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   const [draftNote, setDraftNote]     = useState("");
 
   // ── Manual adjustment entries state ────────────────────────────────────────
-  const [showCleared, setShowCleared] = useState(false);
   const [newDesc,     setNewDesc]     = useState("");
   const [newAmount,   setNewAmount]   = useState("");
   const [newType,     setNewType]     = useState<"debit" | "credit">("debit");
@@ -2152,22 +2151,6 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
         </div>
       )}
 
-      {/* ── Cleared containers toggle ── */}
-      {clearedRows.length > 0 && (
-        <button
-          onClick={() => setShowCleared(v => !v)}
-          className="w-full flex items-center justify-center gap-2 px-3 py-1.5 border-b bg-slate-50 dark:bg-slate-900/20 text-xs hover-elevate"
-          data-testid={`button-toggle-cleared-${agentName}`}
-        >
-          <span className="font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            {showCleared ? "Hide" : "Show"} {clearedRows.length} cleared container{clearedRows.length !== 1 ? "s" : ""}
-            {" "}(${fmt(clearedRows.reduce((s, r) => s + r.dutyFee, 0), 0)} duty)
-          </span>
-          {showCleared
-            ? <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
-            : <ChevronDown className="h-3.5 w-3.5 text-slate-400" />}
-        </button>
-      )}
 
       {/* ── Open / Partial rows (always visible) ── */}
       <div className="overflow-x-auto">
@@ -2180,8 +2163,8 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
             </tr>
           </thead>
           <tbody>
-            {/* Cleared / offloaded rows (optional) */}
-            {showCleared && clearedRows.map(r => (
+            {/* Cleared / offloaded rows (always visible) */}
+            {clearedRows.map(r => (
               <tr key={`cleared-${r.id}`} className="border-b bg-slate-100/60 dark:bg-slate-800/20 opacity-70">
                 <td className="py-0.5 px-2 font-mono text-muted-foreground">{r.containerNumber}</td>
                 <td className="py-0.5 px-2 text-muted-foreground">{r.supplierCode ?? "—"}</td>
