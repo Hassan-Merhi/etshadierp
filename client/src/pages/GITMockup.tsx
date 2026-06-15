@@ -1729,29 +1729,10 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                   ${a.type === "debit" ? "Dr" : "Cr"}
                 </td>
               </tr>`).join("")}
-            <tr>
-              <td colspan="3" style="border-top:1px dashed #d1d5db;padding-top:3px;"></td>
-            </tr>
-            <tr>
-              <td style="font-size:10.5px;padding:2px 0;color:#6b7280;font-weight:600;">Net adjustment</td>
-              <td style="font-size:10.5px;padding:2px 0;text-align:right;font-weight:700;color:${netAdj >= 0 ? "#059669" : "#dc2626"};">
-                ${netAdj >= 0 ? "+" : "-"}$${esc(fmt(Math.abs(netAdj), 0))}
-              </td>
-              <td style="font-size:10.5px;padding:2px 0 2px 8px;font-weight:700;color:${netAdj >= 0 ? "#059669" : "#dc2626"};">
-                ${netAdj >= 0 ? "Dr" : "Cr"}
-              </td>
-            </tr>
           </table>
         </div>` : "";
 
-      const mismatchBannerHtml = waMismatch ? `
-        <div style="background:#fee2e2;border-bottom:1px solid #fca5a5;padding:6px 14px;display:flex;align-items:center;gap:10px;">
-          <span style="font-size:11.5px;font-weight:700;color:#991b1b;">BALANCE MISMATCH</span>
-          <span style="font-size:10.5px;color:#7f1d1d;">
-            Adjusted $${esc(fmt(Math.abs(adjustedBal), 0))} ${adjIsDebit ? "Dr" : "Cr"}
-            &ne; Container remainder $${esc(fmt(waOpenSum, 0))}
-          </span>
-        </div>` : "";
+      const mismatchBannerHtml = "";
 
       // ── open balance footer row ───────────────────────────────────────────
       const balanceRowHtml = hasBalance ? `
@@ -1789,7 +1770,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
           </tr>`;
         });
 
-        const transitCols = ["CONTAINER #", "SUPPLIER", "PLATE", "BORDER DATE", "TRANSPORTER", "LOCATION", "DUTY"];
+        const transitCols = ["CONTAINER", "SUPPLIER", "PLATE", "BORDER DATE", "TRANSPORTER", "LOCATION", "DUTY"];
         transitHtml = `
           <div style="background:#0284c7;padding:12px;text-align:center;">
             <span style="font-size:13px;font-weight:700;color:#ffffff;text-transform:uppercase;letter-spacing:0.08em;">
@@ -1812,7 +1793,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
         "background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;" +
         "border:1px solid #d1d5db;border-radius:6px;overflow:hidden;";
 
-      const openCols = ["CONTAINER #", "SUPPLIER", "PLATE", "OFFLOAD DATE", "BORDER DATE", "TRANSPORTER", "LOCATION", "DUTY", "CLEARED", "REMAINING", "STATUS"];
+      const openCols = ["CONTAINER", "SUPPLIER", "PLATE", "OFFLOAD DATE", "BORDER DATE", "TRANSPORTER", "LOCATION", "DUTY", "CLEARED", "REMAINING", "STATUS"];
 
       const noteHtml = note
         ? `<div style="background:#fffbeb;border-bottom:1px solid #fde68a;padding:8px 14px;display:flex;align-items:flex-start;gap:8px;">
@@ -2065,16 +2046,6 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                 </button>
               </div>
             ))}
-            {/* Net adjustment total */}
-            <div className="flex items-center justify-end gap-2 py-1 border-t border-dashed border-muted mt-1 text-xs text-muted-foreground">
-              <span>Net adjustment:</span>
-              <span className={cn("font-semibold tabular-nums", netAdjustment > 0 ? "text-green-700 dark:text-green-400" : netAdjustment < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>
-                {netAdjustment >= 0 ? "+" : "−"}${fmt(Math.abs(netAdjustment), 0)}
-              </span>
-              <span className={cn("font-semibold", netAdjustment >= 0 ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400")}>
-                {netAdjustment >= 0 ? "Dr" : "Cr"}
-              </span>
-            </div>
           </div>
         )}
         {/* Inline add form */}
@@ -2127,17 +2098,6 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       </div>
 
       {/* ── Reconciliation status banner ── */}
-      {isMismatch && (
-        <div className="flex items-start gap-2 px-3 py-2 bg-red-50 dark:bg-red-950/20 border-b border-red-200 dark:border-red-800 text-xs text-red-800 dark:text-red-300">
-          <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-red-600 dark:text-red-400" />
-          <span>
-            <strong>Balance mismatch</strong> — adjusted balance{" "}
-            <strong>${fmt(Math.abs(adjustedBalance ?? 0), 0)} {(adjustedBalance ?? 0) >= 0 ? "Dr" : "Cr"}</strong>{" "}
-            does not match container remainder{" "}
-            <strong>${fmt(openSum, 0)}</strong>. Check your manual entries.
-          </span>
-        </div>
-      )}
       {isReconciled && (
         <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 dark:bg-green-950/20 border-b border-green-200 dark:border-green-800 text-xs text-green-800 dark:text-green-300">
           <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400 shrink-0" />
@@ -2168,7 +2128,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
         <table className="w-full text-xs whitespace-nowrap border-collapse">
           <thead>
             <tr className="bg-yellow-200 text-yellow-900 border-b border-yellow-400">
-              {["CONTAINER #","SUPPLIER","PLATE","OFFLOAD DATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY","CLEARED","REMAINING","STATUS",""].map(h => (
+              {["CONTAINER","SUPPLIER","PLATE","OFFLOAD DATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY","CLEARED","REMAINING","STATUS",""].map(h => (
                 <th key={h} className="py-1 px-2 font-bold text-center">{h}</th>
               ))}
             </tr>
@@ -2418,7 +2378,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
               <table className="w-full text-xs whitespace-nowrap border-collapse">
                 <thead>
                   <tr className="bg-sky-100 dark:bg-sky-950/30 border-b text-sky-800 dark:text-sky-300">
-                    {["CONTAINER #","SUPPLIER","PLATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY"].map(h => (
+                    {["CONTAINER","SUPPLIER","PLATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY"].map(h => (
                       <th key={h} className="py-1 px-2 font-bold text-center">{h}</th>
                     ))}
                   </tr>
