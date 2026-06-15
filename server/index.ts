@@ -4106,10 +4106,21 @@ END $$`,
       updated_at timestamptz DEFAULT now(),
       UNIQUE (company_id, agent_name)
     )`,
-    // Enable tracking on all active containers — fixes the bug where new
-    // containers were saved with tracking_enabled=false because the drawer
-    // initialised trackEnabled to false before this was corrected.
-    `UPDATE containers SET tracking_enabled = true WHERE LOWER(status) NOT IN ('offloaded','closed','completed')`,
+    // One-time backfill: enable tracking on all active containers.
+    // Guarded by a marker table so it only runs once — subsequent boots are no-ops.
+    // This fixes the historical bug where the drawer defaulted trackEnabled to false,
+    // causing every container to be saved with tracking_enabled=false.
+    `DO $$
+     BEGIN
+       CREATE TABLE IF NOT EXISTS one_time_migrations (
+         name text PRIMARY KEY,
+         applied_at timestamptz DEFAULT now()
+       );
+       IF NOT EXISTS (SELECT 1 FROM one_time_migrations WHERE name = 'backfill_tracking_enabled_2026') THEN
+         UPDATE containers SET tracking_enabled = true WHERE LOWER(status) NOT IN ('offloaded','closed','completed');
+         INSERT INTO one_time_migrations (name) VALUES ('backfill_tracking_enabled_2026');
+       END IF;
+     END $$`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
