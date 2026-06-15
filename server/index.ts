@@ -4077,6 +4077,7 @@ END $$`,
       updated_at timestamp NOT NULL DEFAULT now(),
       CONSTRAINT transporter_payment_settings_uniq UNIQUE (company_id, ledger_account_id)
     )`,
+    `ALTER TABLE transporter_payment_settings ADD COLUMN IF NOT EXISTS payment_terms_days integer NOT NULL DEFAULT 0`,
     `CREATE TABLE IF NOT EXISTS transporter_entry_due_dates (
       id serial PRIMARY KEY,
       voucher_entry_id integer NOT NULL,
