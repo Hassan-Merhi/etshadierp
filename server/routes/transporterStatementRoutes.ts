@@ -401,24 +401,47 @@ export function registerTransporterStatementRoutes(app: Express) {
         });
       }
 
-      // Fetch paid amounts per credit entry from allocations table
-      const allocRows = await db.execute(sql`
-        SELECT credit_entry_id, SUM(allocated_amount) AS paid_amount
-        FROM transporter_payment_allocations
-        WHERE company_id = ${companyId}
-        GROUP BY credit_entry_id
-      `);
-      const paidMap = new Map<number, number>();
-      for (const a of (allocRows.rows as any[])) {
-        paidMap.set(Number(a.credit_entry_id), parseFloat(a.paid_amount || "0"));
-      }
-
       // Opening balance
       const ob = parseFloat(account.openingBalance || "0");
       const obSide = account.openingBalanceSide;
       let runningBalance = obSide === "Dr" ? -ob : ob;
 
       const allRows = rawEntries.rows as any[];
+
+      // ── FIFO allocation computed on-the-fly ──────────────────────────────────
+      // In this transporter ledger:
+      //   CREDIT entries = transport fee charges (what you owe the transporter)
+      //   DEBIT  entries = payments you've made
+      // We iterate payments in date order and apply them oldest-charge-first.
+      // This gives us paidMap: creditEntryId → how much of that charge is covered.
+      const fifoCharges = allRows
+        .filter((r: any) => parseFloat(r.credit_amount || "0") > 0)
+        .map((r: any) => ({
+          id: r.id as number,
+          total: parseFloat(r.credit_amount),
+          remaining: parseFloat(r.credit_amount),
+        }));
+
+      const fifoPayments = allRows
+        .filter((r: any) => parseFloat(r.debit_amount || "0") > 0)
+        .map((r: any) => ({
+          id: r.id as number,
+          total: parseFloat(r.debit_amount),
+          remaining: parseFloat(r.debit_amount),
+        }));
+
+      const paidMap = new Map<number, number>(); // chargeEntryId → paidAmount
+      for (const payment of fifoPayments) {
+        let payRemaining = payment.remaining;
+        for (const charge of fifoCharges) {
+          if (payRemaining <= 0) break;
+          if (charge.remaining <= 0) continue;
+          const alloc = Math.min(payRemaining, charge.remaining);
+          paidMap.set(charge.id, (paidMap.get(charge.id) ?? 0) + alloc);
+          payRemaining -= alloc;
+          charge.remaining -= alloc;
+        }
+      }
 
       // Build rows with running balance
       const statementRows = allRows.map((row: any) => {
@@ -447,7 +470,8 @@ export function registerTransporterStatementRoutes(app: Express) {
           dateToBePaid = addDays(offloadDate, paymentTermsDays);
         }
 
-        // Determine payment status for credit rows
+        // Determine payment status for credit rows (transport fee charges)
+        // paidMap keys are credit entry IDs; value = how much of that charge FIFO covered
         let status: "unpaid" | "partial" | "paid" | null = null;
         let paidAmount: string | null = null;
         if (credit > 0) {
