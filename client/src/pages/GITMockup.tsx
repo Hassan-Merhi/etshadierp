@@ -1661,6 +1661,38 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
         day: "2-digit", month: "short", year: "numeric",
       });
 
+      // ── compute all data from deps (avoids TDZ in production minified build) ──
+      const agentName = agent.agentName;
+      const ledgerBalance = agent.ledgerBalance;
+      const openBalance = agent.openBalance;
+      const hasBalance = ledgerBalance !== null;
+      const activePreviewRows = agent.activePreviewRows.filter(
+        (r: any) => !!(r.numberPlate ?? "").trim()
+      );
+      const cbClearedRows = agent.clearedRows as ApiAllocatedRow[];
+      const cbAllOpenPartial: ApiAllocatedRow[] = [
+        ...(agent.partialRows as ApiAllocatedRow[]),
+        ...(agent.openRows as ApiAllocatedRow[]),
+      ];
+      const cbClearedTotal = cbClearedRows.reduce((s, r) => s + r.dutyFee, 0);
+      const cbRemainder = Math.max(agent.clearedByPayments - cbClearedTotal, 0);
+      let openAndPartial: ApiAllocatedRow[];
+      if (customOrder && customOrder.length > 0) {
+        const orderMap = new Map(customOrder.map((id, i) => [id, i]));
+        const sorted = [...cbAllOpenPartial].sort((a, b) => {
+          const ai = orderMap.has(a.id)
+            ? orderMap.get(a.id)!
+            : customOrder.length + cbAllOpenPartial.findIndex(r => r.id === a.id);
+          const bi = orderMap.has(b.id)
+            ? orderMap.get(b.id)!
+            : customOrder.length + cbAllOpenPartial.findIndex(r => r.id === b.id);
+          return ai - bi;
+        });
+        openAndPartial = clientReallocate(sorted, cbRemainder);
+      } else {
+        openAndPartial = clientReallocate(cbAllOpenPartial, cbRemainder);
+      }
+
       // ── helpers ──────────────────────────────────────────────────────────
       // Top table (11 cols) — compact padding so all columns fit
       const thOpen = (bg = "#92400e") =>
