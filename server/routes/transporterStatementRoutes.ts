@@ -430,15 +430,23 @@ export function registerTransporterStatementRoutes(app: Express) {
           remaining: parseFloat(r.debit_amount),
         }));
 
+      // Account for pre-system opening balance.
+      // If the account has a Cr opening balance, the transporter is owed that amount
+      // from before any voucher entries existed. Payments must cover that pre-system
+      // balance first before being applied to tracked voucher charges.
+      // If Dr, the transporter already owes us money → more of our payments are free
+      // to cover voucher charges.
+      const preSystemBalance = obSide === "Cr" ? ob : -ob; // positive = we owe from before
+      const totalVoucherPayments = fifoPayments.reduce((s, p) => s + p.total, 0);
+      let payPool = Math.max(0, totalVoucherPayments - Math.max(0, preSystemBalance));
+
       const paidMap = new Map<number, number>(); // chargeEntryId → paidAmount
-      for (const payment of fifoPayments) {
-        let payRemaining = payment.remaining;
-        for (const charge of fifoCharges) {
-          if (payRemaining <= 0) break;
-          if (charge.remaining <= 0) continue;
-          const alloc = Math.min(payRemaining, charge.remaining);
+      for (const charge of fifoCharges) {
+        if (payPool <= 0) break;
+        const alloc = Math.min(payPool, charge.remaining);
+        if (alloc > 0) {
           paidMap.set(charge.id, (paidMap.get(charge.id) ?? 0) + alloc);
-          payRemaining -= alloc;
+          payPool -= alloc;
           charge.remaining -= alloc;
         }
       }

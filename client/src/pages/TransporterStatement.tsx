@@ -673,9 +673,6 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
                           <div className="truncate" title={row.description}>
                             {row.description || row.narration || row.voucherNumber}
                           </div>
-                          {row.voucherNumber && (
-                            <div className="text-xs text-muted-foreground">{row.voucherNumber}</div>
-                          )}
                         </TableCell>
                         <TableCell className="text-sm">
                           {row.numberPlate ? (
