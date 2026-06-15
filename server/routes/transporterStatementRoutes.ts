@@ -7,7 +7,7 @@ import {
 import { eq, and, asc, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { parseId } from "../lib/parseId";
-import { getActiveRecipients, sendWhatsAppTextToChatId } from "../services/whatsappService";
+import { getActiveRecipients, sendWhatsAppTextToChatId, sendWhatsAppFileToChatId } from "../services/whatsappService";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -141,9 +141,10 @@ export function registerTransporterStatementRoutes(app: Express) {
       const accountId = parseId(req.params.accountId);
       if (accountId === null) return res.status(400).json({ message: "Invalid account ID" });
 
-      const { dateFrom, dateTo } = z.object({
-        dateFrom: z.string().optional(),
-        dateTo:   z.string().optional(),
+      const { dateFrom, dateTo, imageBase64 } = z.object({
+        dateFrom:    z.string().optional(),
+        dateTo:      z.string().optional(),
+        imageBase64: z.string().optional(),
       }).parse(req.body);
 
       // Verify account
@@ -230,13 +231,21 @@ export function registerTransporterStatementRoutes(app: Express) {
       let sent = 0;
       let failed = 0;
       const errors: string[] = [];
-      for (const r of recipients) {
-        const result = await sendWhatsAppTextToChatId(r.chatId, message);
-        if (result.success) {
-          sent++;
-        } else {
-          failed++;
-          if (result.error) errors.push(result.error);
+
+      if (imageBase64) {
+        // Send as image
+        const base64Data = String(imageBase64).replace(/^data:image\/\w+;base64,/, "");
+        const buffer = Buffer.from(base64Data, "base64");
+        const fileName = `TransporterStatement_${account.name}_${new Date().toISOString().substring(0, 10)}.png`;
+        for (const r of recipients) {
+          const result = await sendWhatsAppFileToChatId(r.chatId, buffer, fileName, message, "image/png");
+          if (result.success) { sent++; } else { failed++; if (result.error) errors.push(result.error); }
+        }
+      } else {
+        // Fallback: send as text
+        for (const r of recipients) {
+          const result = await sendWhatsAppTextToChatId(r.chatId, message);
+          if (result.success) { sent++; } else { failed++; if (result.error) errors.push(result.error); }
         }
       }
 

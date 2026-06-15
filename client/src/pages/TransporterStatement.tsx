@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -339,23 +339,187 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
     dueDateMutation.mutate({ entryId, dueDate });
   }
 
-  // Send WhatsApp summary mutation
-  const whatsappMutation = useMutation({
-    mutationFn: () =>
-      apiRequest("POST", `/api/transporter-statement/${selectedAccountId}/send-whatsapp`, {
-        dateFrom,
-        dateTo,
-      }),
-    onSuccess: (data: any) => {
-      toast({
-        title: "WhatsApp sent",
-        description: `Delivered to ${data?.sent ?? 0} recipient(s).`,
+  const [waSending, setWaSending] = useState(false);
+  const [pdfExporting, setPdfExporting] = useState(false);
+
+  // Build an off-screen, light-themed HTML card for capture
+  const buildCapture = useCallback(() => {
+    if (!statement || !selectedTransporter) return null;
+
+    const esc = (s: unknown) =>
+      String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    const fmt = (v: string | null | undefined) => {
+      if (!v) return "—";
+      const n = parseFloat(v);
+      if (isNaN(n)) return "—";
+      return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    const fmtAmt2 = (v: string | null) => {
+      if (!v) return "";
+      const n = parseFloat(v);
+      if (isNaN(n) || n === 0) return "";
+      return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    const periodStr = [dateFrom, dateTo].filter(Boolean).join(" → ") || "All time";
+    const closingBal = parseFloat(statement.closingBalance ?? "0");
+    const closingSide = closingBal > 0 ? " Cr" : closingBal < 0 ? " Dr" : "";
+
+    const th = (align = "left") =>
+      `padding:6px 9px;font-size:11px;font-weight:700;text-align:${align};` +
+      `background:#0d7c66;color:#ffffff;border:1px solid rgba(0,0,0,0.15);white-space:nowrap;`;
+
+    const td = (align = "left", color = "#111827", bold = false) =>
+      `font-size:11px;padding:5px 9px;text-align:${align};color:${color};` +
+      `font-weight:${bold ? "700" : "400"};border:1px solid #e5e7eb;white-space:nowrap;`;
+
+    const statusLabel = (row: StatementRow) => {
+      if (row.status === "paid") return `<span style="color:#059669;font-weight:600">Paid</span>`;
+      if (row.status === "partial") {
+        const rem = parseFloat(row.credit || "0") - parseFloat(row.paidAmount || "0");
+        return `<span style="color:#b45309;font-weight:600">Partial · ${fmtAmt2(rem.toFixed(2))} left</span>`;
+      }
+      return `<span style="color:#dc2626;font-weight:600">Unpaid</span>`;
+    };
+
+    const openBal = parseFloat(statement.openingBalance ?? "0");
+
+    let rowsHtml = `<tr style="background:#f9fafb">
+      <td style="${td()};color:#6b7280;font-style:italic"></td>
+      <td style="${td()};color:#6b7280;font-style:italic">Opening Balance</td>
+      <td style="${td()}"></td><td style="${td()}"></td><td style="${td()}"></td>
+      <td style="${td("right","#374151",true)}">${fmt(String(openBal))}</td>
+      <td style="${td()}"></td><td style="${td()}"></td>
+    </tr>`;
+
+    statement.rows.forEach((row, i) => {
+      const bal = parseFloat(row.runningBalance);
+      const balColor = bal > 0 ? "#b45309" : bal < 0 ? "#059669" : "#6b7280";
+      const bg = i % 2 === 0 ? "#ffffff" : "#f0faf8";
+      const isOverdue = row.dateToBePaid && row.dateToBePaid < today() && row.status !== "paid";
+      const rowBg = isOverdue ? "#fff1f2" : bg;
+      rowsHtml += `<tr style="background:${rowBg}">
+        <td style="${td()};font-family:monospace">${esc(row.date)}</td>
+        <td style="${td()};max-width:280px;overflow:hidden;text-overflow:ellipsis">${esc(row.description || row.narration || row.voucherNumber)}</td>
+        <td style="${td()};font-family:monospace">${esc(row.numberPlate ?? row.containerNumber ?? "—")}</td>
+        <td style="${td("right","#dc2626")}">${esc(fmtAmt2(row.debit))}</td>
+        <td style="${td("right","#059669")}">${esc(fmtAmt2(row.credit))}</td>
+        <td style="${td("right",balColor,true)}">${fmt(row.runningBalance)}</td>
+        <td style="${td()}">${esc(row.dateToBePaid ?? "—")}</td>
+        <td style="${td()}">${statusLabel(row)}</td>
+      </tr>`;
+    });
+
+    // Closing balance row
+    rowsHtml += `<tr style="background:#e6f7f3">
+      <td style="${td()};color:#6b7280;font-style:italic"></td>
+      <td style="${td("left","#374151",true)}">Closing Balance</td>
+      <td style="${td()}"></td>
+      <td style="${td("right","#dc2626",true)}">${fmt(String(stats?.totalDebit ?? 0))}</td>
+      <td style="${td("right","#059669",true)}">${fmt(String(stats?.totalCredit ?? 0))}</td>
+      <td style="${td("right",closingBal > 0 ? "#b45309" : closingBal < 0 ? "#059669" : "#374151",true)}">${fmt(statement.closingBalance)}${closingSide}</td>
+      <td style="${td()}"></td><td style="${td()}"></td>
+    </tr>`;
+
+    const W = 1060;
+    const el = document.createElement("div");
+    el.style.cssText =
+      `position:fixed;top:-9999px;left:-9999px;width:${W}px;` +
+      "background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;" +
+      "border:1px solid #d1d5db;border-radius:6px;overflow:hidden;";
+
+    el.innerHTML = `
+      <div style="background:#0d7c66;padding:16px 14px;text-align:center;">
+        <div style="font-size:24px;font-weight:800;color:#ffffff;letter-spacing:0.04em;text-transform:uppercase;">${esc(selectedTransporter.name)}</div>
+        <div style="font-size:11px;color:#ccfbf1;margin-top:3px;">Transporter Statement &nbsp;·&nbsp; ${esc(periodStr)}</div>
+      </div>
+      <div style="display:flex;gap:0;border-bottom:1px solid #e5e7eb;">
+        <div style="flex:1;padding:10px 14px;border-right:1px solid #e5e7eb;">
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px;">Total Paid</div>
+          <div style="font-size:15px;font-weight:700;color:#dc2626;">${fmt(String(stats?.totalDebit ?? 0))}</div>
+        </div>
+        <div style="flex:1;padding:10px 14px;border-right:1px solid #e5e7eb;">
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px;">Total Charged</div>
+          <div style="font-size:15px;font-weight:700;color:#059669;">${fmt(String(stats?.totalCredit ?? 0))}</div>
+        </div>
+        <div style="flex:1;padding:10px 14px;">
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px;">Outstanding</div>
+          <div style="font-size:15px;font-weight:700;color:${closingBal > 0 ? "#b45309" : closingBal < 0 ? "#059669" : "#374151"};">${fmt(statement.closingBalance)}${closingSide}</div>
+        </div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;table-layout:auto;">
+        <thead>
+          <tr>
+            ${["DATE","DESCRIPTION","PLATE","DEBIT","CREDIT","BALANCE","DUE DATE","STATUS"]
+              .map((h, idx) => `<th style="${th(idx >= 3 && idx <= 5 ? "right" : "left")}">${h}</th>`)
+              .join("")}
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+      <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:5px 12px;font-size:10px;color:#9ca3af;text-align:right;">
+        HMD International Group &nbsp;·&nbsp; ERP System &nbsp;·&nbsp; ${new Date().toLocaleString("en-GB")}
+      </div>`;
+
+    document.body.appendChild(el);
+    return el;
+  }, [statement, selectedTransporter, dateFrom, dateTo, stats]);
+
+  // Export PNG/PDF via html2canvas
+  const handleExportPDF = useCallback(async () => {
+    const el = buildCapture();
+    if (!el) return;
+    setPdfExporting(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(el, {
+        scale: 2, useCORS: true, allowTaint: true,
+        backgroundColor: "#ffffff", logging: false,
+        width: 1060, height: el.scrollHeight,
+        windowWidth: 1060, windowHeight: el.scrollHeight,
       });
-    },
-    onError: (err: any) => {
+      document.body.removeChild(el);
+      const link = document.createElement("a");
+      link.download = `TransporterStatement_${selectedTransporter?.name ?? "export"}_${today()}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+      toast({ title: "Exported", description: "Statement saved as PNG image." });
+    } catch (err: any) {
+      document.body.removeChild(el);
+      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+    } finally {
+      setPdfExporting(false);
+    }
+  }, [buildCapture, selectedTransporter, toast]);
+
+  // Send WhatsApp image
+  const handleSendWhatsApp = useCallback(async () => {
+    const el = buildCapture();
+    if (!el) return;
+    setWaSending(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(el, {
+        scale: 2, useCORS: true, allowTaint: true,
+        backgroundColor: "#ffffff", logging: false,
+        width: 1060, height: el.scrollHeight,
+        windowWidth: 1060, windowHeight: el.scrollHeight,
+      });
+      document.body.removeChild(el);
+      const imageBase64 = canvas.toDataURL("image/png");
+      const data: any = await apiRequest("POST", `/api/transporter-statement/${selectedAccountId}/send-whatsapp`, {
+        dateFrom, dateTo, imageBase64,
+      });
+      toast({ title: "WhatsApp sent", description: `Delivered to ${data?.sent ?? 0} recipient(s).` });
+    } catch (err: any) {
+      if (el.parentNode) document.body.removeChild(el);
       toast({ title: "WhatsApp failed", description: err?.message, variant: "destructive" });
-    },
-  });
+    } finally {
+      setWaSending(false);
+    }
+  }, [buildCapture, selectedAccountId, dateFrom, dateTo, toast]);
 
   // Reallocate mutation (FIFO)
   const reallocateMutation = useMutation({
@@ -538,20 +702,21 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => whatsappMutation.mutate()}
-                  disabled={whatsappMutation.isPending}
+                  onClick={handleSendWhatsApp}
+                  disabled={waSending || !statement}
                   data-testid="btn-send-whatsapp"
                 >
-                  <MessageCircle className={cn("h-4 w-4 mr-2", whatsappMutation.isPending && "animate-pulse")} />
-                  {whatsappMutation.isPending ? "Sending…" : "Send WhatsApp"}
+                  <MessageCircle className={cn("h-4 w-4 mr-2", waSending && "animate-pulse")} />
+                  {waSending ? "Sending…" : "Send WhatsApp"}
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={handlePrint}
+                  onClick={handleExportPDF}
+                  disabled={pdfExporting || !statement}
                   data-testid="btn-print"
                 >
-                  <Printer className="h-4 w-4 mr-2" />
-                  Print / Export PDF
+                  <Printer className={cn("h-4 w-4 mr-2", pdfExporting && "animate-spin")} />
+                  {pdfExporting ? "Exporting…" : "Print / Export PDF"}
                 </Button>
               </>
             )}
