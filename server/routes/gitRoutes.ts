@@ -1469,4 +1469,35 @@ export function registerGitRoutes(app: Express) {
       res.status(500).json({ message: err.message });
     }
   });
+
+  // ── Agent notes (per-company, per-agent, shared across all users) ─────────
+  app.get("/api/git/agent-note/:companyId/:agentName", requireAuth, async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.companyId, 10);
+      const agentName = req.params.agentName;
+      const row = await db.execute(
+        sql`SELECT note FROM git_agent_notes WHERE company_id = ${companyId} AND agent_name = ${agentName} LIMIT 1`
+      );
+      const note = (row.rows[0] as any)?.note ?? "";
+      res.json({ note });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.put("/api/git/agent-note/:companyId/:agentName", requireAuth, async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.companyId, 10);
+      const agentName = req.params.agentName;
+      const note: string = (req.body.note ?? "").trim();
+      await db.execute(
+        sql`INSERT INTO git_agent_notes (company_id, agent_name, note, updated_at)
+            VALUES (${companyId}, ${agentName}, ${note}, now())
+            ON CONFLICT (company_id, agent_name) DO UPDATE SET note = ${note}, updated_at = now()`
+      );
+      res.json({ ok: true, note });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
 }

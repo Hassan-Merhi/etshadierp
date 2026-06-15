@@ -4098,6 +4098,14 @@ END $$`,
     `CREATE INDEX IF NOT EXISTS transporter_alloc_company_idx ON transporter_payment_allocations (company_id)`,
     `CREATE INDEX IF NOT EXISTS transporter_alloc_credit_idx ON transporter_payment_allocations (credit_entry_id)`,
     `CREATE INDEX IF NOT EXISTS transporter_alloc_debit_idx ON transporter_payment_allocations (debit_entry_id)`,
+    `CREATE TABLE IF NOT EXISTS git_agent_notes (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      agent_name text NOT NULL,
+      note text NOT NULL DEFAULT '',
+      updated_at timestamptz DEFAULT now(),
+      UNIQUE (company_id, agent_name)
+    )`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

@@ -12,8 +12,8 @@
  */
 
 import { useState, useMemo, useRef, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -1565,7 +1565,7 @@ function clientReallocate(
   });
 }
 
-function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupChatId?: string }) {
+function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummary; companyId: number; waGroupChatId?: string }) {
   const { toast } = useToast();
   const [showActive, setShowActive]   = useState(true);
   const [waSending,  setWaSending]    = useState(false);
@@ -1589,19 +1589,23 @@ function AgentCard({ agent, waGroupChatId }: { agent: AgentDutySummary; waGroupC
 
   const resetOrder = () => saveOrder(null);
 
-  // ── Overpayment note ──────────────────────────────────────────────────────
-  // A free-text label the user can set to explain what miscellaneous payments
-  // (peage, fees, etc.) make up the cleared/overpayment amount.
-  const noteKey = `agent-note-${agent.agentName}`;
-  const [note, setNote]           = useState<string>(() => localStorage.getItem(noteKey) ?? "");
+  // ── Overpayment note (DB-backed, shared across all users) ─────────────────
   const [editingNote, setEditingNote] = useState(false);
-  const [draftNote, setDraftNote] = useState(note);
+  const [draftNote, setDraftNote]     = useState("");
+
+  const noteQueryKey = [`/api/git/agent-note/${companyId}/${encodeURIComponent(agent.agentName)}`];
+  const { data: noteData } = useQuery<{ note: string }>({ queryKey: noteQueryKey });
+  const note = noteData?.note ?? "";
+
+  const noteMutation = useMutation({
+    mutationFn: (newNote: string) =>
+      apiRequest("PUT", `/api/git/agent-note/${companyId}/${encodeURIComponent(agent.agentName)}`, { note: newNote }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: noteQueryKey }); },
+  });
 
   const saveNote = () => {
     const trimmed = draftNote.trim();
-    if (trimmed) localStorage.setItem(noteKey, trimmed);
-    else localStorage.removeItem(noteKey);
-    setNote(trimmed);
+    noteMutation.mutate(trimmed);
     setEditingNote(false);
   };
   const cancelNote = () => { setDraftNote(note); setEditingNote(false); };
@@ -2318,6 +2322,7 @@ function TabAgentDuty() {
                 <AgentCard
                   key={`${section.companyId}-${agent.agentName}`}
                   agent={agent}
+                  companyId={section.companyId}
                   waGroupChatId={waSettings?.groups?.[agent.agentName] || waSettings?.groups?.[agent.agentName.toUpperCase()] || undefined}
                 />
               ))
