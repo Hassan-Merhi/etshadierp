@@ -4153,6 +4153,17 @@ END $$`,
          ALTER TABLE git_prepaid_designations ADD COLUMN id serial;
        END IF;
      END $$`,
+    // Ensure the UNIQUE constraint exists — required for ON CONFLICT to work
+    `DO $$ BEGIN
+       IF NOT EXISTS (
+         SELECT 1 FROM pg_constraint
+         WHERE conrelid = 'git_prepaid_designations'::regclass AND contype = 'u'
+       ) THEN
+         ALTER TABLE git_prepaid_designations
+           ADD CONSTRAINT git_prepaid_designations_uniq
+           UNIQUE (company_id, agent_name, container_id);
+       END IF;
+     END $$`,
     // Per-kg pricing support on proforma lines (June 2026)
     `ALTER TABLE customer_proforma_lines ADD COLUMN IF NOT EXISTS pricing_mode text NOT NULL DEFAULT 'per_bale'`,
     `ALTER TABLE customer_proforma_lines ADD COLUMN IF NOT EXISTS price_per_kg decimal(20,4)`,
