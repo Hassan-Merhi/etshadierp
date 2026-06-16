@@ -3227,6 +3227,12 @@ export function registerContainerRoutes(app: Express) {
         // Capture freight in outer scope so the post-transaction parent-freight sync
         // can access it without a ReferenceError.
         let _b1FreightForSync = parseFloat(existingPO.freight ?? "0");
+        // ── Lifted for post-transaction interco sync (belt-and-suspenders) ────
+        let _b1GrandTotalForSync = 0;
+        let _b1HasParentFreightForSync = false;
+        let _b1FreightParentAccountIdForSync: number | null = null;
+        let _b1PoNumsForSync: string | string[] = existingPO.poNumber;
+        let _b1ContainerNumForSync: string | undefined;
 
         // Delete existing line items and create new ones in a transaction
         await db.transaction(async (tx) => {
@@ -3361,6 +3367,12 @@ export function registerContainerRoutes(app: Express) {
               if (!_b1Sync.found) {
                 console.warn(`[PO-PATCH items] No INTERCO-PARENT voucher for PO(s): ${Array.isArray(_b1PoNums) ? _b1PoNums.join(", ") : _b1PoNums}`);
               }
+              // Lift to outer scope so post-transaction backup sync can use them
+              _b1GrandTotalForSync            = poGrandTotal;
+              _b1HasParentFreightForSync      = _b1HasParentFreight;
+              _b1FreightParentAccountIdForSync = _b1FreightParentAccountId;
+              _b1PoNumsForSync                = _b1PoNums;
+              _b1ContainerNumForSync          = _b1ContainerRow?.containerNumber;
             }
           }
           
@@ -3409,7 +3421,33 @@ export function registerContainerRoutes(app: Express) {
             }
           }
         });
-        
+
+        // ── Post-transaction interco sync (backup / belt-and-suspenders) ──────
+        // The in-transaction sync above uses `tx`, which can silently fail if the
+        // transaction encounters a locking issue.  This second sync runs OUTSIDE
+        // the transaction using the plain `db` handle — identical to the pattern
+        // used by the charges-only path — so the parent INTERCO-PARENT JV is
+        // guaranteed to be up-to-date even if the in-transaction call was a no-op.
+        if (_b1GrandTotalForSync > 0) {
+          const _b1PostParentId = await storage.getParentCompanyId();
+          if (_b1PostParentId && existingPO.companyId !== _b1PostParentId) {
+            const _b1PostSync = await syncIntercoParentVoucher(
+              db,
+              _b1PoNumsForSync,
+              _b1GrandTotalForSync,
+              _b1ContainerNumForSync,
+              _b1HasParentFreightForSync && _b1FreightParentAccountIdForSync
+                ? { freightAmount: _b1FreightForSync, freightParentAccountId: _b1FreightParentAccountIdForSync, subsidiaryCompanyId: existingPO.companyId }
+                : undefined,
+            );
+            if (!_b1PostSync.found) {
+              console.warn(`[PO-PATCH items post-tx] No INTERCO-PARENT voucher found for PO(s): ${Array.isArray(_b1PoNumsForSync) ? _b1PoNumsForSync.join(", ") : _b1PoNumsForSync}`);
+            } else if (_b1PostSync.updated) {
+              console.log(`[PO-PATCH items post-tx] Updated parent JV #${_b1PostSync.voucherId}: ${_b1PostSync.oldAmount} → ${_b1PostSync.amount}`);
+            }
+          }
+        }
+
         // Get updated PO with items
         const updatedPO = await storage.getPurchaseOrderById(id);
         const lineItems = await storage.getLineItemsByPO(id);
