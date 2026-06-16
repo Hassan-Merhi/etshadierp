@@ -4144,6 +4144,15 @@ END $$`,
       note text,
       created_at timestamptz DEFAULT now()
     )`,
+    // Ensure git_prepaid_designations has the id serial PK (tables created before this migration may not have it)
+    `DO $$ BEGIN
+       IF NOT EXISTS (
+         SELECT 1 FROM information_schema.columns
+         WHERE table_name='git_prepaid_designations' AND column_name='id'
+       ) THEN
+         ALTER TABLE git_prepaid_designations ADD COLUMN id serial;
+       END IF;
+     END $$`,
     // Per-kg pricing support on proforma lines (June 2026)
     `ALTER TABLE customer_proforma_lines ADD COLUMN IF NOT EXISTS pricing_mode text NOT NULL DEFAULT 'per_bale'`,
     `ALTER TABLE customer_proforma_lines ADD COLUMN IF NOT EXISTS price_per_kg decimal(20,4)`,

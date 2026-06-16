@@ -1821,7 +1821,7 @@ export function registerGitRoutes(app: Express) {
 
       // Verify old is currently designated
       const existing = await db.execute(
-        sql`SELECT id FROM git_prepaid_designations
+        sql`SELECT container_id FROM git_prepaid_designations
             WHERE company_id = ${companyId} AND agent_name = ${agentName} AND container_id = ${Number(oldContainerId)}`
       );
       if ((existing.rows as any[]).length === 0) {
