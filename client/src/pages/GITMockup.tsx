@@ -2000,31 +2000,10 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   // isMismatch: manual entries exist, balance is not zero, and doesn't match container remainder
   const isMismatch      = hasAdjustments && adjustedBalance !== null && !isReconciled && Math.abs(adjustedBalance - openSum) > 0.01;
 
-  // ── Enhanced FIFO: payment + manual Dr entries as combined coverage ────────
-  // Re-runs clientReallocate with (remainderForOpenPartial + netAdjustment) so that
-  // manual Dr entries hide containers that are already explained by them.
-  const enhancedRemainder = remainderForOpenPartial + Math.max(0, netAdjustment);
-  const enhancedAllocated = useMemo(() => {
-    // Use the same order as openAndPartial (respects customOrder), but with raw dutyFee data
-    const orderMap = new Map(openAndPartial.map((r, i) => [r.id, i]));
-    const sortedRaw = [...allOpenPartial].sort(
-      (a, b) => (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999)
-    );
-    return clientReallocate(sortedRaw, enhancedRemainder);
-  }, [openAndPartial, allOpenPartial, enhancedRemainder]); // eslint-disable-line react-hooks/exhaustive-deps
-  const enhancedCoveredIds = useMemo(
-    () => new Set(enhancedAllocated.filter(r => r.clearedAmount >= r.dutyFee).map(r => r.id)),
-    [enhancedAllocated]
-  );
-  // Containers fully covered by payment + manual entries → hidden from the open table
-  const visibleOpenPartial = useMemo(
-    () => openAndPartial.filter(r => !enhancedCoveredIds.has(r.id)),
-    [openAndPartial, enhancedCoveredIds]
-  );
-  const coveredCount = openAndPartial.length - visibleOpenPartial.length;
-
   // ── Prepaid transit allocation ─────────────────────────────────────────────
   // Budget = adjusted balance (account balance minus manual entries).
+  // Must be computed BEFORE the enhanced visibility logic so designatedPrepaidSum
+  // can be included in enhancedRemainder to hide offloaded rows already covered by prepaid.
   const prepaidBudget = adjustedBalance !== null ? Math.max(0, adjustedBalance) : (openBalance !== null ? Math.max(0, openBalance) : 0);
 
   // Auto-designate: greedily fill prepaidBudget from the transit list (client-side suggestion)
@@ -2048,6 +2027,30 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   const prepaidTransitRows   = useMemo(() => activePreviewRows.filter(r => prepaidTransitSet.has(r.id)), [activePreviewRows, prepaidTransitSet]); // eslint-disable-line react-hooks/exhaustive-deps
   const remainingTransitRows = useMemo(() => activePreviewRows.filter(r => !prepaidTransitSet.has(r.id)), [activePreviewRows, prepaidTransitSet]); // eslint-disable-line react-hooks/exhaustive-deps
   const designatedPrepaidSum = useMemo(() => prepaidTransitRows.reduce((s, r) => s + r.dutyFee, 0), [prepaidTransitRows]);
+
+  // ── Enhanced FIFO: payment + manual Dr entries + prepaid transit as combined coverage ──
+  // Re-runs clientReallocate with combined remainder so that:
+  //   • manual Dr entries hide containers already explained by them
+  //   • prepaid in-transit containers hide offloaded "Open" rows they already cover
+  const enhancedRemainder = remainderForOpenPartial + Math.max(0, netAdjustment) + designatedPrepaidSum;
+  const enhancedAllocated = useMemo(() => {
+    // Use the same order as openAndPartial (respects customOrder), but with raw dutyFee data
+    const orderMap = new Map(openAndPartial.map((r, i) => [r.id, i]));
+    const sortedRaw = [...allOpenPartial].sort(
+      (a, b) => (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999)
+    );
+    return clientReallocate(sortedRaw, enhancedRemainder);
+  }, [openAndPartial, allOpenPartial, enhancedRemainder]); // eslint-disable-line react-hooks/exhaustive-deps
+  const enhancedCoveredIds = useMemo(
+    () => new Set(enhancedAllocated.filter(r => r.clearedAmount >= r.dutyFee).map(r => r.id)),
+    [enhancedAllocated]
+  );
+  // Containers fully covered by payment + manual entries + prepaid → hidden from the open table
+  const visibleOpenPartial = useMemo(
+    () => openAndPartial.filter(r => !enhancedCoveredIds.has(r.id)),
+    [openAndPartial, enhancedCoveredIds]
+  );
+  const coveredCount = openAndPartial.length - visibleOpenPartial.length;
 
   // ── Stale-ID cleanup (DB mode) ────────────────────────────────────────────
   // When a prepaid container is offloaded it leaves activePreviewRows.
