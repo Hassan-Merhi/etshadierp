@@ -599,6 +599,50 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         }
       }
 
+      // Auto-reprice active orders: when pricingMode or pricePerKg changes on a proforma line,
+      // immediately update price_used on all matching bales in LOADING/PENDING_VERIFICATION orders
+      // and recalculate order totals so the list view shows the correct amount without a manual repair.
+      const pricingChanged = updateData.pricingMode !== undefined || updateData.pricePerKg !== undefined
+        || (newWeightPerBaleKg !== undefined && newWeightPerBaleKg !== "");
+      if (pricingChanged && existingLine.articleCode) {
+        try {
+          const effectivePricingMode = updateData.pricingMode ?? updated.pricingMode ?? 'per_bale';
+          const effectivePricePerKg  = updateData.pricePerKg  ?? updated.pricePerKg  ?? null;
+          if (effectivePricingMode === 'per_kg' && effectivePricePerKg) {
+            const pkgRate = parseFloat(String(effectivePricePerKg));
+            if (pkgRate > 0) {
+              // Find active orders that use this proforma
+              const activeOrders = await db
+                .select({ id: customerOrders.id })
+                .from(customerOrders)
+                .where(and(
+                  eq(customerOrders.proformaIdUsed, existingLine.proformaId),
+                  sql`${customerOrders.status} IN ('LOADING', 'PENDING_VERIFICATION')`,
+                ));
+              for (const order of activeOrders) {
+                // Fetch bales for this article in this order
+                const bales = await db
+                  .select({ id: customerOrderBales.id, weight: customerOrderBales.weight })
+                  .from(customerOrderBales)
+                  .where(and(
+                    eq(customerOrderBales.orderId, order.id),
+                    eq(customerOrderBales.articleCode, existingLine.articleCode),
+                  ));
+                for (const bale of bales) {
+                  const wt = parseFloat(String(bale.weight || '0'));
+                  if (!isNaN(wt) && wt > 0) {
+                    await db.update(customerOrderBales)
+                      .set({ priceUsed: (wt * pkgRate).toFixed(2) })
+                      .where(eq(customerOrderBales.id, bale.id));
+                  }
+                }
+                await recalculateOrderTotals(db, order.id);
+              }
+            }
+          }
+        } catch (_e) { /* non-blocking */ }
+      }
+
       res.json({ ...updated, ...(stockWarning ? { stockWarning } : {}) });
     } catch (error: any) {
       console.error("Error updating proforma line:", error);
