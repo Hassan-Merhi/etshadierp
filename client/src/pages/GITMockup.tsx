@@ -11,7 +11,7 @@
  *   6. WhatsApp Preview — sample data: formatted text message
  */
 
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -2001,8 +2001,9 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   const coveredCount = openAndPartial.length - visibleOpenPartial.length;
 
   // ── Prepaid transit allocation ─────────────────────────────────────────────
-  // Budget = adjustedBalance (remaining after manual entries explain the offloaded balance).
-  const prepaidBudget = hasAdjustments && adjustedBalance !== null ? Math.max(0, adjustedBalance) : 0;
+  // Budget = adjusted balance (account balance minus manual entries).
+  // Works with OR without manual entries — no hasAdjustments guard.
+  const prepaidBudget = adjustedBalance !== null ? Math.max(0, adjustedBalance) : (openBalance !== null ? Math.max(0, openBalance) : 0);
 
   // Auto-designate: greedily fill prepaidBudget from the transit list in order
   const autoDesignatedTransitIds = useMemo((): number[] => {
@@ -2019,11 +2020,25 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
     return ids;
   }, [prepaidBudget, activePreviewRows]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Stale-ID cleanup ──────────────────────────────────────────────────────
+  // When a prepaid transit container is offloaded it leaves activePreviewRows.
+  // Clean up localStorage so override mode doesn't keep dead IDs.
+  const validTransitIdSet = useMemo(() => new Set(activePreviewRows.map(r => r.id)), [activePreviewRows]);
+  useEffect(() => {
+    if (prepaidTransitIds.length === 0) return;
+    const cleaned = prepaidTransitIds.filter(id => validTransitIdSet.has(id));
+    if (cleaned.length !== prepaidTransitIds.length) {
+      savePrepaidTransit(cleaned); // if cleaned = [] this resets to auto mode
+    }
+  }, [validTransitIdSet]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const isUserTransitOverride  = prepaidTransitIds.length > 0;
   const effectivePrepaidIds    = isUserTransitOverride ? prepaidTransitIds : autoDesignatedTransitIds;
   const prepaidTransitSet      = useMemo(() => new Set(effectivePrepaidIds), [effectivePrepaidIds]); // eslint-disable-line react-hooks/exhaustive-deps
   const prepaidTransitRows     = useMemo(() => activePreviewRows.filter(r => prepaidTransitSet.has(r.id)), [activePreviewRows, prepaidTransitSet]); // eslint-disable-line react-hooks/exhaustive-deps
   const remainingTransitRows   = useMemo(() => activePreviewRows.filter(r => !prepaidTransitSet.has(r.id)), [activePreviewRows, prepaidTransitSet]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Sum of duties already designated prepaid (for budget enforcement on add)
+  const designatedPrepaidSum   = useMemo(() => prepaidTransitRows.reduce((s, r) => s + r.dutyFee, 0), [prepaidTransitRows]);
 
   // When no transit is designated manually, check if the visible open containers look "prepaid"
   // (adjustedBalance ≈ their duty sum → agent already has the money for them)
@@ -2295,10 +2310,12 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                 <td className="py-0.5 px-1 text-center">
                   <button
                     onClick={() => {
+                      // Always work from the effective list so removing from auto mode
+                      // enters user-override with the correct remaining IDs.
                       const next = effectivePrepaidIds.filter(id => id !== r.id);
                       savePrepaidTransit(next);
                     }}
-                    title="Remove from prepaid"
+                    title="Remove from prepaid — pick a replacement from the transit list below"
                     data-testid={`button-unprepaid-transit-${r.id}`}
                     className="text-muted-foreground hover:text-red-500 dark:hover:text-red-400 transition-colors"
                   >
@@ -2554,7 +2571,8 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                     </tr>
                   ) : (
                     remainingTransitRows.map((r) => {
-                      const canDesignate = prepaidBudget > 0;
+                      // Only show ↑ button if adding this container still fits in the budget
+                      const canDesignate = prepaidBudget > 0 && (designatedPrepaidSum + r.dutyFee - 0.01) <= prepaidBudget;
                       return (
                         <tr key={r.id} className="border-b bg-sky-50/30 dark:bg-sky-950/10 text-muted-foreground">
                           <td className="py-0.5 px-2 font-mono text-center">{r.containerNumber}</td>
