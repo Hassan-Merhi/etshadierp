@@ -1600,6 +1600,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   const { data: prepaidData } = useQuery<{ designations: PrepaidDesignation[] }>({
     queryKey: prepaidQKey,
     initialData: { designations: [] },
+    staleTime: 120_000,
   });
   const dbPrepaidIds = useMemo(() => (prepaidData?.designations ?? []).map(d => d.containerId), [prepaidData]);
   const isDbOverride = dbPrepaidIds.length > 0;
@@ -1638,7 +1639,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   const [newType,     setNewType]     = useState<"debit" | "credit">("debit");
 
   const noteQueryKey = [`/api/git/agent-note/${companyId}/${encodeURIComponent(agent.agentName)}`];
-  const { data: noteData } = useQuery<{ note: string }>({ queryKey: noteQueryKey });
+  const { data: noteData } = useQuery<{ note: string }>({ queryKey: noteQueryKey, staleTime: 120_000 });
   const note = noteData?.note ?? "";
 
   const noteMutation = useMutation({
@@ -1657,7 +1658,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   // ── Manual adjustment entries (DB-backed, shared across all users) ─────────
   type AdjEntry = { id: number; description: string; amount: number; type: string };
   const adjQueryKey = [`/api/git/agent-adjustments/${companyId}/${encodeURIComponent(agent.agentName)}`];
-  const { data: adjData } = useQuery<AdjEntry[]>({ queryKey: adjQueryKey, initialData: [] });
+  const { data: adjData } = useQuery<AdjEntry[]>({ queryKey: adjQueryKey, initialData: [], staleTime: 120_000 });
   const adjustments: AdjEntry[] = adjData ?? [];
 
   const createAdjMutation = useMutation({
@@ -2016,15 +2017,16 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   const designatedPrepaidSum = useMemo(() => prepaidTransitRows.reduce((s, r) => s + r.dutyFee, 0), [prepaidTransitRows]);
 
   // ── Enhanced FIFO: payment coverage + prepaid-case full hide ─────────────
-  // When the ledger balance exceeds the total offloaded duty ("ledger_exceeds_containers"),
-  // every offloaded container has already been paid — the surplus is purely prepaid for
-  // in-transit containers. Hide all offloaded rows by using a remainder large enough to
-  // cover them all. In-transit prepaid containers still surface at the TOP of the table
-  // via explicit designation (prepaidTransitRows), independent of this calculation.
-  // For normal partial-payment cases, use the original payment-remainder formula.
-  const isLedgerExceedsContainers = openBalance !== null && offloadedDutyTotal !== undefined
-    && openBalance > offloadedDutyTotal + 0.01;
-  const enhancedRemainder = isLedgerExceedsContainers
+  // When the user designates in-transit containers that consume the full prepaid budget
+  // (designatedPrepaidSum ≈ prepaidBudget), they are explicitly saying:
+  //   "the entire balance is designated for these transit containers — all offloaded
+  //    containers were paid separately."
+  // In that case, hide every offloaded row with a very large remainder.
+  // For normal partial-payment cases (no designation or partial), use the original formula.
+  const allBudgetDesignated = designatedPrepaidSum > 0
+    && prepaidBudget > 0
+    && designatedPrepaidSum >= prepaidBudget - 0.01;
+  const enhancedRemainder = allBudgetDesignated
     ? (offloadedDutyTotal ?? 0) * 2 + 1          // large enough to clear every offloaded row
     : remainderForOpenPartial + Math.max(0, netAdjustment) + designatedPrepaidSum;
   const enhancedAllocated = useMemo(() => {
