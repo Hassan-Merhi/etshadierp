@@ -4124,7 +4124,7 @@ END $$`,
       company_id integer NOT NULL,
       agent_name text NOT NULL,
       container_id integer NOT NULL,
-      designated_by integer,
+      designated_by varchar(255),
       created_at timestamptz DEFAULT now(),
       UNIQUE (company_id, agent_name, container_id)
     )`,
@@ -4140,7 +4140,7 @@ END $$`,
       old_container_number text,
       new_container_number text,
       amount numeric(15,2),
-      performed_by integer,
+      performed_by varchar(255),
       note text,
       created_at timestamptz DEFAULT now()
     )`,
@@ -4164,6 +4164,9 @@ END $$`,
            UNIQUE (company_id, agent_name, container_id);
        END IF;
      END $$`,
+    // Fix user-id column types — production used UUID strings but columns were integer
+    `ALTER TABLE git_prepaid_designations ALTER COLUMN designated_by TYPE varchar(255) USING designated_by::varchar`,
+    `ALTER TABLE git_prepaid_activity_log ALTER COLUMN performed_by TYPE varchar(255) USING performed_by::varchar`,
     // Per-kg pricing support on proforma lines (June 2026)
     `ALTER TABLE customer_proforma_lines ADD COLUMN IF NOT EXISTS pricing_mode text NOT NULL DEFAULT 'per_bale'`,
     `ALTER TABLE customer_proforma_lines ADD COLUMN IF NOT EXISTS price_per_kg decimal(20,4)`,

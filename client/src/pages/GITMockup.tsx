@@ -1571,9 +1571,10 @@ function clientReallocate(
 
 function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummary; companyId: number; waGroupChatId?: string }) {
   const { toast } = useToast();
-  const [showActive,  setShowActive]  = useState(true);
-  const [showCleared, setShowCleared] = useState(false);
-  const [waSending,   setWaSending]   = useState(false);
+  const [showActive,   setShowActive]  = useState(true);
+  const [showCleared,  setShowCleared] = useState(false);
+  const [waSending,    setWaSending]   = useState(false);
+  const [showAdjForm,  setShowAdjForm] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   // ── Manual priority order ─────────────────────────────────────────────────
@@ -1667,6 +1668,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adjQueryKey });
       setNewDesc(""); setNewAmount(""); setNewType("debit");
+      setShowAdjForm(false);
     },
     onError: (e: any) => toast({ title: "Failed to add entry", description: e.message, variant: "destructive" }),
   });
@@ -2113,50 +2115,44 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       })}
 
 
-      {/* ── Overpayment note ── */}
-      <div className="px-3 py-2 border-b bg-amber-50/60 dark:bg-amber-950/15 flex items-start gap-2 min-h-[2rem]">
-        <StickyNote className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-        {editingNote ? (
-          <div className="flex-1 flex items-start gap-1.5">
-            <textarea
-              autoFocus
-              value={draftNote}
-              onChange={e => setDraftNote(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveNote(); } if (e.key === "Escape") cancelNote(); }}
-              placeholder="e.g. Peage $400 · Road fees $530 · etc."
-              rows={2}
-              className="flex-1 text-xs rounded border border-amber-300 dark:border-amber-700 bg-white dark:bg-amber-950/30 px-2 py-1 text-amber-900 dark:text-amber-200 resize-none focus:outline-none focus:ring-1 focus:ring-amber-400"
-              data-testid={`input-note-${agentName}`}
-            />
-            <button onClick={saveNote} title="Save note" className="mt-0.5 text-green-700 dark:text-green-400 hover:text-green-900" data-testid={`button-save-note-${agentName}`}>
-              <Check className="h-4 w-4" />
-            </button>
-            <button onClick={cancelNote} title="Cancel" className="mt-0.5 text-muted-foreground hover:text-foreground">
-              <XIcon className="h-4 w-4" />
-            </button>
-          </div>
-        ) : note ? (
-          <div className="flex-1 flex items-start justify-between gap-2">
-            <p className="text-xs text-amber-800 dark:text-amber-300 whitespace-pre-wrap leading-relaxed">{note}</p>
-            <button
-              onClick={() => { setDraftNote(note); setEditingNote(true); }}
-              title="Edit note"
-              className="shrink-0 text-amber-500 hover:text-amber-700 dark:hover:text-amber-300"
-              data-testid={`button-edit-note-${agentName}`}
-            >
-              <Pencil className="h-3 w-3" />
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => { setDraftNote(""); setEditingNote(true); }}
-            className="text-xs text-amber-500 dark:text-amber-500 hover:text-amber-700 dark:hover:text-amber-300 italic"
-            data-testid={`button-add-note-${agentName}`}
-          >
-            + Add note (e.g. what these payments are for — peage, fees, etc.)
-          </button>
-        )}
-      </div>
+      {/* ── Overpayment note — shown only when a note exists ── */}
+      {(editingNote || note) && (
+        <div className="px-3 py-2 border-b bg-amber-50/60 dark:bg-amber-950/15 flex items-start gap-2 min-h-[2rem]">
+          <StickyNote className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+          {editingNote ? (
+            <div className="flex-1 flex items-start gap-1.5">
+              <textarea
+                autoFocus
+                value={draftNote}
+                onChange={e => setDraftNote(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveNote(); } if (e.key === "Escape") cancelNote(); }}
+                placeholder="e.g. Peage $400 · Road fees $530 · etc."
+                rows={2}
+                className="flex-1 text-xs rounded border border-amber-300 dark:border-amber-700 bg-white dark:bg-amber-950/30 px-2 py-1 text-amber-900 dark:text-amber-200 resize-none focus:outline-none focus:ring-1 focus:ring-amber-400"
+                data-testid={`input-note-${agentName}`}
+              />
+              <button onClick={saveNote} title="Save note" className="mt-0.5 text-green-700 dark:text-green-400 hover:text-green-900" data-testid={`button-save-note-${agentName}`}>
+                <Check className="h-4 w-4" />
+              </button>
+              <button onClick={cancelNote} title="Cancel" className="mt-0.5 text-muted-foreground hover:text-foreground">
+                <XIcon className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-start justify-between gap-2">
+              <p className="text-xs text-amber-800 dark:text-amber-300 whitespace-pre-wrap leading-relaxed">{note}</p>
+              <button
+                onClick={() => { setDraftNote(note); setEditingNote(true); }}
+                title="Edit note"
+                className="shrink-0 text-amber-500 hover:text-amber-700 dark:hover:text-amber-300"
+                data-testid={`button-edit-note-${agentName}`}
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Manual Adjustment Entries ── */}
       <div className="border-b">
@@ -2185,53 +2181,53 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
             ))}
           </div>
         )}
-        {/* Inline add form */}
-        <div className="px-3 py-2 flex items-center gap-1.5 flex-wrap">
-          <Plus className="h-3 w-3 shrink-0 text-muted-foreground" />
-          <input
-            value={newDesc}
-            onChange={e => setNewDesc(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && saveAdj()}
-            placeholder="Description (e.g. Peage, Road fees…)"
-            className="flex-1 min-w-[140px] text-xs rounded border border-input bg-background px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
-            data-testid={`input-adj-desc-${agentName}`}
-          />
-          <input
-            type="number"
-            min="0"
-            step="any"
-            value={newAmount}
-            onChange={e => setNewAmount(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && saveAdj()}
-            placeholder="Amount"
-            className="w-24 text-xs rounded border border-input bg-background px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring text-right"
-            data-testid={`input-adj-amount-${agentName}`}
-          />
-          {/* Dr / Cr toggle */}
-          <div className="flex rounded border border-input overflow-hidden text-[10px] font-bold shrink-0">
-            <button
-              type="button"
-              onClick={() => setNewType("debit")}
-              className={cn("px-2.5 py-1 transition-colors", newType === "debit" ? "bg-green-600 text-white" : "bg-background text-muted-foreground hover:bg-muted")}
-              data-testid={`button-adj-debit-${agentName}`}
-            >Dr</button>
-            <button
-              type="button"
-              onClick={() => setNewType("credit")}
-              className={cn("px-2.5 py-1 transition-colors", newType === "credit" ? "bg-red-600 text-white" : "bg-background text-muted-foreground hover:bg-muted")}
-              data-testid={`button-adj-credit-${agentName}`}
-            >Cr</button>
+        {/* Inline add form — collapsed to a + button by default */}
+        {showAdjForm ? (
+          <div className="px-3 py-2 flex items-center gap-1.5 flex-wrap">
+            <input
+              autoFocus
+              value={newDesc}
+              onChange={e => setNewDesc(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && saveAdj()}
+              placeholder="Description (e.g. Peage, Road fees…)"
+              className="flex-1 min-w-[140px] text-xs rounded border border-input bg-background px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
+              data-testid={`input-adj-desc-${agentName}`}
+            />
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={newAmount}
+              onChange={e => setNewAmount(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && saveAdj()}
+              placeholder="Amount"
+              className="w-24 text-xs rounded border border-input bg-background px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring text-right"
+              data-testid={`input-adj-amount-${agentName}`}
+            />
+            <div className="flex rounded border border-input overflow-hidden text-[10px] font-bold shrink-0">
+              <button type="button" onClick={() => setNewType("debit")} className={cn("px-2.5 py-1 transition-colors", newType === "debit" ? "bg-green-600 text-white" : "bg-background text-muted-foreground hover:bg-muted")} data-testid={`button-adj-debit-${agentName}`}>Dr</button>
+              <button type="button" onClick={() => setNewType("credit")} className={cn("px-2.5 py-1 transition-colors", newType === "credit" ? "bg-red-600 text-white" : "bg-background text-muted-foreground hover:bg-muted")} data-testid={`button-adj-credit-${agentName}`}>Cr</button>
+            </div>
+            <button type="button" onClick={saveAdj} disabled={createAdjMutation.isPending} className="px-2.5 py-1 rounded bg-primary text-primary-foreground text-[10px] font-semibold disabled:opacity-50 shrink-0" data-testid={`button-adj-save-${agentName}`}>
+              {createAdjMutation.isPending ? "…" : "Save"}
+            </button>
+            <button type="button" onClick={() => { setShowAdjForm(false); setNewDesc(""); setNewAmount(""); setNewType("debit"); }} className="p-1 text-muted-foreground hover:text-foreground" title="Cancel">
+              <XIcon className="h-3 w-3" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={saveAdj}
-            disabled={createAdjMutation.isPending}
-            className="px-2.5 py-1 rounded bg-primary text-primary-foreground text-[10px] font-semibold disabled:opacity-50 shrink-0"
-            data-testid={`button-adj-save-${agentName}`}
-          >
-            {createAdjMutation.isPending ? "…" : "Save"}
-          </button>
-        </div>
+        ) : (
+          <div className="px-3 py-1.5 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setShowAdjForm(true)}
+              className="flex items-center justify-center h-5 w-5 rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+              title="Add manual entry"
+              data-testid={`button-adj-add-${agentName}`}
+            >
+              <Plus className="h-3 w-3" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Reconciliation status banner ── */}
@@ -2260,36 +2256,17 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       )}
 
 
-      {/* ── Covered-by-manual-entries info banner ── */}
-      {coveredCount > 0 && !isReconciled && (
-        <div className="flex items-center gap-2 px-3 py-1 bg-teal-50 dark:bg-teal-950/20 border-b border-teal-200 dark:border-teal-800 text-xs text-teal-800 dark:text-teal-300">
-          <CheckCircle2 className="h-3 w-3 shrink-0 text-teal-600" />
-          <span>
-            {coveredCount} container{coveredCount !== 1 ? "s" : ""} covered by payment + manual entries — hidden from table
-          </span>
-        </div>
-      )}
-
-      {/* ── Prepaid transit designation banner ── */}
-      {prepaidTransitRows.length > 0 && (
-        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-950/20 border-b border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300">
-          <ArrowUp className="h-3 w-3 shrink-0" />
-          <span className="font-semibold">
-            {prepaidTransitRows.length} in-transit container{prepaidTransitRows.length !== 1 ? "s" : ""} designated as Prepaid
-          </span>
-          <span className="text-emerald-600 dark:text-emerald-400">
-            — ${fmt(designatedPrepaidSum, 0)} of ${fmt(prepaidBudget, 0)} budget
-          </span>
-          {isDbOverride && (
-            <button
-              onClick={() => setAllPrepaidMutation.mutate([])}
-              className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-medium"
-              data-testid={`button-reset-prepaid-transit-${agentName}`}
-            >
-              <RotateCcw className="h-3 w-3" />
-              Reset to auto
-            </button>
-          )}
+      {/* ── Reset-to-auto button (only shown when user has manually overridden designations) ── */}
+      {isDbOverride && prepaidTransitRows.length > 0 && (
+        <div className="flex justify-end px-3 py-1 border-b">
+          <button
+            onClick={() => setAllPrepaidMutation.mutate([])}
+            className="flex items-center gap-1 px-2 py-0.5 rounded border border-muted text-xs text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+            data-testid={`button-reset-prepaid-transit-${agentName}`}
+          >
+            <RotateCcw className="h-3 w-3" />
+            Reset to auto
+          </button>
         </div>
       )}
 
@@ -2460,31 +2437,16 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                       ? "bg-red-500 text-white font-bold"
                       : "bg-yellow-400 text-yellow-950 font-bold";
                 return (
-                  <>
-                    <tr className={cn(baseCls, "opacity-70")}>
-                      <td colSpan={9} className="py-1 px-2 text-xs uppercase tracking-wide">
-                        Account Balance
-                      </td>
-                      <td className="py-1 px-2 text-right text-sm">
-                        ${fmt(Math.abs(rawBal), 0)}
-                        {balLabel && <span className="ml-1 text-xs opacity-80">({balLabel})</span>}
-                      </td>
-                      <td colSpan={2} />
-                    </tr>
-                    <tr className={adjRowCls}>
-                      <td colSpan={9} className="py-1.5 px-2 text-xs uppercase tracking-wide">
-                        <span className="flex items-center gap-1.5">
-                          Adjusted Balance (After Manual Entries)
-                        </span>
-                      </td>
-                      <td className="py-1.5 px-2 text-right text-sm">
-                        ${fmt(adjAbs, 0)}
-                        <span className="ml-1 text-xs opacity-80">({adjLabel})</span>
-                      </td>
-                      <td />
-                      <td />
-                    </tr>
-                  </>
+                  <tr className={adjRowCls}>
+                    <td colSpan={9} className="py-1.5 px-2 text-xs uppercase tracking-wide">
+                      Account Balance
+                    </td>
+                    <td className="py-1.5 px-2 text-right text-sm">
+                      ${fmt(adjAbs, 0)}
+                      <span className="ml-1 text-xs opacity-80">({adjLabel})</span>
+                    </td>
+                    <td colSpan={2} />
+                  </tr>
                 );
               }
 
