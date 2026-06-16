@@ -897,8 +897,11 @@ export default function FactoryInvoiceDetail() {
                   </TableCell>
                   {isAdmin && (() => {
                     const isPerKg = line.pricingMode === 'per_kg';
+                    const pkgRateInv = line.pricePerKg || 0;
                     const displayRate = isPerKg
-                      ? (Number(line.totalWeight) > 0 ? Number(line.totalPrice) / Number(line.totalWeight) : (line.pricePerKg || 0))
+                      ? (Number(line.totalPrice) > 0 && Number(line.totalWeight) > 0
+                          ? Number(line.totalPrice) / Number(line.totalWeight)
+                          : pkgRateInv)
                       : Number(line.pricePerBale || 0);
                     return (
                       <TableCell className={`text-right font-mono${hideExportSelling ? " print:hidden" : ""}`} data-testid={`text-price-per-bale-${idx}`}>

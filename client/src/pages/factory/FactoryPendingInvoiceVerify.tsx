@@ -797,9 +797,18 @@ export default function FactoryPendingInvoiceVerify() {
                       <TableBody>
                         {verification.loadedItems.map((group, i) => {
                           const isPerKg = group.pricingMode === 'per_kg';
+                          const pkgRate = group.pricePerKg || 0;
+                          // For per-kg: derive rate from actual bale prices if available,
+                          // otherwise fall back to the proforma's price_per_kg so the
+                          // column never shows 0 when bales were loaded before repricing.
                           const unitRate = isPerKg
-                            ? (group.totalWeight > 0 ? group.totalPrice / group.totalWeight : (group.pricePerKg || 0))
+                            ? (group.totalPrice > 0 && group.totalWeight > 0
+                                ? group.totalPrice / group.totalWeight
+                                : pkgRate)
                             : parseFloat(group.pricePerBale || "0");
+                          const displayTotal = isPerKg && group.totalPrice === 0 && pkgRate > 0 && group.totalWeight > 0
+                            ? pkgRate * group.totalWeight
+                            : group.totalPrice;
                           return (
                           <TableRow key={i} data-testid={`row-loaded-${group.articleCode}`}>
                             <TableCell className="font-mono text-sm" data-testid={`text-loaded-article-${group.articleCode}`}>
@@ -809,7 +818,7 @@ export default function FactoryPendingInvoiceVerify() {
                             <TableCell className="text-right font-mono">{group.qty}</TableCell>
                             <TableCell className="text-right font-mono">{fmtNum(group.totalWeight || 0)}</TableCell>
                             {isAdminOrOwner && <TableCell className="text-right font-mono">{fmtNum(unitRate)}</TableCell>}
-                            {isAdminOrOwner && <TableCell className="text-right font-mono font-semibold">{fmtNum(group.totalPrice || 0)}</TableCell>}
+                            {isAdminOrOwner && <TableCell className="text-right font-mono font-semibold">{fmtNum(displayTotal)}</TableCell>}
                             <TableCell className="text-right font-mono text-teal-600 dark:text-teal-400" data-testid={`text-loaded-stock-${group.articleCode}`}>
                               {(group.stockQty ?? 0) > 0 ? (
                                 <button
@@ -1253,17 +1262,26 @@ export default function FactoryPendingInvoiceVerify() {
                 <div className="rounded-md border p-3 space-y-1 max-h-48 overflow-y-auto">
                   <p className="text-xs font-medium text-muted-foreground mb-2">Price lines in this proforma:</p>
                   {pf.lines.map((l, i) => {
-                    const isPerKg = l.pricingMode === "per_kg" && l.pricePerKg && l.weightPerBaleKg;
+                    const isPerKg = l.pricingMode === "per_kg" && l.pricePerKg;
+                    const wt = parseFloat(l.weightPerBaleKg ?? "0");
+                    const pkgKgRate = isPerKg ? parseFloat(l.pricePerKg!) : 0;
+                    // Show weight × rate when weight is known; otherwise just show the rate
                     const effectivePrice = isPerKg
-                      ? parseFloat(l.weightPerBaleKg!) * parseFloat(l.pricePerKg!)
+                      ? (wt > 0 ? wt * pkgKgRate : 0)
                       : parseFloat(l.pricePerBale) || 0;
                     return (
                       <div key={i} className="flex justify-between text-sm">
                         <span className="text-muted-foreground">{l.articleCode}</span>
                         <div className="text-right">
-                          <span className="font-medium">${fmtNum(effectivePrice)}</span>
-                          {isPerKg && (
-                            <span className="text-xs text-muted-foreground ml-1">(${fmtNum(parseFloat(l.pricePerKg!))}/kg)</span>
+                          {isPerKg ? (
+                            <>
+                              <span className="font-medium">${fmtNum(pkgKgRate)}/kg</span>
+                              {wt > 0 && (
+                                <span className="text-xs text-muted-foreground ml-1">(≈${fmtNum(effectivePrice)}/bale)</span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="font-medium">${fmtNum(effectivePrice)}</span>
                           )}
                         </div>
                       </div>
