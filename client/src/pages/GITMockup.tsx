@@ -2015,11 +2015,12 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   const remainingTransitRows = useMemo(() => activePreviewRows.filter(r => !prepaidTransitSet.has(r.id)), [activePreviewRows, prepaidTransitSet]); // eslint-disable-line react-hooks/exhaustive-deps
   const designatedPrepaidSum = useMemo(() => prepaidTransitRows.reduce((s, r) => s + r.dutyFee, 0), [prepaidTransitRows]);
 
-  // ── Enhanced FIFO: payment + manual Dr entries + prepaid transit as combined coverage ──
+  // ── Enhanced FIFO: payment + net prepaid budget as combined coverage ──────
   // Re-runs clientReallocate with combined remainder so that:
-  //   • manual Dr entries hide containers already explained by them
-  //   • prepaid in-transit containers hide offloaded "Open" rows they already cover
-  const enhancedRemainder = remainderForOpenPartial + Math.max(0, netAdjustment) + designatedPrepaidSum;
+  //   • offloaded containers whose duty is covered by the adjusted prepaid balance are hidden
+  //   • in-transit containers explicitly designated as prepaid are shown at the TOP of the
+  //     table (their portion of the budget is subtracted so they don't double-hide offloaded rows)
+  const enhancedRemainder = remainderForOpenPartial + Math.max(0, prepaidBudget - designatedPrepaidSum);
   const enhancedAllocated = useMemo(() => {
     // Use the same order as openAndPartial (respects customOrder), but with raw dutyFee data
     const orderMap = new Map(openAndPartial.map((r, i) => [r.id, i]));
