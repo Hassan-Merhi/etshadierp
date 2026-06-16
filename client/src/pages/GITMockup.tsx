@@ -2051,14 +2051,6 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
     setAllPrepaidMutation.mutate(cleaned);
   }, [validTransitIdSet]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Open-containers "prepaid" hint (no transit designated, balance ≈ open duty sum)
-  const visibleOpenDutySum  = visibleOpenPartial.reduce((s, r) => s + r.remainingAmount, 0);
-  const openContainersPrepaid = hasAdjustments
-    && prepaidTransitRows.length === 0
-    && prepaidBudget > 0
-    && visibleOpenDutySum > 0
-    && Math.abs(visibleOpenDutySum - prepaidBudget) <= 0.01;
-
   const confidenceBadge = {
     exact:    { label: "Exact match",  cls: "bg-green-700 text-white" },
     fuzzy:    { label: "Fuzzy match",  cls: "bg-amber-600 text-white" },
@@ -2362,7 +2354,6 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                 <tr key={r.id} className={cn(
                   "border-b",
                   r.allocationStatus === "Partially Cleared" && "bg-amber-50/80 dark:bg-amber-950/20",
-                  openContainersPrepaid && "bg-emerald-50/40 dark:bg-emerald-950/10"
                 )}>
                   <td className="py-0.5 px-2 font-mono font-semibold text-center">{r.containerNumber}</td>
                   <td className="py-0.5 px-2 text-center">{r.supplierCode ?? "—"}</td>
@@ -2377,11 +2368,9 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                   </td>
                   <td className="py-0.5 px-2 text-right font-semibold">${fmt(r.remainingAmount, 0)}</td>
                   <td className="py-0.5 px-2 text-center">
-                    {openContainersPrepaid
-                      ? <Badge variant="outline" className="text-[10px] text-emerald-700 border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 no-default-active-elevate">Prepaid</Badge>
-                      : r.allocationStatus === "Partially Cleared"
-                        ? <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-400 no-default-active-elevate">Partial</Badge>
-                        : <Badge variant="outline" className="text-[10px] no-default-active-elevate">Open</Badge>
+                    {r.allocationStatus === "Partially Cleared"
+                      ? <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-400 no-default-active-elevate">Partial</Badge>
+                      : <Badge variant="outline" className="text-[10px] no-default-active-elevate">Open</Badge>
                     }
                   </td>
                   {/* ── Priority move buttons ── */}
