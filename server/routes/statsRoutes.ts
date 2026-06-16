@@ -544,8 +544,13 @@ export function registerStatsRoutes(app: Express) {
             .from(propertyMonthlyLedger)
             .where(inArray(propertyMonthlyLedger.contractId, contractIds))
             .groupBy(propertyMonthlyLedger.contractId);
-          // Paid: only payments made on or before the asOf date
-          const paidConditions: any[] = [inArray(propertyPayments.contractId, contractIds)];
+          // Paid: only rent-linked payments (ledgerRowId IS NOT NULL) made on or before the asOf date.
+          // Payments with ledgerRowId=null are guarantee-release/refund log entries — they are NOT
+          // rent payments and must not inflate the "paid" total (which would falsely produce prepaid rent).
+          const paidConditions: any[] = [
+            inArray(propertyPayments.contractId, contractIds),
+            isNotNull(propertyPayments.ledgerRowId),
+          ];
           if (toDate) paidConditions.push(lte(propertyPayments.paymentDate, toDate));
           const paidRows = await db.select({
             contractId: propertyPayments.contractId,
