@@ -2015,12 +2015,18 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   const remainingTransitRows = useMemo(() => activePreviewRows.filter(r => !prepaidTransitSet.has(r.id)), [activePreviewRows, prepaidTransitSet]); // eslint-disable-line react-hooks/exhaustive-deps
   const designatedPrepaidSum = useMemo(() => prepaidTransitRows.reduce((s, r) => s + r.dutyFee, 0), [prepaidTransitRows]);
 
-  // ── Enhanced FIFO: payment + net prepaid budget as combined coverage ──────
-  // Re-runs clientReallocate with combined remainder so that:
-  //   • offloaded containers whose duty is covered by the adjusted prepaid balance are hidden
-  //   • in-transit containers explicitly designated as prepaid are shown at the TOP of the
-  //     table (their portion of the budget is subtracted so they don't double-hide offloaded rows)
-  const enhancedRemainder = remainderForOpenPartial + Math.max(0, prepaidBudget - designatedPrepaidSum);
+  // ── Enhanced FIFO: payment coverage + prepaid-case full hide ─────────────
+  // When the ledger balance exceeds the total offloaded duty ("ledger_exceeds_containers"),
+  // every offloaded container has already been paid — the surplus is purely prepaid for
+  // in-transit containers. Hide all offloaded rows by using a remainder large enough to
+  // cover them all. In-transit prepaid containers still surface at the TOP of the table
+  // via explicit designation (prepaidTransitRows), independent of this calculation.
+  // For normal partial-payment cases, use the original payment-remainder formula.
+  const isLedgerExceedsContainers = openBalance !== null && offloadedDutyTotal !== undefined
+    && openBalance > offloadedDutyTotal + 0.01;
+  const enhancedRemainder = isLedgerExceedsContainers
+    ? (offloadedDutyTotal ?? 0) * 2 + 1          // large enough to clear every offloaded row
+    : remainderForOpenPartial + Math.max(0, netAdjustment) + designatedPrepaidSum;
   const enhancedAllocated = useMemo(() => {
     // Use the same order as openAndPartial (respects customOrder), but with raw dutyFee data
     const orderMap = new Map(openAndPartial.map((r, i) => [r.id, i]));
