@@ -82,7 +82,7 @@ export default function FactoryProformas() {
   const [addLineProformaId, setAddLineProformaId] = useState<number | null>(null);
   const [newLine, setNewLine] = useState({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
   const [editingLine, setEditingLine] = useState<ProformaLine | null>(null);
-  const [editLineValues, setEditLineValues] = useState({ productName: "", quantity: "", pricePerBale: "" });
+  const [editLineValues, setEditLineValues] = useState({ productName: "", quantity: "", pricePerBale: "", weightPerBaleKg: "" });
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const [inlineQtyLineId, setInlineQtyLineId] = useState<number | null>(null);
   const [inlineQtyValue, setInlineQtyValue] = useState<string>("");
@@ -270,11 +270,12 @@ export default function FactoryProformas() {
   });
 
   const editLineMutation = useMutation({
-    mutationFn: async (data: { id: number; pricePerBale: string; productName: string; quantity: string }) => {
+    mutationFn: async (data: { id: number; pricePerBale: string; productName: string; quantity: string; weightPerBaleKg: string }) => {
       return await modeApiRequest("PUT", `/api/factory/customer-proforma-lines/${data.id}`, {
         pricePerBale: data.pricePerBale,
         productName: data.productName,
         quantity: data.quantity,
+        weightPerBaleKg: data.weightPerBaleKg !== "" ? data.weightPerBaleKg : undefined,
       });
     },
     onSuccess: () => {
@@ -505,6 +506,7 @@ export default function FactoryProformas() {
       pricePerBale: editLineValues.pricePerBale,
       productName: editLineValues.productName,
       quantity: editLineValues.quantity,
+      weightPerBaleKg: editLineValues.weightPerBaleKg,
     });
   };
 
@@ -922,6 +924,7 @@ export default function FactoryProformas() {
                                                 productName: line.productName,
                                                 quantity: String(line.quantity),
                                                 pricePerBale: line.pricePerBale,
+                                                weightPerBaleKg: line.weightPerBaleKg ?? "",
                                               });
                                             }}
                                             data-testid={`button-edit-line-${line.id}`}
@@ -1346,7 +1349,7 @@ export default function FactoryProformas() {
                 data-testid="input-edit-line-product-name"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="text-sm font-medium mb-1 block">Quantity</label>
                 <Input
@@ -1366,6 +1369,18 @@ export default function FactoryProformas() {
                   onChange={(e) => setEditLineValues({ ...editLineValues, pricePerBale: e.target.value })}
                   onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); }}
                   data-testid="input-edit-line-price"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">KG / Bale</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="e.g. 97"
+                  value={editLineValues.weightPerBaleKg}
+                  onChange={(e) => setEditLineValues({ ...editLineValues, weightPerBaleKg: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); }}
+                  data-testid="input-edit-line-weight"
                 />
               </div>
             </div>

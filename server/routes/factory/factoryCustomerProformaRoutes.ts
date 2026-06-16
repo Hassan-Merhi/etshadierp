@@ -560,6 +560,17 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       if (req.body.pricingMode !== undefined) updateData.pricingMode = req.body.pricingMode;
       if (req.body.pricePerKg !== undefined) updateData.pricePerKg = req.body.pricePerKg ?? null;
 
+      // Auto-save weight to factoryBaleProducts so stock allocation stays in sync
+      const newWeightPerBaleKg = req.body.weightPerBaleKg;
+      if (newWeightPerBaleKg !== undefined && newWeightPerBaleKg !== "" && existingLine.articleCode) {
+        await db.update(factoryBaleProducts)
+          .set({ weightPerBaleKg: String(newWeightPerBaleKg) })
+          .where(and(
+            eq(factoryBaleProducts.companyId, companyId),
+            eq(factoryBaleProducts.articleCode, existingLine.articleCode),
+          ));
+      }
+
       // factory_v2: warn if quantity increase exceeds free-to-promise (non-blocking)
       let stockWarning: string | undefined;
       if (updateData.quantity !== undefined && await isFactoryV2Company(companyId)) {
