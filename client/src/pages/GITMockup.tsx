@@ -2006,23 +2006,10 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   // can be included in enhancedRemainder to hide offloaded rows already covered by prepaid.
   const prepaidBudget = adjustedBalance !== null ? Math.max(0, adjustedBalance) : (openBalance !== null ? Math.max(0, openBalance) : 0);
 
-  // Auto-designate: greedily fill prepaidBudget from the transit list (client-side suggestion)
-  const autoDesignatedTransitIds = useMemo((): number[] => {
-    if (prepaidBudget <= 0 || activePreviewRows.length === 0) return [];
-    let budget = prepaidBudget;
-    const ids: number[] = [];
-    for (const row of activePreviewRows) {
-      if (budget >= row.dutyFee - 0.01) {
-        ids.push(row.id);
-        budget -= row.dutyFee;
-        if (budget <= 0.01) break;
-      }
-    }
-    return ids;
-  }, [prepaidBudget, activePreviewRows]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Effective IDs: DB override takes priority; fall back to client-side auto-selection
-  const effectivePrepaidIds  = isDbOverride ? dbPrepaidIds : autoDesignatedTransitIds;
+  // Effective IDs: only use explicit DB designations — never auto-fill.
+  // Prepaid must be set deliberately by the user; auto-guessing from the balance causes
+  // false "Prepaid" labels when the agent is simply owed money for offloaded containers.
+  const effectivePrepaidIds  = dbPrepaidIds;
   const prepaidTransitSet    = useMemo(() => new Set(effectivePrepaidIds), [effectivePrepaidIds]); // eslint-disable-line react-hooks/exhaustive-deps
   const prepaidTransitRows   = useMemo(() => activePreviewRows.filter(r => prepaidTransitSet.has(r.id)), [activePreviewRows, prepaidTransitSet]); // eslint-disable-line react-hooks/exhaustive-deps
   const remainingTransitRows = useMemo(() => activePreviewRows.filter(r => !prepaidTransitSet.has(r.id)), [activePreviewRows, prepaidTransitSet]); // eslint-disable-line react-hooks/exhaustive-deps
