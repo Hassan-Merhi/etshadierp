@@ -3315,7 +3315,10 @@ export function registerContainerRoutes(app: Express) {
           // Compute totals. intercoTotal = supplier share (excludes freight when own/parent-paid).
           const poGrandTotal = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
           const b1FreightPaidBy: string = req.body.freightPaidBy ?? existingPO.freightPaidBy ?? 'supplier';
-          const b1IntercoTotal = (b1FreightPaidBy === 'own' || b1FreightPaidBy === 'parent') && freight > 0
+          // 'own': freight goes to a separate own-account voucher → exclude from PO voucher
+          // 'parent': subsidiary still owes parent the full amount including freight → use poGrandTotal
+          // 'supplier': full amount
+          const b1IntercoTotal = b1FreightPaidBy === 'own' && freight > 0
             ? itemsTotal + surcharge + fumigation + documentCharges - discount + otherCharges
             : poGrandTotal;
 
