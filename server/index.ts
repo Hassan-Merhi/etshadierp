@@ -4119,6 +4119,31 @@ END $$`,
     )`,
     `CREATE INDEX IF NOT EXISTS idx_git_agent_adjustments_lookup
       ON git_agent_adjustments (company_id, agent_name)`,
+    `CREATE TABLE IF NOT EXISTS git_prepaid_designations (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      agent_name text NOT NULL,
+      container_id integer NOT NULL,
+      designated_by integer,
+      created_at timestamptz DEFAULT now(),
+      UNIQUE (company_id, agent_name, container_id)
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_git_prepaid_lookup
+      ON git_prepaid_designations (company_id, agent_name)`,
+    `CREATE TABLE IF NOT EXISTS git_prepaid_activity_log (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      agent_name text NOT NULL,
+      action text NOT NULL,
+      old_container_id integer,
+      new_container_id integer,
+      old_container_number text,
+      new_container_number text,
+      amount numeric(15,2),
+      performed_by integer,
+      note text,
+      created_at timestamptz DEFAULT now()
+    )`,
     // Per-kg pricing support on proforma lines (June 2026)
     `ALTER TABLE customer_proforma_lines ADD COLUMN IF NOT EXISTS pricing_mode text NOT NULL DEFAULT 'per_bale'`,
     `ALTER TABLE customer_proforma_lines ADD COLUMN IF NOT EXISTS price_per_kg decimal(20,4)`,

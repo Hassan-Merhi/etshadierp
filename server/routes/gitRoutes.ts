@@ -1745,4 +1745,129 @@ export function registerGitRoutes(app: Express) {
       res.status(500).json({ message: err.message });
     }
   });
+
+  // ── Agent prepaid transit designations ─────────────────────────────────────
+  // Containers in transit that have been paid in advance for this agent.
+  // Stored in git_prepaid_designations (DB-backed, shared across all users).
+  // A container must only appear in ONE status section at a time.
+
+  app.get("/api/git/agent-prepaid/:companyId/:agentName", requireAuth, async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.companyId, 10);
+      const agentName = req.params.agentName;
+      const result = await db.execute(
+        sql`SELECT container_id FROM git_prepaid_designations
+            WHERE company_id = ${companyId} AND agent_name = ${agentName}
+            ORDER BY created_at ASC`
+      );
+      res.json({ designations: (result.rows as any[]).map(r => ({ containerId: r.container_id })) });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Atomically replace the full designation list (used for add/remove operations).
+  app.post("/api/git/agent-prepaid/:companyId/:agentName/set-all", requireAuth, async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.companyId, 10);
+      const agentName = req.params.agentName;
+      const containerIds: number[] = (req.body.containerIds ?? []).map(Number).filter((n: number) => !isNaN(n));
+      const userId = (req as any).user?.id ?? null;
+      // Enforce uniqueness: no container can be prepaid for two agents at once for same company.
+      // We simply replace the list for this agent atomically.
+      await db.execute(
+        sql`DELETE FROM git_prepaid_designations WHERE company_id = ${companyId} AND agent_name = ${agentName}`
+      );
+      for (const cid of containerIds) {
+        await db.execute(
+          sql`INSERT INTO git_prepaid_designations (company_id, agent_name, container_id, designated_by)
+              VALUES (${companyId}, ${agentName}, ${cid}, ${userId})
+              ON CONFLICT (company_id, agent_name, container_id) DO NOTHING`
+        );
+      }
+      res.json({ ok: true, count: containerIds.length });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Replace one PREPAID_IN_TRANSIT container with an IN_TRANSIT_UNPAID one.
+  // The payment allocation moves to the new container; no payment is created.
+  app.post("/api/git/agent-prepaid/:companyId/:agentName/replace", requireAuth, async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.companyId, 10);
+      const agentName = req.params.agentName;
+      const { oldContainerId, newContainerId, confirmDifferentAmount } = req.body;
+      const userId = (req as any).user?.id ?? null;
+
+      if (!oldContainerId || !newContainerId) {
+        return res.status(400).json({ message: "oldContainerId and newContainerId are required." });
+      }
+      if (oldContainerId === newContainerId) {
+        return res.status(400).json({ message: "Old and new containers must be different." });
+      }
+
+      // Look up container details
+      const cResult = await db.execute(
+        sql`SELECT id, container_number, duty_fee FROM containers
+            WHERE id IN (${oldContainerId}, ${newContainerId})`
+      );
+      const rows = cResult.rows as any[];
+      const oldC = rows.find(r => r.id === oldContainerId || r.id === Number(oldContainerId));
+      const newC = rows.find(r => r.id === newContainerId || r.id === Number(newContainerId));
+
+      if (!oldC) return res.status(404).json({ message: `Old container (id ${oldContainerId}) not found.` });
+      if (!newC) return res.status(404).json({ message: `New container (id ${newContainerId}) not found.` });
+
+      // Verify old is currently designated
+      const existing = await db.execute(
+        sql`SELECT id FROM git_prepaid_designations
+            WHERE company_id = ${companyId} AND agent_name = ${agentName} AND container_id = ${Number(oldContainerId)}`
+      );
+      if ((existing.rows as any[]).length === 0) {
+        return res.status(409).json({ message: `Container ${oldC.container_number} is not currently designated as prepaid for this agent.` });
+      }
+
+      // Warn on mismatched duty amounts
+      const amountsDiffer = Math.abs(parseFloat(oldC.duty_fee) - parseFloat(newC.duty_fee)) > 0.01;
+      if (amountsDiffer && !confirmDifferentAmount) {
+        return res.status(409).json({
+          message: "Duty amounts differ between the two containers.",
+          oldAmount: parseFloat(oldC.duty_fee),
+          newAmount: parseFloat(newC.duty_fee),
+          requiresConfirmation: true,
+        });
+      }
+
+      // Perform the swap
+      await db.execute(
+        sql`DELETE FROM git_prepaid_designations
+            WHERE company_id = ${companyId} AND agent_name = ${agentName} AND container_id = ${Number(oldContainerId)}`
+      );
+      await db.execute(
+        sql`INSERT INTO git_prepaid_designations (company_id, agent_name, container_id, designated_by)
+            VALUES (${companyId}, ${agentName}, ${Number(newContainerId)}, ${userId})
+            ON CONFLICT (company_id, agent_name, container_id) DO NOTHING`
+      );
+
+      // Log the activity
+      await db.execute(
+        sql`INSERT INTO git_prepaid_activity_log
+              (company_id, agent_name, action, old_container_id, new_container_id,
+               old_container_number, new_container_number, amount, performed_by)
+            VALUES
+              (${companyId}, ${agentName}, 'replace',
+               ${Number(oldContainerId)}, ${Number(newContainerId)},
+               ${oldC.container_number}, ${newC.container_number},
+               ${parseFloat(newC.duty_fee)}, ${userId})`
+      );
+
+      res.json({
+        ok: true,
+        replaced: { from: oldC.container_number, to: newC.container_number },
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
 }

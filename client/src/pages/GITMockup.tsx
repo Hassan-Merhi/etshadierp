@@ -22,13 +22,17 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
   Ship, Truck, Package, AlertTriangle, FileX, Clock, DollarSign,
   Search, ExternalLink, CheckCircle2, XCircle, MessageSquare,
   FileSpreadsheet, LayoutGrid, List, Info, AlertCircle, ChevronDown, ChevronUp,
-  ArrowUp, ArrowDown, ChevronsUp, RotateCcw, Pencil, Check, X as XIcon, StickyNote,
+  ArrowUp, ArrowDown, ArrowLeftRight, ChevronsUp, RotateCcw, Pencil, Check, X as XIcon, StickyNote,
   Building2, Layers, Loader2, MessageCircle, Trash2, Plus,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
@@ -1590,20 +1594,39 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
 
   const resetOrder = () => saveOrder(null);
 
-  // ── Prepaid in-transit designation ────────────────────────────────────────
-  // User-chosen transit container IDs to show as "Prepaid". Empty = auto-select based on adjustedBalance.
-  const transitStorageKey = `agent-prepaid-transit-${agent.agentName}`;
-  const [prepaidTransitIds, setPrepaidTransitIds] = useState<number[]>(() => {
-    try {
-      const saved = localStorage.getItem(transitStorageKey);
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
+  // ── Prepaid designations (DB-backed, shared across all users) ────────────
+  type PrepaidDesignation = { containerId: number };
+  const prepaidQKey = [`/api/git/agent-prepaid/${companyId}/${encodeURIComponent(agent.agentName)}`];
+  const { data: prepaidData } = useQuery<{ designations: PrepaidDesignation[] }>({
+    queryKey: prepaidQKey,
+    initialData: { designations: [] },
   });
-  const savePrepaidTransit = (ids: number[]) => {
-    setPrepaidTransitIds(ids);
-    localStorage.setItem(transitStorageKey, JSON.stringify(ids));
-  };
-  const resetPrepaidTransit = () => savePrepaidTransit([]);
+  const dbPrepaidIds = useMemo(() => (prepaidData?.designations ?? []).map(d => d.containerId), [prepaidData]);
+  const isDbOverride = dbPrepaidIds.length > 0;
+
+  const setAllPrepaidMutation = useMutation({
+    mutationFn: (containerIds: number[]) =>
+      apiRequest("POST", `/api/git/agent-prepaid/${companyId}/${encodeURIComponent(agent.agentName)}/set-all`, { containerIds }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: prepaidQKey }),
+    onError: (e: any) => toast({ title: "Failed to update prepaid", description: e.message, variant: "destructive" }),
+  });
+
+  const replacePrepaidMutation = useMutation({
+    mutationFn: (body: { oldContainerId: number; newContainerId: number; confirmDifferentAmount?: boolean }) =>
+      apiRequest("POST", `/api/git/agent-prepaid/${companyId}/${encodeURIComponent(agent.agentName)}/replace`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: prepaidQKey });
+      setReplaceTarget(null);
+      setReplaceAmountWarning(null);
+    },
+    onError: (e: any) => {
+      toast({ title: "Replace failed", description: e.message, variant: "destructive" });
+    },
+  });
+
+  // Replace modal state
+  const [replaceTarget, setReplaceTarget] = useState<{ id: number; containerNumber: string; dutyFee: number } | null>(null);
+  const [replaceAmountWarning, setReplaceAmountWarning] = useState<{ oldAmount: number; newAmount: number; newContainerId: number } | null>(null);
 
   // ── Overpayment note (DB-backed, shared across all users) ─────────────────
   const [editingNote, setEditingNote] = useState(false);
@@ -2002,10 +2025,9 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
 
   // ── Prepaid transit allocation ─────────────────────────────────────────────
   // Budget = adjusted balance (account balance minus manual entries).
-  // Works with OR without manual entries — no hasAdjustments guard.
   const prepaidBudget = adjustedBalance !== null ? Math.max(0, adjustedBalance) : (openBalance !== null ? Math.max(0, openBalance) : 0);
 
-  // Auto-designate: greedily fill prepaidBudget from the transit list in order
+  // Auto-designate: greedily fill prepaidBudget from the transit list (client-side suggestion)
   const autoDesignatedTransitIds = useMemo((): number[] => {
     if (prepaidBudget <= 0 || activePreviewRows.length === 0) return [];
     let budget = prepaidBudget;
@@ -2020,28 +2042,26 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
     return ids;
   }, [prepaidBudget, activePreviewRows]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Stale-ID cleanup ──────────────────────────────────────────────────────
-  // When a prepaid transit container is offloaded it leaves activePreviewRows.
-  // Clean up localStorage so override mode doesn't keep dead IDs.
+  // Effective IDs: DB override takes priority; fall back to client-side auto-selection
+  const effectivePrepaidIds  = isDbOverride ? dbPrepaidIds : autoDesignatedTransitIds;
+  const prepaidTransitSet    = useMemo(() => new Set(effectivePrepaidIds), [effectivePrepaidIds]); // eslint-disable-line react-hooks/exhaustive-deps
+  const prepaidTransitRows   = useMemo(() => activePreviewRows.filter(r => prepaidTransitSet.has(r.id)), [activePreviewRows, prepaidTransitSet]); // eslint-disable-line react-hooks/exhaustive-deps
+  const remainingTransitRows = useMemo(() => activePreviewRows.filter(r => !prepaidTransitSet.has(r.id)), [activePreviewRows, prepaidTransitSet]); // eslint-disable-line react-hooks/exhaustive-deps
+  const designatedPrepaidSum = useMemo(() => prepaidTransitRows.reduce((s, r) => s + r.dutyFee, 0), [prepaidTransitRows]);
+
+  // ── Stale-ID cleanup (DB mode) ────────────────────────────────────────────
+  // When a prepaid container is offloaded it leaves activePreviewRows.
+  // Auto-clean DB designations so the container doesn't stay stuck as "prepaid".
   const validTransitIdSet = useMemo(() => new Set(activePreviewRows.map(r => r.id)), [activePreviewRows]);
   useEffect(() => {
-    if (prepaidTransitIds.length === 0) return;
-    const cleaned = prepaidTransitIds.filter(id => validTransitIdSet.has(id));
-    if (cleaned.length !== prepaidTransitIds.length) {
-      savePrepaidTransit(cleaned); // if cleaned = [] this resets to auto mode
-    }
+    if (!isDbOverride || dbPrepaidIds.length === 0) return;
+    const staleIds = dbPrepaidIds.filter(id => !validTransitIdSet.has(id));
+    if (staleIds.length === 0) return;
+    const cleaned = dbPrepaidIds.filter(id => validTransitIdSet.has(id));
+    setAllPrepaidMutation.mutate(cleaned);
   }, [validTransitIdSet]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const isUserTransitOverride  = prepaidTransitIds.length > 0;
-  const effectivePrepaidIds    = isUserTransitOverride ? prepaidTransitIds : autoDesignatedTransitIds;
-  const prepaidTransitSet      = useMemo(() => new Set(effectivePrepaidIds), [effectivePrepaidIds]); // eslint-disable-line react-hooks/exhaustive-deps
-  const prepaidTransitRows     = useMemo(() => activePreviewRows.filter(r => prepaidTransitSet.has(r.id)), [activePreviewRows, prepaidTransitSet]); // eslint-disable-line react-hooks/exhaustive-deps
-  const remainingTransitRows   = useMemo(() => activePreviewRows.filter(r => !prepaidTransitSet.has(r.id)), [activePreviewRows, prepaidTransitSet]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Sum of duties already designated prepaid (for budget enforcement on add)
-  const designatedPrepaidSum   = useMemo(() => prepaidTransitRows.reduce((s, r) => s + r.dutyFee, 0), [prepaidTransitRows]);
-
-  // When no transit is designated manually, check if the visible open containers look "prepaid"
-  // (adjustedBalance ≈ their duty sum → agent already has the money for them)
+  // Open-containers "prepaid" hint (no transit designated, balance ≈ open duty sum)
   const visibleOpenDutySum  = visibleOpenPartial.reduce((s, r) => s + r.remainingAmount, 0);
   const openContainersPrepaid = hasAdjustments
     && prepaidTransitRows.length === 0
@@ -2263,13 +2283,12 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
           <span className="font-semibold">
             {prepaidTransitRows.length} in-transit container{prepaidTransitRows.length !== 1 ? "s" : ""} designated as Prepaid
           </span>
-          {isUserTransitOverride
-            ? <span className="text-emerald-600 dark:text-emerald-400">— user selected</span>
-            : <span className="text-emerald-600 dark:text-emerald-400">— auto-selected from transit list</span>
-          }
-          {isUserTransitOverride && (
+          <span className="text-emerald-600 dark:text-emerald-400">
+            — ${fmt(designatedPrepaidSum, 0)} of ${fmt(prepaidBudget, 0)} budget
+          </span>
+          {isDbOverride && (
             <button
-              onClick={resetPrepaidTransit}
+              onClick={() => setAllPrepaidMutation.mutate([])}
               className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-medium"
               data-testid={`button-reset-prepaid-transit-${agentName}`}
             >
@@ -2291,7 +2310,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
             </tr>
           </thead>
           <tbody>
-            {/* ── Prepaid in-transit rows — shown first, above offloaded open/partial ── */}
+            {/* ── PREPAID_IN_TRANSIT rows — shown first, above offloaded open/partial ── */}
             {prepaidTransitRows.map((r) => (
               <tr key={`prepaid-transit-${r.id}`} className="border-b bg-emerald-50/60 dark:bg-emerald-950/20">
                 <td className="py-0.5 px-2 font-mono font-semibold text-center text-emerald-800 dark:text-emerald-300">{r.containerNumber}</td>
@@ -2308,19 +2327,28 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                   <Badge variant="outline" className="text-[10px] text-emerald-700 border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 no-default-active-elevate">Prepaid</Badge>
                 </td>
                 <td className="py-0.5 px-1 text-center">
-                  <button
-                    onClick={() => {
-                      // Always work from the effective list so removing from auto mode
-                      // enters user-override with the correct remaining IDs.
-                      const next = effectivePrepaidIds.filter(id => id !== r.id);
-                      savePrepaidTransit(next);
-                    }}
-                    title="Remove from prepaid — pick a replacement from the transit list below"
-                    data-testid={`button-unprepaid-transit-${r.id}`}
-                    className="text-muted-foreground hover:text-red-500 dark:hover:text-red-400 transition-colors"
-                  >
-                    <XIcon className="h-3 w-3" />
-                  </button>
+                  <div className="flex items-center gap-0.5 justify-center">
+                    {/* Replace button — swap this prepaid container for a different transit one */}
+                    {remainingTransitRows.length > 0 && (
+                      <button
+                        onClick={() => { setReplaceTarget({ id: r.id, containerNumber: r.containerNumber, dutyFee: r.dutyFee }); setReplaceAmountWarning(null); setReplaceConfirmDiff(false); }}
+                        title="Replace with another in-transit container"
+                        data-testid={`button-replace-prepaid-${r.id}`}
+                        className="text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                      >
+                        <ArrowLeftRight className="h-3 w-3" />
+                      </button>
+                    )}
+                    {/* Remove button — undesignates this container (commits effective list minus this one to DB) */}
+                    <button
+                      onClick={() => setAllPrepaidMutation.mutate(effectivePrepaidIds.filter(id => id !== r.id))}
+                      title="Remove from prepaid — moves back to In Transit (Unpaid)"
+                      data-testid={`button-unprepaid-transit-${r.id}`}
+                      className="text-muted-foreground hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                    >
+                      <XIcon className="h-3 w-3" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -2586,13 +2614,13 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                             {canDesignate && (
                               <button
                                 onClick={() => {
-                                  // If user is overriding: add to user list.
-                                  // If still in auto mode: switch to user override with current auto ids + this one.
-                                  const baseIds = isUserTransitOverride ? prepaidTransitIds : autoDesignatedTransitIds;
-                                  const next = baseIds.includes(r.id) ? baseIds : [...baseIds, r.id];
-                                  savePrepaidTransit(next);
+                                  // Commit the effective list + this container to DB
+                                  const next = effectivePrepaidIds.includes(r.id)
+                                    ? effectivePrepaidIds
+                                    : [...effectivePrepaidIds, r.id];
+                                  setAllPrepaidMutation.mutate(next);
                                 }}
-                                title="Designate as prepaid — moves to top"
+                                title="Designate as prepaid (PREPAID_IN_TRANSIT) — moves to top"
                                 data-testid={`button-designate-prepaid-${r.id}`}
                                 className="text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                               >
@@ -2612,6 +2640,80 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       )}
     </div>
     </div>
+
+    {/* ── Replace Prepaid Modal ─────────────────────────────────────────────── */}
+    <Dialog open={replaceTarget !== null} onOpenChange={open => { if (!open) { setReplaceTarget(null); setReplaceAmountWarning(null); } }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Replace Prepaid Container</DialogTitle>
+          <DialogDescription>
+            Select an in-transit (unpaid) container to swap in place of{" "}
+            <span className="font-mono font-semibold">{replaceTarget?.containerNumber}</span>{" "}
+            (${fmt(replaceTarget?.dutyFee ?? 0, 0)} duty).
+            The prepaid designation will move to the new container.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* ── Amount-mismatch warning: shown when user picks a container with a different duty ── */}
+        {replaceAmountWarning && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 px-3 py-2 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600" />
+            <div className="flex-1">
+              <p className="font-semibold mb-1">Duty amounts differ — click the container again to confirm</p>
+              <p>
+                Old: <span className="font-mono font-semibold">${fmt(replaceAmountWarning.oldAmount, 0)}</span>
+                {" → "}New: <span className="font-mono font-semibold">${fmt(replaceAmountWarning.newAmount, 0)}</span>
+              </p>
+              <p className="mt-1 text-amber-600 dark:text-amber-400">This does not affect payment records.</p>
+            </div>
+          </div>
+        )}
+
+        <div className="max-h-64 overflow-y-auto rounded-md border divide-y text-xs">
+          {remainingTransitRows.length === 0 ? (
+            <p className="py-4 px-3 text-center text-muted-foreground italic">No other in-transit containers available.</p>
+          ) : (
+            remainingTransitRows.map(r => {
+              const amountsDiffer = Math.abs(r.dutyFee - (replaceTarget?.dutyFee ?? 0)) > 0.01;
+              const isWarned = replaceAmountWarning?.newContainerId === r.id;
+              return (
+                <button
+                  key={r.id}
+                  data-testid={`button-replace-pick-${r.id}`}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-left hover-elevate ${isWarned ? "bg-amber-50/60 dark:bg-amber-950/20" : ""}`}
+                  onClick={() => {
+                    if (!replaceTarget) return;
+                    if (amountsDiffer && !isWarned) {
+                      // First click: show warning, don't call API yet
+                      setReplaceAmountWarning({ oldAmount: replaceTarget.dutyFee, newAmount: r.dutyFee, newContainerId: r.id });
+                      return;
+                    }
+                    // Second click (warning visible) or no amount mismatch: proceed
+                    replacePrepaidMutation.mutate({
+                      oldContainerId: replaceTarget.id,
+                      newContainerId: r.id,
+                      confirmDifferentAmount: amountsDiffer ? true : undefined,
+                    });
+                  }}
+                >
+                  <span className="font-mono font-semibold text-sky-700 dark:text-sky-300 w-36 shrink-0">{r.containerNumber}</span>
+                  <span className="text-muted-foreground grow">{r.supplierCode ?? r.supplierName ?? "—"}</span>
+                  <span className="font-mono text-muted-foreground shrink-0">{r.numberPlate ?? ""}</span>
+                  <span className="font-semibold text-right shrink-0 w-20">${fmt(r.dutyFee, 0)}</span>
+                  {amountsDiffer && <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />}
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={() => { setReplaceTarget(null); setReplaceAmountWarning(null); }}>
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
