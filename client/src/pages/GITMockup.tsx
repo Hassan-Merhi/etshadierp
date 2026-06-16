@@ -2076,6 +2076,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   }[matchConfidence];
 
   return (
+    <>
     <div className="space-y-1" data-testid={`agent-card-${agentName}`}>
       {/* WA send button sits ABOVE the captured card so it never appears in the screenshot */}
       {waGroupChatId && (
@@ -2714,6 +2715,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
 
