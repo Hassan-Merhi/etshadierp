@@ -185,7 +185,9 @@ export function registerFactoryDaybookRoutes(app: Express) {
       // ── 1d. Safety-net: drop advance-backed daybook entries whose advance was deleted ─
       // Covers ADVANCE_GIVEN entries left behind when an advance is deleted without
       // the corresponding daybook row being cleaned up (e.g. older deletes).
-      const ADVANCE_TX_TYPES = new Set(["ADVANCE_GIVEN"]);
+      // Also covers entries with referenceId IS NULL (legacy/orphaned) — these can
+      // never be verified so they are always excluded.
+      const ADVANCE_TX_TYPES = new Set(["ADVANCE_GIVEN", "ADVANCE_CASH_UPDATED"]);
       const advanceRefIds = daybookRows
         .filter((r: any) =>
           (r.referenceTable === "factory_worker_advances" || ADVANCE_TX_TYPES.has(r.txType)) &&
@@ -202,6 +204,24 @@ export function registerFactoryDaybookRoutes(app: Express) {
         liveAdvances.forEach((a: any) => validAdvanceIds.add(a.id));
       }
 
+      // ── 1e. Safety-net: drop repayment-backed daybook entries whose repayment was deleted ─
+      const REPAYMENT_TX_TYPES = new Set(["ADVANCE_REPAYMENT"]);
+      const repaymentRefIds = daybookRows
+        .filter((r: any) =>
+          (r.referenceTable === "factory_advance_repayments" || REPAYMENT_TX_TYPES.has(r.txType)) &&
+          r.referenceId != null
+        )
+        .map((r: any) => r.referenceId as number);
+
+      const validRepaymentIds = new Set<number>();
+      if (repaymentRefIds.length > 0) {
+        const liveRepayments = await db
+          .select({ id: factoryAdvanceRepayments.id })
+          .from(factoryAdvanceRepayments)
+          .where(inArray(factoryAdvanceRepayments.id, repaymentRefIds));
+        liveRepayments.forEach((a: any) => validRepaymentIds.add(a.id));
+      }
+
       const filteredDaybookRows = daybookRows
         .filter((r: any) => {
           // Drop voucher-backed entries whose voucher was deleted
@@ -216,12 +236,17 @@ export function registerFactoryDaybookRoutes(app: Express) {
           ) {
             return validPayrollIds.has(r.referenceId);
           }
-          // Drop advance-backed entries whose advance was deleted
-          if (
-            (r.referenceTable === "factory_worker_advances" || ADVANCE_TX_TYPES.has(r.txType)) &&
-            r.referenceId != null
-          ) {
+          // Drop advance-backed entries whose advance was deleted.
+          // Also drop entries with NULL referenceId — they are legacy/orphaned and
+          // cannot be verified against any live advance record.
+          if (r.referenceTable === "factory_worker_advances" || ADVANCE_TX_TYPES.has(r.txType)) {
+            if (r.referenceId == null) return false;
             return validAdvanceIds.has(r.referenceId);
+          }
+          // Drop repayment-backed entries whose repayment was deleted.
+          if (r.referenceTable === "factory_advance_repayments" || REPAYMENT_TX_TYPES.has(r.txType)) {
+            if (r.referenceId == null) return false;
+            return validRepaymentIds.has(r.referenceId);
           }
           return true;
         })

@@ -1655,6 +1655,17 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
           .where(eq(factoryAdvanceRepayments.advanceId, id));
 
         if (repayments.length > 0) {
+          // Delete ADVANCE_REPAYMENT daybook entries for these repayments before
+          // removing the repayment records so orphaned daybook rows don't linger.
+          const repaymentIds = repayments.map((r: any) => r.id);
+          await tx.delete(factoryDaybookEntries)
+            .where(
+              and(
+                eq(factoryDaybookEntries.companyId, companyId),
+                eq(factoryDaybookEntries.referenceTable, "factory_advance_repayments"),
+                inArray(factoryDaybookEntries.referenceId, repaymentIds),
+              )
+            );
           await tx.delete(factoryAdvanceRepayments)
             .where(eq(factoryAdvanceRepayments.advanceId, id));
         }
