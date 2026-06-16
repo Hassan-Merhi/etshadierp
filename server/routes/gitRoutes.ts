@@ -1686,6 +1686,40 @@ export function registerGitRoutes(app: Express) {
     }
   });
 
+  // ── Bulk fetch: all notes for a company (one round-trip) ─────────────────
+  app.get("/api/git/agent-notes-bulk/:companyId", requireAuth, async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.companyId, 10);
+      const rows = await db.execute(
+        sql`SELECT agent_name, note FROM git_agent_notes WHERE company_id = ${companyId}`
+      );
+      res.json({ notes: rows.rows.map((r: any) => ({ agentName: r.agent_name, note: r.note ?? "" })) });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Bulk fetch: all adjustments for a company (one round-trip) ────────────
+  app.get("/api/git/agent-adjustments-bulk/:companyId", requireAuth, async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.companyId, 10);
+      const result = await db.execute(
+        sql`SELECT agent_name, id, description, amount, type, created_at
+            FROM git_agent_adjustments
+            WHERE company_id = ${companyId}
+            ORDER BY created_at ASC`
+      );
+      const byAgent: Record<string, any[]> = {};
+      for (const r of result.rows as any[]) {
+        if (!byAgent[r.agent_name]) byAgent[r.agent_name] = [];
+        byAgent[r.agent_name].push({ id: r.id, description: r.description, amount: parseFloat(r.amount), type: r.type, createdAt: r.created_at });
+      }
+      res.json({ byAgent });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── Agent manual adjustment entries (per-company, per-agent) ──────────────
   app.get("/api/git/agent-adjustments/:companyId/:agentName", requireAuth, async (req, res) => {
     try {

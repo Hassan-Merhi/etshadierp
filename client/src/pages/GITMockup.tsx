@@ -2731,13 +2731,60 @@ function TabAgentDuty() {
     staleTime: 120_000,
   });
 
-  // Normalise to an array of company sections for uniform rendering.
-  // Computed before any early return so it is always available in all render paths.
+  // ── Bulk pre-fetch: seed per-agent note & adjustment cache in one request ──
+  // Instead of each AgentCard firing its own HTTP call (N agents = N round-trips),
+  // we fetch all notes and adjustments for every visible company in two requests
+  // and populate the individual queryKeys that AgentCard reads — so it gets an
+  // instant cache hit with zero extra network calls.
   const sections: AgentDutyCompanySection[] = !data
     ? []
     : data.mode === "all"
     ? data.companies
     : [{ companyId: data.companyId, companyName: data.companyName, agents: data.agents }];
+
+  useEffect(() => {
+    const uniqueCompanyIds = [...new Set(sections.map(s => s.companyId))];
+    for (const cid of uniqueCompanyIds) {
+      // Notes
+      fetch(`/api/git/agent-notes-bulk/${cid}`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : null)
+        .then((body: { notes: { agentName: string; note: string }[] } | null) => {
+          if (!body) return;
+          for (const { agentName, note } of body.notes) {
+            const key = `/api/git/agent-note/${cid}/${encodeURIComponent(agentName)}`;
+            if (!queryClient.getQueryData([key])) {
+              queryClient.setQueryData([key], { note });
+            }
+          }
+        })
+        .catch(() => {});
+
+      // Adjustments
+      fetch(`/api/git/agent-adjustments-bulk/${cid}`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : null)
+        .then((body: { byAgent: Record<string, any[]> } | null) => {
+          if (!body) return;
+          for (const [agentName, adjustments] of Object.entries(body.byAgent)) {
+            const key = `/api/git/agent-adjustments/${cid}/${encodeURIComponent(agentName)}`;
+            if (!queryClient.getQueryData([key])) {
+              queryClient.setQueryData([key], adjustments);
+            }
+          }
+          // Seed empty array for agents with no adjustments so they don't wait either
+          const section = sections.find(s => s.companyId === cid);
+          if (section) {
+            for (const agent of section.agents) {
+              const key = `/api/git/agent-adjustments/${cid}/${encodeURIComponent(agent.agentName)}`;
+              if (!queryClient.getQueryData([key])) {
+                queryClient.setQueryData([key], []);
+              }
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
   // When viewing all companies with merge on, collapse same-named agents into one card.
   const CONF_RANK: Record<AgentDutySummary["matchConfidence"], number> = { exact: 0, fuzzy: 1, unmapped: 2 };
