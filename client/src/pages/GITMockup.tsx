@@ -1782,7 +1782,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       // ── manual adjustment entries section ─────────────────────────────────
       const netAdj   = adjustments.reduce((s, a) => s + (a.type === "debit" ? a.amount : -a.amount), 0);
       const hasAdj   = adjustments.length > 0;
-      const displayBal = openBalance ?? openSum;
+      const displayBal = ledgerBalance ?? openSum;
       const adjustedBal = displayBal - netAdj;
       const adjIsDebit = adjustedBal >= 0;
       const waOpenSum = openAndPartial.reduce((s, r) => s + r.remainingAmount, 0);
@@ -1813,7 +1813,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       const balanceRowHtml = hasBalance ? `
         ${hasAdj ? `<tr style="background:#d1fae5">
           <td colspan="9" style="padding:5px 7px;font-size:10px;font-weight:600;color:#065f46;text-transform:uppercase;letter-spacing:0.04em;border:1px solid #a7f3d0;opacity:0.85;">Account Balance</td>
-          <td style="padding:5px 7px;font-size:12px;font-weight:700;color:#065f46;text-align:right;border:1px solid #a7f3d0;">$${esc(fmt(displayBal, 0))}</td>
+          <td style="padding:5px 7px;font-size:12px;font-weight:700;color:#065f46;text-align:right;border:1px solid #a7f3d0;">$${esc(fmt(Math.abs(displayBal), 0))}</td>
           <td colspan="1" style="padding:5px 7px;border:1px solid #a7f3d0;"></td>
         </tr>` : ""}
         <tr style="background:#fbbf24">
@@ -1994,7 +1994,10 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
 
   // ── Manual entry balance recalculation ────────────────────────────────────
   const netAdjustment   = adjustments.reduce((s, a) => s + (a.type === "debit" ? a.amount : -a.amount), 0);
-  const adjustedBalance = openBalance !== null ? openBalance - netAdjustment : null;
+  // Use SIGNED ledgerBalance (not abs openBalance) so Cr accounts (company owes agent)
+  // produce adjustedBalance < 0 → prepaidBudget = 0 (no designation possible),
+  // while Dr accounts (agent owes company / has prepaid credit) work correctly.
+  const adjustedBalance = ledgerBalance !== null ? ledgerBalance - netAdjustment : null;
   const hasAdjustments  = adjustments.length > 0;
   // isReconciled: manual entries bring the adjusted balance to 0 → everything is explained
   const isReconciled    = hasAdjustments && adjustedBalance !== null && Math.abs(adjustedBalance) <= 0.01;
@@ -2002,10 +2005,9 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   const isMismatch      = hasAdjustments && adjustedBalance !== null && !isReconciled && Math.abs(adjustedBalance - openSum) > 0.01;
 
   // ── Prepaid transit allocation ─────────────────────────────────────────────
-  // Budget = adjusted balance (account balance minus manual entries).
-  // Must be computed BEFORE the enhanced visibility logic so designatedPrepaidSum
-  // can be included in enhancedRemainder to hide offloaded rows already covered by prepaid.
-  const prepaidBudget = adjustedBalance !== null ? Math.max(0, adjustedBalance) : (openBalance !== null ? Math.max(0, openBalance) : 0);
+  // Cr accounts → adjustedBalance < 0 → prepaidBudget = 0 (nothing to designate).
+  // Dr accounts → adjustedBalance > 0 → prepaidBudget = agent's prepaid credit with company.
+  const prepaidBudget = Math.max(0, adjustedBalance ?? 0);
 
   // Effective IDs: only use explicit DB designations — never auto-fill.
   // Prepaid must be set deliberately by the user; auto-guessing from the balance causes
@@ -2420,7 +2422,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
 
             {/* Open balance footer row — updated with manual adjustment entries */}
             {hasBalance && (() => {
-              const rawBal   = openBalance ?? openSum;
+              const rawBal   = ledgerBalance ?? openSum;
               const isDebit  = rawBal > 0;
               const isCredit = rawBal < 0;
               const baseCls  = isDebit
@@ -2440,7 +2442,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                         Account Balance
                       </td>
                       <td className="py-1 px-2 text-right text-sm">
-                        ${fmt(rawBal, 0)}
+                        ${fmt(Math.abs(rawBal), 0)}
                         {balLabel && <span className="ml-1 text-xs opacity-80">({balLabel})</span>}
                       </td>
                       <td colSpan={2} />
@@ -2450,7 +2452,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
 
                 const adjAbs    = Math.abs(adjustedBalance);
                 const adjLabel  = adjustedBalance >= 0 ? "Dr" : "Cr";
-                const adjRowCls = isMismatch
+                const adjRowCls = (isMismatch && !allBudgetDesignated)
                   ? "bg-red-600 text-white font-bold"
                   : adjustedBalance > 0
                     ? "bg-green-500 text-white font-bold"
@@ -2464,7 +2466,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                         Account Balance
                       </td>
                       <td className="py-1 px-2 text-right text-sm">
-                        ${fmt(rawBal, 0)}
+                        ${fmt(Math.abs(rawBal), 0)}
                         {balLabel && <span className="ml-1 text-xs opacity-80">({balLabel})</span>}
                       </td>
                       <td colSpan={2} />
@@ -2492,7 +2494,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                     Open Balance (= Account Balance)
                   </td>
                   <td className="py-1.5 px-2 text-right text-sm">
-                    ${fmt(rawBal, 0)}
+                    ${fmt(Math.abs(rawBal), 0)}
                     {balLabel && <span className="ml-1 text-xs opacity-80">({balLabel})</span>}
                   </td>
                   <td />
