@@ -3527,6 +3527,8 @@ export const customerOrderLines = pgTable("customer_order_lines", {
   totalWeight: decimal("total_weight", { precision: 15, scale: 3 }).notNull(),
   pricePerBale: decimal("price_per_bale", { precision: 20, scale: 2 }).notNull(),
   totalPrice: decimal("total_price", { precision: 20, scale: 2 }).notNull(),
+  pricingMode: text("pricing_mode").notNull().default("per_bale"),
+  pricePerKg: decimal("price_per_kg", { precision: 20, scale: 4 }),
 }, (t) => ({
   orderIdx: index("customer_order_lines_order_idx").on(t.orderId),
 }));

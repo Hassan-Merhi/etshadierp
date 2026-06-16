@@ -4169,6 +4169,9 @@ END $$`,
          INSERT INTO one_time_migrations (name) VALUES ('backfill_tracking_enabled_2026');
        END IF;
      END $$`,
+    // Per-kg pricing on order lines (June 2026)
+    `ALTER TABLE customer_order_lines ADD COLUMN IF NOT EXISTS pricing_mode text NOT NULL DEFAULT 'per_bale'`,
+    `ALTER TABLE customer_order_lines ADD COLUMN IF NOT EXISTS price_per_kg decimal(20,4)`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

@@ -124,8 +124,11 @@ async function buildOrderExcelBuffer(
       totalWt: parseFloat(l.totalWeight || "0"),
       pricePerBale: parseFloat(l.pricePerBale || "0"),
       total: parseFloat(l.totalPrice || "0"),
+      pricingMode: (l.pricingMode as string) || "per_bale",
+      pricePerKg: parseFloat(l.pricePerKg || "0"),
     }))
     .sort((a: any, b: any) => a.articleCode.localeCompare(b.articleCode));
+  const anyPerKgH = helperLines.some((l: any) => l.pricingMode === 'per_kg');
 
   const baseCurrency = (company as any)?.baseCurrency || "USD";
   const currencySymbolMap: Record<string, string> = { USD: "$", GBP: "£", EUR: "€", CFA: "CFA", XOF: "CFA", XAF: "CFA" };
@@ -212,7 +215,8 @@ async function buildOrderExcelBuffer(
   }
   sheet.addRow([]);
 
-  const hdrRow = sheet.addRow(["#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt", ...(hideSelling ? [] : ["Price/Bale", "Total"])]);
+  const unitPriceLabelH = anyPerKgH ? "Price/KG" : "Price/Bale";
+  const hdrRow = sheet.addRow(["#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt", ...(hideSelling ? [] : [unitPriceLabelH, "Total"])]);
   hdrRow.height = 24;
   hdrRow.eachCell((cell: any) => {
     cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
@@ -226,8 +230,11 @@ async function buildOrderExcelBuffer(
     totalQtyH += g.qty;
     totalWtH += g.totalWt;
     totalH += g.total;
+    const unitPriceH = g.pricingMode === 'per_kg'
+      ? (g.totalWt > 0 ? g.total / g.totalWt : (g.pricePerKg || 0))
+      : g.pricePerBale;
     const rowCells: any[] = [idx + 1, g.articleCode, g.productName, g.qty, fmtNum(g.wtPerBale), fmtNum(g.totalWt)];
-    if (!hideSelling) { rowCells.push(fmtMoney(g.pricePerBale)); rowCells.push(fmtMoney(g.total)); }
+    if (!hideSelling) { rowCells.push(fmtMoney(unitPriceH)); rowCells.push(fmtMoney(g.total)); }
     const dr = sheet.addRow(rowCells);
     dr.height = 20;
     dr.eachCell((cell: any) => { cell.font = { size: 11 }; });
@@ -881,7 +888,16 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
                   eq(customerProformaLines.proformaId, order.proformaIdUsed),
                   eq(customerProformaLines.articleCode, bale.articleCode || "")
                 ));
-              if (pl) priceUsed = pl.pricePerBale;
+              if (pl) {
+                const pMode = (pl as any).pricingMode ?? 'per_bale';
+                const pkgRate = parseFloat(String((pl as any).pricePerKg ?? '0'));
+                if (pMode === 'per_kg' && pkgRate > 0) {
+                  const baleWt = parseFloat(String(bale.weightKg || '0'));
+                  priceUsed = (!isNaN(baleWt) ? baleWt * pkgRate : 0).toFixed(2);
+                } else {
+                  priceUsed = pl.pricePerBale;
+                }
+              }
             }
             if (priceUsed === "0" && bale.productId) {
               const product = allProducts.find((p: any) => p.id === bale.productId);
@@ -1024,7 +1040,16 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
                   eq(customerProformaLines.proformaId, order.proformaIdUsed),
                   eq(customerProformaLines.articleCode, bale.articleCode || "")
                 ));
-              if (pl) priceUsed = pl.pricePerBale;
+              if (pl) {
+                const pMode = (pl as any).pricingMode ?? 'per_bale';
+                const pkgRate = parseFloat(String((pl as any).pricePerKg ?? '0'));
+                if (pMode === 'per_kg' && pkgRate > 0) {
+                  const baleWt = parseFloat(String(bale.weightKg || '0'));
+                  priceUsed = (!isNaN(baleWt) ? baleWt * pkgRate : 0).toFixed(2);
+                } else {
+                  priceUsed = pl.pricePerBale;
+                }
+              }
             }
             if (priceUsed === "0" && bale.productId) {
               const product = allProducts.find((p: any) => p.id === bale.productId);
@@ -3051,6 +3076,16 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const productMap = new Map<number, any>(productRecords.map((p: any) => [p.id, p]));
       const balePriceMap = new Map<number, number>(baleLinks.map((l: any) => [l.baleId, parseFloat(l.priceUsed || "0")]));
 
+      // Also read order lines for pricing mode metadata
+      const orderLinesForXls = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
+      const orderLinePricingMap = new Map<string, { pricingMode: string; pricePerKg: number }>();
+      for (const ol of orderLinesForXls) {
+        orderLinePricingMap.set((ol.articleCode || "").toLowerCase(), {
+          pricingMode: (ol as any).pricingMode || 'per_bale',
+          pricePerKg: parseFloat((ol as any).pricePerKg || "0"),
+        });
+      }
+
       // Group bales by product article code
       interface ProductGroup {
         articleCode: string;
@@ -3060,6 +3095,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         totalWt: number;
         pricePerBale: number;
         total: number;
+        pricingMode: string;
+        pricePerKg: number;
       }
       const grouped = new Map<string, ProductGroup>();
       for (const bale of baleRows) {
@@ -3068,8 +3105,9 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         const productName = product?.name || bale.productName || articleCode;
         const wtPerBale = parseFloat(product?.weightPerBaleKg || bale.weightKg || "0");
         const price = balePriceMap.get(bale.id) || 0;
+        const pricingInfo = orderLinePricingMap.get(articleCode.toLowerCase()) || { pricingMode: 'per_bale', pricePerKg: 0 };
         if (!grouped.has(articleCode)) {
-          grouped.set(articleCode, { articleCode, productName, qty: 0, wtPerBale, totalWt: 0, pricePerBale: price, total: 0 });
+          grouped.set(articleCode, { articleCode, productName, qty: 0, wtPerBale, totalWt: 0, pricePerBale: price, total: 0, pricingMode: pricingInfo.pricingMode, pricePerKg: pricingInfo.pricePerKg });
         }
         const g = grouped.get(articleCode)!;
         g.qty += 1;
@@ -3078,6 +3116,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       }
 
       const lines = Array.from(grouped.values()).sort((a, b) => a.articleCode.localeCompare(b.articleCode));
+      const anyPerKgXls1 = lines.some(l => l.pricingMode === 'per_kg');
 
       // Currency
       const baseCurrency = (company as any)?.baseCurrency || "USD";
@@ -3171,7 +3210,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       sheet.addRow([]);
 
       // ── Table header ──
-      const hdrRow = sheet.addRow(["#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt", ...(hideSellingXls1 ? [] : ["Price/Bale", "Total"])]);
+      const unitPriceLabelXls1 = anyPerKgXls1 ? "Price/KG" : "Price/Bale";
+      const hdrRow = sheet.addRow(["#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt", ...(hideSellingXls1 ? [] : [unitPriceLabelXls1, "Total"])]);
       hdrRow.height = 24;
       hdrRow.eachCell((cell: any) => {
         cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
@@ -3186,8 +3226,11 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         totalQty += g.qty;
         totalWtAll += g.totalWt;
         totalAll += g.total;
+        const unitPriceXls1 = g.pricingMode === 'per_kg'
+          ? (g.totalWt > 0 ? g.total / g.totalWt : g.pricePerKg)
+          : g.pricePerBale;
         const rowCells: any[] = [idx + 1, g.articleCode, g.productName, g.qty, fmtNum(g.wtPerBale), fmtNum(g.totalWt)];
-        if (!hideSellingXls1) { rowCells.push(fmtMoney(g.pricePerBale)); rowCells.push(fmtMoney(g.total)); }
+        if (!hideSellingXls1) { rowCells.push(fmtMoney(unitPriceXls1)); rowCells.push(fmtMoney(g.total)); }
         const dr = sheet.addRow(rowCells);
         dr.height = 20;
         dr.eachCell((cell: any) => { cell.font = { size: 11 }; });
@@ -3796,7 +3839,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       const effectiveBales = dataSource === "order_lines" ? syntheticBalesFromLines : orderBales;
 
       // Build preliminary article code set from loaded bales.
-      const loadedByArticle: Record<string, { articleCode: string; productName: string; qty: number; totalWeight: number; totalPrice: number }> = {};
+      const loadedByArticle: Record<string, { articleCode: string; productName: string; qty: number; totalWeight: number; totalPrice: number; pricingMode: string; pricePerKg: number }> = {};
       for (const b of effectiveBales) {
         const articleCode = b.article_code;
         const baleName    = b.bale_name;
@@ -3805,7 +3848,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
         const code = articleCode || "UNKNOWN";
         if (!loadedByArticle[code]) {
-          loadedByArticle[code] = { articleCode: code, productName: baleName || code, qty: 0, totalWeight: 0, totalPrice: 0 };
+          loadedByArticle[code] = { articleCode: code, productName: baleName || code, qty: 0, totalWeight: 0, totalPrice: 0, pricingMode: 'per_bale', pricePerKg: 0 };
         }
         loadedByArticle[code].qty += 1;
         loadedByArticle[code].totalWeight += parseFloat(weight) || 0;
@@ -3813,7 +3856,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       }
 
       let proformaLines: any[] = [];
-      const proformaByArticle: Record<string, { articleCode: string; productName: string; expectedQty: number; pricePerBale: string }> = {};
+      const proformaByArticle: Record<string, { articleCode: string; productName: string; expectedQty: number; pricePerBale: string; pricingMode: string; pricePerKg: number }> = {};
 
       if (order.proformaIdUsed) {
         // SELECT * to avoid explicit-column failures on production tables that may
@@ -3826,12 +3869,21 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         for (const pl of proformaLines) {
           const articleCode = pl.article_code ?? pl.articleCode ?? "";
           if (!articleCode) continue;
+          const pMode = pl.pricing_mode ?? pl.pricingMode ?? "per_bale";
+          const pkgRate = parseFloat(String(pl.price_per_kg ?? pl.pricePerKg ?? "0")) || 0;
           proformaByArticle[articleCode] = {
             articleCode,
             productName:  pl.product_name  ?? pl.productName  ?? articleCode,
             expectedQty:  pl.quantity       ?? 0,
             pricePerBale: pl.price_per_bale ?? pl.pricePerBale ?? "0",
+            pricingMode:  pMode,
+            pricePerKg:   pkgRate,
           };
+          // Propagate pricing mode into loadedByArticle so the frontend can display correctly
+          if (loadedByArticle[articleCode]) {
+            loadedByArticle[articleCode].pricingMode = pMode;
+            loadedByArticle[articleCode].pricePerKg  = pkgRate;
+          }
         }
       }
 
@@ -4524,8 +4576,11 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           totalWt: parseFloat(l.totalWeight || "0"),
           pricePerBale: parseFloat(l.pricePerBale || "0"),
           total: parseFloat(l.totalPrice || "0"),
+          pricingMode: (l.pricingMode as string) || "per_bale",
+          pricePerKg: parseFloat(l.pricePerKg || "0"),
         }))
         .sort((a: any, b: any) => a.articleCode.localeCompare(b.articleCode));
+      const anyPerKgXls2 = lines.some((l: any) => l.pricingMode === 'per_kg');
 
       // Currency
       const baseCurrency = (company as any)?.baseCurrency || "USD";
@@ -4618,7 +4673,8 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       sheet.addRow([]);
 
       // ── Table header ──
-      const hdrRow = sheet.addRow(["#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt", ...(hideSellingXls2 ? [] : ["Price/Bale", "Total"])]);
+      const unitPriceLabelXls2 = anyPerKgXls2 ? "Price/KG" : "Price/Bale";
+      const hdrRow = sheet.addRow(["#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt", ...(hideSellingXls2 ? [] : [unitPriceLabelXls2, "Total"])]);
       hdrRow.height = 24;
       hdrRow.eachCell((cell: any) => {
         cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
@@ -4633,8 +4689,11 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         totalQty += g.qty;
         totalWtAll += g.totalWt;
         totalAll += g.total;
+        const unitPriceXls2 = g.pricingMode === 'per_kg'
+          ? (g.totalWt > 0 ? g.total / g.totalWt : g.pricePerKg)
+          : g.pricePerBale;
         const rowCells2: any[] = [idx + 1, g.articleCode, g.productName, g.qty, fmtNum(g.wtPerBale), fmtNum(g.totalWt)];
-        if (!hideSellingXls2) { rowCells2.push(fmtMoney(g.pricePerBale)); rowCells2.push(fmtMoney(g.total)); }
+        if (!hideSellingXls2) { rowCells2.push(fmtMoney(unitPriceXls2)); rowCells2.push(fmtMoney(g.total)); }
         const dr = sheet.addRow(rowCells2);
         dr.height = 20;
         dr.eachCell((cell: any) => { cell.font = { size: 11 }; });
@@ -5523,6 +5582,105 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
         tracked: queued,
         message: `Tracking started for ${queued} container${queued !== 1 ? "s" : ""}. ETAs will update shortly.`,
       });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // REPAIR PER-KG LOADING PRICES
+  // Finds LOADING/PENDING_VERIFICATION orders whose bales have priceUsed=0
+  // but the proforma uses per_kg pricing, and recomputes each bale's price
+  // using its real weight × pricePerKg.  Idempotent: already-correct bales
+  // (priceUsed > 0) are left untouched.
+  // ─────────────────────────────────────────────────────────────────────
+  app.post("/api/factory/repair-perkg-prices", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // Find all LOADING / PENDING_VERIFICATION orders that have a proforma
+      const ordersToScan = await db
+        .select({ id: customerOrders.id, proformaIdUsed: customerOrders.proformaIdUsed })
+        .from(customerOrders)
+        .where(
+          and(
+            eq(customerOrders.companyId, companyId),
+            sql`${customerOrders.status} IN ('LOADING', 'PENDING_VERIFICATION')`,
+            sql`${customerOrders.proformaIdUsed} IS NOT NULL`,
+          )
+        );
+
+      let ordersScanned = 0;
+      let balesRepaired = 0;
+      const changedOrderIds: number[] = [];
+      const errors: string[] = [];
+
+      for (const order of ordersToScan) {
+        ordersScanned++;
+        try {
+          // Fetch all proforma lines for this order's proforma that use per_kg
+          const proformaPerKgLines = await db
+            .select({
+              articleCode: customerProformaLines.articleCode,
+              pricingMode: customerProformaLines.pricingMode,
+              pricePerKg: customerProformaLines.pricePerKg,
+            })
+            .from(customerProformaLines)
+            .where(
+              and(
+                eq(customerProformaLines.proformaId, order.proformaIdUsed!),
+                sql`${customerProformaLines.pricingMode} = 'per_kg'`,
+                sql`${customerProformaLines.pricePerKg} IS NOT NULL AND ${customerProformaLines.pricePerKg}::numeric > 0`,
+              )
+            );
+
+          if (proformaPerKgLines.length === 0) continue;
+
+          const perKgMap = new Map<string, number>();
+          for (const pl of proformaPerKgLines) {
+            if (pl.articleCode && pl.pricePerKg) {
+              perKgMap.set(pl.articleCode.toLowerCase(), parseFloat(String(pl.pricePerKg)));
+            }
+          }
+
+          // Find all bales in this order that match a per_kg article and have priceUsed = 0
+          const bales = await db
+            .select({
+              id: customerOrderBales.id,
+              articleCode: customerOrderBales.articleCode,
+              weight: customerOrderBales.weight,
+              priceUsed: customerOrderBales.priceUsed,
+            })
+            .from(customerOrderBales)
+            .where(eq(customerOrderBales.orderId, order.id));
+
+          let orderChanged = false;
+          for (const bale of bales) {
+            const key = (bale.articleCode || "").toLowerCase();
+            const pkgRate = perKgMap.get(key);
+            if (!pkgRate) continue;
+            const currentPrice = parseFloat(String(bale.priceUsed || "0"));
+            if (currentPrice !== 0) continue; // already repaired — skip (idempotent)
+            const weightKg = parseFloat(String(bale.weight || "0"));
+            const newPrice = (weightKg * pkgRate).toFixed(2);
+            await db.update(customerOrderBales)
+              .set({ priceUsed: newPrice })
+              .where(eq(customerOrderBales.id, bale.id));
+            balesRepaired++;
+            orderChanged = true;
+          }
+
+          if (orderChanged) {
+            await recalculateOrderTotals(db, order.id);
+            changedOrderIds.push(order.id);
+          }
+        } catch (err: any) {
+          errors.push(`Order ${order.id}: ${err.message}`);
+        }
+      }
+
+      res.json({ ordersScanned, balesRepaired, changedOrderIds, errors });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

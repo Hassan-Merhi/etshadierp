@@ -8,6 +8,7 @@ import {
   customerOrderLines,
   customerOrderCharges,
   customerOrders,
+  customerProformaLines,
   factoryUserProfiles,
   factoryContainers,
   factoryRawStock,
@@ -175,6 +176,26 @@ export async function verifySupervisorPassword(password: string, hash: string): 
 export async function recalculateOrderTotals(dbConn: any, orderId: number) {
   const bales = await dbConn.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
 
+  // Fetch proforma pricing mode and per-kg rate for this order (if proforma-linked)
+  const [order] = await dbConn.select({ proformaIdUsed: customerOrders.proformaIdUsed })
+    .from(customerOrders).where(eq(customerOrders.id, orderId));
+  const proformaPricing = new Map<string, { pricingMode: string; pricePerKg: string | null }>();
+  if (order?.proformaIdUsed) {
+    const pLines = await dbConn.select({
+      articleCode: customerProformaLines.articleCode,
+      pricingMode: customerProformaLines.pricingMode,
+      pricePerKg: customerProformaLines.pricePerKg,
+    }).from(customerProformaLines).where(eq(customerProformaLines.proformaId, order.proformaIdUsed));
+    for (const pl of pLines) {
+      if (pl.articleCode) {
+        proformaPricing.set(pl.articleCode.toLowerCase(), {
+          pricingMode: pl.pricingMode ?? 'per_bale',
+          pricePerKg: pl.pricePerKg ?? null,
+        });
+      }
+    }
+  }
+
   await dbConn.delete(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
 
   const grouped: Record<string, { articleCode: string; baleName: string; qty: number; totalWeight: number; totalPrice: number }> = {};
@@ -189,6 +210,9 @@ export async function recalculateOrderTotals(dbConn: any, orderId: number) {
   }
 
   for (const line of Object.values(grouped)) {
+    const pricing = proformaPricing.get(line.articleCode.toLowerCase());
+    const pricingMode = pricing?.pricingMode ?? 'per_bale';
+    const pricePerKg = pricing?.pricePerKg ?? null;
     await dbConn.insert(customerOrderLines).values({
       orderId,
       articleCode: line.articleCode,
@@ -198,6 +222,8 @@ export async function recalculateOrderTotals(dbConn: any, orderId: number) {
       totalWeight: String(line.totalWeight),
       pricePerBale: String(line.qty > 0 ? line.totalPrice / line.qty : 0),
       totalPrice: String(line.totalPrice),
+      pricingMode,
+      pricePerKg: pricePerKg ?? null,
     });
   }
 

@@ -45,6 +45,8 @@ interface OrderLine {
   totalWeight: number;
   pricePerBale: number;
   totalPrice: number;
+  pricingMode?: string;
+  pricePerKg?: number;
 }
 
 interface OrderBale {
@@ -844,14 +846,17 @@ export default function FactoryInvoiceDetail() {
               <TableHead className="text-right">Qty</TableHead>
               <TableHead className="text-right">Weight/Bale</TableHead>
               <TableHead className="text-right">Total Weight</TableHead>
-              {isAdmin && (
-                <TableHead className={`text-right${hideExportSelling ? " print:hidden" : ""}`}>
-                  Price/Bale
-                  {(isVerifiedStatus || order.status === "FINALIZED") && (
-                    <Pencil className="inline ml-1 h-3 w-3 text-muted-foreground" />
-                  )}
-                </TableHead>
-              )}
+              {isAdmin && (() => {
+                const anyPerKg = sortedLines.some(l => l.pricingMode === 'per_kg');
+                return (
+                  <TableHead className={`text-right${hideExportSelling ? " print:hidden" : ""}`}>
+                    {anyPerKg ? "Price/KG" : "Price/Bale"}
+                    {(isVerifiedStatus || order.status === "FINALIZED") && (
+                      <Pencil className="inline ml-1 h-3 w-3 text-muted-foreground" />
+                    )}
+                  </TableHead>
+                );
+              })()}
               {isAdmin && (
                 <TableHead className={`text-right${hideExportSelling ? " print:hidden" : ""}`}>Total Price</TableHead>
               )}
@@ -890,42 +895,48 @@ export default function FactoryInvoiceDetail() {
                   <TableCell className="text-right font-mono" data-testid={`text-total-weight-${idx}`}>
                     {Number(line.totalWeight || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   </TableCell>
-                  {isAdmin && (
-                    <TableCell className={`text-right font-mono${hideExportSelling ? " print:hidden" : ""}`} data-testid={`text-price-per-bale-${idx}`}>
-                      {(isVerifiedStatus || order.status === "FINALIZED") ? (
-                        editingArticleCode === line.articleCode ? (
-                          <Input
-                            ref={inputRef}
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") commitEdit(line.articleCode);
-                              if (e.key === "Escape") cancelEdit();
-                            }}
-                            onBlur={() => commitEdit(line.articleCode)}
-                            className="h-7 w-28 text-right font-mono p-1 ml-auto"
-                            disabled={repriceArticleMutation.isPending}
-                            data-testid={`input-price-${idx}`}
-                          />
+                  {isAdmin && (() => {
+                    const isPerKg = line.pricingMode === 'per_kg';
+                    const displayRate = isPerKg
+                      ? (Number(line.totalWeight) > 0 ? Number(line.totalPrice) / Number(line.totalWeight) : (line.pricePerKg || 0))
+                      : Number(line.pricePerBale || 0);
+                    return (
+                      <TableCell className={`text-right font-mono${hideExportSelling ? " print:hidden" : ""}`} data-testid={`text-price-per-bale-${idx}`}>
+                        {(isVerifiedStatus || order.status === "FINALIZED") && !isPerKg ? (
+                          editingArticleCode === line.articleCode ? (
+                            <Input
+                              ref={inputRef}
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") commitEdit(line.articleCode);
+                                if (e.key === "Escape") cancelEdit();
+                              }}
+                              onBlur={() => commitEdit(line.articleCode)}
+                              className="h-7 w-28 text-right font-mono p-1 ml-auto"
+                              disabled={repriceArticleMutation.isPending}
+                              data-testid={`input-price-${idx}`}
+                            />
+                          ) : (
+                            <button
+                              onClick={() => startEdit(line.articleCode, line.pricePerBale)}
+                              className="group flex items-center justify-end gap-1 w-full hover-elevate rounded-md px-1 py-0.5"
+                              data-testid={`button-edit-price-${idx}`}
+                              title="Click to edit price"
+                            >
+                              <span>{displayRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 4 })}</span>
+                              <Pencil className="h-3 w-3 text-muted-foreground invisible group-hover:visible" />
+                            </button>
+                          )
                         ) : (
-                          <button
-                            onClick={() => startEdit(line.articleCode, line.pricePerBale)}
-                            className="group flex items-center justify-end gap-1 w-full hover-elevate rounded-md px-1 py-0.5"
-                            data-testid={`button-edit-price-${idx}`}
-                            title="Click to edit price"
-                          >
-                            <span>{Number(line.pricePerBale || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
-                            <Pencil className="h-3 w-3 text-muted-foreground invisible group-hover:visible" />
-                          </button>
-                        )
-                      ) : (
-                        Number(line.pricePerBale || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-                      )}
-                    </TableCell>
-                  )}
+                          displayRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 4 })
+                        )}
+                      </TableCell>
+                    );
+                  })()}
                   {isAdmin && (
                     <TableCell className={`text-right font-mono font-semibold${hideExportSelling ? " print:hidden" : ""}`} data-testid={`text-total-price-${idx}`}>
                       {Number(line.totalPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}

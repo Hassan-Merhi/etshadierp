@@ -449,6 +449,15 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
         for (const bale of available) {
           const resolvedBaleName = proformaProductNameMap.get(bale.articleCode || "") || bale.productName || bale.articleCode || bale.baleCode;
+          const linePricingMode = (line as any).pricingMode ?? 'per_bale';
+          const linePerKg = parseFloat(String((line as any).pricePerKg ?? '0'));
+          let resolvedPriceUsed: string;
+          if (linePricingMode === 'per_kg' && linePerKg > 0) {
+            const baleWt = parseFloat(String(bale.weightKg || '0'));
+            resolvedPriceUsed = (!isNaN(baleWt) ? baleWt * linePerKg : 0).toFixed(2);
+          } else {
+            resolvedPriceUsed = String(line.pricePerBale ?? '0');
+          }
           await db.insert(customerOrderBales).values({
             orderId: order.id,
             baleId: bale.id,
@@ -457,7 +466,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
             weight: bale.weightKg,
             articleCode: bale.articleCode,
             baleName: resolvedBaleName,
-            priceUsed: line.pricePerBale,
+            priceUsed: resolvedPriceUsed,
           });
           // Transition bale: IN_STOCK → RESERVED_FOR_ORDER (physically in a loading order now)
           await db.update(factoryBales)

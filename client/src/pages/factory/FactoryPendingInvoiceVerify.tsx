@@ -72,6 +72,8 @@ interface LoadedGroup {
   totalPrice: number;
   pricePerBale: string;
   stockQty: number;
+  pricingMode?: string;
+  pricePerKg?: number;
 }
 
 interface VerificationSummary {
@@ -371,6 +373,29 @@ export default function FactoryPendingInvoiceVerify() {
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const repairPerKgMutation = useMutation({
+    mutationFn: async () => {
+      const res = await modeApiRequest("POST", "/api/factory/repair-perkg-prices", {});
+      return res.json();
+    },
+    onSuccess: (data: { ordersScanned: number; balesRepaired: number; changedOrderIds: number[]; errors: string[] }) => {
+      toast({
+        title: `Repair complete: ${data.balesRepaired} bale(s) fixed`,
+        description: data.changedOrderIds.length > 0
+          ? `Orders updated: ${data.changedOrderIds.join(", ")}`
+          : "No bales needed repair.",
+      });
+      if (data.errors.length > 0) {
+        toast({ title: "Repair errors", description: data.errors.join("; "), variant: "destructive" });
+      }
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+    },
+    onError: (error: Error) => {
+      if (error?._handledGlobally) return;
+      toast({ title: "Repair failed", description: error.message, variant: "destructive" });
     },
   });
 
@@ -761,13 +786,21 @@ export default function FactoryPendingInvoiceVerify() {
                           <TableHead>Article</TableHead>
                           <TableHead>Product</TableHead>
                           <TableHead className="text-right">Qty</TableHead>
-                          <TableHead className="text-right">Weight</TableHead>
-                          {isAdminOrOwner && <TableHead className="text-right">Price</TableHead>}
+                          <TableHead className="text-right">Weight (kg)</TableHead>
+                          {isAdminOrOwner && <TableHead className="text-right">
+                            {verification.loadedItems.some(g => g.pricingMode === 'per_kg') ? "Price/KG" : "Price"}
+                          </TableHead>}
+                          {isAdminOrOwner && <TableHead className="text-right">Total Price</TableHead>}
                           <TableHead className="text-right text-teal-500 dark:text-teal-400">Stock</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {verification.loadedItems.map((group, i) => (
+                        {verification.loadedItems.map((group, i) => {
+                          const isPerKg = group.pricingMode === 'per_kg';
+                          const unitRate = isPerKg
+                            ? (group.totalWeight > 0 ? group.totalPrice / group.totalWeight : (group.pricePerKg || 0))
+                            : parseFloat(group.pricePerBale || "0");
+                          return (
                           <TableRow key={i} data-testid={`row-loaded-${group.articleCode}`}>
                             <TableCell className="font-mono text-sm" data-testid={`text-loaded-article-${group.articleCode}`}>
                               {group.articleCode}
@@ -775,7 +808,8 @@ export default function FactoryPendingInvoiceVerify() {
                             <TableCell className="text-sm">{group.productName}</TableCell>
                             <TableCell className="text-right font-mono">{group.qty}</TableCell>
                             <TableCell className="text-right font-mono">{fmtNum(group.totalWeight || 0)}</TableCell>
-                            {isAdminOrOwner && <TableCell className="text-right font-mono">{fmtNum(group.totalPrice || 0)}</TableCell>}
+                            {isAdminOrOwner && <TableCell className="text-right font-mono">{fmtNum(unitRate)}</TableCell>}
+                            {isAdminOrOwner && <TableCell className="text-right font-mono font-semibold">{fmtNum(group.totalPrice || 0)}</TableCell>}
                             <TableCell className="text-right font-mono text-teal-600 dark:text-teal-400" data-testid={`text-loaded-stock-${group.articleCode}`}>
                               {(group.stockQty ?? 0) > 0 ? (
                                 <button
@@ -797,7 +831,8 @@ export default function FactoryPendingInvoiceVerify() {
                               )}
                             </TableCell>
                           </TableRow>
-                        ))}
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   ) : (
@@ -985,6 +1020,16 @@ export default function FactoryPendingInvoiceVerify() {
           >
             <DollarSign className="mr-2 h-4 w-4" />
             Apply Proforma Prices
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => repairPerKgMutation.mutate()}
+            disabled={repairPerKgMutation.isPending}
+            data-testid="button-repair-perkg-prices"
+            title="Find orders with 0 price on per-kg items and recompute from actual bale weight"
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            {repairPerKgMutation.isPending ? "Repairing..." : "Repair Per-KG Prices"}
           </Button>
         </div>
 
