@@ -4,6 +4,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory } from "./_helpers";
+import { getOrCreateLedgerAccount } from "./factory/_helpers";
 import {
   inventory, stockItems, stockGroups,
   stockTransferVouchers, stockTransferItems,
@@ -1766,4 +1767,132 @@ export function registerDebugRoutes(app: Express) {
   });
 
   // Net Profit (P&L) Report - Tally Prime style
+
+  // Backfill missing vouchers for post-offload charges that already have a ledgerAccountId
+  // but whose voucher was created in the wrong company (factory instead of ledger account's company).
+  // Idempotent: skips any charge that already has a voucher crediting the chosen ledger account.
+  app.post("/api/admin/backfill-postoffload-vouchers", requireAuth, requireRole("Admin", "Developer"), async (req, res) => {
+    try {
+      let scanned = 0, created = 0, skippedExisting = 0, errors = 0;
+      const errorDetails: string[] = [];
+
+      // Fetch all post-offload charges that have a ledger account chosen
+      const chargesRes = await db.execute(sql`
+        SELECT
+          c.id,
+          c.container_id,
+          c.description,
+          c.amount,
+          c.currency_code,
+          c.fx_rate_to_usd,
+          c.ledger_account_id,
+          c.created_at,
+          fc.container_number
+        FROM factory_offload_additional_charges c
+        JOIN factory_containers fc ON fc.id = c.container_id
+        WHERE c.ledger_account_id IS NOT NULL
+        ORDER BY c.id
+      `);
+      const rows: any[] = (chargesRes as any).rows ?? (chargesRes as unknown as any[]);
+
+      for (const row of rows) {
+        scanned++;
+        try {
+          const chargeId: number = row.id;
+          const containerId: number = row.container_id;
+          const containerNumber: string = row.container_number || `#${containerId}`;
+          const ledgerAccountId: number = row.ledger_account_id;
+          const description: string = row.description || "Post-offload charge";
+          const amount = parseFloat(row.amount || "0");
+          const chargeCcy: string = row.currency_code || "USD";
+          const chargeFx = parseFloat(row.fx_rate_to_usd || "1");
+          const voucherDate: string = row.created_at
+            ? new Date(row.created_at).toISOString().slice(0, 10)
+            : new Date().toISOString().slice(0, 10);
+
+          if (amount <= 0) { skippedExisting++; continue; }
+
+          // Resolve the ledger account's company
+          const [acctRow] = await db
+            .select({ companyId: ledgerAccounts.companyId })
+            .from(ledgerAccounts)
+            .where(eq(ledgerAccounts.id, ledgerAccountId));
+          if (!acctRow) {
+            errors++;
+            errorDetails.push(`chargeId=${chargeId}: ledgerAccount ${ledgerAccountId} not found`);
+            continue;
+          }
+          const voucherCompanyId = acctRow.companyId;
+
+          // Idempotency: check if a voucher already exists that credits this ledger account
+          // for a post-offload entry on this container
+          const existingCheck = await db.execute(sql`
+            SELECT v.id
+            FROM vouchers v
+            JOIN voucher_entries ve ON ve.voucher_id = v.id
+            WHERE v.source_module = 'FACTORY'
+              AND v.description ILIKE ${'%(post-offload)%container ' + containerNumber + '%'}
+              AND ve.ledger_account_id = ${ledgerAccountId}
+              AND ve.credit_amount::numeric > 0
+            LIMIT 1
+          `);
+          const existingRows: any[] = (existingCheck as any).rows ?? (existingCheck as unknown as any[]);
+          if (existingRows.length > 0) {
+            skippedExisting++;
+            continue;
+          }
+
+          // Get or create FACTORY_CHARGES_PAYABLE in the ledger account's company
+          const cpAcctId = await getOrCreateLedgerAccount(
+            voucherCompanyId,
+            "FACTORY_CHARGES_PAYABLE",
+            "Factory Charges Payable",
+          );
+
+          // Insert the voucher
+          const voucherNum = `FACTORY-POC-BACKFILL-${containerId}-${chargeId}`;
+          const [voucher] = await db.insert(vouchers).values({
+            companyId: voucherCompanyId,
+            voucherType: "Journal",
+            voucherNumber: voucherNum,
+            voucherDate,
+            description: `${description} (post-offload) — container ${containerNumber}`,
+            totalAmount: String(amount),
+            currency: chargeCcy,
+            exchangeRate: String(chargeFx),
+            sourceModule: "FACTORY",
+          }).returning();
+
+          // DR FACTORY_CHARGES_PAYABLE
+          await db.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: cpAcctId,
+            debitAmount: String(amount),
+            creditAmount: "0",
+            narration: `${description} payable — container ${containerNumber}`,
+          });
+          // CR chosen ledger account
+          await db.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId,
+            debitAmount: "0",
+            creditAmount: String(amount),
+            narration: `${description} — container ${containerNumber}`,
+          });
+
+          created++;
+          console.log(`[POC backfill] voucherId=${voucher.id} chargeId=${chargeId} container=${containerNumber} voucherCompanyId=${voucherCompanyId} cpAcctId=${cpAcctId}`);
+        } catch (err: any) {
+          errors++;
+          errorDetails.push(`chargeId=${row.id}: ${err.message}`);
+          console.error(`[POC backfill] error on chargeId=${row.id}:`, err);
+        }
+      }
+
+      res.json({ scanned, created, skippedExisting, errors, errorDetails });
+    } catch (error: any) {
+      console.error("Backfill post-offload vouchers error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
 }

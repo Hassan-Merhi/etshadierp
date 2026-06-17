@@ -2158,8 +2158,28 @@ export function registerFactoryRawStockRoutes(app: Express) {
       const actualKg = parseFloat(container.actualReceivedKg || "0");
       if (actualKg <= 0) return res.status(400).json({ message: "Container has no received weight" });
 
-      // Pre-fetch ledger account IDs outside transaction
-      const chargesPayableAcctId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+      // Pre-compute per-charge voucher context — getOrCreateLedgerAccount uses the
+      // raw db connection and MUST NOT run inside a transaction.
+      type ChargeCtx = { voucherCompanyId: number; chargesPayableAcctId: number };
+      const chargeCtxs: ChargeCtx[] = [];
+      for (const charge of validCharges) {
+        if (charge.ledgerAccountId) {
+          const lid = parseInt(charge.ledgerAccountId);
+          const [acctRow] = await db
+            .select({ companyId: ledgerAccounts.companyId })
+            .from(ledgerAccounts)
+            .where(eq(ledgerAccounts.id, lid));
+          const voucherCompanyId = acctRow?.companyId ?? companyId;
+          const cpAcctId = await getOrCreateLedgerAccount(voucherCompanyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+          console.log(`[POC diag] chargeDesc="${charge.description}" ledgerAccountId=${lid} acctCompanyId=${acctRow?.companyId ?? "NOT FOUND"} voucherCompanyId=${voucherCompanyId} chargesPayableAcctId=${cpAcctId} container=${container.containerNumber}`);
+          chargeCtxs.push({ voucherCompanyId, chargesPayableAcctId: cpAcctId });
+        } else if (charge.supplierId) {
+          const cpAcctId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+          chargeCtxs.push({ voucherCompanyId: companyId, chargesPayableAcctId: cpAcctId });
+        } else {
+          chargeCtxs.push({ voucherCompanyId: companyId, chargesPayableAcctId: 0 });
+        }
+      }
 
       // Fetch existing additional charges to include in full recalculation
       const existingCharges = await db
@@ -2299,7 +2319,9 @@ export function registerFactoryRawStockRoutes(app: Express) {
         }
 
         // 6. Daybook entries + vouchers for each new charge
-        for (const charge of insertedCharges) {
+        // chargeCtxs[ci] is pre-computed outside the transaction (index-aligned with validCharges / insertedCharges).
+        for (let ci = 0; ci < insertedCharges.length; ci++) {
+          const charge = insertedCharges[ci];
           const chargeAmt = parseFloat(charge.amount || "0");
           if (chargeAmt <= 0) continue;
           const chargeCcy = charge.currencyCode || "USD";
@@ -2316,27 +2338,11 @@ export function registerFactoryRawStockRoutes(app: Express) {
             metaJson: JSON.stringify({ containerId, sourceType: "POST_OFFLOAD_ADDITIONAL", chargeId: charge.id }),
           });
           if (charge.ledgerAccountId || charge.supplierId) {
-            // When a ledger account is explicitly chosen, the voucher must be posted in
-            // the same company as that account — otherwise the entry never shows in the
-            // account's ledger.  For supplier-linked charges stay in the factory company.
-            let voucherCompanyId = companyId;
-            let voucherChargesPayableAcctId = chargesPayableAcctId;
-            if (charge.ledgerAccountId) {
-              const [acctRow] = await tx
-                .select({ companyId: ledgerAccounts.companyId })
-                .from(ledgerAccounts)
-                .where(eq(ledgerAccounts.id, charge.ledgerAccountId));
-              if (acctRow && acctRow.companyId !== companyId) {
-                voucherCompanyId = acctRow.companyId;
-                // Ensure the matching "charges payable" account exists in that company too.
-                voucherChargesPayableAcctId = await getOrCreateLedgerAccount(
-                  voucherCompanyId,
-                  "FACTORY_CHARGES_PAYABLE",
-                  "Factory Charges Payable",
-                );
-              }
-            }
+            // Use the pre-computed context — voucherCompanyId is derived from the ledger
+            // account's own companyId so the voucher appears in the correct ledger view.
+            const { voucherCompanyId, chargesPayableAcctId: voucherChargesPayableAcctId } = chargeCtxs[ci];
             const voucherNum = `FACTORY-POC-${containerId}-${charge.id}-${Date.now()}`;
+            console.log(`[POC diag] inserting voucher chargeId=${charge.id} voucherCompanyId=${voucherCompanyId} chargesPayableAcctId=${voucherChargesPayableAcctId} container=${container.containerNumber}`);
             const [voucher] = await tx.insert(vouchers).values({
               companyId: voucherCompanyId,
               voucherType: "Journal",
@@ -2348,6 +2354,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
               exchangeRate: String(chargeFx),
               sourceModule: "FACTORY",
             }).returning();
+            console.log(`[POC diag] voucherId=${voucher.id} inserted`);
             await tx.insert(voucherEntries).values({
               voucherId: voucher.id,
               ledgerAccountId: voucherChargesPayableAcctId,
