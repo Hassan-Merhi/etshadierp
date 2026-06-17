@@ -1785,7 +1785,8 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       const netAdj   = adjustments.reduce((s, a) => s + (a.type === "debit" ? a.amount : -a.amount), 0);
       const hasAdj   = adjustments.length > 0;
       const displayBal = ledgerBalance ?? openSum;
-      const adjustedBal = displayBal - netAdj;
+      // Debit notes ADD to the outstanding balance (additional charges), credits reduce it.
+      const adjustedBal = displayBal + netAdj;
       const adjIsDebit = adjustedBal >= 0;
       const waOpenSum = openAndPartial.reduce((s, r) => s + r.remainingAmount, 0);
       const waMismatch = hasAdj && Math.abs(adjustedBal - waOpenSum) > 0.01;
@@ -1812,19 +1813,17 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       const mismatchBannerHtml = "";
 
       // ── open balance footer row ───────────────────────────────────────────
+      // When notes exist the displayed balance is the combined total (ledger + notes).
+      const finalBal  = hasAdj ? adjustedBal : displayBal;
+      const finalLabel = hasAdj ? (adjIsDebit ? "Dr" : "Cr") : "";
       const balanceRowHtml = hasBalance ? `
-        ${hasAdj ? `<tr style="background:#d1fae5">
-          <td colspan="9" style="padding:5px 7px;font-size:10px;font-weight:600;color:#065f46;text-transform:uppercase;letter-spacing:0.04em;border:1px solid #a7f3d0;opacity:0.85;">Account Balance</td>
-          <td style="padding:5px 7px;font-size:12px;font-weight:700;color:#065f46;text-align:right;border:1px solid #a7f3d0;">$${esc(fmt(Math.abs(displayBal), 0))}</td>
-          <td colspan="1" style="padding:5px 7px;border:1px solid #a7f3d0;"></td>
-        </tr>` : ""}
         <tr style="background:#fbbf24">
           <td colspan="9" style="padding:8px 7px;font-size:11px;font-weight:700;color:#1c1917;text-transform:uppercase;letter-spacing:0.05em;border:1px solid #f59e0b;">
-            ${hasAdj ? "Adjusted Balance" : "Open Balance (= Account Balance)"}
+            Account Balance
           </td>
           <td style="padding:8px 7px;font-size:13px;font-weight:800;color:#1c1917;text-align:right;border:1px solid #f59e0b;">
-            $${esc(fmt(Math.abs(hasAdj ? adjustedBal : displayBal), 0))}
-            ${hasAdj ? esc(" (" + (adjIsDebit ? "Dr" : "Cr") + ")") : ""}
+            $${esc(fmt(Math.abs(finalBal), 0))}
+            ${finalLabel ? esc(" (" + finalLabel + ")") : ""}
           </td>
           <td style="padding:8px 7px;font-size:11px;font-weight:700;color:#1c1917;text-align:center;border:1px solid #f59e0b;"></td>
         </tr>` : "";
@@ -1996,10 +1995,9 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
 
   // ── Manual entry balance recalculation ────────────────────────────────────
   const netAdjustment   = adjustments.reduce((s, a) => s + (a.type === "debit" ? a.amount : -a.amount), 0);
-  // Use SIGNED ledgerBalance (not abs openBalance) so Cr accounts (company owes agent)
-  // produce adjustedBalance < 0 → prepaidBudget = 0 (no designation possible),
-  // while Dr accounts (agent owes company / has prepaid credit) work correctly.
-  const adjustedBalance = ledgerBalance !== null ? ledgerBalance - netAdjustment : null;
+  // Debit notes are ADDITIONAL CHARGES owed by the agent → they ADD to the outstanding balance.
+  // Credit notes reduce the balance.  adjustedBalance = total the agent owes including notes.
+  const adjustedBalance = ledgerBalance !== null ? ledgerBalance + netAdjustment : null;
   const hasAdjustments  = adjustments.length > 0;
   // isReconciled: manual entries bring the adjusted balance to 0 → everything is explained
   const isReconciled    = hasAdjustments && adjustedBalance !== null && Math.abs(adjustedBalance) <= 0.01;
