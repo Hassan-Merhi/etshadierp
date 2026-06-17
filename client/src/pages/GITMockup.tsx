@@ -2034,9 +2034,18 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   //    containers were paid separately."
   // In that case, hide every offloaded row with a very large remainder.
   // For normal partial-payment cases (no designation or partial), use the original formula.
+  //
+  // Also trigger when the remaining undesignated budget is less than the cheapest open
+  // container's outstanding duty — meaning the leftover balance can't cover even one more
+  // container on its own, so it must all be accounted for by designations + other charges.
+  // Example: budget=$33,070, designated=$25,500, remaining=$7,570 < min-duty=$8,500 → all designated.
+  const minOpenRemaining = allOpenPartial.length > 0
+    ? Math.min(...allOpenPartial.map(r => r.remainingAmount).filter(a => a > 0.01))
+    : Infinity;
   const allBudgetDesignated = designatedPrepaidSum > 0
     && prepaidBudget > 0
-    && designatedPrepaidSum >= prepaidBudget - 0.01;
+    && (designatedPrepaidSum >= prepaidBudget - 0.01
+        || (prepaidBudget - designatedPrepaidSum) < (isFinite(minOpenRemaining) ? minOpenRemaining : 0));
   const enhancedRemainder = allBudgetDesignated
     ? (offloadedDutyTotal ?? 0) * 2 + 1          // large enough to clear every offloaded row
     : remainderForOpenPartial + designatedPrepaidSum;
@@ -2074,29 +2083,46 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   const coveredCount = openAndPartial.length - visibleOpenPartial.length;
 
   // ── Stale-ID cleanup (DB mode) ────────────────────────────────────────────
-  // When a prepaid container is offloaded it leaves activePreviewRows.
-  // Auto-clean DB designations so the container doesn't stay stuck as "prepaid".
-  // Also auto-promote any graduated container to the top of customOrder so the
-  // enhanced allocation covers it first (prevents it from appearing as "Open").
+  // When a prepaid container offloads it leaves activePreviewRows.  We do this in
+  // TWO phases to handle the query-timing race:
+  //
+  // Phase 1 (fires on transit change): detects stale IDs, records them as
+  //   "pending graduation" in a ref, then removes them from the DB prepaid list.
+  //   At this moment openRows may not yet have refetched, so we can't promote yet.
+  //
+  // Phase 2 (fires on openAndPartial change): as soon as the graduated containers
+  //   appear in openAndPartial we promote them to position-0 in customOrder so
+  //   the enhanced allocation covers them before any other open rows.
   const validTransitIdSet = useMemo(() => new Set(activePreviewRows.map(r => r.id)), [activePreviewRows]);
+  // IDs of containers that left dbPrepaidIds (offloaded) but haven't been promoted yet.
+  // Using useState (not useRef) so Phase 2 re-fires when this list changes — handles
+  // both the live-transition case and the fresh-page-load case where Phase 1 may fire
+  // after allOpenPartial is already populated.
+  const [pendingGraduationIds, setPendingGraduationIds] = useState<number[]>([]);
+
+  // Phase 1 — detect stale prepaid IDs, record for promotion, clean DB
   useEffect(() => {
     if (!isDbOverride || dbPrepaidIds.length === 0) return;
     const staleIds = dbPrepaidIds.filter(id => !validTransitIdSet.has(id));
     if (staleIds.length === 0) return;
-
-    // Graduated containers: were prepaid-in-transit, now appear as offloaded open/partial rows.
-    // Promote them to the front of customOrder so they get first allocation priority.
-    const openPartialIdSet = new Set(allOpenPartial.map(r => r.id));
-    const graduatedIds = staleIds.filter(id => openPartialIdSet.has(id));
-    if (graduatedIds.length > 0) {
-      const existing = customOrder ?? allOpenPartial.map(r => r.id);
-      const existingWithoutGraduated = existing.filter(id => !graduatedIds.includes(id));
-      saveOrder([...graduatedIds, ...existingWithoutGraduated]);
-    }
-
+    setPendingGraduationIds(prev => [...new Set([...prev, ...staleIds])]);
     const cleaned = dbPrepaidIds.filter(id => validTransitIdSet.has(id));
     setAllPrepaidMutation.mutate(cleaned);
   }, [validTransitIdSet]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Phase 2 — once graduated containers appear in openAndPartial, promote to position 0
+  // Runs when either allOpenPartial updates (live transition) or pendingGraduationIds
+  // changes (fresh page load where Phase 1 fires after data is already available).
+  useEffect(() => {
+    if (pendingGraduationIds.length === 0) return;
+    const openPartialIdSet = new Set(allOpenPartial.map(r => r.id));
+    const toPromote = pendingGraduationIds.filter(id => openPartialIdSet.has(id));
+    if (toPromote.length === 0) return;
+    setPendingGraduationIds(prev => prev.filter(id => !openPartialIdSet.has(id)));
+    const existing = customOrder ?? allOpenPartial.map(r => r.id);
+    const withoutPromoted = existing.filter(id => !toPromote.includes(id));
+    saveOrder([...toPromote, ...withoutPromoted]);
+  }, [allOpenPartial, pendingGraduationIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const confidenceBadge = {
     exact:    { label: "Exact match",  cls: "bg-green-700 text-white" },
