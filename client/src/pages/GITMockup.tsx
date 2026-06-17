@@ -2041,13 +2041,27 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
     ? (offloadedDutyTotal ?? 0) * 2 + 1          // large enough to clear every offloaded row
     : remainderForOpenPartial + designatedPrepaidSum;
   const enhancedAllocated = useMemo(() => {
-    // Use the same order as openAndPartial (respects customOrder), but with raw dutyFee data
-    const orderMap = new Map(openAndPartial.map((r, i) => [r.id, i]));
-    const sortedRaw = [...allOpenPartial].sort(
-      (a, b) => (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999)
-    );
-    return clientReallocate(sortedRaw, enhancedRemainder);
-  }, [openAndPartial, allOpenPartial, enhancedRemainder]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Walk openAndPartial in its already-correct order (respects customOrder + actual payment).
+    // Use each row's *remainingAmount* (outstanding after real payment) — NOT the full dutyFee.
+    // This prevents partially-cleared containers from consuming the full dutyFee from the
+    // enhanced budget, which would incorrectly leave later rows (e.g. SUDU8959148) uncovered.
+    let rem = enhancedRemainder;
+    return openAndPartial.map(row => {
+      const needed = row.remainingAmount;
+      if (needed <= 0) {
+        return { ...row, allocationStatus: "Cleared" as ApiAllocStatus };
+      }
+      if (rem >= needed) {
+        rem -= needed;
+        return { ...row, clearedAmount: row.dutyFee, remainingAmount: 0, allocationStatus: "Cleared" as ApiAllocStatus };
+      } else if (rem > 0) {
+        const extra = rem;
+        rem = 0;
+        return { ...row, clearedAmount: row.clearedAmount + extra, remainingAmount: row.remainingAmount - extra, allocationStatus: "Partially Cleared" as ApiAllocStatus };
+      }
+      return row;
+    });
+  }, [openAndPartial, enhancedRemainder]);
   const enhancedCoveredIds = useMemo(
     () => new Set(enhancedAllocated.filter(r => r.clearedAmount >= r.dutyFee).map(r => r.id)),
     [enhancedAllocated]
