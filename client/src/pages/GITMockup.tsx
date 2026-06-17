@@ -2062,11 +2062,24 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   // ── Stale-ID cleanup (DB mode) ────────────────────────────────────────────
   // When a prepaid container is offloaded it leaves activePreviewRows.
   // Auto-clean DB designations so the container doesn't stay stuck as "prepaid".
+  // Also auto-promote any graduated container to the top of customOrder so the
+  // enhanced allocation covers it first (prevents it from appearing as "Open").
   const validTransitIdSet = useMemo(() => new Set(activePreviewRows.map(r => r.id)), [activePreviewRows]);
   useEffect(() => {
     if (!isDbOverride || dbPrepaidIds.length === 0) return;
     const staleIds = dbPrepaidIds.filter(id => !validTransitIdSet.has(id));
     if (staleIds.length === 0) return;
+
+    // Graduated containers: were prepaid-in-transit, now appear as offloaded open/partial rows.
+    // Promote them to the front of customOrder so they get first allocation priority.
+    const openPartialIdSet = new Set(allOpenPartial.map(r => r.id));
+    const graduatedIds = staleIds.filter(id => openPartialIdSet.has(id));
+    if (graduatedIds.length > 0) {
+      const existing = customOrder ?? allOpenPartial.map(r => r.id);
+      const existingWithoutGraduated = existing.filter(id => !graduatedIds.includes(id));
+      saveOrder([...graduatedIds, ...existingWithoutGraduated]);
+    }
+
     const cleaned = dbPrepaidIds.filter(id => validTransitIdSet.has(id));
     setAllPrepaidMutation.mutate(cleaned);
   }, [validTransitIdSet]); // eslint-disable-line react-hooks/exhaustive-deps
