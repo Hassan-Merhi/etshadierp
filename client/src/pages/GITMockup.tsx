@@ -1737,22 +1737,22 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
 
       // ── helpers ──────────────────────────────────────────────────────────
       // Top table (11 cols) — compact padding so all columns fit
-      const thOpen = (bg = "#92400e") =>
-        `padding:5px 7px;font-size:10.5px;font-weight:700;text-align:center;` +
-        `background:${bg};color:#ffffff;border:1px solid rgba(0,0,0,0.15);white-space:nowrap;`;
+      const thOpen = (bg = "#334155") =>
+        `padding:6px 8px;font-size:10.5px;font-weight:700;text-align:center;letter-spacing:0.04em;` +
+        `background:${bg};color:#f1f5f9;border:1px solid rgba(0,0,0,0.2);white-space:nowrap;text-transform:uppercase;`;
 
       const tdOpen = (align = "left", bold = false, color = "#111827") =>
-        `font-size:10.5px;padding:4px 7px;text-align:${align};color:${color};` +
+        `font-size:10.5px;padding:5px 8px;text-align:${align};color:${color};` +
         `font-weight:${bold ? "700" : "400"};border:1px solid #e5e7eb;white-space:nowrap;`;
 
       // Transit table (7 cols) — roomier
-      const thTransit = (bg = "#0369a1") =>
-        `padding:7px 10px;font-size:11.5px;font-weight:700;text-align:center;` +
-        `background:${bg};color:#ffffff;border:1px solid rgba(0,0,0,0.15);white-space:nowrap;`;
+      const thTransit = (bg = "#475569") =>
+        `padding:7px 10px;font-size:11px;font-weight:700;text-align:center;letter-spacing:0.04em;` +
+        `background:${bg};color:#f8fafc;border:1px solid rgba(0,0,0,0.2);white-space:nowrap;text-transform:uppercase;`;
 
-      const tdTransit = (align = "left", bold = false, color = "#0c4a6e") =>
-        `font-size:11.5px;padding:5px 10px;text-align:${align};color:${color};` +
-        `font-weight:${bold ? "700" : "400"};border:1px solid #bae6fd;white-space:nowrap;`;
+      const tdTransit = (align = "left", bold = false, color = "#1e293b") =>
+        `font-size:11px;padding:6px 10px;text-align:${align};color:${color};` +
+        `font-weight:${bold ? "700" : "400"};border:1px solid #e2e8f0;white-space:nowrap;`;
 
       // ── open/partial rows ─────────────────────────────────────────────────
       let openRowsHtml = "";
@@ -1817,16 +1817,17 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       // When notes exist the displayed balance is the combined total (ledger + notes).
       const finalBal  = hasAdj ? adjustedBal : displayBal;
       const finalLabel = hasAdj ? (adjIsDebit ? "Dr" : "Cr") : "";
+      const balRowBg  = finalBal > 0 ? "#16a34a" : finalBal < 0 ? "#dc2626" : "#475569";
       const balanceRowHtml = hasBalance ? `
-        <tr style="background:#fbbf24">
-          <td colspan="9" style="padding:8px 7px;font-size:11px;font-weight:700;color:#1c1917;text-transform:uppercase;letter-spacing:0.05em;border:1px solid #f59e0b;">
-            Account Balance
+        <tr style="background:${balRowBg}">
+          <td colspan="9" style="padding:9px 10px;font-size:11px;font-weight:700;color:#ffffff;text-transform:uppercase;letter-spacing:0.06em;border:1px solid rgba(0,0,0,0.15);">
+            ${hasAdj ? "Account Balance" : "Open Balance"}
           </td>
-          <td style="padding:8px 7px;font-size:13px;font-weight:800;color:#1c1917;text-align:right;border:1px solid #f59e0b;">
+          <td style="padding:9px 10px;font-size:14px;font-weight:800;color:#ffffff;text-align:right;border:1px solid rgba(0,0,0,0.15);">
             $${esc(fmt(Math.abs(finalBal), 0))}
-            ${finalLabel ? esc(" (" + finalLabel + ")") : ""}
+            ${finalLabel ? `<span style="font-size:11px;opacity:0.85;margin-left:4px;">(${esc(finalLabel)})</span>` : ""}
           </td>
-          <td style="padding:8px 7px;font-size:11px;font-weight:700;color:#1c1917;text-align:center;border:1px solid #f59e0b;"></td>
+          <td style="padding:9px 10px;border:1px solid rgba(0,0,0,0.15);"></td>
         </tr>` : "";
 
       // ── in-transit section ────────────────────────────────────────────────
@@ -1852,9 +1853,12 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
 
         const transitCols = ["CONTAINER", "SUPPLIER", "PLATE", "BORDER DATE", "TRANSPORTER", "LOCATION", "DUTY"];
         transitHtml = `
-          <div style="background:#0284c7;padding:12px;text-align:center;">
-            <span style="font-size:13px;font-weight:700;color:#ffffff;text-transform:uppercase;letter-spacing:0.08em;">
-              In Transit — ${waTransitRows.length} Container${waTransitRows.length !== 1 ? "s" : ""} &nbsp;·&nbsp; $${fmt(transitTotal, 0)} Upcoming Duty
+          <div style="background:#1e293b;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;margin-top:2px;">
+            <span style="font-size:12px;font-weight:700;color:#f8fafc;text-transform:uppercase;letter-spacing:0.08em;">
+              In Transit — ${waTransitRows.length} Container${waTransitRows.length !== 1 ? "s" : ""}
+            </span>
+            <span style="font-size:12px;font-weight:700;color:#94a3b8;letter-spacing:0.04em;">
+              $${fmt(transitTotal, 0)} Upcoming Duty
             </span>
           </div>
           <table style="width:100%;border-collapse:collapse;">
@@ -1883,9 +1887,9 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
         : "";
 
       capture.innerHTML = `
-        <div style="background:#fbbf24;padding:18px 12px;text-align:center;">
-          <div style="font-size:26px;font-weight:800;color:#1c1917;letter-spacing:0.06em;text-transform:uppercase;">${esc(agentName)}</div>
-          <div style="font-size:11px;color:#78350f;margin-top:3px;font-weight:500;">Agent Duty Summary &nbsp;·&nbsp; ${today}</div>
+        <div style="background:#1e293b;padding:18px 16px;display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-size:22px;font-weight:800;color:#f8fafc;letter-spacing:0.08em;text-transform:uppercase;">${esc(agentName)}</div>
+          <div style="font-size:11px;color:#94a3b8;font-weight:500;">Agent Duty Summary &nbsp;·&nbsp; ${today}</div>
         </div>
         ${noteHtml}
         ${adjustmentsHtml}
@@ -2075,31 +2079,32 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
 
   return (
     <>
-    <div className="space-y-1" data-testid={`agent-card-${agentName}`}>
+    <div className="space-y-0" data-testid={`agent-card-${agentName}`}>
       {/* WA send button sits ABOVE the captured card so it never appears in the screenshot */}
       {waGroupChatId && (
-        <div className="flex justify-end">
+        <div className="flex justify-end mb-1">
           <button
             type="button"
             onClick={sendToWhatsApp}
             disabled={waSending}
             title={`Send ${agentName} balance to WhatsApp`}
             data-testid={`button-wa-send-${agentName}`}
-            className="flex items-center gap-1 px-2 py-0.5 rounded bg-green-600 hover:bg-green-700 text-white text-[10px] font-semibold disabled:opacity-60"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-green-600 text-white text-xs font-semibold disabled:opacity-60 shadow-sm"
           >
             {waSending
               ? <span className="animate-spin inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full" />
-              : <MessageCircle className="h-3 w-3" />}
-            {waSending ? "Sending…" : "Send"}
+              : <MessageCircle className="h-3.5 w-3.5" />}
+            {waSending ? "Sending…" : "Send to WhatsApp"}
           </button>
         </div>
       )}
 
-    <div ref={cardRef} className="rounded-md border overflow-hidden">
+    <div ref={cardRef} className="rounded-md border border-border overflow-hidden shadow-sm">
 
       {/* ── Agent header ── */}
-      <div className="bg-yellow-400 text-yellow-950 px-3 py-2 font-bold text-sm flex items-center justify-center min-h-[2.5rem]">
-        <span className="tracking-wide text-base">{agentName}</span>
+      <div className="bg-slate-800 dark:bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between min-h-[2.75rem]">
+        <span className="font-bold tracking-widest text-sm uppercase">{agentName}</span>
+        <Badge className={cn("text-[10px] no-default-active-elevate shrink-0", confidenceBadge.cls)}>{confidenceBadge.label}</Badge>
       </div>
 
       {/* ── Warning banners ── */}
@@ -2277,9 +2282,9 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       <div className="overflow-x-auto">
         <table className="w-full text-xs whitespace-nowrap border-collapse">
           <thead>
-            <tr className="bg-yellow-200 text-yellow-900 border-b border-yellow-400">
+            <tr className="bg-slate-700 dark:bg-slate-800 text-slate-100 border-b border-slate-600">
               {["CONTAINER","SUPPLIER","PLATE","OFFLOAD DATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY","CLEARED","REMAINING","STATUS",""].map(h => (
-                <th key={h} className="py-1 px-2 font-bold text-center">{h}</th>
+                <th key={h} className="py-1.5 px-2 font-semibold text-center tracking-wide text-[11px]">{h}</th>
               ))}
             </tr>
           </thead>
@@ -2407,24 +2412,22 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
               const isCredit = rawBal < 0;
               // Cr = I owe them → RED  |  Dr = they owe me → GREEN
               const baseCls  = isDebit
-                ? "bg-green-500 text-white font-bold"
+                ? "bg-green-600 text-white font-bold"
                 : isCredit
-                  ? "bg-red-500 text-white font-bold"
-                  : "bg-yellow-400 text-yellow-950 font-bold";
+                  ? "bg-red-600 text-white font-bold"
+                  : "bg-slate-500 text-white font-bold";
               const balLabel = isDebit ? "Dr" : isCredit ? "Cr" : "";
 
               if (hasAdjustments && adjustedBalance !== null) {
-                // When adjusted balance is 0, manual entries fully explain everything —
-                // only show the account balance row (no need for the adjusted row)
                 if (isReconciled) {
                   return (
                     <tr className={cn(baseCls, "opacity-70")}>
-                      <td colSpan={9} className="py-1 px-2 text-xs uppercase tracking-wide">
+                      <td colSpan={9} className="py-2 px-3 text-[11px] uppercase tracking-widest font-semibold">
                         Account Balance
                       </td>
-                      <td className="py-1 px-2 text-right text-sm">
+                      <td className="py-2 px-3 text-right text-sm font-bold tabular-nums">
                         ${fmt(Math.abs(rawBal), 0)}
-                        {balLabel && <span className="ml-1 text-xs opacity-80">({balLabel})</span>}
+                        {balLabel && <span className="ml-1.5 text-[11px] opacity-80 font-semibold">({balLabel})</span>}
                       </td>
                       <td colSpan={2} />
                     </tr>
@@ -2435,20 +2438,20 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                 const adjLabel  = adjustedBalance >= 0 ? "Dr" : "Cr";
                 // Cr = I owe them → RED  |  Dr = they owe me → GREEN
                 const adjRowCls = (isMismatch && !allBudgetDesignated)
-                  ? "bg-red-600 text-white font-bold"
+                  ? "bg-red-700 text-white font-bold"
                   : adjustedBalance > 0
-                    ? "bg-green-500 text-white font-bold"
+                    ? "bg-green-600 text-white font-bold"
                     : adjustedBalance < 0
-                      ? "bg-red-500 text-white font-bold"
-                      : "bg-yellow-400 text-yellow-950 font-bold";
+                      ? "bg-red-600 text-white font-bold"
+                      : "bg-slate-500 text-white font-bold";
                 return (
                   <tr className={adjRowCls}>
-                    <td colSpan={9} className="py-1.5 px-2 text-xs uppercase tracking-wide">
+                    <td colSpan={9} className="py-2 px-3 text-[11px] uppercase tracking-widest font-semibold">
                       Account Balance
                     </td>
-                    <td className="py-1.5 px-2 text-right text-sm">
+                    <td className="py-2 px-3 text-right text-sm font-bold tabular-nums">
                       ${fmt(adjAbs, 0)}
-                      <span className="ml-1 text-xs opacity-80">({adjLabel})</span>
+                      <span className="ml-1.5 text-[11px] opacity-80 font-semibold">({adjLabel})</span>
                     </td>
                     <td colSpan={2} />
                   </tr>
@@ -2457,12 +2460,12 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
 
               return (
                 <tr className={baseCls}>
-                  <td colSpan={9} className="py-1.5 px-2 text-xs uppercase tracking-wide">
-                    Open Balance (= Account Balance)
+                  <td colSpan={9} className="py-2 px-3 text-[11px] uppercase tracking-widest font-semibold">
+                    Open Balance
                   </td>
-                  <td className="py-1.5 px-2 text-right text-sm">
+                  <td className="py-2 px-3 text-right text-sm font-bold tabular-nums">
                     ${fmt(Math.abs(rawBal), 0)}
-                    {balLabel && <span className="ml-1 text-xs opacity-80">({balLabel})</span>}
+                    {balLabel && <span className="ml-1.5 text-[11px] opacity-80 font-semibold">({balLabel})</span>}
                   </td>
                   <td />
                   <td />
@@ -2525,13 +2528,13 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
           : remainingTransitRows;
         return (
         <>
-          <div className="flex items-center bg-sky-50 dark:bg-sky-950/20 border-t border-sky-200 dark:border-sky-800">
+          <div className="flex items-center bg-slate-50 dark:bg-slate-800/40 border-t border-slate-200 dark:border-slate-700">
             <button
               onClick={() => setShowActive(v => !v)}
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-xs hover-elevate"
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-xs hover-elevate"
               data-testid={`button-toggle-active-${agentName}`}
             >
-              <span className="font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-400">
+              <span className="font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300 text-[11px]">
                 In Transit —{" "}
                 {remainingTransitRows.length} container{remainingTransitRows.length !== 1 ? "s" : ""}
                 {prepaidTransitRows.length > 0 && (
@@ -2539,17 +2542,17 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                     ({prepaidTransitRows.length} prepaid)
                   </span>
                 )}
-                ,{" "}${fmt(remainingTransitRows.reduce((s, r) => s + r.dutyFee, 0), 0)} upcoming duty
+                {" "}·{" "}${fmt(remainingTransitRows.reduce((s, r) => s + r.dutyFee, 0), 0)} upcoming duty
               </span>
-              {showActive ? <ChevronUp className="h-3.5 w-3.5 text-sky-600" /> : <ChevronDown className="h-3.5 w-3.5 text-sky-600" />}
+              {showActive ? <ChevronUp className="h-3.5 w-3.5 text-slate-500" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-500" />}
             </button>
             {transitTransporters.length > 1 && (
               <div className="flex items-center gap-1 pr-2" onClick={e => e.stopPropagation()}>
-                <Filter className="h-3 w-3 text-sky-500 shrink-0" />
+                <Filter className="h-3 w-3 text-slate-400 shrink-0" />
                 <select
                   value={transitTransporterFilter ?? ""}
                   onChange={e => setTransitTransporterFilter(e.target.value || null)}
-                  className="text-[11px] bg-transparent border border-sky-300 dark:border-sky-700 rounded px-1.5 py-0.5 text-sky-700 dark:text-sky-300 focus:outline-none cursor-pointer"
+                  className="text-[11px] bg-transparent border border-slate-300 dark:border-slate-600 rounded px-1.5 py-0.5 text-slate-600 dark:text-slate-300 focus:outline-none cursor-pointer"
                   data-testid={`select-transit-transporter-${agentName}`}
                 >
                   <option value="">All transporters</option>
@@ -2562,12 +2565,12 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
           </div>
 
           {showActive && (
-            <div className="overflow-x-auto border-t border-sky-200 dark:border-sky-800">
+            <div className="overflow-x-auto border-t border-slate-200 dark:border-slate-700">
               <table className="w-full text-xs whitespace-nowrap border-collapse">
                 <thead>
-                  <tr className="bg-sky-100 dark:bg-sky-950/30 border-b text-sky-800 dark:text-sky-300">
+                  <tr className="bg-slate-600 dark:bg-slate-700 text-slate-100 border-b border-slate-500">
                     {["CONTAINER","SUPPLIER","PLATE","BORDER DATE","TRANSPORTER","LOCATION","DUTY",""].map(h => (
-                      <th key={h} className="py-1 px-2 font-bold text-center">{h}</th>
+                      <th key={h} className="py-1.5 px-2 font-semibold text-center tracking-wide text-[11px]">{h}</th>
                     ))}
                   </tr>
                 </thead>
