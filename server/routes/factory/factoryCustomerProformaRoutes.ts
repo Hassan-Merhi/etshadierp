@@ -350,8 +350,10 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         .where(eq(customerProformaLines.proformaId, proformaId));
       if (lines.length === 0) return res.status(400).json({ message: "Proforma has no lines — add article codes first" });
 
-      // ── Phase 4: compute how many bales are already in active loadings for this proforma ──
-      // alreadyLoaded = bales currently in LOADING or PENDING_VERIFICATION orders tied to this proforma
+      // ── Phase 4: compute how many bales are already in active/completed loadings for this proforma ──
+      // alreadyLoaded = bales in any non-cancelled order tied to this proforma
+      // (LOADING, PENDING_VERIFICATION, VERIFIED, FINALIZED) — FINALIZED bales are no longer IN_STOCK
+      // so they won't be grabbed, but counting them ensures we don't exceed the proforma's total qty.
       const alreadyLoadedRaw = await db.execute(
         sql`SELECT fb.article_code as "articleCode", COUNT(*)::int as loaded
             FROM customer_order_bales cob
@@ -359,9 +361,10 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
             JOIN customer_orders co ON co.id = cob.order_id
             WHERE co.company_id = ${companyId}
               AND co.proforma_id_used = ${proformaId}
-              AND co.status IN ('LOADING', 'PENDING_VERIFICATION')
+              AND co.status IN ('LOADING', 'PENDING_VERIFICATION', 'VERIFIED', 'FINALIZED')
             GROUP BY fb.article_code`
       );
+      console.log(`[create-loading] proformaId=${proformaId} companyId=${companyId}`);
       const alreadyLoadedMap = new Map<string, number>(
         ((alreadyLoadedRaw as any).rows || (alreadyLoadedRaw as unknown as any[])).map((r: any) => [r.articleCode, Number(r.loaded)])
       );
@@ -373,6 +376,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         const lineQty = Number(line.quantity) || 0;
         const alreadyLoaded = alreadyLoadedMap.get(line.articleCode) || 0;
         const remaining = Math.max(0, lineQty - alreadyLoaded);
+        console.log(`[create-loading] line articleCode=${line.articleCode} lineId=${line.id} qty=${lineQty} alreadyLoaded=${alreadyLoaded} remaining=${remaining}`);
         if (remaining === 0) {
           articleIssues.push(`${line.articleCode}: proforma quantity (${lineQty}) already fully loaded`);
         }
@@ -581,6 +585,10 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
             stockWarning = `Insufficient free stock for ${existingLine.articleCode}: need ${delta} more, available ${ftp}`;
           }
         }
+      }
+
+      if (updateData.quantity !== undefined) {
+        console.log(`[proforma-line PUT] lineId=${id} proformaId=${existingLine.proformaId} articleCode=${existingLine.articleCode} oldQty=${existingLine.quantity} newQty=${updateData.quantity}`);
       }
 
       const [updated] = await db.update(customerProformaLines).set(updateData)

@@ -212,6 +212,10 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
       qc.invalidateQueries({ queryKey: ["/api/factory/customer-proformas", proformaId] });
+      qc.invalidateQueries({ predicate: (q) => {
+        const k = q.queryKey[0];
+        return typeof k === "string" && k.startsWith("/api/factory/customer-proformas");
+      }});
       toast({ title: "Proforma updated", description: "All changes saved." });
       onClose();
       onSuccess();
