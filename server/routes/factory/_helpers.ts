@@ -230,7 +230,22 @@ export async function recalculateOrderTotals(dbConn: any, orderId: number) {
   const charges = await dbConn.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
   const freightAmount = charges.filter((c: any) => c.chargeType === 'FREIGHT').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
   const otherChargesTotal = charges.filter((c: any) => c.chargeType === 'OTHER').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
-  const subtotalBales = bales.reduce((sum: number, b: any) => sum + parseFloat(b.priceUsed), 0);
+
+  // Mirror the verify-page fallback: for per_kg articles where all bales still have
+  // priceUsed = 0 (scanned before proforma was linked), use proformaRate × totalWeight
+  // so that grandTotal in the list matches the price shown in the verify page.
+  let subtotalBales = 0;
+  for (const line of Object.values(grouped)) {
+    const pricing = proformaPricing.get(line.articleCode.toLowerCase());
+    const pricingMode = pricing?.pricingMode ?? 'per_bale';
+    const pkgRate = pricing?.pricePerKg ? parseFloat(pricing.pricePerKg) : 0;
+    if (pricingMode === 'per_kg' && line.totalPrice === 0 && pkgRate > 0 && line.totalWeight > 0) {
+      subtotalBales += pkgRate * line.totalWeight;
+    } else {
+      subtotalBales += line.totalPrice;
+    }
+  }
+
   const grandTotal = subtotalBales + freightAmount + otherChargesTotal;
 
   await dbConn.update(customerOrders).set({

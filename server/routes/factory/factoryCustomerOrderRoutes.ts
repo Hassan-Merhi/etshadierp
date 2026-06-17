@@ -335,7 +335,24 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           subtotalBales: customerOrders.subtotalBales,
           freightAmount: customerOrders.freightAmount,
           otherChargesTotal: customerOrders.otherChargesTotal,
-          grandTotal: customerOrders.grandTotal,
+          grandTotal: sql<string>`(
+            COALESCE((
+              SELECT SUM(
+                CASE
+                  WHEN col.pricing_mode = 'per_kg'
+                    AND COALESCE(col.total_price::numeric, 0) = 0
+                    AND COALESCE(col.price_per_kg::numeric, 0) > 0
+                    AND COALESCE(col.total_weight::numeric, 0) > 0
+                  THEN col.price_per_kg::numeric * col.total_weight::numeric
+                  ELSE COALESCE(col.total_price::numeric, 0)
+                END
+              )
+              FROM customer_order_lines col
+              WHERE col.order_id = ${customerOrders.id}
+            ), 0)
+            + COALESCE(${customerOrders.freightAmount}::numeric, 0)
+            + COALESCE(${customerOrders.otherChargesTotal}::numeric, 0)
+          )`,
           totalQtyBales: customerOrders.totalQtyBales,
           totalWeightKg: sql<string>`COALESCE((SELECT SUM(cob.weight) FROM customer_order_bales cob WHERE cob.order_id = ${customerOrders.id}), 0)`,
           proformaExpectedBales: sql<string>`COALESCE((SELECT SUM(quantity) FROM customer_proforma_lines WHERE proforma_id = ${customerOrders.proformaIdUsed}), 0)`,
