@@ -342,6 +342,27 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
   const [waSending, setWaSending] = useState(false);
   const [pdfExporting, setPdfExporting] = useState(false);
 
+  // Summary stats — must be declared before buildCapture (used in its dep array)
+  const stats = useMemo(() => {
+    if (!statement) return null;
+    let totalDebit = 0;
+    let totalCredit = 0;
+    let totalPaid = 0;
+    let overdueCount = 0;
+    const now = today();
+    for (const r of (statement.rows ?? [])) {
+      totalDebit += parseFloat(r.debit || "0");
+      totalCredit += parseFloat(r.credit || "0");
+      totalPaid += parseFloat(r.paidAmount || "0");
+      if (r.dateToBePaid && r.dateToBePaid < now && r.status && r.status !== "paid") {
+        overdueCount++;
+      }
+    }
+    return { totalDebit, totalCredit, totalPaid, overdueCount };
+  }, [statement]);
+
+  const selectedTransporter = transporters.find((t) => String(t.id) === selectedAccountId);
+
   // Build an off-screen, light-themed HTML card for capture
   const buildCapture = useCallback(() => {
     if (!statement || !selectedTransporter) return null;
@@ -541,27 +562,7 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
     window.print();
   }
 
-  // Summary stats
-  const stats = useMemo(() => {
-    if (!statement) return null;
-    let totalDebit = 0;
-    let totalCredit = 0;
-    let totalPaid = 0;
-    let overdueCount = 0;
-    const now = today();
-    for (const r of (statement.rows ?? [])) {
-      totalDebit += parseFloat(r.debit || "0");
-      totalCredit += parseFloat(r.credit || "0");
-      totalPaid += parseFloat(r.paidAmount || "0");
-      if (r.dateToBePaid && r.dateToBePaid < now && r.status && r.status !== "paid") {
-        overdueCount++;
-      }
-    }
-    return { totalDebit, totalCredit, totalPaid, overdueCount };
-  }, [statement]);
-
   const closingBal = statement ? parseFloat(statement.closingBalance) : 0;
-  const selectedTransporter = transporters.find((t) => String(t.id) === selectedAccountId);
 
   return (
     <>
