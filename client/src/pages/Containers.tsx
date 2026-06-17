@@ -99,10 +99,10 @@ export default function Containers() {
   const debouncedSoldSearch = useDebounce(soldSearchTerm, 300);
   const debouncedOtwSearch = useDebounce(otwSearchTerm, 300);
   const [statusFilter, setStatusFilter] = useState("OTW");
-  const [supplierFilter, setSupplierFilter] = useState("ALL");
+  const [supplierFilter, setSupplierFilter] = useState<string[]>([]);
   // OTW Tracking filters
   const [otwLocationFilter, setOtwLocationFilter] = useState("ALL");
-  const [otwSupplierFilter, setOtwSupplierFilter] = useState("ALL");
+  const [otwSupplierFilter, setOtwSupplierFilter] = useState<string[]>([]);
   const [otwAgentFilter, setOtwAgentFilter] = useState("ALL");
   const [otwTransporterFilter, setOtwTransporterFilter] = useState("ALL");
   const [otwTruckFilter, setOtwTruckFilter] = useState("ALL");
@@ -352,8 +352,8 @@ export default function Containers() {
     }
     // Supplier filter
     if (
-      otwSupplierFilter !== "ALL" &&
-      c.supplierId.toString() !== otwSupplierFilter
+      otwSupplierFilter.length > 0 &&
+      !otwSupplierFilter.includes(c.supplierId.toString())
     ) {
       return false;
     }
@@ -415,8 +415,8 @@ export default function Containers() {
       return false;
     }
     if (
-      supplierFilter !== "ALL" &&
-      c.supplierId.toString() !== supplierFilter
+      supplierFilter.length > 0 &&
+      !supplierFilter.includes(c.supplierId.toString())
     ) {
       return false;
     }
@@ -1169,25 +1169,57 @@ export default function Containers() {
           ))}
         </div>
         {suppliers.length > 0 && (
-          <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-            <SelectTrigger className="w-[160px]" data-testid="select-supplier-filter">
-              <SelectValue placeholder="All suppliers" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Suppliers</SelectItem>
-              {suppliers.map((supplier) => (
-                <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                  {supplier.legalName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1" data-testid="select-supplier-filter">
+                <Filter className="h-3.5 w-3.5" />
+                {supplierFilter.length === 0
+                  ? "All Suppliers"
+                  : supplierFilter.length === 1
+                    ? getSupplierName(Number(supplierFilter[0]))
+                    : `${supplierFilter.length} Suppliers`}
+                <ChevronDown className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[200px]">
+              {suppliers.map((supplier) => {
+                const val = supplier.id.toString();
+                const checked = supplierFilter.includes(val);
+                return (
+                  <DropdownMenuItem
+                    key={supplier.id}
+                    className="flex items-center gap-2 cursor-pointer"
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setSupplierFilter((prev) =>
+                        checked ? prev.filter((v) => v !== val) : [...prev, val]
+                      );
+                    }}
+                  >
+                    <Checkbox checked={checked} className="pointer-events-none" />
+                    <span className="truncate">{supplier.legalName}</span>
+                  </DropdownMenuItem>
+                );
+              })}
+              {supplierFilter.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-muted-foreground text-xs cursor-pointer justify-center"
+                    onSelect={(e) => { e.preventDefault(); setSupplierFilter([]); }}
+                  >
+                    Clear selection
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
-        {(statusFilter !== "ALL" || supplierFilter !== "ALL" || searchTerm) && (
+        {(statusFilter !== "ALL" || supplierFilter.length > 0 || searchTerm) && (
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => { clearFilters(); setSearchTerm(""); }}
+            onClick={() => { clearFilters(); setSearchTerm(""); setSupplierFilter([]); }}
             data-testid="button-clear-filters"
           >
             <X className="h-4 w-4 mr-1" />
@@ -1319,25 +1351,51 @@ export default function Containers() {
                 data-testid="input-search-otw"
               />
             </div>
-            <Select
-              value={otwSupplierFilter}
-              onValueChange={setOtwSupplierFilter}
-            >
-              <SelectTrigger
-                className="w-full sm:w-[130px]"
-                data-testid="select-otw-supplier"
-              >
-                <SelectValue placeholder="Supplier" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Suppliers</SelectItem>
-                {uniqueOtwSuppliers.map((id) => (
-                  <SelectItem key={id} value={id.toString()}>
-                    {getSupplierName(id)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1" data-testid="select-otw-supplier">
+                  <Filter className="h-3.5 w-3.5" />
+                  {otwSupplierFilter.length === 0
+                    ? "All Suppliers"
+                    : otwSupplierFilter.length === 1
+                      ? getSupplierName(Number(otwSupplierFilter[0]))
+                      : `${otwSupplierFilter.length} Suppliers`}
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-[200px]">
+                {uniqueOtwSuppliers.map((id) => {
+                  const val = id.toString();
+                  const checked = otwSupplierFilter.includes(val);
+                  return (
+                    <DropdownMenuItem
+                      key={id}
+                      className="flex items-center gap-2 cursor-pointer"
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        setOtwSupplierFilter((prev) =>
+                          checked ? prev.filter((v) => v !== val) : [...prev, val]
+                        );
+                      }}
+                    >
+                      <Checkbox checked={checked} className="pointer-events-none" />
+                      <span className="truncate">{getSupplierName(id)}</span>
+                    </DropdownMenuItem>
+                  );
+                })}
+                {otwSupplierFilter.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-muted-foreground text-xs cursor-pointer justify-center"
+                      onSelect={(e) => { e.preventDefault(); setOtwSupplierFilter([]); }}
+                    >
+                      Clear selection
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Select
               value={otwLocationFilter}
               onValueChange={setOtwLocationFilter}
