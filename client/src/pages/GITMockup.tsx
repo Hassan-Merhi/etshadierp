@@ -1831,10 +1831,13 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
 
       // ── in-transit section ────────────────────────────────────────────────
       let transitHtml = "";
-      if (activePreviewRows.length > 0) {
-        const transitTotal = activePreviewRows.reduce((s, r) => s + r.dutyFee, 0);
+      const waTransitRows = transitTransporterFilter
+        ? activePreviewRows.filter((r: any) => r.transporter === transitTransporterFilter)
+        : activePreviewRows;
+      if (waTransitRows.length > 0) {
+        const transitTotal = waTransitRows.reduce((s: number, r: any) => s + r.dutyFee, 0);
         let transitRowsHtml = "";
-        activePreviewRows.forEach((r, i) => {
+        waTransitRows.forEach((r: any, i: number) => {
           const bg = i % 2 === 0 ? "#f0f9ff" : "#e0f2fe";
           transitRowsHtml += `<tr style="background:${bg}">
             <td style="${tdTransit("left", true)}">${esc(r.containerNumber)}</td>
@@ -1851,7 +1854,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
         transitHtml = `
           <div style="background:#0284c7;padding:12px;text-align:center;">
             <span style="font-size:13px;font-weight:700;color:#ffffff;text-transform:uppercase;letter-spacing:0.08em;">
-              In Transit — ${activePreviewRows.length} Container${activePreviewRows.length !== 1 ? "s" : ""} &nbsp;·&nbsp; $${fmt(transitTotal, 0)} Upcoming Duty
+              In Transit — ${waTransitRows.length} Container${waTransitRows.length !== 1 ? "s" : ""} &nbsp;·&nbsp; $${fmt(transitTotal, 0)} Upcoming Duty
             </span>
           </div>
           <table style="width:100%;border-collapse:collapse;">
@@ -1930,7 +1933,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
     } finally {
       setWaSending(false);
     }
-  }, [agent, toast, adjustments]);
+  }, [agent, toast, adjustments, transitTransporterFilter]);
 
   const {
     agentName, matchConfidence, ledgerAccountName,
