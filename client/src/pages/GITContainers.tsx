@@ -1629,6 +1629,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
   const [allCompanies, setAllCompanies] = useState(false);
   const [companyFilter, setCompanyFilter] = useState("ALL");
+  const [supplierFilters, setSupplierFilters] = useState<string[]>([]);
   const [transporterFilters, setTransporterFilters] = useState<string[]>([]);
   const [agentFilters, setAgentFilters] = useState<string[]>([]);
   const [truckFilters, setTruckFilters] = useState<string[]>([]);
@@ -1820,6 +1821,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const filteredContainers = useMemo(() => {
     return allContainers.filter((c) => {
       if (companyFilter !== "ALL" && c.companyName !== companyFilter) return false;
+      if (supplierFilters.length > 0 && !supplierFilters.includes(c.supplierCode ?? "")) return false;
       if (transporterFilters.length > 0 && !transporterFilters.includes(c.transporter ?? "")) return false;
       if (agentFilters.length > 0 && !agentFilters.includes(c.agent ?? "")) return false;
       if (truckFilters.length > 0) {
@@ -1873,7 +1875,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
       if (sh !== 0) return sh;
       return a.containerNumber.localeCompare(b.containerNumber);
     });
-  }, [allContainers, companyFilter, transporterFilters, agentFilters, truckFilters, locationFilters, docsFilter, delayedFilter, freightFilter, etaFilter, notesFilter, sortOrder, search]);
+  }, [allContainers, companyFilter, supplierFilters, transporterFilters, agentFilters, truckFilters, locationFilters, docsFilter, delayedFilter, freightFilter, etaFilter, notesFilter, sortOrder, search]);
 
   // Summary stats — follow the active filters so they match what's visible in the table
   const atSea          = filteredContainers.filter((c) => c.status === "OTW" || c.status === "Sea").length;
@@ -1888,6 +1890,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const totalDuty      = filteredContainers.reduce((s, c) => s + parseNum(c.dutyFee), 0);
 
   const companies   = [...new Set(allContainers.map((c) => c.companyName))].sort();
+  const suppliers   = [...new Set(allContainers.map((c) => c.supplierCode).filter(Boolean))].sort() as string[];
   const transporters = [...new Set(allContainers.map((c) => c.transporter).filter(Boolean))].sort() as string[];
   const agents      = [...new Set(allContainers.map((c) => c.agent).filter(Boolean))].sort() as string[];
   const trucks      = [...new Set(allContainers.map((c) => c.numberPlate).filter(Boolean))].sort() as string[];
@@ -1900,6 +1903,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
   function clearFilters() {
     setCompanyFilter("ALL");
+    setSupplierFilters([]);
     setTransporterFilters([]);
     setAgentFilters([]);
     setTruckFilters([]);
@@ -2349,6 +2353,18 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                     {companies.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
+              </div>
+            )}
+            {suppliers.length > 0 && (
+              <div className="flex flex-col gap-1 min-w-[120px] flex-1">
+                <p className="text-xs text-muted-foreground">Supplier</p>
+                <MultiFilterSelect
+                  allLabel="All Suppliers"
+                  options={suppliers.map((s) => ({ value: s, label: s }))}
+                  selected={supplierFilters}
+                  onChange={setSupplierFilters}
+                  testId="select-otw-supplier"
+                />
               </div>
             )}
             <div className="flex flex-col gap-1 min-w-[130px] flex-1">
