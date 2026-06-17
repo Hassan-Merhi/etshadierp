@@ -1754,6 +1754,16 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
         `font-size:11px;padding:6px 10px;text-align:${align};color:${color};` +
         `font-weight:${bold ? "700" : "400"};border:1px solid #e2e8f0;white-space:nowrap;`;
 
+      // ── manual adjustment / balance values (must be computed before openRowsHtml) ─
+      const netAdj     = adjustments.reduce((s, a) => s + (a.type === "debit" ? a.amount : -a.amount), 0);
+      const hasAdj     = adjustments.length > 0;
+      const displayBal = ledgerBalance ?? openSum;
+      const adjustedBal = displayBal + netAdj;
+      const adjIsDebit  = adjustedBal >= 0;
+      const waOpenSum   = openAndPartial.reduce((s, r) => s + r.remainingAmount, 0);
+      const waMismatch  = hasAdj && Math.abs(adjustedBal - waOpenSum) > 0.01;
+      const isReconciledWa = hasAdj && hasBalance && Math.abs(adjustedBal) <= 0.01;
+
       // ── open/partial rows ─────────────────────────────────────────────────
       let openRowsHtml = "";
       if (openAndPartial.length === 0) {
@@ -1783,16 +1793,8 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       }
 
       // ── manual adjustment entries section ─────────────────────────────────
-      const netAdj   = adjustments.reduce((s, a) => s + (a.type === "debit" ? a.amount : -a.amount), 0);
-      const hasAdj   = adjustments.length > 0;
-      const displayBal = ledgerBalance ?? openSum;
-      // Debit notes ADD to the outstanding balance (additional charges), credits reduce it.
-      const adjustedBal = displayBal + netAdj;
-      const adjIsDebit = adjustedBal >= 0;
-      const waOpenSum = openAndPartial.reduce((s, r) => s + r.remainingAmount, 0);
-      const waMismatch = hasAdj && Math.abs(adjustedBal - waOpenSum) > 0.01;
-      // mirrors isReconciled in the UI: manual entries bring adjusted balance to ~0
-      const isReconciledWa = hasAdj && hasBalance && Math.abs(adjustedBal) <= 0.01;
+      // (netAdj, hasAdj, displayBal, adjustedBal, adjIsDebit, waOpenSum, waMismatch,
+      //  isReconciledWa already computed above before openRowsHtml)
 
       const adjustmentsHtml = hasAdj ? `
         <div style="background:#f9fafb;border-bottom:1px solid #e5e7eb;padding:8px 14px;">
