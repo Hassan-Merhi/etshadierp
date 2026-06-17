@@ -2037,17 +2037,23 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   // In that case, hide every offloaded row with a very large remainder.
   // For normal partial-payment cases (no designation or partial), use the original formula.
   //
-  // Also trigger when the remaining undesignated budget is less than the cheapest open
-  // container's outstanding duty — meaning the leftover balance can't cover even one more
-  // container on its own, so it must all be accounted for by designations + other charges.
-  // Example: budget=$33,070, designated=$25,500, remaining=$7,570 < min-duty=$8,500 → all designated.
+  // Also trigger when the remaining undesignated budget is less than OR EQUAL TO the cheapest
+  // open container's outstanding duty — meaning the leftover balance can't reach any later
+  // container in FIFO on its own, so it must all be accounted for by designations + charges.
+  // Example: budget=$33,070, designated=$25,500, remaining=$7,570 <= min-duty=$7,570 → all designated.
+  //
+  // Third condition: when designatedPrepaidSum + manual netAdjustment ≈ the full prepaidBudget
+  // (within $1), the user's own entries completely explain the ledger balance, meaning every
+  // offloaded container was settled separately outside the system.
+  // Example: $25,500 (3 prepaid containers) + $7,570 (manual charges) = $33,070 (balance) → all designated.
   const minOpenRemaining = allOpenPartial.length > 0
     ? Math.min(...allOpenPartial.map(r => r.remainingAmount).filter(a => a > 0.01))
     : Infinity;
   const allBudgetDesignated = designatedPrepaidSum > 0
     && prepaidBudget > 0
     && (designatedPrepaidSum >= prepaidBudget - 0.01
-        || (prepaidBudget - designatedPrepaidSum) < (isFinite(minOpenRemaining) ? minOpenRemaining : 0));
+        || (prepaidBudget - designatedPrepaidSum) <= (isFinite(minOpenRemaining) ? minOpenRemaining : 0)
+        || Math.abs((designatedPrepaidSum + netAdjustment) - prepaidBudget) <= 1.0);
   const enhancedRemainder = allBudgetDesignated
     ? (offloadedDutyTotal ?? 0) * 2 + 1          // large enough to clear every offloaded row
     : remainderForOpenPartial + designatedPrepaidSum;
