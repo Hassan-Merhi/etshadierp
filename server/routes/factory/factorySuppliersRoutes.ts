@@ -129,7 +129,9 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
         .orderBy(factorySupplierFxTransfers.date)
     : [];
 
-  // Offload additional charges assigned to any of the broker's suppliers
+  // Offload additional charges for any of the broker's suppliers.
+  // Uses COALESCE(charge.supplier_id, container.supplier_id) so legacy rows that were saved
+  // before the supplier_id column was wired up still resolve to the container's main supplier.
   const allOffloadCharges = allSupplierIds.length > 0
     ? await db.select({
         id: factoryOffloadAdditionalCharges.id,
@@ -139,12 +141,13 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
         currencyCode: factoryOffloadAdditionalCharges.currencyCode,
         fxRateToUsd: factoryOffloadAdditionalCharges.fxRateToUsd,
         createdAt: factoryOffloadAdditionalCharges.createdAt,
-        supplierId: (factoryOffloadAdditionalCharges as any).supplierId,
+        supplierId: sql<number>`COALESCE(${(factoryOffloadAdditionalCharges as any).supplierId}, ${factoryContainers.supplierId})`,
       })
       .from(factoryOffloadAdditionalCharges)
+      .innerJoin(factoryContainers, eq(factoryOffloadAdditionalCharges.containerId, factoryContainers.id))
       .where(and(
         eq(factoryOffloadAdditionalCharges.companyId, companyId),
-        sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${sqlArray(allSupplierIds)})`
+        sql`COALESCE(${(factoryOffloadAdditionalCharges as any).supplierId}, ${factoryContainers.supplierId}) = ANY(${sqlArray(allSupplierIds)})`
       ))
       .orderBy(factoryOffloadAdditionalCharges.createdAt)
     : [];
@@ -1585,17 +1588,19 @@ export function registerFactorySuppliersRoutes(app: Express) {
         ));
 
       // Post-offload additional charges assigned to this supplier (or any of its children)
+      // COALESCE(charge.supplier_id, container.supplier_id) handles legacy rows where supplier_id was null.
       const offloadAdditionalChargesForSupplier = await db
         .select({
-          supplierId: (factoryOffloadAdditionalCharges as any).supplierId,
+          supplierId: sql<number>`COALESCE(${(factoryOffloadAdditionalCharges as any).supplierId}, ${factoryContainers.supplierId})`,
           amount: factoryOffloadAdditionalCharges.amount,
           currencyCode: factoryOffloadAdditionalCharges.currencyCode,
           fxRateToUsd: factoryOffloadAdditionalCharges.fxRateToUsd,
         })
         .from(factoryOffloadAdditionalCharges)
+        .innerJoin(factoryContainers, eq(factoryOffloadAdditionalCharges.containerId, factoryContainers.id))
         .where(and(
           eq(factoryOffloadAdditionalCharges.companyId, companyId),
-          sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${sqlArray(supplierIds)})`
+          sql`COALESCE(${(factoryOffloadAdditionalCharges as any).supplierId}, ${factoryContainers.supplierId}) = ANY(${sqlArray(supplierIds)})`
         ));
 
       // computeBalance: TRUE BROKER BALANCE MODEL.
@@ -1750,18 +1755,19 @@ export function registerFactorySuppliersRoutes(app: Express) {
       }
 
       // Pre-fetch all post-offload additional charges for the company so computeStats can include them.
-      // These are charges explicitly assigned to a supplier (supplierId) — distinct from container-column otherCharges.
+      // COALESCE(charge.supplier_id, container.supplier_id) handles legacy rows where supplier_id was null.
       const allOffloadAdditionalCharges = allSupplierIds.length > 0
         ? await db.select({
-            supplierId: (factoryOffloadAdditionalCharges as any).supplierId,
+            supplierId: sql<number>`COALESCE(${(factoryOffloadAdditionalCharges as any).supplierId}, ${factoryContainers.supplierId})`,
             amount: factoryOffloadAdditionalCharges.amount,
             currencyCode: factoryOffloadAdditionalCharges.currencyCode,
             fxRateToUsd: factoryOffloadAdditionalCharges.fxRateToUsd,
           })
           .from(factoryOffloadAdditionalCharges)
+          .innerJoin(factoryContainers, eq(factoryOffloadAdditionalCharges.containerId, factoryContainers.id))
           .where(and(
             eq(factoryOffloadAdditionalCharges.companyId, companyId),
-            sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${sqlArray(allSupplierIds)})`
+            sql`COALESCE(${(factoryOffloadAdditionalCharges as any).supplierId}, ${factoryContainers.supplierId}) = ANY(${sqlArray(allSupplierIds)})`
           ))
         : [];
 
