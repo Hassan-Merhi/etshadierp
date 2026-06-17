@@ -2316,9 +2316,29 @@ export function registerFactoryRawStockRoutes(app: Express) {
             metaJson: JSON.stringify({ containerId, sourceType: "POST_OFFLOAD_ADDITIONAL", chargeId: charge.id }),
           });
           if (charge.ledgerAccountId || charge.supplierId) {
+            // When a ledger account is explicitly chosen, the voucher must be posted in
+            // the same company as that account — otherwise the entry never shows in the
+            // account's ledger.  For supplier-linked charges stay in the factory company.
+            let voucherCompanyId = companyId;
+            let voucherChargesPayableAcctId = chargesPayableAcctId;
+            if (charge.ledgerAccountId) {
+              const [acctRow] = await tx
+                .select({ companyId: ledgerAccounts.companyId })
+                .from(ledgerAccounts)
+                .where(eq(ledgerAccounts.id, charge.ledgerAccountId));
+              if (acctRow && acctRow.companyId !== companyId) {
+                voucherCompanyId = acctRow.companyId;
+                // Ensure the matching "charges payable" account exists in that company too.
+                voucherChargesPayableAcctId = await getOrCreateLedgerAccount(
+                  voucherCompanyId,
+                  "FACTORY_CHARGES_PAYABLE",
+                  "Factory Charges Payable",
+                );
+              }
+            }
             const voucherNum = `FACTORY-POC-${containerId}-${charge.id}-${Date.now()}`;
             const [voucher] = await tx.insert(vouchers).values({
-              companyId,
+              companyId: voucherCompanyId,
               voucherType: "Journal",
               voucherNumber: voucherNum,
               voucherDate: txDate,
@@ -2330,7 +2350,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
             }).returning();
             await tx.insert(voucherEntries).values({
               voucherId: voucher.id,
-              ledgerAccountId: chargesPayableAcctId,
+              ledgerAccountId: voucherChargesPayableAcctId,
               debitAmount: String(chargeAmt),
               creditAmount: "0",
               narration: `${charge.description} payable — container ${container.containerNumber}`,
