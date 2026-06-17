@@ -2402,11 +2402,11 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
               const rawBal   = ledgerBalance ?? openSum;
               const isDebit  = rawBal > 0;
               const isCredit = rawBal < 0;
-              // Dr = I owe them → RED  |  Cr = they owe us → GREEN
+              // Cr = I owe them → RED  |  Dr = they owe me → GREEN
               const baseCls  = isDebit
-                ? "bg-red-500 text-white font-bold"
+                ? "bg-green-500 text-white font-bold"
                 : isCredit
-                  ? "bg-green-500 text-white font-bold"
+                  ? "bg-red-500 text-white font-bold"
                   : "bg-yellow-400 text-yellow-950 font-bold";
               const balLabel = isDebit ? "Dr" : isCredit ? "Cr" : "";
 
@@ -2430,13 +2430,13 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
 
                 const adjAbs    = Math.abs(adjustedBalance);
                 const adjLabel  = adjustedBalance >= 0 ? "Dr" : "Cr";
-                // Dr = I owe them → RED  |  Cr = they owe us → GREEN
+                // Cr = I owe them → RED  |  Dr = they owe me → GREEN
                 const adjRowCls = (isMismatch && !allBudgetDesignated)
                   ? "bg-red-600 text-white font-bold"
                   : adjustedBalance > 0
-                    ? "bg-red-500 text-white font-bold"
+                    ? "bg-green-500 text-white font-bold"
                     : adjustedBalance < 0
-                      ? "bg-green-500 text-white font-bold"
+                      ? "bg-red-500 text-white font-bold"
                       : "bg-yellow-400 text-yellow-950 font-bold";
                 return (
                   <tr className={adjRowCls}>
