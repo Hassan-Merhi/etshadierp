@@ -1996,9 +1996,10 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
 
   // ── Manual entry balance recalculation ────────────────────────────────────
   const netAdjustment   = adjustments.reduce((s, a) => s + (a.type === "debit" ? a.amount : -a.amount), 0);
-  // Debit notes are ADDITIONAL CHARGES owed by the agent → they ADD to the outstanding balance.
-  // Credit notes reduce the balance.  adjustedBalance = total the agent owes including notes.
-  const adjustedBalance = ledgerBalance !== null ? ledgerBalance + netAdjustment : null;
+  // Adjustment rows are informational — they explain the composition of the ledger balance
+  // (e.g. delay charges already posted as vouchers). The ledger balance is the authoritative
+  // total, so we do NOT add netAdjustment on top to avoid double-counting.
+  const adjustedBalance = ledgerBalance !== null ? ledgerBalance : null;
   const hasAdjustments  = adjustments.length > 0;
   // isReconciled: manual entries bring the adjusted balance to 0 → everything is explained
   const isReconciled    = hasAdjustments && adjustedBalance !== null && Math.abs(adjustedBalance) <= 0.01;
@@ -2031,7 +2032,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
     && designatedPrepaidSum >= prepaidBudget - 0.01;
   const enhancedRemainder = allBudgetDesignated
     ? (offloadedDutyTotal ?? 0) * 2 + 1          // large enough to clear every offloaded row
-    : remainderForOpenPartial + Math.max(0, netAdjustment) + designatedPrepaidSum;
+    : remainderForOpenPartial + designatedPrepaidSum;
   const enhancedAllocated = useMemo(() => {
     // Use the same order as openAndPartial (respects customOrder), but with raw dutyFee data
     const orderMap = new Map(openAndPartial.map((r, i) => [r.id, i]));
