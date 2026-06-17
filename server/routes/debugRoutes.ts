@@ -1831,6 +1831,7 @@ export function registerDebugRoutes(app: Express) {
             FROM vouchers v
             JOIN voucher_entries ve ON ve.voucher_id = v.id
             WHERE v.source_module = 'FACTORY'
+              AND v.company_id = ${voucherCompanyId}
               AND v.description ILIKE ${'%(post-offload)%container ' + containerNumber + '%'}
               AND ve.ledger_account_id = ${ledgerAccountId}
               AND ve.credit_amount::numeric > 0
