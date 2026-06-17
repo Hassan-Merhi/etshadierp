@@ -2851,7 +2851,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       </AlertDialog>
 
       {/* Print Dialog */}
-      <AlertDialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
+      <AlertDialog open={showPrintDialog} onOpenChange={(open) => { if (!open) { if (editVoucherId) setShowPrintDialog(false); else handleNewSale(); } }}>
         <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Print Invoice</AlertDialogTitle>
@@ -2977,7 +2977,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           </div>
 
           <AlertDialogFooter>
-            <Button variant="outline" onClick={() => { setShowPrintDialog(false); if (editVoucherId) navigate("/pos-daybook"); }} data-testid="button-cancel-print">
+            <Button variant="outline" onClick={() => { if (editVoucherId) { setShowPrintDialog(false); navigate("/pos-daybook"); } else { handleNewSale(); } }} data-testid="button-cancel-print">
               Close
             </Button>
             {!editVoucherId && (

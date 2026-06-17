@@ -273,6 +273,7 @@ function EditableTransferDetail({
       toast({ title: "Revision saved", description: "Adjustments submitted for admin review." });
       queryClient.invalidateQueries({ queryKey: ["/api/pos-transfer-detail", voucherId] });
       setNote("");
+      onBack();
     },
     onError: (err: any) => { toast({ title: "Error", description: err.message, variant: "destructive" }); },
   });
